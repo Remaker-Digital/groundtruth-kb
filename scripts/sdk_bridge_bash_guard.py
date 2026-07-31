@@ -4,15 +4,14 @@ from __future__ import annotations
 
 import re
 
-_PROTECTED_BRIDGE_PATH_PATTERN = (
-    r"(?:[A-Za-z]:)?"
-    r"(?:[\\/]|[\w .-]+[\\/])*"
-    r"bridge[\\/][A-Za-z0-9_.-]+-\d{3}\.md"
-)
+try:
+    from scripts.controlled_artifact_paths import BRIDGE_STATUS_ARTIFACT_COMMAND_PATTERN
+except ImportError:  # pragma: no cover - direct script execution path
+    from controlled_artifact_paths import BRIDGE_STATUS_ARTIFACT_COMMAND_PATTERN
 
-_PROTECTED_BRIDGE_PATH_RE = re.compile(_PROTECTED_BRIDGE_PATH_PATTERN, re.IGNORECASE)
+_PROTECTED_BRIDGE_PATH_RE = re.compile(BRIDGE_STATUS_ARTIFACT_COMMAND_PATTERN, re.IGNORECASE)
 _REDIRECT_TO_BRIDGE_RE = re.compile(
-    rf"(?:^|[\s;&|])(?:\d?>{{1,2}}|>{{1,2}})\s*['\"]?{_PROTECTED_BRIDGE_PATH_PATTERN}",
+    rf"(?:^|[\s;&|])(?:\d?>{{1,2}}|>{{1,2}})\s*['\"]?{BRIDGE_STATUS_ARTIFACT_COMMAND_PATTERN}",
     re.IGNORECASE,
 )
 _MUTATING_COMMAND_RE = re.compile(
@@ -35,6 +34,14 @@ _SCRIPT_MUTATION_RE = re.compile(
     r"|\.(?:unlink|rename|replace|touch)\s*\(",
     re.IGNORECASE | re.DOTALL,
 )
+_SDK_HARNESS_SELF_INVOCATION_RE = re.compile(
+    r"(?:^|[\s;&|])"
+    r"(?:&\s*)?"
+    r"['\"]?(?:[^\s'\";&|]+[\\/])?pythonw?(?:\.exe)?['\"]?"
+    r"\s+['\"]?(?P<harness>(?:\.?[\\/])?scripts[\\/](?:ollama_harness|openrouter_harness)\.py)"
+    r"(?:\b|['\"\s])",
+    re.IGNORECASE,
+)
 
 
 def protected_bridge_paths(command: str) -> tuple[str, ...]:
@@ -51,6 +58,13 @@ def protected_bridge_paths(command: str) -> tuple[str, ...]:
 
 def bridge_bash_mutation_reason(command: str) -> str | None:
     """Return a denial reason when ``command`` mutates bridge artifacts."""
+    self_invocation = _SDK_HARNESS_SELF_INVOCATION_RE.search(command or "")
+    if self_invocation:
+        harness = self_invocation.group("harness").strip("\"'`").replace("\\", "/").lstrip("./")
+        return (
+            f"Bash SDK harness self-invocation denied for {harness}. "
+            "Use Read/Grep/Glob or governed gt/helper commands instead of launching a nested SDK harness."
+        )
     paths = protected_bridge_paths(command)
     if not paths:
         return None

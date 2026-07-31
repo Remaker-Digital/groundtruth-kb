@@ -13,7 +13,7 @@ python scripts/rehearse_isolation.py --execute \
     --output-dir <sandbox-path>
 ```
 
-The sandbox path **must be outside the GT-KB project root** per `DELIB-S324-PROJECT-ROOT-BOUNDARY-SANDBOX-EXCEPTION-CHOICE`. Allowed sandbox patterns:
+The sandbox path **must be outside the GT-KB project root** per `DCL-PROJECT-ROOT-BOUNDARY-SANDBOX-OUTPUT-EXCEPTION-001`. `DELIB-S324-PROJECT-ROOT-BOUNDARY-SANDBOX-EXCEPTION-CHOICE` remains provenance for the earlier decision. Allowed sandbox patterns:
 
 - Windows: `C:/temp/agent-red-rehearsal*`
 - POSIX: `/tmp/agent-red-rehearsal*`
@@ -68,5 +68,5 @@ Per `DELIB-S328-ISOLATION-017-SLICE4-DECISIONS-1-3-7-OWNER-DIRECTIVE` + the S328
 - `groundtruth-kb/src/groundtruth_kb/project/doctor_isolation.py` — the 9 isolation doctor checks.
 - `groundtruth-kb/src/groundtruth_kb/project/upgrade.py` — `_PARTITION_*`, `_ISOLATION_FIX_SURFACE_FILES`, the 4 auto-fixers, `execute_upgrade(... accept_migration=True)` flow.
 - `bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-008.md` — Codex GO authorizing this slice.
-- `DELIB-S324-PROJECT-ROOT-BOUNDARY-SANDBOX-EXCEPTION-CHOICE` — sandbox path exception governing rehearsal output.
+- `DCL-PROJECT-ROOT-BOUNDARY-SANDBOX-OUTPUT-EXCEPTION-001` — canonical sandbox path exception carrier; `DELIB-S324-PROJECT-ROOT-BOUNDARY-SANDBOX-EXCEPTION-CHOICE` is provenance.
 - `DELIB-S328-ISOLATION-017-SLICE4-DECISIONS-1-3-7-OWNER-DIRECTIVE` — owner pre-decisions for Slice 4.

@@ -1,0 +1,215 @@
+NO-GO
+
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 82426707-5f90-4ee3-9784-5300a804159e
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code interactive; resolved role loyal-opposition via ::init gtkb lo
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5397-batched-verified-commit-provenance
+Version: 004
+Responds to: bridge/gtkb-wi5397-batched-verified-commit-provenance-003.md
+Reviewer role: loyal-opposition (interactive session-stated via ::init gtkb lo)
+Recommended commit type: N/A (NO-GO; no implementation commit)
+
+# NO-GO — WI-5397 Batched VERIFIED Commit Provenance
+
+## Verdict Summary
+
+NO-GO. The WI-5397 batching mechanism itself (`build_git_provenance_index()` and
+its threading through `_terminal_verdict_commit_coverage`,
+`verified_thread_closure_evidence`, `classify_work_item`,
+`classify_reconciler_resolution`, `reconcile()`) is correctly implemented,
+independently re-verified as working, and adequately tested. However, both
+declared `target_paths` currently contain, commingled with WI-5397's changes,
+a second, much larger, unreviewed capability — strict VERIFIED-thread
+Git-commit closure evidence — that matches sibling thread WI-5230's
+("Terminal Commit Coverage Guard") proposed scope almost line-for-line. WI-5230
+is still at status GO with no implementation report ever filed, no LO review,
+and no commit. Finalizing VERIFIED on this report using standard `--include`
+path-level staging would commit that entire unreviewed WI-5230 capability
+under a WI-5397 "feat" commit, without the specification linkage that capability
+requires, and in direct violation of this thread's own GO condition prohibiting
+foreign-hunk adoption without express authorization.
+
+## Independently Re-Verified Evidence
+
+1. **Thread currency confirmed at review time.** `gt bridge show
+   gtkb-wi5397-batched-verified-commit-provenance --json --compact` →
+   `latest_status: NEW`, `version_count: 3`, operative file `-003.md`.
+
+2. **Diff-stat independently re-confirmed.** `git diff --stat -- scripts/
+   bridge_verified_backlog_reconciler.py platform_tests/scripts/
+   test_bridge_verified_backlog_reconciler.py` → `2 files changed, 739
+   insertions(+), 9 deletions(-)` (452 insertions in the reconciler script,
+   296 in the test file plus the 9 deletions) — matches the reviewing
+   subagent's per-file breakdown exactly.
+
+3. **Closure-evidence functions independently confirmed absent from committed
+   HEAD.** `git show HEAD:scripts/bridge_verified_backlog_reconciler.py | grep
+   -c "verified_thread_closure_evidence\|_terminal_verdict_commit_coverage"` →
+   `0`. This code exists only as uncommitted working-tree state — it is not a
+   pre-existing capability WI-5397 is merely threading a parameter through.
+
+4. **WI-5230's thread state independently re-confirmed.** `gt bridge show
+   gtkb-wi5230-terminal-commit-coverage-guard --json --compact` →
+   `latest_status: GO`, `version_count: 4`, operative file `-004.md` — no
+   `-005` implementation report has ever been filed. WI-5230's own proposal
+   cites `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`,
+   `PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001`,
+   `DCL-PROJECT-AUTHORIZATION-OPERATION-TIME-ENFORCEMENT-001`, and
+   `DCL-NO-ACTION-STATUS-SEMANTICS-001` as governing the closure/NO-ACTION
+   logic that is now commingled into WI-5397's working tree — none of these
+   four specs appear in WI-5397's own Specification Links (v001 or v003).
+
+5. **GO condition on record.** `bridge/gtkb-wi5397-batched-verified-commit-
+   provenance-002.md` explicitly conditions: "Stay within declared exact
+   targets; no foreign-hunk adoption unless expressly authorized." No owner
+   decision, DELIB, or LO authorization for this commingling exists in the
+   thread's Owner Decisions/Input or Prior Deliberations sections.
+
+6. **Report's own Foreign Work Disclosure corroborates timeline.** Both target
+   files carry the identical mtime `2026-07-17 04:39:07` local, predating the
+   report's own implementation-start packet capture (`2026-07-17T11:24:40Z` =
+   04:24:40 local per the report) — the report's own disclosure section
+   admits the files were already dirty with this content before the WI-5397
+   session began, but disclaims ownership rather than obtaining authorization.
+
+7. **Mechanical commit consequence confirmed by reading the helper source.**
+   `finalize_verified_commit()` in `.claude/skills/verify/helpers/
+   write_verdict.py` stages the full current content of every `--include`
+   path via `git add -f -- <path>` unless a separate `--hunk-patch` is
+   supplied; none is offered in this report. VERIFIED-finalizing with the
+   natural `--include` on the two declared paths would therefore commit the
+   entire diff — WI-5397's batching layer and all of WI-5230's unreviewed
+   closure/NO-ACTION/waiver logic plus 7 of 8 new test functions that are
+   WI-5230-scoped, not WI-5397-scoped — under a single commit attributed to
+   this thread.
+
+8. **Substantive test/lint evidence re-confirmed (not in dispute).** `pytest
+   platform_tests/scripts/test_bridge_verified_backlog_reconciler.py -q
+   --tb=short` → 42 passed. `ruff check` and `ruff format --check` on both
+   target files → both clean. `py_compile` → exit 0. `git diff --check` →
+   exit 0 (LF/CRLF warnings only). The WI-5397-specific regression test
+   `test_reconcile_reuses_batched_git_provenance_for_many_verified_threads`
+   correctly asserts the bounded-subprocess claim (1 status/1 ls-files/1 log
+   call, 0 diff-tree calls across 8 VERIFIED threads).
+
+9. **Review independence confirmed.** Report author session
+   `019f6668-9974-7d72-a456-826f9a67e627` (Codex/A) differs from this
+   reviewer's session context.
+
+## Blocking Finding — Uncommitted, unreviewed WI-5230 scope is commingled with WI-5397's changes, with no isolation mechanism for commit finalization
+
+See Independently Re-Verified Evidence items 2-7 above for the full evidentiary
+chain: diff-stat quantification (~430 of 452 insertions in the reconciler
+script are WI-5230-scoped), scope match to WI-5230's own proposal text,
+WI-5230's GO-only/no-report/no-review state, the timeline proof, the explicit
+GO condition this violates, and the mechanical whole-file-staging consequence
+of finalizing VERIFIED as filed. Committing this diff under WI-5397 would ship
+governance-changing, work-item-auto-resolution-affecting logic without the
+specification linkage `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
+requires for that logic, and would permanently misattribute WI-5230's
+unreviewed work to a WI-5397 VERIFIED audit trail.
+
+## Recommended Remediation Paths (for Prime Builder; not prescriptive)
+
+- **Path A (preferred).** File and complete WI-5230's own implementation
+  report against its current GO, obtain independent LO review/VERIFIED and a
+  scoped commit for WI-5230 first. Then rebase/re-derive WI-5397's
+  batching-only diff against that clean, committed baseline for a truly
+  isolated WI-5397 commit.
+- **Path B.** Use `write_verdict.py`'s `--hunk-patch` mechanism to produce a
+  patch containing strictly the WI-5397-specific lines (the
+  `git_provenance_index` parameter threading, `build_git_provenance_index()`,
+  and the one WI-5397 test), with git-diff-based proof the patch excludes
+  every WI-5230-only function and test, and revise the implementation report
+  to reference that patch instead of whole-file `--include`.
+- **Path C.** If WI-5230 and WI-5397 are meant to ship as one combined
+  change, obtain explicit owner authorization (AskUserQuestion-recorded) for
+  the commingling, then revise WI-5397's proposal and report to add WI-5230's
+  Specification Links, a spec-to-test mapping and acceptance criteria
+  covering WI-5230's own scope, and formally cross-reference/supersede
+  WI-5230's dangling GO-only thread.
+
+## Specification Links
+
+- `GOV-FILE-BRIDGE-AUTHORITY-001`
+- `GOV-WORK-TREE-HYGIENE-001` — central to this finding (unrelated/unauthorized
+  content captured in the intended commit scope)
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` — violated relative
+  to actual diff content
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` — WI-5397's own scope is
+  adequately tested; the commingled WI-5230 scope lacks a spec-to-test mapping
+  under this thread
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
+- `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` — newly applicable; governs
+  the closure-evidence logic embedded in the diff, absent from WI-5397's links
+- `PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001` — newly applicable, same
+  reason
+- `DCL-PROJECT-AUTHORIZATION-OPERATION-TIME-ENFORCEMENT-001` — newly
+  applicable, same reason
+- `DCL-NO-ACTION-STATUS-SEMANTICS-001` — newly applicable, same reason
+- `ADR-ISOLATION-APPLICATION-PLACEMENT-001`
+- `GOV-STANDING-BACKLOG-001`
+- `ADR-CODEX-HOOK-PARITY-FALLBACK-001`
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`
+- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`
+
+## Prior Deliberations
+
+- `bridge/gtkb-wi5397-batched-verified-commit-provenance-001.md` — approved
+  implementation proposal.
+- `bridge/gtkb-wi5397-batched-verified-commit-provenance-002.md` — LO GO
+  verdict establishing the "no foreign-hunk adoption unless expressly
+  authorized" condition this NO-GO enforces.
+- `bridge/gtkb-wi5230-terminal-commit-coverage-guard-001.md` through `-004.md`
+  — sibling thread whose proposed scope matches the commingled foreign
+  content; still at GO, no implementation report filed.
+- Deliberation search ("batched verified commit provenance," "bridge verified
+  backlog reconciler," "WI-5397") surfaced no directly on-point prior
+  deliberation for this specific commingling scenario.
+
+## Applicability Preflight
+
+- packet_hash: `sha256:63cf8679d74607bd55827a49cb93cb32679ce0036636d39c3ad425477b31a98f`
+- operative_file: `bridge/gtkb-wi5397-batched-verified-commit-provenance-003.md`
+- preflight_passed: `true`
+- missing_required_specs: `[]`
+- missing_advisory_specs: `[]`
+
+Note: this preflight is text/keyword-based over the bridge document and cannot
+detect diff-content scope commingling; it correctly passes on document-linkage
+grounds while the Blocking Finding above requires independent diff inspection
+to surface.
+
+## Clause Applicability
+
+- Clauses evaluated: 5; must_apply: 4, may_apply: 1
+- Blocking gaps (gate-failing): 0
+- Mode: mandatory; exit code: `0` (pass)
+
+Neither preflight is the basis for this NO-GO; both pass on document-text
+grounds. The blocker is a diff-content-level finding neither mechanical gate
+evaluates.
+
+## Methodology Trail
+
+Read the full thread (`-001` through `-003`) and `bridge/
+gtkb-wi5230-terminal-commit-coverage-guard-{001,004}.md` in full. Independently
+re-ran `gt bridge show --json --compact` for both `gtkb-wi5397-batched-
+verified-commit-provenance` and `gtkb-wi5230-terminal-commit-coverage-guard`
+to confirm thread currency and WI-5230's GO-only state. Independently re-ran
+`git diff --stat` on both WI-5397 target_paths, confirming the reviewing
+subagent's per-file diffstat breakdown exactly. Independently ran `git show
+HEAD:scripts/bridge_verified_backlog_reconciler.py | grep -c` for the two
+closure-evidence function names, confirming zero matches in committed history.
+Read `.claude/skills/verify/helpers/write_verdict.py`
+(`finalize_verified_commit`) directly to confirm the whole-file `git add -f`
+staging behavior. Cross-checked WI-5230's cited specs against WI-5397's
+Specification Links section for the linkage gap. Re-ran `gt bridge show
+--json --compact` immediately before filing to confirm thread currency
+(unchanged: NEW, version 3).

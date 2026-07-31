@@ -42,7 +42,6 @@ _REGISTRY_EXEMPT_FILES: frozenset[str] = frozenset(
         # Dual-agent template-copies
         "BRIDGE-INVENTORY.md",
         "bridge-os-poller-setup-prompt.md",
-        "bridge/INDEX.md",
         # Codex bootstrap docs (per `_copy_dual_agent_templates` codex_src loop)
         ".claude/rules/codex-review-operating-contract.md",
         ".claude/rules/codex-session-bootstrap.md",

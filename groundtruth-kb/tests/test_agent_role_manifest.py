@@ -39,7 +39,9 @@ def test_agent_role_manifest_parses_inventory() -> None:
     assert "A" in manifest.harnesses
     assert manifest.harnesses["A"].harness_name == "codex"
     assert any(harness.roles == ("loyal-opposition",) for harness in manifest.dispatch_targets.values())
-    assert set(manifest.event_sources) >= {"A", "E"}
+    assert manifest.event_sources == {}
+    assert manifest.harnesses["A"].can_receive_dispatch is True
+    assert manifest.harnesses["A"].can_fire_events is False
 
 
 def test_manifest_declares_canonical_reader_entrypoints() -> None:

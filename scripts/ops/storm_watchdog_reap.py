@@ -46,14 +46,12 @@ DEFAULT_STARTUP_GRACE_SECONDS = 120
 # primary timeout did not fire). Keep this >= the WI-4806 value + margin.
 DEFAULT_MAX_LIFETIME_SECONDS = 900
 
-# Default lease directories scanned by ``main`` / ``read_leases``. The trigger
-# runs with ``--state-dir .gtkb-state/bridge-poller`` so leases live under
-# ``.gtkb-state/bridge-poller/leases``; the cross-harness-trigger state dir is
-# scanned too for robustness. Overridable via ``--lease-dir`` (repeatable).
-DEFAULT_LEASE_DIRS = (
-    ".gtkb-state/bridge-poller/leases",
-    ".gtkb-state/cross-harness-trigger/leases",
-)
+# Default lease directories scanned by ``main`` / ``read_leases``. The
+# dispatcher runtime runs with ``--state-dir .gtkb-state/bridge-poller`` so
+# leases live under ``.gtkb-state/bridge-poller/leases``. Retired dispatch
+# substrate state directories are intentionally not scanned as live evidence.
+# Overridable via ``--lease-dir`` (repeatable).
+DEFAULT_LEASE_DIRS = (".gtkb-state/bridge-poller/leases",)
 
 
 @dataclass(frozen=True)
@@ -61,7 +59,8 @@ class Process:
     """A candidate dispatch process (gathered by the .ps1).
 
     ``dispatched`` marks a clearly-identifiable dispatched-worker ROOT: a
-    ``codex exec`` process or a non-codex harness python (ollama/openrouter).
+    ``codex exec`` process, a non-codex harness python (ollama/openrouter), or
+    the dispatcher-owned ``run_with_status.py`` wrapper that launches them.
     It is False for helper processes (node_repl, codex-command-runner,
     codex-windows-sandbox) and for INTERACTIVE codex (``codex`` TUI, no
     ``exec``). The decider only acts on process-family components that contain a
@@ -76,6 +75,7 @@ class Process:
     name: str
     create_time_epoch: float
     dispatched: bool = False
+    max_lifetime_seconds: float | None = None
 
 
 @dataclass(frozen=True)
@@ -166,12 +166,17 @@ def decide_reap(
       2. its pid holds a lease acquired within ``max_lifetime_seconds`` and the
          pid is running (it is in ``processes``) -> ``live_lease_holder``;
       3. it is in the same process-family component as a (2) pid ->
-         ``descendant_of_lease_holder``.
+         ``descendant_of_lease_holder``;
+      4. it is a dispatcher-owned wrapper root carrying a per-process lifetime
+         budget and is still within that budget ->
+         ``live_dispatch_run_within_lifetime``.
 
     A running process is REAPABLE otherwise:
       - its pid (or a pid in its component) holds a lease acquired
         ``>= max_lifetime_seconds`` ago -> ``over_lifetime_straggler`` (a genuine
         hang; backstop behind the WI-4806 worker-lifetime timeout);
+      - or it is a dispatcher-owned wrapper root whose own lifetime budget has
+        elapsed -> ``over_lifetime_straggler``;
       - else -> ``orphan_no_lease`` (a corpse/orphan: old, no live lease).
 
     Liveness signal: the lease pid being present in ``processes`` IS the proof
@@ -188,6 +193,16 @@ def decide_reap(
     over_lifetime_pids = {
         lease.pid for lease in leases if lease.pid in by_pid and (now - lease.acquired_at_epoch) >= max_lifetime_seconds
     }
+    lifetime_protective_pids = {
+        p.pid
+        for p in processes
+        if p.dispatched and p.max_lifetime_seconds is not None and (now - p.create_time_epoch) < p.max_lifetime_seconds
+    }
+    over_lifetime_pids |= {
+        p.pid
+        for p in processes
+        if p.dispatched and p.max_lifetime_seconds is not None and (now - p.create_time_epoch) >= p.max_lifetime_seconds
+    }
 
     comps = _components(processes)
     pid_to_comp: dict[int, set[int]] = {}
@@ -195,9 +210,12 @@ def decide_reap(
         for pid in comp:
             pid_to_comp[pid] = comp
     protected_comp_pids: set[int] = set()
+    lifetime_protected_comp_pids: set[int] = set()
     for comp in comps:
         if comp & protective_pids:
             protected_comp_pids |= comp
+        if comp & lifetime_protective_pids:
+            lifetime_protected_comp_pids |= comp
 
     # Safety scoping: only act on process-family components that contain a
     # dispatched-worker root. Components with no dispatched root -- interactive
@@ -225,6 +243,14 @@ def decide_reap(
         if p.pid in protected_comp_pids:
             protect.append(p.pid)
             reasons[p.pid] = "live_lease_holder" if p.pid in protective_pids else "descendant_of_lease_holder"
+            continue
+        if p.pid in lifetime_protected_comp_pids:
+            protect.append(p.pid)
+            reasons[p.pid] = (
+                "live_dispatch_run_within_lifetime"
+                if p.pid in lifetime_protective_pids
+                else "descendant_of_lifetime_protected_dispatch"
+            )
             continue
         comp = pid_to_comp.get(p.pid, {p.pid})
         if p.pid in over_lifetime_pids or (comp & over_lifetime_pids):
@@ -266,6 +292,12 @@ def processes_from_dicts(rows: list[dict[str, Any]]) -> list[Process]:
     """Build ``Process`` records from the .ps1-supplied JSON rows."""
     out: list[Process] = []
     for row in rows:
+        max_lifetime = row.get("max_lifetime_seconds")
+        parsed_max_lifetime = None
+        if max_lifetime not in (None, ""):
+            parsed_max_lifetime = float(max_lifetime)
+            if parsed_max_lifetime <= 0:
+                parsed_max_lifetime = None
         out.append(
             Process(
                 pid=int(row["pid"]),
@@ -273,6 +305,7 @@ def processes_from_dicts(rows: list[dict[str, Any]]) -> list[Process]:
                 name=str(row.get("name", "")),
                 create_time_epoch=float(row["create_time_epoch"]),
                 dispatched=bool(row.get("dispatched", False)),
+                max_lifetime_seconds=parsed_max_lifetime,
             )
         )
     return out
@@ -416,6 +449,12 @@ def main(argv: list[str] | None = None) -> int:
         help="JSON file of process rows. Preferred over stdin on Windows PowerShell, "
         "which can raise an OSError flushing a piped stdin. Falls back to stdin when omitted.",
     )
+    parser.add_argument(
+        "--output-file",
+        type=Path,
+        default=None,
+        help="Write the decision JSON to this file instead of stdout; used by pythonw.exe callers.",
+    )
     args = parser.parse_args(argv)
 
     if args.processes_file is not None:
@@ -446,7 +485,14 @@ def main(argv: list[str] | None = None) -> int:
     # WI-4834: refresh the provenance ledger AFTER deciding, with the current
     # process set, so a just-died root's descendants stay attributable next tick.
     update_provenance(provenance_dir, processes, prior_provenance)
-    print(json.dumps({"reap": decision.reap, "protect": decision.protect, "reasons": decision.reasons}, sort_keys=True))
+    payload = json.dumps(
+        {"reap": decision.reap, "protect": decision.protect, "reasons": decision.reasons}, sort_keys=True
+    )
+    if args.output_file is not None:
+        args.output_file.parent.mkdir(parents=True, exist_ok=True)
+        args.output_file.write_text(payload, encoding="utf-8")
+    else:
+        print(payload)
     return 0
 
 

@@ -18,6 +18,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+__gtkb_dynamic_import_contract__ = {
+    "_import_gate": "Owner-configured governance gate plugin; the loaded class is runtime type-validated.",
+}
+
 
 class GovernanceGateError(ValueError):
     """Raised when a governance gate blocks a transition."""

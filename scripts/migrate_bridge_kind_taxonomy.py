@@ -17,7 +17,7 @@ for _parent in Path(__file__).resolve().parents:
             sys.path.insert(0, str(_gt_src))
         break
 
-from groundtruth_kb.bridge.taxonomy import BridgeKind
+from groundtruth_kb.bridge.taxonomy import BridgeKind  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BRIDGE_DIR = PROJECT_ROOT / "bridge"
@@ -55,7 +55,7 @@ MAPPING = {
     "implementation": "implementation_report",
     "implementation_report_revision": "implementation_report",
     # Governance & Advisory
-    "governance_review": "governance_advisory",
+    "governance_review": "governance_review",
     "loyal_opposition_advisory": "governance_advisory",
     "advisory_report": "governance_advisory",
     "advisory": "governance_advisory",
@@ -164,7 +164,7 @@ def main(argv: list[str] | None = None) -> int:
 
         # Replace in-place
         def repl(m: re.Match) -> str:
-            return f"{m.group(1)}{new_val}{m.group(3)}"
+            return f"{m.group(1)}{new_val}{m.group(3)}"  # noqa: B023
 
         new_content = BRIDGE_KIND_RE.sub(repl, content)
 

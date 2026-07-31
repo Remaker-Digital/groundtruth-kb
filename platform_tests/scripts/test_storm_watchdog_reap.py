@@ -34,6 +34,7 @@ Process = _M.Process
 Lease = _M.Lease
 ProvenanceRecord = _M.ProvenanceRecord
 decide_reap = _M.decide_reap
+processes_from_dicts = _M.processes_from_dicts
 
 NOW = 1_000_000.0
 GRACE = _M.DEFAULT_STARTUP_GRACE_SECONDS  # 120
@@ -48,6 +49,18 @@ def _old(offset: float = 300.0) -> float:
 def _root(pid: int, *, name: str = "codex", age: float = 300.0) -> Process:
     """A dispatched-worker root (codex exec / harness python)."""
     return Process(pid=pid, ppid=1, name=name, create_time_epoch=_old(age), dispatched=True)
+
+
+def _runtime_root(pid: int, *, age: float = 300.0, lifetime: float = 600.0) -> Process:
+    """A dispatcher-owned run_with_status.py wrapper root."""
+    return Process(
+        pid=pid,
+        ppid=1,
+        name="pythonw.exe",
+        create_time_epoch=_old(age),
+        dispatched=True,
+        max_lifetime_seconds=lifetime,
+    )
 
 
 def _helper(pid: int, ppid: int, *, name: str = "node_repl", age: float = 300.0) -> Process:
@@ -104,6 +117,58 @@ def test_over_lifetime_lease_holder_reaped() -> None:
     assert d.reap == [400]
     assert 400 not in d.protect
     assert d.reasons[400] == "over_lifetime_straggler"
+
+
+def test_run_with_status_root_within_lifetime_protected() -> None:
+    # Daemon workers are launched through run_with_status.py and may not hold a
+    # bridge lease for the wrapper pid. Their own configured timeout is the guard.
+    procs = [_runtime_root(450, age=500, lifetime=1800)]
+    d = decide_reap(procs, [], now=NOW)
+    assert d.reap == []
+    assert d.protect == [450]
+    assert d.reasons[450] == "live_dispatch_run_within_lifetime"
+
+
+def test_run_with_status_descendant_within_lifetime_protected() -> None:
+    procs = [_runtime_root(451, age=500, lifetime=1800), _helper(452, 451, name="cursor-agent", age=500)]
+    d = decide_reap(procs, [], now=NOW)
+    assert d.reap == []
+    assert set(d.protect) == {451, 452}
+    assert d.reasons[451] == "live_dispatch_run_within_lifetime"
+    assert d.reasons[452] == "descendant_of_lifetime_protected_dispatch"
+
+
+def test_run_with_status_root_over_lifetime_reaped() -> None:
+    procs = [_runtime_root(453, age=1801, lifetime=1800)]
+    d = decide_reap(procs, [], now=NOW)
+    assert d.reap == [453]
+    assert 453 not in d.protect
+    assert d.reasons[453] == "over_lifetime_straggler"
+
+
+def test_processes_from_dicts_parses_wrapper_lifetime() -> None:
+    procs = processes_from_dicts(
+        [
+            {
+                "pid": 454,
+                "ppid": 1,
+                "name": "pythonw.exe",
+                "create_time_epoch": NOW - 500,
+                "dispatched": True,
+                "max_lifetime_seconds": "1800",
+            }
+        ]
+    )
+    assert procs == [
+        Process(
+            pid=454,
+            ppid=1,
+            name="pythonw.exe",
+            create_time_epoch=NOW - 500,
+            dispatched=True,
+            max_lifetime_seconds=1800.0,
+        )
+    ]
 
 
 def test_many_healthy_workers_none_reaped() -> None:
@@ -192,6 +257,14 @@ def test_decide_reap_reaps_provenance_attributed_dead_root_orphan() -> None:
     assert d.reasons[802] == "orphan_dead_dispatched_root"
 
 
+def test_decide_reap_reaps_provenanced_cursor_agent_orphan() -> None:
+    procs = [Process(pid=803, ppid=50, name="cursor-agent.exe", create_time_epoch=_old(), dispatched=False)]
+    provenance = [_prov(803, root=800)]
+    d = decide_reap(procs, [], now=NOW, provenance=provenance)
+    assert d.reap == [803]
+    assert d.reasons[803] == "orphan_dead_dispatched_root"
+
+
 def test_decide_reap_leaves_unattributed_orphan_untouched() -> None:
     # The same orphan family, but provenance covers only an unrelated pid. With
     # no provenance record, the orphans are left entirely untouched -- the
@@ -252,3 +325,31 @@ def test_main_parses_bom_prefixed_processes_file(tmp_path, capsys) -> None:
     assert rc == 0
     decision = json.loads(capsys.readouterr().out)
     assert "reap" in decision and "protect" in decision and "reasons" in decision
+
+
+def test_main_writes_decision_to_output_file_without_stdout(tmp_path, capsys) -> None:
+    # pythonw.exe callers cannot depend on captured stdout. The optional
+    # output-file transport preserves the same schema while leaving the normal
+    # stdout CLI contract untouched when the flag is omitted.
+    rows = [{"pid": 100, "ppid": 1, "name": "codex.exe", "create_time_epoch": NOW - 500, "dispatched": True}]
+    proc_file = tmp_path / "candidates.json"
+    output_file = tmp_path / "decision.json"
+    proc_file.write_text(json.dumps(rows), encoding="utf-8")
+
+    rc = _M.main(
+        [
+            "--now",
+            str(NOW),
+            "--project-root",
+            str(tmp_path),
+            "--processes-file",
+            str(proc_file),
+            "--output-file",
+            str(output_file),
+        ]
+    )
+
+    assert rc == 0
+    assert capsys.readouterr().out == ""
+    decision = json.loads(output_file.read_text(encoding="utf-8"))
+    assert sorted(decision) == ["protect", "reap", "reasons"]

@@ -108,7 +108,17 @@ before other substantive work. Format, live-source rules, structured `UNKNOWN:<c
 tags, and `/baseline-audit` triggers are defined in
 `.claude/rules/session-start-orientation.md`.
 
+Send startup keywords and task content as separate messages:
+
+```text
+::init gtkb pb
 ```
+
+```text
+::open project
+```
+
+```text
 Continue work on {{PROJECT_NAME}}.
 Key files: CLAUDE.md, MEMORY.md, BRIDGE-INVENTORY.md (if used)
 Next: [describe task].

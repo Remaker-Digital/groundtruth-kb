@@ -14,8 +14,13 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+try:
+    from gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+except ModuleNotFoundError:  # pragma: no cover
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+
 BRIDGE_AUTHOR_METADATA_STATUSES: frozenset[str] = frozenset(
-    {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"}
+    {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED", "NO-ACTION"}
 )
 REQUIRED_AUTHOR_METADATA_FIELDS: tuple[str, ...] = (
     "author_identity",
@@ -36,6 +41,7 @@ OPTIONAL_AUTHOR_METADATA_FIELDS: tuple[str, ...] = (
 # no longer reads it; a follow-on slice removes the constant + any write path
 # once no readers remain.
 AUTHOR_METADATA_RELATIVE_PATH = Path(".gtkb-state") / "bridge-author-metadata" / "current.json"
+CODEX_TURN_METADATA_SOURCE = "x-codex-turn-metadata"
 
 # Three-source harness-name resolution shares this env var with
 # `scripts/_kb_attribution.ENV_VAR_HARNESS_NAME` (the canonical `changed_by`
@@ -48,9 +54,14 @@ FIELD_ENV_NAMES: dict[str, tuple[str, ...]] = {
     "author_harness_id": ("GTKB_AUTHOR_HARNESS_ID", "GTKB_HARNESS_ID", "CODEX_HARNESS_ID", "CLAUDE_HARNESS_ID"),
     "author_session_context_id": (
         "GTKB_AUTHOR_SESSION_CONTEXT_ID",
+        "GTKB_BRIDGE_POLLER_RUN_ID",
+        "GTKB_INHERITED_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "CLAUDE_SESSION_ID",
+        "CODEX_THREAD_ID",
         "GTKB_SESSION_ID",
         "CODEX_SESSION_ID",
-        "CLAUDE_SESSION_ID",
+        "ANTIGRAVITY_SESSION_ID",
     ),
     "author_model": ("GTKB_AUTHOR_MODEL", "GTKB_MODEL", "CODEX_MODEL", "CLAUDE_MODEL"),
     "author_model_version": (
@@ -123,10 +134,54 @@ PLACEHOLDER_VALUES: frozenset[str] = frozenset(
         "[tbd]",
     }
 )
+SYNTHETIC_SESSION_CONTEXT_IDS: frozenset[str] = frozenset(
+    {
+        "openrouter-harness-f",
+        "ollama-harness-d",
+    }
+)
+SYNTHETIC_SESSION_CONTEXT_RE = re.compile(r"^(?:openrouter|ollama)-harness-[a-z]$", re.IGNORECASE)
+DISPATCH_RUN_ID_RE = re.compile(
+    r"^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z)-"
+    r"(?P<role>acting-prime-builder|loyal-opposition|prime-builder)-"
+    r"(?P<harness_id>[A-Za-z][A-Za-z0-9]*)-"
+    r"(?P<suffix>[0-9a-fA-F]{6})$"
+)
 
 
 class BridgeAuthorMetadataError(RuntimeError):
     """Raised when required bridge author metadata is absent or not credible."""
+
+
+def resolve_author_metadata() -> dict[str, str]:
+    """Resolve all author-metadata fields from environment variables.
+
+    Iterates over REQUIRED_AUTHOR_METADATA_FIELDS and OPTIONAL_AUTHOR_METADATA_FIELDS,
+    checking FIELD_ENV_NAMES for each. Returns a dict of {field: value} for
+    all fields that resolve from the environment.
+    """
+    result: dict[str, str] = {}
+    all_fields = list(REQUIRED_AUTHOR_METADATA_FIELDS) + list(OPTIONAL_AUTHOR_METADATA_FIELDS)
+    for field_name in all_fields:
+        env_names = FIELD_ENV_NAMES.get(field_name, ())
+        for env_name in env_names:
+            value = os.environ.get(env_name, "").strip()
+            if value:
+                result[field_name] = value
+                break
+    return result
+
+
+def _emit_metadata() -> int:
+    """CLI mode: emit resolved metadata as YAML-like frontmatter lines."""
+    resolved = resolve_author_metadata()
+    missing = [f for f in REQUIRED_AUTHOR_METADATA_FIELDS if f not in resolved]
+    for field_name in sorted(resolved):
+        print(f"{field_name}: {resolved[field_name]}")
+    if missing:
+        print(f"# Missing required fields: {', '.join(missing)}", file=sys.stderr)
+        return 1
+    return 0
 
 
 def first_nonblank_line(content: str) -> str:
@@ -147,6 +202,15 @@ def metadata_value_is_valid(value: object) -> bool:
         return False
     text = str(value).strip().strip("`")
     return text.lower() not in PLACEHOLDER_VALUES
+
+
+def is_synthetic_session_context_id(value: object) -> bool:
+    """Return true for static bridge session placeholders, not real session ids."""
+    if not metadata_value_is_valid(value):
+        return False
+    text = str(value).strip().strip("`")
+    lowered = text.lower()
+    return lowered in SYNTHETIC_SESSION_CONTEXT_IDS or SYNTHETIC_SESSION_CONTEXT_RE.fullmatch(text) is not None
 
 
 def _field_value(data: Mapping[str, Any], field: str) -> str | None:
@@ -233,11 +297,103 @@ def _metadata_from_env(env: Mapping[str, str]) -> dict[str, str]:
     return values
 
 
+def _runtime_session_context_id(environ: Mapping[str, str]) -> str:
+    explicit = str(environ.get("GTKB_AUTHOR_SESSION_CONTEXT_ID") or "").strip()
+    if metadata_value_is_valid(explicit):
+        return explicit.strip("`")
+    resolved = resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=environ)
+    if metadata_value_is_valid(resolved):
+        return resolved.strip("`")
+    return ""
+
+
+def _harness_name_from_identity_fields(identity_fields: Mapping[str, str]) -> str:
+    identity = identity_fields.get("author_identity", "")
+    if "/" not in identity:
+        return ""
+    return identity.rsplit("/", 1)[-1].strip().lower()
+
+
+def _metadata_from_exact_session_envelope(
+    project_root: Path,
+    *,
+    environ: Mapping[str, str],
+    explicit: Mapping[str, str],
+    identity_fields: Mapping[str, str],
+) -> dict[str, str]:
+    """Load author model metadata only from the exact validated session document."""
+    from groundtruth_kb.session.envelope import (
+        EnvelopeError,
+        load_worker_session,
+        resolve_worker_role_provenance,
+    )
+
+    session_id = explicit.get("author_session_context_id") or _runtime_session_context_id(environ)
+    harness_name = (environ.get(ENV_VAR_HARNESS_NAME) or "").strip().lower()
+    if not harness_name:
+        harness_name = _harness_name_from_identity_fields(identity_fields)
+    harness_id = identity_fields.get("author_harness_id", "")
+    if not session_id or not harness_name or not harness_id:
+        return {}
+    if harness_name != "codex":
+        return {}
+
+    try:
+        envelope = load_worker_session(project_root, harness_name, session_id)
+        if envelope is None:
+            return {}
+        if envelope.get("session_id") != session_id:
+            raise BridgeAuthorMetadataError("exact session author metadata has a mismatched session id")
+        if envelope.get("harness_name") != harness_name or envelope.get("harness_id") != harness_id:
+            raise BridgeAuthorMetadataError("exact session author metadata has mismatched harness identity")
+        if envelope.get("status") != "open":
+            raise BridgeAuthorMetadataError("exact session author metadata requires an open session envelope")
+        if envelope.get("model_metadata_source") != CODEX_TURN_METADATA_SOURCE:
+            raise BridgeAuthorMetadataError("exact session author metadata is not attested by x-codex-turn-metadata")
+        resolve_worker_role_provenance(
+            project_root,
+            current_session_id=session_id,
+            harness_name=harness_name,
+        )
+    except EnvelopeError as exc:
+        raise BridgeAuthorMetadataError(f"exact session author metadata is invalid: {exc}") from exc
+
+    candidate = normalize_author_metadata(
+        {
+            "author_session_context_id": session_id,
+            "author_model": envelope.get("model_id"),
+            "author_model_version": envelope.get("model_version"),
+            "author_model_configuration": envelope.get("model_configuration"),
+            "author_metadata_source": envelope.get("model_metadata_source"),
+        }
+    )
+    return candidate
+
+
+def _replace_author_metadata_value(content: str, field: str, value: str) -> str:
+    pattern = re.compile(rf"^(?P<key>{re.escape(field)}):\s*(?P<value>.*?)\s*$", re.IGNORECASE | re.MULTILINE)
+
+    def replacement(match: re.Match[str]) -> str:
+        return f"{match.group('key')}: {value}"
+
+    return pattern.sub(replacement, content, count=1)
+
+
 def _record_can_receive_dispatch(record: Mapping[str, object]) -> bool:
     """Return dispatchability for a projected harness role record."""
     if "can_receive_dispatch" in record:
         return record.get("can_receive_dispatch") is True
     return record.get("event_driven_hooks") is True
+
+
+def _dispatch_harness_id_from_run_id(value: object) -> str | None:
+    """Return the durable harness id from a dispatcher run id, if well-formed."""
+    if not metadata_value_is_valid(value):
+        return None
+    match = DISPATCH_RUN_ID_RE.fullmatch(str(value).strip().strip("`"))
+    if match is None:
+        return None
+    return match.group("harness_id").upper()
 
 
 def _resolve_durable_identity_fields(
@@ -251,19 +407,20 @@ def _resolve_durable_identity_fields(
     "<id>"}`` resolved per call from the filing harness's own durable identity,
     using the same ``<role>/<harness_name>`` label form as
     ``scripts/_kb_attribution.resolve_changed_by``. The filing harness is
-    resolved with a two-source priority — ``GTKB_HARNESS_NAME`` env, then the
-    active Prime Builder fallback in the registry projection at
-    ``project_root``. If multiple active Prime Builders exist, fallback
-    metadata resolves only when exactly one is dispatchable. ``project_root`` is
-    threaded through the projection-backed loaders so callers (and tests) read
-    the intended registry rather than a module-global root.
+    resolved with a three-source priority — ``GTKB_HARNESS_NAME`` env, a
+    well-formed dispatcher ``GTKB_BRIDGE_POLLER_RUN_ID``, then the active Prime
+    Builder fallback in the registry projection at ``project_root``. If
+    multiple active Prime Builders exist, fallback metadata resolves only when
+    exactly one is dispatchable. ``project_root`` is threaded through the
+    projection-backed loaders so callers (and tests) read the intended registry
+    rather than a module-global root.
 
     Returns ``{}`` (never ``None``) when the filing harness cannot be resolved
-    unambiguously — no ``GTKB_HARNESS_NAME`` and no unambiguous active
-    Prime Builder fallback, no registry id for the resolved name, or no role
-    assignment — so it contributes nothing rather than a wrong value, and an
-    incomplete merged set fails closed in ``validate_author_metadata`` instead
-    of inheriting another harness's values.
+    unambiguously — no ``GTKB_HARNESS_NAME`` and no unambiguous dispatch/run-id
+    or active Prime Builder fallback, no registry id for the resolved name, or
+    no role assignment — so it contributes nothing rather than a wrong value,
+    and an incomplete merged set fails closed in ``validate_author_metadata``
+    instead of inheriting another harness's values.
 
     It NEVER returns the four per-session runtime fields
     (``author_session_context_id``, ``author_model``, ``author_model_version``,
@@ -286,6 +443,20 @@ def _resolve_durable_identity_fields(
     identities = load_harness_identities(project_root).get("harnesses", {})
 
     harness_name = (environ.get(ENV_VAR_HARNESS_NAME) or "").strip()
+    if not harness_name:
+        dispatch_harness_id = _dispatch_harness_id_from_run_id(environ.get("GTKB_BRIDGE_POLLER_RUN_ID"))
+        if dispatch_harness_id:
+            harness_name = next(
+                (
+                    name
+                    for name, record in identities.items()
+                    if isinstance(record, dict) and record.get("id") == dispatch_harness_id
+                ),
+                "",
+            )
+            if not harness_name:
+                return {}
+
     if not harness_name:
         prime_ids = [
             hid for hid, record in assignments.items() if isinstance(record, dict) and is_prime_builder(record)
@@ -336,25 +507,42 @@ def load_author_metadata(
 ) -> dict[str, str]:
     """Load required author metadata from the filing harness's own context.
 
-    Precedence is explicit > environment runtime envelope > durable identity
-    (the registry projection at ``project_root``). The two durable fields
-    (``author_identity``, ``author_harness_id``) are resolved per call from the
-    registry; the four per-session runtime fields come ONLY from the env runtime
-    envelope or explicit values supplied by the filing harness — never from a
-    shared on-disk baseline. A missing runtime envelope therefore fails closed in
-    ``validate_author_metadata`` rather than inheriting another harness's cached
-    values (WI-4522: removes the ``current.json`` shared-mutable provenance
-    baseline; restores ``GOV-DOCUMENT-AUTHOR-PROVENANCE-001`` under concurrent
-    headless filing). The returned mapping is validated and contains the required
-    field names.
+    Precedence is explicit > environment runtime envelope > exact validated
+    per-session envelope > durable identity. The shared current-session
+    projection and the retired shared author-metadata baseline are never read as
+    author authority. A missing or invalid exact session source therefore fails
+    closed rather than inheriting another session's values.
     """
     root = project_root or Path.cwd()
     environ = env or os.environ
     merged: dict[str, Any] = {}
-    merged.update(_resolve_durable_identity_fields(root, env=environ))
-    merged.update(_metadata_from_env(environ))
-    if explicit:
-        merged.update(normalize_author_metadata(explicit))
+    explicit_metadata = normalize_author_metadata(explicit)
+    environment_metadata = _metadata_from_env(environ)
+    identity_fields = _resolve_durable_identity_fields(root, env=environ)
+
+    supplied_runtime_fields = {
+        **environment_metadata,
+        **explicit_metadata,
+    }
+    runtime_fields = {
+        "author_session_context_id",
+        "author_model",
+        "author_model_version",
+        "author_model_configuration",
+    }
+
+    merged.update(identity_fields)
+    if not runtime_fields.issubset(supplied_runtime_fields):
+        merged.update(
+            _metadata_from_exact_session_envelope(
+                root,
+                environ=environ,
+                explicit=explicit_metadata,
+                identity_fields=identity_fields,
+            )
+        )
+    merged.update(environment_metadata)
+    merged.update(explicit_metadata)
     return validate_author_metadata(merged)
 
 
@@ -389,6 +577,10 @@ def ensure_author_metadata(
     if existing:
         gaps = author_metadata_gaps(existing)
         if not gaps:
+            session_context_id = existing.get("author_session_context_id")
+            runtime_session_id = _runtime_session_context_id(env or os.environ)
+            if is_synthetic_session_context_id(session_context_id) and runtime_session_id:
+                return _replace_author_metadata_value(content, "author_session_context_id", runtime_session_id)
             return content
         raise BridgeAuthorMetadataError(
             "bridge artifact contains partial or invalid author metadata: " + ", ".join(gaps)
@@ -411,3 +603,9 @@ def ensure_author_metadata(
         metadata_lines.append("\n")
     lines[insert_idx:insert_idx] = metadata_lines
     return "".join(lines)
+
+
+if __name__ == "__main__":
+    import sys
+
+    raise SystemExit(_emit_metadata())

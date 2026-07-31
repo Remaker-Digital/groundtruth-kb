@@ -1,8 +1,9 @@
 """Benchmark 5: Advisory-to-Action Latency.
 
-Scans LO advisory artifacts (INSIGHTS-*.md ctimes; bridge ADVISORY entries)
-and measures the median wall-clock time from advisory filing to the first
-Prime acknowledgement (a subsequent bridge thread that cites the advisory).
+Discovers status-bearing numbered bridge ``ADVISORY`` entries and measures the
+median wall-clock time from advisory filing to the first later numbered bridge
+entry that cites that advisory. Retired dropbox reports are not discovery
+inputs.
 
 Value = median latency in hours over the window. ``None`` is returned as 0.0
 with dimensions["sample_size"] = 0 when no qualifying advisory exists.
@@ -12,62 +13,64 @@ Read-only.
 
 from __future__ import annotations
 
-import re
 import statistics
+from datetime import datetime
 from pathlib import Path
 
 from scripts.benchmarks.common import BenchmarkResult, current_source_commit, new_run_id
 
 BENCHMARK_ID = "advisory_latency"
 
-_ADVISORY_REF = re.compile(r"INSIGHTS-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-[A-Z0-9-]+\.md")
+_NUMBERED_SUFFIX = "-[0-9][0-9][0-9].md"
 
 
 def _bridge_files(root):
     bridge_dir = root / "bridge"
     if not bridge_dir.exists():
         return []
-    return sorted(bridge_dir.glob("*-[0-9][0-9][0-9].md"))
+    return sorted(bridge_dir.glob(f"*{_NUMBERED_SUFFIX}"))
+
+
+def _first_status(text: str) -> str:
+    return next((line.strip() for line in text.splitlines() if line.strip()), "")
+
+
+def _window_timestamp(value: str) -> float:
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
 
 
 def run(window_start, window_end, project_root=None):
     root = Path(project_root or Path(__file__).resolve().parents[2])
-    dropbox = root / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-    advisories = []
-    if dropbox.exists():
-        for f in dropbox.glob("INSIGHTS-*.md"):
-            try:
-                ctime = f.stat().st_mtime
-            except OSError:
-                continue
-            advisories.append((f.name, ctime))
     bridge_paths = _bridge_files(root)
-    bridge_refs = []
+    start_ts = _window_timestamp(window_start)
+    end_ts = _window_timestamp(window_end)
+    entries: list[tuple[Path, str, float]] = []
     for bf in bridge_paths:
         try:
             text = bf.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            continue
-        matches = _ADVISORY_REF.findall(text)
-        if not matches:
-            continue
-        try:
             bf_time = bf.stat().st_mtime
         except OSError:
             continue
-        for m in matches:
-            bridge_refs.append((m, bf_time))
+        entries.append((bf, text, bf_time))
+
+    advisories = [
+        (path, timestamp)
+        for path, text, timestamp in entries
+        if _first_status(text) == "ADVISORY" and start_ts <= timestamp <= end_ts
+    ]
     latencies_hours = []
-    matched = 0
-    for adv_name, adv_time in advisories:
-        first_ack = None
-        for ref_name, ref_time in bridge_refs:
-            if ref_name == adv_name and ref_time >= adv_time:
-                if first_ack is None or ref_time < first_ack:
-                    first_ack = ref_time
+    for advisory_path, advisory_time in advisories:
+        advisory_ref = advisory_path.relative_to(root).as_posix()
+        first_ack: float | None = None
+        for candidate_path, text, candidate_time in entries:
+            if candidate_path == advisory_path or candidate_time < advisory_time:
+                continue
+            if advisory_ref not in text and advisory_path.name not in text:
+                continue
+            if first_ack is None or candidate_time < first_ack:
+                first_ack = candidate_time
         if first_ack is not None:
-            latencies_hours.append((first_ack - adv_time) / 3600.0)
-            matched += 1
+            latencies_hours.append((first_ack - advisory_time) / 3600.0)
     if latencies_hours:
         value = statistics.median(latencies_hours)
     else:
@@ -80,9 +83,9 @@ def run(window_start, window_end, project_root=None):
         value=round(value, 2),
         dimensions={
             "advisory_count": len(advisories),
-            "matched_advisories": matched,
+            "matched_advisories": len(latencies_hours),
             "sample_size": len(latencies_hours),
         },
         source_commit=current_source_commit(root),
-        source_query="INSIGHTS mtimes vs bridge file mtimes (first reference)",
+        source_query="numbered bridge ADVISORY mtimes vs later numbered bridge citations",
     )

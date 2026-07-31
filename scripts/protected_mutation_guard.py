@@ -21,47 +21,26 @@ from scripts.implementation_authorization import (
     path_authorized,
 )
 
-PROTECTED_EXACT = {
-    ".claude/settings.json",
-    ".codex/hooks.json",
-    "pyproject.toml",
-    "groundtruth.toml",
-    # Environment & Credentials
-    ".env",
-    "env.local",
-    "env.staging",
-    # Cloud & Deployment Configs
-    "Dockerfile",
-    "Dockerfile.test",
-    "Dockerfile.ui",
-    ".dockerignore",
-    "docker-compose.yml",
-    "shopify.app.toml",
-}
-
-PROTECTED_PREFIXES = (
-    "scripts/",
-    "groundtruth-kb/src/",
-    "groundtruth-kb/tests/",
-    "platform_tests/",
-    "tests/",
-    ".claude/hooks/",
-    ".claude/rules/",
-    ".codex/gtkb-hooks/",
-    "config/",
-    ".github/",
-)
-DISPATCHER_CONFIG_PATH = "config/dispatcher/rules.toml"
-
-ALLOWED_WRITE_PREFIXES = (
-    "bridge/",
-    "independent-progress-assessments/",
-)
-
-DIAGNOSTIC_WRITE_PREFIXES = (
-    ".groundtruth/session/snapshots/",
-    ".gtkb-state/",
-)
+try:
+    from scripts.controlled_artifact_paths import (
+        DISPATCHER_CONFIG_PATH,
+        direct_write_block_reason_code,
+        normalize_relative_path_text,
+        protected_path_classification,
+    )
+    from scripts.controlled_artifact_paths import (
+        is_protected_path as _controlled_is_protected_path,
+    )
+except ImportError:  # pragma: no cover - direct script execution path
+    from controlled_artifact_paths import (
+        DISPATCHER_CONFIG_PATH,
+        direct_write_block_reason_code,
+        normalize_relative_path_text,
+        protected_path_classification,
+    )
+    from controlled_artifact_paths import (
+        is_protected_path as _controlled_is_protected_path,
+    )
 
 
 class GuardResult(NamedTuple):
@@ -71,24 +50,12 @@ class GuardResult(NamedTuple):
 
 
 def _preserve_dot_prefixed_relative_path(relative_path: str) -> str:
-    rel = relative_path.replace("\\", "/")
-    while rel.startswith("./"):
-        rel = rel[2:]
-    return rel
+    return normalize_relative_path_text(relative_path)
 
 
 def is_protected_path(relative_path: str) -> bool:
     """Return True if relative_path is a protected workspace path."""
-    rel = _preserve_dot_prefixed_relative_path(relative_path)
-    if rel in PROTECTED_EXACT:
-        return True
-    if rel == ".env" or rel.startswith(".env.") or rel == "env.local" or rel == "env.staging":
-        return True
-    if rel.startswith(ALLOWED_WRITE_PREFIXES):
-        return False
-    if rel.startswith(DIAGNOSTIC_WRITE_PREFIXES):
-        return False
-    return any(rel.startswith(prefix) for prefix in PROTECTED_PREFIXES)
+    return _controlled_is_protected_path(relative_path)
 
 
 def _dispatcher_config_direct_edit_targets(paths: Iterable[str]) -> list[str]:
@@ -120,6 +87,21 @@ def evaluate_mutation(
                 reason_code="target_outside_project_root",
                 details=f"Target path escapes project root: {target}",
             )
+
+    direct_reason_code = direct_write_block_reason_code(normalized_targets)
+    if direct_reason_code is not None:
+        classifications = ", ".join(
+            sorted({protected_path_classification(path) for path in normalized_targets if is_protected_path(path)})
+        )
+        return GuardResult(
+            allowed=False,
+            reason_code=direct_reason_code,
+            details=(
+                "Direct mutation of controlled artifact surface(s) is prohibited: "
+                f"{classifications}. Use the governed bridge, MemBase, dispatcher, or "
+                "implementation-authorization helper path for this artifact class."
+            ),
+        )
 
     # 2. Check for forbidden operations (e.g. recreating bridge/INDEX.md)
     for target in normalized_targets:

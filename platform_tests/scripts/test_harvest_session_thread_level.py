@@ -201,12 +201,11 @@ class TestFlagToggle:
         bridge_dir = tmp_path / "bridge"
         bridge_dir.mkdir()
         (bridge_dir / "delta-001.md").write_text("VERIFIED\n\n# Delta\n\nBody.\n" + "x" * 200, encoding="utf-8")
-        insight_dir = tmp_path / "ipa"
-        insight_dir.mkdir()
 
+        # WI-5589: the LO insight-dropbox scan route is retired, so no
+        # INSIGHT_DIR isolation is needed; bridge artifacts are the only input.
         monkeypatch.setattr(hsd, "REPO_ROOT", tmp_path)
         monkeypatch.setattr(hsd, "BRIDGE_DIR", bridge_dir)
-        monkeypatch.setattr(hsd, "INSIGHT_DIR", insight_dir)
 
         # Dry run, thread_level=False (default)
         results = hsd.harvest(apply=False, thread_level=False)
@@ -226,12 +225,10 @@ class TestFlagToggle:
             "GO\n\n# Epsilon\n\n" + ("body line\n" * 20),
             encoding="utf-8",
         )
-        insight_dir = tmp_path / "ipa"
-        insight_dir.mkdir()
 
+        # WI-5589: LO insight-dropbox scan route retired; no INSIGHT_DIR needed.
         monkeypatch.setattr(hsd, "REPO_ROOT", tmp_path)
         monkeypatch.setattr(hsd, "BRIDGE_DIR", bridge_dir)
-        monkeypatch.setattr(hsd, "INSIGHT_DIR", insight_dir)
 
         results = hsd.harvest(apply=False, thread_level=True)
         compressed = [r for r in results if r.source_ref.endswith("-*.md")]
@@ -251,12 +248,10 @@ class TestFlagToggle:
             "GO\n\n# Zeta\n\n" + ("body line\n" * 20),
             encoding="utf-8",
         )
-        insight_dir = tmp_path / "ipa"
-        insight_dir.mkdir()
 
+        # WI-5589: LO insight-dropbox scan route retired; no INSIGHT_DIR needed.
         monkeypatch.setattr(hsd, "REPO_ROOT", tmp_path)
         monkeypatch.setattr(hsd, "BRIDGE_DIR", bridge_dir)
-        monkeypatch.setattr(hsd, "INSIGHT_DIR", insight_dir)
 
         # Confirm file-level picks up zeta-001.md (dry-run, thread_level off)
         results = hsd.harvest(apply=False, thread_level=False)

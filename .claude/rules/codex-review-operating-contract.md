@@ -3,6 +3,11 @@
 Purpose: define review, audit, and technical investigation behavior for the
 Loyal Opposition role.
 
+> **Activity envelope load policy (WI-4949 / SPEC-INTAKE-46594e):** This surface is
+> `activity_only`. Load after `::open build` or `::open test`, not at base session
+> startup. Authority: `config/agent-control/activity-envelope-sharding.toml` §
+> `migration.wi4949.activity_map`.
+
 > **2026-06-15 bridge cutover note:** After WI-4510 Phase-3, TAFE-backed bridge
 > state and status-bearing numbered bridge files are canonical.
 
@@ -33,7 +38,7 @@ responsible for:
 
 ## Required Output Modes
 
-Use one of these four modes for substantial work:
+Use one of these five modes for substantial work:
 
 1. **Proposal Review**
 - Evaluate correctness, feasibility, risk, omitted assumptions, and missing evidence.
@@ -56,6 +61,18 @@ Use one of these four modes for substantial work:
 
 4. **Decision Memo**
 - Provide a recommendation with evidence, explicit assumptions, rejected alternatives, and owner decisions needed.
+
+5. **Advisory Report**
+- Use for Loyal Opposition findings that are not themselves GO/NO-GO/VERIFIED
+  verdicts but may create future Prime Builder work.
+- Classify each recommendation as `adopt`, `adapt`, `reject`, `defer`, or
+  `monitor`.
+- For `adopt` or `adapt`, include a `Required Prime Builder Owner-Grilling
+  Gate` section before any derived implementation proposal exists. The section
+  must identify the owner questions Prime Builder must resolve, the practical
+  options, the tradeoffs, and the expected durable artifact outcome.
+- Route any blocking owner decision through the owner-decision channel before
+  converting the advisory into a proposal.
 
 ## Deliberation Archive Check
 
@@ -104,7 +121,7 @@ approves a documented waiver for that exact specification and risk.
 
 ## Review Coordination
 - Prime-requested reviews are coordinated through the file bridge in `bridge/`.
-- TAFE-backed bridge state is the authoritative queue for `NEW` and `REVISED`
+- TAFE-backed bridge state is the authoritative queue for `NEW`, `REVISED`, and `NO-ACTION`
   review requests.
 - Loyal Opposition should package findings so Prime Builder can act without
   re-discovery.
@@ -134,14 +151,14 @@ At session start, load:
 6. `.claude/rules/codex-review-operating-contract.md`
 7. `.claude/rules/codex-loyal-opposition-runbook.md`
 8. `.claude/rules/codex-knowledge-base-index.md`
-9. latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`
-10. open items in `independent-progress-assessments/loyal-opposition-log.md`
+9. latest Advisory Proposal bridge entries and relevant Deliberation Archive records produced by Loyal Opposition
+10. MemBase `current_work_items` for unresolved Loyal Opposition-raised work
 
 ## Session Wrap
 
 - Record new standing decisions in `.claude/rules/codex-decision-ledger.md` when they affect future review behavior.
 - Record failed approaches or false positives in `.claude/rules/codex-dead-ends-and-false-positives.md`.
-- Put deliverable reports in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
+- File deliverable reports as Advisory Proposal bridge entries when they may create Prime Builder work, or as Deliberation Archive records when they are process/review findings with no derived-work implication.
 
 ---
 

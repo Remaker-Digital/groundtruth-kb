@@ -324,6 +324,60 @@ def _metric_query(metric_key: str) -> str:
     return f"SELECT value FROM current_metrics WHERE metric_key = '{metric_key}';"
 
 
+# GTKB-DORA-002: DORA four-keys are informational delivery-performance metrics,
+# not good/bad counters, so their stat panels use a single neutral threshold
+# step instead of the default green/yellow/red count coloring.
+_DORA_INFORMATIONAL_THRESHOLDS = {
+    "mode": "absolute",
+    "steps": [{"color": "blue", "value": None}],
+}
+
+
+def _dora_four_keys_panels(builder: PanelBuilder) -> list[dict[str, Any]]:
+    """Build the four DORA-keys stat panels (GTKB-DORA-002).
+
+    Each panel reads its value from ``current_metrics``; a null value renders a
+    null/annotated state (no fabricated telemetry). Titles and the SQLite data
+    source are pinned by the Grafana JSON tests.
+    """
+    return [
+        _stat_panel(
+            builder,
+            "Deployment Frequency",
+            _grid(0, 0, 6, 6),
+            _metric_query("dora_deployment_frequency"),
+            thresholds=_DORA_INFORMATIONAL_THRESHOLDS,
+        ),
+        _stat_panel(
+            builder,
+            "Lead Time for Changes",
+            _grid(6, 0, 6, 6),
+            _metric_query("dora_lead_time_hours"),
+            unit="h",
+            decimals=1,
+            thresholds=_DORA_INFORMATIONAL_THRESHOLDS,
+        ),
+        _stat_panel(
+            builder,
+            "Change Failure Rate",
+            _grid(12, 0, 6, 6),
+            _metric_query("dora_change_failure_rate"),
+            unit="percent",
+            decimals=1,
+            thresholds=_DORA_INFORMATIONAL_THRESHOLDS,
+        ),
+        _stat_panel(
+            builder,
+            "MTTR",
+            _grid(18, 0, 6, 6),
+            _metric_query("dora_mttr_hours"),
+            unit="h",
+            decimals=1,
+            thresholds=_DORA_INFORMATIONAL_THRESHOLDS,
+        ),
+    ]
+
+
 def build_dashboard() -> dict[str, Any]:
     builder = PanelBuilder()
     panels: list[dict[str, Any]] = []
@@ -395,7 +449,6 @@ def build_dashboard() -> dict[str, Any]:
             ),
         ]
     )
-
     panels.extend(
         [
             _bar_gauge_panel(
@@ -514,13 +567,46 @@ def build_dashboard() -> dict[str, Any]:
         )
     )
 
-    panels.append(_row(builder, "GT-KB Install and Setup", 29, collapsed=False))
+    panels.append(_row(builder, "Application Deployment", 29, collapsed=False))
+    panels.extend(
+        [
+            _bar_gauge_panel(
+                builder,
+                "Application Deployment Health",
+                _grid(0, 30, 8, 6),
+                """
+                SELECT surface AS metric,
+                       CASE lower(status)
+                           WHEN 'red' THEN 2
+                           WHEN 'yellow' THEN 1
+                           ELSE 0
+                       END AS value
+                FROM application_deployment_signals
+                ORDER BY sort_order;
+                """,
+                max_value=2,
+                mappings=_status_mappings(),
+            ),
+            _table_panel(
+                builder,
+                "Application Deployment Signals",
+                _grid(8, 30, 16, 6),
+                """
+                SELECT sort_order, surface, signal, mock_value, upper(status) AS status, source_contract
+                FROM application_deployment_signals
+                ORDER BY sort_order;
+                """,
+            ),
+        ]
+    )
+
+    panels.append(_row(builder, "GT-KB Install and Setup", 36, collapsed=False))
     panels.extend(
         [
             _bar_gauge_panel(
                 builder,
                 "Setup Coverage",
-                _grid(0, 30, 8, 6),
+                _grid(0, 37, 8, 6),
                 """
                 SELECT section AS metric, COUNT(*) AS value
                 FROM setup_steps
@@ -531,7 +617,7 @@ def build_dashboard() -> dict[str, Any]:
             _bar_gauge_panel(
                 builder,
                 "Required Tool Categories",
-                _grid(8, 30, 8, 6),
+                _grid(8, 37, 8, 6),
                 """
                 SELECT category AS metric, COUNT(*) AS value
                 FROM required_tools
@@ -542,7 +628,7 @@ def build_dashboard() -> dict[str, Any]:
             _bar_gauge_panel(
                 builder,
                 "Third-Party Service Categories",
-                _grid(16, 30, 8, 6),
+                _grid(16, 37, 8, 6),
                 """
                 SELECT category AS metric, COUNT(*) AS value
                 FROM third_party_services
@@ -553,12 +639,12 @@ def build_dashboard() -> dict[str, Any]:
         ]
     )
 
-    panels.append(_row(builder, "Delivery Timeline", 36, collapsed=False))
+    panels.append(_row(builder, "Delivery Timeline", 43, collapsed=False))
     panels.append(
         _bar_gauge_panel(
             builder,
             "Delivery Timeline Summary",
-            _grid(0, 37, 24, 7),
+            _grid(0, 44, 24, 7),
             """
             SELECT label || ' - ' || latest_result AS metric,
                    event_count AS value
@@ -568,19 +654,49 @@ def build_dashboard() -> dict[str, Any]:
         )
     )
 
-    panels.append(_row(builder, "Release Readiness", 44, collapsed=False))
+    panels.append(_row(builder, "Release Readiness", 51, collapsed=False))
     panels.extend(
         [
+            _stat_panel(
+                builder,
+                "Release Health Findings",
+                _grid(0, 52, 8, 4),
+                _metric_query("release_health_findings"),
+            ),
+            _stat_panel(
+                builder,
+                "Dirty Worktree Paths",
+                _grid(8, 52, 8, 4),
+                _metric_query("dirty_worktree_paths"),
+            ),
+            _stat_panel(
+                builder,
+                "Dispatcher Health Findings",
+                _grid(16, 52, 8, 4),
+                _metric_query("dispatcher_health_findings"),
+            ),
+            _stat_panel(
+                builder,
+                "Bridge Actionability Findings",
+                _grid(0, 56, 8, 4),
+                _metric_query("bridge_actionability_findings"),
+            ),
+            _stat_panel(
+                builder,
+                "README / Wiki Drift",
+                _grid(8, 56, 8, 4),
+                _metric_query("readme_wiki_drift"),
+            ),
             _table_panel(
                 builder,
                 "Release Blockers",
-                _grid(0, 45, 12, 6),
+                _grid(0, 60, 12, 6),
                 "SELECT sort_order, blocker FROM release_blockers ORDER BY sort_order;",
             ),
             _pie_panel(
                 builder,
                 "Risk Severity Mix",
-                _grid(12, 45, 6, 6),
+                _grid(12, 60, 6, 6),
                 """
                 SELECT upper(COALESCE(NULLIF(severity, ''), 'unknown')) AS severity,
                        COUNT(*) AS value
@@ -592,7 +708,7 @@ def build_dashboard() -> dict[str, Any]:
             _pie_panel(
                 builder,
                 "Integration Status Mix",
-                _grid(18, 45, 6, 6),
+                _grid(18, 60, 6, 6),
                 """
                 SELECT upper(COALESCE(NULLIF(health, ''), 'unknown')) AS health,
                        COUNT(*) AS value
@@ -635,7 +751,7 @@ def build_dashboard() -> dict[str, Any]:
             links={"console_url": "Open"},
         ),
     ]
-    panels.append(_row(builder, "Setup Details", 51, collapsed=True, panels=detail_panels))
+    panels.append(_row(builder, "Setup Details", 67, collapsed=True, panels=detail_panels))
 
     action_details = [
         _table_panel(
@@ -650,7 +766,7 @@ def build_dashboard() -> dict[str, Any]:
             links={"shortcut_target": "Open"},
         )
     ]
-    panels.append(_row(builder, "Action Center Details", 52, collapsed=True, panels=action_details))
+    panels.append(_row(builder, "Action Center Details", 68, collapsed=True, panels=action_details))
 
     delivery_details = [
         _table_panel(
@@ -665,7 +781,7 @@ def build_dashboard() -> dict[str, Any]:
             links={"url": "Open"},
         )
     ]
-    panels.append(_row(builder, "Delivery Timeline Details", 53, collapsed=True, panels=delivery_details))
+    panels.append(_row(builder, "Delivery Timeline Details", 69, collapsed=True, panels=delivery_details))
 
     kpi_details = [
         _table_panel(
@@ -687,7 +803,7 @@ def build_dashboard() -> dict[str, Any]:
             """,
         ),
     ]
-    panels.append(_row(builder, "KPI History Details", 54, collapsed=True, panels=kpi_details))
+    panels.append(_row(builder, "KPI History Details", 70, collapsed=True, panels=kpi_details))
 
     integration_details = [
         _table_panel(
@@ -701,7 +817,7 @@ def build_dashboard() -> dict[str, Any]:
             """,
         )
     ]
-    panels.append(_row(builder, "Integration Status Details", 55, collapsed=True, panels=integration_details))
+    panels.append(_row(builder, "Integration Status Details", 71, collapsed=True, panels=integration_details))
 
     freshness_details = [
         _table_panel(
@@ -724,7 +840,7 @@ def build_dashboard() -> dict[str, Any]:
             hidden_columns=(),
         ),
     ]
-    panels.append(_row(builder, "Data Freshness Details", 56, collapsed=True, panels=freshness_details))
+    panels.append(_row(builder, "Data Freshness Details", 72, collapsed=True, panels=freshness_details))
 
     # WI-4506: TAFE Observability panels (read-only visualization of the TAFE
     # state surfaces from groundtruth.db, projected into the dashboard SQLite
@@ -798,7 +914,20 @@ def build_dashboard() -> dict[str, Any]:
             """,
         ),
     ]
-    panels.append(_row(builder, "TAFE Observability", 57, collapsed=True, panels=tafe_details))
+    panels.append(_row(builder, "TAFE Observability", 73, collapsed=True, panels=tafe_details))
+
+    # GTKB-DORA-002: DORA four-keys delivery-performance panels. Appended as a
+    # collapsed detail row (matching the TAFE convention) so the existing
+    # top-of-dashboard panel order is unchanged.
+    panels.append(
+        _row(
+            builder,
+            "DORA Four Keys (Delivery Performance)",
+            74,
+            collapsed=True,
+            panels=_dora_four_keys_panels(builder),
+        )
+    )
 
     return {
         "annotations": {
@@ -821,14 +950,14 @@ def build_dashboard() -> dict[str, Any]:
         "panels": panels,
         "refresh": "5m",
         "schemaVersion": 41,
-        "tags": ["gt-kb", "agent-red", "sqlite"],
+        "tags": ["gt-kb", "operations", "sqlite"],
         "templating": {"list": []},
         "time": {"from": "now-30d", "to": "now"},
         "timepicker": {},
         "timezone": "browser",
-        "title": "Agent Red GT-KB Dashboard",
-        "uid": "agent-red-gtkb",
-        "version": 4,
+        "title": "GT-KB Operations Dashboard",
+        "uid": "groundtruth-kb-dashboard",
+        "version": 5,
         "weekStart": "",
     }
 

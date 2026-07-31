@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Adapt Cursor hook stdin/stdout to GT-KB Claude/Codex hook contracts."""
+"""Adapt Cursor hook stdin/stdout to GT-KB Claude/Codex hook contracts.
+
+Uses the shared lo_file_safety_payloads normalization layer for Shell and
+Write payload shapes while preserving Cursor's existing deny-response
+translation and metadata defaults.
+
+Specifications: ADR-CROSS-HARNESS-PARITY-001, DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +19,19 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+_SCRIPTS = PROJECT_ROOT / "scripts"
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
+try:
+    from lo_file_safety_payloads import normalize_cursor
+except ImportError:
+    normalize_cursor = None  # type: ignore[assignment]
+
+
+def _windows_no_window_creationflags() -> int:
+    return getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
+
 
 def _read_payload() -> dict[str, Any]:
     raw = sys.stdin.buffer.read()
@@ -21,6 +41,18 @@ def _read_payload() -> dict[str, Any]:
 
 
 def _to_claude_pretooluse(payload: dict[str, Any]) -> dict[str, Any]:
+    # Use shared normalizer when available
+    if normalize_cursor is not None:
+        normalized = normalize_cursor(payload)
+        if normalized.mutation_class.value in ("shell", "opaque") and normalized.command:
+            return {"tool_name": "Bash", "tool_input": {"command": normalized.command}}
+        if normalized.tool_name in ("Write", "Edit", "MultiEdit"):
+            return {
+                "tool_name": normalized.tool_name,
+                "tool_input": payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else {},
+            }
+
+    # Fallback
     command = payload.get("command")
     if isinstance(command, str) and command.strip():
         return {"tool_name": "Bash", "tool_input": {"command": command}}
@@ -65,16 +97,26 @@ def main() -> int:
     env = os.environ.copy()
     env.setdefault("GTKB_HARNESS_NAME", "cursor")
     env.setdefault("GTKB_HARNESS_ID", "E")
-
-    completed = subprocess.run(
-        [sys.executable, str(target), *sys.argv[2:]],
-        input=json.dumps(adapted_in),
-        capture_output=True,
-        text=True,
-        cwd=str(PROJECT_ROOT),
-        env=env,
-        check=False,
+    env.setdefault("GTKB_AUTHOR_MODEL", "Composer")
+    env.setdefault("GTKB_AUTHOR_MODEL_VERSION", "cursor-agent")
+    env.setdefault(
+        "GTKB_AUTHOR_MODEL_CONFIGURATION",
+        "Cursor interactive; cursor_hook_adapter; bridge author metadata runtime envelope",
     )
+
+    run_kwargs: dict[str, Any] = {
+        "input": json.dumps(adapted_in),
+        "capture_output": True,
+        "text": True,
+        "cwd": str(PROJECT_ROOT),
+        "env": env,
+        "check": False,
+    }
+    creationflags = _windows_no_window_creationflags()
+    if creationflags:
+        run_kwargs["creationflags"] = creationflags
+
+    completed = subprocess.run([sys.executable, str(target), *sys.argv[2:]], **run_kwargs)
     if completed.stderr:
         sys.stderr.write(completed.stderr)
     stdout = completed.stdout.strip()

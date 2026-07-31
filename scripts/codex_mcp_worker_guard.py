@@ -15,6 +15,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+try:  # Script execution from repository root.
+    from windows_subprocess import no_window_subprocess_kwargs
+except ImportError:  # Package-style import in tests or module execution.
+    from scripts.windows_subprocess import no_window_subprocess_kwargs
+
 KNOWN_MCP_FAMILY_TOKENS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
         "playwright",
@@ -245,6 +250,7 @@ def collect_windows_processes() -> list[ProcessRecord]:
         capture_output=True,
         text=True,
         timeout=15,
+        **no_window_subprocess_kwargs(),
     )
     raw = json.loads(result.stdout or "[]")
     rows = raw if isinstance(raw, list) else [raw]
@@ -258,6 +264,7 @@ def collect_posix_processes() -> list[ProcessRecord]:
         capture_output=True,
         text=True,
         timeout=15,
+        **no_window_subprocess_kwargs(),
     )
     records: list[ProcessRecord] = []
     for line in result.stdout.splitlines():
@@ -287,6 +294,7 @@ def terminate_process(pid: int) -> tuple[bool, str]:
             capture_output=True,
             text=True,
             timeout=10,
+            **no_window_subprocess_kwargs(),
         )
         return result.returncode == 0, (result.stdout + result.stderr).strip()
     try:

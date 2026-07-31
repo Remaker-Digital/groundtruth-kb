@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import cross_harness_bridge_trigger as cht  # noqa: E402
+import dispatcher_runtime as cht  # noqa: E402
 
 
 def test_poll_dispatch_verdict_returns_path_and_latency_on_existing_file(tmp_path: Path) -> None:
@@ -24,7 +24,7 @@ def test_poll_dispatch_verdict_returns_path_and_latency_on_existing_file(tmp_pat
     time.sleep(0.05)
 
     verdict_file = bridge_dir / f"gtkb-{bridge_id}-002.md"
-    verdict_file.write_text("verdict", encoding="utf-8")
+    verdict_file.write_text("GO\n\n# Test verdict\n", encoding="utf-8")
 
     # Touch file to ensure its mtime is definitely >= dispatch_ts
     verdict_file.touch()

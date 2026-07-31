@@ -144,6 +144,18 @@ def _build_narrative_packet(project_root: Path, request: GenerateApprovalPacketR
     if not target_path.exists():
         raise GenerateApprovalPacketError(f"--target does not exist: {target_path}")
 
+    content_source: Path | None = None
+    if request.content_file is not None:
+        content_source = (
+            request.content_file if request.content_file.is_absolute() else project_root / request.content_file
+        )
+        try:
+            project_relative_path(content_source, project_root)
+        except ValueError as exc:
+            raise GenerateApprovalPacketError("--content-file must be inside the project root") from exc
+        if not content_source.exists():
+            raise GenerateApprovalPacketError(f"--content-file does not exist: {content_source}")
+
     packet = build_narrative_packet(
         project_root=project_root,
         target_path=target_path,
@@ -154,6 +166,7 @@ def _build_narrative_packet(project_root: Path, request: GenerateApprovalPacketR
         explicit_change_request=request.explicit_change_request,
         changed_by=request.changed_by,
         change_reason=request.change_reason,
+        content_source=content_source,
     )
     validation = validate_narrative_packet(packet, rel_path=rel_path)
     if not validation.is_valid:

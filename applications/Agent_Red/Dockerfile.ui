@@ -1,0 +1,13 @@
+# Agent Red static UI container.
+
+FROM nginx:1.27-alpine
+
+LABEL maintainer="Remaker Digital <dev@remakerdigital.com>"
+LABEL project="Agent Red UI"
+
+COPY admin/standalone/dist/ /usr/share/nginx/html/admin/standalone/
+COPY admin/provider/dist/ /usr/share/nginx/html/admin/provider/
+COPY admin/shopify/dist/ /usr/share/nginx/html/admin/shopify/
+COPY widget/dist/ /usr/share/nginx/html/widget/
+
+EXPOSE 80

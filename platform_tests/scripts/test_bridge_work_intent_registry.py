@@ -1,19 +1,15 @@
-"""WI-4540 per-session guard-reader tests for the go_implementation claim.
+"""Document-authoritative guard-reader tests for the go_implementation claim.
 
 bridge/gtkb-wi4540-per-session-role-marker-context-envelope-003.md (GO at -004).
 
-These tests exercise the WI-4540 change to the WI-4534 role-eligibility guard
-(``scripts.bridge_work_intent_registry._interactive_marker_role`` via
-``acquire``): an owner-declared interactive Prime session is recognized through
-the PER-SESSION marker (``.claude/session/role-<sanitized_session_id>.json``)
-keyed under — and validated against — the querying session id. This is the
-GO's required demonstration that "the WI-4534 guard's interactive branch now
-finds a valid per-session marker written from the same interactive context,
-under the canonical id."
+WI-5189 supersedes marker and dispatch-token role inference for claim
+eligibility. Positive GO-claim fixtures therefore use validated worker-session
+documents; legacy marker fixtures remain as negative non-authority coverage.
 
 Every oracle is the production ``acquire()`` outcome (raise vs. acquired) plus
-the persisted claim record. The legacy single-file fallback path is covered by
-``platform_tests/scripts/test_work_intent_role_eligibility.py``.
+the persisted claim record. WI-4868 removed the legacy shared-marker fallback;
+``platform_tests/scripts/test_work_intent_role_eligibility.py`` covers the
+interactive eligibility path with per-session markers.
 """
 
 from __future__ import annotations
@@ -30,6 +26,7 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 REGISTRY_PATH = SCRIPTS_DIR / "bridge_work_intent_registry.py"
+CLAIM_CLI_PATH = SCRIPTS_DIR / "bridge_claim_cli.py"
 
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
@@ -83,6 +80,30 @@ def _write_project_thread(root: Path, slug: str, status: str, project_id: str = 
         (bridge / f"{slug}-002.md").write_text("GO\n\nFixture GO.\n", encoding="utf-8")
 
 
+def _write_bootstrap_thread(root: Path, slug: str) -> None:
+    bridge = root / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    proposal = "\n".join(
+        [
+            "NEW",
+            "",
+            f"# Fixture project authorization bootstrap {slug}",
+            "",
+            "Project: PROJECT-X",
+            "Work Item: WI-5279",
+            "Project Authorization: PAUTH-BOOTSTRAP",
+            'target_paths: ["groundtruth.db"]',
+            "",
+            "## Project Authorization Bootstrap",
+            "",
+            "project_authorization_bootstrap owner decision DELIB-BOOTSTRAP for PAUTH-BOOTSTRAP.",
+            "",
+        ]
+    )
+    (bridge / f"{slug}-001.md").write_text(proposal, encoding="utf-8")
+    (bridge / f"{slug}-002.md").write_text("GO\n\nFixture GO.\n", encoding="utf-8")
+
+
 def _write_registry(root: Path, roles: dict[str, str]) -> None:
     harness_dir = root / "harness-state"
     harness_dir.mkdir(parents=True, exist_ok=True)
@@ -120,23 +141,47 @@ def _write_legacy_marker(root: Path, role: str, session_id: str = "marker-sessio
     )
 
 
+def _write_worker_session(root: Path, role: str, session_id: str) -> Path:
+    harness_name = "fixture"
+    harness_id = "T"
+    document = {
+        "status": "open",
+        "session_id": session_id,
+        "harness_id": harness_id,
+        "harness_name": harness_name,
+        "worker_role_provenance": {
+            "schema_version": 1,
+            "session_id": session_id,
+            "harness_id": harness_id,
+            "harness_name": harness_name,
+            "role": role,
+            "role_resolution_source": "test-fixture",
+            "issued_at": "2026-06-14T00:00:00Z",
+            "dispatch_run_id": None,
+        },
+    }
+    path = root / "harness-state" / harness_name / "session-envelopes" / f"{session_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document), encoding="utf-8")
+    return path
+
+
 @pytest.fixture
 def env(monkeypatch):
     monkeypatch.delenv("GTKB_HARNESS_REGISTRY_PATH", raising=False)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "fixture")
     registry = _registry()
     base = datetime(2026, 6, 14, 0, 0, tzinfo=UTC)
     monkeypatch.setattr(registry, "now_utc", lambda: base)
     return registry
 
 
-def test_go_impl_allowed_for_uuid_session_with_per_session_prime_marker(tmp_path: Path, env) -> None:
-    """F3/b realized via the per-session marker: an owner-declared interactive
-    Prime session (raw-UUID id) is accepted when a per-session Prime marker
-    keyed+validated under that id exists."""
+def test_go_impl_allowed_for_uuid_session_with_prime_worker_document(tmp_path: Path, env) -> None:
+    """A raw-UUID Prime session is accepted through its validated document."""
     _write_registry(tmp_path, {"B": "prime-builder", "D": "loyal-opposition"})
     _write_index(tmp_path, {"go-thread": "GO"})
     session_id = "26c2349e-1cd0-4024-acef-f934b35fea4e"
-    _write_per_session_marker(tmp_path, "prime-builder", session_id)
+    _write_worker_session(tmp_path, "prime-builder", session_id)
 
     assert env.acquire("go-thread", session_id, project_root=tmp_path) is True
     holder = env.current_holder("go-thread", project_root=tmp_path)
@@ -197,18 +242,21 @@ def test_per_session_marker_is_authority_over_legacy(tmp_path: Path, env) -> Non
     assert env.claim_status("go-thread", project_root=tmp_path) is None
 
 
-def test_legacy_fallback_when_no_per_session_marker(tmp_path: Path, env) -> None:
-    """Absent a per-session marker, the guard falls back to the legacy single-file
-    marker (preserved transition behavior)."""
+def test_legacy_shared_marker_is_ignored_without_per_session_marker(tmp_path: Path, env) -> None:
+    """WI-4868: the shared active-session-role.json slot must not authorize or
+    attribute acting_role for a session lacking a matching per-session marker."""
     _write_registry(tmp_path, {"B": "prime-builder", "D": "loyal-opposition"})
-    _write_index(tmp_path, {"go-thread": "GO"})
+    _write_index(tmp_path, {"go-thread": "GO", "draft-thread": "NEW"})
     session_id = "26c2349e-1cd0-4024-acef-f934b35fea4e"
     _write_legacy_marker(tmp_path, "prime-builder", session_id=session_id)
 
-    assert env.acquire("go-thread", session_id, project_root=tmp_path) is True
-    holder = env.current_holder("go-thread", project_root=tmp_path)
+    with pytest.raises(env.WorkIntentRegistryError, match="prime-builder harness"):
+        env.acquire("go-thread", session_id, project_root=tmp_path)
+
+    assert env.acquire("draft-thread", session_id, project_root=tmp_path) is True
+    holder = env.current_holder("draft-thread", project_root=tmp_path)
     assert holder is not None
-    assert holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
+    assert holder["acting_role"] is None
 
 
 def test_work_intent_schema_upgrades_with_role_project_columns(tmp_path: Path, env) -> None:
@@ -230,11 +278,10 @@ def test_work_intent_schema_upgrades_with_role_project_columns(tmp_path: Path, e
     conn.commit()
     conn.close()
 
-    assert env.acquire(
-        "thread-a",
-        "2026-06-22T00-00-00Z-prime-builder-B-abc123",
-        project_root=tmp_path,
-    )
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+
+    assert env.acquire("thread-a", session_id, project_root=tmp_path)
     holder = env.current_holder("thread-a", project_root=tmp_path)
     assert holder is not None
     assert holder["acting_role"] == "prime-builder"
@@ -247,10 +294,67 @@ def test_work_intent_schema_upgrades_with_role_project_columns(tmp_path: Path, e
     assert {"acting_role", "project_id"} <= columns
 
 
+def test_project_authorization_bootstrap_claim_records_bound_authority(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_bootstrap_thread(tmp_path, "bootstrap-thread")
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-bootstrap"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+
+    assert env.acquire(
+        "bootstrap-thread",
+        session_id,
+        project_root=tmp_path,
+        claim_kind=env.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
+        bootstrap_authority={
+            "owner_decision_id": "DELIB-BOOTSTRAP",
+            "project_id": "PROJECT-X",
+            "work_item_id": "WI-5279",
+            "authorization_id": "PAUTH-BOOTSTRAP",
+            "carrier_targets": ["groundtruth.db"],
+        },
+    )
+
+    holder = env.current_holder("bootstrap-thread", project_root=tmp_path)
+    assert holder is not None
+    assert holder["claim_kind"] == env.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP
+    assert holder["bootstrap_owner_decision_id"] == "DELIB-BOOTSTRAP"
+    assert holder["bootstrap_project_id"] == "PROJECT-X"
+    assert holder["bootstrap_work_item_id"] == "WI-5279"
+    assert holder["bootstrap_authorization_id"] == "PAUTH-BOOTSTRAP"
+    assert json.loads(holder["bootstrap_carrier_targets"]) == ["groundtruth.db"]
+    authority = env.bootstrap_authority_from_claim(holder)
+    assert authority is not None
+    assert authority["carrier_targets"] == ["groundtruth.db"]
+    assert authority["single_use"]["consumed"] is False
+
+
+def test_project_authorization_bootstrap_claim_requires_carrier_target(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_bootstrap_thread(tmp_path, "bootstrap-thread")
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-bootstrap"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+
+    with pytest.raises(env.WorkIntentRegistryError, match="carrier targets"):
+        env.acquire(
+            "bootstrap-thread",
+            session_id,
+            project_root=tmp_path,
+            claim_kind=env.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
+            bootstrap_authority={
+                "owner_decision_id": "DELIB-BOOTSTRAP",
+                "project_id": "PROJECT-X",
+                "work_item_id": "WI-5279",
+                "authorization_id": "PAUTH-BOOTSTRAP",
+                "carrier_targets": ["scripts/not-a-carrier.py"],
+            },
+        )
+
+
 def test_same_role_project_holder_detects_conflicting_same_role_claim(tmp_path: Path, env) -> None:
     _write_registry(tmp_path, {"B": "prime-builder"})
     _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
     holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", holder_session)
 
     assert env.acquire("thread-a", holder_session, project_root=tmp_path)
 
@@ -267,6 +371,8 @@ def test_same_role_project_guard_does_not_alter_acquire_verdict(tmp_path: Path, 
     _write_project_thread(tmp_path, "thread-b", "GO", project_id="PROJECT-X")
     holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
     other_session = "2026-06-22T00-01-00Z-prime-builder-B-def456"
+    _write_worker_session(tmp_path, "prime-builder", holder_session)
+    _write_worker_session(tmp_path, "prime-builder", other_session)
 
     assert env.acquire("thread-a", holder_session, project_root=tmp_path)
     assert env.same_role_project_holder("prime-builder", "PROJECT-X", other_session, project_root=tmp_path)
@@ -279,6 +385,7 @@ def test_same_role_project_holder_ignores_expired_or_lapsed_claim(
     _write_registry(tmp_path, {"B": "prime-builder"})
     _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
     holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", holder_session)
 
     assert env.acquire("thread-a", holder_session, project_root=tmp_path)
     monkeypatch.setattr(
@@ -291,6 +398,68 @@ def test_same_role_project_holder_ignores_expired_or_lapsed_claim(
     )
 
     assert env.same_role_project_holder("prime-builder", "PROJECT-X", "other-session", project_root=tmp_path) is None
+
+
+def test_go_impl_peer_claim_stays_locked_until_lapsed_then_reacquires(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    """WI-4823: same-thread GO implementation ownership is exclusive until
+    deadline+grace lapse, then a peer Prime session may take over.
+    """
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
+    first_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    second_session = "2026-06-22T00-01-00Z-prime-builder-B-def456"
+    _write_worker_session(tmp_path, "prime-builder", first_session)
+    _write_worker_session(tmp_path, "prime-builder", second_session)
+    base = datetime(2026, 6, 14, 0, 0, tzinfo=UTC)
+    monkeypatch.setattr(env, "now_utc", lambda: base)
+
+    assert env.acquire("thread-a", first_session, project_root=tmp_path)
+    assert env.acquire("thread-a", second_session, project_root=tmp_path) is False
+    holder = env.current_holder("thread-a", project_root=tmp_path)
+    assert holder is not None
+    assert holder["session_id"] == first_session
+
+    lapsed = base + timedelta(seconds=env.GO_IMPLEMENTATION_DEADLINE_SECONDS + env.GO_IMPLEMENTATION_GRACE_SECONDS + 1)
+    monkeypatch.setattr(env, "now_utc", lambda: lapsed)
+
+    assert env.current_holder("thread-a", project_root=tmp_path) is None
+    assert env.acquire("thread-a", second_session, project_root=tmp_path)
+    holder = env.current_holder("thread-a", project_root=tmp_path)
+    assert holder is not None
+    assert holder["session_id"] == second_session
+    assert holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
+
+
+def test_impl_authorization_refuses_borrowed_work_intent_claim(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    """WI-4823: implementation authorization must not accept another session's
+    work-intent claim as provenance for the current caller.
+    """
+    from scripts import implementation_authorization
+
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
+    holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    caller_session = "2026-06-22T00-01-00Z-prime-builder-B-def456"
+    _write_worker_session(tmp_path, "prime-builder", holder_session)
+    base = datetime(2026, 6, 14, 0, 0, tzinfo=UTC)
+    monkeypatch.setattr(implementation_authorization.bridge_work_intent_registry, "now_utc", lambda: base)
+
+    assert env.acquire("thread-a", holder_session, project_root=tmp_path)
+
+    assert implementation_authorization.work_intent_claim_block_reason(tmp_path, "thread-a", holder_session) is None
+    reason = implementation_authorization.work_intent_claim_block_reason(tmp_path, "thread-a", caller_session)
+    assert reason is not None
+    assert "claimed by session" in reason
+    assert holder_session in reason
+    assert caller_session in reason
 
 
 def test_same_role_project_holder_ignores_different_role(tmp_path: Path, env) -> None:
@@ -310,11 +479,10 @@ def test_same_role_project_holder_returns_none_on_null_project_or_role(tmp_path:
     _write_registry(tmp_path, {"B": "prime-builder"})
     _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
 
-    assert env.acquire(
-        "thread-a",
-        "2026-06-22T00-00-00Z-prime-builder-B-abc123",
-        project_root=tmp_path,
-    )
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+
+    assert env.acquire("thread-a", session_id, project_root=tmp_path)
 
     assert env.same_role_project_holder(None, "PROJECT-X", "other-session", project_root=tmp_path) is None
     assert env.same_role_project_holder("prime-builder", None, "other-session", project_root=tmp_path) is None
@@ -324,7 +492,7 @@ def test_same_role_project_holder_returns_none_on_null_project_or_role(tmp_path:
 # bridge/gtkb-dispatch-malformed-status-token-quarantine-001.md (GO at -002).
 #
 # Cover the typed permanent-error class that lets the dispatch batch-acquire
-# surface (cross_harness_bridge_trigger._acquire_prime_work_intent_batch)
+# surface (dispatcher_runtime._acquire_prime_work_intent_batch)
 # distinguish a permanent per-file parse error (skip-and-continue) from
 # transient WorkIntentRegistryError (fail-fast).
 
@@ -365,9 +533,189 @@ def test_bridge_file_status_raises_malformed_on_empty_file(tmp_path: Path, env) 
 
 def test_bridge_file_status_returns_canonical_status_unchanged(tmp_path: Path, env) -> None:
     """Non-regression: every canonical status token must still parse."""
-    for token in ("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN"):
+    for token in ("NEW", "REVISED", "GO", "NO-GO", "NO-ACTION", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN"):
         path = _write_bridge_file(tmp_path, f"slug-{token.lower()}", 1, f"{token}\n\n# Body\n")
         assert env._bridge_file_status(path) == token
+
+
+def test_no_action_claim_uses_draft_kind_not_go_implementation(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"D": "loyal-opposition"})
+    _write_index(tmp_path, {"no-action-thread": "NO-ACTION"})
+    session_id = "2026-06-22T00-00-00Z-loyal-opposition-D-def456"
+
+    assert env.acquire("no-action-thread", session_id, project_root=tmp_path) is True
+
+    holder = env.current_holder("no-action-thread", project_root=tmp_path)
+    assert holder is not None
+    assert holder["claim_kind"] == env.CLAIM_KIND_DRAFT
+
+
+def test_latest_no_go_after_prior_go_remains_draft_while_latest_go_is_implementation(
+    tmp_path: Path,
+    env,
+) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+
+    _write_project_thread(tmp_path, "no-go-thread", "NEW", project_id="PROJECT-X")
+    _write_bridge_file(tmp_path, "no-go-thread", 2, "GO\n\nFixture GO.\n")
+    _write_bridge_file(tmp_path, "no-go-thread", 3, "NO-ACTION\n\nFixture correction.\n")
+    _write_bridge_file(tmp_path, "no-go-thread", 4, "NO-GO\n\nFixture corrected verdict.\n")
+
+    assert env.acquire("no-go-thread", session_id, project_root=tmp_path)
+    draft_holder = env.current_holder("no-go-thread", project_root=tmp_path)
+    assert draft_holder is not None
+    assert draft_holder["claim_kind"] == env.CLAIM_KIND_DRAFT
+    assert draft_holder["implementation_deadline"] is None
+    assert draft_holder["implementation_grace_expires_at"] is None
+
+    _write_project_thread(tmp_path, "go-thread", "GO", project_id="PROJECT-X")
+    assert env.acquire("go-thread", session_id, project_root=tmp_path)
+    implementation_holder = env.current_holder("go-thread", project_root=tmp_path)
+    assert implementation_holder is not None
+    assert implementation_holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
+    assert implementation_holder["implementation_deadline"] is not None
+    assert implementation_holder["implementation_grace_expires_at"] is not None
+
+
+@pytest.mark.parametrize("latest_status", ["GO", "NO-GO"])
+def test_prime_can_claim_no_action_correction_after_lo_verdict(
+    tmp_path: Path,
+    env,
+    latest_status: str,
+) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_project_thread(tmp_path, "verdict-thread", "NEW", project_id="PROJECT-X")
+    (tmp_path / "bridge" / "verdict-thread-002.md").write_text(
+        f"{latest_status}\n\nFixture verdict.\n",
+        encoding="utf-8",
+    )
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+
+    assert env.acquire(
+        "verdict-thread",
+        session_id,
+        project_root=tmp_path,
+        claim_kind=env.CLAIM_KIND_NO_ACTION_CORRECTION,
+    )
+
+    holder = env.current_holder("verdict-thread", project_root=tmp_path)
+    assert holder is not None
+    assert holder["claim_kind"] == env.CLAIM_KIND_NO_ACTION_CORRECTION
+    assert holder["acting_role"] == "prime-builder"
+    assert holder["implementation_deadline"] is None
+    assert holder["implementation_grace_expires_at"] is None
+
+
+def test_no_action_correction_is_separate_from_go_implementation_claim(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+
+    _write_project_thread(tmp_path, "implementation-thread", "GO", project_id="PROJECT-X")
+    assert env.acquire("implementation-thread", session_id, project_root=tmp_path)
+    implementation_holder = env.current_holder("implementation-thread", project_root=tmp_path)
+    assert implementation_holder is not None
+    assert implementation_holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
+    assert implementation_holder["implementation_deadline"] is not None
+    assert implementation_holder["implementation_grace_expires_at"] is not None
+
+    _write_project_thread(tmp_path, "correction-thread", "GO", project_id="PROJECT-X")
+    assert env.acquire(
+        "correction-thread",
+        session_id,
+        project_root=tmp_path,
+        claim_kind=env.CLAIM_KIND_NO_ACTION_CORRECTION,
+    )
+    correction_holder = env.current_holder("correction-thread", project_root=tmp_path)
+    assert correction_holder is not None
+    assert correction_holder["claim_kind"] == env.CLAIM_KIND_NO_ACTION_CORRECTION
+    assert correction_holder["implementation_deadline"] is None
+    assert correction_holder["implementation_grace_expires_at"] is None
+    assert correction_holder["extension_cap_seconds"] is None
+    assert correction_holder["bootstrap_owner_decision_id"] is None
+    assert correction_holder["bootstrap_authorization_id"] is None
+
+
+def test_no_action_correction_claim_cannot_authorize_implementation_start(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    from scripts import implementation_authorization
+
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_project_thread(tmp_path, "correction-only-thread", "GO", project_id="PROJECT-X")
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+    assert env.acquire(
+        "correction-only-thread",
+        session_id,
+        project_root=tmp_path,
+        claim_kind=env.CLAIM_KIND_NO_ACTION_CORRECTION,
+    )
+    monkeypatch.setattr(implementation_authorization.bridge_work_intent_registry, "now_utc", env.now_utc)
+    packet = {"bridge_id": "correction-only-thread"}
+    packet["packet_hash"] = implementation_authorization.packet_hash(packet)
+
+    with pytest.raises(implementation_authorization.AuthorizationError, match="GO-implementation claim"):
+        implementation_authorization.finalize_implementation_start_packet(
+            tmp_path,
+            packet,
+            session_id=session_id,
+        )
+
+
+def test_no_action_correction_rejects_non_verdict_and_non_prime_sessions(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder", "D": "loyal-opposition"})
+    _write_project_thread(tmp_path, "new-thread", "NEW", project_id="PROJECT-X")
+    prime_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    lo_session = "2026-06-22T00-00-00Z-loyal-opposition-D-def456"
+    _write_worker_session(tmp_path, "prime-builder", prime_session)
+    _write_worker_session(tmp_path, "loyal-opposition", lo_session)
+
+    with pytest.raises(env.WorkIntentRegistryError, match="requires latest GO or NO-GO"):
+        env.acquire(
+            "new-thread",
+            prime_session,
+            project_root=tmp_path,
+            claim_kind=env.CLAIM_KIND_NO_ACTION_CORRECTION,
+        )
+
+    (tmp_path / "bridge" / "new-thread-002.md").write_text("GO\n\nFixture GO.\n", encoding="utf-8")
+    with pytest.raises(env.WorkIntentRegistryError, match="requires prime-builder"):
+        env.acquire(
+            "new-thread",
+            lo_session,
+            project_root=tmp_path,
+            claim_kind=env.CLAIM_KIND_NO_ACTION_CORRECTION,
+        )
+
+
+def test_claim_cli_exposes_no_action_correction_mode(tmp_path: Path, env, capsys) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_project_thread(tmp_path, "cli-verdict-thread", "GO", project_id="PROJECT-X")
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+    cli = _load_module(CLAIM_CLI_PATH, "bridge_claim_cli_wi5249")
+
+    assert (
+        cli.main(
+            [
+                "claim-no-action",
+                "cli-verdict-thread",
+                "--session-id",
+                session_id,
+                "--project-root",
+                str(tmp_path),
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["claim_kind"] == env.CLAIM_KIND_NO_ACTION_CORRECTION
 
 
 def test_bridge_file_status_skips_leading_blank_lines(tmp_path: Path, env) -> None:
@@ -380,7 +728,7 @@ def test_acquire_tolerates_legacy_status_shadowed_thread(tmp_path: Path, env) ->
     _write_registry(tmp_path, {"B": "prime-builder"})
     _write_index(tmp_path, {"shadowed-thread": "GO"})
     session_id = "26c2349e-1cd0-4024-acef-f934b35fea4e"
-    _write_per_session_marker(tmp_path, "prime-builder", session_id)
+    _write_worker_session(tmp_path, "prime-builder", session_id)
 
     _write_bridge_file(tmp_path, "shadowed-thread", 1, "NEW\n\n# Body\n")
     _write_bridge_file(tmp_path, "shadowed-thread", 2, "PAUSED\n\n# Legacy\n")

@@ -77,7 +77,7 @@ def _git_head_bridge_files(project_root: Path) -> set[str] | None:
 def check_bridge_numbered_files_have_status(
     project_root: Path,
     *,
-    head_resolver: Callable[[Path], set[str] | None] = _git_head_bridge_files,
+    head_resolver: Callable[[Path], set[str] | None] | None = None,
 ) -> list[dict]:
     """Flag numbered bridge files that are new (not at HEAD) and missing a status token.
 
@@ -92,6 +92,8 @@ def check_bridge_numbered_files_have_status(
     _ensure_bridge_helpers_importable(project_root)
     from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 
+    if head_resolver is None:
+        head_resolver = _git_head_bridge_files
     head_files = head_resolver(project_root)
 
     if head_files is None:

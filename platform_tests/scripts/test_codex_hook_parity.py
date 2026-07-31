@@ -9,10 +9,13 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "check_codex_hook_parity.py"
 CODEX_SESSION_START_DISPATCHER = REPO_ROOT / ".codex" / "gtkb-hooks" / "session_start_dispatch.py"
 CODEX_HOOKS_PATH = REPO_ROOT / ".codex" / "hooks.json"
+CLAUDE_SETTINGS_PATH = REPO_ROOT / ".claude" / "settings.json"
 SESSION_START_DISPATCH_CORE = REPO_ROOT / "scripts" / "session_start_dispatch_core.py"
 
 
@@ -36,6 +39,11 @@ def _load_session_start_dispatcher():
 
 def _load_codex_hooks() -> dict:
     return json.loads(CODEX_HOOKS_PATH.read_text(encoding="utf-8"))
+
+
+def _skip_if_codex_hooks_intentionally_empty(codex_hooks: dict) -> None:
+    if codex_hooks.get("hooks") == {}:
+        pytest.skip("Codex hooks are intentionally empty under Windows no-window containment")
 
 
 def _hooks_for_event(codex_hooks: dict, event_name: str) -> list[dict]:
@@ -75,6 +83,7 @@ def test_codex_hook_parity_passes_for_repository_configuration(capsys) -> None:
 
 def test_codex_sessionstart_hook_timeout_exceeds_inner_startup_service_timeout() -> None:
     codex_hooks = _load_codex_hooks()
+    _skip_if_codex_hooks_intentionally_empty(codex_hooks)
     session_start_hook = _hook_with_command_fragment(
         codex_hooks,
         "SessionStart",
@@ -90,6 +99,7 @@ def test_codex_sessionstart_hook_timeout_exceeds_inner_startup_service_timeout()
 
 def test_codex_userpromptsubmit_wrapup_hook_has_headroom_timeout() -> None:
     codex_hooks = _load_codex_hooks()
+    _skip_if_codex_hooks_intentionally_empty(codex_hooks)
     wrapup_hook = _hook_with_command_fragment(
         codex_hooks,
         "UserPromptSubmit",
@@ -99,6 +109,18 @@ def test_codex_userpromptsubmit_wrapup_hook_has_headroom_timeout() -> None:
     assert wrapup_hook["timeout"] >= 60
 
 
+def test_claude_proactive_wrapup_stop_hook_has_sixty_second_allowance() -> None:
+    claude_settings = json.loads(CLAUDE_SETTINGS_PATH.read_text(encoding="utf-8"))
+    wrapup_hook = _hook_with_command_fragment(
+        claude_settings,
+        "Stop",
+        "session_self_initialization.py",
+    )
+
+    assert "--emit-wrapup" in wrapup_hook["command"]
+    assert wrapup_hook["timeout"] == 60
+
+
 def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
     module = _load_module()
 
@@ -106,15 +128,17 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
 
     assert not errors
     codex_hooks = _load_codex_hooks()
+    _skip_if_codex_hooks_intentionally_empty(codex_hooks)
     claude_settings = json.loads((REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
     assert any(
         "gtkb-hooks" in hook["command"] and "session_start_dispatch.py" in hook["command"]
         for group in codex_hooks["hooks"]["SessionStart"]
         for hook in group["hooks"]
     )
-    assert any(
-        "single_harness_bridge_automation.py" in hook["command"] and "--ensure" in hook["command"]
-        for group in codex_hooks["hooks"]["SessionStart"]
+    assert not any(
+        "gtkb_dispatcher_daemon.py" in hook["command"] or "dispatcher-daemon.cmd" in hook["command"]
+        for groups in codex_hooks["hooks"].values()
+        for group in groups
         for hook in group["hooks"]
     )
     session_start_hook = _hook_with_command_fragment(codex_hooks, "SessionStart", "session_start_dispatch.py")
@@ -149,48 +173,38 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         and any("bridge-compliance-audit.cmd" in hook["command"] for hook in group["hooks"])
         for group in codex_hooks["hooks"]["PostToolUse"]
     )
-    # Per bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations
-    # Codex GO at -004: Slice 3 registers a Codex `Stop` hook that invokes the
-    # cross-harness bridge trigger through the no-space Windows wrapper with
-    # --stop-hook. The previous absence assertion is replaced with presence
-    # assertions scoped to bridge dispatch substrates. Codex Stop may invoke the
-    # cross-harness trigger and the single-harness activation manager; lifecycle
-    # wrap-up remains banned.
     assert "Stop" in codex_hooks["hooks"], (
-        "Codex Stop hook must be registered (Slice 3 cross-harness trigger). "
-        "Pre-Slice-3 baseline (`Stop` absent from `.codex/hooks.json`) is "
-        "superseded by gtkb-bridge-poller-event-driven-replacement-slice-3 GO -004."
+        "Codex Stop hook must be registered for non-dispatch lifecycle parity "
+        "(auto-finalization, advisory scan, and backlog reconciliation)."
     )
     codex_stop_hooks = codex_hooks["hooks"]["Stop"]
     # Stop matchers are not supported by Codex; entries must be matcher-less.
     for group in codex_stop_hooks:
         assert group.get("matcher") in (None, ""), "Codex Stop entries must not declare a matcher (Codex hooks docs)"
     assert any(
-        "bridge-dispatch-trigger.cmd" in hook.get("command", "") and "--stop-hook" in hook.get("command", "")
-        for group in codex_stop_hooks
-        for hook in group["hooks"]
-    ), (
-        "Codex Stop must invoke bridge-dispatch-trigger.cmd with --stop-hook "
-        "(satisfies OpenAI Codex Stop JSON output contract by emitting `{}` on stdout)"
+        "auto_finalize_sweep.py" in hook.get("command", "") for group in codex_stop_hooks for hook in group["hooks"]
     )
     assert any(
-        "single_harness_bridge_automation.py" in hook.get("command", "")
-        and "--ensure" in hook.get("command", "")
-        and "--dispatch-now" in hook.get("command", "")
-        for group in codex_stop_hooks
-        for hook in group["hooks"]
-    ), (
-        "Codex Stop must invoke single_harness_bridge_automation.py so single-harness "
-        "topology gets an immediate post-session dispatch and multi-harness topology "
-        "keeps the scheduled task deactivated."
+        "advisory-router-scan.py" in hook.get("command", "") for group in codex_stop_hooks for hook in group["hooks"]
     )
-    # Lifecycle wrap-up scripts must NOT be registered through Codex Stop —
-    # the parity test continues to ban that surface (the active wrap-up
-    # mechanism is the release-candidate gate / harness-specific tooling).
     codex_stop_commands = [hook["command"] for group in codex_stop_hooks for hook in group["hooks"]]
     assert not any("session_wrapup" in cmd or "session_self_initialization.py" in cmd for cmd in codex_stop_commands), (
         "Codex Stop must not register lifecycle wrap-up scripts. Stop is limited "
-        "to bridge dispatch substrates, not session wrap-up."
+        "to non-dispatch lifecycle parity, not session wrap-up."
+    )
+    assert not any(
+        token in cmd
+        for cmd in codex_stop_commands
+        for token in (
+            "cross_" + "harness_" + "bridge_" + "trigger.py",
+            "single_harness_bridge_automation.py",
+            "single_harness_bridge_dispatcher.py",
+            "dispatcher-daemon.cmd",
+            "gtkb_dispatcher_daemon.py",
+        )
+    ), (
+        "Codex hooks must not register dispatcher-trigger workers; dispatcher "
+        "operation is daemon-owned, with manual assignment as the only fallback."
     )
     # Per bridge/gtkb-startup-enhancements-p1-003.md §2.4 (Codex GO at -004):
     # the previously-registered owner-decision-tracker-ups.cmd entry has been
@@ -226,15 +240,9 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         for cmd in session_start_hooks
     )
     dispatcher_match = any("session_start_dispatch.py" in cmd for cmd in session_start_hooks)
-    single_harness_automation_match = any(
-        "single_harness_bridge_automation.py" in cmd and "--ensure" in cmd for cmd in session_start_hooks
-    )
     assert direct_match or dispatcher_match, (
         "Claude SessionStart must register either the canonical service directly "
         "or a dispatcher under .claude/hooks/ that delegates to it"
-    )
-    assert single_harness_automation_match, (
-        "Claude SessionStart must register the single-harness bridge automation activation hook"
     )
     if dispatcher_match:
         from pathlib import Path as _P
@@ -283,9 +291,11 @@ def test_codex_session_start_dispatcher_json_is_utf8_safe_on_windows() -> None:
     assert json.loads(text)["hookSpecificOutput"]["additionalContext"] == "Smart-poller notification \u2014 ready"
 
 
-def test_codex_session_start_dispatcher_bridge_auto_dispatch_mode(monkeypatch, capsys) -> None:
+def test_codex_session_start_dispatcher_bridge_auto_dispatch_mode(tmp_path, monkeypatch, capsys) -> None:
     module = _load_session_start_dispatcher()
+    monkeypatch.setattr(module, "OUT_DIR", tmp_path)
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-002")
+    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
 
     assert module.main() == 0
     payload = json.loads(capsys.readouterr().out)
@@ -301,30 +311,33 @@ def test_codex_session_start_dispatcher_bridge_auto_dispatch_mode(monkeypatch, c
 
 def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None:
     codex_hooks = json.loads((REPO_ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8"))
+    _skip_if_codex_hooks_intentionally_empty(codex_hooks)
     commands = [
         hook["command"] for groups in codex_hooks["hooks"].values() for group in groups for hook in group["hooks"]
     ]
 
     assert commands
     assert all("$(" not in command for command in commands)
+    assert all(command.split()[0].lower().endswith("pythonw.exe") for command in commands)
+    assert all("run_py_no_window.py" not in command and "run_cmd_no_window.py" not in command for command in commands)
     assert any(
-        "gtkb-hooks" in command and "session_start_dispatch.py" in command and command.startswith("python ")
+        "gtkb-hooks" in command and "session_start_dispatch.py" in command and "run_py_no_window " in command
         for command in commands
     )
     assert any(
-        "gtkb-hooks" in command and "session_wrapup_trigger_dispatch.py" in command and command.startswith("python ")
+        "gtkb-hooks" in command and "session_wrapup_trigger_dispatch.py" in command and "run_py_no_window " in command
         for command in commands
     )
     assert any(
-        "gtkb-hooks" in command and "workstream-focus.cmd" in command and command.startswith("cmd /d /s /c ")
+        "gtkb-hooks" in command and "workstream-focus.cmd" in command and "run_cmd_no_window " in command
         for command in commands
     )
     assert any(
-        "gtkb-hooks" in command and "bridge-compliance-gate.cmd" in command and command.startswith("cmd /d /s /c ")
+        "gtkb-hooks" in command and "bridge-compliance-gate.cmd" in command and "run_cmd_no_window " in command
         for command in commands
     )
     assert any(
-        "gtkb-hooks" in command and "bridge-compliance-audit.cmd" in command and command.startswith("cmd /d /s /c ")
+        "gtkb-hooks" in command and "bridge-compliance-audit.cmd" in command and "run_cmd_no_window " in command
         for command in commands
     )
 

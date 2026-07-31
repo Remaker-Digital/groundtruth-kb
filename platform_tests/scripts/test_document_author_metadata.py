@@ -172,7 +172,8 @@ def test_codex_apply_patch_registration_present() -> None:
         for entry in hooks["hooks"]["PreToolUse"]
         if entry.get("matcher") == "apply_patch"
         for hook in entry.get("hooks", [])
-        if "document_author_provenance_gate.py" in hook.get("command", "")
+        if "pretooluse-apply-patch" in hook.get("command", "")
+        or "document_author_provenance_gate.py" in hook.get("command", "")
     ]
 
     assert registrations

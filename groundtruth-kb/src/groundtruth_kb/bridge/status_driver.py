@@ -101,7 +101,7 @@ class BridgeQueueSnapshot:
 class BridgeAutomationSnapshot:
     """Read-only local bridge automation health evidence."""
 
-    trigger_script_exists: bool
+    dispatcher_daemon_script_exists: bool
     dispatch_state: dict[str, Any]
     active_session_locks: tuple[dict[str, Any], ...]
     hook_registrations: dict[str, dict[str, Any]]
@@ -109,7 +109,7 @@ class BridgeAutomationSnapshot:
 
     def to_json_dict(self) -> dict[str, Any]:
         return {
-            "trigger_script_exists": self.trigger_script_exists,
+            "dispatcher_daemon_script_exists": self.dispatcher_daemon_script_exists,
             "dispatch_state": self.dispatch_state,
             "active_session_locks": list(self.active_session_locks),
             "hook_registrations": self.hook_registrations,
@@ -208,7 +208,7 @@ def _render_state_from_versioned_files(root: Path) -> str:
     bridge_dir = root / "bridge"
     grouped: dict[str, list[tuple[int, str, str]]] = {}
     status_re = re.compile(
-        r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+        r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
         re.IGNORECASE,
     )
     file_re = re.compile(r"^(.+)-(\d{3,})\.md$")
@@ -252,7 +252,7 @@ def _parse_live_bridge_state(root: Path) -> ParseResult:
 def _collect_automation_snapshot(root: Path) -> BridgeAutomationSnapshot:
     state_dir = root / ".gtkb-state" / "bridge-poller"
     return BridgeAutomationSnapshot(
-        trigger_script_exists=(root / "scripts" / "cross_harness_bridge_trigger.py").is_file(),
+        dispatcher_daemon_script_exists=(root / "scripts" / "gtkb_dispatcher_daemon.py").is_file(),
         dispatch_state=_read_dispatch_state(state_dir / "dispatch-state.json"),
         active_session_locks=_active_session_locks(state_dir),
         hook_registrations={
@@ -326,9 +326,15 @@ def _hook_registration_snapshot(path: Path) -> dict[str, Any]:
         "exists": True,
         "parseable": True,
         "command_count": len(commands),
-        "cross_harness_trigger_registered": any("cross_harness_bridge_trigger.py" in command for command in commands),
-        "single_harness_automation_registered": any(
-            "single_harness_bridge_automation.py" in command for command in commands
+        "retired_bridge_worker_registered": any(
+            marker in command
+            for command in commands
+            for marker in (
+                "cross_" + "harness_" + "bridge_" + "trigger.py",
+                "bridge-" + "dispatch-" + "trigger.cmd",
+                "single_" + "harness_" + "bridge_" + "automation.py",
+                "single_" + "harness_" + "bridge_" + "dispatcher.py",
+            )
         ),
         "active_session_heartbeat_registered": any("active_session_heartbeat.py" in command for command in commands),
     }

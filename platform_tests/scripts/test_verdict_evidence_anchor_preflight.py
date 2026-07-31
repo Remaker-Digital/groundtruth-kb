@@ -50,6 +50,10 @@ def _write_op(tmp_path: Path, rel: str, lines: list[str]) -> None:
     target.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _mark_project_root(tmp_path: Path) -> None:
+    (tmp_path / "groundtruth.toml").write_text("[project]\nname = 'verdict-anchor-fixture'\n", encoding="utf-8")
+
+
 def _verdict(body: str, *, status: str = "NO-GO", reviewed: str | None = "bridge/foo-001.md") -> str:
     head = status + "\n"
     if reviewed is not None:
@@ -224,8 +228,35 @@ def test_write_bridge_file_error_is_bridge_error_subclass() -> None:
 
 
 def test_write_bridge_file_allows_valid_nogo(tmp_path: Path) -> None:
-    _write_op(tmp_path, "bridge/foo-001.md", ["NEW", "", "## Implementation Plan", "real anchored text"])
-    good = _verdict('F1: line 4 reads "real anchored text"; `bridge/foo-001.md:4` is in range.')
+    _mark_project_root(tmp_path)
+    _write_op(
+        tmp_path,
+        "bridge/nogo-thread-001.md",
+        [
+            "NEW",
+            "author_identity: prime-builder/test",
+            "author_harness_id: T",
+            "author_session_context_id: fixture-prime-session",
+            "author_model: fixture-model",
+            "author_model_version: fixture-model-version",
+            "author_model_configuration: fixture-prime-configuration",
+            "",
+            "## Implementation Plan",
+            "real anchored text",
+        ],
+    )
+    good = _verdict(
+        "author_identity: loyal-opposition/test\n"
+        "author_harness_id: T\n"
+        "author_session_context_id: fixture-lo-session\n"
+        "author_model: fixture-model\n"
+        "author_model_version: fixture-model-version\n"
+        "author_model_configuration: fixture-lo-configuration\n"
+        "bridge_kind: lo_verdict\n"
+        "\n"
+        'F1: line 10 reads "real anchored text"; `bridge/nogo-thread-001.md:10` is in range.',
+        reviewed="bridge/nogo-thread-001.md",
+    )
     path = write_bridge_file("nogo-thread", 2, good, tmp_path, require_author_metadata=False)
     assert path.exists()
 
@@ -233,7 +264,31 @@ def test_write_bridge_file_allows_valid_nogo(tmp_path: Path) -> None:
 def test_write_bridge_file_allows_non_verdict(tmp_path: Path) -> None:
     # A NEW proposal is not a gated verdict; a forward citation to a proposed
     # (not-yet-created) file:line must not be blocked.
-    proposal = "NEW\n\nWill create `scripts/new_module.py:10`.\n"
+    _mark_project_root(tmp_path)
+    proposal = (
+        "NEW\n"
+        "author_identity: prime-builder/test\n"
+        "author_harness_id: T\n"
+        "author_session_context_id: fixture-prime-session\n"
+        "author_model: fixture-model\n"
+        "author_model_version: fixture-model-version\n"
+        "author_model_configuration: fixture-prime-configuration\n"
+        "bridge_kind: prime_proposal\n"
+        "Project Authorization: PAUTH-PROJECT-TEST-FIXTURE\n"
+        "Project: PROJECT-TEST-FIXTURE\n"
+        "Work Item: WI-0001\n"
+        'target_paths: ["scripts/new_module.py"]\n'
+        "\n"
+        "## Requirement Sufficiency\n"
+        "\n"
+        "Existing requirements are sufficient.\n"
+        "\n"
+        "## Specification Links\n"
+        "\n"
+        "- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`\n"
+        "\n"
+        "Will create `scripts/new_module.py:10`.\n"
+    )
     path = write_bridge_file("propthing", 1, proposal, tmp_path, require_author_metadata=False)
     assert path.exists()
 
@@ -266,10 +321,28 @@ def test_hook_allows_valid_nogo(tmp_path: Path) -> None:
 
 
 def test_hook_deny_reason_for_content_blocks_fabricated_nogo(tmp_path: Path) -> None:
-    _write_op(tmp_path, "bridge/foo-001.md", ["NEW", "", "## Implementation Plan", "tail"])
+    _mark_project_root(tmp_path)
+    _write_op(
+        tmp_path,
+        "bridge/foo-001.md",
+        [
+            "NEW",
+            "author_identity: prime-builder/test",
+            "author_harness_id: T",
+            "author_session_context_id: test-prime-session",
+            "",
+            "## Implementation Plan",
+            "tail",
+        ],
+    )
     hook = _load_hook()
     bad = (
         "NO-GO\n"
+        "::init gtkb pb\n"
+        "::open test\n"
+        "author_identity: loyal-opposition/test\n"
+        "author_harness_id: T\n"
+        "author_session_context_id: test-lo-session\n"
         "bridge_kind: lo_verdict\n"
         "Responds to: bridge/foo-001.md\n"
         "\n"

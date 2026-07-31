@@ -7,18 +7,27 @@ Covers SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 from pathlib import Path
 
 import pytest
 from groundtruth_kb.mode_switch.bridge_substrate import defer_bridge_substrate_switch
 
-from scripts.cross_harness_bridge_trigger import run_trigger
+from scripts.dispatcher_runtime import run_dispatch_cycle
 
 
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+def _seed_daemon_ready(root: Path) -> None:
+    _write(root / "scripts" / "gtkb_dispatcher_daemon.py", "# stub\n")
+    state_dir = root / ".gtkb-state" / "dispatcher-daemon"
+    _write(state_dir / "daemon.lock", "{}")
+    heartbeat = dt.datetime.now(dt.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+    _write(state_dir / "heartbeat.txt", heartbeat + "\n")
 
 
 @pytest.fixture
@@ -43,14 +52,14 @@ def project_root(tmp_path: Path) -> Path:
         "Document: foo\nNEW: bridge/foo-001.md\n",
     )
     _write(
+        tmp_path / "bridge" / "foo-001.md",
+        "NEW\n\nDocument: foo\n",
+    )
+    _write(
         tmp_path / "groundtruth.toml",
         '[groundtruth]\ndb_path = "./groundtruth.db"\nproject_root = "."\n',
     )
-    # Seed hook registrations so cross_harness_trigger validates
-    _write(
-        tmp_path / ".claude" / "settings.json",
-        json.dumps({"hooks": {"PostToolUse": [{"command": "python scripts/cross_harness_bridge_trigger.py"}]}}),
-    )
+    _seed_daemon_ready(tmp_path)
     return tmp_path
 
 
@@ -58,17 +67,17 @@ def test_session_start_drains_pending_before_role_resolution(
     project_root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Ensure no environment variable overrides skip execution in test
-    monkeypatch.delenv("GTKB_NO_CROSS_HARNESS_TRIGGER", raising=False)
+    monkeypatch.delenv("GTKB_DISPATCHER_DAEMON_DISABLED", raising=False)
 
     # Set a pending transaction
-    defer_bridge_substrate_switch(project_root, "cross_harness_trigger", change_reason="session start drain test")
+    defer_bridge_substrate_switch(project_root, "dispatcher_daemon", change_reason="session start drain test")
 
-    # Run trigger simulation
+    # Run dispatcher-runtime simulation.
     state_dir = project_root / ".gtkb-state" / "bridge-poller"
-    run_trigger(project_root=project_root, state_dir=state_dir)
+    run_dispatch_cycle(project_root=project_root, state_dir=state_dir)
 
     # Check that substrate updated durably
     state_path = project_root / "harness-state" / "bridge-substrate.json"
     assert state_path.exists()
     state_data = json.loads(state_path.read_text(encoding="utf-8"))
-    assert state_data["substrate"] == "cross_harness_trigger"
+    assert state_data["substrate"] == "dispatcher_daemon"

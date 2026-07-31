@@ -12,7 +12,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.project.doctor import _check_sot_read_discipline
+from groundtruth_kb.project.sot_registry import load_toml, sync_projection
 
 
 def _make_project(
@@ -36,6 +38,39 @@ def _make_project(
         (tmp_path / ".claude" / "settings.json").write_text(json.dumps(claude_settings), encoding="utf-8")
     if codex_hooks is not None:
         (tmp_path / ".codex" / "hooks.json").write_text(json.dumps(codex_hooks), encoding="utf-8")
+    registry = tmp_path / "config" / "registry" / "sot-artifacts.toml"
+    packaged = (
+        tmp_path
+        / "groundtruth-kb"
+        / "src"
+        / "groundtruth_kb"
+        / "context"
+        / "registries"
+        / "v1"
+        / "config"
+        / "registry"
+        / "sot-artifacts.toml"
+    )
+    registry.parent.mkdir(parents=True)
+    packaged.parent.mkdir(parents=True)
+    payload = b"""[[artifacts]]
+id = "fixture-hook"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/sot-read-discipline.py"
+coverage_mode = "exact"
+authority_spec_id = "DCL-SOT-READ-HOOK-CONTRACT-001"
+mutation_api = "test fixture"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+health_check_function = ""
+owner_role = "shared"
+"""
+    registry.write_bytes(payload)
+    packaged.write_bytes(payload)
+    db_path = tmp_path / "groundtruth.db"
+    KnowledgeDB(db_path=db_path)
+    sync_projection(load_toml(registry), db_path, changed_by="test", change_reason="fixture sync")
     return tmp_path
 
 

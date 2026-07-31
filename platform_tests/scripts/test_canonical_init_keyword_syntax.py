@@ -4,13 +4,15 @@
 Authority: bridge/gtkb-canonical-init-keyword-syntax-001-005.md IP-8 surface 1
 (Codex GO at -008). Specs:
 
-- SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001 — regex ``^::init gtkb (pb|lo)$``;
-  first-line-only; closed vocabulary ``{pb, lo}``; no synonyms; strict parse.
+- SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001 — regex
+  ``^::init (gtkb|application)( (pb|lo))?$``; first-line-only; mandatory
+  subject ``{gtkb, application}``; optional role vocabulary ``{pb, lo}``; no
+  synonyms; strict parse.
 
 These tests pin the exact syntax against three concrete locations where the
 regex is defined identically:
 
-- ``scripts/cross_harness_bridge_trigger.py`` (emitter side, derives mode
+- ``scripts/dispatcher_runtime.py`` (emitter side, derives mode
   from ``DispatchTarget.canonical_mode``).
 - ``.claude/hooks/session_start_dispatch.py`` (Claude receiver).
 - ``.codex/gtkb-hooks/session_start_dispatch.py`` (Codex receiver).
@@ -32,7 +34,7 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CLAUDE_HOOK_PATH = PROJECT_ROOT / ".claude" / "hooks" / "session_start_dispatch.py"
 CODEX_HOOK_PATH = PROJECT_ROOT / ".codex" / "gtkb-hooks" / "session_start_dispatch.py"
-TRIGGER_PATH = PROJECT_ROOT / "scripts" / "cross_harness_bridge_trigger.py"
+TRIGGER_PATH = PROJECT_ROOT / "scripts" / "dispatcher_runtime.py"
 
 
 def _load_module(name: str, path: Path) -> ModuleType:
@@ -62,33 +64,43 @@ def _codex_hook() -> ModuleType:
 
 
 @pytest.mark.parametrize(
-    "keyword,expected_mode",
+    "keyword,expected_subject,expected_mode",
     [
-        ("::init gtkb pb", "pb"),
-        ("::init gtkb lo", "lo"),
+        ("::init gtkb", "gtkb", None),
+        ("::init gtkb pb", "gtkb", "pb"),
+        ("::init gtkb lo", "gtkb", "lo"),
+        ("::init application", "application", None),
+        ("::init application pb", "application", "pb"),
+        ("::init application lo", "application", "lo"),
     ],
 )
-def test_valid_forms_accepted_claude(keyword: str, expected_mode: str) -> None:
+def test_valid_forms_accepted_claude(keyword: str, expected_subject: str, expected_mode: str | None) -> None:
     """SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001 regex accepts both modes (Claude side)."""
     hook = _claude_hook()
     match = hook._CANONICAL_KEYWORD_RE.match(keyword)
     assert match is not None, f"Claude regex rejected valid form {keyword!r}"
-    assert match.group(1) == expected_mode
+    assert match.group("subject") == expected_subject
+    assert match.group("role_mode") == expected_mode
 
 
 @pytest.mark.parametrize(
-    "keyword,expected_mode",
+    "keyword,expected_subject,expected_mode",
     [
-        ("::init gtkb pb", "pb"),
-        ("::init gtkb lo", "lo"),
+        ("::init gtkb", "gtkb", None),
+        ("::init gtkb pb", "gtkb", "pb"),
+        ("::init gtkb lo", "gtkb", "lo"),
+        ("::init application", "application", None),
+        ("::init application pb", "application", "pb"),
+        ("::init application lo", "application", "lo"),
     ],
 )
-def test_valid_forms_accepted_codex(keyword: str, expected_mode: str) -> None:
+def test_valid_forms_accepted_codex(keyword: str, expected_subject: str, expected_mode: str | None) -> None:
     """SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001 regex accepts both modes (Codex side)."""
     hook = _codex_hook()
     match = hook._CANONICAL_KEYWORD_RE.match(keyword)
     assert match is not None, f"Codex regex rejected valid form {keyword!r}"
-    assert match.group(1) == expected_mode
+    assert match.group("subject") == expected_subject
+    assert match.group("role_mode") == expected_mode
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -106,8 +118,9 @@ _INVALID_FORMS = [
     "::init gtkb advisory",
     "::init gtkb status",
     "::init gtkb ",
-    "::init gtkb",
     "::init gtkb x",
+    "::init application prime",
+    "::init application x",
     # Case variants (strict-parse; lowercase only).
     "::INIT GTKB PB",
     "::Init Gtkb Pb",
@@ -180,7 +193,7 @@ def test_emitter_keyword_matches_receiver_regex() -> None:
     regex must accept every such emission verbatim. Drift between emitter
     vocabulary and receiver vocabulary would silently break dispatch.
     """
-    trigger = _load_module("cross_harness_bridge_trigger_syntax", TRIGGER_PATH)
+    trigger = _load_module("dispatcher_runtime_syntax", TRIGGER_PATH)
     claude_hook = _claude_hook()
     codex_hook = _codex_hook()
 
@@ -194,8 +207,10 @@ def test_emitter_keyword_matches_receiver_regex() -> None:
         assert m_codex is not None, (
             f"Codex regex does not accept emitter output for label {label!r} (mode {mode!r}, emitted {emitted!r})"
         )
-        assert m_claude.group(1) == mode
-        assert m_codex.group(1) == mode
+        assert m_claude.group("subject") == "gtkb"
+        assert m_codex.group("subject") == "gtkb"
+        assert m_claude.group("role_mode") == mode
+        assert m_codex.group("role_mode") == mode
 
 
 def test_claude_and_codex_regex_patterns_identical() -> None:
@@ -209,7 +224,9 @@ def test_claude_and_codex_regex_patterns_identical() -> None:
     codex_hook = _codex_hook()
     assert claude_hook._CANONICAL_KEYWORD_RE.pattern == codex_hook._CANONICAL_KEYWORD_RE.pattern
     # Pin the exact string so reviewers see at-a-glance what is being tested.
-    assert claude_hook._CANONICAL_KEYWORD_RE.pattern == r"^::init gtkb (pb|lo)$"
+    assert claude_hook._CANONICAL_KEYWORD_RE.pattern == (
+        r"^::init (?P<subject>gtkb|application)(?: (?P<role_mode>pb|lo))?$"
+    )
 
 
 def test_regex_is_first_line_only() -> None:

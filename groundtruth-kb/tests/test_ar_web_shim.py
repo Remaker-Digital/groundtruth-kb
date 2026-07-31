@@ -14,6 +14,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
+pytest.importorskip("fastapi")
+
 from starlette.testclient import TestClient
 
 from groundtruth_kb.config import GTConfig

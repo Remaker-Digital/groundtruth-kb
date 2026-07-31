@@ -1,0 +1,127 @@
+VERIFIED
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 2026-07-17T13-11-01Z-loyal-opposition-B-dde84b
+author_model: claude-sonnet-5
+author_model_version: claude-sonnet-5
+author_model_configuration: Claude Code dispatcher-spawned headless worker; resolved_role=loyal-opposition; explanatory output style
+
+# Loyal Opposition Verification - VERIFIED - Envelope Protocol Slice A Canonical Insertion
+
+bridge_kind: lo_verdict
+Document: gtkb-envelope-protocol-slice-a-canonical-insertion
+Version: 004
+Reviewed report: bridge/gtkb-envelope-protocol-slice-a-canonical-insertion-003.md
+Date: 2026-07-17 UTC
+
+Project Authorization: PAUTH-PROJECT-GTKB-PLATFORM-MODERNIZATION-ENVELOPE-PROTOCOL-20260716-PROJECT-SCOPE
+Project: PROJECT-GTKB-PLATFORM-MODERNIZATION-ENVELOPE-PROTOCOL
+Work Item: WI-5373
+
+## Verdict
+
+VERIFIED. The implementation report's claim is independently reproduced exactly: five owner-approved formal artifacts (one ADR, three DCLs, one SPEC) were inserted into `groundtruth.db` as canonical version-1 `specified` rows, all five readback content hashes match the corresponding approval-packet `full_content_sha256` byte-for-byte, and no other row in the `specifications` table (nor any file outside `groundtruth.db` and this thread's own bridge chain) shows a mutation from this implementation. Both mandatory preflights pass clean and WI-5373 correctly remains `open` pending this verdict.
+
+## Review Independence
+
+- Report (version 003) author session: `A-2026-07-17T10-20-39Z` (prime-builder/codex, harness A).
+- Verifier (this verdict) session: `2026-07-17T13-11-01Z-loyal-opposition-B-dde84b` (loyal-opposition/claude, harness B, dispatcher auto-dispatch).
+- Distinct harness and distinct session-context id; independent review is satisfied. Note: this thread's version 002 `GO` was authored by a different session of this same harness (`2026-07-17T12-03-24Z-loyal-opposition-B-ea4eeb`), which is a separate, unrelated interactive-context session from this one -- the independence gate keys on session context, not harness identity, per `.claude/rules/file-bridge-protocol.md` "Review Independence Boundary".
+
+## Independent Verification Performed (live this session)
+
+1. **MemBase readback, recomputed independently.** Queried `groundtruth.db` directly via `KnowledgeDB.get_spec` for all five artifact IDs and recomputed each row's content SHA-256 myself (not copied from the report): all five are `version=1`, `status=specified`, correct `type` (`architecture_decision` / `design_constraint` x3 / `requirement`), and all five recomputed hashes match the report's claimed readback hashes and the approval-packet hashes byte-for-byte:
+   - `ADR-BRIDGE-ARTIFACT-HEAD-ENVELOPE-001` -> `51299477d4d820f71b1f352e0a9a09e8d14c0e62fea3a5a59f2c290f7e69a11d`
+   - `DCL-BRIDGE-ENVELOPE-LINE-AUTHORING-PLACEMENT-001` -> `15ab035b9975470b24e448d5c5ad2fc6359d0f828c8be91b2cb6b4a9d6b0fe49`
+   - `SPEC-BRIDGE-ENVELOPE-PACKET-CONTRACT-001` -> `c5f1b0cb397501a5c6b3afb79821afdba3e0ef0426ee891521905b7663148dca`
+   - `DCL-BRIDGE-DISPATCHER-ENVELOPE-READONLY-001` -> `22407ff73cc7e30e6a4b3a51f292a020b08b8d6858e4124d446ccfb7dccd6ccf`
+   - `DCL-SUBJECT-SCOPE-STAGED-ENFORCEMENT-001` -> `4d7c5670e03cbd056aee4c35d8851404fe520bb075febb6be8346cfb86c83303`
+2. **Mutation-scope check beyond the report's own claim.** Listed the 15 most-recently-`changed_at` rows in the entire `specifications` table (not scoped to the five claimed IDs): the top five are exactly the five claimed artifacts, all at the identical timestamp `2026-07-17T12:34:15+00:00`, all `changed_by=prime-builder/codex/A`. The next-most-recent row (`DCL-ARCHIVE-PRESERVE-TERMINAL-VERDICT-DISPOSITION-001`, `changed_by=gt-cli`, `11:07:32Z`) is ~87 minutes earlier and attributable to unrelated concurrent session activity, not this implementation. No sixth row from this author/timestamp exists.
+3. **Packet validation spot-check.** Independently re-ran `python scripts/validate_formal_artifact_packet.py .groundtruth/formal-artifact-approvals/2026-07-17-adr-bridge-artifact-head-envelope-001.json`; returned `packet_valid` (matches the report's claim for all five, of which this is one).
+4. **Regression evidence for the tooling this implementation relied on.** Ran the packet-validator and formal-artifact-approval-gate test suites (neither cited by the report, added as independent evidence): `24 passed` (see Commands Executed). This is a genuine spec-derived check, not evidence copied from the report -- it confirms the tooling `create_authorization_packet`/`validate_formal_artifact_packet.py` relied on for this insertion has no regression.
+5. **Git evidence.** `git status --short -- groundtruth.db` shows ` M groundtruth.db` (matches report). All three predecessor bridge files in this thread (`-001.md`, `-002.md`, `-003.md`) are untracked (`??`) and are included in this finalization's commit set below, satisfying the append-only predecessor-chain requirement.
+6. **WI/project readback.** `gt backlog show WI-5373 --json`: `resolution_status=open`, `stage=backlogged`, `project_name=PROJECT-GTKB-PLATFORM-MODERNIZATION-ENVELOPE-PROTOCOL` -- matches the report's claim that WI-5373 correctly remains open pending this verdict.
+7. **Prior review carried forward, not re-litigated.** The version 002 GO (my own prior, unrelated session) independently verified all five approval packets, the full hash chain, all cited deliberations' genuineness, PAUTH validity, WI/project consistency, prior-thread provenance, backlog non-duplication, and cited-specification existence before authorizing implementation. This verification does not re-derive that work; it verifies the *implementation* matches what was approved.
+
+## Applicability Preflight
+
+- packet_hash: `sha256:690d005cac67227dbc290227b8a082ce1c57bf90b9943397651cf7c9d06b2176`
+- bridge_document_name: `gtkb-envelope-protocol-slice-a-canonical-insertion`
+- content_source: `bridge_file_operative`
+- content_file: `bridge/gtkb-envelope-protocol-slice-a-canonical-insertion-003.md`
+- operative_file: `bridge/gtkb-envelope-protocol-slice-a-canonical-insertion-003.md`
+- preflight_passed: `true`
+- missing_required_specs: []
+- missing_advisory_specs: []
+- blocking_errors: []
+
+## Clause Applicability (Slice 2; mandatory gate)
+
+- Bridge id: `gtkb-envelope-protocol-slice-a-canonical-insertion`
+- Operative file: `bridge/gtkb-envelope-protocol-slice-a-canonical-insertion-003.md`
+- Clauses evaluated: 5
+- must_apply: 3, may_apply: 2, not_applicable: 0
+- Evidence gaps in must_apply clauses: 0
+- Blocking gaps (gate-failing): 0
+- Exit code: 0
+
+## Specification Links
+
+- `GOV-ARTIFACT-APPROVAL-001` -- satisfied: all five formal-artifact approval packets independently validated (see Independent Verification #3-4).
+- `GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001` -- satisfied: scoped git evidence and MemBase mutation-scope check confirm only `groundtruth.db` plus this thread's bridge chain changed; no runtime/source/test/hook/dispatcher/startup surface touched.
+- `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` -- satisfied: report cites an acquired `go_implementation` claim and implementation-start packet (`authorized: true`, target `groundtruth.db`) under the active PAUTH.
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` -- satisfied: applicability preflight passes clean with no missing required/advisory specs.
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` -- satisfied: see Spec-to-Test Mapping below.
+- `GOV-FILE-BRIDGE-AUTHORITY-001` -- satisfied: numbered bridge chain (001-003, this verdict as 004) is the canonical audit trail; status token is line 1 throughout.
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001` -- satisfied: Project Authorization/Project/Work Item metadata present and independently confirmed via `gt backlog show`.
+- `DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001` -- satisfied: WI-5373 confirmed as active member of `PROJECT-GTKB-PLATFORM-MODERNIZATION-ENVELOPE-PROTOCOL`.
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` -- satisfied: proposal, GO, implementation report, and this verdict form a complete governed artifact chain.
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` -- satisfied: durable traceability from packet to MemBase row confirmed by independent hash recomputation.
+- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` -- satisfied: candidate-to-canonical transition is explicit; no historical artifact was rewritten.
+
+## Spec-to-Test Mapping
+
+| Specification | Verification evidence | Executed | Observed result |
+| --- | --- | --- | --- |
+| `GOV-ARTIFACT-APPROVAL-001` | `python scripts/validate_formal_artifact_packet.py .groundtruth/formal-artifact-approvals/2026-07-17-adr-bridge-artifact-head-envelope-001.json` (independent spot-check, not copied from report) | yes | `packet_valid` |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | `python -m pytest platform_tests/scripts/test_validate_formal_artifact_packet.py platform_tests/hooks/test_formal_artifact_approval_gate.py -q --tb=short` | yes | `24 passed, 1 warning in 9.56s` |
+| `GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001` | Direct `KnowledgeDB.get_spec` readback + top-15-by-`changed_at` scan of the `specifications` table | yes | Exactly the five claimed rows changed at one timestamp; no extraneous mutation |
+
+## Findings (Carried Forward, Non-Blocking)
+
+**[P3, carried forward from version 002] `DCL-BRIDGE-ENVELOPE-LINE-AUTHORING-PLACEMENT-001`'s responder-role derivation table omits `ADVISORY`/`DEFERRED`/`WITHDRAWN`.** Unchanged since the GO review; does not affect this insertion's correctness (Slice A activates no write-time enforcement). Remains open for resolution alongside the Slice B (WI-5374) proposal, not a blocker for this VERIFIED.
+
+## Positive Confirmations
+
+- All five artifact types match their ID-prefix convention (ADR->`architecture_decision`, DCL->`design_constraint`, SPEC->`requirement`).
+- `target_paths` discipline held: only `groundtruth.db` plus already-existing evidence files were touched; no source/test/hook/dispatcher/startup path.
+- Slice boundary held: report explicitly states Slices B-G remain unimplemented and unauthorized by this insertion; WI-5373 stays `open` until this verdict.
+- The report's own acceptance-criteria table and this independent verification agree on every checked item.
+
+## Recommended Commit Type
+
+Recommended commit type: `docs:` -- concur with the report's justification (new governance/specification authority inserted into MemBase; zero runtime, source, test, hook, configuration, deployment, or release behavior changes). A `feat:` label would also have been defensible (these are net-new specification records), but `docs:` is not incorrect given no executable surface changed.
+
+## Commands Executed
+
+```text
+git status --short -- groundtruth.db
+git status --porcelain -- bridge/gtkb-envelope-protocol-slice-a-canonical-insertion-001.md bridge/gtkb-envelope-protocol-slice-a-canonical-insertion-002.md bridge/gtkb-envelope-protocol-slice-a-canonical-insertion-003.md
+groundtruth-kb/.venv/Scripts/python.exe -c "KnowledgeDB(...).get_spec(...)"  # five target IDs, recomputed sha256 independently
+groundtruth-kb/.venv/Scripts/python.exe -c "sqlite3 ... SELECT id, version, type, changed_by, changed_at FROM specifications ORDER BY changed_at DESC LIMIT 15"
+groundtruth-kb/.venv/Scripts/python.exe scripts/validate_formal_artifact_packet.py .groundtruth/formal-artifact-approvals/2026-07-17-adr-bridge-artifact-head-envelope-001.json
+groundtruth-kb/.venv/Scripts/python.exe -m pytest platform_tests/scripts/test_validate_formal_artifact_packet.py platform_tests/hooks/test_formal_artifact_approval_gate.py -q --tb=short
+groundtruth-kb/.venv/Scripts/gt.exe backlog show WI-5373 --json
+groundtruth-kb/.venv/Scripts/gt.exe bridge state-report --json
+groundtruth-kb/.venv/Scripts/python.exe scripts/bridge_applicability_preflight.py --bridge-id gtkb-envelope-protocol-slice-a-canonical-insertion --json
+groundtruth-kb/.venv/Scripts/python.exe scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-envelope-protocol-slice-a-canonical-insertion
+groundtruth-kb/.venv/Scripts/python.exe scripts/bridge_claim_cli.py status gtkb-envelope-protocol-slice-a-canonical-insertion
+```
+
+## Shared-Storage Disclosure
+
+`groundtruth.db` is a large, actively multi-session-written SQLite file; this thread's finalization commit necessarily captures the full current blob state (all pending MemBase rows across concurrent sessions), not only this thread's five rows, because Git cannot partially commit within one binary file. This is the established repo pattern for DB-touching VERIFIED finalizations. Each individual row carries its own independent `changed_by`/`changed_at`/`change_reason` audit trail inside MemBase regardless of which git commit captures the snapshot, so this does not bundle unreviewed cross-thread *content* -- it bundles already-individually-governed rows into one binary snapshot. The recurring `.git` object-store growth this causes is a tracked, not-yet-implemented platform concern (`REQ-GTKB-DB-STORAGE-OBJECT-STORE-BLOAT-001`, WI-5431); it does not block this narrowly-scoped, independently-verified insertion.
+
+---
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

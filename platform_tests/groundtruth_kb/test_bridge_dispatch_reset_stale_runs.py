@@ -16,9 +16,6 @@ import psutil
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
-for module_name in list(sys.modules):
-    if module_name == "groundtruth_kb" or module_name.startswith("groundtruth_kb."):
-        del sys.modules[module_name]
 
 from groundtruth_kb.bridge_dispatch_reset import DispatchStateDirs, soft_reset  # noqa: E402
 
@@ -120,3 +117,37 @@ def test_soft_reset_dry_run_does_not_remove(tmp_path: Path) -> None:
     result = soft_reset(DispatchStateDirs.resolve(tmp_path), dry_run=True)
     assert result.stale_dispatch_runs_pruned == 1
     assert (runs_dir / "dispatch-dead.pid").exists()
+
+
+def test_soft_reset_clears_recipient_last_result(tmp_path: Path) -> None:
+    """soft_reset must clear recipient last_result, pending_count, and selected_count."""
+    import json
+
+    poller_dir = tmp_path / ".gtkb-state" / "bridge-poller"
+    poller_dir.mkdir(parents=True, exist_ok=True)
+    dispatch_state = poller_dir / "dispatch-state.json"
+    state_payload = {
+        "recipients": {
+            "loyal-opposition:F": {
+                "circuit_breaker_tripped": True,
+                "last_result": "spawn_rate_limited",
+                "pending_count": 2,
+                "selected_count": 1,
+                "failure_count": 3,
+                "updated_at": "2026-06-29T07:25:59Z",
+            }
+        },
+        "schema_version": 1,
+    }
+    dispatch_state.write_text(json.dumps(state_payload), encoding="utf-8")
+
+    result = soft_reset(DispatchStateDirs.resolve(tmp_path))
+    assert result.recipients_cleared == 1
+
+    saved = json.loads(dispatch_state.read_text(encoding="utf-8"))
+    entry = saved["recipients"]["loyal-opposition:F"]
+    assert entry["circuit_breaker_tripped"] is False
+    assert entry["last_result"] == "no_pending"
+    assert entry["pending_count"] == 0
+    assert entry["selected_count"] == 0
+    assert entry["failure_count"] == 0

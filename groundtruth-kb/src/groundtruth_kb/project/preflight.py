@@ -64,6 +64,26 @@ _STATUS_TOKEN_RE = re.compile(
 _NON_TERMINAL_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "GO", "ADVISORY"})
 
 
+def _read_bridge_status_token(path: Path) -> str | None:
+    """Return the first non-blank bridge status token from *path*.
+
+    The preflight contract only needs the latest version's top status line, so
+    this intentionally stops after the first non-blank line instead of reading
+    the full bridge artifact.
+    """
+    try:
+        with path.open("r", encoding="utf-8", errors="replace") as handle:
+            for raw in handle:
+                stripped = raw.strip()
+                if not stripped:
+                    continue
+                status_match = _STATUS_TOKEN_RE.match(stripped)
+                return status_match.group(1).upper() if status_match else None
+    except OSError:
+        return None
+    return None
+
+
 def _check_bridge_inflight(target: Path, *, ignore: bool = False) -> list[UpgradeAction]:
     """Scan numbered bridge files for un-terminated bridge threads.
 
@@ -92,29 +112,21 @@ def _check_bridge_inflight(target: Path, *, ignore: bool = False) -> list[Upgrad
     if not bridge_dir.is_dir():
         return []
 
-    latest: dict[str, tuple[int, str]] = {}
+    latest_paths: dict[str, tuple[int, Path]] = {}
     for path in bridge_dir.glob("*.md"):
         name_match = _VERSIONED_BRIDGE_FILE_RE.match(path.name)
         if name_match is None:
             continue
-        try:
-            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-        except OSError:
-            continue
-        status: str | None = None
-        for raw in lines:
-            stripped = raw.strip()
-            if not stripped:
-                continue
-            status_match = _STATUS_TOKEN_RE.match(stripped)
-            status = status_match.group(1).upper() if status_match else None
-            break
-        if status is None:
-            continue
         slug = name_match.group("slug")
         version = int(name_match.group("version"))
-        prior = latest.get(slug)
+        prior = latest_paths.get(slug)
         if prior is None or version > prior[0]:
+            latest_paths[slug] = (version, path)
+
+    latest: dict[str, tuple[int, str]] = {}
+    for slug, (version, path) in latest_paths.items():
+        status = _read_bridge_status_token(path)
+        if status is not None:
             latest[slug] = (version, status)
 
     warnings: list[UpgradeAction] = []

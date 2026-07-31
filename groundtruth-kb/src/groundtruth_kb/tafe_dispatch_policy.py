@@ -7,6 +7,7 @@ MemBase. Callers provide the dispatch need and candidate runtime context.
 
 from __future__ import annotations
 
+import random
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -93,7 +94,7 @@ class EligibilityResult:
 
 @dataclass(frozen=True)
 class DispatchDecision:
-    """Deterministic dispatch-policy decision."""
+    """Dispatch-policy decision."""
 
     selected: str | None
     selected_candidate: DispatchCandidate | None
@@ -112,14 +113,16 @@ def evaluate_eligibility(need: DispatchNeed, candidate: DispatchCandidate) -> El
 def select_dispatch_target(
     need: DispatchNeed,
     candidates: Sequence[DispatchCandidate],
+    *,
+    rng: Any | None = None,
 ) -> DispatchDecision:
     """Return the selected harness and full eligibility/ranking evidence."""
 
     evaluations = tuple(evaluate_eligibility(need, candidate) for candidate in candidates)
     eligible_candidates = tuple(
-        sorted(
-            (result.candidate for result in evaluations if result.eligible),
-            key=_candidate_rank_key,
+        _rank_candidates_with_uniform_tiebreak(
+            [result.candidate for result in evaluations if result.eligible],
+            rng=rng,
         )
     )
     selected_candidate = eligible_candidates[0] if eligible_candidates else None
@@ -240,12 +243,35 @@ def _workspace_gate(need: DispatchNeed, candidate: DispatchCandidate) -> GateRes
     return GateResult("workspace_availability", passed, reason)
 
 
-def _candidate_rank_key(candidate: DispatchCandidate) -> tuple[int, float, str]:
+def _candidate_rank_key(candidate: DispatchCandidate) -> tuple[int, float]:
     return (
         int(candidate.reviewer_precedence),
         _cost_for_ranking(candidate.cost),
-        candidate.harness_id,
     )
+
+
+def _rank_candidates_with_uniform_tiebreak(
+    candidates: list[DispatchCandidate],
+    *,
+    rng: Any | None = None,
+) -> list[DispatchCandidate]:
+    ranked = sorted(candidates, key=_candidate_rank_key)
+    if len(ranked) < 2:
+        return ranked
+
+    ranked_with_random_ties: list[DispatchCandidate] = []
+    index = 0
+    while index < len(ranked):
+        rank_key = _candidate_rank_key(ranked[index])
+        tied_group = [ranked[index]]
+        index += 1
+        while index < len(ranked) and _candidate_rank_key(ranked[index]) == rank_key:
+            tied_group.append(ranked[index])
+            index += 1
+        if len(tied_group) > 1:
+            (rng or random).shuffle(tied_group)
+        ranked_with_random_ties.extend(tied_group)
+    return ranked_with_random_ties
 
 
 def _cost_for_ranking(cost: float | int | None) -> float:
@@ -261,7 +287,7 @@ def _decision_rationale(
     if selected_candidate is not None:
         return (
             f"Selected {selected_candidate.harness_id!r}: passed all hard eligibility gates and ranked first "
-            "by reviewer_precedence, cost, and harness_id."
+            "by reviewer_precedence and cost; fully tied candidates use uniform-random selection."
         )
     rejected = "; ".join(
         f"{result.candidate.harness_id or '<unknown>'}: {', '.join(result.failed_reasons)}" for result in evaluations

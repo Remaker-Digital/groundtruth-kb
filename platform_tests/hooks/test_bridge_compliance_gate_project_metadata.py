@@ -22,6 +22,8 @@ from pathlib import Path
 
 import pytest
 
+from scripts.gtkb_bridge_writer import normalize_bridge_envelope_head
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
 TEMPLATE_HOOK = REPO_ROOT / "groundtruth-kb" / "templates" / "hooks" / "bridge-compliance-gate.py"
@@ -69,7 +71,7 @@ def _deny(gate, content: str) -> str | None:
     return gate._deny_reason_for_content(
         cwd_path=REPO_ROOT,
         file_path="bridge/test-project-metadata-001.md",
-        content=content,
+        content=normalize_bridge_envelope_head(content),
         run_pending_preflight=False,
     )
 

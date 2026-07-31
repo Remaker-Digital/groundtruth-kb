@@ -18,7 +18,7 @@ The fix is consumer-side: the upstream `_KIND_TERMINAL_TOKENS` /
 `_derive_dispatchable` rule already published dispatchable=False for these
 GO entries; the AXIS 2 hook previously ignored the field. The hook now
 applies the compatibility-safe `getattr(item, "dispatchable", True)` filter,
-matching the idiom in scripts/cross_harness_bridge_trigger.py.
+matching the idiom in scripts/dispatcher_runtime.py.
 """
 
 from __future__ import annotations
@@ -67,14 +67,9 @@ def _write_fixture(
 ) -> None:
     """Write a fixture bridge thread to tmp_path.
 
-    Creates:
-    - bridge/INDEX.md with one Document entry, top-version line at `top_status`.
-    - bridge/<slug>-<operative_version>.md with the cited `bridge_kind:` header.
-    - bridge/<slug>-<top_version>.md for verdict files (GO/NO-GO) when separate.
-
-    The hook reads bridge/INDEX.md via the canonical parse_index, which expects
-    INDEX entries to point at files that exist on disk; missing files cause the
-    entry to be excluded.
+    Creates status-bearing versioned bridge files. The no-index scanner derives
+    current bridge state from numbered files and then applies the same GO
+    activatability checks used by dispatcher surfaces.
     """
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir(parents=True, exist_ok=True)
@@ -85,23 +80,33 @@ def _write_fixture(
     op_filename = f"bridge/{slug}-{operative_version}.md"
     top_filename = f"bridge/{slug}-{top_version}.md"
 
-    # INDEX: Document header + top-line first, then operative if different.
-    index_lines = [f"Document: {slug}\n", f"{top_status}: {top_filename}\n"]
-    if top_version != operative_version:
-        index_lines.append(f"NEW: {op_filename}\n")
-    (bridge_dir / "INDEX.md").write_text("".join(index_lines), encoding="utf-8")
+    _ = top_filename
+    _ = op_filename
 
-    # Operative file with bridge_kind header.
+    # Operative file with enough proposal metadata for GO activatability checks.
     operative_status = top_status if top_version == operative_version else "NEW"
     operative_body = (
-        f"{operative_status}\n\nbridge_kind: {bridge_kind}\n"
-        f"Document: {slug}\nVersion: {operative_version}\n\nFixture proposal body.\n"
+        f"{operative_status}\n"
+        "author_session_context_id: fixture-prime-session\n\n"
+        f"bridge_kind: {bridge_kind}\n"
+        f"Document: {slug}\nVersion: {operative_version}\n"
+        'target_paths: ["scripts/fixture.py"]\n\n'
+        "## Specification Links\n\n"
+        "- SPEC-CENTRALIZED-DISPATCH-SERVICE-001\n\n"
+        "## Requirement Sufficiency\n\n"
+        "Existing requirements sufficient.\n\n"
+        "## Spec-Derived Verification Plan\n\n"
+        "- Run `python -m pytest platform_tests/hooks/test_bridge_axis_2_surface_governance_review_terminal.py -q`.\n"
     )
     (bridge_dir / f"{slug}-{operative_version}.md").write_text(operative_body, encoding="utf-8")
 
     # Top verdict file (GO/NO-GO) if separate from operative.
     if top_version != operative_version:
-        verdict_body = f"{top_status}\n\nDocument: {slug}\nVersion: {top_version}\nVerdict.\n"
+        verdict_body = (
+            f"{top_status}\n"
+            "author_session_context_id: fixture-lo-session\n\n"
+            f"Document: {slug}\nVersion: {top_version}\nVerdict.\n"
+        )
         (bridge_dir / f"{slug}-{top_version}.md").write_text(verdict_body, encoding="utf-8")
 
 
@@ -126,7 +131,7 @@ def test_governance_review_go_excluded_from_axis_2_surface(tmp_path: Path) -> No
 
     assert items == [], (
         "Expected empty items for a governance_review GO (terminal-kind); the "
-        "AXIS 2 surface must mirror cross-harness trigger dispatch suppression."
+        "AXIS 2 surface must mirror dispatcher daemon dispatch suppression."
     )
     # Empty-list signature is deterministic (hash of empty JSON array).
     import hashlib

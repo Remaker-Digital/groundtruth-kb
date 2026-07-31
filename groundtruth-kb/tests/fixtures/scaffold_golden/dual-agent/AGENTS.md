@@ -75,6 +75,11 @@ remembering cross-agent process state.
 
 Every Codex session MUST execute these steps before any other work:
 
+0. **ORIENT block.** After steps 1–2 below, produce the mandatory 7-item ORIENT block
+   from live sources before other substantive work. Format and structured
+   `UNKNOWN:<category>` rules: `.claude/rules/session-start-orientation.md`.
+   Prime Builder uses the same contract in `CLAUDE.md`.
+
 1. **Bridge sweep.** Read canonical TAFE/dispatcher bridge state. Treat
    retired bridge-index artifacts as non-authoritative historical material.
    Process entries whose latest status is `NEW` or `REVISED` according to the
@@ -88,7 +93,11 @@ Every Codex session MUST execute these steps before any other work:
    - `.claude/rules/canonical-terminology.md` (full glossary — canonical ADR-0001 vocabulary)
 
 3. **Report operating state.** Summarize: file bridge status, document
-   versions loaded, any anomalies detected, and readiness to proceed.
+   versions loaded, any anomalies detected, ORIENT block, and readiness to proceed.
+
+When the owner uses a documented baseline-audit trigger phrase, run
+`/baseline-audit` (`.claude/skills/baseline-audit/SKILL.md`). Loyal Opposition may
+run the same skill for independent verification.
 
 ---
 

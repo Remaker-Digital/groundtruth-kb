@@ -18,10 +18,15 @@ EXPECTED_IDENTITIES = {
     "claude": "B",
     "antigravity": "C",
     "ollama": "D",
+    "cursor": "E",
     "openrouter": "F",
+    "goose": "G",
+    "alibaba-cloud-studio": "H",
 }
 VALID_ROLES = {"prime-builder", "loyal-opposition"}
-VALID_STATUSES = {"active", "suspended"}
+VALID_STATUSES = {"active", "suspended", "retired"}
+EXPECTED_EVENT_SOURCES: set[str] = set()
+EXPECTED_RULE_HARNESS_IDS = {"A", "B", "C", "D", "E", "F", "H"}
 
 
 def _read_json(relative_path: str) -> dict[str, Any]:
@@ -47,39 +52,44 @@ def test_durable_harness_identity_and_role_surfaces_cover_expected_harnesses() -
     assert set(EXPECTED_IDENTITIES.values()).issubset(registry_by_id)
 
     active_rows = []
-    suspended_rows = []
+    suspended_or_retired_rows = []
     for harness_name, harness_id in EXPECTED_IDENTITIES.items():
         row = registry_by_id[harness_id]
         assert row["harness_name"] == harness_name
         assert row["status"] in VALID_STATUSES
         assert set(row["role"]).issubset(VALID_ROLES)
-        assert row["can_receive_dispatch"] is True
         assert row["dispatch_tags"]
         assert "headless" in row["invocation_surfaces"]
 
         if row["status"] == "active":
             active_rows.append(row)
             assert row["role"]
+            assert isinstance(row["can_receive_dispatch"], bool)
         else:
-            suspended_rows.append(row)
+            suspended_or_retired_rows.append(row)
             assert row["can_fire_events"] is False
+            assert row["can_receive_dispatch"] is False
 
     assert any("prime-builder" in row["role"] for row in active_rows)
     assert any("loyal-opposition" in row["role"] for row in active_rows)
-    assert all(row["status"] == "suspended" for row in suspended_rows)
+    assert all(row["status"] in {"suspended", "retired"} for row in suspended_or_retired_rows)
 
-    assert registry_by_id["A"]["event_driven_hooks"] is True
-    assert registry_by_id["B"]["event_driven_hooks"] is True
-    assert registry_by_id["C"]["event_driven_hooks"] is False
-    assert registry_by_id["D"]["event_driven_hooks"] is False
-    assert registry_by_id["F"]["event_driven_hooks"] is False
+    assert {row["id"] for row in registry["harnesses"] if row["can_fire_events"]} == EXPECTED_EVENT_SOURCES
+    dispatch_targets = [row for row in registry["harnesses"] if row["can_receive_dispatch"]]
+    assert dispatch_targets
+    assert all(row["status"] == "active" for row in dispatch_targets)
+    assert any("prime-builder" in row["role"] for row in dispatch_targets)
+    assert any("loyal-opposition" in row["role"] for row in dispatch_targets)
+    assert any("low-cost" in row["dispatch_tags"] for row in dispatch_targets)
+    for harness_id, row in registry_by_id.items():
+        assert row["event_driven_hooks"] is (harness_id in EXPECTED_EVENT_SOURCES)
 
 
 def test_dispatcher_status_rules_match_prime_and_lo_bridge_boundaries() -> None:
     rules_config = _read_toml("config/dispatcher/rules.toml")
 
     harness_ids = set(rules_config["harnesses"])
-    assert set(EXPECTED_IDENTITIES.values()).issubset(harness_ids)
+    assert EXPECTED_RULE_HARNESS_IDS.issubset(harness_ids)
 
     rule_by_id = {rule["id"]: rule for rule in rules_config["rules"]}
     prime_rule = rule_by_id["bridge-prime-builder-default"]
@@ -88,15 +98,36 @@ def test_dispatcher_status_rules_match_prime_and_lo_bridge_boundaries() -> None:
     assert prime_rule["required_roles"] == ["prime-builder"]
     assert prime_rule["statuses"] == ["GO", "NO-GO"]
     assert lo_rule["required_roles"] == ["loyal-opposition"]
-    assert lo_rule["statuses"] == ["NEW", "REVISED"]
+    assert lo_rule["statuses"] == ["NEW", "REVISED", "NO-ACTION"]
 
     protocol = _read_text(".claude/rules/file-bridge-protocol.md")
+    disposition = _read_text("groundtruth-kb/src/groundtruth_kb/bridge/disposition.py")
     assert "GO, NO-GO, or ADVISORY" in protocol
-    assert "NEW or REVISED entries" in protocol
+    assert "NEW, REVISED, or NO-ACTION entries" in protocol
+    assert 'STATUS_NO_ACTION: Final[str] = "NO-ACTION"' in disposition
+    assert "LOYAL_OPPOSITION_ACTIONABLE_STATUSES" in disposition
     assert (
         "ADVISORY entries are Prime-actionable for interactive sessions and non-dispatchable for headless runs"
         in protocol
     )
+
+    for relative_path in (
+        "AGENTS.md",
+        "CLAUDE.md",
+        "config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md",
+        ".claude/rules/codex-standing-priorities.md",
+        ".claude/rules/codex-review-operating-contract.md",
+        ".claude/rules/codex-loyal-opposition-runbook.md",
+        ".claude/rules/prime-bridge-collaboration-protocol.md",
+        ".claude/skills/bridge/SKILL.md",
+        ".codex/skills/bridge/SKILL.md",
+        ".agent/skills/bridge/SKILL.md",
+        ".api-harness/skills/bridge/SKILL.md",
+        "scripts/dispatcher_runtime.py",
+        "scripts/ollama_harness.py",
+        "scripts/openrouter_harness.py",
+    ):
+        assert "NO-ACTION" in _read_text(relative_path), relative_path
 
 
 def test_protected_mutation_surfaces_expose_go_packet_and_claim_requirements() -> None:
@@ -119,8 +150,10 @@ def test_protected_mutation_surfaces_expose_go_packet_and_claim_requirements() -
     for needle in ("missing_bridge_go", "missing_implementation_packet", "missing_or_stale_claim"):
         assert needle in protected_guard
 
-    assert "implementation-start-gate" in codex_hooks
-    assert "bridge-compliance-gate" in codex_hooks
+    assert "--batch pretooluse-bash" in codex_hooks
+    assert "--batch pretooluse-apply-patch" in codex_hooks
+    assert "bridge-compliance-gate.cmd" in _read_text(".codex/gtkb-hooks/run_py_no_window.py")
+    assert "implementation-start-gate.cmd" in _read_text(".codex/gtkb-hooks/run_py_no_window.py")
     assert "implementation-start-gate.py" in claude_settings
     assert "bridge-compliance-gate.py" in claude_settings
 
@@ -154,6 +187,16 @@ def test_capability_registry_tracks_shared_skill_and_low_cost_harness_floors() -
         assert set(harness_floor["advertised_tool_subset"]) == {"Read", "Write", "Edit", "Grep", "Glob", "Bash"}
 
 
+def test_harness_parity_skill_separates_catalog_operational_and_hook_scope() -> None:
+    skill_text = _read_text(".claude/skills/harness-parity-review/SKILL.md")
+
+    assert "phase-1 catalog parity" in skill_text
+    assert "phase-2 operational readiness" in skill_text
+    assert "Discovery-diff applies only where a" in skill_text
+    assert "API/provider harness readiness must" in skill_text
+    assert "python scripts/parity_discovery_diff.py --project-root . --markdown" in skill_text
+
+
 def test_hook_fallback_surfaces_distinguish_event_sources_from_dispatch_targets() -> None:
     registry = _read_json("harness-state/harness-registry.json")
     codex_hooks = _read_text(".codex/hooks.json")
@@ -162,12 +205,27 @@ def test_hook_fallback_surfaces_distinguish_event_sources_from_dispatch_targets(
     by_id = {row["id"]: row for row in registry["harnesses"]}
     event_sources = {row["id"] for row in registry["harnesses"] if row["can_fire_events"]}
     dispatch_only = {row["id"] for row in registry["harnesses"] if not row["can_fire_events"]}
+    dispatch_targets = {row["id"] for row in registry["harnesses"] if row["can_receive_dispatch"]}
 
-    assert event_sources == {"A", "B"}
-    assert dispatch_only == {"C", "D", "F"}
-    assert all(by_id[harness_id]["can_receive_dispatch"] for harness_id in EXPECTED_IDENTITIES.values())
+    assert event_sources == EXPECTED_EVENT_SOURCES
+    assert dispatch_only == set(EXPECTED_IDENTITIES.values())
+    assert dispatch_targets
+    assert all(by_id[harness_id]["status"] == "active" for harness_id in dispatch_targets)
+    assert any("prime-builder" in by_id[harness_id]["role"] for harness_id in dispatch_targets)
+    assert any("loyal-opposition" in by_id[harness_id]["role"] for harness_id in dispatch_targets)
+    assert any("low-cost" in by_id[harness_id]["dispatch_tags"] for harness_id in dispatch_targets)
+    inactive_targets = {
+        harness_id for harness_id in EXPECTED_IDENTITIES.values() if not by_id[harness_id]["can_receive_dispatch"]
+    }
+    assert inactive_targets == set(EXPECTED_IDENTITIES.values()) - dispatch_targets
 
-    assert "cross_harness_bridge_trigger.py" in codex_hooks
-    assert "single_harness_bridge_automation.py" in codex_hooks
-    assert "cross_harness_bridge_trigger.py" in claude_settings
-    assert "single_harness_bridge_automation.py" in claude_settings
+    forbidden_hook_dispatch = (
+        "cross_" + "harness_" + "bridge_" + "trigger.py",
+        "single_harness_bridge_automation.py",
+        "single_harness_bridge_dispatcher.py",
+        "bridge-dispatch-trigger",
+        "dispatcher-daemon.cmd",
+        "gtkb_dispatcher_daemon.py",
+    )
+    for hook_config in (codex_hooks, claude_settings):
+        assert not any(token in hook_config for token in forbidden_hook_dispatch)

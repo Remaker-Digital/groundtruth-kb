@@ -8,12 +8,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 
 from groundtruth_kb.cli import main  # noqa: E402
+from groundtruth_kb.cli_spec_record import SpecRecordError, SpecRecordRequest, record_spec  # noqa: E402
+from groundtruth_kb.config import GTConfig  # noqa: E402
 
 HOOK = REPO_ROOT / ".claude" / "hooks" / "formal-artifact-approval-gate.py"
 
@@ -85,6 +88,39 @@ def _packet_files(root: Path) -> list[Path]:
     return sorted(packet_dir.glob("*.json"))
 
 
+def _service_config(root: Path) -> GTConfig:
+    return GTConfig(db_path=root / "groundtruth.db", project_root=root)
+
+
+def _service_request(content: Path, **overrides: object) -> SpecRecordRequest:
+    values = {
+        "spec_id": "GOV-TEST-001",
+        "title": "Test spec",
+        "status": "specified",
+        "content_file": content,
+        "change_reason": "record owner-approved spec",
+        "auq_id": "S344-AUQ-SPEC-1",
+        "auq_answer": "Approved",
+        "owner_presented": True,
+        "approved_by": None,
+        "spec_type": None,
+        "priority": None,
+        "scope": None,
+        "section": None,
+        "handle": None,
+        "tags_json": None,
+        "assertions_json": None,
+        "constraints_json": None,
+        "affected_by_json": None,
+        "testability": None,
+        "source_paths_json": None,
+        "application_scope": None,
+        "dry_run": True,
+    }
+    values.update(overrides)
+    return SpecRecordRequest(**values)
+
+
 def test_record_requires_owner_presented_before_packet_or_db_write(tmp_path: Path) -> None:
     root, config, content = _project(tmp_path)
     result = CliRunner().invoke(main, _record_args(config, content))
@@ -117,6 +153,44 @@ def test_dry_run_constructs_valid_packet_and_writes_nothing(tmp_path: Path) -> N
     assert packet["approved_by"] == "owner"
     assert packet["full_content"] == content.read_text(encoding="utf-8")
     assert payload["dry_run"] is True
+    assert Path(payload["approval_packet_path"]).name.endswith("-gov-test-001.json")
+    assert _spec_count(root / "groundtruth.db") == 0
+    assert _packet_files(root) == []
+
+
+def test_gap_state_spec_capture_dry_run_carries_context_and_writes_nothing(tmp_path: Path) -> None:
+    root, _config, content = _project(tmp_path)
+    request = _service_request(
+        content,
+        gap_state_capture=True,
+        gap_state_bridge_id="gtkb-gap-state-spec-capture",
+        gap_state_reason="requirement sufficiency gap-state proposal needs formal spec capture",
+    )
+
+    result = record_spec(_service_config(root), request)
+    packet = result["approval_packet"]
+
+    assert result["gap_state_capture"] is True
+    assert packet["capture_context"] == "gap_state"
+    assert packet["gap_state_bridge_id"] == "gtkb-gap-state-spec-capture"
+    assert packet["intended_db_operation"]["method"] == "insert_spec"
+    assert packet["intended_db_operation"]["id"] == "GOV-TEST-001"
+    assert _spec_count(root / "groundtruth.db") == 0
+    assert _packet_files(root) == []
+
+
+def test_gap_state_spec_capture_requires_bridge_context_before_writes(tmp_path: Path) -> None:
+    root, _config, content = _project(tmp_path)
+    request = _service_request(
+        content,
+        gap_state_capture=True,
+        gap_state_bridge_id="",
+        gap_state_reason="missing bridge id should fail closed",
+    )
+
+    with pytest.raises(SpecRecordError, match="--gap-state-bridge-id"):
+        record_spec(_service_config(root), request)
+
     assert _spec_count(root / "groundtruth.db") == 0
     assert _packet_files(root) == []
 
@@ -161,6 +235,28 @@ def test_prefixes_resolve_to_expected_artifact_types_in_dry_run(tmp_path: Path) 
         assert result.exit_code == 0, result.output
         payload = json.loads(result.output)
         assert payload["approval_packet"]["artifact_type"] == expected_type
+        assert Path(payload["approval_packet_path"]).name.endswith(f"-{spec_id.lower()}.json")
+
+
+def test_approval_packet_path_uses_lowercase_filename_and_preserves_payload_id(tmp_path: Path) -> None:
+    root, _config, content = _project(tmp_path)
+    config = _service_config(root)
+    spec_id = "GOV-MIXED-CASE-001"
+
+    dry_run = record_spec(config, _service_request(content, spec_id=spec_id, dry_run=True))
+    dry_run_path = Path(dry_run["approval_packet_path"])
+    assert dry_run_path.name.endswith("-gov-mixed-case-001.json")
+    assert dry_run["approval_packet"]["artifact_id"] == spec_id
+    assert _packet_files(root) == []
+
+    written = record_spec(config, _service_request(content, spec_id=spec_id, dry_run=False))
+    written_path = Path(written["approval_packet_path"])
+    packets = _packet_files(root)
+    assert packets == [written_path]
+    assert written_path == dry_run_path
+    assert written_path.name.endswith("-gov-mixed-case-001.json")
+    packet = json.loads(written_path.read_text(encoding="utf-8"))
+    assert packet["artifact_id"] == spec_id
 
 
 def test_explicit_type_mismatch_is_rejected(tmp_path: Path) -> None:
@@ -223,6 +319,7 @@ def test_successful_dcl_record_creates_packet_and_spec_row(tmp_path: Path) -> No
     assert row["description"] == content.read_text(encoding="utf-8")
     packets = _packet_files(root)
     assert len(packets) == 1
+    assert packets[0].name.endswith("-dcl-test-001.json")
     packet = json.loads(packets[0].read_text(encoding="utf-8"))
     assert packet["artifact_id"] == "DCL-TEST-001"
     assert packet["artifact_type"] == "design_constraint"

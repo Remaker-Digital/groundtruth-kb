@@ -38,6 +38,25 @@ def test_release_runtime_subprocess_without_no_window_is_violation(tmp_path: Pat
     assert [(finding.call, finding.state) for finding in findings] == [("subprocess.run", "violation")]
 
 
+def test_missing_tracked_python_file_is_skipped(tmp_path: Path) -> None:
+    audit = _load_audit()
+
+    assert audit.scan_file(tmp_path / "platform_tests" / "scripts" / "missing.py", root=tmp_path) == []
+
+
+def test_codex_mcp_worker_guard_is_release_runtime(tmp_path: Path) -> None:
+    audit = _load_audit()
+    path = _write(
+        tmp_path,
+        "scripts/codex_mcp_worker_guard.py",
+        "import subprocess\nsubprocess.run(['powershell.exe', '-NoProfile'])\n",
+    )
+
+    findings = audit.scan_file(path, root=tmp_path)
+
+    assert [(finding.call, finding.state) for finding in findings] == [("subprocess.run", "violation")]
+
+
 def test_direct_creationflags_is_compliant(tmp_path: Path) -> None:
     audit = _load_audit()
     path = _write(
@@ -96,6 +115,27 @@ def test_no_window_kwargs_helper_call_is_compliant(tmp_path: Path) -> None:
     assert findings[0].no_window is True
 
 
+def test_no_window_helper_assignment_is_compliant_for_dispatcher_runtime(tmp_path: Path) -> None:
+    audit = _load_audit()
+    path = _write(
+        tmp_path,
+        "scripts/dispatcher_runtime.py",
+        (
+            "import subprocess\n"
+            "def _run_with_status_wrapper_popen_kwargs():\n"
+            "    return {'creationflags': subprocess.CREATE_NO_WINDOW}\n"
+            "def launch():\n"
+            "    wrapper_popen_kwargs = _run_with_status_wrapper_popen_kwargs()\n"
+            "    subprocess.Popen(['pythonw.exe', 'scripts/run_with_status.py'], **wrapper_popen_kwargs)\n"
+        ),
+    )
+
+    findings = audit.scan_file(path, root=tmp_path)
+
+    assert findings[0].state == "compliant_no_window"
+    assert findings[0].no_window is True
+
+
 def test_test_paths_are_classified_non_release(tmp_path: Path) -> None:
     audit = _load_audit()
     path = _write(
@@ -125,3 +165,25 @@ def test_os_system_in_operator_script_is_interactive_allowlist(tmp_path: Path) -
     findings = audit.scan_file(path, root=tmp_path)
 
     assert findings[0].state == "interactive_allowlist"
+
+
+def test_real_tree_has_no_no_window_violations() -> None:
+    """WI-5071 reintroduction guard: no release-runtime launch site in the
+    git-tracked tree may lack a Windows no-window disposition.
+
+    This runs the audit over the real repository tree (not a fixture) so the
+    extended RELEASE_RUNTIME_FILES / RELEASE_RUNTIME_PREFIXES allowlist is
+    exercised against the actual sources. Because platform_tests runs in CI, a
+    regression that reintroduces an unguarded console spawn on a release-runtime
+    surface fails here (and in the release-candidate gate) rather than silently
+    shipping.
+    """
+    audit = _load_audit()
+    tracked = audit._tracked_python_files(_REPO_ROOT)
+    findings = audit.scan_paths(tracked, root=_REPO_ROOT)
+    violations = [(finding.path, finding.line, finding.call) for finding in findings if finding.state == "violation"]
+
+    assert violations == [], (
+        "release-runtime launch sites must carry a Windows no-window disposition "
+        f"(creationflags/startupinfo); violations found: {violations}"
+    )

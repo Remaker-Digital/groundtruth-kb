@@ -45,6 +45,22 @@ def _paths() -> SimpleNamespace:
     )
 
 
+def _confine_marker_lookup_to_fixture(monkeypatch: pytest.MonkeyPatch, fixture_root: Path) -> None:
+    """Hide real host markers above a synthetic negative-test boundary."""
+    from groundtruth_kb.bridge import paths
+
+    boundary = fixture_root.resolve()
+    has_marker = paths._has_marker
+
+    def _has_fixture_marker(candidate: Path) -> bool:
+        resolved = candidate.resolve()
+        if resolved != boundary and boundary not in resolved.parents:
+            return False
+        return has_marker(candidate)
+
+    monkeypatch.setattr(paths, "_has_marker", _has_fixture_marker)
+
+
 @pytest.fixture
 def synthetic_gtkb_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create a synthetic in-root GT-KB project at ``tmp_path/synth_gtkb/``."""
@@ -109,6 +125,7 @@ def test_resolve_project_root_raises_when_no_marker_found(tmp_path: Path, monkey
     monkeypatch.setenv("PATH", str(fake_path))
     if os.name == "nt":
         monkeypatch.setenv("PATHEXT", "")
+    _confine_marker_lookup_to_fixture(monkeypatch, empty)
     with pytest.raises(p.ProjectRootNotFoundError):
         p.resolve_project_root()
 
@@ -201,6 +218,7 @@ def test_resolve_project_root_rejects_git_repo_without_groundtruth_toml(
 
     monkeypatch.delenv(p.PROJECT_ROOT_ENV_VAR, raising=False)
     monkeypatch.chdir(fake_repo)
+    _confine_marker_lookup_to_fixture(monkeypatch, fake_repo)
     with pytest.raises(p.ProjectRootNotFoundError):
         p.resolve_project_root()
 

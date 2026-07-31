@@ -236,10 +236,9 @@ def test_dispatcher_kind_aware_terminal_go_not_dispatched() -> None:
     """SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001 kind-aware dispatchability:
     terminal GO entries must NOT be marked dispatchable.
 
-    This invariant is inherited from the cross-harness trigger's existing
-    kind-aware-routing path (via `gtkb-cross-harness-trigger-codex-exec-hook-firing-001`).
-    The SPEC explicitly preserves it: the single-harness dispatcher honors the
-    same actionable-classification semantic.
+    This invariant is inherited from the earlier kind-aware routing path. The
+    SPEC explicitly preserves it: the single-harness dispatcher honors the same
+    actionable-classification semantic.
 
     Test: import the trigger's actionable-computation; confirm a synthetic
     item flagged dispatchable=False is filtered out by the same predicate the

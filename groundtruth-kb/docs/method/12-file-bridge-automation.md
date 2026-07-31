@@ -1,7 +1,7 @@
 # 12. File Bridge Automation
 
 Dual-agent GroundTruth workflows are not just a pair of prompts. They depend on
-an operating surface: bridge files, status rules, hook registrations,
+an operating surface: bridge files, status rules, daemon configuration,
 agent-specific startup instructions, CLI invocations, plugins, skills, locks,
 logs, and recovery procedures. If those pieces are not captured, the pipeline
 can appear documented while the working system is actually tribal knowledge.
@@ -18,7 +18,7 @@ The file bridge exists to make the review pipeline routine and durable:
 - Loyal Opposition can review queued work without manual owner prompting.
 - Prime Builder can act on review verdicts without the owner copying messages
   between tools.
-- The owner can verify health from files, hook registrations, and dispatch
+- The owner can verify health from files, daemon configuration, and dispatch
   state.
 
 The owner should provide specifications, clarifications, and decisions. The
@@ -27,18 +27,20 @@ evidence capture.
 
 ## Reference topology
 
-The preferred topology is a file-based bridge with a cross-harness
-event-driven trigger that dispatches the appropriate counterpart harness when
-a recipient's actionable queue signature changes. The retired smart-poller and
-OS-scheduler implementations (archived under `archive/smart-poller-2026-05-09/`)
-are no longer the active automation path; bridge dispatch is now event-driven
-rather than interval-driven.
+The preferred topology is a file-based bridge with a dispatcher daemon that
+dispatches the appropriate counterpart harness when a recipient's actionable
+queue signature changes. On Windows, the daemon is kept alive by the hidden
+`GTKB-DispatcherDaemon` scheduled-task supervisor. The retired smart-poller,
+OS-scheduler queue, and hook-trigger worker implementations are not the active
+automation path; bridge dispatch is daemon-driven rather than hook-driven or
+interval-driven.
 
 ```mermaid
 graph TD
-    EVT[Tool-use or Stop event] -->|fires| TRG[scripts/cross_harness_bridge_trigger.py]
-    TRG -->|reads| IDX[TAFE/dispatcher bridge state]
-    TRG -->|writes| DST[.gtkb-state/bridge-poller/dispatch-state.json]
+    SUP[Headless Windows supervisor] -->|ensures alive| TRG[scripts/gtkb_dispatcher_daemon.py]
+    TRG -->|scans| IDX[TAFE/dispatcher bridge state]
+    TRG -->|writes liveness| DSTATE[.gtkb-state/dispatcher-daemon]
+    TRG -->|writes dispatch state| DST[.gtkb-state/bridge-poller/dispatch-state.json]
     TRG -->|dispatches| PRIME[Prime Builder harness]
     TRG -->|dispatches| LO[Loyal Opposition harness]
     PRIME -->|reads/writes| IDX
@@ -50,18 +52,18 @@ graph TD
 |-----------|----------------|
 | TAFE/dispatcher bridge state | Authoritative review queue and status index |
 | `bridge/*.md` | Numbered review documents, implementation reports, and verdicts |
-| `scripts/cross_harness_bridge_trigger.py` | Event-driven dispatch entrypoint that inspects bridge state and dispatches the appropriate counterpart harness when its actionable queue signature changes |
-| `.claude/settings.json` (`PostToolUse`, `Stop` hooks) | Claude Code-side trigger registration |
-| `.codex/hooks.json` (`PostToolUse`, `Stop` hooks) | Codex-side parity trigger registration (forward-compatible per `ADR-CODEX-HOOK-PARITY-FALLBACK-001`) |
+| `scripts/gtkb_dispatcher_daemon.py` | Long-running dispatcher daemon that inspects bridge state and dispatches the appropriate counterpart harness when its actionable queue signature changes |
+| `scripts/install_dispatcher_daemon_task.ps1` | Windows supervisor installer for the hidden `GTKB-DispatcherDaemon` scheduled task |
+| `.gtkb-state/dispatcher-daemon/` | Daemon heartbeat, lock, PID provenance, status, and shadow-decision evidence |
 | `.gtkb-state/bridge-poller/dispatch-state.json` | Per-recipient dispatch-state record consulted by the doctor's `_check_bridge_dispatch_liveness` check |
-| Logs | Hook output and dispatch state provide proof of triggers and dispatches |
-| Inventory | Records hook registrations, the trigger script, dispatch-state path, CLI commands, plugins, skills, and the manual fallback procedure |
+| Logs | Daemon output, worker run records, and dispatch state provide proof of dispatches |
+| Inventory | Records daemon configuration, supervisor status, daemon script, dispatch-state path, CLI commands, plugins, skills, and the manual fallback procedure |
 
-The retired smart-poller and OS-scheduler topology required Windows scheduled
-tasks, hidden VBS launchers, PowerShell scanners, lock files, and short
-polling intervals. None of those pieces remain active. Bridge dispatch fires
-when the agent's tool-call updates bridge state or the agent's turn ends, not on
-a fixed interval.
+The retired smart-poller and OS-scheduler queue topology required Windows
+scheduled tasks, hidden VBS launchers, PowerShell scanners, lock files, and
+short polling intervals. Those queue implementations remain retired. The only
+scheduled-task role in the current topology is headless daemon supervision; it
+does not scan or route bridge work itself.
 
 ## Protocol model
 
@@ -90,12 +92,12 @@ stateDiagram-v2
 | `NO-GO` | Loyal Opposition | Blockers remain; Prime Builder must respond |
 | `VERIFIED` | Loyal Opposition | Terminal verification; no Prime response is expected |
 
-The trigger inspects the latest status for each document entry. Historical
+The daemon inspects the latest status for each document entry. Historical
 statuses below the latest line are evidence, not action items.
 
 ## Dispatch filters
 
-The trigger uses separate signatures for the two directions to decide
+The daemon uses separate signatures for the two directions to decide
 whether dispatching is warranted.
 
 | Recipient | Actionable latest statuses | Ignored |
@@ -103,32 +105,33 @@ whether dispatching is warranted.
 | Loyal Opposition | `NEW`, `REVISED` | `GO`, `NO-GO`, `VERIFIED` |
 | Prime Builder | `GO`, `NO-GO` | `NEW`, `REVISED`, `VERIFIED` |
 
-`VERIFIED` is terminal. The trigger never dispatches Prime Builder for
+`VERIFIED` is terminal. The daemon never dispatches Prime Builder for
 `VERIFIED` items, and the dispatch-state signature ignores historical statuses
 beneath the latest entry per document.
 
-## Trigger dispatch standard
+## Dispatcher dispatch standard
 
-The cross-harness event-driven trigger is the authoritative dispatch
+The dispatcher daemon is the authoritative dispatch
 mechanism when the bridge must operate across sessions.
 
-Recommended trigger properties:
+Recommended dispatcher properties:
 
-- Fire on `PostToolUse` (so a bridge-state update dispatches the
-  counterpart immediately) and `Stop` (so an end-of-turn check catches
-  pending recipient work).
+- Run as a persistent daemon; on Windows, use the headless scheduled-task
+  supervisor for production persistence across IDE and terminal closure.
 - Compute an actionable-queue signature for each recipient and dispatch only
   when the signature changes.
+- Record daemon heartbeat, lock, status, and PID provenance under
+  `.gtkb-state/dispatcher-daemon/`.
 - Record dispatches in `.gtkb-state/bridge-poller/dispatch-state.json` with
   per-recipient `updated_at` so the doctor can detect missed dispatches.
 - Skip dispatch when no recipient has actionable work.
 - Keep stdout and stderr from dispatched harness invocations in a
   diagnosable location.
 - Provide a single-instance lock so a bridge update under heavy
-  tool-use does not produce overlapping dispatches.
+  activity does not produce overlapping dispatches.
 
 Manual bridge-state scans remain available as a fallback when the
-trigger is unhealthy. The owner triggers a Prime bridge scan with a brief
+daemon is unhealthy. The owner triggers a Prime bridge scan with a brief
 prompt such as `Bridge` or `Bridge scan`.
 
 ## Prompt and configuration capture
@@ -142,16 +145,17 @@ For each side, document:
 - Permission mode and sandbox assumptions
 - Startup instruction files, such as `CLAUDE.md`, `AGENTS.md`, or `MEMORY.md`
 - Rule files, such as `.claude/rules/file-bridge-protocol.md`
-- Hook registrations (`.claude/settings.json`, `.codex/hooks.json`)
+- Dispatcher configuration and selected targets
+- Supervisor install/status surface on Windows
 - Dispatch-state path (`.gtkb-state/bridge-poller/dispatch-state.json`)
-- Trigger script path (`scripts/cross_harness_bridge_trigger.py`)
+- Daemon script path (`scripts/gtkb_dispatcher_daemon.py`)
 - Plugins, MCP servers, and skills required for the run
 - Environment variables and config files needed by the CLI
 - Log, lock, and transcript locations
 - Owner-only escalation rules
 - Manual bridge-scan fallback procedure
 
-Prompt text is configuration. If changing a prompt changes what the trigger
+Prompt text is configuration. If changing a prompt changes what the daemon
 does, that prompt must be versioned or inventoried like code.
 
 ## Inventory fields
@@ -161,8 +165,9 @@ usually `BRIDGE-INVENTORY.md`, with at least:
 
 - agent roles and ownership
 - file bridge paths and status semantics
-- hook registrations (`.claude/settings.json`, `.codex/hooks.json`)
-- trigger script path (`scripts/cross_harness_bridge_trigger.py`)
+- daemon configuration and selected targets
+- Windows supervisor task name and status surface
+- daemon script path (`scripts/gtkb_dispatcher_daemon.py`)
 - dispatch-state path (`.gtkb-state/bridge-poller/dispatch-state.json`)
 - lock and log paths
 - CLI commands and working directories
@@ -177,22 +182,27 @@ The package template `templates/BRIDGE-INVENTORY.md` includes these sections.
 
 ## Health checks
 
-A bridge health check should answer four questions:
+A bridge health check should answer five questions:
 
-1. Is the cross-harness-trigger script present and executable?
-2. Are both hook registrations (`.claude/settings.json` PostToolUse + Stop;
-   `.codex/hooks.json` PostToolUse + Stop) in place?
-3. Is the dispatch-state file fresh (PASS < 4 min, WARN 4-10 min, ALARM > 10 min)?
-4. Does the INDEX reflect expected status transitions?
+1. Is the dispatcher daemon script present and executable?
+2. Are daemon configuration and selected dispatch targets valid?
+3. Is the daemon heartbeat fresh and, on Windows, is the supervisor healthy?
+4. Is the dispatch-state file fresh (PASS < 4 min, WARN 4-10 min, ALARM > 10 min)?
+5. Does the INDEX reflect expected status transitions?
 
-The doctor exposes this via two checks:
+The doctor exposes this via several checks:
 
 ```text
 gt project doctor
 ```
 
-- `_check_cross_harness_trigger` reports PASS/WARN/FAIL covering trigger
-  script presence, both hook registrations, and dispatch-state freshness.
+- `_check_dispatcher_only_bridge_automation` reports PASS/WARN/FAIL covering
+  dispatcher script presence, retired worker absence, and dispatch-state
+  presence.
+- `_check_dispatcher_daemon_substrate_readiness` reports whether the active
+  `dispatcher_daemon` substrate has a fresh daemon heartbeat.
+- `_check_dispatcher_daemon_supervisor_task` warns when a Windows
+  `dispatcher_daemon` substrate lacks a healthy headless supervisor task.
 - `_check_bridge_dispatch_liveness` reports per-recipient dispatch-state
   liveness for `claude` and `codex`.
 
@@ -212,12 +222,13 @@ Common failures to review explicitly:
 
 | Failure | Signal | Correction |
 |---------|--------|------------|
-| Trigger script missing | `_check_cross_harness_trigger` reports FAIL on script presence | Restore from scaffold or `gt project init my-project --profile dual-agent` |
-| Hook registration missing | `_check_cross_harness_trigger` reports FAIL on hook registrations | Update `.claude/settings.json` PostToolUse/Stop arrays or `.codex/hooks.json` |
-| Dispatch-state stale | `_check_bridge_dispatch_liveness` reports WARN/ALARM | Inspect last hook invocation and INDEX state; verify hooks fire on tool-use |
-| Completed items re-dispatch | Trigger treats `VERIFIED` as actionable | Verify dispatch-filter logic ignores `VERIFIED` |
+| Daemon script missing | `_check_dispatcher_only_bridge_automation` reports FAIL on script presence | Restore from scaffold or `gt project init my-project --profile dual-agent` |
+| Supervisor disabled or missing (Windows) | `_check_dispatcher_daemon_supervisor_task` reports WARN | Run `gt bridge dispatch daemon supervisor install` |
+| Daemon configuration missing | `gt bridge dispatch health` reports configuration findings | Correct selected target eligibility with governed dispatcher CLI/config workflow |
+| Dispatch-state stale | `_check_bridge_dispatch_liveness` reports WARN/ALARM | Inspect daemon heartbeat, last decision, worker runs, and INDEX state |
+| Completed items re-dispatch | Daemon treats `VERIFIED` as actionable | Verify dispatch-filter logic ignores `VERIFIED` |
 | Duplicate dispatches | Concurrent INDEX modifications | Verify single-instance lock acquisition |
-| Silent failures | Hook output not captured | Capture trigger stdout/stderr in dispatch-state |
+| Silent failures | Worker output not captured | Capture daemon and worker stdout/stderr in dispatch-state/run records |
 | Wrong agent behavior | CLI prompt omits role, verdict rules, or config paths | Version the prompt and include it in inventory |
 | Stale integration config | Archived MCP or bridge config remains active | Remove or mark inactive in config and inventory |
 
@@ -229,7 +240,7 @@ Use GroundTruth records to preserve the operating history:
 
 | Record type | Use |
 |-------------|-----|
-| `environment_config` | CLI paths, hook registration paths, config files, env vars |
+| `environment_config` | CLI paths, dispatcher configuration, supervisor task, config files, env vars |
 | `operation_procedure` | Setup, health check, recovery, and review procedures |
 | `document` | Bridge design notes, inventories, prompt captures, audits |
 | `work_item` | Follow-up tasks for missing automation, docs, or verification |
@@ -251,20 +262,73 @@ For new installations, scaffold the project with:
 gt project init my-project --profile dual-agent --owner "Your Name"
 ```
 
-The `dual-agent` profile installs the trigger script, both hook
-registrations, and the dispatch-state path automatically. See
+The `dual-agent` profile installs the daemon script and dispatch-state path
+automatically. See
 `docs/tutorials/dual-agent-setup.md` for the end-to-end walkthrough.
+
+### Windows dispatcher supervisor (WI-4937)
+
+On Windows hosts using the `dispatcher_daemon` bridge substrate, the
+dispatcher must survive IDE and terminal closure without a visible console.
+WI-4882 delivered the headless supervisor scripts
+(`scripts/install_dispatcher_daemon_task.ps1`,
+`scripts/ensure_dispatcher_daemon.py`); WI-4937 governs operator install and
+health checks through the CLI and doctor.
+
+**Production path (recommended):**
+
+```bash
+gt bridge dispatch daemon supervisor install
+gt bridge dispatch daemon supervisor status --json
+```
+
+The install command registers the hidden `GTKB-DispatcherDaemon` scheduled
+task (``pythonw.exe`` + ensure-alive entrypoint) and enables it. The doctor
+emits a WARN when the substrate is `dispatcher_daemon` but the supervisor is
+missing, disabled, or misconfigured.
+
+**Diagnostic fallback only:**
+
+```bash
+gt bridge dispatch daemon start
+```
+
+starts a detached daemon from the current shell but does **not** install or
+enable the scheduled-task supervisor. Use it for one-off debugging; do not treat
+it as the production persistence boundary.
+
+Supervisor lifecycle commands: `status`, `install`, `enable`, `disable`,
+`uninstall` under `gt bridge dispatch daemon supervisor`.
+
+## Bridge author-metadata audit (WI-4938 / WI-4941)
+
+Read-only tooling audits latest status-bearing bridge artifacts for the six
+required author metadata fields and synthetic session-id patterns. It does not
+mutate committed bridge history.
+
+```bash
+gt bridge audit metadata --json
+python scripts/bridge_metadata_audit.py --grandfather-report --json
+```
+
+**Forward-prevention vs repair queue:** write-time enforcement (WI-4940+) applies
+only to newly authored bridge files. Historical non-compliance is recorded once
+in `.gtkb-state/bridge-metadata-grandfather-audit/grandfather-audit-<date>.json`
+(the grandfather audit). That JSON is an append-only baseline snapshot for
+release evidence and repair prioritization; it is not a backfill or rewrite of
+`bridge/*.md`.
 
 ## Review checklist
 
 Before accepting a bridge setup, verify:
 
 - The latest-status semantics match the protocol table above.
-- The cross-harness event-driven trigger, not a chat session, is the
+- The dispatcher daemon, not a chat session, is the
   reliability boundary.
-- Both hook registrations (`.claude/settings.json`,
-  `.codex/hooks.json`) are present and reference
-  `scripts/cross_harness_bridge_trigger.py`.
+- On Windows, the `GTKB-DispatcherDaemon` supervisor is registered,
+  enabled, and headless (`pythonw.exe` + ensure script).
+- Daemon configuration selects dispatchable targets and references
+  `scripts/gtkb_dispatcher_daemon.py`.
 - Both directions are configured and independently testable.
 - CLI prompts are captured and versioned.
 - Required plugins, skills, MCP servers, and config files are inventoried.

@@ -1,0 +1,163 @@
+VERIFIED
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 2026-07-12T20-15-28Z-loyal-opposition-B-b41aa1
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code dispatched loyal-opposition worker; bridge auto-dispatch; full GT-KB governance
+
+# WI-5212 Post-Implementation Verification Verdict — VERIFIED
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5212-provider-verdict-telemetry-visibility
+Version: 004
+Date: 2026-07-12 UTC
+Responds to: bridge/gtkb-wi5212-provider-verdict-telemetry-visibility-003.md
+Approved proposal: bridge/gtkb-wi5212-provider-verdict-telemetry-visibility-001.md
+Independent GO: bridge/gtkb-wi5212-provider-verdict-telemetry-visibility-002.md
+
+## Verdict
+
+VERIFIED. The implementation exactly matches the GO'd proposal and the -003 report:
+the governed provider verdict tool name is added to the telemetry canonical
+allowlist so genuine provider verdict publications now contribute exact name and
+count evidence, with the names-only privacy contract intact. Every spec-derived
+test and both Ruff gates were re-executed by this independent verifier and pass.
+No blocking findings.
+
+## Review Independence
+
+- Implementation report (-003) author session context:
+  `019f5474-93a6-7f70-8e54-d6d8b0a31bb4` (prime-builder/codex/A).
+- This verdict session context:
+  `2026-07-12T20-15-28Z-loyal-opposition-B-b41aa1` (loyal-opposition/claude/B).
+- Distinct harness and distinct session context; session-context review
+  independence is satisfied. The -002 GO was authored in a separate B session;
+  the artifact under verification is the Codex-A -003 report, from which this
+  session is independent.
+
+## Implementation Verified Against Live Tree
+
+- Consumer allowlist: `shim_dispatch_telemetry.py:31` now carries the governed
+  verdict tool among the seven canonical names. `git diff` on this file is
+  exactly that single-line change and nothing else.
+- Consumer filter: `record_turn` (`shim_dispatch_telemetry.py:445`) filters
+  observed tool names against the canonical allowlist, so the added name is now
+  retained and counted rather than silently dropped.
+- Producer/consumer literal match: the shared-cloud producer
+  (`scripts/cloud_harness_base.py:123`) defines and emits the identical literal,
+  so the exact name reaching `record_turn` now survives the allowlist filter.
+- Test: `git diff` on `platform_tests/groundtruth_kb/test_shim_dispatch_telemetry.py`
+  is exactly one additive test function and no other edits.
+- Isolation: both target files carry only the WI-5212 change; the worktree's
+  unrelated owner/other-session edits are in different files and are excluded by
+  the pathspec-limited disposable-index finalization.
+
+## Privacy Contract — Preserved
+
+`record_turn` stores tool names only; it never serializes tool arguments, and the
+provider response is consumed only for numeric usage and cost scalars. The new
+regression proves this defense-in-depth: it supplies sensitive argument, verdict,
+prompt, provider-body, and environment sentinels plus an unknown tool, and asserts
+all sentinels are absent from the serialized envelope while the governed verdict
+tool counts exactly twice. Adding a name to the allowlist opens no payload path.
+
+## Spec-to-Test Mapping
+
+| Specification | Spec-derived test / evidence executed | Executed | Observed result |
+| --- | --- | --- | --- |
+| SPEC-SHIM-HARNESS-DISPATCH-TELEMETRY-001 (name/count + privacy) | test_governed_verdict_tool_is_counted_without_serializing_payload — exact per-name/total counts and prohibited-content absence in the serialized envelope | yes | 17 passed |
+| SPEC-SHIM-HARNESS-DISPATCH-TELEMETRY-001 (compatibility) | Same test asserts the original six canonical names remain countable and the unknown name remains filtered | yes | 17 passed |
+| DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001 | ruff check and ruff format --check on both target files | yes | All checks passed; 2 files already formatted |
+| GOV-FILE-BRIDGE-AUTHORITY-001 | Applicability and clause preflights against the operative bridge file | yes | both exit 0; preflight_passed true |
+
+## Commands Executed
+
+1. `groundtruth-kb/.venv/Scripts/python.exe -m pytest platform_tests/groundtruth_kb/test_shim_dispatch_telemetry.py -q --tb=short` -> `17 passed, 1 warning in 2.15s` (the warning is the pre-existing unknown `asyncio_mode` pytest config option; unrelated to this patch).
+2. `groundtruth-kb/.venv/Scripts/ruff.exe check groundtruth-kb/src/groundtruth_kb/shim_dispatch_telemetry.py platform_tests/groundtruth_kb/test_shim_dispatch_telemetry.py` -> `All checks passed!`.
+3. `groundtruth-kb/.venv/Scripts/ruff.exe format --check` on both target files -> `2 files already formatted`.
+4. `git diff` on both target files -> exactly the one-line allowlist addition plus one additive test.
+5. `groundtruth-kb/.venv/Scripts/python.exe scripts/bridge_applicability_preflight.py --bridge-id gtkb-wi5212-provider-verdict-telemetry-visibility` -> preflight_passed true; missing_required_specs empty.
+6. `groundtruth-kb/.venv/Scripts/python.exe scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-wi5212-provider-verdict-telemetry-visibility` -> exit 0; zero blocking gaps.
+
+## Specification Links
+
+- SPEC-SHIM-HARNESS-DISPATCH-TELEMETRY-001
+- GOV-HARNESS-ONBOARDING-CONTRACT-001
+- ADR-CLOUD-HARNESS-TEMPLATE-001
+- SPEC-CENTRALIZED-DISPATCH-SERVICE-001
+- GOV-FILE-BRIDGE-AUTHORITY-001
+- DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001
+- DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001
+- DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001
+- GOV-ARTIFACT-ORIENTED-GOVERNANCE-001
+- ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001
+- DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001
+- ADR-ISOLATION-APPLICATION-PLACEMENT-001
+- GOV-STANDING-BACKLOG-001
+
+## Applicability Preflight
+
+- packet_hash: `sha256:7cd5239b266d1a8fddf21d0d82b3afec8643c82a406684176d2e4c58ddfe0292`
+- bridge_document_name: `gtkb-wi5212-provider-verdict-telemetry-visibility`
+- content_source: `bridge_file_operative`
+- operative_file: `bridge/gtkb-wi5212-provider-verdict-telemetry-visibility-003.md`
+- preflight_passed: `true`
+- missing_required_specs: []
+- missing_advisory_specs: []
+
+## Clause Applicability
+
+- Clauses evaluated: 5 (must_apply 4, may_apply 1, not_applicable 0)
+- Evidence gaps in must_apply clauses: 0
+- Blocking gaps (gate-failing): 0
+- Exit code: 0 (mandatory-mode pass)
+
+| Clause | Applicability | Evidence found |
+| --- | --- | --- |
+| ADR-ISOLATION-APPLICATION-PLACEMENT-001/CLAUSE-IN-ROOT | must_apply | yes |
+| GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-NUMBERED-FILE-CHAIN-IS-CANONICAL | must_apply | yes |
+| DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001/CLAUSE-CONCRETE-LINKS | must_apply | yes |
+| DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001/CLAUSE-SPEC-TO-TEST-MAPPING | must_apply | yes |
+| GOV-STANDING-BACKLOG-001/CLAUSE-VISIBILITY-BULK-OPS | may_apply | — |
+
+## Prior Deliberations
+
+- `DELIB-202666173` — owner directive to correct every defect discovered during
+  the genuine A/B/C/D/F/H proof cycle. Deliberation search run 2026-07-12; no
+  prior deliberation rejected adding a governed provider tool name to the
+  telemetry allowlist, so this verification does not revisit a rejected approach.
+- `DELIB-202666135` — WI-5173 telemetry v1 review establishing the canonical-name,
+  privacy, and observational boundaries this fix operates within.
+- `bridge/gtkb-wi5210-provider-lo-governed-verdict-publication-006.md` (VERIFIED) —
+  introduced the governed provider verdict tool whose telemetry name this fix
+  restores.
+- `bridge/gtkb-wi5212-provider-verdict-telemetry-visibility-002.md` — the
+  independent B GO and its non-blocking recurrence-risk advisory (captured as
+  WI-5215 / TEST-11369 by the -003 report).
+
+## Non-Blocking Follow-On (already captured; not a verdict condition)
+
+The latent allowlist-drift defect class flagged in the -002 GO — the dispatch
+canonical-tools constant and the telemetry canonical-names constant are two
+independent allowlists that can silently diverge again — is captured as
+WI-5215 / TEST-11369 per the -003 report, satisfying the strategic
+self-improvement directive. No action is required for this VERIFIED.
+
+## Methodology Trail
+
+- Read the full bridge chain (-001 proposal, -002 GO, -003 report).
+- Read `shim_dispatch_telemetry.py` (canonical allowlist and `record_turn`) and
+  the focused test file in full.
+- Traced producer emission in `scripts/cloud_harness_base.py`.
+- Re-ran the focused pytest suite, `ruff check`, `ruff format --check`, and
+  `git diff` on both target files.
+- Ran both bridge preflights (applicability and clause); each passes.
+- Confirmed the -002 non-blocking advisory is captured as WI-5215 / TEST-11369.
+
+## Recommended Commit Type
+
+Recommended commit type: `fix` — repairs broken telemetry counting for a governed
+provider tool; adds no new capability surface.
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

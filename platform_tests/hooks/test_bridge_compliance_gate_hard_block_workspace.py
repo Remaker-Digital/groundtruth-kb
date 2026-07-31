@@ -16,12 +16,17 @@ behavior across all branches).
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 import re
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
+
+from scripts.gtkb_bridge_writer import normalize_bridge_envelope_head
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
@@ -34,6 +39,22 @@ AUTHOR_METADATA = (
     "author_model: GPT-5.5\n"
     "author_model_version: 5.5\n"
     "author_model_configuration: Extra High\n"
+)
+DISTINCT_AUTHOR_METADATA = (
+    "author_identity: Codex\n"
+    "author_harness_id: A\n"
+    "author_session_context_id: session-456\n"
+    "author_model: GPT-5.5\n"
+    "author_model_version: 5.5\n"
+    "author_model_configuration: Extra High\n"
+)
+SYNTHETIC_AUTHOR_METADATA = (
+    "author_identity: OpenRouter Loyal Opposition\n"
+    "author_harness_id: F\n"
+    "author_session_context_id: openrouter-harness-f\n"
+    "author_model: deepseek/deepseek-v4-pro\n"
+    "author_model_version: deepseek-v4-pro\n"
+    "author_model_configuration: OpenRouter harness shim\n"
 )
 WORK_INTENT_SESSION_ENV_VARS = (
     "GTKB_BRIDGE_POLLER_RUN_ID",
@@ -57,6 +78,11 @@ def _run_hook(payload: str) -> subprocess.CompletedProcess:
     payload_data = json.loads(payload)
     session_id = str(payload_data.get("session_id") or "test")
     bridge_id = _bridge_id_from_payload(payload_data)
+    tool_input = payload_data.get("tool_input") or {}
+    content = tool_input.get("content")
+    if bridge_id is not None and isinstance(content, str):
+        tool_input["content"] = normalize_bridge_envelope_head(content)
+        payload = json.dumps(payload_data)
     if bridge_id is not None:
         _claim_bridge_thread(bridge_id, session_id)
     run_env = os.environ.copy()
@@ -290,46 +316,15 @@ def test_malformed_advisory_report_blocked_with_template_message() -> None:
     assert "verified ADVISORY report template" in reason
 
 
-def test_verified_lacking_spec_to_test_mapping_blocked_with_deny() -> None:
-    """Verifies DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001.A1:
-    hook MUST hard-block (emit_deny) VERIFIED bridge reports lacking
-    spec-to-test mapping or executed-test evidence. Per
-    bridge/gov-process-spec-precondition-2026-04-29-005.md §3 test 5.
-    """
+def test_bridge_artifact_synthetic_session_context_id_blocked_with_deny() -> None:
+    content = _template_shaped_advisory_content().replace(AUTHOR_METADATA, SYNTHETIC_AUTHOR_METADATA)
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",
             "tool_name": "Write",
             "tool_input": {
-                "file_path": "bridge/test-fake-verified-no-tests-002.md",
-                "content": ("VERIFIED\n\n## Specification Links\n- DCL-EXAMPLE-001\n\nNo command evidence here."),
-            },
-            "session_id": "test",
-            "cwd": str(REPO_ROOT),
-        }
-    )
-    result = _run_hook(payload)
-    assert result.returncode == 0
-    output = json.loads(result.stdout)
-    hsoutput = output.get("hookSpecificOutput", {})
-    assert hsoutput.get("permissionDecision") == "deny", (
-        f"Expected deny; got {hsoutput.get('permissionDecision')!r}. Full output: {output}"
-    )
-    reason = hsoutput.get("permissionDecisionReason", "")
-    assert "spec-to-test" in reason.lower() or "Specification Links" in reason or "Applicability Preflight" in reason
-
-
-def test_go_lacking_applicability_preflight_blocked_with_deny() -> None:
-    """GO verdicts must carry a clean Applicability Preflight packet so
-    cross-cutting spec applicability is not only memory/judgment based.
-    """
-    payload = json.dumps(
-        {
-            "hook_event_name": "PreToolUse",
-            "tool_name": "Write",
-            "tool_input": {
-                "file_path": "bridge/test-fake-go-no-preflight-002.md",
-                "content": "GO\n\n## Findings\n\nNo blocking findings.",
+                "file_path": "bridge/test-fake-advisory-synthetic-session-001.md",
+                "content": content,
             },
             "session_id": "test",
             "cwd": str(REPO_ROOT),
@@ -340,38 +335,162 @@ def test_go_lacking_applicability_preflight_blocked_with_deny() -> None:
     output = json.loads(result.stdout)
     hsoutput = output.get("hookSpecificOutput", {})
     assert hsoutput.get("permissionDecision") == "deny"
-    assert "Applicability Preflight" in hsoutput.get("permissionDecisionReason", "")
+    reason = hsoutput.get("permissionDecisionReason", "")
+    assert "synthetic" in reason
+    assert "openrouter-harness-f" in reason
+
+
+def test_verified_lacking_spec_to_test_mapping_blocked_with_deny() -> None:
+    """Verifies DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001.A1:
+    hook MUST hard-block (emit_deny) VERIFIED bridge reports lacking
+    spec-to-test mapping or executed-test evidence. Per
+    bridge/gov-process-spec-precondition-2026-04-29-005.md §3 test 5.
+    """
+    prior_file = REPO_ROOT / "bridge" / "test-fake-verified-no-tests-001.md"
+    prior_file.write_text(
+        normalize_bridge_envelope_head("NEW\n" + AUTHOR_METADATA + "\n"),
+        encoding="utf-8",
+    )
+    try:
+        payload = json.dumps(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Write",
+                "tool_input": {
+                    "file_path": "bridge/test-fake-verified-no-tests-002.md",
+                    "content": (
+                        "VERIFIED\n" + DISTINCT_AUTHOR_METADATA + "\n"
+                        "## Specification Links\n- DCL-EXAMPLE-001\n\nNo command evidence here."
+                    ),
+                },
+                "session_id": "test",
+                "cwd": str(REPO_ROOT),
+            }
+        )
+        result = _run_hook(payload)
+        assert result.returncode == 0
+        output = json.loads(result.stdout)
+        hsoutput = output.get("hookSpecificOutput", {})
+        assert hsoutput.get("permissionDecision") == "deny", (
+            f"Expected deny; got {hsoutput.get('permissionDecision')!r}. Full output: {output}"
+        )
+        reason = hsoutput.get("permissionDecisionReason", "")
+        assert (
+            "spec-to-test" in reason.lower() or "Specification Links" in reason or "Applicability Preflight" in reason
+        )
+    finally:
+        if prior_file.exists():
+            prior_file.unlink()
+
+
+def test_go_lacking_applicability_preflight_blocked_with_deny() -> None:
+    """GO verdicts must carry a clean Applicability Preflight packet so
+    cross-cutting spec applicability is not only memory/judgment based.
+    """
+    prior_file = REPO_ROOT / "bridge" / "test-fake-go-no-preflight-001.md"
+    prior_file.write_text(
+        normalize_bridge_envelope_head("NEW\n" + AUTHOR_METADATA + "\n"),
+        encoding="utf-8",
+    )
+    try:
+        payload = json.dumps(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Write",
+                "tool_input": {
+                    "file_path": "bridge/test-fake-go-no-preflight-002.md",
+                    "content": ("GO\n" + DISTINCT_AUTHOR_METADATA + "\n## Findings\n\nNo blocking findings."),
+                },
+                "session_id": "test",
+                "cwd": str(REPO_ROOT),
+            }
+        )
+        result = _run_hook(payload)
+        assert result.returncode == 0
+        output = json.loads(result.stdout)
+        hsoutput = output.get("hookSpecificOutput", {})
+        assert hsoutput.get("permissionDecision") == "deny"
+        assert "Applicability Preflight" in hsoutput.get("permissionDecisionReason", "")
+    finally:
+        if prior_file.exists():
+            prior_file.unlink()
 
 
 def test_go_with_clean_applicability_preflight_passes() -> None:
     """A GO verdict with a generated clean preflight packet is not blocked by
     the applicability gate.
     """
-    payload = json.dumps(
-        {
-            "hook_event_name": "PreToolUse",
-            "tool_name": "Write",
-            "tool_input": {
-                "file_path": "bridge/test-fake-go-with-preflight-002.md",
-                "content": (
-                    "GO\n" + AUTHOR_METADATA + "\n"
-                    "## Applicability Preflight\n\n"
-                    "- packet_hash: `sha256:"
-                    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`\n"
-                    "- missing_required_specs: []\n\n"
-                    "## Findings\n\nNo blocking findings."
-                ),
-            },
-            "session_id": "test",
-            "cwd": str(REPO_ROOT),
-        }
+    prior_file = REPO_ROOT / "bridge" / "test-fake-go-with-preflight-001.md"
+    prior_file.write_text(
+        normalize_bridge_envelope_head("NEW\n" + AUTHOR_METADATA + "\n"),
+        encoding="utf-8",
     )
-    result = _run_hook(payload)
-    assert result.returncode == 0
-    if result.stdout.strip():
-        output = json.loads(result.stdout)
-        decision = output.get("hookSpecificOutput", {}).get("permissionDecision")
-        assert decision != "deny", f"Clean GO verdict incorrectly denied. Output: {output}"
+    try:
+        payload = json.dumps(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Write",
+                "tool_input": {
+                    "file_path": "bridge/test-fake-go-with-preflight-002.md",
+                    "content": (
+                        "GO\n" + DISTINCT_AUTHOR_METADATA + "\n"
+                        "## Applicability Preflight\n\n"
+                        "- packet_hash: `sha256:"
+                        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`\n"
+                        "- missing_required_specs: []\n\n"
+                        "## Findings\n\nNo blocking findings."
+                    ),
+                },
+                "session_id": "test",
+                "cwd": str(REPO_ROOT),
+            }
+        )
+        result = _run_hook(payload)
+        assert result.returncode == 0
+        if result.stdout.strip():
+            output = json.loads(result.stdout)
+            decision = output.get("hookSpecificOutput", {}).get("permissionDecision")
+            assert decision != "deny", f"Clean GO verdict incorrectly denied. Output: {output}"
+    finally:
+        if prior_file.exists():
+            prior_file.unlink()
+
+
+@pytest.mark.parametrize("hook_path", [ACTIVE_HOOK, TEMPLATE_HOOK])
+def test_hook_blocks_semantic_preflight_failure_without_missing_specs(
+    hook_path: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_name = f"bridge_compliance_gate_{hook_path.parent.name}_{id(hook_path)}"
+    spec = importlib.util.spec_from_file_location(module_name, hook_path)
+    assert spec is not None and spec.loader is not None
+    hook = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hook)
+    completed = subprocess.CompletedProcess(
+        args=[],
+        returncode=5,
+        stdout=json.dumps(
+            {
+                "preflight_passed": False,
+                "missing_required_specs": [],
+                "blocking_errors": ["owner approval evidence is missing"],
+            }
+        ),
+        stderr="",
+    )
+    monkeypatch.setattr(hook.subprocess, "run", lambda *args, **kwargs: completed)
+
+    passed, detail = hook._run_pending_applicability_preflight(
+        cwd=tmp_path,
+        file_path="bridge/fixture-001.md",
+        bridge_id="fixture",
+        content="NEW\n",
+    )
+
+    assert passed is False
+    assert "owner approval evidence is missing" in detail
+    assert '"missing_required_specs": []' in detail
 
 
 def _pending_preflight_content(*, include_application_spec: bool) -> str:

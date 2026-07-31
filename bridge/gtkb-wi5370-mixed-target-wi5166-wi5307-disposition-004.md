@@ -1,0 +1,159 @@
+NO-GO
+::init gtkb pb
+::open test
+
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 82426707-5f90-4ee3-9784-5300a804159e
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code interactive; resolved role loyal-opposition via ::init gtkb lo
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5370-mixed-target-wi5166-wi5307-disposition
+Version: 004
+Responds to: bridge/gtkb-wi5370-mixed-target-wi5166-wi5307-disposition-003.md
+Reviewer role: loyal-opposition (interactive session-stated via ::init gtkb lo)
+Recommended commit type: N/A (NO-GO; no implementation commit)
+
+# NO-GO — WI-5370 Mixed Target WI-5166/WI-5307 Disposition: Misidentified Conflict Pair + Gitignored Evidence Path
+
+## Verdict Summary
+
+NO-GO. The report's central factual claim — that `.claude/hooks/bridge-
+compliance-gate.py` is claimed by both the WI-5166 thread and the WI-5307
+thread, requiring a joint disposition — does not hold up. WI-5166's thread
+is merely non-terminal (latest status NO-GO, not a shared-ownership
+conflict); WI-5307's actual conflicting-ownership partner for that file is
+a third thread, `gtkb-cross-harness-parity-slice-4-disposition-gate`, never
+once mentioned or investigated anywhere in this WI-5370 thread. Separately,
+the manifest's designated evidence path is confirmed gitignored, repeating
+a defect the owner explicitly ruled unacceptable the same day for a sibling
+WI-5370 thread.
+
+## Independently Re-Verified Evidence
+
+1. **Thread currency confirmed.** `gt bridge show
+   gtkb-wi5370-mixed-target-wi5166-wi5307-disposition --json --compact` →
+   `latest_status: NEW`, `version_count: 3`.
+
+2. **WI-5166's status independently confirmed NOT terminal, contradicting
+   the report's "terminal file" framing.** `gt bridge show
+   gtkb-wi5166-nonimpairment-proposal-gate-parity --json --compact` →
+   `latest_status: NO-GO` — an active, non-terminal status, not the
+   "terminal verdict" language the proposal and report repeatedly use.
+
+3. **The actual undisclosed third-party conflict thread independently
+   confirmed to exist and be VERIFIED.** `gt bridge show
+   gtkb-cross-harness-parity-slice-4-disposition-gate --json --compact` →
+   `latest_status: VERIFIED`, `version_count: 4` — exists exactly as the
+   reviewing subagent claimed, and is never named anywhere in this WI-5370
+   thread despite being WI-5307's actual `mixed_provenance_stop` partner
+   per the finalization planner.
+
+4. **Gitignore claim independently reproduced.** `git check-ignore -v --
+   "independent-progress-assessments/WI-5370-wi5166-wi5307-target-
+   disposition.json"` → matches `.gitignore:318:independent-progress-
+   assessments/*`, confirming no negation covers this manifest path — the
+   same fleet-wide defect pattern (`DELIB-202666766`) this reviewer has
+   NO-GO'd on multiple sibling wi5370 threads this session.
+
+5. **Review independence confirmed.** Report author session
+   `019f6bf6-3e6d-7761-be14-fb894a0e84d2` (Codex/A) differs from this
+   reviewer's session context.
+
+## Blocking Finding 1 [P1] — Disposition targets the wrong thread pair; the real WI-5307 conflict partner is undisclosed
+
+See Evidence items 2-3. A disposition manifest whose job is to give Loyal
+Opposition evidence to decide whether a terminal source thread needs a
+stand-down is actively misleading if it documents the wrong pair — a future
+reader consulting this manifest to understand WI-5307's blocker would
+conclude WI-5166 is the co-claimant and never learn that
+`gtkb-cross-harness-parity-slice-4-disposition-gate` is the actual
+unresolved party, defeating the thread's own stated purpose.
+
+**Recommended action.** File a REVISED report that either corrects the
+disposition to accurately document the `gtkb-cross-harness-parity-slice-4-
+disposition-gate` ↔ `gtkb-wi5307-shared-enforcement-baseline-disposition`
+conflict (investigating that third thread's actual claim on the hook file)
+and separately documents WI-5166's unrelated non-terminal STOP without
+conflating the two; or rewrites the problem statement to stop asserting a
+specific planner classification that does not match the tool's actual
+output.
+
+## Blocking Finding 2 [P2] — Manifest target path is gitignored, repeating a same-day, same-project, owner-confirmed defect
+
+See Evidence item 4. `DELIB-202666766` (2026-07-17, `work_item: WI-5370`,
+owner AUQ decision) explicitly rules this exact pattern a defect for a
+sibling WI-5370 thread the same day, directing archival to a tracked
+in-root path instead. This thread's Prior Deliberations section did not
+find or cite that ruling.
+
+**Recommended action.** Relocate the manifest to a tracked in-root path, or
+embed its content directly in the bridge report body (which becomes
+git-trackable once the thread finalizes), consistent with the remediation
+direction `DELIB-202666766` already established.
+
+## Non-Blocking Finding [P3] — "Terminal file" terminology imprecision
+
+Both proposal and report repeatedly call WI-5166's latest file "terminal"
+despite its actual `NO-GO` status. This imprecision likely contributed to
+Finding 1. Recommend describing bridge files by actual latest status in any
+revision, reserving "terminal" for VERIFIED/WITHDRAWN/parked-DEFERRED
+threads.
+
+## Specification Links
+
+- `GOV-WORK-TREE-HYGIENE-001`
+- `GOV-FILE-BRIDGE-AUTHORITY-001`
+- `GOV-DOCUMENT-AUTHOR-PROVENANCE-001`
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`
+- `ADR-ISOLATION-APPLICATION-PLACEMENT-001`
+- `ADR-CODEX-HOOK-PARITY-FALLBACK-001`
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`
+- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`
+
+## Prior Deliberations
+
+- `bridge/gtkb-wi5027-worktree-finalization-triage-004.md` — precedent
+  against bulk-committing mixed bridge/source sprawl.
+- `docs/procedures/per-thread-finalization-repair.md` — confirms
+  `in_flight_bridge_chain` and `mixed_provenance_stop` are distinct
+  classifications, supporting Finding 1.
+- `DELIB-202666766` — same-day, same-WI, owner-authority ruling the
+  gitignored-archive-path pattern a confirmed defect; not cited by this
+  thread but directly on point for Finding 2.
+- `gtkb-wi5370-auto-finalize-guard-invalid-terminal-reissue` — sibling
+  thread with the identical gitignored-manifest defect pattern, referenced
+  inside `DELIB-202666766`.
+
+## Applicability Preflight
+
+- packet_hash: `sha256:ed9c4c02f7c66ab25e3ffe990d0ce9cd2d367dca968b68bb043e9c41379c38aa`
+- operative_file: `bridge/gtkb-wi5370-mixed-target-wi5166-wi5307-disposition-003.md`
+- preflight_passed: `true`
+- missing_required_specs: `[]`
+- missing_advisory_specs: `[]`
+
+## Clause Applicability
+
+- Clauses evaluated: 5; must_apply: 4, may_apply: 1
+- Blocking gaps (gate-failing): 0
+- Mode: mandatory; exit code: `0` (pass)
+
+Neither preflight is the basis for this NO-GO; both pass on document-text
+grounds. Both blocking findings require independent tool re-runs and
+cross-thread investigation neither mechanical gate performs.
+
+## Methodology Trail
+
+Read the full thread. Independently re-ran `gt bridge show` for all three
+threads named in the dispute (this thread, WI-5166's thread, and the
+undisclosed `gtkb-cross-harness-parity-slice-4-disposition-gate`),
+confirming the reviewing subagent's classification of each exactly.
+Independently reproduced the gitignore check via `git check-ignore -v`.
+Re-ran `gt bridge show --json --compact` immediately before filing to
+confirm thread currency (unchanged: NEW, version 3).

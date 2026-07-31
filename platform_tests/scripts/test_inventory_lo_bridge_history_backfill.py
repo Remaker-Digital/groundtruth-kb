@@ -162,22 +162,24 @@ def test_exclusion_size_under_100_bytes(tmp_path):
 
 def test_exclusion_redaction_survivor(tmp_path):
     repo = _make_repo(tmp_path)
-    # An LO report long enough to pass the size floor but carrying a credential
-    # survivor. The survivor token is assembled at runtime so no credential-shaped
-    # literal appears in this test source (scanner-safe-writer / SPEC-0058).
+    # A canonical numbered bridge artifact long enough to pass the size floor but
+    # carrying a credential survivor. WI-5589 retired the LO insight-dropbox scan
+    # route, so this SPEC-DA-HARVEST-EXCLUSION obligation is now exercised against
+    # the canonical bridge carrier. The survivor token is assembled at runtime so no
+    # credential-shaped literal appears in this test source (scanner-safe-writer /
+    # SPEC-0058).
     survivor = "ar_" + "live_" + ("Z" * 16)
     body = (
-        "# LO report with an embedded credential survivor that redaction cannot fully scrub.\n"
+        "ADVISORY\n\n"
+        "# LO advisory with an embedded credential survivor that redaction cannot fully scrub.\n"
         f"leaked = {survivor}\n"
         "padding line to exceed the hundred byte harvest exclusion threshold for this fixture.\n"
     )
-    _write_lo(repo, "INSIGHTS-2026-01-01-00-00.md", body)
+    _write_bridge(repo, "gtkb-survivor-advisory-001.md", body)
     db = _make_da(tmp_path, [])
 
     records, _ = INV.build_inventory(repo, db)
-    rec = _record_by_path(
-        records, "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-01-01-00-00.md"
-    )
+    rec = _record_by_path(records, "bridge/gtkb-survivor-advisory-001.md")
     # When the redaction helper is importable it may scrub the token; the survivor
     # regex still matches the fixture token, so a non-scrubbing redactor (and the
     # conservative fallback) classify it excluded. Accept either deterministic
@@ -291,7 +293,7 @@ def test_orphan_bridge_thread_recorded(tmp_path):
     _write_bridge(
         repo,
         "orphan-thread-001.md",
-        "NEW\n\n# orphaned bridge file not present in any INDEX entry, beyond size floor.\n",
+        "# orphaned bridge file with no status token, beyond size floor.\n",
     )
     # Empty INDEX.md => no status for the file.
     (repo / "bridge" / "INDEX.md").write_text("# Bridge Index\n", encoding="utf-8")

@@ -6,7 +6,7 @@ by owner decision ``DELIB-20261667``.
 Read-only. Snapshots the backlog from the ``current_work_items`` view (latest
 version per id) and classifies every open work item by deterministic hard
 signals: advisory-router provenance, content-hash duplication, bridge/spec/owner
-linkage, approval_state, origin, component, age, articulation length, and
+linkage, origin, component, age, articulation length, and
 ``project_name``-vs-membership-table consistency. Partitions platform-scope vs
 Agent-Red-scope items (decision D1). Assigns a conservative disposition label
 (a *candidate* flag only -- never an instruction to retire) for later stages.
@@ -60,7 +60,7 @@ _AGENT_RED = re.compile(r"AGENT[-_]?RED", re.IGNORECASE)
 # forces retirement -- it only marks a candidate.
 LABEL_KEEP_SIGNAL = "keep_signal"
 LABEL_RETIRE_DUPLICATE = "retire_candidate_duplicate"
-LABEL_RETIRE_UNAPPROVED_NOISE = "retire_candidate_unapproved_noise"
+LABEL_RETIRE_ROUTER_LOW_SIGNAL = "retire_candidate_router_low_signal"
 LABEL_REVIEW = "review"
 
 
@@ -213,7 +213,6 @@ def _classify(
                 "has_source_spec_id": has_source_spec_id,
                 "owner_sourced": owner_sourced,
                 "signal_bearing": bool(bridge_linked or spec_linked or owner_sourced),
-                "approval_state": _as_text(r["approval_state"]) or "unset",
                 "origin": _as_text(r["origin"]) or "unset",
                 "component": _as_text(r["component"]) or "unset",
                 "age_days": _age_days(_as_text(r["changed_at"]), reference),
@@ -238,8 +237,8 @@ def _classify(
             label = LABEL_KEEP_SIGNAL
         elif is_dup_member:
             label = LABEL_RETIRE_DUPLICATE
-        elif item["router_generated"] and item["approval_state"] in ("unapproved", "unset"):
-            label = LABEL_RETIRE_UNAPPROVED_NOISE
+        elif item["router_generated"]:
+            label = LABEL_RETIRE_ROUTER_LOW_SIGNAL
         else:
             label = LABEL_REVIEW
         item["label"] = label
@@ -256,7 +255,6 @@ def _aggregate(rows: list[sqlite3.Row], open_items: list[dict]) -> dict:
     )
     by_label = Counter(i["label"] for i in open_items)
     by_scope = Counter(i["scope"] for i in open_items)
-    by_approval = Counter(i["approval_state"] for i in open_items)
     by_origin = Counter(i["origin"] for i in open_items)
     artic = Counter(_bucket_articulation(i["articulation_len"]) for i in open_items)
     age = Counter(_bucket_age(i["age_days"]) for i in open_items)
@@ -268,13 +266,12 @@ def _aggregate(rows: list[sqlite3.Row], open_items: list[dict]) -> dict:
         "nonopen_by_status": dict(nonopen),
         "router_generated": sum(1 for i in open_items if i["router_generated"]),
         "signal_bearing": sum(1 for i in open_items if i["signal_bearing"]),
-        "unapproved": sum(1 for i in open_items if i["approval_state"] in ("unapproved", "unset")),
+        "router_low_signal_candidates": sum(1 for i in open_items if i["label"] == LABEL_RETIRE_ROUTER_LOW_SIGNAL),
         "duplicate_items": sum(1 for i in open_items if i["duplicate_of"] is not None),
         "duplicate_groups": len(dup_groups),
         "project_name_inconsistent": sum(1 for i in open_items if not i["project_name_consistent"]),
         "by_label": dict(sorted(by_label.items())),
         "by_scope": dict(sorted(by_scope.items())),
-        "by_approval_state": dict(sorted(by_approval.items())),
         "by_origin": dict(sorted(by_origin.items())),
         "articulation_buckets": dict(sorted(artic.items())),
         "age_buckets": dict(sorted(age.items())),
@@ -301,7 +298,7 @@ def run(window_start, window_end, project_root=None):
             if _table_exists(con, "current_work_items"):
                 rows = con.execute(
                     "SELECT id, version, resolution_status, changed_by, changed_at, "
-                    "title, description, acceptance_summary, approval_state, origin, "
+                    "title, description, acceptance_summary, origin, "
                     "component, related_bridge_threads, related_spec_ids_at_creation, "
                     "source_spec_id, source_owner_directive, project_name "
                     "FROM current_work_items"
@@ -334,6 +331,6 @@ def run(window_start, window_end, project_root=None):
         source_query=(
             "current_work_items (+current_project_work_item_memberships) "
             "read-only; classified by router-provenance / content-hash / "
-            "bridge-spec-owner linkage / approval_state / age / articulation"
+            "bridge-spec-owner linkage / age / articulation"
         ),
     )

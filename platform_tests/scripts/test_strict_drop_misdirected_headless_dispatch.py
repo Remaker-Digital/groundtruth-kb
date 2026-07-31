@@ -77,7 +77,7 @@ def _load_dispatcher(harness: str) -> ModuleType:
 def _stage_harness_registry(project_root: Path) -> Path:
     """Stage harness-state files so ``_resolve_own_role_set`` succeeds.
 
-    Mirrors the fixture in test_cross_harness_trigger_durable_keyed_regression.py
+    Mirrors the fixture in test_dispatcher_runtime_durable_keyed_regression.py
     (claude=B=prime-builder, codex=A=loyal-opposition). Both dispatchers'
     ``_resolve_own_role_set`` consults ``harness-state/harness-registry.json``
     via ``load_harness_projection``.

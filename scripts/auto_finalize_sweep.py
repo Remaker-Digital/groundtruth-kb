@@ -3,7 +3,7 @@
 
 Shared Stop-hook service registered in BOTH ``.claude/settings.json`` and
 ``.codex/hooks.json`` (the same cross-harness pattern as
-``scripts/cross_harness_bridge_trigger.py``). On turn-end it drains the dispatch
+``scripts/dispatcher_runtime.py``). On turn-end it drains the dispatch
 durability treadmill created by the PHASE-Y dispatcher-daemon go-live
 (``DELIB-20266272``): the dispatchable Loyal Opposition harness (Cursor-E)
 writes terminal ``VERIFIED`` verdicts but cannot commit them, and no dispatchable
@@ -45,9 +45,20 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = _SCRIPTS_DIR.parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+_VERIFY_HELPERS = PROJECT_ROOT / ".claude" / "skills" / "gtkb-verify" / "helpers"
+if str(_VERIFY_HELPERS) not in sys.path:
+    sys.path.insert(0, str(_VERIFY_HELPERS))
+from windows_subprocess import no_window_subprocess_kwargs  # noqa: E402
+
 AUDIT_DIR = PROJECT_ROOT / ".gtkb-state" / "auto-finalize-sweep"
 AUDIT_LOG = AUDIT_DIR / "sweep.jsonl"
+GIT_TIMEOUT_SECONDS = int(os.environ.get("GTKB_AUTO_FINALIZE_GIT_TIMEOUT_SECONDS", "60"))
 
 _VERSION_RE = re.compile(r"-(\d{3})\.md$")
 _RESPONDS_RE = re.compile(r"^Responds to:\s*(?:GO\s+)?(bridge/[^\s]+-\d{3}\.md)", re.MULTILINE)
@@ -68,13 +79,22 @@ def _audit(event: dict) -> None:
         pass
 
 
-def _git(args: list[str], *, env: dict | None = None) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["git", "-C", str(PROJECT_ROOT), *args],
-        capture_output=True,
-        text=True,
-        env=env,
-    )
+def _git(args: list[str], *, env: dict | None = None, timeout: int | None = None) -> subprocess.CompletedProcess:
+    command = ["git", "-C", str(PROJECT_ROOT), *args]
+    try:
+        return subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=timeout if timeout is not None else GIT_TIMEOUT_SECONDS,
+            **no_window_subprocess_kwargs(),
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout if isinstance(exc.stdout, str) else ""
+        stderr = exc.stderr if isinstance(exc.stderr, str) else ""
+        detail = f"git subprocess timed out after {exc.timeout} seconds: {' '.join(command)}"
+        return subprocess.CompletedProcess(command, 124, stdout, (stderr + "\n" + detail).strip())
 
 
 def _enumerate_untracked_verified() -> list[str]:
@@ -111,6 +131,17 @@ def _all_untracked_bridge_md() -> list[str]:
     )
 
 
+def _planner_report_only() -> dict:
+    """Consult the shared WI-4979 planner in report-only mode, fail-soft."""
+    try:
+        import worktree_finalization_triage as triage  # type: ignore[import-not-found]
+
+        plan = triage.build_plan(PROJECT_ROOT)
+        return {"status": "ok", "summary": triage.summarize_plan(plan)}
+    except Exception as exc:  # noqa: BLE001 - Stop-hook advisory must fail soft
+        return {"status": "error", "reason": repr(exc)}
+
+
 def _slug_of(rel: str) -> str | None:
     name = Path(rel).name
     m = _VERSION_RE.search(name)
@@ -139,7 +170,16 @@ def _is_path_committed(path: str) -> bool:
     result = _git(["status", "--porcelain", "--", path])
     if result.returncode != 0:
         return False
-    return result.stdout.strip() == ""
+    status_lines = [line for line in result.stdout.splitlines() if line.strip()]
+    if not status_lines:
+        return True
+    if any(line[:2] != " M" for line in status_lines):
+        return False
+    # Windows/autocrlf can surface CR-at-EOL-only noise in temp repos; keep
+    # rejecting every other status form and require both diffs to be clean.
+    unstaged = _git(["diff", "--quiet", "--ignore-cr-at-eol", "--", path])
+    cached = _git(["diff", "--cached", "--quiet", "--ignore-cr-at-eol", "--", path])
+    return unstaged.returncode == 0 and cached.returncode == 0
 
 
 def _independent(verdict_content: str, report_rel: str) -> tuple[bool, str]:
@@ -170,6 +210,34 @@ def _target_paths(report_content: str) -> tuple[list[str] | None, str]:
         return None, f"no parseable target_paths: {exc}"
     except Exception as exc:  # pragma: no cover - defensive
         return None, f"target_paths parse error: {exc}"
+
+
+def _canonical_verdict_skip_reason(verdict_rel: str, verdict_content: str) -> str | None:
+    try:
+        from write_verdict import VerifiedFinalizationError, validate_verified_body  # type: ignore[import-not-found]
+    except Exception as exc:  # pragma: no cover - import-environment guard
+        return f"canonical finalizer validation unavailable: {exc}"
+    try:
+        validate_verified_body(verdict_content, project_root=PROJECT_ROOT)
+    except VerifiedFinalizationError as exc:
+        return f"canonical_finalizer_rejects_verdict_body: {exc}"
+
+    try:
+        import check_protected_commit_authorization as protected_commit  # type: ignore[import-not-found]
+    except Exception as exc:  # pragma: no cover - import-environment guard
+        return f"protected commit authorization checker unavailable: {exc}"
+    try:
+        result = protected_commit.evaluate(PROJECT_ROOT, paths=[verdict_rel])
+    except Exception as exc:  # noqa: BLE001 - fail closed for stop-hook safety
+        return f"protected_commit_authorization_error: {exc}"
+    if result.get("status") != "pass":
+        findings = result.get("findings") or []
+        reasons = [
+            f"{finding.get('path', verdict_rel)}: {finding.get('reason', 'unknown reason')}" for finding in findings
+        ]
+        reason = "; ".join(reasons) if reasons else "checker returned failure"
+        return f"protected_commit_authorization_rejects_terminal_verdict: {reason}"
+    return None
 
 
 def _commit_chain(slug: str, chain: list[str], message: str) -> tuple[bool, str]:
@@ -209,6 +277,12 @@ def sweep(*, dry_run: bool = False) -> dict:
     untracked = _enumerate_untracked_verified()
     if not untracked:
         return summary
+    try:
+        summary["planner"] = _planner_report_only()
+    except Exception as exc:  # noqa: BLE001 - Stop-hook advisory must fail soft
+        summary["planner"] = {"status": "error", "reason": repr(exc)}
+    if summary["planner"].get("status") == "error":
+        _audit({"action": "planner_error", "reason": summary["planner"].get("reason")})
 
     all_untracked = _all_untracked_bridge_md()
     handled_slugs: set[str] = set()
@@ -246,6 +320,12 @@ def sweep(*, dry_run: bool = False) -> dict:
             reason = f"verified impl not committed: {', '.join(sorted(dirty))}"
             summary["skipped"].append({"verdict": verdict_rel, "reason": reason})
             _audit({"action": "skip", "verdict": verdict_rel, "reason": reason})
+            continue
+
+        canonical_skip = _canonical_verdict_skip_reason(verdict_rel, content)
+        if canonical_skip:
+            summary["skipped"].append({"verdict": verdict_rel, "reason": canonical_skip})
+            _audit({"action": "skip", "verdict": verdict_rel, "reason": canonical_skip})
             continue
 
         # Eligible. Stage the verdict + all untracked chain .md files for this slug.

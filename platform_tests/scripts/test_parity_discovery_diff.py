@@ -61,20 +61,48 @@ def test_enumerate_hook_surfaces_extracts_stems_across_separators() -> None:
                     ]
                 }
             ],
-            "Stop": [
-                {
-                    "hooks": [
-                        {"type": "command", "command": "python scripts/cross_harness_bridge_trigger.py --stop-hook"}
-                    ]
-                }
-            ],
+            "Stop": [{"hooks": [{"type": "command", "command": "python scripts/dispatcher_runtime.py --stop-hook"}]}],
         }
     }
     stems = diff.enumerate_hook_surfaces(config)
     assert "spec-classifier" in stems
     assert "session_wrapup_trigger_dispatch" in stems
     assert "workstream-focus" in stems  # .cmd wrapper reduces to its stem
-    assert "cross_harness_bridge_trigger" in stems
+    assert "dispatcher_runtime" in stems
+
+
+def test_enumerate_hook_surfaces_expands_codex_batch_runner(tmp_path: Path) -> None:
+    runner = tmp_path / ".codex" / "gtkb-hooks" / "run_py_no_window.py"
+    runner.parent.mkdir(parents=True)
+    runner.write_text(
+        "BATCHES = {\n"
+        "    'user-prompt-submit': (\n"
+        "        ('cmd', '.codex/gtkb-hooks/workstream-focus.cmd'),\n"
+        "        ('py', '.claude/hooks/spec-classifier.py'),\n"
+        "    ),\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    config = {
+        "hooks": {
+            "UserPromptSubmit": [
+                {
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": str(tmp_path / ".codex" / "gtkb-hooks" / "run_py_no_window")
+                            + " --batch user-prompt-submit",
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+
+    stems = diff.enumerate_hook_surfaces(config, project_root=tmp_path)
+
+    assert "spec-classifier" in stems
+    assert "workstream-focus" in stems
 
 
 def test_live_codex_userpromptsubmit_discovers_session_wrapup() -> None:
@@ -123,6 +151,54 @@ def test_synthetic_unregistered_single_harness_hook_caught() -> None:
 def test_symmetric_surfaces_produce_no_findings() -> None:
     surfaces = {"claude": {"shared-a", "shared-b"}, "codex": {"shared-a", "shared-b"}}
     report = diff.compute_diff(surfaces, {}, _projection("claude", "codex"))
+    assert report.overall_status == "PASS"
+    assert report.findings == []
+
+
+def test_registered_same_stem_fallback_satisfies_unregistered_raw_alias() -> None:
+    registry = {
+        "parity_schema_version": 1,
+        "capabilities": [
+            {
+                "id": "hook.scanner-safe-writer",
+                "kind": "hook",
+                "canonical_name": "scanner-safe-writer",
+                "required_for_roles": ["prime-builder"],
+                "claude": {"surface": ".claude/hooks/scanner-safe-writer.py", "status": "native"},
+                "codex": {"surface": ".codex/gtkb-hooks/credential-scan.cmd", "status": "fallback"},
+            },
+            {
+                "id": "hook.session-start-governance",
+                "kind": "hook",
+                "canonical_name": "session-start-governance",
+                "required_for_roles": ["prime-builder"],
+                "claude": {"surface": ".claude/hooks/session-start-governance.py", "status": "native"},
+                "codex": {"surface": ".codex/gtkb-hooks/session_start_dispatch.py", "status": "fallback"},
+            },
+            {
+                "id": "hook.spec-before-code",
+                "kind": "hook",
+                "canonical_name": "spec-before-code",
+                "required_for_roles": ["prime-builder"],
+                "claude": {"surface": ".claude/hooks/spec-before-code.py", "status": "native"},
+                "codex": {"surface": ".claude/hooks/spec-classifier.py", "status": "fallback"},
+            },
+        ],
+    }
+    surfaces = {
+        "claude": {
+            "credential-scan",
+            "scanner-safe-writer",
+            "session-start-governance",
+            "session_start_dispatch",
+            "spec-before-code",
+            "spec-classifier",
+        },
+        "codex": {"credential-scan", "session_start_dispatch", "spec-classifier"},
+    }
+
+    report = diff.compute_diff(surfaces, registry, _projection("claude", "codex"))
+
     assert report.overall_status == "PASS"
     assert report.findings == []
 

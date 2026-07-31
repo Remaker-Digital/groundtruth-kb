@@ -106,6 +106,19 @@ def test_latest_no_go_yields_prime_builder_next_action(health_module, tmp_path: 
     assert item["owner_visible"] is False
 
 
+def test_latest_no_action_yields_loyal_opposition_review_action(health_module, tmp_path: Path) -> None:
+    _write_bridge(tmp_path, "fixture-no-action", [(1, "NEW"), (2, "GO"), (3, "NO-ACTION")])
+
+    report = health_module.generate_report(tmp_path, generated_at=STAMP)
+
+    assert report["status"] == "warning"
+    assert report["summary"]["bridge_actionability"]["loyal_opposition"] == 1
+    item = report["items"][0]
+    assert item["category"] == "unresolved_no_action"
+    assert item["next_action"] == "review_no_action"
+    assert item["owner_visible"] is False
+
+
 def test_latest_advisory_is_owner_visible(health_module, tmp_path: Path) -> None:
     _write_bridge(tmp_path, "fixture-advisory", [(1, "ADVISORY")])
 

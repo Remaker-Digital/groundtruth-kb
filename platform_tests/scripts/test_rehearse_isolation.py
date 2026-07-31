@@ -91,14 +91,17 @@ def test_target_root_allowed_for_valid_names(name: str) -> None:
     validate_target_root(good)
 
 
-def test_target_root_allowed_outside_legacy_root(tmp_path: Path) -> None:
-    """A path entirely outside <gt-kb-root>/ is allowed (e.g., test sandbox).
+def test_target_root_allowed_outside_legacy_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A path outside the configured legacy root is allowed."""
+    from rehearse import _common
 
-    The ADR binds adopters under GT-KB; rehearsal can run against any path
-    that doesn't conflict with the conflated legacy surfaces. Tests live
-    outside <gt-kb-root>/ in a tmp_path fixture.
-    """
-    validate_target_root(tmp_path / "sandbox" / "anywhere")
+    synthetic_legacy_root = tmp_path / "synthetic-legacy"
+    outside_target = tmp_path / "sandbox" / "anywhere"
+    monkeypatch.setattr(_common, "LEGACY_ROOT", synthetic_legacy_root)
+    monkeypatch.setattr(_common, "APPLICATIONS_NAMESPACE", synthetic_legacy_root / "applications")
+
+    assert not outside_target.is_relative_to(synthetic_legacy_root)
+    validate_target_root(outside_target)
 
 
 # ============================================================================

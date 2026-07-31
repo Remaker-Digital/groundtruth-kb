@@ -2,25 +2,31 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import sqlite3
 import sys
 import tomllib
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 SCAN_HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
 
 import groundtruth_kb.bridge_dispatch_config as bridge_dispatch_config  # noqa: E402
+import groundtruth_kb.bridge_dispatch_reset as bridge_dispatch_reset  # noqa: E402
 from groundtruth_kb.bridge_dispatch_config import (  # noqa: E402
     BENIGN_NONLAUNCH_LAUNCH_REASONS,
     _runtime_findings_for_recipient,
+    collect_bridge_dispatch_health,
     collect_bridge_dispatch_status,
     load_bridge_dispatch_config,
     select_dispatch_candidates,
 )
 from groundtruth_kb.bridge_dispatch_report import build_bridge_dispatch_report  # noqa: E402
+from groundtruth_kb.bridge_dispatch_reset import DispatchStateDirs, drain  # noqa: E402
 from groundtruth_kb.bridge_dispatch_rules import DispatchContext, context_from_bridge_text  # noqa: E402
 from groundtruth_kb.bridge_dispatch_transactions import (  # noqa: E402
     DispatchConfigTransactionError,
@@ -28,14 +34,14 @@ from groundtruth_kb.bridge_dispatch_transactions import (  # noqa: E402
     set_rule,
     set_weights,
 )
-from groundtruth_kb.harness_projection import read_roles  # noqa: E402
+from groundtruth_kb.cli import main as gt_main  # noqa: E402
+from groundtruth_kb.db import KnowledgeDB  # noqa: E402
+from groundtruth_kb.harness_projection import generate_harness_projection, read_roles  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
 def _no_registry_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GTKB_HARNESS_REGISTRY_PATH", raising=False)
-    monkeypatch.delenv(bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR, raising=False)
-    monkeypatch.setattr(bridge_dispatch_config, "_read_windows_persistent_env_var", lambda _name, _scope: None)
 
 
 def _write_project(root: Path, *, rules: str = "", harnesses: list[dict] | None = None) -> None:
@@ -60,6 +66,15 @@ rules = []
         ),
         encoding="utf-8",
     )
+
+
+def _write_current_work_items(root: Path, rows: dict[str, str]) -> None:
+    with sqlite3.connect(root / "groundtruth.db") as con:
+        con.execute("CREATE TABLE current_work_items (id TEXT PRIMARY KEY, resolution_status TEXT)")
+        con.executemany(
+            "INSERT INTO current_work_items (id, resolution_status) VALUES (?, ?)",
+            sorted(rows.items()),
+        )
 
 
 def _default_harnesses() -> list[dict]:
@@ -125,6 +140,83 @@ def test_collect_status_keeps_role_and_dispatchability_orthogonal(tmp_path: Path
     assert claude["can_fire_events"] is True
 
 
+def test_collect_bridge_dispatch_health_reports_complex_and_routing_dimensions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_project(tmp_path)
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "gtkb_dispatcher_daemon.py").write_text("# test marker\n", encoding="utf-8")
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_complex.collect_complex_health",
+        lambda project_root: {
+            "health_status": "WARN",
+            "aggregate_status": "degraded",
+            "healthy": False,
+            "components": {"daemon": {"severity": "WARN"}},
+            "findings": ["WARN daemon: dispatcher daemon is not running"],
+        },
+    )
+
+    payload = collect_bridge_dispatch_health(tmp_path)
+
+    assert payload["health_status"] == "WARN"
+    assert set(payload["dimensions"]) == {"complex_lifecycle", "git_lock_health", "routing_config"}
+    assert payload["complex_lifecycle"]["health_status"] == "WARN"
+    assert payload["git_lock_health"]["health_status"] == "PASS"
+    assert payload["git_lock_health"]["present"] is False
+    assert payload["routing_config"]["health_status"] == "PASS"
+    assert payload["selected_by_role"]["prime-builder"][0]["id"] == "A"
+    assert "complex_lifecycle: WARN daemon: dispatcher daemon is not running" in payload["findings"]
+
+
+def test_git_lock_health_fresh_index_lock_passes(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    lock_path = tmp_path / ".git" / "index.lock"
+    lock_path.parent.mkdir()
+    lock_path.write_text("", encoding="utf-8")
+
+    payload = collect_bridge_dispatch_health(tmp_path)
+
+    assert payload["health_status"] == "PASS"
+    assert payload["git_lock_health"]["health_status"] == "PASS"
+    assert payload["git_lock_health"]["present"] is True
+    assert payload["git_lock_health"]["age_seconds"] < 5
+    assert payload["git_lock_health"]["findings"] == []
+    assert lock_path.is_file()
+
+
+@pytest.mark.parametrize(
+    ("age_seconds", "expected_status"),
+    [
+        (bridge_dispatch_config.GIT_LOCK_WARN_AGE_SECONDS + 1, "WARN"),
+        (bridge_dispatch_config.GIT_LOCK_FAIL_AGE_SECONDS + 1, "FAIL"),
+    ],
+)
+def test_git_lock_health_stale_index_lock_escalates_aggregate(
+    tmp_path: Path,
+    age_seconds: int,
+    expected_status: str,
+) -> None:
+    _write_project(tmp_path)
+    lock_path = tmp_path / ".git" / "index.lock"
+    lock_path.parent.mkdir()
+    lock_path.write_text("", encoding="utf-8")
+    modified_at = bridge_dispatch_config._now_utc().timestamp() - age_seconds
+    os.utime(lock_path, (modified_at, modified_at))
+
+    payload = collect_bridge_dispatch_health(tmp_path)
+
+    assert payload["health_status"] == expected_status
+    dimension = payload["git_lock_health"]
+    assert dimension["health_status"] == expected_status
+    assert dimension["present"] is True
+    assert dimension["age_seconds"] >= age_seconds
+    assert any(expected_status in finding and "index.lock" in finding for finding in dimension["findings"])
+    assert any(finding.startswith(f"git_lock_health: {expected_status} git lock:") for finding in payload["findings"])
+    assert lock_path.is_file()
+
+
 def test_collect_status_preserves_harness_registry_projection_bytes(tmp_path: Path) -> None:
     _write_project(tmp_path)
     registry_path = tmp_path / "harness-state" / "harness-registry.json"
@@ -136,64 +228,112 @@ def test_collect_status_preserves_harness_registry_projection_bytes(tmp_path: Pa
     assert registry_path.read_bytes() == before
 
 
-def test_wi4760_health_warns_when_process_kill_switch_active(
+def test_wi4760_retired_worker_disable_env_is_not_dispatch_health_control(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_project(tmp_path)
-    monkeypatch.setenv(bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR, "1")
+    retired_env = "GTKB_NO_" + "CROSS_" + "HARN" + "ESS_TRIGGER"
+    monkeypatch.setenv(retired_env, "1")
 
     status = collect_bridge_dispatch_status(tmp_path)
 
-    assert status.health_status == "WARN"
-    finding = "\n".join(status.health_findings)
-    assert bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR in finding
-    assert "Process" in finding
-    assert "no-op" in finding
+    assert status.health_status == "PASS"
+    assert retired_env not in "\n".join(status.health_findings)
 
 
-def test_wi4760_health_warns_when_user_scope_kill_switch_active(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _write_project(tmp_path)
-
-    def _persistent_reader(_name: str, scope: str) -> str | None:
-        return "1" if scope == "User" else None
-
-    monkeypatch.setattr(bridge_dispatch_config, "_read_windows_persistent_env_var", _persistent_reader)
+def test_dispatcher_daemon_topology_does_not_require_event_firing_harnesses(tmp_path: Path) -> None:
+    harnesses = _default_harnesses()
+    for harness in harnesses:
+        harness["can_fire_events"] = False
+        harness["event_driven_hooks"] = False
+    _write_project(tmp_path, harnesses=harnesses)
 
     status = collect_bridge_dispatch_status(tmp_path)
 
-    assert status.health_status == "WARN"
-    finding = "\n".join(status.health_findings)
-    assert bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR in finding
-    assert "User" in finding
-    assert "no-op" in finding
+    assert status.health_status == "PASS"
+    assert status.health_findings == ()
+    assert [row["id"] for row in status.selected_by_role["prime-builder"]] == ["A"]
+    assert [row["id"] for row in status.selected_by_role["loyal-opposition"]] == ["D", "F"]
 
 
-def test_wi4768_live_dispatch_config_projection_drift_is_visible() -> None:
+def test_wi5012_live_dispatch_config_keeps_registry_dispatch_authority() -> None:
     rules = tomllib.loads((REPO_ROOT / "config" / "dispatcher" / "rules.toml").read_text(encoding="utf-8"))
     harness_b_rules = rules["harnesses"]["B"]
 
-    assert harness_b_rules["can_receive_dispatch"] is False
-    assert "interactive-only" not in harness_b_rules["tags"]
+    authoritative_fields = {
+        "can_receive_dispatch",
+        "can_fire_events",
+        "dispatch_cost",
+        "dispatch_quality",
+        "dispatch_availability",
+    }
+    assert not (authoritative_fields & set(harness_b_rules))
 
     projection = read_roles(REPO_ROOT)
     harness_b = next(row for row in projection["harnesses"] if row["id"] == "B")
+    assert isinstance(harness_b["can_receive_dispatch"], bool)
 
     status_payload = collect_bridge_dispatch_status(REPO_ROOT).to_json_dict()
     harness_b_status = next(row for row in status_payload["harnesses"] if row["id"] == "B")
-    assert harness_b_status["can_receive_dispatch"] is False
+    assert harness_b_status["can_receive_dispatch"] is harness_b["can_receive_dispatch"]
     assert harness_b_status["status"] == harness_b["status"]
-    candidate_ids = [row["id"] for row in status_payload["selected_by_role"]["prime-builder"]]
+    selected_roles = [role for role in harness_b["role"] if role in status_payload["selected_by_role"]]
     if harness_b["status"] == "active" and harness_b_status["can_receive_dispatch"]:
-        assert "B" in candidate_ids
+        assert any("B" in {row["id"] for row in status_payload["selected_by_role"][role]} for role in selected_roles)
     else:
-        assert "B" not in candidate_ids
+        assert all(
+            "B" not in {row["id"] for row in status_payload["selected_by_role"][role]} for role in selected_roles
+        )
 
 
-def test_config_overlay_can_disable_dispatchability(tmp_path: Path) -> None:
+def test_wi4983_live_dispatch_config_routes_prime_no_go_only_to_prime() -> None:
+    config = load_bridge_dispatch_config(REPO_ROOT)
+    records = read_roles(REPO_ROOT)["harnesses"]
+
+    prime_go = select_dispatch_candidates(
+        records,
+        config,
+        DispatchContext(required_role="prime-builder", status="GO"),
+    )
+    prime_no_go = select_dispatch_candidates(
+        records,
+        config,
+        DispatchContext(required_role="prime-builder", status="NO-GO"),
+    )
+    prime_no_action = select_dispatch_candidates(
+        records,
+        config,
+        DispatchContext(required_role="prime-builder", status="NO-ACTION"),
+    )
+    lo_no_action = select_dispatch_candidates(
+        records,
+        config,
+        DispatchContext(required_role="loyal-opposition", status="NO-ACTION"),
+    )
+
+    expected_prime_ids = {
+        row["id"]
+        for row in records
+        if row.get("status") == "active"
+        and row.get("can_receive_dispatch") is True
+        and ("prime-builder" in row.get("role", []) or "acting-prime-builder" in row.get("role", []))
+    }
+    expected_lo_ids = {
+        row["id"]
+        for row in records
+        if row.get("status") == "active"
+        and row.get("can_receive_dispatch") is True
+        and "loyal-opposition" in row.get("role", [])
+    }
+
+    assert {row["id"] for row in prime_go} == expected_prime_ids
+    assert {row["id"] for row in prime_no_go} == expected_prime_ids
+    assert prime_no_action == []
+    assert {row["id"] for row in lo_no_action} == expected_lo_ids
+
+
+def test_config_overlay_cannot_disable_registry_dispatchability(tmp_path: Path) -> None:
     _write_project(
         tmp_path,
         rules="""
@@ -209,9 +349,12 @@ rules = []
 
     status = collect_bridge_dispatch_status(tmp_path)
 
-    assert status.health_status == "FAIL"
-    assert status.selected_by_role["prime-builder"] == []
-    assert any("prime-builder" in finding for finding in status.health_findings)
+    assert status.health_status == "WARN"
+    assert [row["id"] for row in status.selected_by_role["prime-builder"]] == ["A"]
+    assert any(
+        "harness A rules.toml carries deprecated authoritative field(s)" in finding
+        for finding in status.consistency_findings
+    )
 
 
 def test_dispatch_budget_config_parses_and_reports_without_changing_selection(tmp_path: Path) -> None:
@@ -313,7 +456,7 @@ prefer = ["harness_id"]
         DispatchContext(required_role="loyal-opposition", status="GO", activity="verify"),
     )
 
-    assert [row["id"] for row in matching] == ["D", "F"]
+    assert {row["id"] for row in matching} == {"D", "F"}
     assert non_matching == []
 
 
@@ -378,6 +521,63 @@ rules = []
     assert [row["id"] for row in selected] == ["D", "C", "B", "A"]
 
 
+def test_fully_tied_dispatch_candidates_use_injected_random_tiebreak() -> None:
+    class ReversingRng:
+        def __init__(self) -> None:
+            self.groups: list[list[str]] = []
+
+        def shuffle(self, values: list[dict[str, object]]) -> None:
+            self.groups.append([str(row["id"]) for row in values])
+            values.reverse()
+
+    config = bridge_dispatch_config.BridgeDispatchConfig(
+        path=Path("config/dispatcher/rules.toml"),
+        exists=True,
+        schema_version=1,
+        selection_order=("quality", "cost", "availability", "harness_id"),
+    )
+    records = [
+        {
+            "id": "A",
+            "status": "active",
+            "role": ["prime-builder"],
+            "can_receive_dispatch": True,
+            "dispatch_quality": 90,
+            "dispatch_cost": 20,
+            "dispatch_availability": 80,
+        },
+        {
+            "id": "B",
+            "status": "active",
+            "role": ["prime-builder"],
+            "can_receive_dispatch": True,
+            "dispatch_quality": 90,
+            "dispatch_cost": 20,
+            "dispatch_availability": 80,
+        },
+        {
+            "id": "C",
+            "status": "active",
+            "role": ["prime-builder"],
+            "can_receive_dispatch": True,
+            "dispatch_quality": 70,
+            "dispatch_cost": 20,
+            "dispatch_availability": 80,
+        },
+    ]
+    rng = ReversingRng()
+
+    selected = select_dispatch_candidates(
+        records,
+        config,
+        DispatchContext(required_role="prime-builder"),
+        rng=rng,
+    )
+
+    assert rng.groups == [["A", "B"]]
+    assert [row["id"] for row in selected] == ["B", "A", "C"]
+
+
 # WI-4658 — collect_bridge_dispatch_status quarantined-thread health-finding tests.
 # bridge/gtkb-dispatch-malformed-status-token-quarantine-001.md (GO at -002).
 #
@@ -396,12 +596,65 @@ def _write_dispatch_state(root: Path, recipients: dict[str, dict]) -> None:
     )
 
 
+def _write_bridge_thread_status_helper(root: Path) -> None:
+    scripts_dir = root / "scripts"
+    scripts_dir.mkdir(exist_ok=True)
+    (scripts_dir / "bridge_thread_files.py").write_text(
+        """
+from pathlib import Path
+
+
+def latest_bridge_status_for_thread(project_root, bridge_id, status_reader):
+    bridge_dir = Path(project_root) / "bridge"
+    versioned = []
+    for path in bridge_dir.glob("*.md"):
+        stem = path.stem
+        prefix = f"{bridge_id}-"
+        if not stem.startswith(prefix):
+            continue
+        suffix = stem[len(prefix):]
+        if len(suffix) == 3 and suffix.isdigit():
+            versioned.append((int(suffix), path))
+    if not versioned:
+        return None
+    return status_reader(sorted(versioned, reverse=True)[0][1])
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+
+def _write_bridge_thread(root: Path, slug: str, latest_status: str, work_item_id: str) -> None:
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(exist_ok=True)
+    (bridge_dir / f"{slug}-001.md").write_text(
+        f"NEW\n\nbridge_kind: implementation_proposal\nWork Item: {work_item_id}\n",
+        encoding="utf-8",
+    )
+    (bridge_dir / f"{slug}-002.md").write_text(
+        f"{latest_status}\n\nWork Item: {work_item_id}\n",
+        encoding="utf-8",
+    )
+
+
 def _write_dispatch_run(root: Path, dispatch_id: str, *, exit_code: int, stderr: str) -> None:
     runs_dir = root / ".gtkb-state" / "bridge-poller" / "dispatch-runs"
     runs_dir.mkdir(parents=True, exist_ok=True)
     (runs_dir / f"{dispatch_id}.stdout.log").write_text("", encoding="utf-8")
     (runs_dir / f"{dispatch_id}.stderr.log").write_text(stderr, encoding="utf-8")
     (runs_dir / f"{dispatch_id}.exit_code").write_text(str(exit_code), encoding="utf-8")
+
+
+def _write_live_dispatch_run(
+    root: Path,
+    dispatch_id: str,
+    *,
+    pid: int = 424242,
+    create_time_epoch: float = 1234.5,
+) -> None:
+    runs_dir = root / ".gtkb-state" / "bridge-poller" / "dispatch-runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    (runs_dir / f"{dispatch_id}.pid").write_text(str(pid), encoding="utf-8")
+    (runs_dir / f"{dispatch_id}.create_time_epoch").write_text(f"{create_time_epoch:.6f}", encoding="utf-8")
 
 
 def _load_scan_helper():
@@ -442,6 +695,43 @@ def test_wi4658_health_warns_when_quarantined_threads_present(tmp_path: Path) ->
     assert "2 bridge thread(s)" in finding
     assert "gtkb-wi4232-bridge-index-drift-pb-classification" in finding
     assert status.health_status == "WARN"
+
+
+def test_drain_dry_run_matches_status_live_dispatch_run_pids(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "last_result": "unchanged",
+                "pending_count": 1,
+                "selected_count": 0,
+            }
+        },
+    )
+    _write_live_dispatch_run(tmp_path, "2026-06-30T23-05-00Z-loyal-opposition-F-live")
+    monkeypatch.setattr(bridge_dispatch_config, "_pid_alive", lambda pid: int(pid) == 424242)
+    monkeypatch.setattr(
+        bridge_dispatch_config,
+        "_pid_create_time_matches",
+        lambda pid, expected: int(pid) == 424242 and float(expected) == 1234.5,
+    )
+    monkeypatch.setattr(bridge_dispatch_reset, "_dispatch_run_pid_alive", lambda pid: int(pid) == 424242)
+    monkeypatch.setattr(
+        bridge_dispatch_reset,
+        "_dispatch_run_pid_provenance_matches",
+        lambda pid, expected: int(pid) == 424242 and float(expected) == 1234.5,
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+    drain_result = drain(DispatchStateDirs.resolve(tmp_path), dry_run=True)
+
+    classification = next(row for row in status.runtime_classifications if row["recipient"] == "loyal-opposition:F")
+    assert classification["live_inflight_dispatch_count"] == 1
+    assert drain_result.drained_pids == [424242]
 
 
 def test_wi4658_health_silent_when_no_quarantined_threads(tmp_path: Path) -> None:
@@ -692,6 +982,93 @@ def test_wi4893_recent_openrouter_run_failure_warns_when_recipient_state_is_comp
     assert report["summary"]["runtime_failure_count"] >= 1
 
 
+def test_recent_run_failure_is_ignored_after_current_recipient_has_no_pending_work(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "last_result": "no_pending",
+                "pending_count": 0,
+                "selected_count": 0,
+                "signature": "sig-f",
+                "last_dispatched_signature": "sig-f",
+            }
+        },
+    )
+    _write_dispatch_run(
+        tmp_path,
+        "2026-06-28T16-04-29Z-loyal-opposition-F-d34cfc",
+        exit_code=1,
+        stderr="openrouter_harness: session timeout exceeded before OpenRouter chat turn\n",
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "PASS"
+    assert not any("latest_run=2026-06-28T16-04-29Z-loyal-opposition-F-d34cfc" in f for f in status.health_findings)
+
+
+def test_wi4885_unchanged_pending_with_live_recipient_worker_is_pass(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "last_result": "unchanged",
+                "pending_count": 2,
+                "selected_count": 0,
+                "signature": "sig-f",
+                "last_dispatched_signature": "sig-f",
+            }
+        },
+    )
+    _write_live_dispatch_run(tmp_path, "2026-06-29T20-00-00Z-loyal-opposition-F-live")
+    monkeypatch.setattr(bridge_dispatch_config, "_pid_alive", lambda pid: int(pid) == 424242)
+    monkeypatch.setattr(
+        bridge_dispatch_config,
+        "_pid_create_time_matches",
+        lambda pid, expected: int(pid) == 424242 and float(expected) == 1234.5,
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    findings = "\n".join(status.health_findings)
+    assert status.health_status == "PASS"
+    assert "last_result=unchanged" not in findings
+    classification = next(row for row in status.runtime_classifications if row["recipient"] == "loyal-opposition:F")
+    assert classification["severity"] == "PASS"
+    assert classification["live_inflight_dispatch_count"] == 1
+
+
+def test_wi4885_unchanged_pending_without_live_recipient_worker_warns(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "last_result": "unchanged",
+                "pending_count": 2,
+                "selected_count": 0,
+                "signature": "sig-f",
+                "last_dispatched_signature": "sig-f",
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    findings = "\n".join(status.health_findings)
+    assert status.health_status == "WARN"
+    assert "dispatch runtime warning: loyal-opposition:F last_result=unchanged with pending_count=2" in findings
+    classification = next(row for row in status.runtime_classifications if row["recipient"] == "loyal-opposition:F")
+    assert classification["severity"] == "WARN"
+    assert classification["live_inflight_dispatch_count"] == 0
+
+
 def test_wi4893_recent_cursor_gui_warning_warns_even_with_exit_zero(tmp_path: Path) -> None:
     _write_project(
         tmp_path,
@@ -760,6 +1137,35 @@ def test_wi4893_recent_ollama_max_turn_run_failure_warns(tmp_path: Path) -> None
     findings = "\n".join(status.health_findings)
     assert "latest_run=2026-06-28T15-13-47Z-loyal-opposition-D-7ea816" in findings
     assert "max_turn_exhaustion" in findings
+
+
+def test_wi4933_recent_openrouter_429_is_backpressure_warning(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "last_result": "launched",
+                "pending_count": 2,
+                "signature": "sig-f",
+                "last_dispatched_signature": "sig-f",
+            }
+        },
+    )
+    _write_dispatch_run(
+        tmp_path,
+        "2026-06-30T08-00-00Z-loyal-opposition-F-rate",
+        exit_code=1,
+        stderr="openrouter_harness: OpenRouter rate limited (HTTP 429 provider backpressure) after 3 attempt(s)\n",
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "WARN"
+    findings = "\n".join(status.health_findings)
+    assert "dispatch runtime warning: loyal-opposition:F latest_run=2026-06-30T08-00-00Z" in findings
+    assert "failure_class=provider_rate_limited" in findings
+    assert "dispatch runtime failure: loyal-opposition:F latest_run=2026-06-30T08-00-00Z" not in findings
 
 
 # WI-4718 — benign concurrency_cap_reached must not be misclassified as a runtime FAIL.
@@ -835,11 +1241,8 @@ def test_wi4718_no_findings_when_no_pending_work(tmp_path: Path) -> None:
     assert findings == []
 
 
-def test_wi4718_genuine_launch_reason_emits_runtime_failure_finding(tmp_path: Path) -> None:
-    """A genuine failure reason (spawn_rate_limited) still produces a runtime-failure
-    FINDING (WI-4718, unchanged). WI-4789 reconciliation: overall health_status is now
-    WARN, not FAIL, because the recipient and prime-builder remain dispatch-eligible
-    (SPEC-DISPATCH-HEALTH-STATUS-SEMANTICS-001 v2)."""
+def test_wi4933_spawn_rate_limited_launch_reason_warns_as_backpressure(tmp_path: Path) -> None:
+    """WI-4933: spawn_rate_limited is bounded backpressure, not a crash-class failure."""
     _write_project(tmp_path)
     _write_dispatch_state(
         tmp_path,
@@ -856,7 +1259,41 @@ def test_wi4718_genuine_launch_reason_emits_runtime_failure_finding(tmp_path: Pa
     status = collect_bridge_dispatch_status(tmp_path)
 
     assert status.health_status == "WARN"
-    assert any("last_result=launch_failed" in f for f in status.health_findings)
+    findings = "\n".join(status.health_findings)
+    assert "dispatch runtime failure: loyal-opposition:D last_result=launch_failed" not in findings
+    assert "dispatch runtime failure: loyal-opposition:D last_launch.reason=spawn_rate_limited" not in findings
+    assert "dispatch runtime warning: loyal-opposition:D backpressure last_launch.reason=spawn_rate_limited" in findings
+
+
+def test_wi4933_spawn_rate_limited_last_result_warns_with_live_worker(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "pending_count": 0,
+                "selected_count": 0,
+                "last_result": "spawn_rate_limited",
+            }
+        },
+    )
+    _write_live_dispatch_run(tmp_path, "2026-06-30T08-05-00Z-loyal-opposition-F-live")
+    monkeypatch.setattr(bridge_dispatch_config, "_pid_alive", lambda pid: int(pid) == 424242)
+    monkeypatch.setattr(
+        bridge_dispatch_config,
+        "_pid_create_time_matches",
+        lambda pid, expected: int(pid) == 424242 and float(expected) == 1234.5,
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "WARN"
+    findings = "\n".join(status.health_findings)
+    assert "dispatch runtime failure: loyal-opposition:F last_result=spawn_rate_limited" not in findings
+    assert "dispatch runtime warning: loyal-opposition:F backpressure last_result=spawn_rate_limited" in findings
 
 
 def test_wi4718_absent_launch_reason_still_fails() -> None:
@@ -878,6 +1315,252 @@ def test_wi4718_benign_constant_contains_expected_reasons() -> None:
     assert "concurrency_cap_reached" in BENIGN_NONLAUNCH_LAUNCH_REASONS
     assert "per_role_concurrency_cap_reached" in BENIGN_NONLAUNCH_LAUNCH_REASONS
     assert isinstance(BENIGN_NONLAUNCH_LAUNCH_REASONS, frozenset)
+
+
+def test_wi4995_document_lease_held_ignores_stale_failure_class() -> None:
+    """document_lease_held is a benign current non-launch, not a subprocess failure."""
+    row: dict = {
+        "pending_count": 1,
+        "selected_count": 1,
+        "last_result": "document_lease_held",
+        "failure_class": "subprocess_execution_failed",
+        "last_launch": {
+            "reason": "document_lease_held",
+            "recipient": "loyal-opposition:B",
+        },
+    }
+
+    classification = bridge_dispatch_config._runtime_classification_for_recipient("loyal-opposition:B", row)
+    findings = "\n".join(classification["findings"])
+
+    assert "dispatch runtime failure" not in findings
+    assert "stale failure evidence ignored (current document_lease_held non-launch)" in findings
+    assert classification["severity"] == "WARN"
+    assert classification["stale_failure_evidence"] is True
+    assert classification["stale_failure_reason"] == "current document_lease_held non-launch"
+
+
+def test_wi4995_document_lease_held_does_not_hide_current_exit_failure() -> None:
+    """A separate current failure signal still fails even when the row is lease-held."""
+    row: dict = {
+        "pending_count": 1,
+        "selected_count": 1,
+        "last_result": "document_lease_held",
+        "failure_class": "subprocess_execution_failed",
+        "last_launch": {
+            "reason": "document_lease_held",
+            "recipient": "loyal-opposition:B",
+            "exit_failure_reason": "no_verdict_produced",
+        },
+    }
+
+    classification = bridge_dispatch_config._runtime_classification_for_recipient("loyal-opposition:B", row)
+    findings = "\n".join(classification["findings"])
+
+    assert "dispatch runtime failure: loyal-opposition:B failure_class=subprocess_execution_failed" in findings
+    assert (
+        "dispatch runtime failure: loyal-opposition:B last_launch.exit_failure_reason=no_verdict_produced" in findings
+    )
+    assert classification["severity"] == "FAIL"
+    assert classification["stale_failure_evidence"] is False
+
+
+def test_wi5207_selected_documents_incomplete_is_distinct_nonprovider_warning() -> None:
+    row: dict = {
+        "pending_count": 1,
+        "selected_count": 0,
+        "last_result": "selected_documents_incomplete",
+        "failure_count": 0,
+        "circuit_breaker_tripped": False,
+        "last_launch": {
+            "recipient": "loyal-opposition:B",
+            "exit_failure_reason": "selected_documents_incomplete",
+            "completed_documents": ["completed-thread"],
+            "incomplete_documents": ["missing-thread"],
+        },
+    }
+
+    classification = bridge_dispatch_config._runtime_classification_for_recipient("loyal-opposition:B", row)
+    findings = "\n".join(classification["findings"])
+
+    assert classification["severity"] == "WARN"
+    assert "selected_documents_incomplete" in findings
+    assert "missing_documents=['missing-thread']" in findings
+    assert "dispatch runtime failure" not in findings
+    assert "provider_failure" not in findings
+    assert classification["failure_class"] is None
+
+
+def test_wi4992_all_impl_auth_quarantine_ignores_stale_failure_class() -> None:
+    """all_impl_auth_quarantined is deterministic non-work, not a subprocess failure."""
+    row: dict = {
+        "pending_count": 1,
+        "selected_count": 0,
+        "last_result": "all_impl_auth_quarantined",
+        "failure_class": "subprocess_execution_failed",
+        "last_launch": {
+            "reason": "all_impl_auth_quarantined",
+            "recipient": "prime-builder:A",
+        },
+    }
+
+    classification = bridge_dispatch_config._runtime_classification_for_recipient("prime-builder:A", row)
+    findings = "\n".join(classification["findings"])
+
+    assert "dispatch runtime failure" not in findings
+    assert "stale failure evidence ignored (current all_impl_auth_quarantined non-launch)" in findings
+    assert classification["severity"] == "PASS"
+    assert classification["stale_failure_evidence"] is True
+    assert classification["stale_failure_reason"] == "current all_impl_auth_quarantined non-launch"
+
+
+def test_wi5000_all_impl_auth_quarantine_stale_failure_is_health_pass(tmp_path: Path) -> None:
+    """Deterministic impl-auth quarantine visibility does not degrade dispatch health."""
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "prime-builder:A": {
+                "pending_count": 1,
+                "selected_count": 0,
+                "last_result": "all_impl_auth_quarantined",
+                "failure_class": "subprocess_execution_failed",
+                "last_launch": {
+                    "reason": "all_impl_auth_quarantined",
+                    "recipient": "prime-builder:A",
+                },
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    findings = "\n".join(status.health_findings)
+    assert status.health_status == "PASS"
+    assert "dispatch runtime failure" not in findings
+    assert "stale failure evidence ignored (current all_impl_auth_quarantined non-launch)" in findings
+    classification = next(row for row in status.runtime_classifications if row["recipient"] == "prime-builder:A")
+    assert classification["severity"] == "PASS"
+    assert classification["stale_failure_reason"] == "current all_impl_auth_quarantined non-launch"
+
+
+def test_terminal_work_item_dispatch_residue_is_health_pass(tmp_path: Path) -> None:
+    """A GO/NO-GO row linked to a terminal work item is historical residue, not live failure."""
+    _write_project(tmp_path)
+    _write_bridge_thread_status_helper(tmp_path)
+    doc = "retired-work-item-thread"
+    _write_bridge_thread(tmp_path, doc, "NO-GO", "WI-5002")
+    _write_current_work_items(tmp_path, {"WI-5002": "retired"})
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "prime-builder:A": {
+                "pending_count": 1,
+                "selected_count": 1,
+                "last_result": "subprocess_execution_failed",
+                "failure_class": "subprocess_execution_failed",
+                "last_launch": {
+                    "recipient": "prime-builder:A",
+                    "primary_bridge_id": doc,
+                    "selected_documents": [doc],
+                    "exit_failure_reason": "subprocess_execution_failed",
+                },
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    findings = "\n".join(status.health_findings)
+    assert status.health_status == "PASS"
+    assert "dispatch runtime failure" not in findings
+    assert "referenced bridge work item terminal" in findings
+    classification = next(row for row in status.runtime_classifications if row["recipient"] == "prime-builder:A")
+    assert classification["severity"] == "PASS"
+    assert classification["stale_failure_evidence"] is True
+    assert classification["stale_failure_reason"] == (
+        f"referenced bridge work item terminal ({doc}: referenced work item terminal (WI-5002=retired))"
+    )
+
+
+def test_no_action_dispatch_residue_is_not_terminal_when_work_item_is_terminal(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    _write_bridge_thread_status_helper(tmp_path)
+    doc = "retired-work-item-verdict-correction"
+    _write_bridge_thread(tmp_path, doc, "NO-ACTION", "WI-5002")
+    _write_current_work_items(tmp_path, {"WI-5002": "retired"})
+    recipient_state = {
+        "pending_count": 1,
+        "selected_count": 1,
+        "selected_documents": [doc],
+    }
+
+    assert bridge_dispatch_config._terminal_bridge_reconciliation_reason(tmp_path, recipient_state) is None
+
+
+def test_wi5000_all_impl_auth_quarantine_with_live_worker_warns(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A concurrent live worker keeps impl-auth quarantine residue WARN-visible."""
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "prime-builder:A": {
+                "pending_count": 1,
+                "selected_count": 0,
+                "last_result": "all_impl_auth_quarantined",
+                "failure_class": "subprocess_execution_failed",
+                "last_launch": {
+                    "reason": "all_impl_auth_quarantined",
+                    "recipient": "prime-builder:A",
+                },
+            }
+        },
+    )
+    _write_live_dispatch_run(tmp_path, "2026-07-03T18-00-00Z-prime-builder-A-live")
+    monkeypatch.setattr(bridge_dispatch_config, "_pid_alive", lambda pid: int(pid) == 424242)
+    monkeypatch.setattr(
+        bridge_dispatch_config,
+        "_pid_create_time_matches",
+        lambda pid, expected: int(pid) == 424242 and float(expected) == 1234.5,
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "WARN"
+    classification = next(row for row in status.runtime_classifications if row["recipient"] == "prime-builder:A")
+    assert classification["severity"] == "WARN"
+    assert classification["live_inflight_dispatch_count"] == 1
+
+
+def test_wi5000_all_impl_auth_quarantine_circuit_breaker_still_warns(tmp_path: Path) -> None:
+    """Current failure signals still degrade health even when last_result is impl-auth quarantine."""
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "prime-builder:A": {
+                "pending_count": 1,
+                "selected_count": 0,
+                "last_result": "all_impl_auth_quarantined",
+                "last_launch": {
+                    "reason": "all_impl_auth_quarantined",
+                    "recipient": "prime-builder:A",
+                },
+                "circuit_breaker_tripped": True,
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    findings = "\n".join(status.health_findings)
+    assert status.health_status == "WARN"
+    assert "circuit breaker is tripped" in findings
+    classification = next(row for row in status.runtime_classifications if row["recipient"] == "prime-builder:A")
+    assert classification["severity"] == "FAIL"
 
 
 def test_wi4768_per_role_saturation_emits_warn_not_fail(tmp_path: Path) -> None:
@@ -941,12 +1624,16 @@ def test_wi4768_orphaned_failure_evidence_warns_not_fails(tmp_path: Path) -> Non
     assert classification["stale_failure_reason"] == "recipient evidence points to loyal-opposition:D"
 
 
-def test_wi4768_status_surfaces_config_projection_drift(tmp_path: Path) -> None:
-    """Status keeps overlay behavior visible by reporting raw projection drift."""
+def test_wi5012_status_warns_and_ignores_deprecated_config_authority_fields(tmp_path: Path) -> None:
+    """Deprecated rules.toml authority fields are visible but cannot override projection."""
     harnesses = _default_harnesses()
     for harness in harnesses:
         if harness["id"] == "F":
             harness["can_receive_dispatch"] = False
+        if harness["id"] == "D":
+            harness["dispatch_quality"] = 95
+            harness["dispatch_cost"] = 30
+            harness["dispatch_availability"] = 80
     _write_project(
         tmp_path,
         harnesses=harnesses,
@@ -965,10 +1652,10 @@ rules = []
 
     assert status.health_status == "WARN"
     assert any(
-        "harness F can_receive_dispatch rules.toml=True harness-registry=False" in finding
+        "harness F rules.toml carries deprecated authoritative field(s)" in finding
         for finding in status.consistency_findings
     )
-    assert any(row["id"] == "F" for row in status.selected_by_role["loyal-opposition"])
+    assert all(row["id"] != "F" for row in status.selected_by_role["loyal-opposition"])
 
 
 def test_wi4765_report_builder_preserves_dispatch_runtime_failure_causes(tmp_path: Path) -> None:
@@ -1007,11 +1694,8 @@ schema_version = 1
 selection_order = ["quality", "cost", "availability", "harness_id"]
 
 [harnesses.A]
-can_receive_dispatch = true
-can_fire_events = true
-dispatch_cost = 60
-dispatch_quality = 90
-dispatch_availability = 90
+max_items = 1
+tags = ["prime-builder"]
 
 [[rules]]
 id = "bridge-prime-builder-default"
@@ -1020,6 +1704,28 @@ statuses = ["GO"]
 prefer = ["quality", "cost", "availability", "harness_id"]
 """.lstrip(),
     )
+    db = KnowledgeDB(db_path=tmp_path / "groundtruth.db")
+    db.insert_harness(
+        id="A",
+        harness_name="codex",
+        harness_type="codex",
+        role=["prime-builder"],
+        changed_by="test",
+        change_reason="WI-5012 dispatch metadata fixture",
+        status="active",
+        invocation_surfaces={
+            "dispatch": {
+                "can_receive_dispatch": True,
+                "can_fire_events": True,
+                "event_driven_hooks": True,
+                "dispatch_cost": 60,
+                "dispatch_quality": 90,
+                "dispatch_availability": 90,
+                "dispatch_tags": ["prime-builder"],
+            }
+        },
+    )
+    generate_harness_projection(db, tmp_path)
 
     set_eligibility(tmp_path, "A", can_receive_dispatch=False, can_fire_events=None)
     set_weights(tmp_path, "A", dispatch_quality=75, dispatch_cost=20, dispatch_availability=None)
@@ -1028,14 +1734,51 @@ prefer = ["quality", "cost", "availability", "harness_id"]
     dispatch_config = load_bridge_dispatch_config(tmp_path)
     overlay = dispatch_config.overlay_for("A")
     assert overlay is not None
-    assert overlay.can_receive_dispatch is False
-    assert overlay.dispatch_quality == 75
-    assert overlay.dispatch_cost == 20
+    assert overlay.can_receive_dispatch is None
+    assert overlay.dispatch_quality is None
+    assert overlay.dispatch_cost is None
+    projection = read_roles(tmp_path)
+    harness_a = next(row for row in projection["harnesses"] if row["id"] == "A")
+    assert harness_a["can_receive_dispatch"] is False
+    assert harness_a["dispatch_quality"] == 75.0
+    assert harness_a["dispatch_cost"] == 20.0
     assert dispatch_config.rules[0].statuses == ("GO", "NO-GO")
     assert dispatch_config.selection_order_for(DispatchContext(required_role="prime-builder", status="GO")) == (
         "cost",
         "harness_id",
     )
+
+
+def test_wi5033_set_weights_cli_accepts_reviewer_precedence_dry_run(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    (tmp_path / "groundtruth.toml").write_text(
+        '[groundtruth]\ndb_path = "./groundtruth.db"\nproject_root = "."\n',
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        gt_main,
+        [
+            "--config",
+            str(tmp_path / "groundtruth.toml"),
+            "bridge",
+            "dispatch",
+            "config",
+            "set-weights",
+            "D",
+            "--reviewer-precedence",
+            "20",
+            "--dry-run",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["transaction"] == "set-weights"
+    assert payload["status"] == "dry_run"
+    assert payload["mutated"] is False
+    assert "harness registry unchanged" in payload["message"]
 
 
 def test_wi4766_transactions_reject_unknown_rule_without_config_write(tmp_path: Path) -> None:
@@ -1063,8 +1806,7 @@ slug = "archived-new"
     )
     (bridge_dir / "archived-new-001.md").write_text("NEW\n\n# Archived thread\n", encoding="utf-8")
     (bridge_dir / "live-new-001.md").write_text("NEW\n\n# Live thread\n", encoding="utf-8")
-    index_path = bridge_dir / "INDEX.md"
-    index_path.write_text("", encoding="utf-8")
+    index_path = bridge_dir / "state.md"
 
     helper = _load_scan_helper()
     result = helper.scan(role="loyal-opposition", index_path=index_path)
@@ -1153,3 +1895,90 @@ def test_wi4789_observed_defect_regression(tmp_path: Path) -> None:
     assert status.health_status == "WARN"
     assert [row["id"] for row in status.selected_by_role["prime-builder"]] == ["A"]
     assert any("dispatch runtime failure" in f for f in status.health_findings)
+
+
+# WI-5070: governed dispatcher budget-model setter CLI verb.
+
+_BUDGET_MODEL_RULES = """\
+schema_version = 1
+selection_order = ["reviewer_precedence", "harness_id"]
+rules = []
+
+[budget]
+enabled = false
+
+[budget.harnesses.D]
+model = "deepseek-v4-pro-cloud"
+pricing = "priced"
+estimated_usd_per_dispatch = 0.0
+"""
+
+
+def _write_budget_project(root: Path) -> None:
+    _write_project(root, rules=_BUDGET_MODEL_RULES)
+    (root / "groundtruth.toml").write_text(
+        '[groundtruth]\ndb_path = "./groundtruth.db"\nproject_root = "."\n',
+        encoding="utf-8",
+    )
+
+
+def test_wi5070_set_model_cli_updates_budget_model(tmp_path: Path) -> None:
+    """DCL-DISPATCHER-CONFIG-CLI-ONLY-001: the budget model change flows through
+    `gt bridge dispatch config set-model`, not a direct TOML edit."""
+    _write_budget_project(tmp_path)
+
+    result = CliRunner().invoke(
+        gt_main,
+        [
+            "--config",
+            str(tmp_path / "groundtruth.toml"),
+            "bridge",
+            "dispatch",
+            "config",
+            "set-model",
+            "D",
+            "--model",
+            "kimi-k2-7-code-cloud",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["transaction"] == "set-model"
+    assert payload["status"] == "applied"
+    assert payload["mutated"] is True
+    rules = tomllib.loads((tmp_path / "config" / "dispatcher" / "rules.toml").read_text(encoding="utf-8"))
+    assert rules["budget"]["harnesses"]["D"]["model"] == "kimi-k2-7-code-cloud"
+    assert rules["budget"]["harnesses"]["D"]["pricing"] == "priced"
+
+
+def test_wi5070_set_model_cli_dry_run_does_not_write(tmp_path: Path) -> None:
+    """A dry-run reports the projected model without writing the config file."""
+    _write_budget_project(tmp_path)
+    config_path = tmp_path / "config" / "dispatcher" / "rules.toml"
+    before_bytes = config_path.read_bytes()
+
+    result = CliRunner().invoke(
+        gt_main,
+        [
+            "--config",
+            str(tmp_path / "groundtruth.toml"),
+            "bridge",
+            "dispatch",
+            "config",
+            "set-model",
+            "D",
+            "--model",
+            "kimi-k2-7-code-cloud",
+            "--dry-run",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["transaction"] == "set-model"
+    assert payload["status"] == "dry_run"
+    assert payload["mutated"] is False
+    assert config_path.read_bytes() == before_bytes

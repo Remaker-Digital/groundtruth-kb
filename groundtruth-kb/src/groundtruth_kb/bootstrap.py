@@ -265,8 +265,7 @@ def bootstrap_summary(target: Path, *, include_ci: bool, init_git: bool, seed_ex
         "  - groundtruth.db",
         "  - CLAUDE.md, MEMORY.md, BRIDGE-INVENTORY.md",
         "  - bridge-os-poller-setup-prompt.md (DEPRECATED compatibility stub; smart poller retired "
-        "in Slice 4. Bridge dispatch is automated by the cross-harness event-driven trigger "
-        "registered in .claude/settings.json and .codex/hooks.json.)",
+        "in Slice 4. Bridge dispatch is automated by the dispatcher daemon.)",
         "  - .claude/hooks and .claude/rules",
         f"  - CI workflows: {'yes' if include_ci else 'no'}",
         f"  - Git initialized: {'yes' if init_git else 'no'}",
@@ -278,7 +277,7 @@ def bootstrap_summary(target: Path, *, include_ci: bool, init_git: bool, seed_ex
         "     Replace remaining TBD and angle-bracket values.",
         "     The bridge-os-poller-setup-prompt.md stub is retained for two release",
         "     cycles to give adopters time to migrate references; do not follow it.",
-        "     Bridge dispatch is automated by the cross-harness event-driven trigger.",
+        "     Bridge dispatch is automated by the dispatcher daemon.",
         "  3. Run `gt --config groundtruth.toml summary`.",
         "  4. Open the project in your editor and start the first session.",
     ]

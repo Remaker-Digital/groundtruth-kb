@@ -149,10 +149,20 @@ def build_narrative_packet(
     explicit_change_request: str,
     changed_by: str,
     change_reason: str,
+    content_source: Path | None = None,
 ) -> dict[str, object]:
-    """Build a narrative-artifact approval packet from a target file."""
+    """Build a narrative-artifact approval packet from a target file.
 
-    full_content = read_lf_normalized(target_path)
+    ``target_path`` supplies the packet's path identity (must match the real
+    write target for the PreToolUse hook to authorize it). ``content_source``,
+    when given, supplies the packet's ``full_content`` instead of reading it
+    from ``target_path`` -- this decouples "which file this packet
+    authorizes" from "what content the packet approves", letting a caller
+    stage intended new content (e.g. a scratch file) and reference the real,
+    already-existing target path in the same packet.
+    """
+
+    full_content = read_lf_normalized(content_source if content_source is not None else target_path)
     packet: dict[str, object] = {
         "artifact_type": NARRATIVE_ARTIFACT_TYPE,
         "artifact_id": artifact_id,

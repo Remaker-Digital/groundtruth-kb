@@ -1,15 +1,14 @@
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Tests for _is_lo_enforced role resolution in lo-file-safety-gate.py.
 
-Verifies that the LO file-safety write-gate resolves the session role via the
-DCL-SESSION-ROLE-RESOLUTION-001 deterministic table (marker > durable), using
-the canonical shared session-id resolver for harness-neutral session-id
-resolution.
+Verifies that the LO file-safety write-gate enforces only explicit interactive
+session authority (session marker or open session envelope), while durable
+registry fallback fails open for this non-dispatcher hook.
 
 Bridge: gtkb-lo-file-safety-gate-envelope-role-resolution (GO at -006)
 Specs:
-  - DCL-SESSION-ROLE-RESOLUTION-001 (marker > durable resolution)
-  - GOV-SESSION-ROLE-AUTHORITY-001 (durable fallback when no marker)
+  - DCL-SESSION-ROLE-RESOLUTION-001 (session marker/envelope resolution)
+  - GOV-SESSION-ROLE-AUTHORITY-001 (durable registry is dispatcher authority)
   - ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 (session-stated role precedence)
   - SPEC-DISPATCH-ENVELOPE-ELEMENT-001 (envelope-authoritative principle)
 Work Item: WI-4371
@@ -112,6 +111,22 @@ def _write_durable_role(
     ident.write_text(json.dumps(ident_doc), encoding="utf-8")
 
 
+def _write_envelope(project_root: Path, role: str, harness_name: str = "claude") -> None:
+    """Write an open session envelope with an explicit resolved role."""
+    envelope_dir = project_root / "harness-state" / harness_name
+    envelope_dir.mkdir(parents=True, exist_ok=True)
+    envelope = envelope_dir / "session-envelope.json"
+    envelope.write_text(
+        json.dumps(
+            {
+                "status": "open",
+                "role_resolved": role,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Test 1: Verified PB marker + matching payload session_id → False (writes OK)
 # DCL-SESSION-ROLE-RESOLUTION-001: resolved role = marker when verified
@@ -149,6 +164,44 @@ def test_is_lo_enforced_false_when_verified_pb_marker_payload(
     result = _is_lo_enforced(project_root, payload)
     assert result is False, (
         "PB marker with matching payload session_id should resolve to PB (writes allowed, gate returns False)"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 1b: Verified LO marker + matching payload session_id -> True
+# Explicit interactive LO authority still enforces the gate.
+# ---------------------------------------------------------------------------
+
+
+def test_is_lo_enforced_true_when_verified_lo_marker_payload(
+    project_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When an LO marker exists and the payload session_id matches, writes are
+    blocked (gate returns True).
+    """
+    session_id = "test-session-lo123"
+    _write_marker(project_root, "loyal-opposition", session_id)
+    _write_durable_role(project_root, "B", "prime-builder", "claude")
+
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project_root))
+    monkeypatch.delenv("GTKB_HARNESS_NAME", raising=False)
+    monkeypatch.delenv("GTKB_ACTIVE_HARNESS_ID", raising=False)
+    monkeypatch.delenv("GTKB_HARNESS_ID", raising=False)
+    for var in (
+        "GTKB_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+        "CLAUDE_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "GTKB_INHERITED_SESSION_ID",
+        "ANTIGRAVITY_SESSION_ID",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+    payload = {"session_id": session_id}
+    result = _is_lo_enforced(project_root, payload)
+    assert result is True, (
+        "LO marker with matching payload session_id should resolve to LO (writes blocked, gate returns True)"
     )
 
 
@@ -233,16 +286,16 @@ def test_is_lo_enforced_false_when_env_session_id_matches_pb_marker(
 
 
 # ---------------------------------------------------------------------------
-# Test 4: No payload + env session id MISMATCHES marker → durable fallback LO
-# F2.3 from the proposal
+# Test 4: No payload + env session id MISMATCHES marker -> durable fallback
+# fails open for this non-dispatcher hook.
 # ---------------------------------------------------------------------------
 
 
-def test_is_lo_enforced_true_when_env_session_id_mismatches_marker_durable_lo(
+def test_is_lo_enforced_false_when_env_session_id_mismatches_marker_durable_lo(
     project_root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Env session id does not match the marker's session_id. The resolver
-    falls back to durable role which is LO → True (writes blocked).
+    falls back to durable LO, which this hook treats as fail-open.
     """
     marker_session_id = "marker-session-aaa"
     env_session_id = "different-session-bbb"
@@ -267,7 +320,7 @@ def test_is_lo_enforced_true_when_env_session_id_mismatches_marker_durable_lo(
 
     payload: dict = {}  # No payload session_id
     result = _is_lo_enforced(project_root, payload)
-    assert result is True, "Session id mismatch should fall back to durable LO role (writes blocked, gate returns True)"
+    assert result is False, "Session id mismatch falling back to durable LO should fail open for this hook"
 
 
 # ---------------------------------------------------------------------------
@@ -312,13 +365,13 @@ def test_is_lo_enforced_no_session_id_documents_unverified_branch(
 
 
 # ---------------------------------------------------------------------------
-# Test 6: No marker, durable LO → True (writes blocked)
-# GOV-SESSION-ROLE-AUTHORITY-001: durable fallback when no marker
+# Test 6: No marker, durable LO -> False (fail-open)
+# GOV-SESSION-ROLE-AUTHORITY-001: durable registry is dispatcher authority only.
 # ---------------------------------------------------------------------------
 
 
-def test_is_lo_enforced_true_when_no_marker_durable_lo(project_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """No session-role marker exists. The durable role is LO → True."""
+def test_is_lo_enforced_false_when_no_marker_durable_lo(project_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """No session-role marker exists. The durable role is LO -> False."""
     # Do NOT write a marker
     _write_durable_role(project_root, "B", "loyal-opposition", "claude")
 
@@ -339,7 +392,73 @@ def test_is_lo_enforced_true_when_no_marker_durable_lo(project_root: Path, monke
 
     payload: dict = {}
     result = _is_lo_enforced(project_root, payload)
-    assert result is True, "No marker + durable LO → writes blocked (True)"
+    assert result is False, "No marker + durable LO -> fail-open (False)"
+
+
+# ---------------------------------------------------------------------------
+# Test 6b: No marker, open session envelope LO -> True
+# Session envelope is explicit interactive authority and still enforces.
+# ---------------------------------------------------------------------------
+
+
+def test_is_lo_enforced_true_when_no_marker_session_envelope_lo(
+    project_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No marker exists, but an open session envelope resolves LO -> True."""
+    _write_durable_role(project_root, "B", "prime-builder", "claude")
+    _write_envelope(project_root, "loyal-opposition", "claude")
+
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project_root))
+    monkeypatch.delenv("GTKB_HARNESS_NAME", raising=False)
+    monkeypatch.delenv("GTKB_ACTIVE_HARNESS_ID", raising=False)
+    monkeypatch.delenv("GTKB_HARNESS_ID", raising=False)
+    for var in (
+        "GTKB_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+        "CLAUDE_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "GTKB_INHERITED_SESSION_ID",
+        "ANTIGRAVITY_SESSION_ID",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+    payload: dict = {}
+    result = _is_lo_enforced(project_root, payload)
+    assert result is True, "No marker + open session envelope LO -> writes blocked (True)"
+
+
+# ---------------------------------------------------------------------------
+# Test 6c: No marker, durable LO + open session envelope PB -> False
+# Models ::init gtkb pb overriding durable registry fallback for this session.
+# ---------------------------------------------------------------------------
+
+
+def test_is_lo_enforced_false_when_durable_lo_session_envelope_pb(
+    project_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An explicit open PB session envelope takes precedence over durable LO."""
+    _write_durable_role(project_root, "B", "loyal-opposition", "claude")
+    _write_envelope(project_root, "prime-builder", "claude")
+
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project_root))
+    monkeypatch.delenv("GTKB_HARNESS_NAME", raising=False)
+    monkeypatch.delenv("GTKB_ACTIVE_HARNESS_ID", raising=False)
+    monkeypatch.delenv("GTKB_HARNESS_ID", raising=False)
+    for var in (
+        "GTKB_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+        "CLAUDE_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "GTKB_INHERITED_SESSION_ID",
+        "ANTIGRAVITY_SESSION_ID",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+    payload: dict = {}
+    result = _is_lo_enforced(project_root, payload)
+    assert result is False, "Durable LO + open session envelope PB -> writes allowed (False)"
 
 
 # ---------------------------------------------------------------------------
@@ -409,17 +528,13 @@ def test_is_lo_enforced_false_when_role_state_unavailable(project_root: Path, mo
 
 
 # ---------------------------------------------------------------------------
-# Bonus: Regression test — original durable-only fallback path
-# Exercises the case where resolve_interactive_session_role is None
+# Bonus: Regression test - resolver unavailable fails open
+# Exercises the case where resolve_interactive_session_role is None.
 # ---------------------------------------------------------------------------
 
 
-def test_is_lo_enforced_durable_fallback_when_resolver_unavailable(
-    project_root: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """When the session role resolver is unavailable (None sentinel), the gate
-    falls back to the durable-only path.
-    """
+def test_is_lo_enforced_false_when_resolver_unavailable(project_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """When the session role resolver is unavailable, the gate fails open."""
     _write_durable_role(project_root, "B", "loyal-opposition", "claude")
 
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project_root))
@@ -443,6 +558,6 @@ def test_is_lo_enforced_durable_fallback_when_resolver_unavailable(
         HOOK_MODULE.resolve_interactive_session_role = None
         payload: dict = {}
         result = _is_lo_enforced(project_root, payload)
-        assert result is True, "Resolver unavailable + durable LO → fallback returns True (writes blocked)"
+        assert result is False, "Resolver unavailable + durable LO -> fail-open (False)"
     finally:
         HOOK_MODULE.resolve_interactive_session_role = original_resolver

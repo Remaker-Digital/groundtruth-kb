@@ -11,12 +11,10 @@ failed entries remain in ``pending/`` with the error logged so the owner
 can inspect.
 
 The shared ``apply_pending(project_root)`` entry point is invoked from
-multiple SessionStart-adjacent call sites BEFORE durable role resolution
-(both SessionStart dispatch hooks, the cross-harness trigger, and
-``scripts/session_self_initialization.py``) so that a deferred transaction
-takes effect for the next session it can observe, regardless of which path
-that session enters through. Each call site wraps the invocation
-fail-soft.
+    multiple SessionStart-adjacent call sites BEFORE durable role resolution
+    (startup initialization and dispatcher-daemon status/control paths) so that
+    a deferred transaction takes effect for the next session it can observe.
+    Each call site wraps the invocation fail-soft.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen and Palmeter, LLC. All rights
 reserved.

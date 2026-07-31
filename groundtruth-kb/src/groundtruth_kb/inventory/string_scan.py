@@ -4,11 +4,17 @@ from __future__ import annotations
 
 import fnmatch
 import json
-import subprocess
-import tomllib
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from groundtruth_kb.project.registry_control_plane import (
+    RegistryControlPlaneError,
+    RegistrySnapshot,
+    load_registry_snapshot,
+)
+from groundtruth_kb.project.sot_registry import InvalidSoTRecord, SoTArtifact, UnknownDomain
 
 REGISTRY_RELATIVE_PATH = Path("config") / "registry" / "sot-artifacts.toml"
 DEFAULT_CRITICAL_CLASSES = {
@@ -32,109 +38,198 @@ class ArtifactRecord:
     domain: str
     lifecycle: str
     storage_path: str
+    coverage_mode: str
+    mutation_api: str
+    health_check_function: str | None
 
     @property
     def classes(self) -> set[str]:
         return {self.id, self.domain, self.lifecycle}
+
+    @classmethod
+    def from_sot(cls, record: SoTArtifact) -> ArtifactRecord:
+        return cls(
+            id=record.id,
+            domain=record.domain,
+            lifecycle=record.lifecycle,
+            storage_path=record.storage_path,
+            coverage_mode=record.coverage_mode,
+            mutation_api=record.mutation_api,
+            health_check_function=record.health_check_function,
+        )
+
+
+@dataclass(frozen=True)
+class ArtifactExpansion:
+    artifact: ArtifactRecord
+    path_class: str
+    status: str
+    files: tuple[Path, ...]
+    resolved: bool
+    blocking: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "artifact_id": self.artifact.id,
+            "blocking": self.blocking,
+            "domain": self.artifact.domain,
+            "expanded_file_count": len(self.files),
+            "lifecycle": self.artifact.lifecycle,
+            "path_class": self.path_class,
+            "resolved": self.resolved,
+            "status": self.status,
+            "storage_path": self.artifact.storage_path,
+        }
 
 
 def _rel(path: Path, project_root: Path) -> str:
     return path.relative_to(project_root).as_posix()
 
 
-def _load_registry(project_root: Path, registry_path: Path | None = None) -> list[ArtifactRecord]:
+def _load_registry(
+    project_root: Path,
+    registry_path: Path | None = None,
+    *,
+    snapshot: RegistrySnapshot | None = None,
+) -> list[ArtifactRecord]:
     path = registry_path or project_root / REGISTRY_RELATIVE_PATH
-    if not path.is_file():
-        raise InventoryScanError(f"SoT artifact registry not found: {path}")
     try:
-        data = tomllib.loads(path.read_text(encoding="utf-8"))
-    except tomllib.TOMLDecodeError as exc:
-        raise InventoryScanError(f"Malformed SoT artifact registry {path}: {exc}") from exc
-    rows = data.get("artifacts")
-    if not isinstance(rows, list):
-        raise InventoryScanError(f"{path} must contain [[artifacts]] rows")
-    artifacts: list[ArtifactRecord] = []
-    for index, row in enumerate(rows, start=1):
-        if not isinstance(row, dict):
-            raise InventoryScanError(f"artifact row {index} must be a table")
-        try:
-            artifact_id = str(row["id"])
-            domain = str(row["domain"])
-            lifecycle = str(row["lifecycle"])
-            storage_path = str(row["storage_path"])
-        except KeyError as exc:
-            raise InventoryScanError(f"artifact row {index} missing required field {exc.args[0]!r}") from exc
-        artifacts.append(ArtifactRecord(artifact_id, domain, lifecycle, storage_path))
-    return artifacts
-
-
-def _git_tracked_paths(project_root: Path) -> set[str] | None:
-    proc = subprocess.run(
-        ["git", "-C", str(project_root), "ls-files"],
-        capture_output=True,
-        check=False,
-        text=True,
-    )
-    if proc.returncode != 0:
-        return None
-    return {line.strip().replace("\\", "/") for line in proc.stdout.splitlines() if line.strip()}
-
-
-def _is_tracked(path: Path, project_root: Path, tracked: set[str] | None) -> bool:
-    if tracked is None:
-        return True
-    return _rel(path, project_root) in tracked
+        coherent = snapshot or load_registry_snapshot(
+            project_root=project_root,
+            registry_path=path,
+            db_path=project_root / "groundtruth.db",
+        )
+        return [ArtifactRecord.from_sot(record) for record in coherent.records]
+    except (FileNotFoundError, InvalidSoTRecord, RegistryControlPlaneError, UnknownDomain, OSError) as exc:
+        raise InventoryScanError(f"SoT artifact registry could not be loaded from {path}: {exc}") from exc
 
 
 def _glob_has_magic(pattern: str) -> bool:
     return any(ch in pattern for ch in "*?[")
 
 
+_EXTERNAL_STORAGE_RE = re.compile(r"^[a-z][a-z0-9+.-]*:", re.IGNORECASE)
+
+
+def _path_class(artifact: ArtifactRecord, project_root: Path) -> str:
+    storage = artifact.storage_path.strip()
+    if artifact.coverage_mode == "opaque_container":
+        return "opaque_container"
+    if storage.startswith("membase:"):
+        return "membase"
+    if _EXTERNAL_STORAGE_RE.match(storage) and not Path(storage).is_absolute():
+        return "external"
+    if artifact.lifecycle == "archive":
+        return "archive"
+    if artifact.lifecycle == "deprecated":
+        return "deprecated"
+    if artifact.lifecycle == "generated":
+        return "generated"
+    if _glob_has_magic(storage):
+        return "glob"
+    candidate = project_root / storage
+    if storage.endswith(("/", "\\")) or candidate.is_dir():
+        return "directory"
+    return "file"
+
+
 def _expand_artifact_files(
     artifact: ArtifactRecord,
     project_root: Path,
-    tracked: set[str] | None,
-) -> tuple[list[Path], bool]:
+) -> ArtifactExpansion:
     storage = artifact.storage_path.strip()
-    if not storage or storage.startswith("membase:"):
-        return [], True
+    path_class = _path_class(artifact, project_root)
+    if not storage:
+        return ArtifactExpansion(artifact, "file", "invalid_empty_path", (), False, True)
+    if path_class == "membase":
+        return ArtifactExpansion(artifact, path_class, "declared_membase", (), True, False)
+    if path_class == "external":
+        return ArtifactExpansion(artifact, path_class, "declared_external", (), True, False)
     if Path(storage).is_absolute():
-        return [], False
-    if _glob_has_magic(storage):
-        matches = sorted(project_root.glob(storage))
-    else:
-        candidate = project_root / storage
-        if candidate.is_dir():
-            matches = sorted(path for path in candidate.rglob("*") if path.is_file())
-        elif candidate.is_file():
-            matches = [candidate]
-        else:
-            matches = []
-    files = [path for path in matches if path.is_file() and _is_tracked(path, project_root, tracked)]
-    return files, bool(matches) or storage.startswith(".gtkb-state/")
+        blocking = artifact.lifecycle == "active"
+        return ArtifactExpansion(artifact, path_class, "absolute_path_unsupported", (), False, blocking)
+
+    candidate = project_root / storage
+    if path_class == "opaque_container":
+        exists = candidate.is_dir()
+        blocking = artifact.lifecycle == "active" and not exists
+        return ArtifactExpansion(
+            artifact,
+            path_class,
+            "opaque_present" if exists else "missing_active_opaque_container" if blocking else "absent_nonactive",
+            (),
+            exists,
+            blocking,
+        )
+    if path_class == "generated":
+        exists = candidate.exists()
+        files = (candidate,) if candidate.is_file() else ()
+        status = "generated_present" if exists else "generated_absent"
+        return ArtifactExpansion(artifact, path_class, status, files, exists, False)
+
+    if path_class == "glob":
+        matches = tuple(sorted(path for path in project_root.glob(storage) if path.is_file()))
+        resolved = bool(matches)
+        blocking = artifact.lifecycle == "active" and not resolved
+        return ArtifactExpansion(
+            artifact,
+            path_class,
+            "expanded" if resolved else "missing_active_glob" if blocking else "absent_nonactive",
+            matches,
+            resolved,
+            blocking,
+        )
+
+    if path_class == "directory":
+        exists = candidate.is_dir()
+        files = tuple(sorted(path for path in candidate.rglob("*") if path.is_file())) if exists else ()
+        blocking = artifact.lifecycle == "active" and not exists
+        return ArtifactExpansion(
+            artifact,
+            path_class,
+            "expanded" if exists else "missing_active_directory" if blocking else "absent_nonactive",
+            files,
+            exists,
+            blocking,
+        )
+
+    exists = candidate.is_file()
+    files = (candidate,) if exists else ()
+    blocking = artifact.lifecycle == "active" and not exists
+    return ArtifactExpansion(
+        artifact,
+        path_class,
+        "resolved" if exists else "missing_active_file" if blocking else "absent_nonactive",
+        files,
+        exists,
+        blocking,
+    )
 
 
-def _artifact_inventory(
-    project_root: Path, registry_path: Path | None = None
-) -> tuple[list[ArtifactRecord], dict[str, list[ArtifactRecord]], list[dict[str, str]]]:
-    artifacts = _load_registry(project_root, registry_path)
-    tracked = _git_tracked_paths(project_root)
+def registered_artifact_inventory(
+    project_root: Path, registry_path: Path | None = None, *, snapshot: RegistrySnapshot | None = None
+) -> tuple[
+    list[ArtifactRecord],
+    dict[str, list[ArtifactRecord]],
+    list[dict[str, Any]],
+    list[ArtifactExpansion],
+]:
+    artifacts = _load_registry(project_root, registry_path, snapshot=snapshot)
     by_path: dict[str, list[ArtifactRecord]] = {}
-    missing: list[dict[str, str]] = []
+    missing: list[dict[str, Any]] = []
+    expansions: list[ArtifactExpansion] = []
     for artifact in artifacts:
-        files, resolved = _expand_artifact_files(artifact, project_root, tracked)
-        if not resolved:
-            missing.append(
-                {
-                    "artifact_id": artifact.id,
-                    "storage_path": artifact.storage_path,
-                    "domain": artifact.domain,
-                    "lifecycle": artifact.lifecycle,
-                }
-            )
-        for file_path in files:
+        expansion = _expand_artifact_files(artifact, project_root)
+        expansions.append(expansion)
+        if expansion.blocking:
+            missing.append(expansion.to_dict())
+        for file_path in expansion.files:
             by_path.setdefault(_rel(file_path, project_root), []).append(artifact)
-    return artifacts, by_path, missing
+    return artifacts, by_path, missing, expansions
+
+
+# Compatibility only. New consumers must use the public API above.
+_artifact_inventory = registered_artifact_inventory
 
 
 def load_match_file(path: Path) -> list[str]:
@@ -206,7 +301,7 @@ def scan_inventory_strings(
     literal_matches = [match for match in matches if match]
     if not literal_matches:
         raise InventoryScanError("at least one --match or --match-file value is required")
-    artifacts, by_path, missing = _artifact_inventory(project_root, registry_path)
+    artifacts, by_path, missing, _ = registered_artifact_inventory(project_root, registry_path)
     critical = DEFAULT_CRITICAL_CLASSES | set(critical_classes or set())
     warn = DEFAULT_WARN_CLASSES | set(warn_classes or set())
     match_ids = {value: f"M{index:03d}" for index, value in enumerate(literal_matches, start=1)}
@@ -264,16 +359,43 @@ def scan_inventory_strings(
 
 def build_refresh_report(project_root: Path, *, registry_path: Path | None = None) -> dict[str, Any]:
     project_root = project_root.resolve()
-    artifacts, by_path, missing = _artifact_inventory(project_root, registry_path)
+    artifacts, by_path, missing, expansions = registered_artifact_inventory(project_root, registry_path)
+    path_class_counts: dict[str, int] = {}
+    lifecycle_counts: dict[str, int] = {}
+    status_counts: dict[str, int] = {}
+    for expansion in expansions:
+        path_class_counts[expansion.path_class] = path_class_counts.get(expansion.path_class, 0) + 1
+        lifecycle = expansion.artifact.lifecycle
+        lifecycle_counts[lifecycle] = lifecycle_counts.get(lifecycle, 0) + 1
+        status_counts[expansion.status] = status_counts.get(expansion.status, 0) + 1
+    findings = [
+        {
+            "artifact_id": expansion.artifact.id,
+            "code": expansion.status,
+            "lifecycle": expansion.artifact.lifecycle,
+            "path_class": expansion.path_class,
+            "severity": "blocking" if expansion.blocking else "info",
+            "storage_path": expansion.artifact.storage_path,
+        }
+        for expansion in expansions
+        if expansion.blocking or not expansion.resolved
+    ]
     return {
         "artifact_count": len(artifacts),
+        "artifact_statuses": [expansion.to_dict() for expansion in expansions],
+        "blocking": bool(missing),
         "missing_artifacts": missing,
         "mutated": False,
+        "registry_findings": findings,
         "scanned_file_count": len(by_path),
         "summary": {
             "artifact_count": len(artifacts),
+            "blocking_finding_count": len(missing),
+            "lifecycle_counts": dict(sorted(lifecycle_counts.items())),
             "missing_artifact_count": len(missing),
+            "path_class_counts": dict(sorted(path_class_counts.items())),
             "scanned_file_count": len(by_path),
+            "status_counts": dict(sorted(status_counts.items())),
         },
     }
 

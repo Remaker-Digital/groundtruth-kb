@@ -13,6 +13,7 @@ WI-4527; ``PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDALONE-DEFECT-BATCH-2``.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -46,25 +47,47 @@ def _write_index(root: Path, statuses: dict[str, str]) -> None:
     lines: list[str] = []
     for slug, status in statuses.items():
         version = "002" if status == "GO" else "001"
+        if status == "GO":
+            (bridge / f"{slug}-001.md").write_text(
+                "NEW\n\n# Fixture proposal\n",
+                encoding="utf-8",
+            )
         lines.extend([f"Document: {slug}", f"{status}: bridge/{slug}-{version}.md", ""])
+        # Also write the versioned file containing the status as its first line
+        (bridge / f"{slug}-{version}.md").write_text(
+            f"{status}\n"
+            "author_session_context_id: test-prime-session\n"
+            "author_identity: prime-builder/test\n"
+            "author_harness_id: T\n",
+            encoding="utf-8",
+        )
     (bridge / "INDEX.md").write_text("\n".join(lines), encoding="utf-8")
 
 
-def _write_prime_marker(root: Path) -> None:
-    """Provide owner-declared interactive Prime evidence for go_implementation claims.
-
-    WI-4534 Slice A made ``go_implementation`` claims Prime-only; these tests
-    acquire such a claim, so each must present positive Prime evidence via the
-    hermetic in-``project_root`` interactive marker. See the equivalent helper in
-    ``test_go_impl_claim_timebox.py``.
-    """
-    import json
-
-    marker_dir = root / ".claude" / "session"
-    marker_dir.mkdir(parents=True, exist_ok=True)
-    (marker_dir / "active-session-role.json").write_text(
-        json.dumps({"role": "prime-builder", "session_id": "marker-session"}), encoding="utf-8"
-    )
+def _write_prime_worker_session(root: Path, session_id: str, monkeypatch) -> None:
+    """Provide validated document authority for a GO-implementation claim."""
+    harness_name = "fixture"
+    harness_id = "T"
+    monkeypatch.setenv("GTKB_HARNESS_NAME", harness_name)
+    document = {
+        "status": "open",
+        "session_id": session_id,
+        "harness_id": harness_id,
+        "harness_name": harness_name,
+        "worker_role_provenance": {
+            "schema_version": 1,
+            "session_id": session_id,
+            "harness_id": harness_id,
+            "harness_name": harness_name,
+            "role": "prime-builder",
+            "role_resolution_source": "test-fixture",
+            "issued_at": "2026-06-13T00:00:00Z",
+            "dispatch_run_id": None,
+        },
+    }
+    path = root / "harness-state" / harness_name / "session-envelopes" / f"{session_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document), encoding="utf-8")
 
 
 # --- Registry-level behavior -------------------------------------------------
@@ -77,7 +100,7 @@ def test_auto_extend_when_deadline_near(tmp_path: Path, monkeypatch) -> None:
     now = {"value": base}
     monkeypatch.setattr(registry, "now_utc", lambda: now["value"])
     _write_index(tmp_path, {"go-thread": "GO"})
-    _write_prime_marker(tmp_path)
+    _write_prime_worker_session(tmp_path, "session-a", monkeypatch)
 
     assert registry.acquire("go-thread", "session-a", project_root=tmp_path)
     # Advance to within the auto-extend threshold of the 00:30 deadline (5 min left).
@@ -98,7 +121,7 @@ def test_no_extend_when_deadline_far(tmp_path: Path, monkeypatch) -> None:
     base = datetime(2026, 6, 13, 0, 0, tzinfo=UTC)
     monkeypatch.setattr(registry, "now_utc", lambda: base)
     _write_index(tmp_path, {"go-thread": "GO"})
-    _write_prime_marker(tmp_path)
+    _write_prime_worker_session(tmp_path, "session-a", monkeypatch)
 
     assert registry.acquire("go-thread", "session-a", project_root=tmp_path)
     # now == base: 30 min remaining, above the 10 min threshold.
@@ -117,7 +140,7 @@ def test_no_extend_for_non_holder(tmp_path: Path, monkeypatch) -> None:
     now = {"value": base}
     monkeypatch.setattr(registry, "now_utc", lambda: now["value"])
     _write_index(tmp_path, {"go-thread": "GO"})
-    _write_prime_marker(tmp_path)
+    _write_prime_worker_session(tmp_path, "session-a", monkeypatch)
 
     assert registry.acquire("go-thread", "session-a", project_root=tmp_path)
     now["value"] = base + timedelta(minutes=25)
@@ -151,13 +174,13 @@ def test_no_extend_for_draft_claim(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_auto_extend_fail_soft_at_cap(tmp_path: Path, monkeypatch) -> None:
-    """Fail-soft at the 2 h cap (GOV bound preserved): returns None, no raise."""
+    """Fail-soft at the 2 h cap without persisting a denial-side event."""
     registry = _registry()
     base = datetime(2026, 6, 13, 0, 0, tzinfo=UTC)
     now = {"value": base}
     monkeypatch.setattr(registry, "now_utc", lambda: now["value"])
     _write_index(tmp_path, {"go-thread": "GO"})
-    _write_prime_marker(tmp_path)
+    _write_prime_worker_session(tmp_path, "session-a", monkeypatch)
 
     assert registry.acquire("go-thread", "session-a", project_root=tmp_path)
     # Drive the deadline to the 02:00 cap via explicit extends (00:30 -> 02:00).
@@ -172,7 +195,7 @@ def test_auto_extend_fail_soft_at_cap(tmp_path: Path, monkeypatch) -> None:
 
     assert result is None
     status = registry.claim_status("go-thread", project_root=tmp_path)
-    assert status["extension_capped"] is True
+    assert status["extension_capped"] is False
     assert status["implementation_deadline"] == "2026-06-13T02:00:00Z"
 
 
@@ -183,7 +206,7 @@ def test_repeated_auto_extend_bounded_by_max_hold(tmp_path: Path, monkeypatch) -
     now = {"value": base}
     monkeypatch.setattr(registry, "now_utc", lambda: now["value"])
     _write_index(tmp_path, {"go-thread": "GO"})
-    _write_prime_marker(tmp_path)
+    _write_prime_worker_session(tmp_path, "session-a", monkeypatch)
 
     assert registry.acquire("go-thread", "session-a", project_root=tmp_path)
     cap = base + timedelta(seconds=registry.GO_IMPLEMENTATION_MAX_HOLD_SECONDS)
@@ -206,11 +229,8 @@ def test_repeated_auto_extend_bounded_by_max_hold(tmp_path: Path, monkeypatch) -
 # --- Gate-verdict invariant --------------------------------------------------
 
 
-def test_gate_verdict_unchanged_when_auto_extend_raises(monkeypatch) -> None:
-    """PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001: the impl-start gate's
-    allow/deny verdict on an authorized edit is identical whether the auto-extend
-    side-effect raises or succeeds (the error is swallowed; the edit is allowed).
-    """
+def test_gate_does_not_auto_extend_an_allowed_mutation(monkeypatch) -> None:
+    """An allowed protected mutation has no hidden lease-extension side effect."""
     import scripts.bridge_work_intent_registry as registry_pkg
     import scripts.implementation_start_gate as gate
 
@@ -223,17 +243,8 @@ def test_gate_verdict_unchanged_when_auto_extend_raises(monkeypatch) -> None:
     )
     monkeypatch.setattr(gate, "work_intent_claim_block_reason", lambda root, bridge_id, session_id: None)
 
-    # Baseline: auto-extend succeeds (returns a record) -> allow.
-    monkeypatch.setattr(registry_pkg, "maybe_auto_extend", lambda *a, **k: {"ok": True})
-    allow_baseline = gate.gate_decision({})
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+    monkeypatch.setattr(registry_pkg, "maybe_auto_extend", lambda *args, **kwargs: calls.append((args, kwargs)))
 
-    # Side-effect raises -> still allow; verdict must be byte-identical.
-    def _raise(*_a, **_k):
-        raise RuntimeError("boom")
-
-    monkeypatch.setattr(registry_pkg, "maybe_auto_extend", _raise)
-    allow_when_raises = gate.gate_decision({})
-
-    assert allow_baseline == {}
-    assert allow_when_raises == {}
-    assert allow_when_raises == allow_baseline
+    assert gate.gate_decision({}) == {}
+    assert calls == []

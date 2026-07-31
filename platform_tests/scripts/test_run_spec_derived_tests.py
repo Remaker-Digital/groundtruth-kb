@@ -62,7 +62,7 @@ def _patch_paths(monkeypatch: pytest.MonkeyPatch, project_root: Path) -> None:
     """Point the runner at a synthesized project root."""
     runner = _load_runner()
     monkeypatch.setattr(runner, "PROJECT_ROOT", project_root)
-    monkeypatch.setattr(runner, "INDEX_PATH", project_root / "bridge" / "INDEX.md")
+    monkeypatch.setattr(runner, "BRIDGE_DIR", project_root / "bridge")
     monkeypatch.setattr(runner, "DB_PATH", project_root / "groundtruth.db")
     monkeypatch.setattr(runner, "APPROVALS_DIR", project_root / ".groundtruth" / "formal-artifact-approvals")
     monkeypatch.setattr(
@@ -224,6 +224,10 @@ def test_runner_enumerates_all_versions_regardless_of_status(tmp_path: Path, mon
             ("NEW", "thread-001.md"),
         ],
     )
+    _seed_bridge_file(tmp_path, "thread-001.md", status_header="NEW")
+    _seed_bridge_file(tmp_path, "thread-002.md", status_header="GO")
+    _seed_bridge_file(tmp_path, "thread-003.md", status_header="NEW")
+    _seed_bridge_file(tmp_path, "thread-004.md", status_header="VERIFIED")
     versions = runner._parse_index_for_document("thread")
     assert len(versions) == 4
     statuses = [v.status for v in versions]
@@ -779,35 +783,42 @@ def test_runner_writes_no_files_outside_project_root(tmp_path: Path, monkeypatch
 
 
 def test_runner_parses_document_block_format_per_protocol(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """`.claude/rules/file-bridge-protocol.md`: parser handles the canonical INDEX format."""
+    """Verifies that _status_from_bridge_file extracts the status token correctly."""
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "# Bridge Index\n\nDocument: thread-a\nGO: bridge/thread-a-002.md\nNEW: bridge/thread-a-001.md\n\n"
-        "Document: thread-b\nNEW: bridge/thread-b-001.md\n",
-        encoding="utf-8",
-    )
+
+    # Create files on disk
+    (bridge_dir / "thread-a-001.md").write_text("NEW\n", encoding="utf-8")
+    (bridge_dir / "thread-a-002.md").write_text("GO\n", encoding="utf-8")
+    (bridge_dir / "thread-b-001.md").write_text("  * REVISED\n", encoding="utf-8")
+
     versions_a = runner._parse_index_for_document("thread-a")
     versions_b = runner._parse_index_for_document("thread-b")
     assert len(versions_a) == 2
     assert len(versions_b) == 1
+    assert [v.status for v in versions_a] == ["GO", "NEW"]
+    assert versions_b[0].status == "REVISED"
 
 
 def test_runner_rejects_malformed_document_blocks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """`.claude/rules/file-bridge-protocol.md`: malformed lines don't crash."""
+    """Verifies that malformed or status-less files are ignored or skipped, but valid status lines work."""
     runner = _load_runner()
     _patch_paths(monkeypatch, tmp_path)
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: foo\nthis-is-not-a-status-line\nGO: bridge/foo-002.md\n",
-        encoding="utf-8",
-    )
+
+    # Write one file with a valid status but comments
+    (bridge_dir / "foo-001.md").write_text("> GO\n", encoding="utf-8")
+    # Write one file with no valid status
+    (bridge_dir / "foo-002.md").write_text("this-is-not-a-status-line\n", encoding="utf-8")
+
     versions = runner._parse_index_for_document("foo")
+    # foo-002 should be ignored because status is None, leaving only foo-001
     assert len(versions) == 1
     assert versions[0].status == "GO"
+    assert versions[0].version_number == 1
 
 
 # ---------------------------------------------------------------------------

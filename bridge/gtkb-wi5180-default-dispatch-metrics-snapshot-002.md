@@ -1,0 +1,158 @@
+GO
+
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 12a16794-f84d-457f-81b4-8e803034e4d5
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code interactive session; resolved role loyal-opposition via ::init gtkb lo
+
+# Loyal Opposition Verdict — WI-5180 default dispatch metrics snapshot (proposal review)
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5180-default-dispatch-metrics-snapshot
+Version: 002
+Responds to: bridge/gtkb-wi5180-default-dispatch-metrics-snapshot-001.md
+
+## Verdict
+
+GO. The proposal for `WI-5180 Canonical default dispatch metrics schema and
+bounded snapshot` is approved for implementation within the declared scope. Every
+cited governing specification, the owner-decision deliberation, and the project
+authorization resolve in canonical MemBase; both preflights pass with zero missing
+required specs and zero blocking clause gaps; all target_paths are in-root; and no
+implementation-before-GO exists. Implementation remains gated on a matching
+work-intent claim and a live implementation-start packet derived from this GO.
+
+## Review Independence
+
+Satisfied. The operative proposal's `author_session_context_id`
+(`019f387f-0fc7-7200-abaa-03068ca8eee0`, prime-builder/codex, harness A) differs
+from this reviewer's session context (`12a16794-f84d-457f-81b4-8e803034e4d5`,
+loyal-opposition/claude, harness B). This is a cross-context review, not a
+self-review; author session metadata is present and readable.
+
+## Premise Verification
+
+All premise claims were verified against canonical MemBase (`groundtruth.db`), not
+by trusting the proposal's assertions.
+
+Specifications (latest version per id — all cited specs FOUND):
+
+- `SPEC-DISPATCH-DEFAULT-METRICS-SNAPSHOT-001` — type=requirement, status=specified, v=1
+- `SPEC-HARNESS-OBSERVABILITY-SELF-TUNING-PROGRAM-001` — type=requirement, status=specified, v=1
+- `SPEC-SHIM-HARNESS-DISPATCH-TELEMETRY-001` — type=requirement, status=specified, v=1
+- `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` — type=governance, status=specified, v=1
+- `GOV-FILE-BRIDGE-AUTHORITY-001` — type=governance, status=verified, v=2
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` — type=design_constraint, status=specified, v=1
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001` — type=design_constraint, status=specified, v=1
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` — type=design_constraint, status=specified, v=1
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` — type=governance, status=verified, v=1
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` — type=architecture_decision, status=verified, v=1
+- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` — type=design_constraint, status=verified, v=1
+
+Deliberation:
+
+- `DELIB-202666085` — FOUND, source_type=owner_conversation. Summary: "Owner
+  approved the bounded default metrics schema and snapshot authorization; report
+  enrichment and tuning remain excluded." Corroborates the proposal's
+  `Owner Decisions / Input` claim.
+
+Project authorization:
+
+- `PAUTH-PROJECT-GTKB-DISPATCHER-COMPLEX-CLI-WI5180-DEFAULT-METRICS-20260711` —
+  FOUND, status=active, project_id=PROJECT-GTKB-DISPATCHER-COMPLEX-CLI,
+  included_work_item_ids=["WI-5180"], expires_at=None (not expired),
+  owner_decision_deliberation_id=DELIB-202666085 (matches the cited owner
+  decision). scope_summary authorizes exactly the three declared paths.
+
+Work item:
+
+- `WI-5180` — FOUND, title "Canonical default dispatch metrics schema and bounded
+  snapshot", project_name=PROJECT-GTKB-DISPATCHER-COMPLEX-CLI, stage=backlogged.
+
+## Applicability Preflight
+
+- packet_hash: `sha256:0028f2b39b659ac877e1c63decb13ef97415e4add173ff966d8fc4a12db62d6d`
+- preflight_passed: `true`
+- content_source: `bridge_file_operative`; operative_file: `bridge/gtkb-wi5180-default-dispatch-metrics-snapshot-001.md`
+- missing_required_specs: `[]`
+- missing_advisory_specs: `[]`
+- warnings.missing_parent_dirs: `[]`
+- Blocking cross-cutting specs matched and cited: `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`, `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`, `GOV-FILE-BRIDGE-AUTHORITY-001` (all `cited: yes`).
+- Advisory specs matched and cited: `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`, `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`, `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`.
+
+## Clause Applicability
+
+`scripts/adr_dcl_clause_preflight.py` (mandatory mode) exited 0. 5 clauses
+evaluated; must_apply=3, may_apply=2, not_applicable=0; evidence gaps in must_apply
+clauses=0; blocking gaps (gate-failing)=0.
+
+- `GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-NUMBERED-FILE-CHAIN-IS-CANONICAL` — must_apply, evidence found: yes.
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001/CLAUSE-CONCRETE-LINKS` — must_apply, evidence found: yes.
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001/CLAUSE-SPEC-TO-TEST-MAPPING` — must_apply, evidence found: yes.
+- `ADR-ISOLATION-APPLICATION-PLACEMENT-001/CLAUSE-IN-ROOT` — may_apply (not gating; all target_paths are in-root).
+- `GOV-STANDING-BACKLOG-001/CLAUSE-VISIBILITY-BULK-OPS` — may_apply (not gating; no bulk backlog op in scope).
+
+## Prior Deliberations
+
+- `DELIB-202666085` (owner_conversation) — the owner approval of the bounded
+  WI-5180 default-metrics PAUTH; verified present. Scopes this slice to
+  observational metrics only, with report enrichment and tuning excluded.
+- `SPEC-DISPATCH-DEFAULT-METRICS-SNAPSHOT-001` — the owner-approved child
+  specification defining the exact event/snapshot data contract; present and
+  status=specified.
+- `SPEC-SHIM-HARNESS-DISPATCH-TELEMETRY-001` and terminal WI-5173 evidence —
+  present; constrain the permissible privacy-bounded, nullable telemetry input.
+
+No prior deliberation rejects this approach or a substantially similar one.
+
+## Findings
+
+No blocking findings. Positive confirmations:
+
+1. Specification Links are complete: every cross-cutting spec the applicability
+   preflight requires is cited (`missing_required_specs: []`), and each resolves
+   in MemBase.
+2. Owner approval and PAUTH chain are sound: active, unexpired PAUTH tied to the
+   cited owner-decision DELIB, covering WI-5180 by direct membership, scoped to the
+   exact three declared paths.
+3. Root-boundary compliance: all three target_paths
+   (`groundtruth-kb/src/groundtruth_kb/dispatch_default_metrics.py`,
+   `groundtruth-kb/src/groundtruth_kb/db.py`,
+   `platform_tests/groundtruth_kb/test_dispatch_default_metrics.py`) are within
+   `E:\GT-KB`.
+4. Scope is coherent and minimal: one new projection module, `db.py`
+   persistence/migration support, and one new test file — explicitly observational,
+   no dispatcher/role/claim/config/production mutation, matching the PAUTH's
+   forbidden-operations envelope.
+5. No implementation-before-GO: `git status --porcelain` is clean on all three
+   target_paths; the two new files do not yet exist and `db.py` carries no diff.
+
+Advisory (non-blocking) note for the implementation phase: ensure the
+post-implementation report carries executed evidence for BOTH the prohibited-content
+privacy scan and the insertion-order determinism assertion, plus `ruff check` and
+`ruff format --check` over the three Python paths, since those are what an
+independent VERIFIED will require under `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`.
+
+## Gate Summary
+
+| Gate | Result |
+| --- | --- |
+| Review independence (cross-context) | PASS |
+| Specification Links complete + all resolve in MemBase | PASS |
+| Owner approval (DELIB-202666085) verified | PASS |
+| PAUTH active, unexpired, covers WI-5180, links owner DELIB | PASS |
+| target_paths in-root under E:\GT-KB | PASS |
+| Scope coherent/minimal, observational-only | PASS |
+| No implementation-before-GO (git status clean) | PASS |
+| Applicability preflight (`missing_required_specs: []`) | PASS |
+| Clause preflight (0 blocking gaps, exit 0) | PASS |
+
+## Recommended Commit Type
+
+Concur with the proposal's `feat`. The slice adds a net-new canonical observational
+metrics/snapshot substrate (new module + persistence support + tests) without
+altering dispatch behavior.
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

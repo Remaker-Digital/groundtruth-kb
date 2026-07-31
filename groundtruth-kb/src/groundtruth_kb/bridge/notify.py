@@ -4,11 +4,9 @@
 RETIRED (2026-05-09): This module belongs to the retired smart-poller
 runtime. The smart-poller scheduled task and runner script have been
 archived to ``archive/smart-poller-2026-05-09/``; bridge dispatch is now
-governed by the cross-harness event-driven trigger
-(``scripts/cross_harness_bridge_trigger.py``) registered as PostToolUse +
-Stop hooks in ``.claude/settings.json`` and ``.codex/hooks.json``. The
-notification-artifact API below is retained for compatibility and historical
-reference; the trigger writes its own dispatch state at
+governed by the dispatcher daemon. The notification-artifact API below is
+retained for compatibility and historical reference; the daemon writes its
+dispatch state at
 ``.gtkb-state/bridge-poller/dispatch-state.json``.
 
 Per ``bridge/gtkb-bridge-poller-p3-notify-2026-04-29-008.md`` GO at REVISED-3,
@@ -37,16 +35,19 @@ operational_state_change/candidate_spec_intake).
 Routing contract (per ``AGENTS.md:153-159`` + DELIB-S319-SMART-POLLER-OBJECTIVE-CLARIFICATION
 + smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4):
 
-- ``NEW`` / ``REVISED`` top status → Codex (Loyal Opposition reviews).
+- ``NEW`` / ``REVISED`` / ``NO-ACTION`` top status → Codex (Loyal Opposition reviews).
   Always dispatchable; kind classification is informational only.
 - ``NO-GO`` top status → Prime Builder (Prime revises). Always dispatchable
   because NO-GO is "proposal requires changes before approval", regardless
-  of bridge_kind.
+  of bridge_kind, except when the latest verdict explicitly marks the thread
+  as ``Hold for Owner Decision``. Owner-hold threads remain Prime-visible but
+  are manual-only for headless dispatch.
 - ``GO`` top status → Prime Builder (Prime acts). Dispatchable iff the
   bridge_kind classification is NOT terminal — terminal kinds (scoping,
   closure, parking, index_reconciliation, thread_reconciliation,
-  operational_state_change, candidate_spec_intake, implementation_report)
-  have no Prime follow-up after a GO verdict.
+  operational_state_change, candidate_spec_intake, implementation_report) or
+  explicit ``Hold for Owner Decision`` latest verdicts have no headless Prime
+  follow-up after a GO verdict.
 - ``ADVISORY`` top status -> Prime Builder owner-visible disposition work,
   but non-dispatchable for headless automation.
 - ``VERIFIED`` / ``DEFERRED`` / ``WITHDRAWN`` top status -> not actionable
@@ -54,8 +55,8 @@ Routing contract (per ``AGENTS.md:153-159`` + DELIB-S319-SMART-POLLER-OBJECTIVE-
 
 Phase-2 Ollama dispatch wiring keeps this module role-actionability-only.
 Harness-local readiness (Ollama shim, daemon, route/tool subset) is applied
-downstream by ``scripts/cross_harness_bridge_trigger.py`` when a role-actionable
-entry resolves to harness D.
+downstream by the dispatcher daemon when a role-actionable entry resolves to
+harness D.
 
 Schema v3 (bumped from v2 per kind-aware-routing slice): ``pending_actions[]``
 entries now carry ``dispatchable`` (bool) + ``classification`` (str:
@@ -77,6 +78,8 @@ from groundtruth_kb.bridge.detector import BridgeDocument, BridgeStatus, BridgeV
 from groundtruth_kb.bridge.disposition import (
     BRIDGE_KIND_DISPATCHABLE_TOKENS,
     BRIDGE_KIND_TERMINAL_TOKENS,
+    CLASSIFICATION_HEADLESS_INELIGIBLE,
+    CLASSIFICATION_OWNER_HOLD,
     LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
     PRIME_ACTIONABLE_STATUSES,
     dispatchable_for_status,
@@ -110,9 +113,23 @@ _KIND_DISPATCHABLE_TOKENS: Final[tuple[str, ...]] = BRIDGE_KIND_DISPATCHABLE_TOK
 
 # Frontmatter parser: bridge_kind: <value> at start-of-line, allows whitespace.
 _BRIDGE_KIND_RE: Final[re.Pattern[str]] = re.compile(r"^bridge_kind:\s*(\S+)", re.MULTILINE)
+_OWNER_HOLD_RE: Final[re.Pattern[str]] = re.compile(
+    r"^\s*(?:[-*+]|\d+[.)])?\s*(?:#{1,6}\s*)?(?:\*\*)?"
+    r"hold\s+for\s+owner\s+decision(?::)?(?:\*\*)?\s*(?::|\b)",
+    re.IGNORECASE | re.MULTILINE,
+)
+_HEADLESS_INELIGIBLE_RE: Final[re.Pattern[str]] = re.compile(
+    r"\bdispatch\s+loop\s+must\s+be\s+broken\b"
+    r"|\bdo\s+not\s+re-?dispatch\s+to\s+codex\s+headless\b"
+    r"|\bno\s+further\s+(?:codex\s+)?headless\s+(?:auto-?)?re-?dispatch(?:es)?\b",
+    re.IGNORECASE,
+)
 
 # Header read budget (bytes). bridge_kind is always in the header section.
 _HEADER_READ_BUDGET_BYTES: Final[int] = 4096
+
+# Latest verdict owner-hold markers can appear after metadata and review notes.
+_OWNER_HOLD_READ_BUDGET_BYTES: Final[int] = 65536
 
 
 def _kind_aware_routing_enabled() -> bool:
@@ -151,6 +168,48 @@ def find_operative_prime_version(doc: BridgeDocument) -> BridgeVersion | None:
     return None
 
 
+def _latest_verdict_declares_owner_hold(project_root: Path, doc: BridgeDocument) -> bool:
+    """Return True when the latest Prime-actionable verdict is owner-held."""
+    if not doc.versions:
+        return False
+    top = doc.versions[0]
+    if top.status not in (BridgeStatus.GO, BridgeStatus.NO_GO):
+        return False
+
+    full_path = project_root / top.file_path
+    try:
+        with full_path.open("r", encoding="utf-8") as fh:
+            head = fh.read(_OWNER_HOLD_READ_BUDGET_BYTES)
+    except (OSError, UnicodeDecodeError):
+        return False
+
+    return _OWNER_HOLD_RE.search(head) is not None
+
+
+def _latest_verdict_declares_headless_ineligible(project_root: Path, doc: BridgeDocument) -> bool:
+    """Return True when the latest verdict explicitly blocks headless redispatch.
+
+    The match surface is intentionally narrow and imperative: "dispatch loop
+    must be broken", "do not re-dispatch to Codex headless", or "no further
+    Codex/headless redispatch". General historical discussion of headless
+    dispatch remains dispatchable.
+    """
+    if not doc.versions:
+        return False
+    top = doc.versions[0]
+    if top.status not in (BridgeStatus.GO, BridgeStatus.NO_GO):
+        return False
+
+    full_path = project_root / top.file_path
+    try:
+        with full_path.open("r", encoding="utf-8") as fh:
+            head = fh.read(_OWNER_HOLD_READ_BUDGET_BYTES)
+    except (OSError, UnicodeDecodeError):
+        return False
+
+    return _HEADLESS_INELIGIBLE_RE.search(head) is not None
+
+
 def classify_document_dispatchability(
     project_root: Path,
     doc: BridgeDocument,
@@ -168,10 +227,21 @@ def classify_document_dispatchability(
     - "terminal" — bridge_kind matches a terminal token (scoping, closure,
       parking, index/thread reconciliation, operational state change, candidate
       spec intake, implementation report)
+    - "owner_hold" — latest GO/NO-GO verdict explicitly says Hold for Owner
+      Decision; action remains visible to Prime but headless dispatch is
+      suppressed
+    - "headless_ineligible" — latest GO/NO-GO verdict explicitly says headless
+      redispatch must stop; action remains visible to Prime but headless
+      dispatch is suppressed
     - "ambiguous" — bridge_kind missing, bare "proposal", "review",
       "verification", or unrecognized; falls back to status-only routing
       via the dispatchable invariant in `_derive_dispatchable`
     """
+    if _latest_verdict_declares_owner_hold(project_root, doc):
+        return CLASSIFICATION_OWNER_HOLD
+    if _latest_verdict_declares_headless_ineligible(project_root, doc):
+        return CLASSIFICATION_HEADLESS_INELIGIBLE
+
     operative = find_operative_prime_version(doc)
     if operative is None:
         return "ambiguous"
@@ -207,13 +277,13 @@ def _derive_dispatchable(top_status: str, classification: str) -> bool:
 
     Per smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4 §1.1:
 
-    - NEW / REVISED → True (Codex reviews regardless of kind classification;
+    - NEW / REVISED / NO-ACTION → True (Codex reviews regardless of kind classification;
       terminal-kind means "no Prime follow-up", not "no Codex review")
-    - NO-GO → True (Prime revises regardless of kind, per
-      file-bridge-protocol.md:92,104-107: "proposal requires changes before
-      approval")
+    - NO-GO → True unless the latest verdict explicitly declares owner-hold
+      (Prime revises regardless of kind, per file-bridge-protocol.md:92,
+      104-107: "proposal requires changes before approval")
     - GO → ``classification != "terminal"`` (Prime filters terminal kinds,
-      keeps everything else)
+      keeps everything else, unless latest-verdict owner-hold suppresses it)
     - ADVISORY + others -> False for headless dispatch (Prime-visible/manual only)
     - VERIFIED / DEFERRED / WITHDRAWN + others -> False (not actionable)
     """
@@ -336,7 +406,7 @@ def compute_actionable_pending(
     recipient.
 
     - ``GO`` / ``NO-GO`` → Prime list.
-    - ``NEW`` / ``REVISED`` → Codex list.
+    - ``NEW`` / ``REVISED`` / ``NO-ACTION`` → Codex list.
     - ``ADVISORY`` -> Prime list, with ``dispatchable=False`` for headless
       automation.
     - ``VERIFIED`` / ``DEFERRED`` / ``WITHDRAWN`` -> excluded

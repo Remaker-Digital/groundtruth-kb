@@ -7,9 +7,9 @@ Covers the interactive rows of ``DCL-SESSION-ROLE-RESOLUTION-001``:
 
 - assertion 7: marker role must be in {prime-builder, loyal-opposition}.
 - assertion 6: a marker whose session id mismatches the current session id is
-  stale and falls back to durable.
-- marker > durable precedence; durable fallback on absent/invalid/stale marker.
-- the resolver is READ-ONLY (never writes the marker or the durable role map).
+  stale and falls back to registry fallback.
+- marker > registry fallback precedence; registry fallback on absent/invalid/stale marker.
+- the resolver is READ-ONLY (never writes the marker or the dispatcher/default role map).
 - the resolver's marker path equals the Slice 2 writer path (no drift).
 """
 
@@ -137,7 +137,7 @@ def test_resolver_marker_path_matches_writer() -> None:
 
 
 def test_resolver_is_read_only(tmp_path: Path) -> None:
-    """The REAL resolver mutates neither the marker nor the durable role map."""
+    """The REAL resolver mutates neither the marker nor the dispatcher/default role map."""
     _seed_registry(tmp_path, ["prime-builder"])
     marker = _write_marker(tmp_path, srr.ROLE_LO, "sess-1")
     projection = tmp_path / "harness-state" / "harness-registry.json"
@@ -157,7 +157,7 @@ def test_resolver_is_read_only(tmp_path: Path) -> None:
     assert resolved == srr.ROLE_LO
     assert source == "marker"
     assert _sha(marker) == marker_before, "resolver mutated the marker file"
-    assert _sha(projection) == proj_before, "resolver mutated the durable role map"
+    assert _sha(projection) == proj_before, "resolver mutated the dispatcher/default role map"
 
 
 def test_durable_lookup_reads_seeded_role(tmp_path: Path) -> None:
@@ -193,7 +193,7 @@ def test_resolver_uses_envelope_fallback(tmp_path: Path, monkeypatch: pytest.Mon
         tmp_path, current_session_id="sess-1", harness_name="claude"
     )
     assert resolved == srr.ROLE_LO
-    assert source == "durable_marker_absent"
+    assert source == "session_envelope"
 
     # marker is stale -> fallback to envelope role (loyal-opposition)
     _write_marker(tmp_path, srr.ROLE_PRIME, "old-sess")
@@ -201,7 +201,7 @@ def test_resolver_uses_envelope_fallback(tmp_path: Path, monkeypatch: pytest.Mon
         tmp_path, current_session_id="new-sess", harness_name="claude"
     )
     assert resolved == srr.ROLE_LO
-    assert source == "durable_marker_stale_session"
+    assert source == "session_envelope_marker_stale_session"
 
 
 def test_resolver_envelope_closed_or_missing_falls_back_to_durable(

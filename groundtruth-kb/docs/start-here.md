@@ -358,7 +358,7 @@ propose → review → implement → verify
 - **Verify:** Prime files a post-implementation report; Loyal Opposition
   reads it and writes `VERIFIED` or another `NO-GO`.
 
-The cross-harness event-driven trigger dispatches the counterpart harness on
+The dispatcher daemon dispatches the counterpart harness on
 tool-use and Stop events (the retired OS scheduler and smart poller are no
 longer used). No human has to babysit the queue. See
 [Method — File Bridge Automation](method/12-file-bridge-automation.md)

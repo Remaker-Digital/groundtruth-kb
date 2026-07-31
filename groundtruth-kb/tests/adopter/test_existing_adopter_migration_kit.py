@@ -75,6 +75,9 @@ def test_pre_isolation_with_managed_drift_refuses_with_non_auto_fixable_error(
     ``IsolationNonAutoFixableError`` before mutation.
     """
     adopter, product_root = _load_existing_adopter_into_tmp_path(tmp_path, "pre_isolation_with_managed_drift")
+    chroma = adopter / ".groundtruth-chroma"
+    chroma.mkdir()
+    (chroma / "orphan.bin").write_bytes(b"not-regeneratable-without-groundtruth.db")
     _setup_git(adopter)
     with pytest.raises(IsolationNonAutoFixableError):
         execute_upgrade(

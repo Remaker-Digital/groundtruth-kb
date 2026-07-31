@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +13,10 @@ from scripts import ollama_harness as oh
 
 FIXTURE_MODEL_ID = "fixture-model:fixture-version"
 FIXTURE_MODEL_VERSION = oh.infer_model_version(FIXTURE_MODEL_ID)
+READ_TRUNCATION_MARKER_RE = re.compile(
+    r"\n\n\[Read truncated: returned characters \[(\d+), (\d+)\) of (\d+)\. "
+    r"Continue with offset=(\d+)\.\]$"
+)
 
 
 def make_root(tmp_path: Path) -> Path:
@@ -41,6 +46,39 @@ default_model = "fixture-full"
         encoding="utf-8",
     )
     return root
+
+
+def set_ollama_timeout(root: Path, timeout_seconds: float | str) -> None:
+    config_path = root / oh.ROUTING_CONFIG_PATH
+    config_path.write_text(
+        config_path.read_text(encoding="utf-8").replace(
+            '[routing.ollama]\ndefault_model = "fixture-full"',
+            f'[routing.ollama]\ndefault_model = "fixture-full"\ntimeout_seconds = {timeout_seconds}',
+        ),
+        encoding="utf-8",
+    )
+
+
+def set_ollama_max_turns(root: Path, max_turns: int | float | str) -> None:
+    config_path = root / oh.ROUTING_CONFIG_PATH
+    config_path.write_text(
+        config_path.read_text(encoding="utf-8").replace(
+            '[routing.ollama]\ndefault_model = "fixture-full"',
+            f'[routing.ollama]\ndefault_model = "fixture-full"\nmax_turns = {max_turns}',
+        ),
+        encoding="utf-8",
+    )
+
+
+def set_ollama_session_timeout(root: Path, session_timeout_seconds: float | str) -> None:
+    config_path = root / oh.ROUTING_CONFIG_PATH
+    config_path.write_text(
+        config_path.read_text(encoding="utf-8").replace(
+            '[routing.ollama]\ndefault_model = "fixture-full"',
+            (f'[routing.ollama]\ndefault_model = "fixture-full"\nsession_timeout_seconds = {session_timeout_seconds}'),
+        ),
+        encoding="utf-8",
+    )
 
 
 def route(root: Path) -> oh.ModelRoute:
@@ -82,6 +120,222 @@ def test_load_routing_config_parses_selected_model(tmp_path: Path):
     assert selected.model_id == FIXTURE_MODEL_ID
     assert selected.model_version == FIXTURE_MODEL_VERSION
     assert selected.allowed_tools == ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
+    assert config.timeout_seconds is None
+    assert config.session_timeout_seconds is None
+    assert config.max_turns is None
+
+
+def test_load_routing_config_parses_ollama_timeout_seconds(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_timeout(root, 42.5)
+
+    config = oh.load_routing_config(root)
+
+    assert config.timeout_seconds == pytest.approx(42.5)
+
+
+def test_load_routing_config_rejects_non_positive_ollama_timeout(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_timeout(root, 0)
+
+    with pytest.raises(oh.OllamaHarnessError, match="routing.ollama.timeout_seconds"):
+        oh.load_routing_config(root)
+
+
+def test_load_routing_config_parses_distinct_ollama_session_timeout(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_session_timeout(root, 3600)
+
+    config = oh.load_routing_config(root)
+
+    assert config.session_timeout_seconds == 3600
+
+
+def test_load_routing_config_parses_ollama_max_turns(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_max_turns(root, 200)
+
+    config = oh.load_routing_config(root)
+
+    assert config.max_turns == 200
+
+
+def test_load_routing_config_rejects_non_positive_ollama_max_turns(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_max_turns(root, 0)
+
+    with pytest.raises(oh.OllamaHarnessError, match="routing.ollama.max_turns"):
+        oh.load_routing_config(root)
+
+
+def test_load_routing_config_rejects_fractional_ollama_max_turns(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_max_turns(root, 42.5)
+
+    with pytest.raises(oh.OllamaHarnessError, match="routing.ollama.max_turns"):
+        oh.load_routing_config(root)
+
+
+def test_runtime_timeouts_use_routing_config_when_cli_uses_defaults(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_timeout(root, 42.5)
+    raw_argv = ["-p", "hello"]
+    args = oh.build_arg_parser().parse_args(raw_argv)
+
+    operation_timeout, session_timeout = oh.resolve_runtime_timeouts(
+        args,
+        oh.load_routing_config(root),
+        raw_argv,
+    )
+
+    assert operation_timeout == pytest.approx(42.5)
+    assert session_timeout == pytest.approx(42.5 + oh.ROUTING_SESSION_TIMEOUT_GRACE_SECONDS)
+
+
+def test_runtime_timeouts_preserve_explicit_cli_overrides(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_timeout(root, 42.5)
+    raw_argv = ["-p", "hello", "--timeout=10.0", "--session-timeout", "20.0"]
+    args = oh.build_arg_parser().parse_args(raw_argv)
+
+    operation_timeout, session_timeout = oh.resolve_runtime_timeouts(
+        args,
+        oh.load_routing_config(root),
+        raw_argv,
+    )
+
+    assert operation_timeout == pytest.approx(10.0)
+    assert session_timeout == pytest.approx(20.0)
+
+
+def test_runtime_timeouts_use_distinct_routing_session_timeout(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_timeout(root, 900)
+    set_ollama_session_timeout(root, 3600)
+    raw_argv = ["-p", "hello"]
+    args = oh.build_arg_parser().parse_args(raw_argv)
+
+    operation_timeout, session_timeout = oh.resolve_runtime_timeouts(
+        args,
+        oh.load_routing_config(root),
+        raw_argv,
+    )
+
+    assert operation_timeout == 900
+    assert session_timeout == 3600
+
+
+def test_read_schema_and_short_file_output_remain_compatible(tmp_path: Path):
+    root = make_root(tmp_path)
+    content = "short file\n"
+    (root / "short.txt").write_text(content, encoding="utf-8")
+
+    read_schema = oh.build_tool_schemas(["Read"])[0]["function"]["parameters"]
+    assert read_schema["properties"]["offset"] == {"type": "integer", "minimum": 0}
+    assert oh._dispatch_read({"path": "short.txt"}, root) == content
+    assert oh._dispatch_read({"path": "short.txt", "offset": len(content)}, root) == ""
+
+    for invalid_offset in (-1, -1.0, "-1", 1.5, True):
+        with pytest.raises(oh.OllamaHarnessError, match="offset must be a nonnegative integer"):
+            oh._dispatch_read({"path": "short.txt", "offset": invalid_offset}, root)
+
+
+def test_read_pagination_is_bounded_marked_and_lossless_for_unicode(tmp_path: Path):
+    root = make_root(tmp_path)
+    content = "segment-\u03b1-\U0001f642\n" * 1200
+    (root / "long.txt").write_text(content, encoding="utf-8")
+
+    offset = 0
+    chunks: list[str] = []
+    marker_count = 0
+    while offset < len(content):
+        result = oh._dispatch_read({"path": "long.txt", "offset": offset}, root)
+        assert len(result) <= oh.MAX_TOOL_OUTPUT_CHARS
+        marker = READ_TRUNCATION_MARKER_RE.search(result)
+        if marker is None:
+            chunks.append(result)
+            break
+
+        marker_count += 1
+        chunk = result[: marker.start()]
+        start, end, total, next_offset = (int(value) for value in marker.groups())
+        assert start == offset
+        assert end == offset + len(chunk)
+        assert total == len(content)
+        assert next_offset == end
+        assert chunk
+        chunks.append(chunk)
+        offset = next_offset
+
+    assert marker_count >= 2
+    assert "".join(chunks) == content
+
+
+def test_read_marker_survives_small_and_oversized_page_requests(tmp_path: Path):
+    root = make_root(tmp_path)
+    content = "x" * 12_115
+    (root / "h-report.txt").write_text(content, encoding="utf-8")
+
+    small = oh._dispatch_read({"path": "h-report.txt", "max_chars": 1}, root)
+    small_marker = READ_TRUNCATION_MARKER_RE.search(small)
+    assert small_marker is not None
+    assert small_marker.start() == 1
+    assert tuple(int(value) for value in small_marker.groups()) == (0, 1, len(content), 1)
+
+    oversized = oh._dispatch_read({"path": "h-report.txt", "max_chars": 1_000_000}, root)
+    oversized_marker = READ_TRUNCATION_MARKER_RE.search(oversized)
+    assert oversized_marker is not None
+    assert len(oversized) <= oh.MAX_TOOL_OUTPUT_CHARS
+    assert int(oversized_marker.group(2)) == oversized_marker.start()
+    assert int(oversized_marker.group(3)) == len(content)
+
+    large_offset = 1_000_000
+    large_content = "x" * (large_offset + 12_115)
+    large_offset_result = oh._bounded_read_result(large_content, large_offset, 1_000_000)
+    large_offset_marker = READ_TRUNCATION_MARKER_RE.search(large_offset_result)
+    assert large_offset_marker is not None
+    assert len(large_offset_result) <= oh.MAX_TOOL_OUTPUT_CHARS
+    assert int(large_offset_marker.group(1)) == large_offset
+    assert int(large_offset_marker.group(2)) == large_offset + large_offset_marker.start()
+    assert int(large_offset_marker.group(4)) == int(large_offset_marker.group(2))
+
+
+def test_runtime_timeouts_preserve_default_session_when_timeout_override_is_explicit(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_timeout(root, 42.5)
+    raw_argv = ["-p", "hello", "--timeout", "10.0"]
+    args = oh.build_arg_parser().parse_args(raw_argv)
+
+    operation_timeout, session_timeout = oh.resolve_runtime_timeouts(
+        args,
+        oh.load_routing_config(root),
+        raw_argv,
+    )
+
+    assert operation_timeout == pytest.approx(10.0)
+    assert session_timeout == pytest.approx(oh.DEFAULT_SESSION_TIMEOUT_SECONDS)
+
+
+def test_runtime_max_turns_use_routing_config_when_cli_uses_default(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_max_turns(root, 200)
+    raw_argv = ["-p", "hello"]
+    args = oh.build_arg_parser().parse_args(raw_argv)
+
+    max_turns = oh.resolve_runtime_max_turns(args, oh.load_routing_config(root), raw_argv)
+
+    assert max_turns == 200
+
+
+def test_runtime_max_turns_preserve_explicit_cli_override(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_max_turns(root, 200)
+    raw_argv = ["-p", "hello", "--max-turns", "5"]
+    args = oh.build_arg_parser().parse_args(raw_argv)
+
+    max_turns = oh.resolve_runtime_max_turns(args, oh.load_routing_config(root), raw_argv)
+
+    assert max_turns == 5
 
 
 def test_routing_rejects_noncanonical_tool(tmp_path: Path):
@@ -125,12 +379,58 @@ def test_cli_parser_accepts_required_flags():
     assert args.max_turns == 2
 
 
+def test_main_threads_skill_and_preserves_generous_runtime_limits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = make_root(tmp_path)
+    set_ollama_timeout(root, 900)
+    set_ollama_session_timeout(root, 3600)
+    set_ollama_max_turns(root, 600)
+    captured: dict[str, object] = {}
+
+    def fake_run_tool_loop(prompt, model_route, endpoint, max_turns, project_root, **kwargs):
+        captured.update(
+            prompt=prompt,
+            model_route=model_route,
+            endpoint=endpoint,
+            max_turns=max_turns,
+            project_root=project_root,
+            **kwargs,
+        )
+        return "done"
+
+    monkeypatch.chdir(root)
+    monkeypatch.setattr(oh, "call_ollama_tags", lambda _endpoint, _timeout: [FIXTURE_MODEL_ID])
+    monkeypatch.setattr(oh, "run_tool_loop", fake_run_tool_loop)
+
+    assert oh.main(["-p", "review", "--skill", "bridge-review"]) == 0
+    assert capsys.readouterr().out.strip() == "done"
+    assert captured["skill"] == "bridge-review"
+    assert captured["max_turns"] == 600
+    assert captured["timeout"] == 900
+    assert captured["session_timeout"] == 3600
+
+
 def test_tool_schemas_expose_only_canonical_tools():
     schemas = oh.build_tool_schemas(["Read", "Write", "Edit", "Grep", "Glob", "Bash"])
     names = [schema["function"]["name"] for schema in schemas]
     assert names == ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
     with pytest.raises(oh.OllamaHarnessError):
         oh.build_tool_schemas(["Read", "Delete"])
+
+
+def test_publish_bridge_verdict_schema_and_skill_filtering():
+    schema = oh.build_tool_schemas([oh.PUBLISH_BRIDGE_VERDICT_TOOL])[0]["function"]
+    properties = schema["parameters"]["properties"]
+    assert set(schema["parameters"]["required"]) == {"slug", "verdict", "content"}
+    assert not {"path", "file_path", "version"} & properties.keys()
+    assert properties["verdict"]["enum"] == ["GO", "NO-GO", "VERIFIED"]
+
+    allowed = ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
+    for skill in ("bridge-review", "verification"):
+        assert oh.allowed_tools_for_skill(allowed, skill)[-1] == oh.PUBLISH_BRIDGE_VERDICT_TOOL
+    for skill in ("implementation", None):
+        assert oh.PUBLISH_BRIDGE_VERDICT_TOOL not in oh.allowed_tools_for_skill(allowed, skill)
 
 
 def test_glob_skips_root_escaping_resolved_matches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -174,7 +474,61 @@ def test_tool_loop_posts_chat_payload_and_returns_final_text(tmp_path: Path):
     assert calls[0][0] == "http://ollama.test"
     assert calls[0][1]["model"] == FIXTURE_MODEL_ID
     assert calls[0][1]["stream"] is False
-    assert {tool["function"]["name"] for tool in calls[0][1]["tools"]} == oh.CANONICAL_TOOLS
+    assert {tool["function"]["name"] for tool in calls[0][1]["tools"]} == (
+        oh.CANONICAL_TOOLS - {oh.PUBLISH_BRIDGE_VERDICT_TOOL}
+    )
+
+
+def test_tool_loop_keeps_read_continuation_marker_model_visible(tmp_path: Path):
+    root = make_root(tmp_path)
+    (root / "long.txt").write_text("x" * 12_115, encoding="utf-8")
+    calls: list[tuple[str, dict]] = []
+
+    def chat(url: str, payload: dict, timeout: float) -> dict:
+        calls.append((url, payload))
+        if len(calls) == 1:
+            return {
+                "message": {
+                    "content": "",
+                    "tool_calls": [{"id": "read_1", "function": {"name": "Read", "arguments": {"path": "long.txt"}}}],
+                }
+            }
+        tool_result = payload["messages"][-1]
+        assert tool_result["role"] == "tool"
+        assert len(tool_result["content"]) <= oh.MAX_TOOL_OUTPUT_CHARS
+        assert READ_TRUNCATION_MARKER_RE.search(tool_result["content"]) is not None
+        return {"message": {"content": "marker observed"}}
+
+    result = oh.run_tool_loop("read the report", route(root), "http://ollama.test", 2, root, chat_func=chat)
+
+    assert result == "marker observed"
+
+
+def test_tool_loop_emits_allowlisted_turn_metadata_to_telemetry(tmp_path: Path):
+    root = make_root(tmp_path)
+
+    class Recorder:
+        def __init__(self) -> None:
+            self.turns: list[tuple[int, list[str]]] = []
+            self.stop_reasons: list[str] = []
+
+        def record_turn(self, index: int, tool_names: list[str], **_kwargs) -> None:
+            self.turns.append((index, tool_names))
+
+        def finish(self, *, stop_reason: str) -> None:
+            self.stop_reasons.append(stop_reason)
+
+    recorder = Recorder()
+
+    def chat(_url: str, _payload: dict, _timeout: float) -> dict:
+        return {"message": {"content": "done"}, "prompt_eval_count": 0, "eval_count": 0}
+
+    assert (
+        oh.run_tool_loop("hello", route(root), "http://ollama.test", 1, root, chat_func=chat, telemetry=recorder)
+        == "done"
+    )
+    assert recorder.turns == [(1, [])]
+    assert recorder.stop_reasons == ["final_response"]
 
 
 def test_bridge_review_system_prompt_uses_selected_route_metadata(tmp_path: Path):
@@ -223,11 +577,309 @@ def test_bridge_review_prompt_requires_atomic_verified_finalization(tmp_path: Pa
     prompt = oh.build_system_prompt("bridge-review", route(root))
 
     assert prompt is not None
-    assert "--finalize-verified" in prompt
-    assert "--no-prepopulate" in prompt
-    assert "local commit containing the verified path set" in prompt
+    assert "only through\nPublishBridgeVerdict" in prompt
+    assert "Never use raw Write, Edit, or Bash for a numbered bridge verdict" in prompt
+    assert "include_paths" in prompt
+    assert "commit_message" in prompt
+    assert "performs atomic VERIFIED\nfinalization" in prompt
     assert "fail closed" in prompt
-    assert "terminal VERIFIED file" in prompt
+    assert "terminal\nVERIFIED file without its commit" in prompt
+
+
+def test_dispatch_worker_role_document_uses_canonical_keyword(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from groundtruth_kb.session import envelope
+
+    root = make_root(tmp_path)
+    captured: dict[str, object] = {}
+    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-envelope")
+    monkeypatch.setattr(
+        envelope,
+        "ensure_worker_session",
+        lambda project_root, **kwargs: captured.update(project_root=project_root, **kwargs),
+    )
+
+    oh.ensure_dispatch_worker_role_document(root)
+
+    assert captured == {
+        "project_root": root,
+        "harness_name": "ollama",
+        "harness_id": "D",
+        "session_id": "dispatch-D-envelope",
+        "role": "loyal-opposition",
+        "role_source": "dispatcher_composition",
+        "init_keyword": "::init gtkb lo",
+        "dispatch_run_id": "dispatch-D-envelope",
+    }
+
+
+def test_run_tool_loop_threads_lo_skill_to_tool_exposure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    payloads: list[dict] = []
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", lambda _root: lambda *_args, **_kwargs: Published())
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-exposure")
+
+    def chat(url: str, payload: dict, timeout: float) -> dict:
+        payloads.append(payload)
+        if len(payloads) == 1:
+            return {
+                "message": {
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "function": {
+                                "name": oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+                                "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
+                            }
+                        }
+                    ],
+                }
+            }
+        return {"message": {"content": "done"}}
+
+    oh.run_tool_loop(
+        "review",
+        route(root),
+        "http://ollama.test",
+        2,
+        root,
+        skill="bridge-review",
+        chat_func=chat,
+    )
+
+    names = {tool["function"]["name"] for tool in payloads[0]["tools"]}
+    assert oh.PUBLISH_BRIDGE_VERDICT_TOOL in names
+
+
+def test_bridge_review_requires_publish_bridge_verdict_before_final_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_root(tmp_path)
+    payloads: list[dict] = []
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", lambda _root: lambda *_args, **_kwargs: Published())
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-completion")
+
+    def chat(_url: str, payload: dict, _timeout: float) -> dict:
+        payloads.append(json.loads(json.dumps(payload)))
+        if len(payloads) == 1:
+            return {"message": {"content": "GO body without tool publication"}}
+        if len(payloads) == 2:
+            assert [tool["function"]["name"] for tool in payload["tools"]] == [oh.PUBLISH_BRIDGE_VERDICT_TOOL]
+            return {
+                "message": {
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": "publish_1",
+                            "function": {
+                                "name": oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+                                "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
+                            },
+                        }
+                    ],
+                }
+            }
+        return {"message": {"content": "published"}}
+
+    assert (
+        oh.run_tool_loop(
+            "review",
+            route(root),
+            "http://ollama.test",
+            3,
+            root,
+            skill="bridge-review",
+            chat_func=chat,
+        )
+        == "published"
+    )
+    assert payloads[1]["messages"][-2]["content"] == "GO body without tool publication"
+    assert "PublishBridgeVerdict" in payloads[1]["messages"][-1]["content"]
+
+
+def test_bridge_review_recovers_publisher_result_without_verdict_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_root(tmp_path)
+    payloads: list[dict] = []
+    publish_calls = 0
+
+    class MissingPath:
+        def to_dict(self) -> dict[str, object]:
+            return {"status": "ok"}
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    def fake_publish(*_args, **_kwargs):
+        nonlocal publish_calls
+        publish_calls += 1
+        return MissingPath() if publish_calls == 1 else Published()
+
+    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", lambda _root: fake_publish)
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-missing-path")
+
+    def publish_tool_call(call_id: str) -> dict:
+        return {
+            "id": call_id,
+            "function": {
+                "name": oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+                "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
+            },
+        }
+
+    def chat(_url: str, payload: dict, _timeout: float) -> dict:
+        payloads.append(json.loads(json.dumps(payload)))
+        if len(payloads) in (1, 2):
+            return {"message": {"content": "", "tool_calls": [publish_tool_call(f"publish_{len(payloads)}")]}}
+        return {"message": {"content": "done"}}
+
+    assert (
+        oh.run_tool_loop(
+            "review",
+            route(root),
+            "http://ollama.test",
+            3,
+            root,
+            skill="bridge-review",
+            chat_func=chat,
+        )
+        == "done"
+    )
+    assert [tool["function"]["name"] for tool in payloads[1]["tools"]] == [oh.PUBLISH_BRIDGE_VERDICT_TOOL]
+    assert "verdict_path" in payloads[1]["messages"][-1]["content"]
+    assert '"status": "ok"' in payloads[1]["messages"][-1]["content"]
+    assert publish_calls == 2
+
+
+def test_dispatch_publish_bridge_verdict_uses_ollama_runtime_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from scripts import gtkb_bridge_writer as writer
+
+    root = make_root(tmp_path)
+    captured: dict[str, object] = {}
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    def fake_publish(slug, verdict, content, project_root, **kwargs):
+        captured.update(slug=slug, verdict=verdict, content=content, project_root=project_root, **kwargs)
+        return Published()
+
+    monkeypatch.setattr(writer, "publish_lo_verdict", fake_publish)
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-parity")
+
+    result = oh.dispatch_tool_call(
+        oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+        {"slug": "example", "verdict": "GO", "content": "GO\n"},
+        metadata(),
+        root,
+        skill="verification",
+    )
+
+    assert json.loads(result)["verdict_path"] == "bridge/example-002.md"
+    assert captured["session_id"] == "dispatch-D-parity"
+    assert captured["harness_name"] == "ollama"
+    author_metadata = captured["author_metadata"]
+    assert isinstance(author_metadata, dict)
+    assert author_metadata["author_harness_id"] == "D"
+    assert author_metadata["author_model"] == FIXTURE_MODEL_ID
+    assert "skill verification" in author_metadata["author_model_configuration"]
+
+
+def test_dispatch_publish_bridge_verdict_fails_closed_for_invalid_context(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_root(tmp_path)
+    arguments = {"slug": "example", "verdict": "GO", "content": "GO\n"}
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+
+    with pytest.raises(oh.OllamaHarnessError, match="bridge-review/verification"):
+        oh.dispatch_tool_call(
+            oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+            arguments,
+            metadata(),
+            root,
+            skill="implementation",
+        )
+    with pytest.raises(oh.OllamaHarnessError, match="concrete dispatcher session id"):
+        oh.dispatch_tool_call(
+            oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+            arguments,
+            metadata(),
+            root,
+            skill="bridge-review",
+        )
+
+
+def test_dispatch_publish_bridge_verdict_rejects_malformed_lists_and_publisher_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_root(tmp_path)
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-parity")
+
+    with pytest.raises(oh.OllamaHarnessError, match="include_paths must be an array"):
+        oh.dispatch_tool_call(
+            oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+            {"slug": "example", "verdict": "VERIFIED", "content": "VERIFIED\n", "include_paths": "bad"},
+            metadata(),
+            root,
+            skill="verification",
+        )
+
+    def fail_publisher(_root: Path):
+        def fail(*_args, **_kwargs):
+            raise ValueError("publisher rejected")
+
+        return fail
+
+    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", fail_publisher)
+    with pytest.raises(oh.OllamaHarnessError, match="governed bridge verdict publication failed"):
+        oh.dispatch_tool_call(
+            oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+            {"slug": "example", "verdict": "GO", "content": "GO\n"},
+            metadata(),
+            root,
+            skill="bridge-review",
+        )
+
+
+def test_tool_loop_reconciles_success_only_after_canonical_bridge_advancement(tmp_path: Path):
+    root = make_root(tmp_path)
+    prompt = oh.build_system_prompt("bridge-review", route(root))
+
+    assert prompt is not None
+    assert "canonical exact bridge thread" in prompt
+    assert "bridge/<slug>-NNN.md" in prompt
+    assert "Draft files, prefix-sibling slugs, and noncanonical filenames do not count" in prompt
+    assert "VERIFIED completion additionally requires the atomic" in prompt
+    assert "finalization helper commit" in prompt
 
 
 def test_default_tool_loop_calls_single_chat_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -286,14 +938,324 @@ def test_tool_loop_fail_closed_on_max_turns(tmp_path: Path):
         oh.run_tool_loop("loop", route(root), oh.DEFAULT_ENDPOINT, 1, root, chat_func=chat)
 
 
-def test_tool_loop_rejects_malformed_tool_arguments(tmp_path: Path):
+@pytest.mark.parametrize("content", ["", "   \r\n\t"])
+def test_tool_loop_rejects_blank_final_text(tmp_path: Path, content: str):
     root = make_root(tmp_path)
 
     def chat(url: str, payload: dict, timeout: float) -> dict:
-        return {"message": {"content": "", "tool_calls": [{"function": {"name": "Read", "arguments": "{"}}]}}
+        return {"message": {"content": content}}
 
-    with pytest.raises(oh.OllamaHarnessError, match="arguments string must be JSON"):
-        oh.run_tool_loop("bad", route(root), oh.DEFAULT_ENDPOINT, 2, root, chat_func=chat)
+    with pytest.raises(oh.OllamaHarnessError, match="nonblank text content"):
+        oh.run_tool_loop("return blank", route(root), oh.DEFAULT_ENDPOINT, 1, root, chat_func=chat)
+
+
+def test_tool_loop_stops_repeated_no_progress_calls(tmp_path: Path):
+    root = make_root(tmp_path)
+    (root / "note.txt").write_text("hello", encoding="utf-8")
+    calls: list[dict] = []
+
+    def chat(url: str, payload: dict, timeout: float) -> dict:
+        calls.append(payload)
+        return {
+            "message": {
+                "content": "",
+                "tool_calls": [{"id": "c1", "function": {"name": "Read", "arguments": {"path": "note.txt"}}}],
+            }
+        }
+
+    with pytest.raises(oh.OllamaHarnessError, match="repeated no-progress tool loop"):
+        oh.run_tool_loop("loop", route(root), oh.DEFAULT_ENDPOINT, 20, root, chat_func=chat)
+
+    assert len(calls) == oh.MAX_REPEATED_TOOL_SIGNATURE_TURNS + 1
+
+
+def test_bridge_review_requires_publish_before_final_text(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    payloads: list[dict] = []
+    published: list[dict] = []
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    def fake_publish(slug, verdict, content, project_root, **kwargs):
+        published.append(
+            {
+                "slug": slug,
+                "verdict": verdict,
+                "content": content,
+                "project_root": project_root,
+                **kwargs,
+            }
+        )
+        return Published()
+
+    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", lambda _root: fake_publish)
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-completion")
+
+    def chat(_url: str, payload: dict, _timeout: float) -> dict:
+        payloads.append(payload)
+        if len(payloads) == 1:
+            return {"message": {"content": "VERIFIED is ready"}}
+        if len(payloads) == 2:
+            assert (
+                oh.BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.split("{reason}")[0] in payload["messages"][-1]["content"]
+            )
+            return {
+                "message": {
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": "publish_1",
+                            "function": {
+                                "name": oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+                                "arguments": {
+                                    "slug": "example",
+                                    "verdict": "VERIFIED",
+                                    "content": "VERIFIED\n\nResponds to: bridge/example-001.md\n",
+                                    "include_paths": ["scripts/example.py"],
+                                    "commit_message": "fix: example",
+                                },
+                            },
+                        }
+                    ],
+                }
+            }
+        assert "bridge/example-002.md" in payload["messages"][-1]["content"]
+        return {"message": {"content": "published"}}
+
+    assert (
+        oh.run_tool_loop(
+            "verify",
+            route(root),
+            oh.DEFAULT_ENDPOINT,
+            4,
+            root,
+            skill="verification",
+            chat_func=chat,
+        )
+        == "published"
+    )
+    assert len(published) == 1
+    assert published[0]["session_id"] == "dispatch-D-completion"
+
+
+def test_bridge_review_fails_closed_after_repeated_publisher_failures(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    calls = 0
+    payloads: list[dict] = []
+
+    def fail_publish(*_args, **_kwargs):
+        raise RuntimeError("claim contention")
+
+    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", lambda _root: fail_publish)
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-failure")
+
+    def chat(_url: str, payload: dict, _timeout: float) -> dict:
+        nonlocal calls
+        calls += 1
+        payloads.append(json.loads(json.dumps(payload)))
+        return {
+            "message": {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": f"publish_{calls}",
+                        "function": {
+                            "name": oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+                            "arguments": {
+                                "slug": "example",
+                                "verdict": "GO",
+                                "content": f"GO\n\nAttempt {calls}\n",
+                            },
+                        },
+                    }
+                ],
+            }
+        }
+
+    with pytest.raises(oh.OllamaHarnessError) as exc_info:
+        oh.run_tool_loop(
+            "review",
+            route(root),
+            oh.DEFAULT_ENDPOINT,
+            10,
+            root,
+            skill="bridge-review",
+            chat_func=chat,
+        )
+    assert calls == oh.MAX_BRIDGE_VERDICT_RECOVERY_TURNS + 1
+    assert f"exhausted after {calls} attempts" in str(exc_info.value)
+    assert "claim contention" in str(exc_info.value)
+    assert "claim contention" in payloads[1]["messages"][-1]["content"]
+    for payload in payloads[1:]:
+        assert [tool["function"]["name"] for tool in payload["tools"]] == [oh.PUBLISH_BRIDGE_VERDICT_TOOL]
+
+
+def test_bridge_review_bounds_nonpublisher_recovery_without_dispatch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    payloads: list[dict] = []
+    dispatched: list[str] = []
+    original_dispatch = oh.dispatch_tool_call
+
+    def recording_dispatch(tool_name: str, *args, **kwargs) -> str:
+        dispatched.append(tool_name)
+        return original_dispatch(tool_name, *args, **kwargs)
+
+    monkeypatch.setattr(oh, "dispatch_tool_call", recording_dispatch)
+
+    def chat(_url: str, payload: dict, _timeout: float) -> dict:
+        payloads.append(json.loads(json.dumps(payload)))
+        if len(payloads) == 1:
+            return {"message": {"content": "GO is ready"}}
+        return {
+            "message": {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": f"invalid_{len(payloads)}",
+                        "function": {"name": "Read", "arguments": {"path": "bridge/example-001.md"}},
+                    }
+                ],
+            }
+        }
+
+    with pytest.raises(oh.OllamaHarnessError) as exc_info:
+        oh.run_tool_loop(
+            "review",
+            route(root),
+            oh.DEFAULT_ENDPOINT,
+            10,
+            root,
+            skill="bridge-review",
+            chat_func=chat,
+        )
+
+    assert dispatched == []
+    assert len(payloads) == oh.MAX_BRIDGE_VERDICT_RECOVERY_TURNS + 2
+    assert "exhausted after 4 attempts" in str(exc_info.value)
+    assert "non-publisher tool call(s): Read" in str(exc_info.value)
+    for payload in payloads[1:]:
+        assert [tool["function"]["name"] for tool in payload["tools"]] == [oh.PUBLISH_BRIDGE_VERDICT_TOOL]
+
+
+def test_publisher_failure_diagnostic_is_credential_safe_and_bounded():
+    raw_secret = "secret-value-that-must-never-escape"
+    diagnostic = oh._bounded_publisher_failure_diagnostic(
+        f"ERROR: claim contention; api_key={raw_secret}; " + ("x" * 1000)
+    )
+
+    assert raw_secret not in diagnostic
+    assert "[REDACTED:api_key]" in diagnostic
+    assert len(diagnostic) <= oh.MAX_PUBLISHER_DIAGNOSTIC_CHARS
+
+
+def test_tool_loop_enforces_session_timeout_between_turns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    (root / "note.txt").write_text("hello", encoding="utf-8")
+    ticks = [100.0, 100.0, 101.5]
+
+    def fake_monotonic() -> float:
+        return ticks.pop(0) if ticks else 101.5
+
+    def chat(url: str, payload: dict, timeout: float) -> dict:
+        return {
+            "message": {
+                "content": "",
+                "tool_calls": [{"function": {"name": "Read", "arguments": {"path": "note.txt"}}}],
+            }
+        }
+
+    monkeypatch.setattr(oh.time, "monotonic", fake_monotonic)
+
+    with pytest.raises(oh.OllamaHarnessError, match="session timeout exceeded"):
+        oh.run_tool_loop(
+            "loop",
+            route(root),
+            oh.DEFAULT_ENDPOINT,
+            3,
+            root,
+            chat_func=chat,
+            timeout=10.0,
+            session_timeout=1.0,
+        )
+
+
+def test_tool_loop_caps_bash_timeout_to_remaining_session_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    ticks = [100.0, 101.0, 102.0, 103.0]
+    observed_timeouts: list[float] = []
+
+    def fake_monotonic() -> float:
+        return ticks.pop(0) if ticks else 103.0
+
+    def chat(url: str, payload: dict, timeout: float) -> dict:
+        if len(observed_timeouts) == 0 and len(payload["messages"]) == 1:
+            return {
+                "message": {
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "function": {
+                                "name": "Bash",
+                                "arguments": {"command": "echo ok", "timeout_seconds": 99},
+                            }
+                        }
+                    ],
+                }
+            }
+        return {"message": {"content": "done"}}
+
+    def command_runner(command: str, cwd: Path, env: dict, timeout: float) -> subprocess.CompletedProcess[str]:
+        observed_timeouts.append(timeout)
+        return subprocess.CompletedProcess(args=command, returncode=0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(oh.time, "monotonic", fake_monotonic)
+
+    assert (
+        oh.run_tool_loop(
+            "run",
+            route(root),
+            oh.DEFAULT_ENDPOINT,
+            3,
+            root,
+            chat_func=chat,
+            command_runner=command_runner,
+            timeout=20.0,
+            session_timeout=5.0,
+        )
+        == "done"
+    )
+    assert observed_timeouts == [3.0]
+
+
+def test_tool_loop_recovers_from_malformed_tool_arguments(tmp_path: Path):
+    root = make_root(tmp_path)
+    calls: list[dict] = []
+
+    def chat(url: str, payload: dict, timeout: float) -> dict:
+        calls.append(payload)
+        if len(calls) == 1:
+            return {
+                "message": {
+                    "content": "",
+                    "tool_calls": [{"id": "bad_1", "function": {"name": "Read", "arguments": "{"}}],
+                }
+            }
+        tool_result = payload["messages"][-1]
+        assert tool_result["role"] == "tool"
+        assert tool_result["name"] == "Read"
+        assert tool_result["tool_call_id"] == "bad_1"
+        assert tool_result["content"].startswith("ERROR:")
+        assert "arguments string must be JSON" in tool_result["content"]
+        return {"message": {"content": "recovered"}}
+
+    assert oh.run_tool_loop("bad", route(root), oh.DEFAULT_ENDPOINT, 2, root, chat_func=chat) == "recovered"
+    assert len(calls) == 2
 
 
 def test_write_edit_and_bash_enter_guards_before_side_effects(tmp_path: Path):
@@ -698,6 +1660,15 @@ def test_wi4817_ollama_bounded_exhaustion(monkeypatch: pytest.MonkeyPatch):
     behaviors = [_ollama_http_error(503)] * (oh.CHAT_MAX_ATTEMPTS + 1)
     _patch_ollama_urlopen(monkeypatch, behaviors, calls)
     with pytest.raises(oh.OllamaHarnessError, match="HTTP 503"):
+        oh.call_ollama_chat("http://ollama.test", {"model": "m"})
+    assert len(calls) == oh.CHAT_MAX_ATTEMPTS
+
+
+def test_wi4933_ollama_bare_timeout_is_classified(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    behaviors = [TimeoutError("timed out")] * (oh.CHAT_MAX_ATTEMPTS + 1)
+    _patch_ollama_urlopen(monkeypatch, behaviors, calls)
+    with pytest.raises(oh.OllamaHarnessError, match="timed out"):
         oh.call_ollama_chat("http://ollama.test", {"model": "m"})
     assert len(calls) == oh.CHAT_MAX_ATTEMPTS
 

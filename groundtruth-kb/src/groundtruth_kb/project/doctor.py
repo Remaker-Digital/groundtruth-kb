@@ -11,9 +11,10 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -23,9 +24,6 @@ from groundtruth_kb.bridge.role_state import (
 )
 from groundtruth_kb.bridge.role_state import (
     ROLE_STATE_KEYS,
-)
-from groundtruth_kb.bridge_dispatch_config import (
-    cross_harness_trigger_disable_findings,
 )
 from groundtruth_kb.project.managed_registry import (
     FileArtifact,
@@ -37,7 +35,6 @@ from groundtruth_kb.project.managed_registry import (
 from groundtruth_kb.project.profiles import get_profile
 
 STANDING_BACKLOG_STALE_NO_GO_DAYS = 14
-IMPLEMENTATION_ACTIVE_APPROVAL_STATES = frozenset({"implementation_authorized"})
 IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES = frozenset({"in_progress"})
 IMPLEMENTATION_ACTIVE_STAGES = frozenset({"implementing"})
 _BRIDGE_VERSION_FILE_RE = re.compile(r"^(.+)-(\d{3,})\.md$")
@@ -1276,6 +1273,156 @@ def _check_harness_metadata_freshness(target: Path) -> ToolCheck:
     )
 
 
+_HARNESS_MODEL_PIN_CONFIRMATIONS_REL = Path("config") / "agent-control" / "harness-model-pin-confirmations.toml"
+_DEFAULT_HARNESS_MODEL_PIN_STALE_AFTER_DAYS = 90
+
+
+def _check_harness_model_pin_reconfirmation(target: Path) -> ToolCheck:
+    """Surface active dispatch harness model pins that need owner reconfirmation."""
+    import tomllib  # noqa: PLC0415 - py3.11+; defer import
+
+    from groundtruth_kb.bridge.state_report import _argv_value as _state_report_argv_value  # noqa: PLC0415
+    from groundtruth_kb.harness_projection import HarnessStateError, read_roles  # noqa: PLC0415
+
+    check_name = "Harness model pin reconfirmation"
+    try:
+        registry = read_roles(project_root=target)
+    except HarnessStateError as exc:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message=f"harness registry unreadable; cannot surface model pins: {exc}",
+        )
+
+    active_pins: list[dict[str, str]] = []
+    harnesses = registry.get("harnesses") if isinstance(registry, dict) else None
+    if isinstance(harnesses, list):
+        for record in harnesses:
+            if not isinstance(record, dict):
+                continue
+            status = str(record.get("status") or "").strip().lower()
+            if status != "active" or record.get("can_receive_dispatch") is not True:
+                continue
+            surfaces = record.get("invocation_surfaces")
+            headless = surfaces.get("headless") if isinstance(surfaces, dict) else None
+            argv = headless.get("argv") if isinstance(headless, dict) else None
+            argv_items = [str(item) for item in argv] if isinstance(argv, list) else []
+            model_pin = _state_report_argv_value(argv_items, "--model") or _state_report_argv_value(argv_items, "-m")
+            active_pins.append(
+                {
+                    "id": str(record.get("id") or "?"),
+                    "name": str(record.get("harness_name") or record.get("harness_type") or "?"),
+                    "model_pin": model_pin or "(unspecified)",
+                }
+            )
+
+    if not active_pins:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message="no active dispatch-capable harness model pins found through canonical harness projection",
+        )
+
+    config_path = target / _HARNESS_MODEL_PIN_CONFIRMATIONS_REL
+    config: dict[str, Any] = {}
+    config_found = config_path.is_file()
+    findings: list[str] = []
+    if config_found:
+        try:
+            config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError) as exc:
+            findings.append(f"{_HARNESS_MODEL_PIN_CONFIRMATIONS_REL.as_posix()} unreadable: {exc}")
+            config = {}
+    else:
+        findings.append(f"{_HARNESS_MODEL_PIN_CONFIRMATIONS_REL.as_posix()} missing")
+
+    stale_after_days = _DEFAULT_HARNESS_MODEL_PIN_STALE_AFTER_DAYS
+    configured_stale_after = config.get("stale_after_days") if isinstance(config, dict) else None
+    if isinstance(configured_stale_after, int) and configured_stale_after > 0:
+        stale_after_days = configured_stale_after
+    elif configured_stale_after is not None:
+        findings.append("stale_after_days must be a positive integer")
+
+    confirmations = config.get("confirmations") if isinstance(config, dict) else None
+    if not isinstance(confirmations, dict):
+        confirmations = {}
+
+    now = datetime.now(UTC)
+    for pin in active_pins:
+        harness_id = pin["id"]
+        label = f"{harness_id}/{pin['name']}={pin['model_pin']}"
+        confirmation = confirmations.get(harness_id)
+        if not isinstance(confirmation, dict):
+            findings.append(f"missing owner confirmation for {label}")
+            continue
+
+        confirmed_pin = confirmation.get("model_pin")
+        if confirmed_pin != pin["model_pin"]:
+            findings.append(f"owner confirmation changed for {label}; last_confirmed={confirmed_pin!r}")
+            continue
+
+        confirmed_at = _parse_model_pin_confirmed_at(confirmation.get("confirmed_at"))
+        if confirmed_at is None:
+            findings.append(f"owner confirmation for {label} has no parseable confirmed_at")
+            continue
+        age_days = (now - confirmed_at).days
+        if age_days > stale_after_days:
+            findings.append(
+                f"owner confirmation stale for {label}; confirmed_at={confirmed_at.date().isoformat()} "
+                f"age_days={age_days} stale_after_days={stale_after_days}"
+            )
+
+    current = ", ".join(f"{pin['id']}/{pin['name']}={pin['model_pin']}" for pin in active_pins)
+    if findings:
+        details = "; ".join(findings)
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=config_found,
+            status="warning",
+            message=f"{len(active_pins)} active dispatch model pin(s): {current}; "
+            f"{len(findings)} warning(s): {details}",
+        )
+
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="pass",
+        message=(
+            f"{len(active_pins)} active dispatch model pin(s) owner-confirmed within {stale_after_days} days: {current}"
+        ),
+    )
+
+
+def _parse_model_pin_confirmed_at(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    if isinstance(value, date):
+        return datetime(value.year, value.month, value.day, tzinfo=UTC)
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return None
+        candidates = [raw]
+        if raw.endswith("Z"):
+            candidates.append(raw[:-1] + "+00:00")
+        for candidate in candidates:
+            try:
+                parsed = datetime.fromisoformat(candidate)
+            except ValueError:
+                continue
+            return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+        with suppress(ValueError):
+            parsed_date = date.fromisoformat(raw)
+            return datetime(parsed_date.year, parsed_date.month, parsed_date.day, tzinfo=UTC)
+    return None
+
+
 def _json_file_contains_hook(path: Path, expected: str) -> bool:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -1529,6 +1676,231 @@ def _check_ollama_harness(target: Path) -> ToolCheck:
         found=True,
         status="warning",
         message=f"{len(findings)} findings; first: {head}{extra}",
+    )
+
+
+def _check_alibaba_cloud_studio_harness(target: Path) -> ToolCheck:
+    """Verify the Alibaba Cloud Studio H onboarding contract without reading secrets."""
+    import tomllib  # noqa: PLC0415 - py3.11+; defer import
+
+    from groundtruth_kb.harness_projection import (  # noqa: PLC0415
+        HarnessStateError,
+        read_capabilities,
+        read_identity,
+        read_roles,
+    )
+
+    check_name = "Alibaba Cloud Studio H harness consistency"
+    canonical_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
+    findings: list[str] = []
+
+    # Layer 1: the durable installation identity is separate from the registry projection.
+    try:
+        identities = read_identity(project_root=target)
+    except HarnessStateError as exc:
+        findings.append(f"L1: identities store error: {exc}")
+    else:
+        harnesses = identities.get("harnesses") if isinstance(identities, dict) else None
+        entry = harnesses.get("alibaba-cloud-studio") if isinstance(harnesses, dict) else None
+        if not isinstance(entry, dict):
+            findings.append("L1: identities store missing 'alibaba-cloud-studio' entry")
+        elif entry.get("id") != "H":
+            findings.append(f"L1: alibaba-cloud-studio.id={entry.get('id')!r}; expected 'H'")
+
+    registry_entry: dict[str, Any] | None = None
+    goose_entry: dict[str, Any] | None = None
+    # Layer 2: H's live-smoke ordering is governed report evidence; the registry
+    # records only its current (pre- or post-proof) dispatch state.
+    try:
+        registry = read_roles(project_root=target)
+    except HarnessStateError as exc:
+        findings.append(f"L2: registry store error: {exc}")
+    else:
+        records = registry.get("harnesses") if isinstance(registry, dict) else None
+        if isinstance(records, list):
+            for entry in records:
+                if not isinstance(entry, dict):
+                    continue
+                if entry.get("id") == "H":
+                    registry_entry = entry
+                elif entry.get("id") == "G":
+                    goose_entry = entry
+        if registry_entry is None:
+            findings.append("L2: registry has no entry for id=H")
+        else:
+            expected = {
+                "harness_name": "alibaba-cloud-studio",
+                "harness_type": "claude",
+                "status": "active",
+            }
+            for key, value in expected.items():
+                if registry_entry.get(key) != value:
+                    findings.append(f"L2: registry {key}={registry_entry.get(key)!r}; expected {value!r}")
+            if registry_entry.get("role") != ["loyal-opposition"]:
+                findings.append(f"L2: registry role={registry_entry.get('role')!r}; expected ['loyal-opposition']")
+            if not isinstance(registry_entry.get("can_receive_dispatch"), bool):
+                findings.append("L2: H can_receive_dispatch must be a boolean")
+            surfaces = registry_entry.get("invocation_surfaces")
+            headless = surfaces.get("headless") if isinstance(surfaces, dict) else None
+            argv = headless.get("argv") if isinstance(headless, dict) else None
+            if not isinstance(argv, list):
+                findings.append("L2: H headless invocation argv is missing")
+            else:
+                required_argv = {
+                    "scripts/alibaba_cloud_studio_harness.py",
+                    "--prompt",
+                    "{{PROMPT}}",
+                    "--skill",
+                    "bridge-review",
+                    "--model",
+                    "alibaba-deepseek-v4-pro",
+                }
+                missing_argv = sorted(required_argv.difference(str(item) for item in argv))
+                if missing_argv:
+                    findings.append(f"L2: H headless argv missing {missing_argv}")
+        if goose_entry is None:
+            findings.append("L2: registry has no retained Goose G retirement record")
+        else:
+            if goose_entry.get("status") not in {"suspended", "retired"}:
+                findings.append(f"L2: Goose status={goose_entry.get('status')!r}; expected suspended or retired")
+            if goose_entry.get("can_receive_dispatch") is not False:
+                findings.append("L2: Goose G remains dispatchable")
+
+    # Layer 3: capability floor, provider envelope, and env-name-only metadata.
+    try:
+        capabilities = read_capabilities(project_root=target)
+    except HarnessStateError as exc:
+        findings.append(f"L3: capability registry error: {exc}")
+    else:
+        h_caps = (
+            capabilities.get("harnesses", {}).get("alibaba-cloud-studio") if isinstance(capabilities, dict) else None
+        )
+        if not isinstance(h_caps, dict):
+            findings.append("L3: capability registry missing [harnesses.alibaba-cloud-studio]")
+        else:
+            expected_caps: dict[str, Any] = {
+                "bridge_compliance_gate_respect": True,
+                "root_boundary_respect": True,
+                "author_metadata_env_var_setting": True,
+                "destructive_gate_delegation": True,
+                "advertised_tool_subset": canonical_tools,
+                "tool_guard_adapter_fail_closed": True,
+                "dialect": "anthropic-messages",
+                "hook_tier": "native-full-hooks",
+                "auth_style": "authorization-bearer",
+                "auth_env_key": "ALIBABA_API_KEY",
+                "endpoint_env_key": "ALIBABA_ANTHROPIC_COMPATIBLE_ENDPOINT",
+                "provider_routing_key": "alibaba-cloud-studio",
+                "activity_envelope_projection_mode": "compact-provider",
+                "compact_result_envelope_mode": "compact-provider",
+                "compact_session_envelope_mode": "compact-provider",
+                "full_transcript_archive_required": False,
+            }
+            for key, value in expected_caps.items():
+                if h_caps.get(key) != value:
+                    findings.append(f"L3: capability {key}={h_caps.get(key)!r}; expected {value!r}")
+
+    # Layer 4: routing and wrapper source only name the approved env keys.
+    routing_path = target / ".api-harness" / "routing.toml"
+    try:
+        routing = tomllib.loads(routing_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        findings.append(f"L4: routing TOML unreadable: {exc}")
+    else:
+        model = routing.get("models", {}).get("alibaba-deepseek-v4-pro") if isinstance(routing, dict) else None
+        route = routing.get("routing", {}).get("alibaba-cloud-studio") if isinstance(routing, dict) else None
+        if not isinstance(model, dict):
+            findings.append("L4: routing has no models.alibaba-deepseek-v4-pro row")
+        else:
+            if model.get("provider") != "alibaba-cloud-studio":
+                findings.append(f"L4: Alibaba model provider={model.get('provider')!r}")
+            if model.get("tool_calling_supported") is not True:
+                findings.append("L4: Alibaba model does not advertise tool calling")
+            if model.get("allowed_tools") != canonical_tools:
+                findings.append("L4: Alibaba model does not expose the canonical tool set")
+        if not isinstance(route, dict):
+            findings.append("L4: routing has no routing.alibaba-cloud-studio row")
+        elif route.get("default_model") != "alibaba-deepseek-v4-pro":
+            findings.append(f"L4: Alibaba default_model={route.get('default_model')!r}")
+
+    wrapper_path = target / "scripts" / "alibaba_cloud_studio_harness.py"
+    try:
+        wrapper_source = wrapper_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        findings.append(f"L4: Alibaba wrapper unreadable: {exc}")
+    else:
+        for env_name in ("ALIBABA_API_KEY", "ALIBABA_ANTHROPIC_COMPATIBLE_ENDPOINT"):
+            if env_name not in wrapper_source:
+                findings.append(f"L4: wrapper does not reference {env_name}")
+            if re.search(rf"{env_name}\\s*=\\s*['\"](?!['\"])", wrapper_source):
+                findings.append(f"L4: wrapper embeds a value for {env_name}")
+
+    if not findings:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message=(
+                "Alibaba H onboarding clean (identity, registry, capability floor, routing, "
+                "env-name-only wrapper, Goose retirement)"
+            ),
+        )
+
+    head = findings[0]
+    extra = f" (+{len(findings) - 1} more)" if len(findings) > 1 else ""
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="warning",
+        message=f"{len(findings)} findings; first: {head}{extra}",
+    )
+
+
+def _check_cursor_dispatch_readiness(target: Path) -> ToolCheck:
+    """WI-4778: surface Cursor headless dispatch readiness without activating it."""
+
+    check_name = "Cursor dispatch readiness"
+    try:
+        from scripts.verify_cursor_dispatch import evaluate_readiness  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001 - doctor must surface import drift
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message=f"scripts/verify_cursor_dispatch.py unavailable: {exc}",
+        )
+
+    try:
+        result = evaluate_readiness(project_root=target)
+    except Exception as exc:  # noqa: BLE001 - readiness probe is diagnostic
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=f"Cursor dispatch readiness probe failed: {exc}",
+        )
+
+    if result.get("ready"):
+        dispatchable = "dispatchable" if result.get("dispatchable_now") else "ready but not currently selected"
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message=f"Cursor headless Agent CLI readiness clean ({dispatchable})",
+        )
+
+    detail = str(result.get("first_failed_check") or "readiness check failed")
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="warning",
+        message=f"Cursor headless dispatch unavailable: {detail}",
     )
 
 
@@ -2154,6 +2526,113 @@ def _check_untracked_terminal_verified_verdicts(target: Path) -> ToolCheck:
     )
 
 
+def _check_skill_rename_reference_sweep(target: Path) -> ToolCheck:
+    """WI-5668: WARN while any pre-rename bare skill-directory references remain.
+
+    The GTKB-SKILL-RENAME-REFERENCE-SWEEP program renamed the ``.claude/skills/``
+    directories to a ``gtkb-`` prefix (``DELIB-202667105`` / ``DELIB-202667106``).
+    This deterministic completion gate (``GOV-DETERMINISTIC-SERVICES-PRINCIPLE-001``)
+    counts remaining tracked references to the bare pre-rename skill dirs and WARNs
+    until the count reaches zero, so the sweep's "done" is objective rather than a
+    session judgment call.
+
+    Self-maintaining: the bare-name set is derived from the current ``gtkb-`` skill
+    dirs (for each ``gtkb-<name>`` dir, ``<name>`` is a stale bare name), so no
+    hardcoded list is needed and the check adapts to future renames.
+
+    ``required=False`` — a surfaced warning, never a hard release-block — while the
+    multi-slice sweep is in flight. Append-only / historical / runtime trees that
+    intentionally retain bare references are excluded.
+    """
+    name = "skill-rename reference sweep"
+    skills_dir = target / ".claude" / "skills"
+    if not skills_dir.is_dir():
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=False,
+            status="info",
+            message="no .claude/skills/ directory; nothing to verify",
+        )
+
+    prefix = "gtkb-"
+    bare_names = sorted(
+        d.name[len(prefix) :]
+        for d in skills_dir.iterdir()
+        if d.is_dir() and d.name.startswith(prefix) and len(d.name) > len(prefix)
+    )
+    if not bare_names:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="info",
+            message="no gtkb- skill dirs found; no bare pre-rename names to sweep",
+        )
+
+    alt = "|".join(re.escape(b) for b in bare_names)
+    grep_pattern = rf'skills/({alt})/|"skills"[ ]*/[ ]*"({alt})"'
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(target), "grep", "-n", "-E", grep_pattern],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="info",
+            message="git grep unavailable; skill-rename reference scan skipped",
+        )
+    # git grep exit codes: 0 = matches found, 1 = no matches (a PASS), >1 = error.
+    if completed.returncode > 1:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="info",
+            message="git grep error; skill-rename reference scan skipped",
+        )
+
+    excluded = ("bridge/", "RETIRED-", "BARRED-", "archive/", "archive-", ".gtkb-state/")
+    hits: list[str] = []
+    if completed.returncode == 0:
+        for line in completed.stdout.splitlines():
+            path_part, sep, rest = line.replace("\\", "/").partition(":")
+            if not sep:
+                continue
+            if any(path_part.startswith(p) for p in excluded):
+                continue
+            lineno_part = rest.partition(":")[0]
+            hits.append(f"{path_part}:{lineno_part}")
+
+    count = len(hits)
+    if count:
+        sample = ", ".join(hits[:8])
+        more = f" (+{count - 8} more)" if count > 8 else ""
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                f"{count} pre-rename bare skill-dir reference(s) remain; "
+                f"GTKB-SKILL-RENAME-REFERENCE-SWEEP incomplete: {sample}{more}"
+            ),
+        )
+
+    return ToolCheck(
+        name=name,
+        required=False,
+        found=True,
+        status="pass",
+        message="0 pre-rename bare skill-dir references remain; sweep complete",
+    )
+
+
 def _check_parity_discovery_diff(target: Path) -> ToolCheck:
     """Cross-harness parity discovery-diff (Slice 3 of PROJECT-GTKB-CROSS-HARNESS-PARITY).
 
@@ -2623,6 +3102,8 @@ def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
         "gtkb-prime-worker-context-aware-auq-slice-2-005.md",
         "gtkb-prime-worker-delivery-regression-slice-4-008.md",
         "gtkb-role-resolution-r1-r5-assertion-enforcement-005.md",
+        # WI-4365 report is report-only; matches AUQ + approval via false positive on spec names/delib titles
+        "gtkb-wi4365-prompt-submit-surface-classification-003.md",
     }
 
     bridge_filename_date_re = _re.compile(r"(20\d{2}-\d{2}-\d{2})")
@@ -3117,20 +3598,18 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
     """Validate the platform SoT artifact registry (GOV-PLATFORM-SOT-REGISTRY-001).
 
     Two sub-checks per DCL-SOT-REGISTRY-PROJECTION-PARITY-001 and the umbrella
-    Slice-1 scope:
+    WI-5441 control-plane scope:
 
-    1. **Parity** — the TOML edit-surface at ``config/registry/sot-artifacts.toml``
-       and the MemBase ``sot_artifacts`` projection must agree. A projection that
-       has never been synced (empty) or that diverges is reported as drift.
-    2. **Reality** — every active record whose ``storage_path`` is a concrete
-       (non-``membase:``, non-glob) path must resolve on disk under ``target``.
+    1. **Coherence/identity** — canonical TOML, packaged mirror, MemBase
+       projection, and active identity locators must agree.
+    2. **Membership** — the shared five-observer reconciliation must classify
+       every load-bearing object as a registered member.
+    3. **Audit freshness** — stale or missing content observations are visible
+       as repair-forward warnings; they do not disable otherwise-valid work.
 
-    Severity is **WARN-only** during Slice 1 per owner decision Q6 of
-    ``DELIB-20260671`` (the check ships at WARN; promotion to ERROR is a separate
-    downstream owner decision). The check never returns ``fail`` for drift; it
-    returns ``fail`` only when the registry file itself cannot be parsed (a
-    structural defect, not inventory drift). When the registry is absent (e.g.
-    an adopter project before Slice 7 rollout), it returns ``info`` (skip).
+    Authority, identity, and membership defects fail closed. A missing registry
+    remains an informational skip for adopters that have not enabled the
+    platform registry.
     """
     check_name = "SoT registry completeness"
     registry_path = target / "config" / "registry" / "sot-artifacts.toml"
@@ -3145,81 +3624,73 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
         )
 
     try:
-        from groundtruth_kb.project import sot_registry
+        from groundtruth_kb.project.registry_control_plane import inspect_registry, load_registry_snapshot
     except Exception as exc:  # pragma: no cover - defensive import boundary  # intentional-catch: quality gate waiver
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=f"sot_registry module unavailable: {exc}",
-        )
-
-    try:
-        toml_records = sot_registry.load_toml(registry_path)
-    except Exception as exc:  # intentional-catch: InvalidSoTRecord / UnknownDomain / parse error
         return ToolCheck(
             name=check_name,
             required=True,
             found=True,
             status="fail",
-            message=f"sot-artifacts.toml failed to load: {exc}",
+            message=f"registry control plane unavailable: {exc}",
         )
 
-    warnings: list[str] = []
+    try:
+        snapshot = load_registry_snapshot(project_root=target)
+        toml_records = list(snapshot.records)
+        authority_report = inspect_registry(project_root=target, include_census=True)
+    except Exception as exc:  # intentional-catch: authority failures are ERROR severity
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="fail",
+            message=f"coherent registry snapshot failed to load: {exc}",
+        )
 
-    # Sub-check 1: TOML / MemBase projection parity.
-    db_path = target / "groundtruth.db"
-    if db_path.is_file():
-        try:
-            projection = sot_registry.load_projection(db_path)
-        except Exception as exc:  # pragma: no cover - defensive DB boundary  # intentional-catch: quality gate waiver
-            projection = []
-            warnings.append(f"projection load failed: {exc}")
-        if not projection:
-            warnings.append(
-                f"MemBase sot_artifacts projection empty — run `gt registry sync` "
-                f"({len(toml_records)} TOML records unsynced)"
-            )
-        else:
-            parity = sot_registry.validate_projection_parity(toml_records, projection)
-            if not parity.in_sync:
-                bits: list[str] = []
-                if parity.missing_in_projection:
-                    bits.append(f"missing in projection: {', '.join(parity.missing_in_projection[:5])}")
-                if parity.missing_in_toml:
-                    bits.append(f"missing in TOML: {', '.join(parity.missing_in_toml[:5])}")
-                if parity.field_divergences:
-                    diverged = ", ".join(f"{i}.{f}" for i, f in parity.field_divergences[:5])
-                    bits.append(f"field drift: {diverged}")
-                warnings.append("TOML/MemBase parity drift — " + "; ".join(bits))
+    failures: list[str] = []
+    audit_notes: list[str] = []
+
+    if not authority_report.get("coherent"):
+        failures.append(f"registry generation is not coherent: {authority_report.get('error')}")
     else:
-        warnings.append("groundtruth.db not present — parity sub-check skipped")
+        identity = authority_report["identity_state"]
+        if not identity["current"]:
+            failures.append(
+                f"registry identity failed: {len(identity['missing'])} missing locators, "
+                f"{len(identity['object_kind_mismatches'])} object-kind mismatches"
+            )
+        membership = authority_report["membership_reconciliation"]
+        if not membership["membership_complete"]:
+            counts = membership["counts"]
+            failures.append(
+                "registry membership incomplete: "
+                f"{counts['unregistered_load_bearing']} load-bearing gaps, "
+                f"{counts['invalid_unknown']} invalid unknowns"
+            )
+        currentness = authority_report["currentness"]
+        if not currentness["current"]:
+            audit_notes.append(
+                f"registry audit incomplete: {len(currentness['missing_revisions'])} missing revisions, "
+                f"{len(currentness['stale'])} stale records"
+            )
 
-    # Sub-check 2: registry / on-disk reality for active concrete paths.
-    unresolved: list[str] = []
-    for rec in toml_records:
-        if rec.lifecycle != "active":
-            continue
-        path = rec.storage_path
-        if path.startswith("membase:"):
-            continue
-        if any(ch in path for ch in "*?[]"):
-            # Glob/pattern storage paths are not point-resolvable; skip.
-            continue
-        if not (target / path).exists():
-            unresolved.append(rec.id)
-    if unresolved:
-        warnings.append(f"{len(unresolved)} active record(s) with unresolved storage_path: {', '.join(unresolved[:5])}")
+    if failures:
+        suffix = "" if len(failures) <= 3 else f"; +{len(failures) - 3} more"
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="fail",
+            message=f"{len(toml_records)} SoT records — " + "; ".join(failures[:3]) + suffix,
+        )
 
-    if warnings:
-        suffix = "" if len(warnings) <= 3 else f"; +{len(warnings) - 3} more"
+    if audit_notes:
         return ToolCheck(
             name=check_name,
             required=False,
             found=True,
             status="warning",
-            message=f"{len(toml_records)} SoT records — " + "; ".join(warnings[:3]) + suffix,
+            message=f"{len(toml_records)} SoT records — " + "; ".join(audit_notes),
         )
 
     return ToolCheck(
@@ -3227,7 +3698,7 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
         required=False,
         found=True,
         status="pass",
-        message=f"{len(toml_records)} SoT records registered; TOML/MemBase parity OK; all active paths resolve",
+        message=f"{len(toml_records)} SoT records registered; parity, identity, and membership complete",
     )
 
 
@@ -3334,35 +3805,22 @@ def _check_sot_read_discipline(target: Path) -> ToolCheck:
     else:
         warnings.append(".codex/hooks.json absent — cannot verify Codex registration")
 
-    # Layer 5: Registry referential integrity (best-effort)
-    db_path = target / "groundtruth.db"
-    if db_path.is_file():
-        try:
-            import sqlite3
+    # Layer 5: Registry referential integrity from one coherent generation.
+    try:
+        from groundtruth_kb.project.registry_control_plane import load_registry_snapshot
 
-            con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-            try:
-                cur = con.cursor()
-                cur.execute("SELECT id, storage_path, forbidden_substitutes FROM current_sot_artifacts")
-                rows = cur.fetchall()
-            finally:
-                con.close()
-            known_paths = {row[1] for row in rows if row[1]}
-            for rid, _, subs in rows:
-                try:
-                    sub_list = json.loads(subs) if subs else []
-                except json.JSONDecodeError:
-                    continue
-                for sub in sub_list:
-                    # Substitute paths SHOULD match some registry storage_path (referential)
-                    if sub and not any(known.endswith(sub) or sub in known for known in known_paths):
-                        warnings.append(
-                            f"forbidden_substitutes on {rid!r} references {sub!r} "
-                            "which does not match any known SoT storage_path"
-                        )
-                        break  # one warning per record is enough
-        except Exception:  # intentional-catch: defensive
-            pass
+        rows = load_registry_snapshot(project_root=target).records
+        known_paths = {row.storage_path for row in rows if row.storage_path}
+        for row in rows:
+            for substitute in row.forbidden_substitutes:
+                if substitute and not any(known.endswith(substitute) or substitute in known for known in known_paths):
+                    warnings.append(
+                        f"forbidden_substitutes on {row.id!r} references {substitute!r} "
+                        "which does not match any known SoT storage_path"
+                    )
+                    break
+    except Exception as exc:  # intentional-catch: authority failure must be visible
+        warnings.append(f"coherent registry authority unavailable: {exc}")
 
     if warnings:
         return ToolCheck(
@@ -3382,6 +3840,71 @@ def _check_sot_read_discipline(target: Path) -> ToolCheck:
             "canonical hook + Codex adapter present; Claude+Codex registrations effective; "
             "registry referential integrity OK"
         ),
+    )
+
+
+def _check_sot_duplicate_guard(target: Path) -> ToolCheck:
+    """Run the duplicate-SoT drift-prevention guard from the verified audit engine."""
+    check_name = "SoT duplicate guard"
+
+    try:
+        from groundtruth_kb.project.sot_audit import run_duplicate_sot_audit
+    except Exception as exc:  # pragma: no cover - defensive import boundary
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=False,
+            status="fail",
+            message=f"duplicate-SoT audit engine unavailable: {exc}",
+        )
+
+    try:
+        report = run_duplicate_sot_audit(target)
+    except Exception as exc:  # intentional-catch: baseline unavailable or structurally invalid
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=False,
+            status="fail",
+            message=f"duplicate-SoT audit baseline unavailable: {exc}",
+        )
+
+    if not report.coverage_complete:
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="fail",
+            message=(
+                "duplicate-SoT audit baseline incomplete: "
+                f"registry_count={report.registry_count}, "
+                f"persistent_file_count={report.persistent_file_count}, "
+                f"registered_file_count={report.registered_file_count}"
+            ),
+        )
+
+    violations = [candidate for candidate in report.candidates if candidate.classification == "duplicate_sot_violation"]
+    if violations:
+        first = "; ".join(
+            f"{candidate.candidate_id} paths={','.join(candidate.paths)} "
+            f"fields={','.join(candidate.duplicated_fields) or 'n/a'}"
+            for candidate in violations[:3]
+        )
+        suffix = "" if len(violations) <= 3 else f"; +{len(violations) - 3} more"
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="fail",
+            message=f"{len(violations)} persistent duplicate-SoT violation(s): {first}{suffix}",
+        )
+
+    return ToolCheck(
+        name=check_name,
+        required=True,
+        found=True,
+        status="pass",
+        message=f"coverage complete; {len(report.candidates)} candidate(s); no duplicate-SoT violations",
     )
 
 
@@ -3471,8 +3994,8 @@ def _check_skill_present(target: Path, profile_name: str) -> ToolCheck:
             message="not applicable to base profile",
         )
 
-    skill_md = target / ".claude" / "skills" / "decision-capture" / "SKILL.md"
-    helper_py = target / ".claude" / "skills" / "decision-capture" / "helpers" / "record_decision.py"
+    skill_md = target / ".claude" / "skills" / "gtkb-decision-capture" / "SKILL.md"
+    helper_py = target / ".claude" / "skills" / "gtkb-decision-capture" / "helpers" / "record_decision.py"
 
     missing: list[str] = []
     if not skill_md.exists():
@@ -3487,7 +4010,7 @@ def _check_skill_present(target: Path, profile_name: str) -> ToolCheck:
             found=False,
             status="warning",
             message=(
-                f".claude/skills/decision-capture/ missing: {', '.join(missing)}. "
+                f".claude/skills/gtkb-decision-capture/ missing: {', '.join(missing)}. "
                 f"Run `gt project upgrade --apply` to restore."
             ),
         )
@@ -3521,8 +4044,8 @@ def _check_bridge_propose_skill_present(target: Path, profile_name: str) -> Tool
             message="not applicable to base profile",
         )
 
-    skill_md = target / ".claude" / "skills" / "bridge-propose" / "SKILL.md"
-    helper_py = target / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py"
+    skill_md = target / ".claude" / "skills" / "gtkb-bridge-propose" / "SKILL.md"
+    helper_py = target / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py"
 
     missing: list[str] = []
     if not skill_md.exists():
@@ -3537,7 +4060,7 @@ def _check_bridge_propose_skill_present(target: Path, profile_name: str) -> Tool
             found=False,
             status="warning",
             message=(
-                f".claude/skills/bridge-propose/ missing: {', '.join(missing)}. "
+                f".claude/skills/gtkb-bridge-propose/ missing: {', '.join(missing)}. "
                 f"Run `gt project upgrade --apply` to restore."
             ),
         )
@@ -3572,8 +4095,8 @@ def _check_spec_intake_skill_present(target: Path, profile_name: str) -> ToolChe
             message="not applicable to base profile",
         )
 
-    skill_md = target / ".claude" / "skills" / "spec-intake" / "SKILL.md"
-    helper_py = target / ".claude" / "skills" / "spec-intake" / "helpers" / "spec_intake.py"
+    skill_md = target / ".claude" / "skills" / "gtkb-spec-intake" / "SKILL.md"
+    helper_py = target / ".claude" / "skills" / "gtkb-spec-intake" / "helpers" / "spec_intake.py"
 
     missing: list[str] = []
     if not skill_md.exists():
@@ -3588,7 +4111,7 @@ def _check_spec_intake_skill_present(target: Path, profile_name: str) -> ToolChe
             found=False,
             status="warning",
             message=(
-                f".claude/skills/spec-intake/ missing: {', '.join(missing)}. "
+                f".claude/skills/gtkb-spec-intake/ missing: {', '.join(missing)}. "
                 f"Run `gt project upgrade --apply` to restore."
             ),
         )
@@ -4134,11 +4657,8 @@ def _check_file_bridge_state_parse(target: Path) -> ToolCheck:
 
 
 # -- Bridge dispatch liveness ------------------------------------------
-# Slice 4 (2026-05-09): the smart-poller mechanism was retired in favor of
-# the cross-harness event-driven trigger. The dispatch-liveness check below
-# is mechanism-agnostic — it reads recipients[role].updated_at from the
-# shared dispatch-state.json regardless of which mechanism wrote it. The
-# replacement-mechanism check is _check_cross_harness_trigger below.
+# Bridge dispatch liveness reads recipients[role].updated_at from the shared
+# dispatch-state.json written by the dispatcher daemon.
 
 _BRIDGE_DISPATCH_STATE_PATH = Path(".gtkb-state/bridge-poller/dispatch-state.json")
 
@@ -4148,103 +4668,11 @@ _BRIDGE_DISPATCH_DOC = "docs/tutorials/dual-agent-setup.md"
 _BRIDGE_AUTH_DOC = "docs/troubleshooting/auth.md"
 
 
-_KILL_SWITCH_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
-# WI-4804: WARN once a manual emergency-stop kill-switch has been set this long.
-_KILL_SWITCH_STALE_SECONDS = 7200  # 2h
-_KILL_SWITCH_FIRST_SEEN_REL = Path(".gtkb-state") / "ops" / "kill-switch-first-seen.json"
-
-
-def _read_kill_switch_first_seen(path: Path) -> datetime | None:
-    """Read the recorded first-seen timestamp; None when absent/unreadable (fail-soft)."""
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    raw = data.get("first_seen") if isinstance(data, dict) else None
-    if not isinstance(raw, str):
-        return None
-    try:
-        parsed = datetime.fromisoformat(raw)
-    except ValueError:
-        return None
-    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
-
-
-def _write_kill_switch_first_seen(path: Path, when: datetime) -> None:
-    """Record the first-seen timestamp (fail-soft; bookkeeping only, never canonical)."""
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"first_seen": when.isoformat()}), encoding="utf-8")
-    except OSError:
-        pass
-
-
-def _check_kill_switch_staleness(target: Path) -> ToolCheck:
-    """Surface a long-standing cross-harness dispatch kill-switch (WI-4804).
-
-    ``GTKB_NO_CROSS_HARNESS_TRIGGER=1`` is the manual, emergency-only operator
-    kill-switch (the cross-harness trigger no-ops while it is set; see
-    ``SPEC-DISPATCH-KILL-SWITCH-EMERGENCY-ONLY-001``). A forgotten kill-switch
-    otherwise disables dispatch indefinitely with no surfaced signal. This check
-    records a first-seen timestamp when the kill-switch is observed set, WARNs
-    once it has been set beyond ``_KILL_SWITCH_STALE_SECONDS``, and clears the
-    record when the env var is unset. It NEVER auto-clears the env var (visibility
-    only, per DELIB-20266140 / DELIB-20266166).
-    """
-    name = "Dispatch kill-switch staleness"
-    first_seen_path = target / _KILL_SWITCH_FIRST_SEEN_REL
-
-    if os.environ.get(_KILL_SWITCH_ENV_VAR) != "1":
-        # Not kill-switched: clear stale bookkeeping so a future set starts fresh.
-        with suppress(OSError):
-            first_seen_path.unlink(missing_ok=True)
-        return ToolCheck(
-            name=name,
-            required=False,
-            found=True,
-            status="pass",
-            message=f"{_KILL_SWITCH_ENV_VAR} not set; cross-harness dispatch is not kill-switched",
-        )
-
-    now = datetime.now(UTC)
-    first_seen = _read_kill_switch_first_seen(first_seen_path)
-    if first_seen is None:
-        first_seen = now
-        _write_kill_switch_first_seen(first_seen_path, now)
-    age_seconds = max(0.0, (now - first_seen).total_seconds())
-
-    if age_seconds >= _KILL_SWITCH_STALE_SECONDS:
-        return ToolCheck(
-            name=name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                f"{_KILL_SWITCH_ENV_VAR}=1 set since {first_seen.isoformat()} "
-                f"(~{age_seconds / 3600.0:.1f}h); cross-harness dispatch is disabled. "
-                f"Clear it if the emergency has passed (emergency-only/manual per "
-                f"SPEC-DISPATCH-KILL-SWITCH-EMERGENCY-ONLY-001; this check never auto-clears it)."
-            ),
-        )
-    return ToolCheck(
-        name=name,
-        required=False,
-        found=True,
-        status="info",
-        message=(
-            f"{_KILL_SWITCH_ENV_VAR}=1 set recently (since {first_seen.isoformat()}); "
-            f"deliberate manual stop, under the {_KILL_SWITCH_STALE_SECONDS // 3600}h staleness threshold"
-        ),
-    )
-
-
 def _check_bridge_dispatch_liveness(target: Path, agent: str) -> ToolCheck:
     """Check file bridge dispatch liveness for *agent* (``'claude'`` or ``'codex'``).
 
-    Reads ``recipients[role].updated_at`` from the cross-harness trigger's
-    ``dispatch-state.json`` and computes staleness against the freshness
-    thresholds. The check is mechanism-agnostic — it surfaces dispatch
-    freshness regardless of which mechanism updates the state file.
+    Reads ``recipients[role].updated_at`` from ``dispatch-state.json`` and
+    computes staleness against the freshness thresholds.
 
     - ``< 4 min`` or empty queue with fresh state heartbeat → OK
     - ``4–10 min`` → WARN
@@ -4262,10 +4690,7 @@ def _check_bridge_dispatch_liveness(target: Path, agent: str) -> ToolCheck:
             required=False,
             found=False,
             status="warning",
-            message=(
-                f"{agent} bridge dispatch not started; see {_BRIDGE_DISPATCH_DOC} "
-                "for cross-harness event-driven trigger setup"
-            ),
+            message=(f"{agent} bridge dispatch not started; see {_BRIDGE_DISPATCH_DOC} for dispatcher daemon setup"),
         )
 
     try:
@@ -4392,7 +4817,7 @@ def _check_bridge_dispatch_liveness(target: Path, agent: str) -> ToolCheck:
         status = "warning"
         message = (
             f"{agent} bridge dispatch: WARN (last update {age_display}, state: {state_display}) "
-            f"— investigate cross-harness event-driven trigger or see {_BRIDGE_DISPATCH_DOC}"
+            f"— investigate dispatcher daemon liveness or see {_BRIDGE_DISPATCH_DOC}"
         )
     else:
         status = "fail"
@@ -4502,7 +4927,7 @@ def _check_dispatcher_daemon_substrate_readiness(target: Path) -> ToolCheck:
     )
 
     sub_path = target / "harness-state" / "bridge-substrate.json"
-    substrate = "cross_harness_trigger"
+    substrate = DISPATCHER_DAEMON_SUBSTRATE
     if sub_path.is_file():
         try:
             sub_doc = json.loads(sub_path.read_text(encoding="utf-8"))
@@ -4594,97 +5019,378 @@ def _check_dispatcher_daemon_substrate_readiness(target: Path) -> ToolCheck:
     )
 
 
-def _check_cross_harness_trigger(target: Path) -> ToolCheck:
-    """Check cross-harness event-driven trigger surface (Slice 4 replacement).
+def _check_dispatcher_daemon_supervisor_task(
+    target: Path,
+    load_complex_health: Callable[[], dict[str, Any]] | None = None,
+) -> ToolCheck:
+    """Warn when dispatcher_daemon substrate lacks a healthy Windows supervisor (WI-4937)."""
+    check_name = "Dispatcher daemon supervisor task"
+    skip = _dispatcher_daemon_task_skip_check(target, check_name=check_name, component_label="supervisor")
+    if skip is not None:
+        return skip
 
-    Per Slice 3 of bridge/gtkb-bridge-poller-event-driven-replacement-* the
-    cross-harness trigger replaces the retired smart-poller. The trigger
-    fires from PostToolUse + Stop hooks; this check verifies the trigger
-    surface is wired up.
+    status = _dispatcher_complex_component_status(
+        load_complex_health or _dispatcher_complex_health_reader(target), "supervisor"
+    )
+    if status.get("healthy"):
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message="GTKB-DispatcherDaemon supervisor is registered, enabled, and headless",
+        )
+    findings = status.get("findings") or []
+    detail = "; ".join(str(item) for item in findings) or "supervisor unhealthy"
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=bool(status.get("registered")),
+        status="warning",
+        message=(f"{detail}. Install/enable with: gt bridge dispatch daemon supervisor install"),
+    )
 
-    Subchecks:
-      1. ``scripts/cross_harness_bridge_trigger.py`` exists.
-      2. ``.claude/settings.json`` registers the trigger in PostToolUse and
-         Stop hook arrays (Codex parity in ``.codex/hooks.json`` is
-         covered by ``scripts/check_codex_hook_parity.py``; the doctor
-         reports the Claude side here).
-      3. ``.gtkb-state/bridge-poller/dispatch-state.json`` exists or the
-         trigger has not yet fired (steady-state warn, not fail).
 
-    Status mapping:
-      - All three subchecks pass → ``pass``
-      - Trigger script missing → ``fail``
-      - Hook registrations missing → ``fail``
-      - Dispatch-state absent or trigger has not yet fired → ``warning``
-    """
-    check_name = "Cross-harness event-driven trigger"
+def _check_dispatcher_daemon_watchdog_task(
+    target: Path,
+    load_complex_health: Callable[[], dict[str, Any]] | None = None,
+) -> ToolCheck:
+    """Warn when dispatcher_daemon substrate lacks a healthy Windows storm watchdog (WI-5023)."""
+    check_name = "Dispatcher daemon watchdog task"
+    skip = _dispatcher_daemon_task_skip_check(target, check_name=check_name, component_label="watchdog")
+    if skip is not None:
+        return skip
 
-    trigger_script = target / "scripts" / "cross_harness_bridge_trigger.py"
-    if not trigger_script.is_file():
+    status = _dispatcher_complex_component_status(
+        load_complex_health or _dispatcher_complex_health_reader(target), "watchdog"
+    )
+    if status.get("healthy"):
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message="GTKB-HarnessStormWatchdog is registered, enabled, hidden, and uses pythonw.exe",
+        )
+    findings = status.get("findings") or []
+    detail = "; ".join(str(item) for item in findings) or "watchdog unhealthy"
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=bool(status.get("registered")),
+        status="warning",
+        message=(f"{detail}. Install/enable with: gt bridge dispatch daemon watchdog install"),
+    )
+
+
+def _check_service_sot_watchdog(
+    target: Path,
+    load_task_status: Callable[[Path], dict[str, Any]] | None = None,
+) -> ToolCheck:
+    """Warn when the platform service/SoT watchdog task is absent or stale."""
+    check_name = "Service/SoT watchdog task"
+    registry_path = target / "config" / "registry" / "sot-artifacts.toml"
+    if not registry_path.is_file():
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message="Service/SoT watchdog skipped outside a platform SoT-registry workspace",
+        )
+    if os.name != "nt":
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message="Service/SoT watchdog task check is Windows-only; skipped on this host",
+        )
+
+    try:
+        if load_task_status is None:
+            from groundtruth_kb.watchdog.service_sot import collect_task_status
+
+            status = collect_task_status(target)
+        else:
+            status = load_task_status(target)
+    except Exception as exc:  # noqa: BLE001 - doctor checks fail soft
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message=f"Service/SoT watchdog status unavailable: {exc}",
+        )
+
+    if status.get("healthy"):
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message="GTKB-ServiceSoTWatchdog is registered, enabled, hidden, fresh, and detection-only",
+        )
+    findings = status.get("findings") or []
+    detail = "; ".join(str(item) for item in findings) or "service/SoT watchdog unhealthy"
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=bool(status.get("registered")),
+        status="warning",
+        message=(f"{detail}. Install/enable with: gt watchdog service-sot install"),
+    )
+
+
+def _check_deliberation_search_backend(target: Path) -> ToolCheck:
+    """Fail loudly when mandatory deliberation semantic search is degraded."""
+    check_name = "Deliberation search backend"
+    db_path = target / "groundtruth.db"
+    if not db_path.is_file():
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=False,
+            status="fail",
+            message="Deliberation search backend unavailable: groundtruth.db not found",
+        )
+
+    try:
+        from groundtruth_kb.db import KnowledgeDB
+
+        db = KnowledgeDB(db_path)
+        try:
+            status = db.deliberation_search_backend_status()
+        finally:
+            db.close()
+    except Exception as exc:  # noqa: BLE001 - doctor checks must report, not crash
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=False,
+            status="fail",
+            message=f"Deliberation search backend probe failed: {exc}",
+        )
+
+    current_count = int(status.get("current_deliberation_count") or 0)
+    indexed_count = int(status.get("indexed_deliberation_count") or 0)
+    chunk_count = int(status.get("indexed_chunk_count") or 0)
+    chroma_path = str(status.get("canonical_chroma_path") or "<unknown>")
+    if status.get("healthy"):
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="pass",
+            message=(
+                "Deliberation search backend healthy: ChromaDB importable; "
+                f"indexed {indexed_count}/{current_count} current deliberations "
+                f"({chunk_count} chunks) at {chroma_path}"
+            ),
+        )
+
+    reason = str(status.get("degradation_reason") or "unknown_degradation")
+    found = bool(status.get("chromadb_importable")) and bool(status.get("index_path_exists"))
+    return ToolCheck(
+        name=check_name,
+        required=True,
+        found=found,
+        status="fail",
+        message=(
+            f"Deliberation search backend degraded ({reason}): "
+            f"indexed {indexed_count}/{current_count} current deliberations "
+            f"({chunk_count} chunks) at {chroma_path}; run `gt deliberations rebuild-index`"
+        ),
+    )
+
+
+def _dispatcher_daemon_task_skip_check(target: Path, *, check_name: str, component_label: str) -> ToolCheck | None:
+    """Return a completed skip/warning check when the component probe is not applicable."""
+    from groundtruth_kb.mode_switch.validation import DISPATCHER_DAEMON_SUBSTRATE
+
+    if os.name != "nt":
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message=f"{component_label} task check is Windows-only; skipped on this host",
+        )
+
+    sub_path = target / "harness-state" / "bridge-substrate.json"
+    substrate = DISPATCHER_DAEMON_SUBSTRATE
+    if sub_path.is_file():
+        try:
+            sub_doc = json.loads(sub_path.read_text(encoding="utf-8"))
+            if isinstance(sub_doc, dict):
+                raw = sub_doc.get("substrate")
+                if isinstance(raw, str) and raw.strip():
+                    substrate = raw.strip()
+        except (OSError, json.JSONDecodeError):
+            return ToolCheck(
+                name=check_name,
+                required=False,
+                found=True,
+                status="warning",
+                message=f"harness-state/bridge-substrate.json is unreadable; {component_label} check skipped",
+            )
+
+    if substrate != DISPATCHER_DAEMON_SUBSTRATE:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message=f"substrate is {substrate!r}; {component_label} task not required",
+        )
+
+    return None
+
+
+def _collect_dispatcher_complex_health(target: Path) -> dict[str, Any]:
+    from groundtruth_kb.dispatcher_complex import collect_complex_health
+
+    try:
+        return collect_complex_health(target)
+    except Exception as exc:  # intentional-catch: doctor probes fail soft
+        return {
+            "components": {
+                "daemon": {
+                    "status": {
+                        "healthy": False,
+                        "registered": False,
+                        "findings": [f"dispatcher complex health unavailable: {exc}"],
+                    }
+                },
+                "supervisor": {
+                    "status": {
+                        "healthy": False,
+                        "registered": False,
+                        "findings": [f"dispatcher complex health unavailable: {exc}"],
+                    }
+                },
+                "watchdog": {
+                    "status": {
+                        "healthy": False,
+                        "registered": False,
+                        "findings": [f"dispatcher complex health unavailable: {exc}"],
+                    }
+                },
+            }
+        }
+
+
+def _dispatcher_complex_health_reader(target: Path) -> Callable[[], dict[str, Any]]:
+    health: dict[str, Any] | None = None
+
+    def read() -> dict[str, Any]:
+        nonlocal health
+        if health is None:
+            health = _collect_dispatcher_complex_health(target)
+        return health
+
+    return read
+
+
+def _dispatcher_complex_component_status(
+    load_complex_health: Callable[[], dict[str, Any]],
+    component_name: str,
+) -> dict[str, Any]:
+    health = load_complex_health()
+    components = health.get("components")
+    if not isinstance(components, dict):
+        return {
+            "healthy": False,
+            "registered": False,
+            "findings": ["dispatcher complex health payload has no components"],
+        }
+    component = components.get(component_name)
+    if not isinstance(component, dict):
+        return {
+            "healthy": False,
+            "registered": False,
+            "findings": [f"dispatcher complex health payload has no {component_name} component"],
+        }
+    status = component.get("status")
+    if isinstance(status, dict):
+        return status
+    finding = component.get("finding") or component.get("error") or f"{component_name} status unavailable"
+    return {
+        "healthy": False,
+        "registered": False,
+        "findings": [str(finding)],
+    }
+
+
+def _retired_bridge_worker_markers() -> tuple[str, ...]:
+    return (
+        "cross_" + "harness_" + "bridge_" + "trigger.py",
+        "bridge-" + "dispatch-" + "trigger.cmd",
+        "single_" + "harness_" + "bridge_" + "automation.py",
+        "single_" + "harness_" + "bridge_" + "dispatcher.py",
+    )
+
+
+def _collect_hook_commands(value: object) -> list[str]:
+    commands: list[str] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key == "command" and isinstance(child, str):
+                commands.append(child)
+            else:
+                commands.extend(_collect_hook_commands(child))
+    elif isinstance(value, list):
+        for child in value:
+            commands.extend(_collect_hook_commands(child))
+    return commands
+
+
+def _check_dispatcher_only_bridge_automation(target: Path) -> ToolCheck:
+    """Check that automated bridge dispatch is daemon-only."""
+    check_name = "Dispatcher-only bridge automation"
+
+    daemon_script = target / "scripts" / "gtkb_dispatcher_daemon.py"
+    if not daemon_script.is_file():
         return ToolCheck(
             name=check_name,
             required=False,
             found=False,
             status="fail",
-            message=(
-                f"cross-harness event-driven trigger script missing at "
-                f"scripts/cross_harness_bridge_trigger.py — see {_BRIDGE_DISPATCH_DOC} "
-                f"for installation"
-            ),
+            message=f"scripts/gtkb_dispatcher_daemon.py missing; see {_BRIDGE_DISPATCH_DOC} for daemon setup",
         )
 
-    settings_path = target / ".claude" / "settings.json"
-    if not settings_path.is_file():
+    markers = _retired_bridge_worker_markers()
+    script_findings = [
+        marker for marker in markers if marker.endswith(".py") and (target / "scripts" / marker).exists()
+    ]
+    hook_findings: list[str] = []
+    for hook_path in (target / ".claude" / "settings.json", target / ".codex" / "hooks.json"):
+        if not hook_path.exists():
+            continue
+        try:
+            payload = json.loads(hook_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            return ToolCheck(
+                name=check_name,
+                required=False,
+                found=True,
+                status="fail",
+                message=f"{hook_path.relative_to(target).as_posix()} unreadable: {exc}",
+            )
+        for command in _collect_hook_commands(payload):
+            if any(marker in command for marker in markers):
+                hook_findings.append(f"{hook_path.relative_to(target).as_posix()}: {command[:160]}")
+
+    if script_findings or hook_findings:
+        head = (script_findings + hook_findings)[0]
+        finding_count = len(script_findings) + len(hook_findings)
+        extra = "" if finding_count == 1 else f" (+{finding_count - 1} more)"
         return ToolCheck(
             name=check_name,
             required=False,
             found=True,
             status="fail",
-            message=(
-                f".claude/settings.json missing — bridge dispatch automation cannot "
-                f"fire from PostToolUse + Stop hooks. See {_BRIDGE_DISPATCH_DOC}."
-            ),
-        )
-    try:
-        settings_text = settings_path.read_text(encoding="utf-8")
-    except OSError as exc:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=f".claude/settings.json unreadable: {exc}",
-        )
-
-    trigger_marker = "cross_harness_bridge_trigger.py"
-    has_post_tool_use = "PostToolUse" in settings_text and trigger_marker in settings_text
-    has_stop = "Stop" in settings_text and trigger_marker in settings_text
-    if not (has_post_tool_use and has_stop):
-        missing = []
-        if not has_post_tool_use:
-            missing.append("PostToolUse")
-        if not has_stop:
-            missing.append("Stop")
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=(
-                f"cross-harness event-driven trigger not registered in {', '.join(missing)} "
-                f"hook(s) in .claude/settings.json — bridge dispatch automation will not fire. "
-                f"See {_BRIDGE_DISPATCH_DOC}."
-            ),
-        )
-
-    disable_findings = cross_harness_trigger_disable_findings()
-    if disable_findings:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=disable_findings[0],
+            message=f"retired bridge worker surface present: {head}{extra}",
         )
 
     state_path = target / _BRIDGE_DISPATCH_STATE_PATH
@@ -4695,9 +5401,7 @@ def _check_cross_harness_trigger(target: Path) -> ToolCheck:
             found=True,
             status="warning",
             message=(
-                "cross-harness event-driven trigger registered but dispatch-state.json "
-                "absent; trigger has not yet fired (steady state if no actionable bridge "
-                "entries since installation)"
+                "dispatcher daemon script present and retired hook workers absent; dispatch-state.json not written yet"
             ),
         )
 
@@ -4706,18 +5410,15 @@ def _check_cross_harness_trigger(target: Path) -> ToolCheck:
         required=False,
         found=True,
         status="pass",
-        message=(
-            "cross-harness event-driven trigger active (script present; PostToolUse + Stop "
-            "hooks registered; dispatch-state.json present)"
-        ),
+        message="dispatcher daemon is the only automated bridge substrate and dispatch-state.json is present",
     )
 
 
 def _normalize_harness_argv_head(head: str, project_root: Path) -> str:
     """Resolve a registry argv head to a launchable form.
 
-    Mirror of ``scripts/cross_harness_bridge_trigger._normalize_argv_head`` (the
-    doctor package must not import from ``scripts/``, which is not on the package
+    Mirror of the dispatcher runtime's argv-head normalization (the doctor
+    package must not import from ``scripts/``, which is not on the package
     path). HYG-001 (FAB-01): a forward-slash-relative path or a bare ``PATHEXT``
     command fails ``CreateProcess`` with ``WinError 2`` unless normalized
     (``os.path.normpath``), resolved against ``project_root`` when relative with
@@ -4743,12 +5444,12 @@ def _normalize_harness_argv_head(head: str, project_root: Path) -> str:
 def _check_harness_launchability(target: Path) -> ToolCheck:
     """FAB-01 / HYG-001: verify each active dispatch target's argv head launches.
 
-    The cross-harness trigger spawns a recipient harness from its
+    The dispatcher daemon launches a recipient harness from its
     ``invocation_surfaces.headless.argv``. On Windows a forward-slash-relative
     path (e.g. ``groundtruth-kb/.venv/Scripts/python.exe``) or a bare ``PATHEXT``
     command (e.g. ``gemini`` resolving to ``gemini.cmd``) fails ``CreateProcess``
-    with ``WinError 2`` unless normalized/resolved. The trigger now normalizes
-    the head at spawn (``_normalize_argv_head``); this check exercises that same
+    with ``WinError 2`` unless normalized/resolved. The dispatcher runtime
+    normalizes the head at launch (``_normalize_argv_head``); this check exercises that same
     resolution so a launch regression surfaces here instead of silently
     degrading to an exit-127 in the dispatch logs (the masking failure mode of
     HYG-001).
@@ -4889,6 +5590,47 @@ _HARNESS_SCRATCHPAD_NEGATION_RE = re.compile(
     r"do not|does not|is not|are not|forbids?|outside the scope)\b",
     re.IGNORECASE,
 )
+_CANONICAL_AUTHORITY_CONFIG_GLOBS = (
+    "config/**/*.toml",
+    "config/**/*.json",
+    "config/**/*.yaml",
+    "config/**/*.yml",
+)
+_CANONICAL_AUTHORITY_LABEL_RE = re.compile(
+    r"\b(?:authoritative(?:[_ -]?source)?|authority|canonical(?:[_ -]?source)?|"
+    r"source[_ -]?of[_ -]?truth)\b",
+    re.IGNORECASE,
+)
+_CANONICAL_AUTHORITY_MEMORY_PATH_RE = re.compile(r"\bmemory[\\/][^\"'`\s,\]}]+", re.IGNORECASE)
+_CANONICAL_AUTHORITY_NON_AUTHORITY_RE = re.compile(
+    r"\b(?:non[_ -]?authoritative|not authoritative|not canonical|not the source of truth|"
+    r"truth comes from|canonical .* lives in|governed in-root artifacts|"
+    r"human-readable companion)\b",
+    re.IGNORECASE,
+)
+_CANONICAL_AUTHORITY_SKILL_FRONTMATTER_KEY_RE = re.compile(
+    r"^\s*(?:name|description|allowed-tools|allowed_tools|tools|type)\s*:",
+    re.IGNORECASE,
+)
+_CANONICAL_AUTHORITY_FEEDBACK_TYPE_RE = re.compile(r"^\s*type\s*:\s*feedback\s*$", re.IGNORECASE | re.MULTILINE)
+_CANONICAL_AUTHORITY_RULE_HEADING_RE = re.compile(
+    r"^\s*#{1,3}\s+(?:rule|rules|instructions?|operating rule|how to apply)\b",
+    re.IGNORECASE,
+)
+_CANONICAL_AUTHORITY_IMPERATIVE_RE = re.compile(
+    r"\b(?:MUST|NEVER|ALWAYS|REQUIRED|FORBIDDEN|Do not|Never|Always|Before|When)\b"
+)
+_CANONICAL_AUTHORITY_SOURCE_LINE_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:\*\*)?(?:Source|Sources|Authority)\s*:\s*(?:\*\*)?\s*(.*)$",
+    re.IGNORECASE,
+)
+_CANONICAL_AUTHORITY_DELIB_RE = re.compile(r"\bDELIB-[A-Z0-9][A-Z0-9_-]*\b", re.IGNORECASE)
+_CANONICAL_AUTHORITY_CARRIER_RE = re.compile(
+    r"\b(?:ADR|DCL|GOV|SPEC)-[A-Z0-9][A-Z0-9_-]*\b|"
+    r"\bMEMBASE-[A-Z0-9][A-Z0-9_.-]*\b|"
+    r"\bgroundtruth\.db\b|\bbridge[\\/][^\s`'\"]+",
+    re.IGNORECASE,
+)
 
 
 def _check_harness_local_scratchpad_boundary(target: Path) -> ToolCheck:
@@ -4951,8 +5693,175 @@ def _check_harness_local_scratchpad_boundary(target: Path) -> ToolCheck:
     )
 
 
+def _check_canonical_authority_drift(target: Path) -> ToolCheck:
+    """Flag recurrence of memory/DELIB-only canonical-authority drift patterns."""
+    check_name = "Canonical authority drift guard"
+    findings: list[str] = []
+
+    findings.extend(_canonical_authority_config_findings(target))
+    findings.extend(_canonical_authority_memory_findings(target))
+    findings.extend(_canonical_authority_rule_source_findings(target))
+
+    if findings:
+        head = findings[0]
+        extra = f" (+{len(findings) - 1} more)" if len(findings) > 1 else ""
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="fail",
+            message=f"{len(findings)} canonical-authority drift finding(s); first: {head}{extra}",
+        )
+
+    return ToolCheck(
+        name=check_name,
+        required=True,
+        found=True,
+        status="pass",
+        message=(
+            "No active config memory-authority labels, memory rule-shaped files, or DELIB-sole rule sources found"
+        ),
+    )
+
+
+def _canonical_authority_config_findings(target: Path) -> list[str]:
+    findings: list[str] = []
+    paths: set[Path] = set()
+    for pattern in _CANONICAL_AUTHORITY_CONFIG_GLOBS:
+        paths.update(path for path in target.glob(pattern) if path.is_file())
+
+    for path in sorted(paths, key=lambda item: item.as_posix()):
+        try:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError as exc:
+            findings.append(f"{_rel_to_target(path, target)} unreadable: {exc}")
+            continue
+        for index, line in enumerate(lines):
+            if not _CANONICAL_AUTHORITY_MEMORY_PATH_RE.search(line):
+                continue
+            if not _CANONICAL_AUTHORITY_LABEL_RE.search(line):
+                continue
+            context = "\n".join(lines[max(0, index - 2) : min(len(lines), index + 5)])
+            if _CANONICAL_AUTHORITY_NON_AUTHORITY_RE.search(context):
+                continue
+            findings.append(f"{_rel_to_target(path, target)}:{index + 1} labels memory path as authority")
+    return findings
+
+
+def _canonical_authority_memory_findings(target: Path) -> list[str]:
+    memory_dir = target / "memory"
+    if not memory_dir.is_dir():
+        return []
+
+    findings: list[str] = []
+    for path in sorted(memory_dir.glob("*.md"), key=lambda item: item.as_posix()):
+        if path.name in {"MEMORY.md", "CLAUDE_ARCHIVE.md", "pending-owner-decisions.md"}:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            findings.append(f"{_rel_to_target(path, target)} unreadable: {exc}")
+            continue
+        if _memory_markdown_declares_non_authority(text):
+            continue
+        if _memory_markdown_has_skill_frontmatter(text):
+            findings.append(f"{_rel_to_target(path, target)} has skill-style frontmatter")
+            continue
+        if _memory_markdown_is_rule_shaped(text):
+            findings.append(f"{_rel_to_target(path, target)} has imperative rule-shaped content")
+    return findings
+
+
+def _memory_markdown_declares_non_authority(text: str) -> bool:
+    head = "\n".join(text.splitlines()[:40])
+    return bool(
+        _CANONICAL_AUTHORITY_NON_AUTHORITY_RE.search(head) or _CANONICAL_AUTHORITY_FEEDBACK_TYPE_RE.search(head)
+    )
+
+
+def _memory_markdown_has_skill_frontmatter(text: str) -> bool:
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return False
+    keys: set[str] = set()
+    for line in lines[1:25]:
+        if line.strip() == "---":
+            break
+        if not _CANONICAL_AUTHORITY_SKILL_FRONTMATTER_KEY_RE.match(line):
+            continue
+        key = line.split(":", 1)[0].strip().lower().replace("_", "-")
+        keys.add(key)
+    return "name" in keys and "description" in keys
+
+
+def _memory_markdown_is_rule_shaped(text: str) -> bool:
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if not _CANONICAL_AUTHORITY_RULE_HEADING_RE.match(line):
+            continue
+        context = "\n".join(lines[index + 1 : min(len(lines), index + 8)])
+        if _CANONICAL_AUTHORITY_IMPERATIVE_RE.search(context):
+            return True
+    return False
+
+
+def _canonical_authority_rule_source_findings(target: Path) -> list[str]:
+    rules_dir = target / ".claude" / "rules"
+    if not rules_dir.is_dir():
+        return []
+
+    findings: list[str] = []
+    for path in sorted(rules_dir.glob("*.md"), key=lambda item: item.as_posix()):
+        try:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError as exc:
+            findings.append(f"{_rel_to_target(path, target)} unreadable: {exc}")
+            continue
+        for line_number, block in _iter_rule_source_blocks(lines):
+            if not _CANONICAL_AUTHORITY_DELIB_RE.search(block):
+                continue
+            if _CANONICAL_AUTHORITY_CARRIER_RE.search(block):
+                continue
+            if _source_block_is_delib_only(block):
+                findings.append(f"{_rel_to_target(path, target)}:{line_number} cites DELIB as sole rule authority")
+    return findings
+
+
+def _iter_rule_source_blocks(lines: list[str]) -> list[tuple[int, str]]:
+    blocks: list[tuple[int, str]] = []
+    for index, line in enumerate(lines):
+        match = _CANONICAL_AUTHORITY_SOURCE_LINE_RE.match(line)
+        if not match:
+            continue
+        collected = [match.group(1)]
+        for continuation in lines[index + 1 : min(len(lines), index + 5)]:
+            stripped = continuation.strip()
+            if not stripped:
+                break
+            if stripped.startswith("#"):
+                break
+            if _CANONICAL_AUTHORITY_SOURCE_LINE_RE.match(continuation):
+                break
+            collected.append(stripped)
+        blocks.append((index + 1, " ".join(collected)))
+    return blocks
+
+
+def _source_block_is_delib_only(block: str) -> bool:
+    without_delibs = _CANONICAL_AUTHORITY_DELIB_RE.sub("", block)
+    remaining = re.sub(r"[`'\";:,().\s\-/]+", "", without_delibs)
+    return not remaining
+
+
+def _rel_to_target(path: Path, target: Path) -> str:
+    try:
+        return path.relative_to(target).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 _HARNESS_EXEC_SCAN_TARGETS = (
-    Path("scripts") / "cross_harness_bridge_trigger.py",
+    Path("scripts") / "dispatcher_runtime.py",
     Path("scripts") / "verify_antigravity_dispatch.py",
 )
 _HARNESS_EXEC_INROOT_TOOLCHAIN = frozenset({"python", "python3"})
@@ -5003,7 +5912,7 @@ def _check_external_harness_exec_boundary(target: Path) -> ToolCheck:
 
     Loads ``harness-state/harness-registry.json``; collects the set of
     ``invocation_surfaces.*.argv[0]`` command names. AST-scans
-    ``scripts/cross_harness_bridge_trigger.py`` and
+    ``scripts/dispatcher_runtime.py`` and
     ``scripts/verify_antigravity_dispatch.py`` for literal ``shutil.which`` /
     ``subprocess.{run,Popen,call,check_output,check_call}`` invocations.
     Classifies each literal command name against the allowed set, the
@@ -5465,234 +6374,111 @@ def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
     )
 
 
-def _check_single_harness_dispatcher_when_required(target: Path) -> ToolCheck:
-    """When single-harness mode is applicable, verify the dispatcher is registered.
+_ROLE_AUTHORITY_BOUNDARY_SCAN_PATHS = (
+    Path("CLAUDE.md"),
+    Path("AGENTS.md"),
+    Path(".claude") / "rules" / "canonical-terminology.md",
+    Path(".claude") / "rules" / "operating-role.md",
+    Path("config") / "agent-control" / "SESSION-STARTUP-INDEX.md",
+    Path("scripts") / "session_role_resolution.py",
+    Path("scripts") / "session_self_initialization.py",
+    Path("scripts") / "bridge_work_intent_registry.py",
+    Path("scripts") / "bridge_claim_cli.py",
+    Path("scripts") / "_kb_attribution.py",
+    Path("groundtruth-kb") / "src" / "groundtruth_kb" / "mcp_surface" / "roles.py",
+)
+_ROLE_AUTHORITY_FORBIDDEN_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\bdurable\s+map\s+wins\b", re.IGNORECASE),
+    re.compile(
+        r"\bdurable\s+(?:operating-?role|role)\s+record\s+assigns\s+(?:prime\s+builder|loyal\s+opposition)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bresolved\s+durable\s+role\s+record\s+assigns\s+(?:prime\s+builder|loyal\s+opposition)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bcanonical\s+role\s+registry\b.*\bsingle\s+source-of-truth\s+operating-role\s+record\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bdurable\s+role\b.*\b(?:permissions|restrictions|hook behavior|file authority)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bdispatcher/default\s+role\b.*\b(?:permissions|restrictions|hook behavior|file authority)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\brole\s+authority:\s+resolve\b.*\bharness-state/harness-registry\.json\b", re.IGNORECASE),
+)
+_ROLE_AUTHORITY_QUALIFIERS = (
+    "headless dispatch",
+    "dispatch routing",
+    "dispatcher-routing",
+    "dispatcher daemon",
+    "dispatcher role set",
+    "dispatcher/default role metadata",
+    "fallback",
+    "registry fallback",
+    "routing labels only",
+    "resolved session role",
+    "session role",
+    "session-stated role",
+    "interactive surfaces only",
+    "not authority",
+    "not behavior",
+    "display",
+    "labelling",
+    "labeling",
+    "metadata",
+    "schema",
+    "topology",
+    "provenance",
+)
 
-    Per IP-6 of bridge/gtkb-single-harness-bridge-dispatcher-001-013.md
-    (Codex GO at -014). The check is applicability-gated:
 
-    - Applicable iff exactly one harness identity has a multi-element role set
-      (i.e., the active harness holds both ``prime-builder`` and
-      ``loyal-opposition`` per ``ADR-SINGLE-HARNESS-OPERATING-MODE-001``).
-    - When applicable: WARN if the Slice 2 dispatcher script + scheduled task
-      are not yet installed (Slice 2 is a separate bridge thread; this check is
-      forward-compatible).
-    - When NOT applicable (the common multi-harness case): PASS with "not
-      applicable".
-    """
-    check_name = "Single-harness dispatcher when required"
-    # WI-3342 IP-4: single-harness applicability is determined from the
-    # DB-backed registry projection (harness-state/harness-registry.json),
-    # migrated from the retired role mirror.
-    from groundtruth_kb.harness_projection import harness_registry_path
+def _line_has_role_authority_boundary_violation(line: str) -> bool:
+    lowered = line.lower()
+    if any(qualifier in lowered for qualifier in _ROLE_AUTHORITY_QUALIFIERS):
+        return False
+    return any(pattern.search(line) for pattern in _ROLE_AUTHORITY_FORBIDDEN_PATTERNS)
 
-    registry_path = harness_registry_path(target)
 
-    if not registry_path.is_file():
+def _check_role_authority_boundary(target: Path) -> ToolCheck:
+    """Fail when non-dispatcher surfaces treat durable registry role as behavior authority."""
+
+    findings: list[str] = []
+    scanned = 0
+    for rel_path in _ROLE_AUTHORITY_BOUNDARY_SCAN_PATHS:
+        path = target / rel_path
+        if not path.is_file():
+            continue
+        scanned += 1
+        try:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError as exc:
+            findings.append(f"{rel_path.as_posix()}: unreadable: {exc}")
+            continue
+        for line_number, line in enumerate(lines, start=1):
+            if _line_has_role_authority_boundary_violation(line):
+                findings.append(f"{rel_path.as_posix()}:{line_number}: {line.strip()[:160]}")
+
+    if findings:
+        first = findings[0]
+        extra = f" (+{len(findings) - 1} more)" if len(findings) > 1 else ""
         return ToolCheck(
-            name=check_name,
-            required=False,
-            found=False,
-            status="warning",
-            message=(
-                "harness-state/harness-registry.json missing; single-harness "
-                "dispatcher applicability cannot be determined"
-            ),
-        )
-
-    try:
-        registry_doc = json.loads(registry_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return ToolCheck(
-            name=check_name,
-            required=False,
+            name="Role-authority boundary",
+            required=True,
             found=True,
             status="fail",
-            message=f"harness-state/harness-registry.json unreadable: {exc}",
+            message=f"{len(findings)} registry-authority boundary findings; first: {first}{extra}",
         )
-
-    multi_role_harnesses: list[str] = []
-    harnesses = registry_doc.get("harnesses", []) if isinstance(registry_doc, dict) else []
-    if isinstance(harnesses, list):
-        for record in harnesses:
-            if not isinstance(record, dict):
-                continue
-            harness_id = record.get("id")
-            raw_role = record.get("role")
-            if isinstance(raw_role, list):
-                canonical = {str(t).strip().lower() for t in raw_role if isinstance(t, str)}
-                if len(canonical) >= 2 and "prime-builder" in canonical and "loyal-opposition" in canonical:
-                    multi_role_harnesses.append(str(harness_id))
-
-    if not multi_role_harnesses:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message=(
-                "single-harness dispatcher not applicable "
-                "(no harness holds multi-element role set; multi-harness topology)"
-            ),
-        )
-
-    # Applicable: check dispatcher script AND scheduled-task registration.
-    # Per IP-4 of bridge/gtkb-single-harness-bridge-dispatcher-slice-2-005.md
-    # (Codex GO at -006) and DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001
-    # § Doctor Check: severity is WARN (not FAIL) for any "applicable but
-    # not fully healthy" case; PASS only for "applicable + script + task
-    # registered + last-run-time fresh". On non-Windows hosts: WARN with
-    # platform-extension pointer (Slice 2 ships Windows-only).
-    dispatcher_script = target / "scripts" / "single_harness_bridge_dispatcher.py"
-    if not dispatcher_script.is_file():
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                f"single-harness mode applicable (harness(es) {multi_role_harnesses} hold multi-element "
-                f"role sets) but scripts/single_harness_bridge_dispatcher.py is absent. "
-                f"Bridge dispatch in single-harness mode operates via manual-trigger fallback "
-                f"until the dispatcher script is installed."
-            ),
-        )
-
-    # Non-Windows host: Slice 2 ships Windows-only.
-    if sys.platform != "win32":
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                f"single-harness mode applicable (harness(es) {multi_role_harnesses}) and dispatcher "
-                f"script present, but the Windows scheduled-task registration check is "
-                f"Windows-only. macOS/Linux installers are DECISION DEFERRED to a future Slice "
-                f"per DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001 § Platform Bindings."
-            ),
-        )
-
-    # Windows host: probe Get-ScheduledTask for the canonical task name.
-    task_name = "GTKB-SingleHarnessBridgeDispatcher"
-    try:
-        completed = subprocess.run(
-            [
-                "powershell.exe",
-                "-NoProfile",
-                "-Command",
-                (
-                    f"$t = Get-ScheduledTask -TaskName '{task_name}' "
-                    f"-ErrorAction SilentlyContinue; "
-                    f"if ($t) {{ "
-                    f"$info = Get-ScheduledTaskInfo -TaskName '{task_name}' "
-                    f"-ErrorAction SilentlyContinue; "
-                    f"$lr = if ($info -and $info.LastRunTime) "
-                    f"{{ $info.LastRunTime.ToString('o') }} else {{ '' }}; "
-                    f'Write-Output "REGISTERED|$lr" '
-                    f"}} else {{ Write-Output 'NOT_REGISTERED' }}"
-                ),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
-        )
-    except (subprocess.SubprocessError, OSError, subprocess.TimeoutExpired) as exc:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                f"single-harness mode applicable (harness(es) {multi_role_harnesses}) and dispatcher "
-                f"script present, but Get-ScheduledTask probe failed: {exc}. Task registration "
-                f"state unknown."
-            ),
-        )
-
-    output = (completed.stdout or "").strip()
-    if output.startswith("NOT_REGISTERED"):
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                f"single-harness mode applicable (harness(es) {multi_role_harnesses}) and dispatcher "
-                f"script present at scripts/single_harness_bridge_dispatcher.py, but Windows scheduled "
-                f"task '{task_name}' is not registered. Run "
-                f"scripts/install_single_harness_dispatcher_task.ps1 -ProjectRoot <project-root> "
-                f"to register it. Bridge dispatch in single-harness mode operates via manual-trigger "
-                f"fallback until the task is registered."
-            ),
-        )
-
-    if output.startswith("REGISTERED"):
-        # Parse last-run time; warn if stale beyond interval + sanity TTL.
-        last_run = output.split("|", 1)[1] if "|" in output else ""
-        try:
-            sanity_ttl = int(os.environ.get("GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS", "120"))
-        except (TypeError, ValueError):
-            sanity_ttl = 120
-        # Default Slice 2 interval is 5 minutes (300s); stale threshold =
-        # interval + sanity_ttl.
-        stale_threshold_seconds = 300 + sanity_ttl
-        if not last_run:
-            return ToolCheck(
-                name=check_name,
-                required=False,
-                found=True,
-                status="warning",
-                message=(
-                    f"single-harness dispatcher task '{task_name}' is registered but has no "
-                    f"recorded last-run time yet (newly registered or never fired). "
-                    f"Harness(es): {multi_role_harnesses}."
-                ),
-            )
-        try:
-            last_run_dt = datetime.fromisoformat(last_run.replace("Z", "+00:00"))
-            if last_run_dt.tzinfo is None:
-                last_run_dt = last_run_dt.replace(tzinfo=UTC)
-            age_seconds = (datetime.now(UTC) - last_run_dt).total_seconds()
-        except (ValueError, OSError):
-            age_seconds = stale_threshold_seconds + 1
-
-        if age_seconds > stale_threshold_seconds:
-            return ToolCheck(
-                name=check_name,
-                required=False,
-                found=True,
-                status="warning",
-                message=(
-                    f"single-harness dispatcher task '{task_name}' is registered but last "
-                    f"ran {int(age_seconds)}s ago (threshold {stale_threshold_seconds}s = "
-                    f"interval 300s + sanity TTL {sanity_ttl}s). Task may be disabled or "
-                    f"failing silently; check Task Scheduler history."
-                ),
-            )
-
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message=(
-                f"single-harness dispatcher healthy: task '{task_name}' registered; "
-                f"last_run={last_run}; harness(es): {multi_role_harnesses}."
-            ),
-        )
-
-    # Unrecognized probe output.
     return ToolCheck(
-        name=check_name,
-        required=False,
-        found=True,
-        status="warning",
-        message=(
-            f"single-harness mode applicable but Get-ScheduledTask probe returned unrecognized "
-            f"output: {output[:200]!r}. Task registration state unknown."
-        ),
+        name="Role-authority boundary",
+        required=True,
+        found=scanned > 0,
+        status="pass",
+        message=f"role-authority boundary clean across {scanned} surfaces",
     )
 
 
@@ -5788,17 +6574,21 @@ def _check_da_harvest_coverage(target: Path) -> ToolCheck:
 # ── Main entry point ──────────────────────────────────────────────────
 
 
+def _read_bridge_file_status(path: Path) -> str | None:
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = _BRIDGE_FILE_STATUS_RE.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
+
+
 def _status_from_bridge_file(path: Path) -> str | None:
     try:
-        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-            stripped = line.strip()
-            if not stripped:
-                continue
-            match = _BRIDGE_FILE_STATUS_RE.match(stripped)
-            return match.group(1).upper() if match else None
+        return _read_bridge_file_status(path)
     except OSError:
         return None
-    return None
 
 
 def _latest_bridge_status_entries(target: Path) -> list[dict[str, str]]:
@@ -5810,7 +6600,7 @@ def _latest_bridge_status_entries(target: Path) -> list[dict[str, str]]:
         match = _BRIDGE_VERSION_FILE_RE.match(path.name)
         if match is None:
             continue
-        status = _status_from_bridge_file(path)
+        status = _read_bridge_file_status(path)
         if status is None:
             continue
         grouped.setdefault(match.group(1), []).append((int(match.group(2)), status, f"bridge/{path.name}"))
@@ -5830,15 +6620,13 @@ def _latest_bridge_status_entries(target: Path) -> list[dict[str, str]]:
 
 
 def _bridge_file_date(path: Path) -> datetime | None:
-    if not path.is_file():
-        return None
-    try:
-        for line in path.read_text(encoding="utf-8", errors="replace").splitlines()[:80]:
-            match = _BRIDGE_DATE_RE.match(line.strip())
-            if match:
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines()[:80]:
+        match = _BRIDGE_DATE_RE.match(line.strip())
+        if match:
+            try:
                 return datetime.fromisoformat(match.group(1)).replace(tzinfo=UTC)
-    except OSError:
-        return None
+            except ValueError:
+                continue
     return None
 
 
@@ -5857,14 +6645,9 @@ def _active_authorized_work_item_ids(db: Any) -> set[str]:
 
 
 def _is_implementation_active_work_item(item: dict[str, Any]) -> bool:
-    approval_state = str(item.get("approval_state") or "").strip()
     resolution_status = str(item.get("resolution_status") or "").strip()
     stage = str(item.get("stage") or "").strip()
-    return (
-        approval_state in IMPLEMENTATION_ACTIVE_APPROVAL_STATES
-        or resolution_status in IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES
-        or stage in IMPLEMENTATION_ACTIVE_STAGES
-    )
+    return resolution_status in IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES or stage in IMPLEMENTATION_ACTIVE_STAGES
 
 
 def check_standing_backlog_health(
@@ -5878,7 +6661,8 @@ def check_standing_backlog_health(
     Findings use the severity taxonomy required by GTKB-GOV-010, calibrated by
     GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001:
     implementation-active orphaned-WI=WARN, stale-NO-GO=WARN,
-    missing-evidence=FAIL. Unapproved/future WIs do not require PAUTH coverage.
+    missing-verdict-date=WARN, missing-evidence=FAIL. Unapproved/future WIs do
+    not require PAUTH coverage.
     """
 
     from groundtruth_kb.db import KnowledgeDB
@@ -5915,7 +6699,6 @@ def check_standing_backlog_health(
                         "severity": "WARN",
                         "work_item_id": item_id,
                         "project_name": item.get("project_name"),
-                        "approval_state": item.get("approval_state"),
                         "resolution_status": item.get("resolution_status"),
                         "message": (
                             f"Implementation-active work item {item_id} is not listed in any active "
@@ -5956,11 +6739,14 @@ def check_standing_backlog_health(
                 if decided_at is None:
                     findings.append(
                         {
-                            "kind": "missing-evidence",
-                            "severity": "FAIL",
+                            "kind": "missing-verdict-date",
+                            "severity": "WARN",
                             "document": entry["document"],
                             "path": entry["path"],
-                            "message": f"Latest NO-GO file {entry['path']} has no parseable Date line.",
+                            "message": (
+                                f"Latest NO-GO file {entry['path']} has no parseable explicit Date line; "
+                                "add governed verdict metadata before including it in stale-age calculation."
+                            ),
                         }
                     )
                     continue
@@ -6005,6 +6791,7 @@ def check_standing_backlog_health(
             "orphaned_wi_count": sum(1 for finding in findings if finding["kind"] == "orphaned-WI"),
             "non_implementation_uncovered_count": non_implementation_uncovered_count,
             "stale_no_go_count": sum(1 for finding in findings if finding["kind"] == "stale-NO-GO"),
+            "missing_verdict_date_count": sum(1 for finding in findings if finding["kind"] == "missing-verdict-date"),
             "missing_evidence_count": sum(1 for finding in findings if finding["kind"] == "missing-evidence"),
         },
         "findings": findings,
@@ -6106,6 +6893,26 @@ def _format_work_tree_stray_ages(ages: list[float]) -> str:
     return f"age_hours=min={min(ages):.1f} avg={average:.1f} max={max(ages):.1f}"
 
 
+def _format_auto_resolve_summary(report: dict[str, Any]) -> str:
+    summary = report.get("auto_resolve_summary")
+    if not isinstance(summary, dict):
+        plan = report.get("auto_resolve_plan")
+        if not isinstance(plan, dict):
+            return ""
+        counts = plan.get("counts", {})
+        if not isinstance(counts, dict):
+            return ""
+        summary = {
+            "dirty_paths": counts.get("dirty_paths", 0),
+            "actuator_actions": counts.get("actuator_actions", {}),
+        }
+    actions = summary.get("actuator_actions", {})
+    action_text = "none"
+    if isinstance(actions, dict) and actions:
+        action_text = ",".join(f"{key}={value}" for key, value in sorted(actions.items()) if value)
+    return f"; auto_resolve=dirty_paths={summary.get('dirty_paths', 0)} actions={action_text}"
+
+
 def _check_work_tree_strays(target: Path) -> ToolCheck:
     """Read-only WI-4356 doctor visibility for stale work-tree strays."""
     check_name = "work-tree strays"
@@ -6146,6 +6953,7 @@ def _check_work_tree_strays(target: Path) -> ToolCheck:
         )
 
     ages = _format_work_tree_stray_ages(_work_tree_stray_age_hours(report))
+    auto_resolve = _format_auto_resolve_summary(report)
     return ToolCheck(
         name=check_name,
         required=False,
@@ -6153,7 +6961,7 @@ def _check_work_tree_strays(target: Path) -> ToolCheck:
         status="warning",
         message=(
             f"Work-tree strays: {stale} stale "
-            f"(workspace={workspace}, stash={stash}, worktree={worktree}; {ages}); "
+            f"(workspace={workspace}, stash={stash}, worktree={worktree}; {ages}{auto_resolve}); "
             "run `gt hygiene strays` for read-only details"
         ),
     )
@@ -6418,6 +7226,7 @@ def run_doctor(
         checks.append(_check_spec_classifier_settings_registered(target))
         checks.append(_check_registered_hooks_tracked(target))
         checks.append(_check_untracked_terminal_verified_verdicts(target))
+        checks.append(_check_skill_rename_reference_sweep(target))
         checks.append(_check_spec_classifier_codex_parity(target))
         checks.append(_check_spec_classifier_test_exists(target))
         checks.append(_check_untriaged_prose_decisions(target))
@@ -6433,19 +7242,24 @@ def run_doctor(
         checks.append(_check_managed_artifact_drift(target, profile))
         checks.append(_check_sot_registry_completeness(target))
         checks.append(_check_sot_read_discipline(target))
+        checks.append(_check_sot_duplicate_guard(target))
         for registration in artifacts_for_doctor(profile, class_="settings-hook-registration"):
             if isinstance(registration, SettingsHookRegistration):
                 checks.append(_check_settings_hook_registration_drift(target, profile, registration))
         checks.append(_check_bridge_dispatch_liveness(target, "claude"))
         checks.append(_check_bridge_dispatch_liveness(target, "codex"))
-        checks.append(_check_cross_harness_trigger(target))
+        checks.append(_check_dispatcher_only_bridge_automation(target))
         # Slice 3 of PROJECT-GTKB-CROSS-HARNESS-PARITY: discovery-diff over actual
         # harness hook surfaces (DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001 assertion
         # PARITY-DIFF-WIRED). WARN-only at Slice 3 per Q6; FAIL ramp + CI gate land
         # in Slice 6 after a coverage audit.
         checks.append(_check_parity_discovery_diff(target))
         checks.append(_check_dispatcher_daemon_substrate_readiness(target))
-        checks.append(_check_kill_switch_staleness(target))
+        dispatcher_complex_health = _dispatcher_complex_health_reader(target)
+        checks.append(_check_dispatcher_daemon_supervisor_task(target, dispatcher_complex_health))
+        checks.append(_check_dispatcher_daemon_watchdog_task(target, dispatcher_complex_health))
+        checks.append(_check_service_sot_watchdog(target))
+        checks.append(_check_deliberation_search_backend(target))
         checks.append(_check_lapsed_go_implementation_claims(target))
         checks.append(_check_work_tree_strays(target))
         # WI-4795: Phase-1 WARN surface for DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001
@@ -6456,17 +7270,15 @@ def run_doctor(
         # in the doctor rather than as a silent exit-127 in dispatch logs.
         checks.append(_check_harness_launchability(target))
         checks.append(_check_harness_local_scratchpad_boundary(target))
+        checks.append(_check_canonical_authority_drift(target))
         checks.append(_check_external_harness_exec_boundary(target))
-        # IP-6 of bridge/gtkb-single-harness-bridge-dispatcher-001-013.md
-        # (Codex GO at -014): role-set schema validation + single-harness
-        # dispatcher applicability check.
         checks.append(_check_role_set_topology_consistency(target))
+        checks.append(_check_role_authority_boundary(target))
         # Slice 7 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE: read-only
         # session-state role marker diagnostics (validity + best-effort staleness).
         checks.append(_check_session_role_marker_validity(target))
         checks.append(_check_session_role_marker_session_id_alignment(target))
         checks.append(_check_session_wrap_had_orient(target))
-        checks.append(_check_single_harness_dispatcher_when_required(target))
         checks.append(_check_da_harvest_coverage(target))
         checks.append(_check_standing_backlog_health(target))
         checks.append(_check_orphan_citations(target))
@@ -6486,6 +7298,11 @@ def run_doctor(
         # routes are still advertised as cheap/local in dispatcher or canonical
         # narrative surfaces.
         checks.append(_check_harness_metadata_freshness(target))
+        # WI-4999: owner-facing reconfirmation surface for active dispatch
+        # harness model pins. WARN-only because vendor-default introspection is
+        # intentionally out of scope; owner confirmation metadata is the durable
+        # evidence.
+        checks.append(_check_harness_model_pin_reconfirmation(target))
         checks.append(_check_dispatcher_config_cli_only_guard(target))
         # WI-4323: Ollama harness 4-store consistency. Verifies identities + registry +
         # capability registry + routing TOML agree about ollama→D / status=registered /
@@ -6493,6 +7310,10 @@ def run_doctor(
         # bridge/gtkb-ollama-integration-phase-1-verification-006.md (GO at -006).
         # Severity WARN per Phase-1 GOV-HARNESS-ONBOARDING-CONTRACT-001 rollout convention.
         checks.append(_check_ollama_harness(target))
+        checks.append(_check_alibaba_cloud_studio_harness(target))
+        # WI-4778: Cursor headless dispatch readiness stays diagnostic until
+        # the external Cursor Agent CLI is present and activation is deliberate.
+        checks.append(_check_cursor_dispatch_readiness(target))
         # WI-4431 / FAB-19: Skill health check (WARN/advisory only)
         checks.append(_check_skill_health(target))
         # FAB-03: DB snapshot checks

@@ -3,8 +3,8 @@
 > **An Internal Developer Platform for AI-assisted software development.**
 > You supply specifications, clarifications, and decisions. GT-KB and its AI agents preserve the durable artifacts, draft and review the work, implement what's approved, and verify it against the specs — so the project's *truth* and its *reasoning* both survive past any single session.
 
-[![Python Tests](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/python-tests.yml/badge.svg?branch=develop)](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/python-tests.yml)
-[![Lint](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/lint.yml/badge.svg?branch=develop)](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/lint.yml)
+[![Python Tests](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/python-tests.yml/badge.svg?branch=main)](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/python-tests.yml)
+[![Lint](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/lint.yml)
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)
 ![Version 0.7.0-rc1](https://img.shields.io/badge/version-0.7.0--rc1-orange)
 ![License AGPL-3.0-or-later](https://img.shields.io/badge/package%20license-AGPL--3.0--or--later-green)
@@ -71,7 +71,7 @@ gt project doctor             # health checks across the platform
 | **Deliberation Archive** | The design-reasoning tier: a searchable archive of decisions, reviews, and rejected alternatives that answers *why*. Implemented as the `deliberations` table with semantic indexing. |
 | **File bridge protocol** | The dual-agent coordination surface (Prime Builder ↔ Loyal Opposition), versioned markdown under `bridge/`. After WI-4510 Phase-3 cutover, dispatcher/TAFE bridge state is canonical; retired bridge-index artifacts are not live queue authority. See [file-bridge-protocol.md](.claude/rules/file-bridge-protocol.md). |
 | **`gt` CLI** | The platform command surface — `gt project init`, `gt summary`, `gt assert`, `gt backlog`, `gt deliberations`, `gt project doctor`, `gt project upgrade`. |
-| **Dashboard** | KPI surface for governance, release-readiness, drift, and bridge state. Optional Grafana integration; core surfaces are always available via the CLI. |
+| **Dashboard** | KPI surface for governance, release-readiness, drift, bridge state, and provider-neutral application-deployment signals. Optional Grafana integration; core surfaces are always available via the CLI. |
 
 ---
 
@@ -84,6 +84,7 @@ gt project doctor             # health checks across the platform
 | **Package README** | [groundtruth-kb/README.md](groundtruth-kb/README.md) |
 | **MemBase concepts** | [MEMBASE-4-CLAUDE.md](MEMBASE-4-CLAUDE.md) |
 | **Harness governance** | [AGENTS.md](AGENTS.md), [.claude/rules/](.claude/rules/) |
+| **Release health wiki source** | [groundtruth-kb/docs/wiki/release-health.md](groundtruth-kb/docs/wiki/release-health.md) |
 | **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
 | **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | **Security policy** | [SECURITY.md](SECURITY.md) |
@@ -92,7 +93,25 @@ gt project doctor             # health checks across the platform
 
 ## Project status
 
-GT-KB is at **`0.7.0-rc1`** (release candidate). The version source of truth is [`groundtruth-kb/src/groundtruth_kb/__init__.py`](groundtruth-kb/src/groundtruth_kb/__init__.py); release-readiness is gated by [`scripts/release_candidate_gate.py`](scripts/release_candidate_gate.py). This repository builds and governs the GT-KB platform itself — it is, by design, a working example of the platform applied to its own development.
+GT-KB is at **`0.7.0-rc1`** (release candidate). The version source of truth is [`groundtruth-kb/src/groundtruth_kb/__init__.py`](groundtruth-kb/src/groundtruth_kb/__init__.py); release-readiness is gated by [`scripts/release_candidate_gate.py`](scripts/release_candidate_gate.py), the file bridge, dispatcher health, clean-candidate test evidence, and the dashboard release-health metrics. The release branch is `main`; README badges and published wiki pages should be compared against `main` before a formal release announcement.
+
+Dashboard application-deployment panels use mock, provider-neutral rows by default. Live container, topology, security, throughput/latency, defect, and infrastructure health data is supplied by the active application for its chosen deployment environment.
+
+Deferred release-scope work must have an expiry, time limit, or resume trigger. Indefinite deferral is treated as a release-health warning, not a quiet parking lot.
+
+Local dashboard refresh:
+
+```powershell
+groundtruth-kb/.venv/Scripts/python.exe scripts/gtkb_dashboard/refresh_dashboard_db.py --db-path .tmp/gtkb-dashboard-health.sqlite --project-root E:\GT-KB
+```
+
+Wiki source comparison:
+
+```powershell
+groundtruth-kb/.venv/Scripts/python.exe scripts/update_wiki_pages.py compare --wiki-dir .tmp/groundtruth-kb.wiki
+```
+
+This repository builds and governs the GT-KB platform itself — it is, by design, a working example of the platform applied to its own development.
 
 ---
 

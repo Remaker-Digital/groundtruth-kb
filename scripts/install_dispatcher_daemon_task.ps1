@@ -6,7 +6,8 @@
 .DESCRIPTION
     Per DELIB-20266276 D3 (Daemon Resilience scope-lock): register a Windows
     Task Scheduler task that runs the idempotent ensure-alive entrypoint
-    (scripts/ensure_dispatcher_daemon.py) on a fixed interval (default 1 minute).
+    (scripts/ensure_dispatcher_daemon.py) at startup and on a fixed interval
+    (default 1 minute).
     The ensure entrypoint no-ops when the daemon is alive and spawns a detached
     daemon when it is dead, so this supervisor keeps the daemon up unattended.
 
@@ -14,7 +15,8 @@
     watchdog defect cannot take down daemon supervision.
 
     Runs hidden via pythonw.exe (GUI-subsystem; no console window). Idempotent:
-    re-registering with the same -TaskName unregisters the prior instance first.
+    re-registering with the same -TaskName replaces the prior instance only after
+    Task Scheduler accepts the replacement definition.
     -DryRun prints the rendered command line WITHOUT any Task Scheduler call.
 
 .PARAMETER TaskName
@@ -74,32 +76,33 @@ if ([string]::IsNullOrEmpty($PythonExe)) {
 $argString = "`"$scriptPath`" --project-root `"$ProjectRoot`" --interval $DaemonTickSeconds"
 
 if ($DryRun) {
-    Write-Output "WOULD REGISTER TaskName=$TaskName Execute=$PythonExe Arguments=$argString"
+    Write-Output "WOULD REGISTER TaskName=$TaskName IntervalMinutes=$IntervalMinutes StartupTrigger=True RepetitionTrigger=True Force=True Execute=$PythonExe Arguments=$argString"
     exit 0
 }
 
 $action = New-ScheduledTaskAction -Execute $PythonExe -Argument $argString -WorkingDirectory $ProjectRoot
 
 $startTime = (Get-Date).AddSeconds(60)
-$trigger = New-ScheduledTaskTrigger -Once -At $startTime `
+$startupTrigger = New-ScheduledTaskTrigger -AtStartup
+$intervalTrigger = New-ScheduledTaskTrigger -Once -At $startTime `
     -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes)
 # Force an effectively-infinite repetition duration (PowerShell otherwise clamps).
-$trigger.Repetition.Duration = ""
+$intervalTrigger.Repetition.Duration = ""
+$triggers = @($startupTrigger, $intervalTrigger)
 
 $settings = New-ScheduledTaskSettingsSet -Hidden `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
     -StartWhenAvailable
 
-if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
-    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
-}
-
 Register-ScheduledTask -TaskName $TaskName `
     -Action $action `
-    -Trigger $trigger `
+    -Trigger $triggers `
     -Settings $settings `
     -RunLevel Limited `
+    -Force `
     -Description "GroundTruth-KB dispatcher daemon supervisor (WI-4882; DELIB-20266276 D3). Idempotent ensure-alive keep-live." | Out-Null
 
-Write-Output "Registered TaskName=$TaskName IntervalMinutes=$IntervalMinutes Execute=$PythonExe ScriptPath=$scriptPath"
+Enable-ScheduledTask -TaskName $TaskName | Out-Null
+
+Write-Output "Registered TaskName=$TaskName IntervalMinutes=$IntervalMinutes StartupTrigger=True RepetitionTrigger=True Execute=$PythonExe ScriptPath=$scriptPath Enabled=True"

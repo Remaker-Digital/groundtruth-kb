@@ -133,6 +133,7 @@ def _add_completion_guard(
     project_root: Path,
     *,
     artifact_type: str = "completion_guard",
+    artifact_ref: str = "plan-incomplete-fixture",
     status: str = "active",
     link_id: str = "PAL-PLAN-INCOMPLETE",
 ) -> None:
@@ -141,7 +142,7 @@ def _add_completion_guard(
         db.add_project_artifact_link(
             "PROJECT-X",
             artifact_type,
-            "plan-incomplete-fixture",
+            artifact_ref,
             "test",
             "seed plan_incomplete guard",
             relationship="plan_incomplete",
@@ -162,10 +163,26 @@ def test_scanner_marks_all_verified_authorization_completion_ready(scanner, tmp_
     assert ready[0].unverified_work_item_ids == []
 
 
-@pytest.mark.parametrize("artifact_type", ["completion_guard", "bridge_thread"])
-def test_scanner_plan_incomplete_guard_suppresses_completion(scanner, tmp_path, artifact_type):
+def test_scanner_plan_incomplete_completion_guard_does_not_suppress_completion(scanner, tmp_path):
     _seed(tmp_path, wi_statuses={"WI-8001": True, "WI-8002": True})
-    _add_completion_guard(tmp_path, artifact_type=artifact_type)
+    _add_completion_guard(tmp_path, artifact_type="completion_guard")
+
+    ready = scanner.completion_ready(tmp_path)
+    assert [r.authorization_id for r in ready] == ["PAUTH-X"]
+    full = scanner.scan(tmp_path)
+    auth = next(r for r in full if r.authorization_id == "PAUTH-X")
+    assert auth.completion_ready is True
+    assert auth.completion_guarded is True
+    assert auth.unverified_work_item_ids == []
+    assert auth.completion_guard_refs[0]["artifact_type"] == "completion_guard"
+    assert auth.completion_guard_refs[0]["relationship"] == "plan_incomplete"
+    assert auth.as_dict()["completion_guarded"] is True
+    assert auth.as_dict()["completion_guard_refs"] == auth.completion_guard_refs
+
+
+def test_scanner_plan_incomplete_bridge_thread_guard_suppresses_completion(scanner, tmp_path):
+    _seed(tmp_path, wi_statuses={"WI-8001": True, "WI-8002": True})
+    _add_completion_guard(tmp_path, artifact_type="bridge_thread")
 
     assert scanner.completion_ready(tmp_path) == []
     full = scanner.scan(tmp_path)
@@ -173,7 +190,7 @@ def test_scanner_plan_incomplete_guard_suppresses_completion(scanner, tmp_path, 
     assert auth.completion_ready is False
     assert auth.completion_guarded is True
     assert auth.unverified_work_item_ids == []
-    assert auth.completion_guard_refs[0]["artifact_type"] == artifact_type
+    assert auth.completion_guard_refs[0]["artifact_type"] == "bridge_thread"
     assert auth.completion_guard_refs[0]["relationship"] == "plan_incomplete"
     assert auth.as_dict()["completion_guarded"] is True
     assert auth.as_dict()["completion_guard_refs"] == auth.completion_guard_refs
@@ -181,8 +198,8 @@ def test_scanner_plan_incomplete_guard_suppresses_completion(scanner, tmp_path, 
 
 def test_inactive_plan_incomplete_guard_does_not_suppress_completion(scanner, tmp_path):
     _seed(tmp_path, wi_statuses={"WI-8001": True})
-    _add_completion_guard(tmp_path, status="active")
-    _add_completion_guard(tmp_path, status="inactive")
+    _add_completion_guard(tmp_path, artifact_type="bridge_thread", status="active")
+    _add_completion_guard(tmp_path, artifact_type="bridge_thread", status="inactive")
 
     ready = scanner.completion_ready(tmp_path)
     assert [r.authorization_id for r in ready] == ["PAUTH-X"]
@@ -599,3 +616,33 @@ def test_wi4737_two_sided_guard_rejects_unlinked_and_unverified(scanner, tmp_pat
 
     verified = scanner.verified_work_items_by_project(tmp_path).get("PROJECT-X", set())
     assert verified == set(), f"two-sided guard breached: {verified}"
+
+
+def test_member_completion_ignores_verified_draft_bridge_file(scanner, tmp_path):
+    """A noncanonical ``*-draft.md`` file must not satisfy VERIFIED evidence."""
+    bridge = tmp_path / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    (bridge / "gtkb-draft-thread-001.md").write_text("NEW\n\nWork Item: WI-1\n", encoding="utf-8")
+    (bridge / "gtkb-draft-thread-002-draft.md").write_text("VERIFIED\n\n# Draft verdict\n", encoding="utf-8")
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        db.insert_project("Draft Project", "test", "seed", id="PROJECT-X", status="active")
+        db.insert_work_item("WI-1", "Member", "new", "backlog", "verified", "test", "seed")
+        db.link_project_work_item("PROJECT-X", "WI-1", "test", "seed")
+        db.add_project_artifact_link(
+            "PROJECT-X",
+            "bridge_thread",
+            "gtkb-draft-thread",
+            "test",
+            "seed implements link",
+            relationship="implements",
+        )
+    finally:
+        db.close()
+
+    result = scanner.member_completion_scan(tmp_path)[0]
+
+    assert result.completion_ready is False
+    assert result.non_verified_implements_bridge_threads == ["gtkb-draft-thread"]
+    assert result.unverified_bridge_work_item_ids == ["WI-1"]
+    assert "missing_verified_bridge_evidence" in result.exclusion_reasons

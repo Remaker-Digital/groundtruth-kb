@@ -1,7 +1,17 @@
 ---
 name: gtkb-hygiene-investigation
 description: Run a repeatable, full-coverage GT-KB architecture/hygiene investigation using the proven 4-round probe method (parallel focus-area probes -> gap probe -> completeness critic -> adversarial skeptic) with loop-until-dry and explicit decay disclosure. Emits findings against a structured schema, renders a chunked report via the deterministic report generator, and uses the frozen HYG-001..068 baseline registry for lookup and reporting; baseline diff/delta mode is deferred to a follow-on bridge. Use when the owner asks for a hygiene/architecture investigation, a drift/debt census, or a repeat of the GT-KB self-investigation that produced HYG-001..068.
+license: "Proprietary - (c) 2026 Remaker Digital"
+metadata:
+  project: groundtruth-kb
+  category: operations and hygiene
+  activity-envelope: ops
 ---
+
+# Activity Envelope Requirement
+
+This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
+
 
 # /gtkb-hygiene-investigation
 

@@ -1,0 +1,63 @@
+---
+name: gtkb-send-review
+description: "Create an implementation proposal through the governed bridge-propose helper for Loyal Opposition review."
+argument-hint: "<descriptive-name>"
+allowed-tools: Read, Write, Edit, Bash, Glob
+license: "Proprietary - (c) 2026 Remaker Digital"
+compatibility:
+  - claude-code >= 1.0
+metadata:
+  project: groundtruth-kb
+  category: bridge-coordination
+  governance: file-bridge-protocol
+  activity-envelope: build, ops
+---
+
+# Activity Envelope Requirement
+
+This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
+
+
+# Send Review to Loyal Opposition
+
+Compatibility alias for filing a Prime Builder proposal through the governed
+`gtkb-bridge-propose` helper path. Do not write proposal files directly, and do
+not create or restore aggregate queue artifacts.
+
+**Arguments:** `$ARGUMENTS` = descriptive kebab-case name for the proposal (e.g., `widget-refactor`).
+
+## Behavior
+
+1. **Determine the descriptive name** from `$ARGUMENTS`. If not provided, derive
+   a kebab-case `topic_slug` from the current work context.
+
+2. **Draft the proposal content** with the required bridge sections from
+   `config/agent-control/gtkb-file-bridge-protocol.md`, including specification links,
+   project/work-item metadata when implementation-targeting, prior
+   deliberations, owner input when applicable, and a spec-derived verification
+   plan.
+
+3. **File through `gtkb-bridge-propose`.** Use the helper-mediated bridge writer
+   described in `.claude/skills/gtkb-bridge-propose/SKILL.md`. The helper performs
+   credential scanning, bridge-compliance validation for Codex paths, proposal
+   file creation, author metadata insertion, and dispatcher/TAFE bridge-state
+   publication via `gtkb-bridge-propose`.
+
+4. **Report** the helper result: created proposal path, bridge document slug,
+   status line, and any helper error that blocked filing.
+
+## Example
+
+```
+/send-review widget-refactor
+```
+
+The helper creates `bridge/widget-refactor-001.md` and reports a registration
+like:
+```
+Document: widget-refactor
+NEW: bridge/widget-refactor-001.md
+```
+
+The example output above is produced by the bridge-propose helper. This skill is
+only the caller-facing alias.

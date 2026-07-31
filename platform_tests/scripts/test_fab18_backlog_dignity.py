@@ -21,7 +21,14 @@ def _write_bridge_index(root: Path) -> None:
     )
 
 
-def _insert_open_work_item(root: Path, item_id: str, *, approval_state: str) -> None:
+def _insert_open_work_item(
+    root: Path,
+    item_id: str,
+    *,
+    approval_state: str = "unapproved",
+    resolution_status: str = "open",
+    stage: str = "backlogged",
+) -> None:
     db = KnowledgeDB(db_path=root / "groundtruth.db")
     try:
         db.insert_work_item(
@@ -29,9 +36,10 @@ def _insert_open_work_item(root: Path, item_id: str, *, approval_state: str) -> 
             f"Work item {item_id}",
             "hygiene",
             "backlog",
-            "open",
+            resolution_status,
             "test",
             "seed",
+            stage=stage,
             approval_state=approval_state,
         )
     finally:
@@ -50,13 +58,25 @@ def test_unapproved_future_wi_without_pauth_is_not_doctor_warn(tmp_path: Path) -
     assert payload["findings"] == []
 
 
-def test_implementation_authorized_wi_without_pauth_still_warns(tmp_path: Path) -> None:
+def test_legacy_implementation_authorized_wi_without_pauth_is_not_doctor_warn(tmp_path: Path) -> None:
     _write_bridge_index(tmp_path)
     _insert_open_work_item(tmp_path, "WI-ACTIVE", approval_state="implementation_authorized")
+
+    payload = check_standing_backlog_health(tmp_path)
+
+    assert payload["status"] == "pass"
+    assert payload["summary"]["orphaned_wi_count"] == 0
+    assert payload["summary"]["non_implementation_uncovered_count"] == 1
+    assert payload["findings"] == []
+
+
+def test_implementing_stage_wi_without_pauth_still_warns(tmp_path: Path) -> None:
+    _write_bridge_index(tmp_path)
+    _insert_open_work_item(tmp_path, "WI-ACTIVE", stage="implementing")
 
     payload = check_standing_backlog_health(tmp_path)
 
     assert payload["status"] == "warning"
     assert payload["summary"]["orphaned_wi_count"] == 1
     assert payload["findings"][0]["work_item_id"] == "WI-ACTIVE"
-    assert payload["findings"][0]["approval_state"] == "implementation_authorized"
+    assert "approval_state" not in payload["findings"][0]

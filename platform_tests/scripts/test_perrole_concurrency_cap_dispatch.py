@@ -5,6 +5,8 @@ Covers the spec-derived behaviors from
 ``bridge/gtkb-perrole-concurrency-cap-dispatch-001.md`` (GO at -002):
 
 - ``_max_live_dispatched_per_role`` env parsing + fail-safe default.
+- Role-specific default reconciliation with scripts/bridge_dispatch_concurrency.py:
+  loyal-opposition defaults to 3, prime-builder defaults to 2.
 - ``_count_live_dispatched_processes_for_role`` role-scoped count semantics.
 - The ``_spawn_harness`` per-role gate: at/over the per-role cap it skips the
   dispatch (no ``Popen``) with ``reason="per_role_concurrency_cap_reached"``;
@@ -25,12 +27,12 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-_SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "cross_harness_bridge_trigger.py"
+_SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "dispatcher_runtime.py"
 _CODEX_INVOCATION_SURFACES = {"headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}}
 
 
 def _load_trigger() -> ModuleType:
-    module_name = "cross_harness_bridge_trigger"
+    module_name = "dispatcher_runtime"
     if module_name in sys.modules:
         return sys.modules[module_name]
     spec = importlib.util.spec_from_file_location(module_name, _SCRIPT_PATH)
@@ -47,6 +49,16 @@ def _lo_target(trigger: ModuleType) -> object:
         harness_id="A",
         command_handle="codex",
         canonical_mode="lo",
+        invocation_surfaces=_CODEX_INVOCATION_SURFACES,
+    )
+
+
+def _pb_target(trigger: ModuleType) -> object:
+    return trigger.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="pb",
         invocation_surfaces=_CODEX_INVOCATION_SURFACES,
     )
 
@@ -72,6 +84,8 @@ def _isolate_host_dispatch_cap_env(trigger_module: ModuleType, monkeypatch: pyte
     """Host env can override GTKB cap defaults; spawn-gate tests assume defaults."""
     monkeypatch.delenv(trigger_module.MAX_LIVE_DISPATCHED_PROCESSES_ENV_VAR, raising=False)
     monkeypatch.delenv(trigger_module.MAX_LIVE_DISPATCHED_PER_ROLE_ENV_VAR, raising=False)
+    monkeypatch.delenv("GTKB_DISPATCH_CONCURRENCY_LOYAL_OPPOSITION", raising=False)
+    monkeypatch.delenv("GTKB_DISPATCH_CONCURRENCY_PRIME_BUILDER", raising=False)
 
 
 # --------------------------------------------------------------------------- #
@@ -79,23 +93,46 @@ def _isolate_host_dispatch_cap_env(trigger_module: ModuleType, monkeypatch: pyte
 # --------------------------------------------------------------------------- #
 
 
-def test_per_role_cap_default_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_per_role_cap_defaults_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
     trigger = _load_trigger()
     monkeypatch.delenv(trigger.MAX_LIVE_DISPATCHED_PER_ROLE_ENV_VAR, raising=False)
-    assert trigger._max_live_dispatched_per_role() == trigger.DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE
+    assert (
+        trigger._max_live_dispatched_per_role("loyal-opposition")
+        == trigger.DISPATCH_ROLE_LIMIT_DEFAULTS["loyal-opposition"]
+    )
+    assert (
+        trigger._max_live_dispatched_per_role("prime-builder") == trigger.DISPATCH_ROLE_LIMIT_DEFAULTS["prime-builder"]
+    )
 
 
-def test_per_role_cap_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_per_role_cap_per_role_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    trigger = _load_trigger()
+    monkeypatch.setenv("GTKB_DISPATCH_CONCURRENCY_PRIME_BUILDER", "5")
+    assert trigger._max_live_dispatched_per_role("prime-builder") == 5
+    assert (
+        trigger._max_live_dispatched_per_role("loyal-opposition")
+        == trigger.DISPATCH_ROLE_LIMIT_DEFAULTS["loyal-opposition"]
+    )
+
+
+def test_per_role_cap_legacy_flat_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     trigger = _load_trigger()
     monkeypatch.setenv(trigger.MAX_LIVE_DISPATCHED_PER_ROLE_ENV_VAR, "5")
-    assert trigger._max_live_dispatched_per_role() == 5
+    assert trigger._max_live_dispatched_per_role("loyal-opposition") == 5
+    assert trigger._max_live_dispatched_per_role("prime-builder") == 5
 
 
 @pytest.mark.parametrize("value", ["0", "-2", "notanint", "  "])
 def test_per_role_cap_invalid_or_nonpositive_falls_back(value: str, monkeypatch: pytest.MonkeyPatch) -> None:
     trigger = _load_trigger()
     monkeypatch.setenv(trigger.MAX_LIVE_DISPATCHED_PER_ROLE_ENV_VAR, value)
-    assert trigger._max_live_dispatched_per_role() == trigger.DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE
+    assert (
+        trigger._max_live_dispatched_per_role("loyal-opposition")
+        == trigger.DISPATCH_ROLE_LIMIT_DEFAULTS["loyal-opposition"]
+    )
+    assert (
+        trigger._max_live_dispatched_per_role("prime-builder") == trigger.DISPATCH_ROLE_LIMIT_DEFAULTS["prime-builder"]
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -113,6 +150,7 @@ def test_per_role_count_is_role_scoped(tmp_path: Path, monkeypatch: pytest.Monke
     (runs_dir / "2026-06-21T05-00-00Z-loyal-opposition-A-bbbbbb.pid").write_text(str(me), encoding="utf-8")
     (runs_dir / "2026-06-21T05-00-00Z-prime-builder-B-cccccc.pid").write_text(str(me), encoding="utf-8")
     monkeypatch.setattr(trigger, "_pid_alive", lambda pid: str(pid) == str(me))
+    monkeypatch.setattr(trigger, "_dispatch_pid_provenance_matches", lambda runs_dir, dispatch_id, pid: True)
 
     assert trigger._count_live_dispatched_processes_for_role(runs_dir, "loyal-opposition") == 2
     assert trigger._count_live_dispatched_processes_for_role(runs_dir, "prime-builder") == 1
@@ -145,7 +183,7 @@ def test_per_role_cap_suppresses_at_limit(tmp_path: Path, monkeypatch: pytest.Mo
     monkeypatch.setattr(
         trigger,
         "_count_live_dispatched_processes_for_role",
-        lambda runs_dir, role: trigger.DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE,
+        lambda runs_dir, role: trigger.DISPATCH_ROLE_LIMIT_DEFAULTS["loyal-opposition"],
     )
 
     meta = trigger._spawn_harness(
@@ -160,13 +198,46 @@ def test_per_role_cap_suppresses_at_limit(tmp_path: Path, monkeypatch: pytest.Mo
     assert meta["launched"] is False
     assert meta["reason"] == "per_role_concurrency_cap_reached"
     assert meta["role"] == "loyal-opposition"
-    assert meta["per_role_live"] == trigger.DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE
-    assert meta["per_role_cap"] == trigger.DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE
+    assert meta["per_role_live"] == trigger.DISPATCH_ROLE_LIMIT_DEFAULTS["loyal-opposition"]
+    assert meta["per_role_cap"] == trigger.DISPATCH_ROLE_LIMIT_DEFAULTS["loyal-opposition"]
 
     failures = state_dir / trigger.DISPATCH_FAILURES_FILENAME
     assert failures.is_file()
     records = [json.loads(line) for line in failures.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert any(r.get("reason") == "per_role_concurrency_cap_reached" for r in records)
+
+
+def test_prime_role_cap_uses_shared_prime_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+
+    def _sentinel_popen(*args, **kwargs):  # noqa: ANN002, ANN003
+        raise AssertionError("Popen must not be called when the per-role cap is reached")
+
+    monkeypatch.setattr(subprocess, "Popen", _sentinel_popen)
+    monkeypatch.setattr(trigger, "_dispatch_prompt", lambda *a, **k: "prompt")
+    monkeypatch.setattr(trigger, "_harness_command", lambda *a, **k: ["codex", "exec", "prompt"])
+    monkeypatch.setattr(trigger, "_count_live_dispatched_processes", lambda runs_dir: 0)
+    monkeypatch.setattr(
+        trigger,
+        "_count_live_dispatched_processes_for_role",
+        lambda runs_dir, role: trigger.DISPATCH_ROLE_LIMIT_DEFAULTS["prime-builder"],
+    )
+
+    meta = trigger._spawn_harness(
+        target=_pb_target(trigger),
+        items=[_fake_item()],
+        project_root=tmp_path,
+        state_dir=state_dir,
+        max_items=2,
+        dry_run=False,
+    )
+
+    assert meta["launched"] is False
+    assert meta["reason"] == "per_role_concurrency_cap_reached"
+    assert meta["role"] == "prime-builder"
+    assert meta["per_role_live"] == trigger.DISPATCH_ROLE_LIMIT_DEFAULTS["prime-builder"]
+    assert meta["per_role_cap"] == trigger.DISPATCH_ROLE_LIMIT_DEFAULTS["prime-builder"]
 
 
 def test_per_role_below_cap_allows_same_role_spawn(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

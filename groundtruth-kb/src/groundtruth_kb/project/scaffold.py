@@ -866,9 +866,8 @@ def _render_all_templates(
         "{{TEST_STATUS}}": "Not run yet",
         "{{BRIDGE_INVENTORY_PATH_OR_NA}}": ("BRIDGE-INVENTORY.md" if profile.includes_bridge else "N/A"),
         "{{AUTOMATION_SUMMARY_OR_NA}}": (
-            "File bridge inventory and cross-harness event-driven trigger "
-            "(.claude/settings.json + .codex/hooks.json PostToolUse + Stop "
-            "hooks) included; smart poller and OS poller retired in Slice 4 "
+            "File bridge inventory and dispatcher daemon included; smart poller "
+            "and OS poller retired in Slice 4 "
             "and archived"
             if profile.includes_bridge
             else "None configured yet"
@@ -887,7 +886,7 @@ def _render_all_templates(
             else "Document your bridge or automation entrypoint here."
         ),
         "{{HOW_IT_RUNS}}": (
-            "PostToolUse + Stop hooks invoke scripts/cross_harness_bridge_trigger.py"
+            "Dispatcher daemon owns automated bridge dispatch"
             if profile.includes_bridge
             else "Manual start or scheduled run"
         ),
@@ -895,14 +894,14 @@ def _render_all_templates(
         "{{KIND}}": "TBD",
         "{{PURPOSE}}": "Replace with the actual purpose for this control surface.",
         "{{WHEN_TO_UPDATE}}": "Whenever the runtime or coordination rules change.",
-        "{{AUTOMATION_NAME}}": "file-bridge-cross-harness-trigger",
-        "{{SCHEDULE}}": "Event-driven on tool-use; manual fallback via 'Bridge' prompt",
-        "{{EXECUTOR}}": "claude -p / codex exec invoked by the cross-harness event-driven trigger",
-        "{{SOURCE}}": ("Slice 3 hook registrations in .claude/settings.json + .codex/hooks.json"),
+        "{{AUTOMATION_NAME}}": "file-bridge-dispatcher-daemon",
+        "{{SCHEDULE}}": "Daemon tick; manual fallback via owner assignment",
+        "{{EXECUTOR}}": "dispatcher daemon invokes eligible harnesses",
+        "{{SOURCE}}": "Dispatcher daemon control surface and numbered bridge files",
         "{{FAILURE_SIGNAL}}": "No dispatch-state updates after new bridge versions",
         "{{ASYNC_OR_TRANSACTIONAL_DESCRIPTION}}": ("Dispatcher-backed latest-status queue over numbered bridge files."),
         "{{WHEN_MESSAGES_REQUIRE_REPLIES}}": (
-            "Latest NEW/REVISED entries require Loyal Opposition verdicts; latest GO/NO-GO entries "
+            "Latest NEW/REVISED/NO-ACTION entries require Loyal Opposition verdicts; latest GO/NO-GO entries "
             "require Prime responses."
         ),
         "{{WHEN_TO_RETRY}}": "Scheduled re-scan after the next interval; lock files prevent overlapping runs.",
@@ -995,7 +994,7 @@ approval from the owner.
 - **Output:** evidence-based reports in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`
 
 ## Startup Checklist
-1. Run file bridge sweep: scan versioned bridge files for latest NEW or REVISED entries
+1. Run file bridge sweep: scan versioned bridge files for latest NEW, REVISED, or NO-ACTION entries
 2. Read project CLAUDE.md and MEMORY.md
 3. Report operating state to Prime Builder
 
@@ -1240,8 +1239,7 @@ def scaffold_summary(target: Path, profile: str) -> str:
                 "  - AGENTS.md (Loyal Opposition contract)",
                 "  - BRIDGE-INVENTORY.md",
                 "  - bridge-os-poller-setup-prompt.md (DEPRECATED stub; smart poller retired in Slice 4. "
-                "Bridge dispatch is automated by the cross-harness event-driven trigger via "
-                ".claude/settings.json and .codex/hooks.json hook registrations.)",
+                "Bridge dispatch is automated by the dispatcher daemon.)",
                 "  - Bridge rules and hooks",
                 "  - independent-progress-assessments/ (Codex reports)",
             ]

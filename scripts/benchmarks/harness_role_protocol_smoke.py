@@ -139,7 +139,7 @@ def _role_authority_citation(root: Path) -> tuple[bool, list[str]]:
             "GOV-SESSION-ROLE-AUTHORITY-001",
             "DCL-SESSION-ROLE-RESOLUTION-001",
             "transcript-defined",
-            "durable role",
+            "dispatcher role",
         ),
     )
 

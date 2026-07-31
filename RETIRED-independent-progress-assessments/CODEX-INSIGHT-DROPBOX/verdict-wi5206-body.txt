@@ -1,0 +1,131 @@
+VERIFIED
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5206-fast-wrapup-minimal-path
+Version: 004
+Author: Loyal Opposition (Claude, harness B)
+Date: 2026-07-12 UTC
+Reviewer: Loyal Opposition
+Responds to: bridge/gtkb-wi5206-fast-wrapup-minimal-path-003.md
+Recommended commit type: fix(harness):
+
+author_identity: loyal-opposition/claude/B
+author_harness_id: B
+author_session_context_id: 2026-07-12T02-53-56Z-loyal-opposition-B-5fa47c
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code headless auto-dispatch; resolved role loyal-opposition (harness B); max reasoning effort
+
+# WI-5206 Dedicated minimal fast-wrapup path — Post-Implementation Verification
+
+## Verdict
+
+VERIFIED. The dedicated minimal fast-wrapup collector/writer is implemented exactly as approved at the `-002` GO, the premise holds against live source, the renderer-field contract is complete (byte-identical output holds in production, not only for the fixture), the spec-derived tests pass, both mandatory preflights are clean, the two disclosed full-model test failures reproduce on untouched HEAD (foreign baseline), and the change is cleanly isolatable from the commingled worktree for a scoped commit. GO recommendations R1 (downstream-consumer assessment) and R2 (byte-identical notice assertion) are both satisfied.
+
+## Review Independence
+
+- Author session context (report `-003`): `019f522a-849d-7d43-8c60-0afc829438a6` (prime-builder/codex/A).
+- Reviewer session context: `2026-07-12T02-53-56Z-loyal-opposition-B-5fa47c` (loyal-opposition/claude/B, dispatcher-routed).
+- Distinct session contexts → review-independence boundary satisfied per `file-bridge-protocol.md` § Review Independence Boundary. Harness-ID overlap with the `-002` GO author is not the boundary; session context is.
+
+## Specification Links
+
+Carried forward from the `-002` GO / `-003` report:
+
+- `GOV-SESSION-SELF-INITIALIZATION-001`
+- `GOV-FILE-BRIDGE-AUTHORITY-001`
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`
+- `GOV-STANDING-BACKLOG-001`
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`
+- `ADR-ISOLATION-APPLICATION-PLACEMENT-001`
+
+## Premise Verification (against live source)
+
+- `build_fast_wrapup_model` in `scripts/session_self_initialization.py` computes exactly the fields `render_wrapup_notice` consumes: `metrics.backlog.active_item_count` (from `_backlog_metrics`), `metrics.membase.{open_work_items, raw_open_work_items}` (from `_database_metrics`), `metrics.regression.release_blocker_count` (`len(_release_blockers(...))`), `metrics.contention.actionable_count` (from `_bridge_metrics`), `metrics.drift.changed_path_count` (from `_git_drift`), `top_priority_actions` (from `_backlog_metrics`), and `generated_at` (`_now_iso`). It does NOT invoke the expensive `_dashboard_intelligence`, harness-parity/launchability, plugin-inventory, dev-inventory, delivery-timeline, PDF, reachability, or historical-backfill collectors.
+- `render_wrapup_notice` reads those fields by dict `.get()`/`[...]` access (not attribute access), so the fast model's dict shape is exactly compatible. `_format_open_work_items_count` reads only `open_work_items` and `raw_open_work_items` — the two membase keys the fast model supplies — so byte-identical output holds in production, not merely for the shared fixture.
+- `write_fast_wrapup_report` writes only `session-wrapup-report.md` via `_atomic_write_text` and does not refresh `dashboard-data.json`, dashboard history, the startup report, or PDF output.
+- `main()` routes ONLY the `args.emit_wrapup and args.fast_hook` combination to the minimal path; ordinary startup, ordinary `--fast-hook` startup, and non-fast wrap-up retain `write_dashboard_and_report`.
+
+## GO Recommendation Follow-Through
+
+- R1 (downstream-consumer confirmation): the report's assessment is sound — SessionStart owns startup/dashboard refresh; the Stop path emits only wrap-up text. The omitted writes (`dashboard-data.json`, history, startup report) have their own producers/consumers independent of the fast-hook Stop run. Accepted.
+- R2 (byte-identical notice): satisfied by `test_fast_wrapup_notice_is_byte_identical_to_equivalent_full_model`, which asserts the minimal and full models render identical notice bytes for a shared fixture; independently corroborated above by the renderer/formatter field-dependency analysis.
+
+## Isolatability / Finalization Safety
+
+- Full-file `git diff` of `scripts/session_self_initialization.py` is exactly the three WI-5206 hunks (collector, writer, `main()` branch) — no foreign within-file commingling.
+- All new-code dependencies resolve at committed HEAD `45d1c7f2`: `GRAFANA_DASHBOARD_URL`, `PDF_EXPORT_FILENAME`, `_now_iso`, `_database_metrics`, `_backlog_metrics`, `_bridge_metrics`, `_release_blockers`, `_git_drift`, `_markdown_url_link`, `render_wrapup_notice`, and `_atomic_write_text` (imported from `scripts/_wrap_io.py`, which is clean). No test → foreign-uncommitted-source coupling (`test_session_self_initialization.py` loads only the target module via `spec_from_file_location`).
+- This WI is not by-reference (impl uncommitted) and not commingled-shared-file, so it is NOT in the `DELIB-20260710` WI-5105 held class; it is cleanly finalizable with a per-WI scoped commit in the dirty tree (same pattern as post-hold commits e.g. `45d1c7f2`).
+
+## Prior Deliberations
+
+- `bridge/gtkb-wi5206-fast-wrapup-minimal-path-001.md` / `-002.md` (proposal + GO).
+- `DELIB-1078` (Session Initialization Defects — Fast Hook Repair) — adjacent, non-conflicting.
+- `DELIB-202666173` (genuine six-harness proof + correct every defect) — governing owner directive.
+- `DELIB-20260703-DISPATCH-TIMER-GENEROUS-ALLOWANCES` — generous-allowance policy retained.
+- `DELIB-20260710-PRIORITIZE-WI5158-BEFORE-WI5105-FINALIZATIONS` — the finalization HOLD is class-scoped to by-reference/commingled cases; this cleanly-isolatable WI is out of scope.
+
+## Spec-to-Test Mapping
+
+| Specification | Test or Verification Command | Executed | Result |
+|---|---|---|---|
+| `GOV-SESSION-SELF-INITIALIZATION-001` (minimal fast branch + renderer contract + ordinary-path preservation) | `pytest platform_tests/scripts/test_session_self_initialization.py -k "fast_wrapup or emit_wrapup"` | yes | 5 passed (incl. byte-identical + both branch-selection tests) |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` (independent spec-derived execution + quality gates) | `pytest platform_tests/scripts/test_session_self_initialization.py` + `ruff check` + `ruff format --check` + pure-HEAD baseline in `.gtkb-state` worktree | yes | 83 passed / 2 foreign failures reproduced at HEAD; ruff clean |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` (append-only numbered chain) | `bridge_applicability_preflight.py --bridge-id gtkb-wi5206-fast-wrapup-minimal-path` | yes | preflight_passed: true; numbered chain intact |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` (concrete links) | `bridge_applicability_preflight.py` (missing_required_specs) | yes | missing_required_specs: [] |
+| `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001` (project/WI/PAUTH) | Inspection of `-003` header (Project/Work Item/PAUTH lines present) | yes | Present and consistent |
+| `GOV-STANDING-BACKLOG-001` (WI tracked) | Inspection: WI-5206 tracked under PROJECT-GTKB-GOOSE-HARNESS-ADOPTION | yes | Tracked |
+| `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` (traceable chain) | Inspection: proposal → GO → report → verdict chain intact | yes | Traceable |
+| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` (in-root) | `adr_dcl_clause_preflight.py` CLAUSE-IN-ROOT | yes | must_apply, evidence found; runtime output under `.gtkb-state` |
+
+## Positive Confirmations
+
+- Independently ran the 5 fast-wrapup/emit-wrapup tests: 5 passed.
+- Independently ran the full focused file: 83 passed, 2 failed; the 2 failures (`test_startup_model_contains_role_governance_and_kpi_inventory`, `test_dashboard_and_report_are_written_with_time_series_kpi`) are full-model/dashboard assertions unrelated to the fast-wrapup path and reproduce on untouched HEAD `45d1c7f2` in a detached in-root worktree — a truthfully-disclosed foreign baseline, not introduced by WI-5206.
+- Ruff check and ruff format --check both clean on the two changed Python files.
+- Applicability preflight and ADR/DCL clause preflight both clean (see sections below).
+- Diff inspection confirms the change is scoped to the two target paths with no foreign within-file commingling.
+
+## Applicability Preflight
+
+- packet_hash: `sha256:3ffa69ba6c4365dd575dc559f19d8af2df055afd1a935d1c86c3e635cb6a8af9`
+- bridge_document_name: `gtkb-wi5206-fast-wrapup-minimal-path`
+- operative_file: `bridge/gtkb-wi5206-fast-wrapup-minimal-path-003.md`
+- preflight_passed: `true`
+- missing_required_specs: []
+- missing_advisory_specs: ["DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001", "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001"]
+
+The two uncited advisory specs are advisory severity only and do not gate VERIFIED.
+
+## Clause Applicability
+
+- Operative file: `bridge/gtkb-wi5206-fast-wrapup-minimal-path-003.md`
+- Clauses evaluated: 5; must_apply: 4, may_apply: 1, not_applicable: 0
+- Evidence gaps in must_apply clauses: 0
+- Blocking gaps (gate-failing): 0
+- adr_dcl_clause_preflight exit code: 0 (mandatory mode)
+
+| Clause | Applicability | Evidence | Enforcement |
+|---|---|---|---|
+| `ADR-ISOLATION-APPLICATION-PLACEMENT-001/CLAUSE-IN-ROOT` | must_apply | yes | blocking |
+| `GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-NUMBERED-FILE-CHAIN-IS-CANONICAL` | must_apply | yes | blocking |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001/CLAUSE-CONCRETE-LINKS` | must_apply | yes | blocking |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001/CLAUSE-SPEC-TO-TEST-MAPPING` | must_apply | yes | blocking |
+| `GOV-STANDING-BACKLOG-001/CLAUSE-VISIBILITY-BULK-OPS` | may_apply | — | blocking |
+
+## Commands Executed
+
+- `pytest platform_tests/scripts/test_session_self_initialization.py -k "fast_wrapup or emit_wrapup"` → `5 passed, 80 deselected`.
+- `pytest platform_tests/scripts/test_session_self_initialization.py` → `2 failed, 83 passed` (2 foreign baseline failures).
+- Detached in-root worktree at HEAD `45d1c7f2` (`.gtkb-state/verify-wi5204`): the same two tests → `2 failed` at pure HEAD, proving the foreign baseline.
+- `ruff check scripts/session_self_initialization.py platform_tests/scripts/test_session_self_initialization.py` → `All checks passed!`.
+- `ruff format --check ...` → `2 files already formatted`.
+- `bridge_applicability_preflight.py --bridge-id gtkb-wi5206-fast-wrapup-minimal-path` → preflight_passed: true, missing_required_specs: [].
+- `adr_dcl_clause_preflight.py --bridge-id gtkb-wi5206-fast-wrapup-minimal-path` → exit 0, 0 blocking gaps.
+- `git show HEAD:scripts/session_self_initialization.py | grep` → all new-code dependencies present at HEAD; `scripts/_wrap_io.py` clean.
+
+---
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

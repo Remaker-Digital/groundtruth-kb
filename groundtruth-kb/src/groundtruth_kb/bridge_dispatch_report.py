@@ -5,19 +5,39 @@ from __future__ import annotations
 import json
 import os
 import re
+import sqlite3
 import subprocess
 from collections import Counter, deque
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from groundtruth_kb.bridge_dispatch_config import DISPATCH_ROLES, collect_bridge_dispatch_status
+from groundtruth_kb.bridge_dispatch_config import (
+    DISPATCH_ROLES,
+    collect_bridge_dispatch_health,
+    collect_bridge_dispatch_status,
+)
 
 STATE_DIR_RELATIVE_PATH = Path(".gtkb-state") / "bridge-poller"
 RUNS_RELATIVE_PATH = STATE_DIR_RELATIVE_PATH / "dispatch-runs"
 RUN_TIMESTAMP_RE = re.compile(r"^(?P<stamp>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z)")
 PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
 PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 0.01
+WORKFLOW_SCHEMA_VERSION = "gtkb.dispatch_workflow.v1"
+WORKFLOW_RECORD_LIMIT = 20
+METRICS_SNAPSHOT_CATEGORY = "dispatch_default_metrics_snapshot"
+_METRIC_LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._:/@()+-]{0,119}$")
+_WORK_ITEM_METADATA_RE = re.compile(r"^Work Item:\s*`?(?P<work_item_id>WI-[A-Za-z0-9-]+)", re.IGNORECASE | re.MULTILINE)
+_PROJECT_AUTHORIZATION_METADATA_RE = re.compile(
+    r"^Project Authorization:\s*`?(?P<authorization_id>PAUTH-[A-Za-z0-9-]+)", re.IGNORECASE | re.MULTILINE
+)
+_PROJECT_METADATA_RE = re.compile(r"^Project:\s*`?(?P<project_id>[A-Za-z0-9_-]+)", re.IGNORECASE | re.MULTILINE)
+_BRIDGE_VERSION_RE = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3,})\.md$")
+_BRIDGE_SLUG_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$")
+_DISPATCH_RECIPIENT_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z-(?P<role>prime-builder|loyal-opposition)-"
+    r"(?P<harness_id>[^-]+)-"
+)
 
 
 def build_bridge_dispatch_report(
@@ -30,6 +50,7 @@ def build_bridge_dispatch_report(
     root = project_root.resolve()
     status = collect_bridge_dispatch_status(root)
     status_payload = status.to_json_dict()
+    health_rollup = collect_bridge_dispatch_health(root, routing_status=status)
     now_utc = now or datetime.now(UTC)
 
     state, state_warnings = _read_json(root / STATE_DIR_RELATIVE_PATH / "dispatch-state.json")
@@ -69,7 +90,7 @@ def build_bridge_dispatch_report(
 
     return {
         "summary": {
-            "health_status": status.health_status,
+            "health_status": health_rollup["health_status"],
             "health_finding_count": len(status.health_findings),
             "runtime_failure_count": runtime_failure_count,
             "runtime_warning_count": runtime_warning_count,
@@ -92,6 +113,7 @@ def build_bridge_dispatch_report(
         },
         "reliability": {
             "health_status": status.health_status,
+            "health_rollup": health_rollup,
             "findings": list(status.health_findings),
             "consistency_findings": list(status.consistency_findings),
             "runtime_classifications": list(status.runtime_classifications),
@@ -139,6 +161,627 @@ def format_bridge_dispatch_report(report: dict[str, Any]) -> str:
         for finding in report["reliability"]["findings"]:
             lines.append(f"- {finding}")
     return "\n".join(lines)
+
+
+def build_compact_dispatch_workflow(
+    project_root: Path,
+    *,
+    report: dict[str, Any] | None = None,
+    max_records: int = WORKFLOW_RECORD_LIMIT,
+) -> dict[str, Any]:
+    """Build the bounded, read-only workflow projection for dispatch reporting."""
+    from groundtruth_kb.bridge.status_driver import collect_bridge_status
+
+    root = project_root.resolve()
+    limit = min(max(1, max_records), WORKFLOW_RECORD_LIMIT)
+    full_report = report or build_bridge_dispatch_report(root)
+    queue = collect_bridge_status(root, top_n=None).queue
+
+    prime_queues, prime_truncation = _workflow_prime_queues(root, queue.prime_actionable, limit)
+    loyal_queues, loyal_truncation = _workflow_loyal_queues(queue.loyal_opposition_actionable, limit)
+    in_flight, in_flight_truncated = _bounded_workflow_records(_workflow_in_flight(root, full_report), limit)
+    findings, findings_truncated = _bounded_workflow_records(
+        [{"finding": finding} for finding in full_report["reliability"]["findings"]],
+        limit,
+    )
+    selected_targets, targets_truncated = _workflow_selected_targets(full_report, limit)
+    recent_work_metrics = _recent_work_metrics(root, limit)
+
+    return {
+        "schema_version": WORKFLOW_SCHEMA_VERSION,
+        "status": {
+            "health_status": full_report["summary"]["health_status"],
+            "findings": findings,
+            "bridge_status_counts": dict(queue.status_counts),
+            "selected_targets": selected_targets,
+        },
+        "in_flight": in_flight,
+        "queues": {
+            "prime_builder": prime_queues,
+            "loyal_opposition": loyal_queues,
+        },
+        "recent_work_metrics": recent_work_metrics,
+        "bounds": {
+            "per_section_limit": limit,
+            "truncated": {
+                "status_findings": findings_truncated,
+                "status_selected_targets": targets_truncated,
+                "in_flight": in_flight_truncated,
+                "queues": {
+                    "prime_builder": prime_truncation,
+                    "loyal_opposition": loyal_truncation,
+                },
+            },
+        },
+    }
+
+
+def format_compact_dispatch_workflow(workflow: dict[str, Any]) -> str:
+    """Render the default bounded human workflow view."""
+    status = workflow["status"]
+    lines = [
+        f"Bridge dispatch workflow: {status['health_status']}",
+        f"In-flight dispatches: {len(workflow['in_flight'])}",
+        "",
+    ]
+    for label, key in (("Prime Builder", "prime_builder"), ("Loyal Opposition", "loyal_opposition")):
+        lines.append(f"{label}:")
+        queues = workflow["queues"][key]
+        for category, title in (
+            ("actionable_now", "Actionable now"),
+            ("candidate_next", "Candidate next"),
+            ("blocked", "Blocked"),
+        ):
+            rows = queues[category]
+            if not rows:
+                lines.append(f"- {title}: (none)")
+                continue
+            rendered = ", ".join(_format_workflow_record(row) for row in rows)
+            lines.append(f"- {title}: {rendered}")
+        lines.append("")
+    metrics = workflow["recent_work_metrics"]
+    lines.append("Recent-work metrics:")
+    if metrics["availability"] in {"unavailable", "stale"}:
+        lines.append(f"- {metrics['availability']}: {metrics['reason']}")
+    else:
+        lines.extend(
+            [
+                f"- Snapshot: {metrics['snapshot_id']}",
+                f"- Availability: {metrics['availability']}",
+                f"- Records: {metrics['record_count']}",
+                f"- Coverage: {json.dumps(metrics['coverage'], sort_keys=True, separators=(',', ':'))}",
+            ]
+        )
+    return "\n".join(lines).rstrip()
+
+
+def _unavailable_recent_work_metrics(reason: str) -> dict[str, Any]:
+    return {
+        "availability": "unavailable",
+        "reason": reason,
+        "snapshot_id": None,
+        "schema_id": None,
+        "schema_version": None,
+        "source_window": {"start": None, "end": None},
+        "generated_at": None,
+        "freshness": {"status": "unavailable"},
+        "record_count": None,
+        "coverage": None,
+        "distributions": None,
+        "breakouts": None,
+        "cost_coverage": {
+            "provider_reported": None,
+            "benchmark_estimated": None,
+        },
+        "bounds": {"per_distribution_limit": WORKFLOW_RECORD_LIMIT},
+    }
+
+
+def _recent_work_metrics(root: Path, limit: int) -> dict[str, Any]:
+    db_path = root / "groundtruth.db"
+    if not db_path.is_file():
+        return _unavailable_recent_work_metrics("canonical_snapshot_store_unavailable")
+    try:
+        with sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True) as connection:
+            connection.row_factory = sqlite3.Row
+            row = connection.execute(
+                """
+                SELECT id, content, changed_at, version
+                FROM current_documents
+                WHERE category = ? AND status = 'active'
+                ORDER BY changed_at DESC, version DESC, id DESC
+                LIMIT 1
+                """,
+                (METRICS_SNAPSHOT_CATEGORY,),
+            ).fetchone()
+    except (OSError, sqlite3.Error):
+        return _unavailable_recent_work_metrics("canonical_snapshot_store_unavailable")
+    if row is None:
+        return _unavailable_recent_work_metrics("canonical_snapshot_unavailable")
+    try:
+        from groundtruth_kb.dispatch_default_metrics import SNAPSHOT_SCHEMA_ID, validate_metrics_snapshot
+
+        raw = json.loads(str(row["content"] or ""))
+        snapshot = validate_metrics_snapshot(raw)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return _unavailable_recent_work_metrics("canonical_snapshot_invalid")
+
+    freshness = snapshot.get("freshness") if isinstance(snapshot.get("freshness"), dict) else {}
+    freshness_status = str(freshness.get("status") or "unavailable")
+    if freshness_status not in {"fresh", "partial", "stale", "unavailable"}:
+        freshness_status = "unavailable"
+    record_count = snapshot.get("source_record_count")
+    usage_coverage = snapshot.get("usage_coverage") if isinstance(snapshot.get("usage_coverage"), dict) else {}
+    cost_coverage = snapshot.get("cost_coverage") if isinstance(snapshot.get("cost_coverage"), dict) else {}
+    coverage = {
+        "turns": _metric_coverage(usage_coverage.get("turns")),
+        "tool_calls": _metric_coverage(usage_coverage.get("tools")),
+        "token_cache": _metric_coverage(usage_coverage.get("usage")),
+        "benchmark_quality": _metric_coverage(snapshot.get("quality_coverage")),
+        "adaptation": _metric_coverage(snapshot.get("adaptation_coverage")),
+    }
+    availability = _metrics_availability(freshness_status, record_count, coverage)
+    reason = None
+    if availability == "stale":
+        reason = "canonical_snapshot_stale"
+    elif availability == "unavailable":
+        reason = "canonical_snapshot_empty"
+    elif availability == "partial":
+        reason = "canonical_snapshot_partial"
+
+    return {
+        "availability": availability,
+        "reason": reason,
+        "snapshot_id": _safe_metric_label(snapshot.get("id")),
+        "schema_id": SNAPSHOT_SCHEMA_ID,
+        "schema_version": 1,
+        "source_window": {
+            "start": _safe_metric_timestamp(snapshot.get("source_window_start")),
+            "end": _safe_metric_timestamp(snapshot.get("source_window_end")),
+        },
+        "generated_at": _safe_metric_timestamp(snapshot.get("generated_at")),
+        "freshness": {"status": freshness_status},
+        "record_count": record_count,
+        "coverage": coverage,
+        "distributions": {
+            "outcomes": _bounded_metric_counts(snapshot.get("counts_by_bridge_outcome"), limit),
+            "failure_classes": _bounded_metric_counts(snapshot.get("counts_by_failure_class"), limit),
+            "elapsed_time": _bounded_metric_counts(snapshot.get("elapsed_distribution"), limit),
+            "turns": _bounded_metric_counts(snapshot.get("turns_distribution"), limit),
+            "tool_calls": _bounded_metric_counts(snapshot.get("tools_distribution"), limit),
+        },
+        "breakouts": {
+            "harness": _bounded_metric_counts(snapshot.get("counts_by_harness"), limit),
+            "model_profile": _bounded_metric_counts(snapshot.get("counts_by_model_profile"), limit),
+            "role": _bounded_metric_counts(snapshot.get("counts_by_role"), limit),
+        },
+        "cost_coverage": {
+            "provider_reported": _metric_coverage(cost_coverage.get("provider_reported")),
+            "benchmark_estimated": _metric_coverage(cost_coverage.get("benchmark_estimated")),
+        },
+        "bounds": {"per_distribution_limit": limit},
+    }
+
+
+def _bounded_metric_counts(value: Any, limit: int) -> dict[str, int | float] | None:
+    if not isinstance(value, dict):
+        return None
+    allowed: dict[str, int | float] = {}
+    for key, item in sorted(value.items(), key=lambda row: str(row[0])):
+        if len(allowed) >= limit:
+            break
+        safe_key = _safe_metric_label(key)
+        if safe_key is None or isinstance(item, bool) or not isinstance(item, (int, float)) or item < 0:
+            continue
+        allowed[safe_key] = item
+    return allowed
+
+
+def _metric_coverage(value: Any) -> dict[str, int | float] | None:
+    if not isinstance(value, dict):
+        return None
+    result: dict[str, int | float] = {}
+    for key in ("observed_count", "missing_count", "record_count", "coverage_ratio"):
+        item = value.get(key)
+        if isinstance(item, (int, float)) and not isinstance(item, bool) and item >= 0:
+            result[key] = item
+    return result or None
+
+
+def _safe_metric_label(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized if _METRIC_LABEL_RE.fullmatch(normalized) else None
+
+
+def _safe_metric_timestamp(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _metrics_availability(
+    freshness_status: str,
+    record_count: Any,
+    coverage: dict[str, dict[str, Any] | None],
+) -> str:
+    if freshness_status == "stale":
+        return "stale"
+    if freshness_status == "unavailable" or not isinstance(record_count, int) or record_count <= 0:
+        return "unavailable"
+    if freshness_status == "partial":
+        return "partial"
+    for details in coverage.values():
+        if isinstance(details, dict) and int(details.get("missing_count") or 0) > 0:
+            return "partial"
+    return "observed"
+
+
+def _workflow_prime_queues(
+    root: Path, items: Any, limit: int
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, bool]]:
+    categories: dict[str, list[dict[str, Any]]] = {
+        "actionable_now": [],
+        "candidate_next": [],
+        "blocked": [],
+    }
+    for item in items:
+        record = _workflow_record(item)
+        if item.top_status == "NO-GO":
+            categories["actionable_now"].append(record)
+            continue
+        if item.top_status == "ADVISORY":
+            record["reason_code"] = "advisory_requires_owner_intake"
+            categories["candidate_next"].append(record)
+            continue
+        if item.top_status != "GO":
+            continue
+
+        reason_code, context = _workflow_go_context(root, item.top_file)
+        if context:
+            record.update(context)
+        if reason_code is None:
+            categories["actionable_now"].append(record)
+        else:
+            record["reason_code"] = reason_code
+            categories["blocked"].append(record)
+    return _bound_workflow_categories(categories, limit)
+
+
+def _workflow_loyal_queues(items: Any, limit: int) -> tuple[dict[str, list[dict[str, Any]]], dict[str, bool]]:
+    categories: dict[str, list[dict[str, Any]]] = {
+        "actionable_now": [],
+        "candidate_next": [],
+        "blocked": [],
+    }
+    for item in items:
+        record = _workflow_record(item)
+        if item.top_status in {"NEW", "REVISED"}:
+            categories["actionable_now"].append(record)
+        else:
+            record["reason_code"] = "owner_hold"
+            categories["candidate_next"].append(record)
+    return _bound_workflow_categories(categories, limit)
+
+
+def _workflow_record(item: Any) -> dict[str, Any]:
+    return {
+        "id": item.document_name,
+        "document_name": item.document_name,
+        "title": item.document_name,
+        "source_authority": item.top_file,
+        "lifecycle_status": item.top_status,
+        "dispatchable": item.dispatchable,
+    }
+
+
+def _workflow_go_context(root: Path, top_file: str) -> tuple[str | None, dict[str, Any]]:
+    metadata = _read_workflow_bridge_metadata(root, top_file)
+    work_item_id = metadata.get("work_item_id")
+    authorization_id = metadata.get("authorization_id")
+    project_id = metadata.get("project_id")
+    if not work_item_id or not project_id:
+        return "bridge_metadata_unresolvable", {}
+
+    context: dict[str, Any] = {"work_item_id": work_item_id, "project_id": project_id}
+    if authorization_id:
+        context["project_authorization_id"] = authorization_id
+    db_path = root / "groundtruth.db"
+    if not db_path.is_file():
+        return "bridge_metadata_unresolvable", context
+
+    try:
+        with sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True) as connection:
+            connection.row_factory = sqlite3.Row
+            work_item = connection.execute(
+                "SELECT id, title, source_spec_id FROM current_work_items WHERE id = ? LIMIT 1",
+                (work_item_id,),
+            ).fetchone()
+            if work_item is None:
+                return "bridge_metadata_unresolvable", context
+            title = str(work_item["title"] or "").strip()
+            if title:
+                context["title"] = title
+            membership = connection.execute(
+                """
+                SELECT status
+                FROM current_project_work_item_memberships
+                WHERE project_id = ? AND work_item_id = ?
+                LIMIT 1
+                """,
+                (project_id, work_item_id),
+            ).fetchone()
+            if membership is None or str(membership["status"] or "").lower() != "active":
+                return "bridge_metadata_unresolvable", context
+            source_spec_id = str(work_item["source_spec_id"] or "").strip()
+            if not source_spec_id:
+                return "missing_source_spec", context
+            context["source_spec_id"] = source_spec_id
+            specification = connection.execute(
+                "SELECT status FROM current_specifications WHERE id = ? LIMIT 1",
+                (source_spec_id,),
+            ).fetchone()
+            if specification is None or str(specification["status"] or "").lower() not in {
+                "specified",
+                "implemented",
+                "verified",
+            }:
+                return "missing_source_spec", context
+            if not authorization_id:
+                return "missing_matching_pauth", context
+            authorization = connection.execute(
+                """
+                SELECT id, project_id, status, included_work_item_ids, excluded_work_item_ids
+                FROM current_project_authorizations
+                WHERE id = ? AND status = 'active'
+                LIMIT 1
+                """,
+                (authorization_id,),
+            ).fetchone()
+    except (OSError, sqlite3.Error):
+        return "bridge_metadata_unresolvable", context
+
+    if (
+        authorization is None
+        or str(authorization["project_id"] or "") != project_id
+        or not _authorization_covers_work_item(authorization, work_item_id)
+    ):
+        return "missing_matching_pauth", context
+    return None, context
+
+
+def _read_workflow_bridge_metadata(root: Path, top_file: str) -> dict[str, str | None]:
+    top_path = root / top_file
+    candidates = [top_path]
+    match = _BRIDGE_VERSION_RE.match(top_path.name)
+    if match and top_path.parent.is_dir():
+        versions: list[tuple[int, Path]] = []
+        for path in top_path.parent.glob(f"{match.group('slug')}-*.md"):
+            version_match = _BRIDGE_VERSION_RE.match(path.name)
+            if version_match and version_match.group("slug") == match.group("slug"):
+                versions.append((int(version_match.group("version")), path))
+        candidates = [path for _version, path in sorted(versions, reverse=True)]
+
+    metadata: dict[str, str | None] = {"work_item_id": None, "authorization_id": None, "project_id": None}
+    for path in candidates:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if metadata["work_item_id"] is None:
+            work_item = _WORK_ITEM_METADATA_RE.search(text)
+            if work_item:
+                metadata["work_item_id"] = work_item.group("work_item_id").upper()
+        if metadata["authorization_id"] is None:
+            authorization = _PROJECT_AUTHORIZATION_METADATA_RE.search(text)
+            if authorization:
+                metadata["authorization_id"] = authorization.group("authorization_id")
+        if metadata["project_id"] is None:
+            project = _PROJECT_METADATA_RE.search(text)
+            if project:
+                metadata["project_id"] = project.group("project_id")
+        if all(metadata.values()):
+            break
+    return metadata
+
+
+def _authorization_covers_work_item(authorization: sqlite3.Row, work_item_id: str) -> bool:
+    included = _workflow_json_list(authorization["included_work_item_ids"])
+    excluded = _workflow_json_list(authorization["excluded_work_item_ids"])
+    return work_item_id not in excluded and (not included or work_item_id in included)
+
+
+def _workflow_json_list(value: Any) -> set[str]:
+    if value is None:
+        return set()
+    try:
+        decoded = json.loads(str(value))
+    except json.JSONDecodeError:
+        decoded = str(value).split(",")
+    if not isinstance(decoded, list):
+        return set()
+    return {str(item).strip() for item in decoded if str(item).strip()}
+
+
+def _workflow_launch_index(report: dict[str, Any]) -> dict[str, dict[str, Any] | None]:
+    recipients = report.get("live_state", {}).get("recipients", {})
+    if not isinstance(recipients, dict):
+        return {}
+
+    index: dict[str, dict[str, Any] | None] = {}
+    missing = object()
+
+    def add(launch: Any) -> None:
+        if not isinstance(launch, dict):
+            return
+        dispatch_id = launch.get("dispatch_id")
+        if not isinstance(dispatch_id, str) or not dispatch_id.strip():
+            return
+        dispatch_id = dispatch_id.strip()
+        existing = index.get(dispatch_id, missing)
+        if existing is missing:
+            index[dispatch_id] = launch
+        elif existing is not None and existing != launch:
+            index[dispatch_id] = None
+
+    for recipient in recipients.values():
+        if not isinstance(recipient, dict):
+            continue
+        ledger_ids: set[str] = set()
+        ledger = recipient.get("launch_ledger")
+        if isinstance(ledger, dict):
+            ledger_groups: list[dict[str, Any]] = []
+            active = ledger.get("active")
+            completed = ledger.get("completed")
+            if isinstance(active, dict) or isinstance(completed, dict):
+                if isinstance(active, dict):
+                    ledger_groups.append(active)
+                if isinstance(completed, dict):
+                    ledger_groups.append(completed)
+            else:
+                ledger_groups.append(ledger)
+            for group in ledger_groups:
+                for launch in group.values():
+                    if isinstance(launch, dict):
+                        dispatch_id = launch.get("dispatch_id")
+                        if isinstance(dispatch_id, str) and dispatch_id.strip():
+                            ledger_ids.add(dispatch_id.strip())
+                    add(launch)
+
+        last_launch = recipient.get("last_launch")
+        if isinstance(last_launch, dict):
+            dispatch_id = last_launch.get("dispatch_id")
+            if isinstance(dispatch_id, str) and dispatch_id.strip() not in ledger_ids:
+                add(last_launch)
+    return index
+
+
+def _workflow_bridge_slug(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    slug = value.strip()
+    return slug if _BRIDGE_SLUG_RE.fullmatch(slug) else None
+
+
+def _workflow_launch_document(launch: dict[str, Any]) -> str | None:
+    lease_documents: list[str] = []
+    handles = launch.get("document_lease_handles")
+    if isinstance(handles, list):
+        for handle in handles:
+            slug = _workflow_bridge_slug(handle.get("doc_slug")) if isinstance(handle, dict) else None
+            if slug and slug not in lease_documents:
+                lease_documents.append(slug)
+
+    selected_documents: list[str] = []
+    for key in ("selected_documents", "document_names"):
+        values = launch.get(key)
+        if not isinstance(values, list):
+            continue
+        for value in values:
+            slug = _workflow_bridge_slug(value)
+            if slug and slug not in selected_documents:
+                selected_documents.append(slug)
+
+    canonical_documents = lease_documents + [slug for slug in selected_documents if slug not in lease_documents]
+    primary = _workflow_bridge_slug(launch.get("primary_bridge_id"))
+    if primary in canonical_documents:
+        return primary
+    return canonical_documents[0] if canonical_documents else None
+
+
+def _workflow_numbered_bridge_file(root: Path, slug: str) -> str | None:
+    bridge_dir = (root / "bridge").resolve()
+    versions: list[tuple[int, Path]] = []
+    for path in bridge_dir.glob(f"{slug}-*.md"):
+        match = _BRIDGE_VERSION_RE.fullmatch(path.name)
+        if match and match.group("slug") == slug:
+            versions.append((int(match.group("version")), path.resolve()))
+    if not versions:
+        return None
+    path = max(versions)[1]
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return None
+
+
+def _workflow_in_flight(root: Path, report: dict[str, Any]) -> list[dict[str, Any]]:
+    launches = _workflow_launch_index(report)
+    records: list[dict[str, Any]] = []
+    for run in report["history"]["recent_runs"]:
+        state = str(run.get("state") or "")
+        if state not in {"live", "stale", "unknown"}:
+            continue
+        dispatch_id = str(run.get("dispatch_id") or "")
+        recipient_match = _DISPATCH_RECIPIENT_RE.match(dispatch_id)
+        recipient = None
+        if recipient_match:
+            recipient = f"{recipient_match.group('role')}:{recipient_match.group('harness_id')}"
+        bridge_document = None
+        work_item_id = None
+        launch = launches.get(dispatch_id) if dispatch_id else None
+        if launch is not None:
+            bridge_document = _workflow_launch_document(launch)
+            top_file = _workflow_numbered_bridge_file(root, bridge_document) if bridge_document else None
+            if top_file:
+                work_item_id = _read_workflow_bridge_metadata(root, top_file)["work_item_id"]
+        records.append(
+            {
+                "dispatch_id": dispatch_id,
+                "recipient": recipient,
+                "lifecycle_state": state,
+                "started_at": run.get("started_at"),
+                "age_seconds": run.get("age_seconds"),
+                "bridge_document": bridge_document,
+                "work_item_id": work_item_id,
+            }
+        )
+    return records
+
+
+def _workflow_selected_targets(report: dict[str, Any], limit: int) -> tuple[dict[str, list[dict[str, Any]]], bool]:
+    selected: dict[str, list[dict[str, Any]]] = {}
+    truncated = False
+    for role in DISPATCH_ROLES:
+        rows = report["topology"]["selected_by_role"].get(role, [])
+        summaries = [
+            {
+                "id": row.get("id"),
+                "harness_name": row.get("harness_name"),
+                "dispatch_availability": row.get("dispatch_availability"),
+            }
+            for row in rows
+        ]
+        selected[role], role_truncated = _bounded_workflow_records(summaries, limit)
+        truncated = truncated or role_truncated
+    return selected, truncated
+
+
+def _bound_workflow_categories(
+    categories: dict[str, list[dict[str, Any]]], limit: int
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, bool]]:
+    bounded: dict[str, list[dict[str, Any]]] = {}
+    truncated: dict[str, bool] = {}
+    for category, records in categories.items():
+        bounded[category], truncated[category] = _bounded_workflow_records(records, limit)
+    return bounded, truncated
+
+
+def _bounded_workflow_records(records: list[dict[str, Any]], limit: int) -> tuple[list[dict[str, Any]], bool]:
+    return records[:limit], len(records) > limit
+
+
+def _format_workflow_record(record: dict[str, Any]) -> str:
+    label = str(record.get("title") or record.get("document_name") or record.get("id") or "unknown")
+    reason = record.get("reason_code")
+    return f"{label} [{reason}]" if reason else label
 
 
 def _read_json(path: Path) -> tuple[dict[str, Any], list[str]]:

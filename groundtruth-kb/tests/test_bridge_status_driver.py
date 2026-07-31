@@ -35,6 +35,11 @@ def test_bridge_status_driver_reports_role_actionability_without_verified(projec
         "NO-GO: bridge/review-revised-002.md",
         "NEW: bridge/review-revised-001.md",
         "",
+        "Document: review-no-action",
+        "NO-ACTION: bridge/review-no-action-003.md",
+        "GO: bridge/review-no-action-002.md",
+        "NEW: bridge/review-no-action-001.md",
+        "",
         "Document: closed",
         "VERIFIED: bridge/closed-002.md",
         "NEW: bridge/closed-001.md",
@@ -48,21 +53,24 @@ def test_bridge_status_driver_reports_role_actionability_without_verified(projec
     ]
     (bridge_dir / "INDEX.md").write_text("\n".join(index_lines), encoding="utf-8")
 
-    _write_bridge_file(project_dir, "impl-go", 1, "bridge_kind: implementation_proposal\n")
+    _write_bridge_file(project_dir, "impl-go", 1, "NEW\nbridge_kind: implementation_proposal\n")
     _write_bridge_file(project_dir, "impl-go", 2, "GO\n")
-    _write_bridge_file(project_dir, "scoping-go", 1, "bridge_kind: implementation_scoping\n")
+    _write_bridge_file(project_dir, "scoping-go", 1, "NEW\nbridge_kind: implementation_scoping\n")
     _write_bridge_file(project_dir, "scoping-go", 2, "GO\n")
-    _write_bridge_file(project_dir, "revise-me", 1, "bridge_kind: implementation_proposal\n")
+    _write_bridge_file(project_dir, "revise-me", 1, "NEW\nbridge_kind: implementation_proposal\n")
     _write_bridge_file(project_dir, "revise-me", 2, "NO-GO\n")
-    _write_bridge_file(project_dir, "review-new", 1, "bridge_kind: implementation_proposal\n")
-    _write_bridge_file(project_dir, "review-revised", 1, "bridge_kind: implementation_proposal\n")
+    _write_bridge_file(project_dir, "review-new", 1, "NEW\nbridge_kind: implementation_proposal\n")
+    _write_bridge_file(project_dir, "review-revised", 1, "NEW\nbridge_kind: implementation_proposal\n")
     _write_bridge_file(project_dir, "review-revised", 2, "NO-GO\n")
-    _write_bridge_file(project_dir, "review-revised", 3, "bridge_kind: implementation_proposal\n")
-    _write_bridge_file(project_dir, "closed", 1, "bridge_kind: post_implementation_report\n")
+    _write_bridge_file(project_dir, "review-revised", 3, "REVISED\nbridge_kind: implementation_proposal\n")
+    _write_bridge_file(project_dir, "review-no-action", 1, "NEW\nbridge_kind: implementation_proposal\n")
+    _write_bridge_file(project_dir, "review-no-action", 2, "GO\n")
+    _write_bridge_file(project_dir, "review-no-action", 3, "NO-ACTION\n")
+    _write_bridge_file(project_dir, "closed", 1, "NEW\nbridge_kind: post_implementation_report\n")
     _write_bridge_file(project_dir, "closed", 2, "VERIFIED\n")
-    _write_bridge_file(project_dir, "withdrawn", 1, "bridge_kind: implementation_proposal\n")
+    _write_bridge_file(project_dir, "withdrawn", 1, "NEW\nbridge_kind: implementation_proposal\n")
     _write_bridge_file(project_dir, "withdrawn", 2, "WITHDRAWN\n")
-    _write_bridge_file(project_dir, "advisory", 1, "bridge_kind: advisory_report\n")
+    _write_bridge_file(project_dir, "advisory", 1, "ADVISORY\nbridge_kind: advisory_report\n")
 
     from groundtruth_kb.bridge.status_driver import collect_bridge_status
 
@@ -71,20 +79,24 @@ def test_bridge_status_driver_reports_role_actionability_without_verified(projec
 
     assert queue.status_counts["VERIFIED"] == 1
     assert queue.status_counts["WITHDRAWN"] == 1
-    assert [item.document_name for item in queue.prime_actionable] == [
+    assert queue.status_counts["NO-ACTION"] == 1
+    assert {item.document_name for item in queue.prime_actionable} == {
         "impl-go",
         "scoping-go",
         "revise-me",
         "advisory",
-    ]
+    }
     assert {item.top_status for item in queue.prime_actionable} == {"GO", "NO-GO", "ADVISORY"}
     assert "closed" not in {item.document_name for item in queue.prime_actionable}
-    assert [item.document_name for item in queue.loyal_opposition_actionable] == [
+    assert {item.document_name for item in queue.loyal_opposition_actionable} == {
         "review-new",
         "review-revised",
-    ]
+        "review-no-action",
+    }
+    assert {item.top_status for item in queue.loyal_opposition_actionable} == {"NEW", "REVISED", "NO-ACTION"}
     assert queue.dispatchable_counts["prime_dispatchable"] == 2
     assert queue.dispatchable_counts["prime_interactive"] == 2
+    assert queue.dispatchable_counts["loyal_opposition_dispatchable"] == 3
     assert queue.dispatchable_counts["terminal_or_non_actionable"] == 3
 
 
@@ -107,7 +119,7 @@ def test_bridge_status_driver_accepts_multiline_index_header_comments(project_di
         "NEW: bridge/review-new-001.md",
     ]
     (bridge_dir / "INDEX.md").write_text("\n".join(index_lines), encoding="utf-8")
-    _write_bridge_file(project_dir, "review-new", 1, "bridge_kind: implementation_proposal\n")
+    _write_bridge_file(project_dir, "review-new", 1, "NEW\nbridge_kind: implementation_proposal\n")
 
     from groundtruth_kb.bridge.status_driver import collect_bridge_status
 
@@ -122,7 +134,7 @@ def test_bridge_status_driver_reports_local_automation_health(project_dir: Path)
     (project_dir / "bridge").mkdir()
     (project_dir / "bridge" / "INDEX.md").write_text("", encoding="utf-8")
     (project_dir / "scripts").mkdir()
-    (project_dir / "scripts" / "cross_harness_bridge_trigger.py").write_text("# trigger\n", encoding="utf-8")
+    (project_dir / "scripts" / "gtkb_dispatcher_daemon.py").write_text("# daemon\n", encoding="utf-8")
     (project_dir / ".claude").mkdir()
     (project_dir / ".codex").mkdir()
     hook_payload = {
@@ -130,9 +142,7 @@ def test_bridge_status_driver_reports_local_automation_health(project_dir: Path)
             "Stop": [
                 {
                     "hooks": [
-                        {"command": "python scripts/cross_harness_bridge_trigger.py"},
                         {"command": "python scripts/active_session_heartbeat.py"},
-                        {"command": "python scripts/single_harness_bridge_automation.py --ensure"},
                     ]
                 }
             ]
@@ -175,10 +185,10 @@ def test_bridge_status_driver_reports_local_automation_health(project_dir: Path)
 
     automation = collect_bridge_status(project_dir).automation
 
-    assert automation.trigger_script_exists is True
+    assert automation.dispatcher_daemon_script_exists is True
     assert automation.dispatch_state["recipient_count"] == 2
-    assert automation.hook_registrations[".claude/settings.json"]["cross_harness_trigger_registered"] is True
-    assert automation.hook_registrations[".codex/hooks.json"]["single_harness_automation_registered"] is True
+    assert automation.hook_registrations[".claude/settings.json"]["retired_bridge_worker_registered"] is False
+    assert automation.hook_registrations[".codex/hooks.json"]["retired_bridge_worker_registered"] is False
     assert len(automation.active_session_locks) == 1
     assert automation.system_inventory["retired_systems"][0]["id"] == "smart-poller"
     assert automation.system_inventory["external_thread_automations"][0]["id"] == "monitor-gt-kb-bridge-codex-thread"

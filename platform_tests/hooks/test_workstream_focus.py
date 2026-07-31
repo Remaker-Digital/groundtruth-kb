@@ -328,7 +328,7 @@ def test_hook_payload_accepts_claude_prompt_field_for_startup_gate(tmp_path, mon
     assert guard_state["discard_next_user_prompt"] is False
     assert guard_state["startup_prompt_discarded"] is True
     assert guard_state["startup_response_pending"] is True
-    assert guard_state["startup_prompt_preview"] == "::init gtkb pb"
+    assert "startup_prompt_preview" not in guard_state
 
 
 def test_startup_gate_no_match_passes_prompt_through(tmp_path, monkeypatch) -> None:
@@ -366,7 +366,7 @@ def test_startup_gate_no_match_passes_prompt_through(tmp_path, monkeypatch) -> N
     assert guard_state["startup_gate_no_match_passed_through"] is True
 
 
-def test_sessionstart_plus_dispatch_prompt_without_marker_processes_bridge_task(tmp_path, monkeypatch) -> None:
+def test_sessionstart_plus_daemon_dispatch_prompt_without_marker_processes_bridge_task(tmp_path, monkeypatch) -> None:
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
     guard_path = tmp_path / "guard.json"
@@ -383,9 +383,9 @@ def test_sessionstart_plus_dispatch_prompt_without_marker_processes_bridge_task(
     )
     dispatch_prompt = """::init gtkb pb
 
-Single-harness bridge dispatcher notification (Slice 2 scheduled task).
+Dispatcher daemon bridge dispatch notification.
 
-This is an automated bridge dispatch from the single-harness dispatcher, not a fresh-session owner stimulus;
+This is an automated bridge dispatch from the dispatcher daemon, not a fresh-session owner stimulus;
 do not wait for another owner message before processing the selected entries.
 
 Read bridge/INDEX.md directly before acting.
@@ -407,7 +407,7 @@ Read bridge/INDEX.md directly before acting.
     assert guard_state["startup_prompt_discarded"] is False
     assert guard_state["startup_response_pending"] is False
     assert guard_state["startup_gate_no_match_passed_through"] is True
-    assert guard_state["startup_prompt_preview"].startswith("::init gtkb pb Single-harness bridge dispatcher")
+    assert "startup_prompt_preview" not in guard_state
 
 
 def test_startup_gate_init_keyword_sets_app_scope(tmp_path, monkeypatch) -> None:
@@ -441,6 +441,41 @@ def test_startup_gate_init_keyword_sets_app_scope(tmp_path, monkeypatch) -> None
     guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
     assert guard_state["current_subject"] == module.SUBJECT_APPLICATION
     assert guard_state["startup_init_app_scope"] == "agent_red"
+
+
+def test_startup_gate_canonical_application_subject_sets_application_scope(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    canonical, _ = _isolate_state(monkeypatch, tmp_path)
+    guard_path = tmp_path / "guard.json"
+    guard_path.write_text(
+        json.dumps(
+            {
+                "discard_next_user_prompt": True,
+                "startup_guard_id": "test-guard",
+                "startup_response_pending": False,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    response = module.handle_hook_payload(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "::init application",
+        },
+        REPO_ROOT,
+    )
+
+    assert "(init-keyword match)" in response["systemMessage"]
+    state = json.loads(canonical.read_text(encoding="utf-8"))
+    assert state["current_subject"] == module.SUBJECT_APPLICATION
+    assert state["application_id"] is None
+    guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
+    assert guard_state["current_subject"] == module.SUBJECT_APPLICATION
+    assert guard_state["startup_init_app_scope"] == "application"
+    assert "startup_session_role_marker_written_at" not in guard_state
+    assert "startup_session_role_per_session_markers_written" not in guard_state
 
 
 def _write_startup_gate_guard(tmp_path: Path) -> None:
@@ -565,6 +600,23 @@ def test_lo_default_startup_gate_continues_to_harness_action(tmp_path, monkeypat
     assert "status-bearing versioned files under `bridge/`" in context
     assert "process actionable latest `NEW` / `REVISED` bridge entries oldest-to-newest by default" in context
     assert "stop and wait for the next owner message" not in context
+    guard_state = json.loads((tmp_path / "guard.json").read_text(encoding="utf-8"))
+    assert guard_state["startup_response_pending"] is False
+    assert guard_state["startup_input_gate_clear_reason"] == "lo_startup_relay"
+    assert (
+        module.guard_tool_use(
+            {"tool_name": "Bash", "tool_input": {"command": "gt bridge state-report --markdown"}},
+            tmp_path,
+        )
+        == {}
+    )
+    assert (
+        module.guard_tool_use(
+            {"tool_name": "Write", "tool_input": {"file_path": "bridge/gtkb-wi5186-example-002.md"}},
+            tmp_path,
+        )
+        == {}
+    )
 
 
 def test_lo_advisory_startup_gate_asks_before_auto_process(tmp_path, monkeypatch) -> None:
@@ -590,6 +642,16 @@ def test_lo_advisory_startup_gate_asks_before_auto_process(tmp_path, monkeypatch
     assert "ask Mike whether to switch to auto-process" in context
     assert "Do not write verdict files or auto-process bridge entries in advisory mode" in context
     assert "stop and wait for the next owner message" not in context
+    guard_state = json.loads((tmp_path / "guard.json").read_text(encoding="utf-8"))
+    assert guard_state["startup_response_pending"] is False
+    assert guard_state["startup_input_gate_clear_reason"] == "lo_startup_relay"
+    assert (
+        module.guard_tool_use(
+            {"tool_name": "Bash", "tool_input": {"command": "gt bridge state-report --markdown"}},
+            tmp_path,
+        )
+        == {}
+    )
 
 
 def test_prime_builder_startup_gate_still_waits_after_disclosure(tmp_path, monkeypatch) -> None:
@@ -614,6 +676,15 @@ def test_prime_builder_startup_gate_still_waits_after_disclosure(tmp_path, monke
     assert "stop and wait for the next owner message" in context
     assert "must not choose, map, or begin session work" in context
     assert "process actionable latest `NEW` / `REVISED`" not in context
+    guard_state = json.loads((tmp_path / "guard.json").read_text(encoding="utf-8"))
+    assert guard_state["startup_response_pending"] is True
+    for payload in (
+        {"tool_name": "Bash", "tool_input": {"command": "gt bridge state-report --markdown"}},
+        {"tool_name": "Write", "tool_input": {"file_path": "bridge/gtkb-wi5186-example-002.md"}},
+    ):
+        blocked = module.guard_tool_use(payload, tmp_path)
+        assert blocked["decision"] == "block"
+        assert "GTKB-STARTUP-INPUT-GATE" in blocked["reason"]
 
 
 def test_startup_gate_does_not_consult_shared_dashboard_report(tmp_path, monkeypatch) -> None:
@@ -644,23 +715,34 @@ def test_startup_gate_fails_visibly_on_inconsistent_cache(tmp_path, monkeypatch)
     """T5 -- DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001: a bad cache fails visibly, not silently."""
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
+    _seed_registry(tmp_path, {"A": ("codex", ["loyal-opposition"], "active")})
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "A")
     monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
     _write_startup_gate_guard(tmp_path)
     _write_relay_cache(
         tmp_path / ".codex" / "gtkb-hooks",
         "# Fresh Session Startup\n\nbody",
         sha="0" * 64,
+        role_mode="lo",
     )
 
     response = module.handle_hook_payload(
-        {"hook_event_name": "UserPromptSubmit", "prompt": "init gtkb"},
+        {"hook_event_name": "UserPromptSubmit", "prompt": "::init gtkb lo", "session_id": "session-lo"},
         tmp_path,
     )
     context = response["hookSpecificOutput"]["additionalContext"]
 
     assert "STARTUP RELAY FAILURE" in context
     assert "do not treat startup as satisfied" in context.lower()
+    guard_state = json.loads((tmp_path / "guard.json").read_text(encoding="utf-8"))
+    assert guard_state["startup_response_pending"] is True
+    blocked = module.guard_tool_use(
+        {"tool_name": "Bash", "tool_input": {"command": "gt bridge state-report --markdown"}},
+        tmp_path,
+    )
+    assert blocked["decision"] == "block"
+    assert "GTKB-STARTUP-INPUT-GATE" in blocked["reason"]
 
 
 def test_user_promptsubmit_clears_stale_startup_gate_after_startup_stop(tmp_path, monkeypatch) -> None:
@@ -697,7 +779,7 @@ def test_user_promptsubmit_clears_stale_startup_gate_after_startup_stop(tmp_path
     assert guard_state["discard_next_user_prompt"] is False
     assert guard_state["stale_startup_gate_cleared"] is True
     assert guard_state["stale_startup_gate_reason"] == "startup_stop_already_suppressed"
-    assert guard_state["startup_prompt_preview"] == "work subject application"
+    assert "startup_prompt_preview" not in guard_state
 
 
 def test_prompt_hook_accepts_bom_prefixed_stdin_from_windows_pipeline(tmp_path) -> None:
@@ -892,7 +974,7 @@ def test_prompt_hook_discards_first_fresh_session_message_when_startup_gate_is_a
     assert guard_state["discard_next_user_prompt"] is False
     assert guard_state["startup_prompt_discarded"] is True
     assert guard_state["startup_response_pending"] is True
-    assert guard_state["startup_prompt_preview"] == "Please resume."
+    assert "startup_prompt_preview" not in guard_state
 
 
 @pytest.mark.skip(reason="workstream-focus.py intentionally retired S304/S305; see REVISED-5 BN-3")
@@ -938,6 +1020,28 @@ def test_classify_root_4_categories(tmp_path, monkeypatch) -> None:
     )
     assert module.classify_root("AGENTS.md", REPO_ROOT) == module.ROOT_CURRENT_REPO_BRIDGE_OR_GOVERNANCE
     assert module.classify_root("README.md", REPO_ROOT) == module.ROOT_NEUTRAL
+
+
+def test_classify_root_config_platform_carveout() -> None:
+    # WI-5100: GT-KB platform config/ subdirs are governance surfaces, not
+    # application product, so GT-KB-subject sessions can edit them. classify_root
+    # matches governance prefixes BEFORE the blanket config/ APPLICATION_PREFIXES
+    # entry, so these carve-outs win.
+    module = _load_module()
+    platform_config_files = (
+        "config/agent-control/harness-capability-registry.toml",
+        "config/agent-control/SESSION-STARTUP-INDEX.md",
+        "config/dispatcher/rules.toml",
+        "config/governance/spec-applicability.toml",
+        "config/harness-parity/example.toml",
+        "config/project-templates/example.toml",
+        "config/registry/sot-artifacts.toml",
+    )
+    for path_text in platform_config_files:
+        assert module.classify_root(path_text, REPO_ROOT) == module.ROOT_CURRENT_REPO_BRIDGE_OR_GOVERNANCE, path_text
+    # Carve-out precision: a config/ path OUTSIDE the platform subdirs still
+    # classifies as application_product (the blanket config/ fallback preserved).
+    assert module.classify_root("config/app-settings.toml", REPO_ROOT) == module.ROOT_APPLICATION_PRODUCT
 
 
 def test_application_subject_blocks_gtkb_product_write(tmp_path, monkeypatch) -> None:
@@ -1092,6 +1196,7 @@ def test_startup_response_pending_blocks_tool_use_until_next_owner_prompt(tmp_pa
             {
                 "discard_next_user_prompt": False,
                 "startup_prompt_discarded": True,
+                "startup_prompt_preview": "owner-private-input",
                 "startup_response_pending": True,
             }
         )
@@ -1110,6 +1215,47 @@ def test_startup_response_pending_blocks_tool_use_until_next_owner_prompt(tmp_pa
     assert "init-keyword contract" in response["reason"]
     assert "DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001" in response["reason"]
     assert "first owner message of this fresh session was discarded" not in response["reason"]
+    assert "startup_prompt_preview" not in json.loads(guard_path.read_text(encoding="utf-8"))
+
+
+def test_auq_acknowledgement_clears_only_matching_pending_session(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    guard_path = tmp_path / "guard.json"
+    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(tmp_path / "focus.json"))
+    monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(guard_path))
+    guard_path.write_text(
+        json.dumps(
+            {
+                "discard_next_user_prompt": False,
+                "startup_guard_id": "session-a",
+                "startup_prompt_discarded": True,
+                "startup_prompt_discarded_at": module._now_iso(),
+                "startup_prompt_preview": "owner-private-input",
+                "startup_response_pending": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert module.acknowledge_startup_owner_input("session-b", REPO_ROOT) is False
+    mismatched_state = json.loads(guard_path.read_text(encoding="utf-8"))
+    assert mismatched_state["startup_response_pending"] is True
+    assert "startup_prompt_preview" not in mismatched_state
+
+    assert module.acknowledge_startup_owner_input("session-a", REPO_ROOT) is True
+    assert module.acknowledge_startup_owner_input("session-a", REPO_ROOT) is False
+    guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
+    assert guard_state["startup_response_pending"] is False
+    assert guard_state["startup_input_gate_clear_reason"] == "ask_user_question_completed"
+    assert "startup_prompt_preview" not in guard_state
+    assert (
+        module.guard_tool_use(
+            {"tool_name": "Write", "tool_input": {"file_path": ".claude/rules/new-rule.md"}},
+            REPO_ROOT,
+        )
+        == {}
+    )
 
 
 def test_stale_startup_response_pending_does_not_block_later_tool_use(tmp_path, monkeypatch) -> None:
@@ -1123,6 +1269,7 @@ def test_stale_startup_response_pending_does_not_block_later_tool_use(tmp_path, 
                 "discard_next_user_prompt": False,
                 "startup_prompt_discarded": True,
                 "startup_prompt_discarded_at": "2026-01-01T00:00:00Z",
+                "startup_prompt_preview": "owner-private-input",
                 "startup_response_pending": True,
             }
         )
@@ -1139,6 +1286,7 @@ def test_stale_startup_response_pending_does_not_block_later_tool_use(tmp_path, 
     guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
     assert guard_state["startup_response_pending"] is False
     assert guard_state["stale_startup_response_pending_cleared"] is True
+    assert "startup_prompt_preview" not in guard_state
 
 
 def test_bash_guard_blocks_mutating_gtkb_and_governance_commands(tmp_path, monkeypatch) -> None:
@@ -1557,14 +1705,14 @@ def test_detect_counterpart_state_uses_project_root_paths_when_provided(tmp_path
     module.detect_counterpart_state(sandbox)
 
     assert recorded_paths, "expected detect_counterpart_state to load role assignments"
-    canonical_root = module.PROJECT_ROOT
+    expected_role_assignment_path = sandbox / "harness-state" / "harness-registry.json"
     for path in recorded_paths:
         assert sandbox in path.parents, (
             f"role assignment path {path!r} should be under sandbox {sandbox!r} but is not — class-level fix regressed"
         )
-        assert canonical_root not in path.parents, (
-            f"role assignment path {path!r} should NOT be under canonical "
-            f"PROJECT_ROOT {canonical_root!r} — class-level fix regressed"
+        assert path == expected_role_assignment_path, (
+            f"role assignment path {path!r} should equal sandbox registry "
+            f"{expected_role_assignment_path!r} — class-level fix regressed"
         )
 
 
@@ -1625,14 +1773,16 @@ def test_startup_gate_self_heals_freshness_stale_cache(tmp_path, monkeypatch) ->
     stale_time_str = "2026-01-01T00:00:00Z"
     diagnostics = tmp_path / ".codex" / "gtkb-hooks"
     diagnostics.mkdir(parents=True, exist_ok=True)
-    cache_file = diagnostics / "last-user-visible-startup.md"
-    meta_file = diagnostics / "last-user-visible-startup.meta.json"
+    cache_file = diagnostics / "last-user-visible-startup-pb.md"
+    meta_file = diagnostics / "last-user-visible-startup-pb.meta.json"
     cache_file.write_text(body_text, encoding="utf-8", newline="\n")
 
     encoded = body_text.encode("utf-8")
     meta = {
         "harness_name": "codex",
         "harness_id": "A",
+        "role_mode": "pb",
+        "role_profile": "prime-builder",
         "generated_at": stale_time_str,
         "byte_length": len(encoded),
         "sha256": hashlib.sha256(encoded).hexdigest(),
@@ -1644,7 +1794,7 @@ def test_startup_gate_self_heals_freshness_stale_cache(tmp_path, monkeypatch) ->
     monkeypatch.setattr(module, "_resolved_harness_id", lambda root: "A")
 
     response = module.handle_hook_payload(
-        {"hook_event_name": "UserPromptSubmit", "prompt": "init gtkb"},
+        {"hook_event_name": "UserPromptSubmit", "prompt": "::init gtkb pb"},
         tmp_path,
     )
 
@@ -1652,6 +1802,165 @@ def test_startup_gate_self_heals_freshness_stale_cache(tmp_path, monkeypatch) ->
     new_meta = json.loads(meta_file.read_text(encoding="utf-8"))
     assert new_meta["generated_at"] != stale_time_str
     assert "STARTUP RELAY FAILURE" not in response["hookSpecificOutput"]["additionalContext"]
+
+
+def test_startup_gate_default_refresh_budget_allows_local_render(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.delenv("GTKB_STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS", raising=False)
+
+    assert module.STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS == 5.0
+    assert module._startup_relay_refresh_timeout_seconds() == 5.0
+
+
+def _mock_dispatch_core_render_and_write(monkeypatch, module, *, render, write) -> None:
+    """Stub both _render_role_startup_report and _write_startup_relay_cache on
+    whichever session_start_dispatch_core import path the refresh thread resolves."""
+    import sys
+
+    if str(module.PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(module.PROJECT_ROOT))
+    try:
+        import scripts.session_start_dispatch_core as _core_pkg
+
+        monkeypatch.setattr(_core_pkg, "_render_role_startup_report", render)
+        monkeypatch.setattr(_core_pkg, "_write_startup_relay_cache", write)
+    except (ImportError, AttributeError):
+        pass
+
+    if str(module.PROJECT_ROOT / "scripts") not in sys.path:
+        sys.path.insert(0, str(module.PROJECT_ROOT / "scripts"))
+    try:
+        import session_start_dispatch_core as _core_top
+
+        monkeypatch.setattr(_core_top, "_render_role_startup_report", render)
+        monkeypatch.setattr(_core_top, "_write_startup_relay_cache", write)
+    except (ImportError, AttributeError):
+        pass
+
+
+def test_refresh_records_timeout_abandonment(tmp_path, monkeypatch) -> None:
+    """WI-5650 A1 / GOV-SESSION-SELF-INITIALIZATION-001: a budget-exceeding refresh
+    returns False AND records a timeout_abandoned diagnostic with elapsed + budget."""
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("GTKB_STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS", "0.05")
+
+    def _slow_render(role_profile):
+        time.sleep(0.4)
+        return "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nlate"
+
+    _mock_dispatch_core_render_and_write(monkeypatch, module, render=_slow_render, write=lambda *a, **k: None)
+
+    result = module._refresh_startup_relay_cache_bounded(tmp_path, role_mode="pb", meta={"role_mode": "pb"})
+
+    assert result is False
+    diag = tmp_path / ".codex" / "gtkb-hooks" / module.STARTUP_RELAY_REFRESH_DIAGNOSTIC_NAME
+    assert diag.is_file(), "an abandoned refresh must leave a diagnostic record"
+    records = [json.loads(line) for line in diag.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert records, "at least one record must be written"
+    last = records[-1]
+    assert last["outcome"] == "timeout_abandoned"
+    assert isinstance(last["elapsed_seconds"], (int, float))
+    assert last["elapsed_seconds"] >= 0.0
+    assert last["budget_seconds"] == pytest.approx(0.05)
+    assert last["role_mode"] == "pb"
+
+
+def test_refresh_records_completion(tmp_path, monkeypatch) -> None:
+    """WI-5650 A1 / DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001: a fast refresh
+    returns True and records outcome=completed with elapsed below budget."""
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("GTKB_STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS", "2.0")
+
+    def _fast_render(role_profile):
+        return "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nfresh"
+
+    _mock_dispatch_core_render_and_write(monkeypatch, module, render=_fast_render, write=lambda *a, **k: None)
+
+    result = module._refresh_startup_relay_cache_bounded(tmp_path, role_mode="pb", meta={"role_mode": "pb"})
+
+    assert result is True
+    diag = tmp_path / ".codex" / "gtkb-hooks" / module.STARTUP_RELAY_REFRESH_DIAGNOSTIC_NAME
+    records = [json.loads(line) for line in diag.read_text(encoding="utf-8").splitlines() if line.strip()]
+    last = records[-1]
+    assert last["outcome"] == "completed"
+    assert last["elapsed_seconds"] < last["budget_seconds"]
+    assert last["budget_seconds"] == pytest.approx(2.0)
+    assert last["role_mode"] == "pb"
+
+
+def test_stale_but_intact_cache_reports_staleness_not_corruption(tmp_path, monkeypatch) -> None:
+    """WI-5650 A2 / GOV-SOURCE-OF-TRUTH-FRESHNESS-001: an identity-intact,
+    content-consistent, but stale cache whose refresh was abandoned is diagnosed
+    as staleness + refresh abandonment, not as a corruption/mismatch."""
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
+    _write_startup_gate_guard(tmp_path)
+
+    body = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nintact body\n"
+    diagnostics = tmp_path / ".codex" / "gtkb-hooks"
+    diagnostics.mkdir(parents=True, exist_ok=True)
+    cache_file = diagnostics / "last-user-visible-startup.md"
+    meta_file = diagnostics / "last-user-visible-startup.meta.json"
+    cache_file.write_text(body, encoding="utf-8", newline="\n")
+    encoded = body.encode("utf-8")
+    meta_file.write_text(
+        json.dumps(
+            {
+                "harness_name": "codex",
+                "harness_id": "A",
+                "generated_at": "2020-01-01T00:00:00Z",
+                "byte_length": len(encoded),
+                "sha256": hashlib.sha256(encoded).hexdigest(),
+            }
+        ),
+        encoding="utf-8",
+        newline="\n",
+    )
+    monkeypatch.setattr(module, "_resolved_harness_id", lambda root: "A")
+    monkeypatch.setattr(module, "_refresh_startup_relay_cache_bounded", lambda *a, **k: False)
+
+    response, validated = module._startup_gate_response(tmp_path, role_mode=None)
+    diagnostic = response["hookSpecificOutput"]["additionalContext"]
+
+    assert validated is False
+    assert "STARTUP RELAY FAILURE" in diagnostic
+    lowered = diagnostic.lower()
+    assert "stale" in lowered
+    assert "abandoned" in lowered
+    assert "budget" in lowered
+    assert "sha256" not in lowered
+    assert "does not match its metadata sidecar" not in diagnostic
+
+
+def test_genuine_identity_mismatch_message_unchanged(tmp_path, monkeypatch) -> None:
+    """WI-5650 A2 / GOV-SOURCE-OF-TRUTH-FRESHNESS-001: a genuine identity/shape
+    mismatch keeps the existing corruption-shaped diagnostic byte-for-byte."""
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
+    _write_startup_gate_guard(tmp_path)
+
+    diagnostics = tmp_path / ".codex" / "gtkb-hooks"
+    _write_relay_cache(diagnostics, "this is not a startup disclosure at all\n")
+    monkeypatch.setattr(module, "_resolved_harness_id", lambda root: "A")
+
+    response, validated = module._startup_gate_response(tmp_path, role_mode=None)
+    diagnostic = response["hookSpecificOutput"]["additionalContext"]
+
+    assert validated is False
+    assert (
+        "does not match its metadata sidecar (sha256, byte-length, harness id, role, "
+        "freshness, or startup-disclosure shape mismatch); it may be stale, wrong-role, "
+        "or displaced by a non-disclosure payload"
+    ) in diagnostic
 
 
 def test_startup_gate_self_heals_rederivable_content_drift(tmp_path, monkeypatch) -> None:
@@ -1895,3 +2204,67 @@ def test_startup_gate_no_self_heal_on_fresh_consistent_cache(tmp_path, monkeypat
     assert not called
     assert cache_file.read_text(encoding="utf-8") == body_text
     assert "STARTUP RELAY FAILURE" not in response["hookSpecificOutput"]["additionalContext"]
+
+
+def test_continuation_armed_gate_does_not_block_tool_use(tmp_path, monkeypatch) -> None:
+    """WI-5083 belt-and-suspenders: a startup-input gate armed under a
+    mid-session continuation source must not block tool use, even inside the
+    30-min pending window."""
+    module = _load_module()
+    guard_path = tmp_path / "guard.json"
+    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(tmp_path / "focus.json"))
+    monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(guard_path))
+    guard_path.write_text(
+        json.dumps(
+            {
+                "discard_next_user_prompt": False,
+                "startup_prompt_discarded": True,
+                "startup_prompt_discarded_at": module._now_iso(),  # fresh, within window
+                "startup_response_pending": True,
+                "armed_source": "resume",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    response = module.guard_tool_use(
+        {"tool_name": "Write", "tool_input": {"file_path": ".claude/rules/new-rule.md"}},
+        REPO_ROOT,
+    )
+
+    assert response == {}
+    guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
+    assert guard_state["startup_response_pending"] is False
+    assert guard_state["stale_startup_response_pending_cleared"] is True
+    assert guard_state["stale_startup_response_pending_cleared_reason"] == "session_continuation_armed_source"
+
+
+def test_fresh_armed_gate_still_blocks_within_window(tmp_path, monkeypatch) -> None:
+    """A genuine fresh-start await (armed_source=startup, within window) still
+    blocks -- WI-5083 must not weaken the legitimate startup relay guard."""
+    module = _load_module()
+    guard_path = tmp_path / "guard.json"
+    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(tmp_path / "focus.json"))
+    monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(guard_path))
+    guard_path.write_text(
+        json.dumps(
+            {
+                "discard_next_user_prompt": False,
+                "startup_prompt_discarded": True,
+                "startup_prompt_discarded_at": module._now_iso(),
+                "startup_response_pending": True,
+                "armed_source": "startup",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    response = module.guard_tool_use(
+        {"tool_name": "Write", "tool_input": {"file_path": ".claude/rules/new-rule.md"}},
+        REPO_ROOT,
+    )
+
+    assert response["decision"] == "block"
+    assert "GTKB-STARTUP-INPUT-GATE" in response["reason"]

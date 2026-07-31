@@ -10,7 +10,7 @@ The 5 surfaces:
 - `AGENTS.md`
 - `scripts/session_self_initialization.py`
 - `scripts/check_index_role_intent_sentinel.py`
-- `scripts/single_harness_bridge_dispatcher.py`
+- `scripts/gtkb_dispatcher_daemon.py`
 
 Carve-outs (allowed mentions):
 
@@ -37,7 +37,7 @@ TARGETS = [
     "AGENTS.md",
     "scripts/session_self_initialization.py",
     "scripts/check_index_role_intent_sentinel.py",
-    "scripts/single_harness_bridge_dispatcher.py",
+    "scripts/gtkb_dispatcher_daemon.py",
 ]
 
 MIRROR = "role-assignments.json"

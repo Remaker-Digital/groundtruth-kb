@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shlex
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -19,8 +20,12 @@ try:
         AuthorizationError,
         canonical_project_root,
         cross_claim_path_collision_reason,
+        finalization_target_paths_for_verified,
         normalize_relative_path,
+        path_authorized_by_target_paths,
+        peer_report_dirty_path_collision_reason,
         resolve_work_intent_session_id,
+        validate_packet_project_authorization_operation,
         validate_targets,
         work_intent_claim_block_reason,
     )
@@ -29,11 +34,20 @@ except ImportError:  # pragma: no cover - direct script execution path
         AuthorizationError,
         canonical_project_root,
         cross_claim_path_collision_reason,
+        finalization_target_paths_for_verified,
         normalize_relative_path,
+        path_authorized_by_target_paths,
+        peer_report_dirty_path_collision_reason,
         resolve_work_intent_session_id,
+        validate_packet_project_authorization_operation,
         validate_targets,
         work_intent_claim_block_reason,
     )
+
+try:
+    from scripts import bridge_work_intent_registry
+except ImportError:  # pragma: no cover - direct script execution path
+    import bridge_work_intent_registry  # type: ignore[no-redef]
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -81,46 +95,41 @@ def _record_gate_exemption(pattern_id: str, subject: str, reason: str, paths: li
         pass
 
 
-PROTECTED_EXACT = {
-    ".claude/settings.json",
-    ".codex/hooks.json",
-    ".env",
-    "env.local",
-    "env.staging",
-    "pyproject.toml",
-    "groundtruth.toml",
-}
-PROTECTED_PREFIXES = (
-    "scripts/",
-    "groundtruth-kb/src/",
-    "groundtruth-kb/tests/",
-    "platform_tests/",
-    "tests/",
-    ".claude/hooks/",
-    ".claude/rules/",
-    ".codex/gtkb-hooks/",
-    "config/",
-    ".github/",
-)
-DISPATCHER_CONFIG_PATH = "config/dispatcher/rules.toml"
-DISPATCHER_CONFIG_CLI_ONLY_BLOCK_ID = "GTKB-DISPATCHER-CONFIG-CLI-ONLY"
-ALLOWED_WRITE_PREFIXES = (
-    "bridge/",
-    "independent-progress-assessments/",
-)
-DIAGNOSTIC_WRITE_PREFIXES = (
-    ".groundtruth/session/snapshots/",
-    ".gtkb-state/",
-)
+try:
+    from scripts.controlled_artifact_paths import (
+        DISPATCHER_CONFIG_PATH,
+        direct_write_block_reason_code,
+        normalize_relative_path_text,
+    )
+    from scripts.controlled_artifact_paths import (
+        is_protected_path as _controlled_is_protected_path,
+    )
+    from scripts.controlled_artifact_paths import (
+        protected_path_classification as _controlled_path_classification,
+    )
+except ImportError:  # pragma: no cover - direct script execution path
+    from controlled_artifact_paths import (
+        DISPATCHER_CONFIG_PATH,
+        direct_write_block_reason_code,
+        normalize_relative_path_text,
+    )
+    from controlled_artifact_paths import (
+        is_protected_path as _controlled_is_protected_path,
+    )
+    from controlled_artifact_paths import (
+        protected_path_classification as _controlled_path_classification,
+    )
+
+DISPATCHER_CONFIG_CLI_ONLY_BLOCK_ID = "GTKB-DISPATCHER-CONFIG-CLI-ONLY"  # config/dispatcher/rules.toml CLI-only guard
 EMERGENCY_BRIDGE_REPAIR_ENV_VAR = "GTKB_EMERGENCY_BRIDGE_REPAIR"
 BRIDGE_FUNCTION_EXACT = {
     ".claude/settings.json",
     ".codex/hooks.json",
     "scripts/bridge_claim_cli.py",
-    "scripts/cross_harness_bridge_trigger.py",
+    "scripts/dispatcher_runtime.py",
+    "scripts/gtkb_bridge_writer.py",
     "scripts/implementation_authorization.py",
     "scripts/implementation_start_gate.py",
-    "scripts/single_harness_bridge_dispatcher.py",
 }
 BRIDGE_FUNCTION_PREFIXES = (
     ".claude/hooks/",
@@ -143,16 +152,47 @@ SAFE_COMMAND_PREFIXES = (
     "python scripts/bridge_applicability_preflight.py",
     "python scripts/adr_dcl_clause_preflight.py",
 )
-GIT_FINALIZATION_SUBCOMMANDS = {"commit", "push"}
-# Markers that disqualify the simple git-finalization exemption, split by
-# shell quoting semantics so the scan can be quote-aware (WI-3357):
+GIT_LIFECYCLE_MUTATING_SUBCOMMANDS = frozenset(
+    {"create", "attach", "preserve", "promote", "close", "resume", "recover", "drain"}
+)
+INVALID_HOOK_PAYLOAD_KEY = "__gtkb_invalid_hook_payload__"
+# Direct Git is an inspection surface only. Every subcommand outside this
+# deliberately small allowlist must enter through ``groundtruth_kb.git_lifecycle``
+# so effect-time authority, quiescence, recovery, and evidence are enforced.
+DIRECT_GIT_READ_ONLY_SUBCOMMANDS = frozenset(
+    {
+        "blame",
+        "check-attr",
+        "check-ignore",
+        "cherry",
+        "describe",
+        "diff",
+        "help",
+        "log",
+        "ls-files",
+        "ls-remote",
+        "ls-tree",
+        "merge-base",
+        "rev-list",
+        "rev-parse",
+        "shortlog",
+        "show",
+        "status",
+        "verify-commit",
+        "verify-tag",
+        "version",
+    }
+)
+GIT_GLOBAL_OPTIONS_WITH_VALUES = frozenset(
+    {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix", "--config-env"}
+)
+# Markers that disqualify a safe-command prefix, split by shell quoting
+# semantics so the scan can be quote-aware (WI-3357):
 #   - chaining markers are literal inside EITHER quote type;
 #   - execution markers still run inside double quotes (literal only inside
 #     single quotes).
 GIT_FINALIZATION_CHAINING_MARKERS = (";", "&&", "||", "|")
 GIT_FINALIZATION_EXECUTION_MARKERS = ("$(", "`")
-GIT_FINALIZATION_CONTROL_MARKERS = GIT_FINALIZATION_CHAINING_MARKERS + GIT_FINALIZATION_EXECUTION_MARKERS
-GIT_FINALIZATION_DENIED_FLAGS = {"-f", "--force", "--force-with-lease"}
 MUTATING_COMMAND_RE = re.compile(
     r"\b("
     r"set-content|out-file|new-item|remove-item|move-item|copy-item|"
@@ -191,10 +231,6 @@ BLOCKING_CLAUSE_ID = "PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001"
 # (its sole live user) imports it from there — eliminating the prior drift.
 PATCH_PATH_RE = re.compile(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", re.MULTILINE)
 PATCH_MOVE_RE = re.compile(r"^\*\*\* Move to: (.+)$", re.MULTILINE)
-POWERSHELL_ENV_ASSIGNMENT_RE = re.compile(
-    r"""^(?:\$env:[a-z_][\w_]*\s*=\s*(?:'[^']*'|"[^""]*"|[^\s;]+)\s*;\s*)+""",
-    re.IGNORECASE,
-)
 # WI-3357: opener of the documented HEREDOC commit-message pattern
 #   git commit -m "$(cat <<'EOF' ... EOF)"
 # This regex matches ONLY the fixed opener `$(cat <<['"]DELIM['"]` on a single
@@ -252,37 +288,15 @@ def _normalize(root: Path, path_text: str) -> str | None:
 
 
 def _preserve_dot_prefixed_relative_path(relative_path: str) -> str:
-    rel = relative_path.replace("\\", "/")
-    while rel.startswith("./"):
-        rel = rel[2:]
-    return rel
+    return normalize_relative_path_text(relative_path)
 
 
 def is_protected_path(relative_path: str) -> bool:
-    rel = _preserve_dot_prefixed_relative_path(relative_path)
-    if rel in PROTECTED_EXACT:
-        return True
-    if rel.startswith(".env."):
-        return True
-    if rel.startswith(ALLOWED_WRITE_PREFIXES):
-        return False
-    if rel.startswith(DIAGNOSTIC_WRITE_PREFIXES):
-        return False
-    return any(rel.startswith(prefix) for prefix in PROTECTED_PREFIXES)
+    return _controlled_is_protected_path(relative_path)
 
 
 def _protected_path_classification(relative_path: str) -> str:
-    rel = _preserve_dot_prefixed_relative_path(relative_path)
-    if rel == "<unknown-mutating-target>":
-        return rel
-    if rel in PROTECTED_EXACT:
-        return rel
-    if rel.startswith(".env."):
-        return ".env.*"
-    for prefix in PROTECTED_PREFIXES:
-        if rel.startswith(prefix):
-            return prefix
-    return rel
+    return _controlled_path_classification(relative_path)
 
 
 def _is_bridge_function_path(relative_path: str) -> bool:
@@ -318,9 +332,13 @@ def _dispatcher_config_cli_only_block(targets: list[str]) -> dict[str, Any]:
 
 
 def _paths_from_apply_patch(root: Path, text: str) -> list[str]:
-    normalized = (text or "").replace("`r`n", "\n").replace("`n", "\n").replace("\\r\\n", "\n").replace("\\n", "\n")
-    paths = PATCH_PATH_RE.findall(normalized)
-    paths.extend(PATCH_MOVE_RE.findall(normalized))
+    raw = text or ""
+    paths = PATCH_PATH_RE.findall(raw)
+    paths.extend(PATCH_MOVE_RE.findall(raw))
+    if not paths:
+        normalized = raw.replace("`r`n", "\n").replace("`n", "\n").replace("\\r\\n", "\n").replace("\\n", "\n")
+        paths = PATCH_PATH_RE.findall(normalized)
+        paths.extend(PATCH_MOVE_RE.findall(normalized))
     return [rel for raw in paths if (rel := _normalize(root, raw))]
 
 
@@ -414,40 +432,7 @@ def _extract_powershell_both_paths(tokens: list[str]) -> list[str]:
     return flag_paths + positional
 
 
-_GIT_NON_MUTATING_SUBCOMMANDS = frozenset(
-    {
-        "commit",
-        "merge",
-        "rebase",
-        "tag",
-        "push",
-        "log",
-        "diff",
-        "status",
-        "show",
-        "branch",
-        "fetch",
-        "pull",
-        "remote",
-        "stash",
-        "config",
-        "describe",
-        "rev-parse",
-        "rev-list",
-        "ls-files",
-        "ls-tree",
-        "ls-remote",
-        "blame",
-        "bisect",
-        "cherry",
-        "reflog",
-        "shortlog",
-        "submodule",
-        "worktree",
-        "notes",
-        "clean",
-    }
-)
+_GIT_NON_MUTATING_SUBCOMMANDS = DIRECT_GIT_READ_ONLY_SUBCOMMANDS
 
 _GIT_MUTATING_EXTRACTORS = {
     "rm": _extract_git_rm,
@@ -528,6 +513,13 @@ def _split_pipeline_stages(command: str) -> list[str]:
     while i < len(masked):
         ch = masked[i]
         nxt = masked[i + 1] if i + 1 < len(masked) else ""
+        if ch in "\r\n":
+            stages.append(command[start:i])
+            if ch == "\r" and nxt == "\n":
+                i += 1
+            start = i + 1
+            i += 1
+            continue
         if ch == ";":
             stages.append(command[start:i])
             start = i + 1
@@ -577,6 +569,69 @@ def _shell_verb_index(tokens: list[str]) -> int | None:
     return None
 
 
+def _executable_name(token: str) -> str:
+    """Return a shell executable basename across POSIX and Windows paths."""
+    return _clean_shell_token(token).replace("\\", "/").rsplit("/", 1)[-1].lower()
+
+
+_CMD_SHELL_NAMES = frozenset({"cmd", "cmd.exe"})
+_POWERSHELL_NAMES = frozenset({"powershell", "powershell.exe", "pwsh", "pwsh.exe"})
+_POSIX_SHELL_NAMES = frozenset({"bash", "bash.exe", "sh", "sh.exe", "zsh", "zsh.exe"})
+_POWERSHELL_ENCODED_COMMAND_FLAGS = frozenset(
+    {"-e", "-ec", "-en", "-enc", "-enco", "-encod", "-encode", "-encoded", "-encodedcommand"}
+)
+
+
+def _nested_shell_command(stage: str) -> tuple[str | None, bool]:
+    """Return a nested shell command and whether a shell wrapper was recognized.
+
+    An encoded or malformed command is reported as a recognized wrapper with no
+    inspectable command so direct Git enforcement can fail closed.
+    """
+    tokens = _shell_split(stage)
+    if not tokens:
+        return None, False
+    verb_index = _shell_verb_index(tokens)
+    if verb_index is None:
+        return None, False
+    relevant = tokens[verb_index:]
+    while relevant and _clean_shell_token(relevant[0]).lower() in {"&", "call"}:
+        relevant = relevant[1:]
+    if not relevant:
+        return None, True
+    executable = _executable_name(relevant[0])
+
+    if executable in _CMD_SHELL_NAMES:
+        for index, raw in enumerate(relevant[1:], start=1):
+            if _clean_shell_token(raw).lower() in {"/c", "/k"}:
+                nested = " ".join(relevant[index + 1 :]).strip()
+                return (_clean_shell_token(nested) if nested else None), True
+        return None, False
+
+    if executable in _POWERSHELL_NAMES:
+        normalized = [_clean_shell_token(token).lower() for token in relevant[1:]]
+        if any(token in _POWERSHELL_ENCODED_COMMAND_FLAGS for token in normalized):
+            return None, True
+        for index, token in enumerate(normalized, start=1):
+            if token in {"-c", "-command", "/c", "/command"}:
+                nested = " ".join(relevant[index + 1 :]).strip()
+                return (_clean_shell_token(nested) if nested else None), True
+        return None, False
+
+    if executable in _POSIX_SHELL_NAMES:
+        normalized = [_clean_shell_token(token).lower() for token in relevant[1:]]
+        for index, token in enumerate(normalized, start=1):
+            if token == "-c":
+                if index + 1 >= len(relevant):
+                    return None, True
+                return _clean_shell_token(relevant[index + 1]), True
+        return None, False
+
+    if verb_index < len(tokens) and tokens[verb_index:] != relevant:
+        return " ".join(relevant), True
+    return None, False
+
+
 def _python_script_invocation(tokens: list[str]) -> tuple[str, list[str]] | None:
     verb_index = _shell_verb_index(tokens)
     if verb_index is None:
@@ -592,6 +647,123 @@ def _python_script_invocation(tokens: list[str]) -> tuple[str, list[str]] | None
     if script_name not in _WRAP_DIAGNOSTIC_SCRIPT_NAMES:
         return None
     return script_name, relevant[2:]
+
+
+def _git_lifecycle_subcommand(stage: str) -> str | None:
+    """Return the production Git-lifecycle CLI subcommand for one shell stage."""
+    tokens = _shell_split(stage)
+    if not tokens:
+        return None
+    verb_index = _shell_verb_index(tokens)
+    if verb_index is None:
+        return None
+    relevant = [_clean_shell_token(token) for token in tokens[verb_index:]]
+    executable = Path(relevant[0]).name.lower()
+    if executable not in _PYTHON_EXECUTABLE_NAMES and not executable.startswith("python"):
+        return None
+    if len(relevant) < 4 or relevant[1:3] != ["-m", "groundtruth_kb.git_lifecycle"]:
+        return None
+
+    # argparse accepts these global options before the required subcommand.
+    index = 3
+    options_with_values = {"--repo", "--state-dir", "--dispatcher-state-dir"}
+    flag_options = {"--json", "--dry-run"}
+    while index < len(relevant):
+        token = relevant[index]
+        if token in options_with_values:
+            if index + 1 >= len(relevant):
+                return None
+            index += 2
+            continue
+        if any(token.startswith(option + "=") for option in options_with_values):
+            index += 1
+            continue
+        if token in flag_options:
+            index += 1
+            continue
+        return token.lower()
+    return None
+
+
+def _direct_git_subcommand(stage: str) -> str | None:
+    """Return a direct Git subcommand, accounting for executable/global options."""
+    tokens = _shell_split(stage)
+    if not tokens:
+        return None
+    verb_index = _shell_verb_index(tokens)
+    if verb_index is None:
+        return None
+    relevant = [_clean_shell_token(token) for token in tokens[verb_index:]]
+    executable = Path(relevant[0]).name.lower()
+    if executable not in {"git", "git.exe"}:
+        return None
+
+    index = 1
+    while index < len(relevant):
+        token = relevant[index]
+        if token == "--":
+            index += 1
+            break
+        if token in GIT_GLOBAL_OPTIONS_WITH_VALUES:
+            if index + 1 >= len(relevant):
+                return None
+            index += 2
+            continue
+        if any(token.startswith(option + "=") for option in GIT_GLOBAL_OPTIONS_WITH_VALUES):
+            index += 1
+            continue
+        if token.startswith("-C") and token != "-C":
+            index += 1
+            continue
+        if token.startswith("-c") and token != "-c":
+            index += 1
+            continue
+        if token.startswith("-"):
+            index += 1
+            continue
+        return token.lower()
+    if index < len(relevant):
+        return relevant[index].lower()
+    return None
+
+
+def _is_direct_git_invocation(stage: str) -> bool:
+    tokens = _shell_split(stage)
+    if not tokens:
+        return False
+    verb_index = _shell_verb_index(tokens)
+    if verb_index is None:
+        return False
+    return Path(_clean_shell_token(tokens[verb_index])).name.lower() in {"git", "git.exe"}
+
+
+def _direct_git_effect(stage: str, *, _depth: int = 0) -> str | None:
+    if _depth > 4:
+        return "<uninspectable-shell-command>"
+    if not _is_direct_git_invocation(stage):
+        nested, recognized_wrapper = _nested_shell_command(stage)
+        if recognized_wrapper:
+            if not nested:
+                return "<uninspectable-shell-command>"
+            return _direct_git_effect(nested, _depth=_depth + 1)
+        return None
+    subcommand = _direct_git_subcommand(stage)
+    if subcommand in DIRECT_GIT_READ_ONLY_SUBCOMMANDS:
+        return None
+    return subcommand or "<unknown>"
+
+
+def _has_direct_git_effect_signal(command: str) -> bool:
+    if _direct_git_effect(command) is not None:
+        return True
+    return any(_direct_git_effect(stage) is not None for stage in _split_pipeline_stages(command))
+
+
+def _has_mutating_git_lifecycle_signal(command: str) -> bool:
+    return any(
+        _git_lifecycle_subcommand(stage) in GIT_LIFECYCLE_MUTATING_SUBCOMMANDS
+        for stage in _split_pipeline_stages(command)
+    )
 
 
 def _arg_value(args: list[str], flag: str) -> str | None:
@@ -699,14 +871,27 @@ def _paths_from_shell(root: Path, command: str) -> list[str]:
 
 
 def _is_safe_command(command: str) -> bool:
-    normalized = " ".join(command.strip().split()).lower()
-    if _is_simple_git_finalization_command(command):
-        return True
-    if any(normalized.startswith(prefix) for prefix in SAFE_COMMAND_PREFIXES):
-        return True
-    without_env_prefix = POWERSHELL_ENV_ASSIGNMENT_RE.sub("", normalized)
-    return without_env_prefix != normalized and any(
-        without_env_prefix.startswith(prefix) for prefix in SAFE_COMMAND_PREFIXES
+    # A safe-command entry authorizes exactly one parsed shell stage. Applying
+    # it to the raw command prefix lets a later stage inherit the exemption
+    # (for example, ``pytest; Set-Content`` or ``git status; git add``).
+    scan_command = _neutralize_heredoc_message_substitutions(command)
+    if _has_disqualifying_control_marker(scan_command):
+        return False
+    chaining_view = _mask_quoted_spans(scan_command, mask_double=True)
+    if any(marker in chaining_view for marker in ("&", "\r", "\n")):
+        return False
+    stages = _split_pipeline_stages(scan_command)
+    if len(stages) != 1:
+        return False
+    tokens = _shell_split(stages[0])
+    if not tokens:
+        return False
+    verb_index = _shell_verb_index(tokens)
+    if verb_index is None:
+        return False
+    normalized = " ".join(_clean_shell_token(token).lower() for token in tokens[verb_index:])
+    return any(
+        normalized == prefix.strip() or normalized.startswith(prefix.strip() + " ") for prefix in SAFE_COMMAND_PREFIXES
     )
 
 
@@ -742,7 +927,7 @@ def _mask_quoted_spans(command: str, *, mask_double: bool) -> str:
 
 
 def _has_disqualifying_control_marker(command: str) -> bool:
-    """True iff a control marker disqualifies the git-finalization exemption.
+    """True iff a control marker disqualifies a safe-command prefix.
 
     ``command`` must already have safe HEREDOC substitutions neutralized.
     Chaining markers (``;``, ``|``, ``&&``, ``||``) count only outside every
@@ -829,20 +1014,6 @@ def _neutralize_heredoc_message_substitutions(command: str) -> str:
     return "".join(out)
 
 
-def _is_simple_git_finalization_command(command: str) -> bool:
-    scan_command = _neutralize_heredoc_message_substitutions(command)
-    if _has_disqualifying_control_marker(scan_command):
-        return False
-    try:
-        tokens = [_clean_shell_token(token).lower() for token in shlex.split(scan_command, posix=False)]
-    except ValueError:
-        return False
-    tokens = [token for token in tokens if token]
-    if len(tokens) < 2 or tokens[0] != "git" or tokens[1] not in GIT_FINALIZATION_SUBCOMMANDS:
-        return False
-    return not (tokens[1] == "push" and any(token in GIT_FINALIZATION_DENIED_FLAGS for token in tokens[2:]))
-
-
 def _clean_shell_token(token: str) -> str:
     return token.strip().strip("'\"")
 
@@ -927,6 +1098,8 @@ def _has_mutating_signal(command: str) -> bool:
     shell_view = _mask_quoted_spans(command, mask_double=True)
     return (
         MUTATING_COMMAND_RE.search(shell_view) is not None
+        or _has_direct_git_effect_signal(command)
+        or _has_mutating_git_lifecycle_signal(command)
         or _has_python_mutating_signal(command)
         or _shell_redirect_present(command)
     )
@@ -1116,6 +1289,56 @@ def _apply_patch_text(payload: dict[str, Any], data: Any) -> str:
     return ""
 
 
+def _argv_command(argv: Any) -> str | None:
+    if not isinstance(argv, list | tuple) or not argv:
+        return None
+    if not all(isinstance(token, str | int | float) for token in argv):
+        return None
+    return subprocess.list2cmdline([str(token) for token in argv])
+
+
+def _command_from_payload(payload: dict[str, Any], data: Any, tool: str) -> str | None:
+    """Normalize shell command strings and shell-free Git argv payloads."""
+    raw_command = data.get("command") if isinstance(data, dict) else None
+    if raw_command is None:
+        raw_command = payload.get("command")
+    command = raw_command if isinstance(raw_command, str) else _argv_command(raw_command)
+
+    args: Any = None
+    if isinstance(data, dict):
+        args = data.get("argv") if data.get("argv") is not None else data.get("args")
+    if command:
+        executable = Path(_clean_shell_token(command)).name.lower()
+        argv_text = _argv_command(args)
+        if executable in {"git", "git.exe"} and argv_text:
+            return f"{command} {argv_text}"
+        return command
+
+    if Path(tool).name.lower() not in {"git", "git.exe"}:
+        return None
+    argv_text = _argv_command(args)
+    if not argv_text:
+        return None
+    argv_tokens = list(args)
+    first = Path(str(argv_tokens[0])).name.lower()
+    return argv_text if first in {"git", "git.exe"} else f"git {argv_text}"
+
+
+def _direct_git_effect_from_payload(payload: dict[str, Any]) -> str | None:
+    data = _tool_input(payload)
+    command = _command_from_payload(payload, data, _tool_name(payload).lower())
+    if not command:
+        return None
+    subcommand = _direct_git_effect(command)
+    if subcommand is not None:
+        return subcommand
+    for stage in _split_pipeline_stages(command):
+        subcommand = _direct_git_effect(stage)
+        if subcommand is not None:
+            return subcommand
+    return None
+
+
 def changed_paths(payload: dict[str, Any]) -> tuple[list[str], bool]:
     root = _project_root(payload)
     tool = _tool_name(payload).lower()
@@ -1130,8 +1353,8 @@ def changed_paths(payload: dict[str, Any]) -> tuple[list[str], bool]:
         text = _apply_patch_text(payload, data)
         return _paths_from_apply_patch(root, text), True
 
-    if tool in {"bash", "shell_command", "shell"} or (isinstance(data, dict) and "command" in data):
-        command = str((data.get("command") if isinstance(data, dict) else None) or payload.get("command") or "")
+    command = _command_from_payload(payload, data, tool)
+    if command is not None:
         if _is_safe_command(command):
             return [], False
         diagnostic_outputs = _diagnostic_output_paths_from_shell(root, command)
@@ -1143,7 +1366,311 @@ def changed_paths(payload: dict[str, Any]) -> tuple[list[str], bool]:
     return [], False
 
 
+def _finalization_git_add_targets(command: str) -> list[str] | None:
+    """Return the explicit path args of a pure ``git add`` staging command.
+
+    Returns ``None`` (disqualified) unless the command is a single-stage
+    ``git add`` of explicit file paths. Any of the following disqualifies the
+    fast finalization clearance so the command falls through to the normal
+    authorization gate: multiple pipeline stages / chaining, control or
+    command-substitution markers, a non-``git add`` verb, a broad or whole-tree
+    stage (``-A`` / ``--all`` / ``-u`` / ``.`` / any flag), pathspec magic
+    (``:/``, ``:(exclude)``), glob metacharacters, unparseable tokens, or no
+    explicit path argument. This mirrors the disqualifiers named in the WI-4837
+    proposal (chained protected writes, broad reset/checkout/rm, deletion,
+    cleanup, denied git flags, unparseable targets).
+    """
+    scan_command = command or ""
+    if _has_disqualifying_control_marker(scan_command):
+        return None
+    stages = _split_pipeline_stages(scan_command)
+    if len(stages) != 1:
+        return None
+    try:
+        raw_tokens = shlex.split(stages[0], posix=False)
+    except ValueError:
+        return None
+    tokens = [token for token in (_clean_shell_token(raw) for raw in raw_tokens) if token]
+    # Skip leading VAR=value env prefixes (mirror _classify_command_verb).
+    index = 0
+    while index < len(tokens):
+        tok = tokens[index]
+        if "=" in tok and not tok.startswith("-") and "/" not in tok and "\\" not in tok:
+            index += 1
+            continue
+        break
+    relevant = tokens[index:]
+    if len(relevant) < 3 or relevant[0].lower() != "git" or relevant[1].lower() != "add":
+        return None
+    paths: list[str] = []
+    for arg in relevant[2:]:
+        if arg == "--":
+            continue
+        if arg.startswith("-"):
+            return None  # any flag (incl. -A/--all/-u/-p/--patch) disqualifies
+        if arg.startswith(":"):
+            return None  # pathspec magic (:/, :(exclude)) disqualifies
+        if arg == ".":
+            return None  # whole-tree add disqualifies
+        if any(meta in arg for meta in ("*", "?", "[", "]")):
+            return None  # glob disqualifies (targets not concretely enumerable)
+        paths.append(arg)
+    if not paths:
+        return None
+    return paths
+
+
+def _post_verified_finalization_clearance(root: Path, payload: dict[str, Any]) -> str | None:
+    """Clear a narrow post-``VERIFIED`` finalization ``git add`` staging command.
+
+    WI-4837 automatic parity (owner decision
+    ``DELIB-WI4837-AUTOMATIC-PARITY-20260707``). After a bridge thread reaches
+    terminal ``VERIFIED`` the implementation phase is closed, so ordinary
+    implementation-start packets fail closed and a Prime-side ``git add`` that
+    stages the thread's own approved paths for a recovery finalization commit is
+    blocked. This mirrors the pre-commit gate, which already clears
+    terminal-``VERIFIED`` approved paths. The clearance is granted only when ALL
+    of the following hold:
+
+    - the command is a single-stage ``git add`` of explicit file paths (no
+      chaining, substitution, flags, pathspec magic, globs, or whole-tree add);
+    - the current work-intent/session context identifies one bridge thread;
+    - that thread's latest post-GO chain state is terminal ``VERIFIED``;
+    - every staged target is inside the thread's approved proposal
+      ``target_paths``.
+
+    Returns a human-readable reason string when the clearance is granted, or
+    ``None`` to fall through to the normal authorization gate (which fails
+    closed). Never raises: any lookup failure returns ``None``.
+    """
+    data = _tool_input(payload)
+    is_shell = _tool_name(payload).lower() in {"bash", "shell_command", "shell"} or (
+        isinstance(data, dict) and "command" in data
+    )
+    if not is_shell:
+        return None
+    command = str((data.get("command") if isinstance(data, dict) else None) or payload.get("command") or "")
+    targets = _finalization_git_add_targets(command)
+    if not targets:
+        return None
+    normalized_targets: list[str] = []
+    for target in targets:
+        cleaned = target.strip().strip("'\"`").replace("\\", "/")
+        if not cleaned or cleaned == ".":
+            return None
+        try:
+            rel = normalize_relative_path(root, cleaned)
+        except AuthorizationError:
+            return None  # target escapes project root -> fail closed
+        normalized_targets.append(rel)
+    session_id = resolve_work_intent_session_id(payload)
+    if not session_id:
+        return None
+    try:
+        bridge_id = bridge_work_intent_registry.current_claimed_bridge_id(session_id, project_root=root)
+    except Exception:  # noqa: BLE001 - registry failure must not clear the gate
+        return None
+    if not bridge_id:
+        return None
+    try:
+        approved_target_paths = finalization_target_paths_for_verified(root, bridge_id)
+    except AuthorizationError:
+        return None  # not terminal VERIFIED, or approved paths unparseable -> fall through
+    for rel in normalized_targets:
+        if not path_authorized_by_target_paths(approved_target_paths, rel):
+            return None  # a staged target is outside approved target_paths -> fall through
+    return (
+        f"post-VERIFIED finalization staging cleared for bridge {bridge_id!r}: "
+        f"staged targets {sorted(normalized_targets)} are all inside the approved "
+        "terminal-VERIFIED proposal target_paths "
+        "(automatic parity per DELIB-WI4837-AUTOMATIC-PARITY-20260707)."
+    )
+
+
+def _registry_observation_intent(
+    root: Path,
+    payload: dict[str, Any],
+    protected: list[str],
+    *,
+    session_id: str,
+    bridge_id: str,
+    packet: dict[str, Any],
+    project_authorization: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Best-effort observation setup for content edits; identity changes stay strict."""
+
+    if payload.get("__gtkb_registry_diagnostic__") is True:
+        return None
+    tool = _tool_name(payload).strip() or "unknown"
+    data = _tool_input(payload)
+    command = str(data.get("command") or payload.get("command") or "") if isinstance(data, dict) else ""
+    patch_text = str(data.get("patch") or "") if isinstance(data, dict) else ""
+    identity_change = (
+        tool.casefold() in {"delete", "move"}
+        or bool(re.search(r"\b(?:remove-item|move-item|git\s+(?:mv|rm)|rm|del)\b", command, re.IGNORECASE))
+        or bool(re.search(r"^\*\*\* (?:Delete File:|Move to:)", patch_text, re.MULTILINE))
+    )
+
+    def audit_gap(code: str, detail: str) -> dict[str, Any]:
+        row = {
+            "schema_version": 1,
+            "kind": "registry_observation_gap",
+            "code": code,
+            "detail": detail,
+            "target_paths": sorted(set(protected)),
+            "session_id": session_id or None,
+            "bridge_id": bridge_id or None,
+            "tool_event_id": str(
+                payload.get("tool_use_id")
+                or payload.get("toolUseID")
+                or payload.get("tool_event_id")
+                or payload.get("event_id")
+                or ""
+            )
+            or None,
+            "observed_at": _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        try:
+            destination = root / ".gtkb-state" / "sot-registry" / "audit-gaps.jsonl"
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with destination.open("a", encoding="utf-8", newline="\n") as handle:
+                handle.write(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n")
+        except OSError:
+            pass
+        return {"audit_gap": row}
+
+    registry_path = root / "config" / "registry" / "sot-artifacts.toml"
+    if not registry_path.exists():
+        return None
+    package_src = root / "groundtruth-kb" / "src"
+    if str(package_src) not in sys.path:
+        sys.path.insert(0, str(package_src))
+    try:
+        from groundtruth_kb.project.registry_control_plane import (
+            RegistryControlPlaneError,
+            load_registry_snapshot,
+            mint_observation_capability,
+        )
+
+        from scripts.registry_observation_hook import intent_path
+    except ImportError as exc:
+        if identity_change:
+            raise AuthorizationError("registry identity check is unavailable for a delete, move, or rename") from exc
+        return audit_gap("registry_control_plane_unavailable", str(exc))
+    try:
+        snapshot = load_registry_snapshot(project_root=root, db_path=root / "groundtruth.db")
+        registered: dict[str, Any] = {}
+        registered_paths: list[str] = []
+        for path in protected:
+            record = snapshot.resolver.resolve(path)
+            if record is not None:
+                registered[record.id] = record
+                registered_paths.append(path)
+        if not registered:
+            return None
+        if identity_change:
+            raise AuthorizationError(
+                "registered deletion, move, rename, or locator change requires separately reviewed transition authority"
+            )
+        denied_roles = sorted(
+            record.id for record in registered.values() if record.owner_role not in {"shared", "prime_builder"}
+        )
+        if denied_roles:
+            return audit_gap(
+                "legacy_owner_role_metadata",
+                f"registered content targets carry non-Prime legacy owner metadata: {denied_roles}",
+            )
+        missing_api = sorted(record.id for record in registered.values() if not record.mutation_api.strip())
+        if missing_api:
+            return audit_gap(
+                "missing_mutation_api_metadata",
+                f"registered content targets have no mutation API metadata: {missing_api}",
+            )
+        event_id = str(
+            payload.get("tool_use_id")
+            or payload.get("toolUseID")
+            or payload.get("tool_event_id")
+            or payload.get("event_id")
+            or ""
+        ).strip()
+        if not session_id or not event_id:
+            return audit_gap(
+                "missing_observation_identity",
+                "content edit has no session/tool-event pair for automatic observation",
+            )
+        start_packet_hash = str(packet.get("packet_hash") or "")
+        if not start_packet_hash:
+            start_packet_hash = (
+                "sha256:"
+                + hashlib.sha256(json.dumps(packet, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            )
+        minted = mint_observation_capability(
+            target_paths=registered_paths,
+            session_id=session_id,
+            tool_event_id=event_id,
+            bridge_id=bridge_id,
+            start_packet_hash=start_packet_hash,
+            pauth_decision=project_authorization,
+            operation=tool,
+            authorized=True,
+            project_root=root,
+            db_path=root / "groundtruth.db",
+        )
+        intent = {
+            "capability": minted["capability"],
+            "capability_hash": minted["capability_hash"],
+            "target_paths": minted["paths"],
+            "preimage_digests": minted["preimage_digests"],
+            "session_id": session_id,
+            "tool_event_id": event_id,
+            "bridge_id": bridge_id,
+            "start_packet_hash": start_packet_hash,
+            "operation": tool,
+            "change_reason": f"authorized observation for bridge {bridge_id}",
+        }
+        destination = intent_path(root, session_id, event_id)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_suffix(".tmp")
+        temporary.write_text(json.dumps(intent, sort_keys=True), encoding="utf-8")
+        os.replace(temporary, destination)
+        return {"capability_hash": minted["capability_hash"], "tool_event_id": event_id}
+    except RegistryControlPlaneError as exc:
+        if identity_change:
+            raise AuthorizationError(
+                "registry identity check failed for a delete, move, or rename: " + str(exc)
+            ) from exc
+        return audit_gap("registry_observation_unavailable", str(exc))
+    except (OSError, ValueError) as exc:
+        if identity_change:
+            raise AuthorizationError(
+                "registry identity check failed for a delete, move, or rename: " + str(exc)
+            ) from exc
+        return audit_gap("registry_observation_setup_failed", f"{type(exc).__name__}: {exc}")
+
+
 def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
+    invalid_payload_reason = payload.get(INVALID_HOOK_PAYLOAD_KEY)
+    if isinstance(invalid_payload_reason, str) and invalid_payload_reason:
+        return {
+            "decision": "block",
+            "reason_code": "invalid_hook_payload",
+            "reason": (
+                "BLOCKED (GTKB-IMPLEMENTATION-START-GATE): invalid PreToolUse payload. "
+                f"{invalid_payload_reason} The gate fails closed because tool intent cannot be verified."
+            ),
+        }
+    direct_git_effect = _direct_git_effect_from_payload(payload)
+    if direct_git_effect is not None:
+        return {
+            "decision": "block",
+            "reason_code": "direct_git_effect_requires_lifecycle",
+            "reason": (
+                "BLOCKED (GTKB-GIT-LIFECYCLE): direct "
+                f"`git {direct_git_effect}` is not an authorized execution boundary. "
+                "Use the canonical `python -m groundtruth_kb.git_lifecycle` operation so current authority, "
+                "scope binding, quiescence, recovery, and evidence are enforced at effect time."
+            ),
+        }
     root = _project_root(payload)
     paths, mutating = changed_paths(payload)
     if not mutating:
@@ -1154,6 +1681,19 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
         protected = [path for path in paths if is_protected_path(path)]
     if not protected:
         return {}
+    direct_reason_code = direct_write_block_reason_code(protected)
+    if direct_reason_code is not None:
+        classifications = ", ".join(sorted({_protected_path_classification(path) for path in protected}))
+        return {
+            "decision": "block",
+            "reason_code": direct_reason_code,
+            "reason": (
+                f"BLOCKED (GTKB-CONTROLLED-ARTIFACT-DIRECT-MUTATION): {BLOCKING_CLAUSE_ID}\n"
+                f"Reason: direct mutation matched controlled artifact surface(s): {classifications}. "
+                "Use the governed bridge, MemBase, dispatcher, or implementation-authorization helper path "
+                "for this artifact class; a raw tool or shell write is not valid authority evidence."
+            ),
+        }
     dispatcher_config_targets = _dispatcher_config_direct_edit_targets(protected)
     if dispatcher_config_targets:
         return _dispatcher_config_cli_only_block(dispatcher_config_targets)
@@ -1162,6 +1702,22 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
             "emergency-bridge-repair",
             json.dumps(payload, sort_keys=True),
             "owner-authorized emergency bridge repair exemption",
+            protected,
+        )
+        return {}
+    # WI-4837: post-VERIFIED finalization staging clearance (automatic parity per
+    # DELIB-WI4837-AUTOMATIC-PARITY-20260707). A narrow `git add` of the thread's
+    # own approved target_paths, on a terminal-VERIFIED chain identified by the
+    # session's work-intent claim, is cleared here so the finalization commit can
+    # stage its verified paths. This runs BEFORE validate_targets (which fails
+    # closed for terminal VERIFIED) and leaves _validate_packet unchanged:
+    # ordinary post-VERIFIED mutation still falls through and is blocked below.
+    finalization_reason = _post_verified_finalization_clearance(root, payload)
+    if finalization_reason is not None:
+        _record_gate_exemption(
+            "post-verified-finalization-staging",
+            json.dumps(payload, sort_keys=True),
+            finalization_reason,
             protected,
         )
         return {}
@@ -1174,6 +1730,16 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
         session_id = resolve_work_intent_session_id(payload)
         result = validate_targets(root, protected, session_id=session_id)
         packet = result.get("packet", {})
+        project_authorization = validate_packet_project_authorization_operation(
+            root,
+            packet,
+            requested_operations=["implementation_start", "protected_mutation"],
+            target_paths=[str(path) for path in result.get("targets", protected)],
+        )
+        if project_authorization is None:
+            raise AuthorizationError(
+                "Project Authorization is required before every protected source, test, or configuration mutation."
+            )
         bridge_id = str(packet.get("bridge_id") or "")
         block_reason = work_intent_claim_block_reason(root, bridge_id, session_id)
         if block_reason:
@@ -1185,21 +1751,22 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
         )
         if collision_reason:
             raise AuthorizationError(collision_reason)
-        # WI-4527: the edit is authorized. As a fail-soft side-effect on the
-        # already-allowed path, auto-extend an active GO-implementation claim
-        # whose deadline is near so a long build does not lose its claim
-        # mid-edit. This NEVER changes the gate's allow/deny verdict: it runs
-        # only after authorization succeeds, swallows every error, and the
-        # extension itself is bounded by the existing 2 h MAX_HOLD cap.
-        if bridge_id:
-            try:
-                try:
-                    from scripts.bridge_work_intent_registry import maybe_auto_extend
-                except ImportError:  # pragma: no cover - direct script execution path
-                    from bridge_work_intent_registry import maybe_auto_extend
-                maybe_auto_extend(bridge_id, session_id, project_root=root)
-            except Exception:
-                pass
+        peer_report_reason = peer_report_dirty_path_collision_reason(
+            root,
+            targets=protected,
+            bridge_id=bridge_id,
+        )
+        if peer_report_reason:
+            raise AuthorizationError(peer_report_reason)
+        observation_intent = _registry_observation_intent(
+            root,
+            payload,
+            protected,
+            session_id=session_id or "",
+            bridge_id=bridge_id,
+            packet=packet,
+            project_authorization=project_authorization,
+        )
     except AuthorizationError as exc:
         classifications = ", ".join(sorted({_protected_path_classification(path) for path in protected}))
         return {
@@ -1213,21 +1780,29 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
                 "`python scripts/implementation_authorization.py begin --bridge-id <id>` before mutating protected targets."
             ),
         }
+    if observation_intent is not None:
+        return {"registryObservationIntent": observation_intent}
     return {}
 
 
 def _read_payload() -> dict[str, Any]:
+    raw = sys.stdin.read()
+    if not raw.strip():
+        return {INVALID_HOOK_PAYLOAD_KEY: "Hook input was empty."}
     try:
-        raw = sys.stdin.read()
-        payload = json.loads(raw) if raw.strip() else {}
-        return payload if isinstance(payload, dict) else {}
-    except json.JSONDecodeError:
-        return {}
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        return {INVALID_HOOK_PAYLOAD_KEY: (f"Hook input was malformed JSON at line {exc.lineno}, column {exc.colno}.")}
+    if not isinstance(payload, dict) or not payload:
+        return {INVALID_HOOK_PAYLOAD_KEY: "Hook input must be a non-empty JSON object."}
+    return payload
 
 
 def main() -> int:
     diagnostic = "--diagnostic" in sys.argv[1:]
     payload = _read_payload()
+    if diagnostic:
+        payload["__gtkb_registry_diagnostic__"] = True
     result = gate_decision(payload)
     if diagnostic:
         print(
@@ -1259,7 +1834,7 @@ def main() -> int:
             )
         )
     else:
-        print("{}")
+        print(json.dumps(result, sort_keys=True))
     return 0
 
 

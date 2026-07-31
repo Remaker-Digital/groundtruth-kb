@@ -96,16 +96,17 @@ def _make_packet(target_path: str, content: str, **overrides) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def test_c_block_without_evidence(tmp_path):
-    """Staging a narrative-artifact change without an approval packet must fail."""
+def test_c_records_gap_without_evidence(tmp_path):
+    """Missing approval evidence is visible but does not reject the commit."""
     module = _load_module()
     target = ".claude/rules/example.md"
     content = "new narrative content\n"
     root = _make_fixture(tmp_path, {target: content})
     result = module.evaluate(root, paths=[target])
-    assert result["status"] == "fail"
-    assert len(result["findings"]) == 1
-    finding = result["findings"][0]
+    assert result["status"] == "pass"
+    assert result["findings"] == []
+    assert len(result["audit_gaps"]) == 1
+    finding = result["audit_gaps"][0]
     assert finding["path"] == target
     assert "no matching approval packet" in finding["reason"]
 
@@ -126,6 +127,7 @@ def test_c_allow_with_matching_packet(tmp_path):
     assert result["status"] == "pass", result
     assert target in result["cleared"]
     assert result["findings"] == []
+    assert result["audit_gaps"] == []
 
 
 def test_c_allow_with_lf_normalized_packet_for_crlf_staged_blob(tmp_path):
@@ -140,6 +142,7 @@ def test_c_allow_with_lf_normalized_packet_for_crlf_staged_blob(tmp_path):
     assert result["status"] == "pass", result
     assert target in result["cleared"]
     assert result["findings"] == []
+    assert result["audit_gaps"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -147,8 +150,8 @@ def test_c_allow_with_lf_normalized_packet_for_crlf_staged_blob(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_c_block_when_packet_content_does_not_match_staged(tmp_path):
-    """A packet whose full_content does not match the staged blob must fail."""
+def test_c_records_gap_when_packet_content_does_not_match_staged(tmp_path):
+    """A stale packet is reported without making the commit unavailable."""
     module = _load_module()
     target = ".claude/rules/example.md"
     staged_content = "what was actually staged\n"
@@ -157,11 +160,11 @@ def test_c_block_when_packet_content_does_not_match_staged(tmp_path):
     root = _make_fixture(tmp_path, {target: staged_content}, packets={"2026-05-08-test.json": packet})
     result = module.evaluate(root, paths=[target])
     # No matching packet found because target_path matches but sha256 doesn't
-    assert result["status"] == "fail"
-    assert "no matching approval packet" in result["findings"][0]["reason"]
+    assert result["status"] == "pass"
+    assert "no matching approval packet" in result["audit_gaps"][0]["reason"]
 
 
-def test_c_block_when_crlf_staged_blob_substantively_differs_from_packet(tmp_path):
+def test_c_records_gap_when_crlf_staged_blob_substantively_differs_from_packet(tmp_path):
     """EOL normalization must not mask actual text differences."""
     module = _load_module()
     target = ".claude/rules/example.md"
@@ -169,21 +172,21 @@ def test_c_block_when_crlf_staged_blob_substantively_differs_from_packet(tmp_pat
     packet = _make_packet(target, "what the packet describes\n")
     root = _make_fixture(tmp_path, {target: staged_content}, packets={"2026-05-08-test.json": packet})
     result = module.evaluate(root, paths=[target])
-    assert result["status"] == "fail"
-    assert "no matching approval packet" in result["findings"][0]["reason"]
+    assert result["status"] == "pass"
+    assert "no matching approval packet" in result["audit_gaps"][0]["reason"]
 
 
-def test_c_block_non_utf8_staged_blob(tmp_path):
-    """Protected narrative artifacts are UTF-8 text; undecodable staged blobs fail."""
+def test_c_records_gap_for_non_utf8_staged_blob(tmp_path):
+    """Undecodable narrative bytes produce a visible non-blocking audit gap."""
     module = _load_module()
     target = ".claude/rules/example.md"
     root = _make_fixture(tmp_path, {target: b"\xff\xfe\x00"})
     result = module.evaluate(root, paths=[target])
-    assert result["status"] == "fail"
-    assert "not valid UTF-8" in result["findings"][0]["reason"]
+    assert result["status"] == "pass"
+    assert "not valid UTF-8" in result["audit_gaps"][0]["reason"]
 
 
-def test_c_block_when_packet_target_path_mismatches(tmp_path):
+def test_c_records_gap_when_packet_target_path_mismatches(tmp_path):
     """A packet for a different target_path must not authorize an unrelated staged path."""
     module = _load_module()
     other_target = "AGENTS.md"
@@ -198,7 +201,8 @@ def test_c_block_when_packet_target_path_mismatches(tmp_path):
     )
     # Stage only `target` for the test
     result = module.evaluate(root, paths=[target])
-    assert result["status"] == "fail"
+    assert result["status"] == "pass"
+    assert result["audit_gaps"]
 
 
 # ---------------------------------------------------------------------------
@@ -206,14 +210,14 @@ def test_c_block_when_packet_target_path_mismatches(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_c_blocks_regardless_of_origin(tmp_path):
-    """The pre-commit gate runs at git-layer and is harness-agnostic; same blocking
+def test_c_records_actor_blind_gaps_regardless_of_origin(tmp_path):
+    """The pre-commit audit runs at git-layer and is harness-agnostic; same
     behavior regardless of which AI harness produced the staged change.
 
     This is verified structurally: the gate reads from `git diff --cached`, not
     from any harness-specific identifier. We simulate two notional sources by
     running the same evaluation twice with different packet states; both must
-    block when no packet is present and pass when one is.
+    repair-forward gap is recorded when no packet is present.
     """
     module = _load_module()
     target = "AGENTS.md"
@@ -222,15 +226,15 @@ def test_c_blocks_regardless_of_origin(tmp_path):
     # Source 1: "Claude harness" produced the change without a packet
     root1 = _make_fixture(tmp_path / "claude_origin", {target: content})
     r1 = module.evaluate(root1, paths=[target])
-    assert r1["status"] == "fail"
+    assert r1["status"] == "pass"
 
     # Source 2: "Codex harness" produced the same change without a packet
     root2 = _make_fixture(tmp_path / "codex_origin", {target: content})
     r2 = module.evaluate(root2, paths=[target])
-    assert r2["status"] == "fail"
+    assert r2["status"] == "pass"
 
-    # Both block equivalently; the gate does not consult harness identity
-    assert r1["findings"][0]["reason"] == r2["findings"][0]["reason"]
+    # Both report equivalently; the audit does not infer a worker identity.
+    assert r1["audit_gaps"][0]["reason"] == r2["audit_gaps"][0]["reason"]
 
 
 # ---------------------------------------------------------------------------
@@ -304,8 +308,9 @@ def test_c_cli_emits_json(tmp_path):
     # Returns exit 1 on fail (no packet) but still emits valid JSON
     assert result.returncode in (0, 1)
     payload = json.loads(result.stdout)
-    assert payload["status"] in {"pass", "fail"}
+    assert payload["status"] == "pass"
     assert "findings" in payload
+    assert "audit_gaps" in payload
     assert "cleared" in payload
     assert "skipped_unprotected" in payload
 

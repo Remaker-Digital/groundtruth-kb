@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import importlib
 import json
 import os
+import re
 import subprocess
+import sys
 import time
 import uuid
 from collections.abc import Callable
@@ -22,10 +26,14 @@ LEASES_DIR_NAME = "leases"
 PROVENANCE_LEDGER_FILENAME = "dispatch-provenance.json"
 DISPATCH_RUNS_DIR_NAME = "dispatch-runs"
 PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
-PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 0.01
-KILL_SWITCH_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
+PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 1.0
 DEFAULT_LEASE_TTL_SECONDS = 300
 COMPUTED_QUALITY_RELATIVE = Path(".gtkb-state") / "ops" / "dispatch-quality.json"
+KILL_SWITCH_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
+TARGETED_REOFFER_AUDIT_RELATIVE_PATH = Path(".gtkb-state") / "bridge-dispatch-reset-transactions" / "audit.jsonl"
+
+_RECIPIENT_PATTERN = re.compile(r"^(?:prime-builder|loyal-opposition):[A-Za-z0-9][A-Za-z0-9_-]*$")
+_DOCUMENT_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 TerminateFn = Callable[[int], None]
 NowFn = Callable[[], float]
@@ -44,9 +52,9 @@ class DispatchStateDirs:
         root = project_root.resolve()
         primary = (state_dir or root / ".gtkb-state" / "bridge-poller").resolve()
         dirs: list[Path] = [primary]
-        trigger = (root / ".gtkb-state" / "cross-harness-trigger").resolve()
-        if trigger not in dirs and trigger.is_dir():
-            dirs.append(trigger)
+        legacy_dispatch = (root / ".gtkb-state" / "cross-harness-trigger").resolve()
+        if legacy_dispatch not in dirs and legacy_dispatch.is_dir():
+            dirs.append(legacy_dispatch)
         provenance = (root / ".gtkb-state" / "ops" / "dispatch-provenance").resolve()
         return cls(project_root=root, dispatch_dirs=tuple(dirs), provenance_dir=provenance)
 
@@ -78,11 +86,50 @@ class ResetResult:
 
 
 @dataclass
+class TargetedReofferResult:
+    """Result of rearming one exact dispatcher recipient/document pair."""
+
+    status: str
+    recipient: str
+    document: str
+    dry_run: bool
+    mutated: bool = False
+    changed_fields: list[str] = field(default_factory=list)
+    state_path: Path | None = None
+    before_hash: str | None = None
+    after_hash: str | None = None
+    audit_path: Path | None = None
+    message: str = ""
+
+    def to_json_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "status": self.status,
+            "recipient": self.recipient,
+            "document": self.document,
+            "dry_run": self.dry_run,
+            "mutated": self.mutated,
+            "changed_fields": list(self.changed_fields),
+            "message": self.message,
+        }
+        if self.state_path is not None:
+            payload["state_path"] = str(self.state_path)
+        if self.before_hash is not None:
+            payload["before_hash"] = self.before_hash
+        if self.after_hash is not None:
+            payload["after_hash"] = self.after_hash
+        if self.audit_path is not None:
+            payload["audit_path"] = str(self.audit_path)
+        return payload
+
+
+@dataclass
 class DrainResult:
     dry_run: bool
     drained_pids: list[int] = field(default_factory=list)
     terminated_pids: list[int] = field(default_factory=list)
     drain_markers_written: int = 0
+    dead_lease_locks_removed: int = 0
+    stale_dispatch_runs_pruned: int = 0
 
     def to_json_dict(self) -> dict[str, Any]:
         return {
@@ -90,6 +137,8 @@ class DrainResult:
             "drained_pids": list(self.drained_pids),
             "terminated_pids": list(self.terminated_pids),
             "drain_markers_written": self.drain_markers_written,
+            "dead_lease_locks_removed": self.dead_lease_locks_removed,
+            "stale_dispatch_runs_pruned": self.stale_dispatch_runs_pruned,
         }
 
 
@@ -102,9 +151,14 @@ class LiveLease:
 
 def is_drain_marker_active(state_dir: Path) -> bool:
     """Return True when ``dispatch-drain.json`` is active under ``state_dir``."""
-    data = _read_json(state_dir / DRAIN_MARKER_FILENAME)
-    if data is None:
+    marker_path = state_dir / DRAIN_MARKER_FILENAME
+    if not marker_path.exists():
         return False
+    data = _read_json(marker_path)
+    if data is None:
+        # An existing marker that cannot be interpreted must stop dispatch. The
+        # lifecycle recovery command is the only surface allowed to clear it.
+        return True
     return bool(data.get("active"))
 
 
@@ -180,6 +234,224 @@ def _write_json_atomic(path: Path, payload: dict[str, Any], *, dry_run: bool) ->
     return True
 
 
+def _hash_json(payload: dict[str, Any]) -> str:
+    rendered = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return "sha256:" + hashlib.sha256(rendered).hexdigest()
+
+
+def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8", newline="\n") as stream:
+        stream.write(json.dumps(payload, sort_keys=True) + "\n")
+
+
+def _load_bridge_lease_registry(project_root: Path) -> Any:
+    """Load the canonical scripts-side document lease primitive."""
+    candidates = (
+        project_root.resolve() / "scripts",
+        Path(__file__).resolve().parents[3] / "scripts",
+    )
+    for scripts_dir in candidates:
+        if not (scripts_dir / "bridge_lease_registry.py").is_file():
+            continue
+        scripts_dir_text = str(scripts_dir)
+        if scripts_dir_text not in sys.path:
+            sys.path.insert(0, scripts_dir_text)
+        return importlib.import_module("bridge_lease_registry")
+    raise RuntimeError("canonical bridge lease registry is unavailable")
+
+
+def _targeted_reoffer_invalid(recipient: str, document: str, message: str, *, dry_run: bool) -> TargetedReofferResult:
+    return TargetedReofferResult(
+        status="invalid",
+        recipient=recipient,
+        document=document,
+        dry_run=dry_run,
+        message=message,
+    )
+
+
+def _targeted_reoffer_from_state(
+    state: dict[str, Any],
+    *,
+    recipient: str,
+    document: str,
+) -> tuple[list[str], str, str]:
+    before_hash = _hash_json(state)
+    recipients = state.get("recipients")
+    if not isinstance(recipients, dict):
+        return [], before_hash, before_hash
+    recipient_state = recipients.get(recipient)
+    if not isinstance(recipient_state, dict):
+        return [], before_hash, before_hash
+
+    changed_fields: list[str] = []
+    removed_signature: Any = None
+    signature_found = False
+    per_document = recipient_state.get("last_dispatched_signatures_by_document")
+    if isinstance(per_document, dict) and document in per_document:
+        retained = dict(per_document)
+        removed_signature = retained.pop(document)
+        signature_found = True
+        recipient_state["last_dispatched_signatures_by_document"] = retained
+        changed_fields.append(f"recipients.{recipient}.last_dispatched_signatures_by_document.{document}")
+
+    thread_reoffers = state.get("thread_reoffers")
+    if isinstance(thread_reoffers, dict) and document in thread_reoffers:
+        retained_reoffers = dict(thread_reoffers)
+        retained_reoffers.pop(document)
+        state["thread_reoffers"] = retained_reoffers
+        changed_fields.append(f"thread_reoffers.{document}")
+
+    if signature_found and removed_signature is not None:
+        for field_name in ("last_dispatched_signature", "signature", "last_suppressed_signature"):
+            if recipient_state.get(field_name) == removed_signature:
+                recipient_state[field_name] = None
+                changed_fields.append(f"recipients.{recipient}.{field_name}")
+
+    after_hash = _hash_json(state)
+    return changed_fields, before_hash, after_hash
+
+
+def targeted_reoffer(
+    state_dirs: DispatchStateDirs,
+    recipient: str,
+    document: str,
+    *,
+    dry_run: bool = False,
+) -> TargetedReofferResult:
+    """Rearm one exact recipient/document without disturbing other runtime state."""
+    recipient = str(recipient or "").strip()
+    document = str(document or "").strip()
+    if not _RECIPIENT_PATTERN.fullmatch(recipient):
+        return _targeted_reoffer_invalid(
+            recipient,
+            document,
+            "recipient must be an exact prime-builder:<id> or loyal-opposition:<id> key",
+            dry_run=dry_run,
+        )
+    if not _DOCUMENT_PATTERN.fullmatch(document):
+        return _targeted_reoffer_invalid(
+            recipient,
+            document,
+            "document must be a kebab-case bridge document slug",
+            dry_run=dry_run,
+        )
+
+    state_dir = state_dirs.dispatch_dirs[0]
+    state_path = state_dir / DISPATCH_STATE_FILENAME
+    lease_registry = _load_bridge_lease_registry(state_dirs.project_root)
+    if dry_run:
+        if lease_registry.is_lease_held(document, state_dir=state_dir):
+            return TargetedReofferResult(
+                status="lease_held",
+                recipient=recipient,
+                document=document,
+                dry_run=True,
+                state_path=state_path,
+                message="the exact document has a live dispatcher lease",
+            )
+        state = _read_json(state_path)
+        if state is None:
+            return TargetedReofferResult(
+                status="not_found",
+                recipient=recipient,
+                document=document,
+                dry_run=True,
+                state_path=state_path,
+                message="canonical dispatcher state was not found",
+            )
+        changed_fields, before_hash, after_hash = _targeted_reoffer_from_state(
+            state,
+            recipient=recipient,
+            document=document,
+        )
+        return TargetedReofferResult(
+            status="changed" if changed_fields else "not_found",
+            recipient=recipient,
+            document=document,
+            dry_run=True,
+            changed_fields=changed_fields,
+            state_path=state_path,
+            before_hash=before_hash,
+            after_hash=after_hash,
+            message="targeted reoffer dry run; no files written",
+        )
+
+    handle = lease_registry.acquire_lease(
+        document,
+        action=f"targeted-reoffer:{recipient}",
+        state_dir=state_dir,
+    )
+    if handle is None:
+        return TargetedReofferResult(
+            status="lease_held",
+            recipient=recipient,
+            document=document,
+            dry_run=False,
+            state_path=state_path,
+            message="the exact document has a live dispatcher lease",
+        )
+    try:
+        state = _read_json(state_path)
+        if state is None:
+            return TargetedReofferResult(
+                status="not_found",
+                recipient=recipient,
+                document=document,
+                dry_run=False,
+                state_path=state_path,
+                message="canonical dispatcher state was not found",
+            )
+        changed_fields, before_hash, after_hash = _targeted_reoffer_from_state(
+            state,
+            recipient=recipient,
+            document=document,
+        )
+        if not changed_fields:
+            return TargetedReofferResult(
+                status="not_found",
+                recipient=recipient,
+                document=document,
+                dry_run=False,
+                state_path=state_path,
+                before_hash=before_hash,
+                after_hash=after_hash,
+                message="no matching dispatch signature or thread-reoffer state was found",
+            )
+        _write_json_atomic(state_path, state, dry_run=False)
+        audit_path = state_dirs.project_root / TARGETED_REOFFER_AUDIT_RELATIVE_PATH
+        _append_jsonl(
+            audit_path,
+            {
+                "ts": _now_iso(),
+                "transaction": "targeted-reoffer",
+                "status": "applied",
+                "recipient": recipient,
+                "document": document,
+                "state_path": str(state_path),
+                "before_hash": before_hash,
+                "after_hash": after_hash,
+                "changed_fields": changed_fields,
+            },
+        )
+        return TargetedReofferResult(
+            status="changed",
+            recipient=recipient,
+            document=document,
+            dry_run=False,
+            mutated=True,
+            changed_fields=changed_fields,
+            state_path=state_path,
+            before_hash=before_hash,
+            after_hash=after_hash,
+            audit_path=audit_path,
+            message="targeted reoffer applied",
+        )
+    finally:
+        lease_registry.release_lease(handle)
+
+
 def _clear_recipient_entry(entry: dict[str, Any]) -> bool:
     if not isinstance(entry, dict):
         return False
@@ -204,6 +476,15 @@ def _clear_recipient_entry(entry: dict[str, Any]) -> bool:
         if entry.get(key) is not None:
             entry[key] = None
             changed = True
+    if "last_result" in entry and entry.get("last_result") not in ("no_pending", "substrate_mismatch_inert"):
+        entry["last_result"] = "no_pending"
+        changed = True
+    if entry.get("pending_count", 0) != 0:
+        entry["pending_count"] = 0
+        changed = True
+    if entry.get("selected_count", 0) != 0:
+        entry["selected_count"] = 0
+        changed = True
     if changed:
         entry["updated_at"] = _now_iso()
     return changed
@@ -280,9 +561,9 @@ def _clear_computed_quality_surfaces(state_dirs: DispatchStateDirs, *, dry_run: 
 def _dispatch_run_pid_alive(pid: int) -> bool:
     """Best-effort cross-platform liveness probe for a dispatched-worker PID (WI-4861).
 
-    Defined locally (not imported from ``cross_harness_bridge_trigger``) to
-    preserve the module dependency direction. Fails closed to not-alive on any
-    probe error so a malformed sidecar can never preserve a dead record.
+    Defined locally to preserve the module dependency direction. Fails closed
+    to not-alive on any probe error so a malformed sidecar can never preserve a
+    dead record.
     """
     try:
         pid_int = int(pid)
@@ -506,6 +787,45 @@ def read_live_leases(state_dirs: DispatchStateDirs) -> list[LiveLease]:
     return leases
 
 
+def read_live_dispatch_runs(state_dirs: DispatchStateDirs) -> list[LiveLease]:
+    """Return live dispatch-run workers with provenance-verified PID sidecars."""
+    workers: list[LiveLease] = []
+    for dispatch_dir in state_dirs.dispatch_dirs:
+        runs_dir = dispatch_dir / DISPATCH_RUNS_DIR_NAME
+        if not runs_dir.is_dir():
+            continue
+        for dispatch_id in sorted(_dispatch_run_ids(runs_dir)):
+            pid_path = runs_dir / f"{dispatch_id}.pid"
+            exit_code_path = runs_dir / f"{dispatch_id}.exit_code"
+            try:
+                if exit_code_path.exists() and exit_code_path.stat().st_size > 0:
+                    continue
+            except OSError:
+                continue
+            if not pid_path.is_file():
+                continue
+            pid = _read_dispatch_run_pid(pid_path)
+            expected = _read_dispatch_run_create_time(runs_dir / f"{dispatch_id}{PID_CREATE_TIME_SUFFIX}")
+            if pid is None or not _dispatch_run_pid_alive(pid):
+                continue
+            if not _dispatch_run_pid_provenance_matches(pid, expected):
+                continue
+            workers.append(LiveLease(doc_slug=dispatch_id, pid=pid, path=pid_path))
+    return workers
+
+
+def read_live_workers(state_dirs: DispatchStateDirs) -> list[LiveLease]:
+    """Return all drainable live workers, preferring dispatch-runs provenance."""
+    live: list[LiveLease] = []
+    seen_pids: set[int] = set()
+    for worker in [*read_live_dispatch_runs(state_dirs), *read_live_leases(state_dirs)]:
+        if worker.pid in seen_pids:
+            continue
+        seen_pids.add(worker.pid)
+        live.append(worker)
+    return live
+
+
 def _write_drain_marker(state_dir: Path, *, dry_run: bool) -> bool:
     payload = {
         "active": True,
@@ -523,6 +843,58 @@ def _clear_drain_markers(state_dirs: DispatchStateDirs, *, dry_run: bool) -> Non
         _remove_path(dispatch_dir / DRAIN_MARKER_FILENAME, dry_run=dry_run)
 
 
+def _lease_record_worker_alive(record: dict[str, Any] | None) -> bool:
+    """True when a lease record names a currently-alive worker PID."""
+    if not isinstance(record, dict):
+        return False
+    pid = record.get("pid")
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
+        return False
+    return _dispatch_run_pid_alive(pid)
+
+
+def _prune_dead_lease_locks(dispatch_dir: Path, *, dry_run: bool) -> int:
+    """Remove orphaned document-lease locks with no live worker (WI-5066).
+
+    A lease lock is dead residue only when BOTH its heartbeat is stale
+    (``_lease_is_live`` is False) AND its recorded worker PID is not alive. A
+    lease that is live by heartbeat OR still backed by a live PID is preserved,
+    so an in-flight (even hung-but-not-yet-reaped) worker's lease is never
+    dropped. Never touches bridge files, PAUTH/project state, or quality
+    surfaces. Returns the count of dead lease locks removed.
+    """
+    lease_dir = dispatch_dir / LEASES_DIR_NAME
+    if not lease_dir.is_dir():
+        return 0
+    now = datetime.now(UTC)
+    removed = 0
+    for path in sorted(lease_dir.glob("*.lock")):
+        record = _parse_lease_record(path)
+        heartbeat_live = record is not None and _lease_is_live(record, now=now)
+        if heartbeat_live or _lease_record_worker_alive(record):
+            continue
+        if _remove_path(path, dry_run=dry_run):
+            removed += 1
+    return removed
+
+
+def _drain_residue_cleanup(state_dirs: DispatchStateDirs, *, dry_run: bool) -> tuple[int, int]:
+    """Prune no-live-worker lease locks and stale dispatch-run sidecars (WI-5066).
+
+    Returns ``(dead_lease_locks_removed, stale_dispatch_runs_pruned)`` summed
+    across every dispatcher state dir, so drain leaves the same clean state a
+    soft reset does. Reuses ``_prune_stale_dispatch_runs`` (its own PID/exit-code
+    liveness rule) and never touches recipient/quiesce state, bridge files,
+    PAUTH/project state, or quality surfaces.
+    """
+    dead_leases = 0
+    stale_runs = 0
+    for dispatch_dir in state_dirs.dispatch_dirs:
+        dead_leases += _prune_dead_lease_locks(dispatch_dir, dry_run=dry_run)
+        stale_runs += _prune_stale_dispatch_runs(dispatch_dir, dry_run=dry_run)
+    return dead_leases, stale_runs
+
+
 def drain(
     state_dirs: DispatchStateDirs,
     *,
@@ -536,8 +908,11 @@ def drain(
     terminator = terminate_fn or terminate_pid_tree
     result = DrainResult(dry_run=dry_run)
     if dry_run:
-        live = read_live_leases(state_dirs)
+        live = read_live_workers(state_dirs)
         result.drained_pids = [lease.pid for lease in live]
+        result.dead_lease_locks_removed, result.stale_dispatch_runs_pruned = _drain_residue_cleanup(
+            state_dirs, dry_run=True
+        )
         return result
 
     markers_written = 0
@@ -548,14 +923,17 @@ def drain(
 
     deadline = clock() + max(0.0, float(timeout_seconds))
     while clock() < deadline:
-        live = read_live_leases(state_dirs)
+        live = read_live_workers(state_dirs)
         if not live:
             result.drained_pids = []
             _clear_drain_markers(state_dirs, dry_run=False)
+            result.dead_lease_locks_removed, result.stale_dispatch_runs_pruned = _drain_residue_cleanup(
+                state_dirs, dry_run=False
+            )
             return result
         time.sleep(min(poll_interval, max(0.0, deadline - clock())))
 
-    live = read_live_leases(state_dirs)
+    live = read_live_workers(state_dirs)
     terminated: list[int] = []
     for lease in live:
         terminator(lease.pid)
@@ -563,4 +941,7 @@ def drain(
     result.terminated_pids = terminated
     result.drained_pids = []
     _clear_drain_markers(state_dirs, dry_run=False)
+    result.dead_lease_locks_removed, result.stale_dispatch_runs_pruned = _drain_residue_cleanup(
+        state_dirs, dry_run=False
+    )
     return result

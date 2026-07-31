@@ -28,7 +28,7 @@ _MODULE_PATH = Path(__file__).resolve().parents[2] / "scripts" / "bridge_lease_r
 
 def _load_module() -> ModuleType:
     """Load scripts/bridge_lease_registry.py via importlib (``scripts/`` is not
-    a package), matching the loader idiom in test_cross_harness_bridge_trigger.py."""
+    a package), matching the loader idiom in test_dispatcher_runtime.py."""
     assert _MODULE_PATH.is_file(), f"Expected lease registry at {_MODULE_PATH}"
     module_name = "bridge_lease_registry"
     if module_name in sys.modules:

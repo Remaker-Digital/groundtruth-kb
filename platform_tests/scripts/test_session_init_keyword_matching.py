@@ -22,7 +22,54 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import _session_init_keyword as ik  # noqa: E402
 
 # ---------------------------------------------------------------------------
-# Positive: verb-led forms
+# Canonical v3 machine/init grammar.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "prompt,expected_subject,expected_role_mode",
+    [
+        ("::init gtkb", "gtkb", None),
+        ("::init gtkb pb", "gtkb", "pb"),
+        ("::init gtkb lo", "gtkb", "lo"),
+        ("::init application", "application", None),
+        ("::init application pb", "application", "pb"),
+        ("::init application lo", "application", "lo"),
+    ],
+)
+def test_canonical_v3_forms_match(
+    prompt: str,
+    expected_subject: str,
+    expected_role_mode: str | None,
+) -> None:
+    result = ik.match_canonical_init_keyword(prompt)
+    assert result is not None
+    assert result.subject == expected_subject
+    assert result.role_mode == expected_role_mode
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "init gtkb",
+        "start gtkb session",
+        "GT-KB startup",
+        "::init gtkb prime",
+        "::init agent_red pb",
+        "::init GTKB pb",
+        "::init gtkb  pb",
+        " ::init gtkb pb",
+        "::init gtkb pb ",
+        "::init gtkb pb\nfollow-up",
+        "",
+    ],
+)
+def test_canonical_v3_rejects_aliases_and_malformed_forms(prompt: str) -> None:
+    assert ik.match_canonical_init_keyword(prompt) is None
+
+
+# ---------------------------------------------------------------------------
+# Compatibility alias matcher: verb-led forms
 # ---------------------------------------------------------------------------
 
 
@@ -91,7 +138,7 @@ def test_bare_verbs_do_not_match(prompt: str) -> None:
     "prompt",
     [
         "Hello, what is the status?",
-        "Bridge auto-dispatch notification (cross-harness trigger).",
+        "Bridge auto-dispatch notification (dispatcher daemon).",
         "Continue working on the proposal.",
         "What does init even mean here?",
         "",

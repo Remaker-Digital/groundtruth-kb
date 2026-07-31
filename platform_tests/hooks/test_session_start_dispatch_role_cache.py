@@ -8,9 +8,9 @@ Governing specifications:
 
 - ``ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001`` Decision 2: both the ``-pb`` and
   ``-lo`` startup-disclosure caches are generated unconditionally regardless of
-  the harness's durable role set, so the UserPromptSubmit init-keyword matcher's
+  the harness's dispatcher/default role set, so the UserPromptSubmit init-keyword matcher's
   keyword-keyed cache lookup succeeds for either role.
-- ``DCL-SESSION-ROLE-RESOLUTION-001``: durable role is the authority for headless
+- ``DCL-SESSION-ROLE-RESOLUTION-001``: registry role is the authority for headless
   dispatch routing only; it is NOT consulted when generating interactive
   startup-disclosure caches. Assertion 8 requires the Claude and Codex
   SessionStart dispatchers to implement the same behavior.
@@ -24,10 +24,11 @@ every behavioral test is parameterized over both to assert parity.
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import sys
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -40,6 +41,7 @@ _DISPATCHERS = {
     "claude": REPO_ROOT / ".claude" / "hooks" / "session_start_dispatch.py",
     "codex": REPO_ROOT / ".codex" / "gtkb-hooks" / "session_start_dispatch.py",
 }
+_CODEX_WRAP_HOOK = REPO_ROOT / ".codex" / "gtkb-hooks" / "session_wrapup_trigger_dispatch.py"
 
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -48,6 +50,14 @@ if str(REPO_ROOT) not in sys.path:
 def _load_dispatcher(harness: str) -> ModuleType:
     path = _DISPATCHERS[harness]
     spec = importlib.util.spec_from_file_location(f"_test_session_start_dispatch_{harness}", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_codex_wrap_hook() -> ModuleType:
+    spec = importlib.util.spec_from_file_location("_test_codex_wrap_trigger_dispatch", _CODEX_WRAP_HOOK)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -88,7 +98,7 @@ def _isolate(
 
     ``durable_roles`` seeds what ``_resolve_own_role_set`` would return. The
     Slice 1 change must IGNORE it for cache generation; stubbing it to a
-    singleton is how the tests prove the writer no longer consults durable role.
+    singleton is how the tests prove the writer no longer consults registry role.
     """
     tmp_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(module, "OUT_DIR", tmp_dir)
@@ -113,7 +123,7 @@ def test_both_role_caches_written_regardless_of_durable_role(
     monkeypatch: pytest.MonkeyPatch,
     durable_roles: frozenset[str],
 ) -> None:
-    """Both -pb and -lo caches exist no matter what the durable role set is.
+    """Both -pb and -lo caches exist no matter what the dispatcher/default role set is.
 
     Core proof of the Slice 1 fix: with ``durable_roles == {pb}`` (harness B's
     singleton), the old loop never produced the ``-lo`` cache. The new loop
@@ -146,8 +156,10 @@ def test_metadata_role_mode_fields_match_cache(
 
     assert pb_meta["role_mode"] == "pb"
     assert pb_meta["role_profile"] == "prime-builder"
+    assert isinstance(pb_meta["generated_at"], str) and pb_meta["generated_at"].endswith("Z")
     assert lo_meta["role_mode"] == "lo"
     assert lo_meta["role_profile"] == "loyal-opposition"
+    assert isinstance(lo_meta["generated_at"], str) and lo_meta["generated_at"].endswith("Z")
     assert pb_meta["role_authority"]["interactive_resolved_role"] == "prime-builder"
     assert pb_meta["role_authority"]["authority_mode"] == "cache_only_pending_init_keyword"
     assert "non-overriding" in pb_meta["role_authority"]["durable_registry_authority"]
@@ -228,3 +240,74 @@ def test_parity_both_dispatchers_produce_identical_cache_set(
             "last-user-visible-startup-lo.md",
         }
     )
+
+
+def test_codex_wrap_trigger_latches_missing_envelope_from_shared_resolver(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Codex topic/wrap routing opens missing envelopes with interactive role evidence."""
+
+    hook = _load_codex_wrap_hook()
+    out_dir = tmp_path / "out"
+    opened: dict[str, object] = {}
+    monkeypatch.setattr(hook, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(hook, "OUT_DIR", out_dir)
+    monkeypatch.setattr(hook, "_persistent_harness_id", lambda: "A")
+    monkeypatch.setattr(hook, "resolve_harness_identity", lambda *_a, **_k: ("codex", "A"))
+    monkeypatch.setattr(hook, "load_current", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        hook,
+        "resolve_interactive_session_role_details",
+        lambda *_a, **_k: {
+            "interactive_resolved_role": "loyal-opposition",
+            "interactive_role_source": "marker",
+            "durable_registry_role": "prime-builder",
+            "authority_mode": "interactive_transcript",
+        },
+    )
+
+    def _open_session(*_args, **kwargs):
+        opened.update(kwargs)
+        return {"role_resolved": kwargs.get("role")}
+
+    monkeypatch.setattr(hook, "open_session", _open_session)
+
+    assert hook._ensure_session_role_latched() == "loyal-opposition"
+    assert opened["harness_name"] == "codex"
+    assert opened["harness_id"] == "A"
+    assert opened["role"] == "loyal-opposition"
+
+    diagnostic = json.loads((out_dir / "last-session-role-latch.json").read_text(encoding="utf-8"))
+    assert diagnostic["opened_envelope"] is True
+    assert diagnostic["interactive_role_source"] == "marker"
+    assert diagnostic["durable_registry_role"] == "prime-builder"
+
+
+def test_codex_wrapup_generation_receives_resolved_interactive_role(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture,
+) -> None:
+    """Explicit wrap-up generation uses resolver output instead of rediscovering durable role."""
+
+    hook = _load_codex_wrap_hook()
+    captured: dict[str, list[str]] = {}
+    monkeypatch.setattr(hook, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(hook, "OUT_DIR", tmp_path / "out")
+    monkeypatch.setattr(hook, "_startup_input_gate_active", lambda: False)
+    monkeypatch.setattr(hook, "_persistent_harness_id", lambda: "A")
+    monkeypatch.setattr(hook, "_interactive_role_profile", lambda: "loyal-opposition")
+    monkeypatch.setattr("sys.stdin", io.StringIO("wrap up"))
+
+    def _run(args, **_kwargs):
+        captured["args"] = [str(item) for item in args]
+        return SimpleNamespace(returncode=0, stdout=json.dumps({"additionalContext": "WRAP-CONTEXT"}), stderr="")
+
+    monkeypatch.setattr(hook.subprocess, "run", _run)
+
+    assert hook.main() == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert "WRAP-CONTEXT" in payload["hookSpecificOutput"]["additionalContext"]
+    role_arg = captured["args"].index("--role-profile")
+    assert captured["args"][role_arg + 1] == "loyal-opposition"

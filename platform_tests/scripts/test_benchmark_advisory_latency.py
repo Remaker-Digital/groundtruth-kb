@@ -9,6 +9,7 @@ dimension keys, empty-window behavior, and output-writing.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -25,7 +26,23 @@ EMPTY_START = "1990-01-01T00:00:00+00:00"
 EMPTY_END = "1990-01-02T00:00:00+00:00"
 
 
+def _write_numbered(path: Path, status: str, body: str, *, timestamp: float) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"{status}\n\n{body}\n", encoding="utf-8")
+    os.utime(path, (timestamp, timestamp))
+
+
 def test_advisory_latency_basic_run(tmp_path):
+    advisory = tmp_path / "bridge" / "gtkb-latency-advisory-001.md"
+    acknowledgement = tmp_path / "bridge" / "gtkb-latency-action-001.md"
+    _write_numbered(advisory, "ADVISORY", "# Advisory", timestamp=1_750_000_000)
+    _write_numbered(
+        acknowledgement,
+        "NEW",
+        "Responds to: bridge/gtkb-latency-advisory-001.md",
+        timestamp=1_750_007_200,
+    )
+
     result = bm.run(PAST, FUTURE, tmp_path)
     assert isinstance(result, BenchmarkResult)
     assert result.benchmark_id == bm.BENCHMARK_ID
@@ -33,6 +50,20 @@ def test_advisory_latency_basic_run(tmp_path):
     assert result.window_end == FUTURE
     assert isinstance(result.value, (int, float))
     assert isinstance(result.dimensions, dict)
+    assert result.value == 2.0
+    assert result.dimensions == {"advisory_count": 1, "matched_advisories": 1, "sample_size": 1}
+
+
+def test_retired_dropbox_report_is_not_an_advisory_input(tmp_path):
+    dropbox = tmp_path / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
+    dropbox.mkdir(parents=True)
+    (dropbox / "INSIGHTS-2026-01-01-legacy.md").write_text("Mode: advisory report\n", encoding="utf-8")
+
+    result = bm.run(PAST, FUTURE, tmp_path)
+
+    assert result.dimensions["advisory_count"] == 0
+    assert result.dimensions["sample_size"] == 0
+    assert "numbered bridge ADVISORY" in result.source_query
 
 
 def test_advisory_latency_idempotency_dimensions(tmp_path):

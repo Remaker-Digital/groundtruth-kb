@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "bridge_id": "gtkb-wi5370-mixed-staged-index-neutralization",
+  "work_item_id": "WI-5370",
+  "project_id": "PROJECT-GTKB-TREE-STABILIZATION",
+  "generated_at": "2026-07-16T23:16:40Z",
+  "session_id": "019f6d05-f4ab-7e61-8e5e-ddbe8d5730e7",
+  "implementation_authorization": {
+    "go_file": "bridge/gtkb-wi5370-mixed-staged-index-neutralization-002.md",
+    "packet_hash": "sha256:d7359cd649952bdd2601a6533138b80d0069224d49f59a46f000332f6ec140ef",
+    "target_path_globs": [
+      ".git/index",
+      "independent-progress-assessments/WI-5370-staged-index-neutralization-manifest.json"
+    ]
+  },
+  "stop_checks": {
+    "git_index_lock_present": false,
+    "forbidden_git_index_writer_present": false,
+    "git_process_notes": [
+      "Observed long-running git push/remote-https process owned by another workflow; not an index writer under the GO conditions.",
+      "Observed transient git status/diff read processes during evidence collection; read-only."
+    ]
+  },
+  "staged_snapshot": {
+    "staged_path_count": 0,
+    "nul_delimited_payload_sha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "snapshot_file_written": false,
+    "reason_snapshot_file_not_written": "Live staged set was already empty at execution time; no pathspec file was needed."
+  },
+  "worktree_digest": {
+    "pre_digest_sha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "post_digest_sha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "matched": true,
+    "restored_or_unstaged_paths": 0
+  },
+  "commands": [
+    {
+      "command": "python scripts/implementation_authorization.py begin --bridge-id gtkb-wi5370-mixed-staged-index-neutralization",
+      "exit_code": 0,
+      "result": "Implementation-start packet issued for .git/index and this manifest."
+    },
+    {
+      "command": "Get-CimInstance Win32_Process -Filter \"Name='git.exe'\"",
+      "exit_code": 0,
+      "result": "No forbidden index-writing git add/commit/restore/reset/checkout command observed; read-only status/diff and unrelated push processes observed."
+    },
+    {
+      "command": "Test-Path .git\\index.lock",
+      "exit_code": 0,
+      "result": "False"
+    },
+    {
+      "command": "git diff --cached --name-only | Measure-Object",
+      "exit_code": 0,
+      "result": "0 staged paths"
+    },
+    {
+      "command": "git status --porcelain=v1 -uall",
+      "exit_code": 0,
+      "result": "940 entries: 19 modified, 921 untracked"
+    },
+    {
+      "command": "python scripts/per_thread_finalization_repair.py --format json --exclude-wi WI-5320 --exclude-wi WI-5328 --exclude-wi WI-5330",
+      "exit_code": 0,
+      "result": "Planner ran read-only after staged-index neutralization evidence."
+    }
+  ],
+  "planner_after": {
+    "generated_at": "2026-07-16T23:16:14Z",
+    "source_dirty_paths": 939,
+    "threads": 53,
+    "classification_counts": {
+      "excluded_active_program": 13,
+      "in_flight_bridge_chain": 3,
+      "mixed_provenance_stop": 7,
+      "terminal_verified_blocked_dirty_targets": 1,
+      "terminal_verified_blocked_missing_scope": 20,
+      "terminal_verified_repair_candidate": 10
+    },
+    "source_actuator_action_counts": {
+      "auto_drop_byte_identical": 0,
+      "auto_ignore": 0,
+      "manual_owner_review": 890,
+      "safe_commit": 47,
+      "skip": 2
+    }
+  },
+  "status_after": {
+    "porcelain_total": 940,
+    "counts": {
+      " M": 19,
+      "??": 921
+    }
+  },
+  "outcome": {
+    "index_mutated": false,
+    "git_restore_staged_executed": false,
+    "summary": "No staged-index neutralization command was required because the live staged set was already empty. The manifest records the governed no-op and confirms the per-thread planner can now classify terminal repair candidates without a broad staged index."
+  }
+}

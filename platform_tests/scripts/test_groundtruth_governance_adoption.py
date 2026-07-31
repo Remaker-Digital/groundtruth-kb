@@ -126,7 +126,6 @@ def test_groundtruth_governance_artifacts_are_present_and_not_ignored() -> None:
         "platform_tests/scripts/test_session_self_initialization.py",
         "platform_tests/scripts/test_standing_backlog_harvest.py",
         "platform_tests/hooks/test_workstream_focus.py",
-        "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/STANDING-BACKLOG-HARVEST-2026-04-20.md",
     ]
 
     # Per S330 Slice 8.6 row-9 waiver

@@ -1,0 +1,232 @@
+# Authoritative canonical skill rename map (gtkb- prefix rollout).
+# Canonical source of truth = SKILL.md frontmatter `name:` (owner Decision 7A/A1).
+# Slice 0 reconciles any dir whose name differs from its frontmatter name.
+schema_version = 1
+
+[[skills]]
+dir = "gtkb-adr"
+canonical_name = "gtkb-adr"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-advisory-disposition"
+canonical_name = "gtkb-advisory-disposition"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-advisory-intake"
+canonical_name = "gtkb-advisory-intake"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-advisory-proposal"
+canonical_name = "gtkb-advisory-proposal"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-alternatives-investigation"
+canonical_name = "gtkb-alternatives-investigation"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-arch-audit"
+canonical_name = "gtkb-arch-audit"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-assert"
+canonical_name = "gtkb-assert"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-assertion-triage"
+canonical_name = "gtkb-assertion-triage"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-batch"
+canonical_name = "gtkb-batch"
+registry_old_name = "kb-batch"
+needs_frontmatter_fix = true  # edit SKILL.md frontmatter name: kb-batch -> gtkb-batch (dir already gtkb-batch)
+
+[[skills]]
+dir = "gtkb-benchmarks"
+canonical_name = "gtkb-benchmarks"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-bridge"
+canonical_name = "gtkb-bridge"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-bridge-config"
+canonical_name = "gtkb-bridge-config"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-bridge-propose"
+canonical_name = "gtkb-bridge-propose"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-bridge-reconciliation"
+canonical_name = "gtkb-bridge-reconciliation"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-check-deliberations"
+canonical_name = "gtkb-check-deliberations"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-code-review-audit"
+canonical_name = "gtkb-code-review-audit"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-codex-report"
+canonical_name = "gtkb-loyal-opposition-report"  # rename dir -> gtkb-loyal-opposition-report
+registry_old_name = ""
+needs_dir_rename = true  # rename dir .claude/skills/gtkb-codex-report -> gtkb-loyal-opposition-report
+
+[[skills]]
+dir = "gtkb-decision-capture"
+canonical_name = "gtkb-decision-capture"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-dispatcher-control"
+canonical_name = "gtkb-dispatcher-control"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-formal-artifact-packet-helper"
+canonical_name = "gtkb-formal-artifact-packet-helper"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-grill-me-for-clarification"
+canonical_name = "gtkb-grill-me-for-clarification"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-harness-parity-review"
+canonical_name = "gtkb-harness-parity-review"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-hygiene-investigation"
+canonical_name = "gtkb-hygiene-investigation"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-hygiene-reclaim"
+canonical_name = "gtkb-hygiene-reclaim"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-hygiene-sweep"
+canonical_name = "gtkb-hygiene-sweep"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-kb-work-item"
+canonical_name = "gtkb-work-item"  # rename dir -> gtkb-work-item
+registry_old_name = ""
+needs_dir_rename = true  # rename dir .claude/skills/gtkb-kb-work-item -> gtkb-work-item
+
+[[skills]]
+dir = "gtkb-lo-hygiene-assessment"
+canonical_name = "gtkb-lo-hygiene-assessment"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-lo-opportunity-radar"
+canonical_name = "gtkb-lo-opportunity-radar"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-managed-skill-adoption-review"
+canonical_name = "gtkb-managed-skill-adoption-review"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-projects"
+canonical_name = "gtkb-projects"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-promote"
+canonical_name = "gtkb-promote"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-proposal-review"
+canonical_name = "gtkb-proposal-review"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-propose"
+canonical_name = "gtkb-propose"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-query"
+canonical_name = "gtkb-query"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-release-candidate-gate"
+canonical_name = "gtkb-release-candidate-gate"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-send-review"
+canonical_name = "gtkb-send-review"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-session-wrap"
+canonical_name = "gtkb-session-wrap"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-session-wrap-scan"
+canonical_name = "gtkb-session-wrap-scan"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-skill-governance-lifecycle"
+canonical_name = "gtkb-skill-governance-lifecycle"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-spec"
+canonical_name = "gtkb-spec"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-spec-intake"
+canonical_name = "gtkb-spec-intake"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-structural-hygiene-review"
+canonical_name = "gtkb-structural-hygiene-review"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-sweep-commit"
+canonical_name = "gtkb-sweep-commit"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-verify"
+canonical_name = "gtkb-verify"
+registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-skill-rollout"
+canonical_name = "gtkb-skill-rollout"
+registry_old_name = ""

@@ -34,9 +34,9 @@ def _projection() -> dict[str, Any]:
     }
 
 
-def test_cross_harness_trigger_uses_projection_reader_shim(monkeypatch: Any, tmp_path: Path) -> None:
+def test_dispatcher_runtime_uses_projection_reader_shim(monkeypatch: Any, tmp_path: Path) -> None:
     """The trigger adapts the canonical projection without direct JSON reads."""
-    import scripts.cross_harness_bridge_trigger as trigger
+    import scripts.dispatcher_runtime as trigger
 
     calls: list[Path] = []
 

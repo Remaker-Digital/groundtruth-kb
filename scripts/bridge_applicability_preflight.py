@@ -27,24 +27,52 @@ try:
 except ImportError:  # pragma: no cover - direct script execution path
     from implementation_authorization import PATH_TOKEN_RE
 
+try:
+    from scripts.bridge_author_metadata import REQUIRED_AUTHOR_METADATA_FIELDS
+except ImportError:  # pragma: no cover - direct script execution path
+    from bridge_author_metadata import REQUIRED_AUTHOR_METADATA_FIELDS
+
+try:
+    from groundtruth_kb.governance.project_authorization_operation_time import classify_target as _classify_target
+except ImportError:  # pragma: no cover
+    _classify_target = None  # type: ignore[assignment]
+
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 DEFAULT_BRIDGE_DIR: Final[Path] = PROJECT_ROOT / "bridge"
 DEFAULT_CONFIG_PATH: Final[Path] = PROJECT_ROOT / "config" / "governance" / "spec-applicability.toml"
 DEFAULT_DB_PATH: Final[Path] = PROJECT_ROOT / "groundtruth.db"
+PACKET_HASH_SCHEMA_VERSION: Final[int] = 2
+PACKET_HASH_MATERIAL_KEYS: Final[frozenset[str]] = frozenset(
+    {
+        "packet_hash_schema_version",
+        "bridge_document_name",
+        "source_identity",
+        "source_content_hash",
+        "rules_content_hash",
+        "cited_specs",
+        "target_paths",
+        "declared_target_paths",
+        "applicability_path_evidence",
+        "work_items",
+        "applicable_specs",
+        "missing_required_specs",
+        "missing_advisory_specs",
+    }
+)
 
 BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED)\b",
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED)\b",
     re.IGNORECASE,
 )
 SPEC_LINK_HEADING_RE: Final[re.Pattern[str]] = re.compile(
     # Strict harvest heading. Tolerates a trailing qualifier ONLY when it is
     # introduced by a separator -- "(" (parenthetical), ":", en-dash, em-dash,
-    # or hyphen -- e.g. "## Specification Links (carried forward)". Bare trailing
-    # words (e.g. "## Specification Format Guide") still do NOT match, so the
-    # widening cannot over-harvest from unrelated headings (WI-4542).
+    # or a whitespace-prefixed hyphen -- e.g. "## Specification Links (carried
+    # forward)". Requiring whitespace before an ASCII hyphen prevents compound
+    # headings such as "Specification-Derived" from matching (WI-5330).
     r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?"
     r"specification(?:\s+links?|\s+references?)?"
-    r"(?:\s*[(:–—-].*)?\s*$",
+    r"(?:\s*[(:–—].*|\s+-.*)?\s*$",
     re.IGNORECASE,
 )
 # Loose detector for spec-links-like headings the STRICT regex rejects (e.g. the
@@ -66,6 +94,13 @@ FILES_CHANGED_HEADING_RE: Final[re.Pattern[str]] = re.compile(
     r"^#{1,6}\s+Files\s+(?:Changed|Expected\s+To\s+Change)\s*$",
     re.IGNORECASE,
 )
+OPERATIVE_REFERENCE_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?im)^\s*(?:Responds\s+to|Corrects|Approved\s+proposal|Reviewed|Verified):\s*"
+    r"(?:bridge/)?([^\s`]+)-(\d+)\.md\s*$"
+)
+PAUTH_AMENDMENT_SPEC_ID: Final[str] = "DCL-PROJECT-SPECIFICATION-AMENDMENT-APPROVAL-REQUIRED-001"
+OWNER_EVIDENCE_RE: Final[re.Pattern[str]] = re.compile(r"Owner evidence:\s*([^\s`)]+)", re.IGNORECASE)
+JSON_FENCE_RE: Final[re.Pattern[str]] = re.compile(r"```json\s*(.*?)```", re.IGNORECASE | re.DOTALL)
 
 
 @dataclass(frozen=True)
@@ -169,6 +204,10 @@ def _status_from_bridge_file(path: Path) -> str | None:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
+    return _status_from_content(text)
+
+
+def _status_from_content(text: str) -> str | None:
     for line in text.splitlines():
         stripped = line.strip()
         if not stripped:
@@ -204,11 +243,30 @@ def choose_operative_version(versions: list[BridgeVersion]) -> BridgeVersion | N
         latest = max(versions, key=lambda v: v.version_number)
         if latest.status == "WITHDRAWN":
             return latest
-    for status_set in ({"NEW", "REVISED"}, {"VERIFIED", "WITHDRAWN", "GO", "NO-GO"}):
+        earlier_no_actions = [
+            version
+            for version in versions
+            if version.status == "NO-ACTION" and version.version_number < latest.version_number
+        ]
+        if latest.status in {"GO", "NO-GO", "VERIFIED"} and earlier_no_actions:
+            references = _operative_reference_versions(latest)
+            if references:
+                return latest
+    for status_set in ({"NEW", "REVISED", "NO-ACTION"}, {"VERIFIED", "WITHDRAWN", "GO", "NO-GO"}):
         candidates = [v for v in versions if v.status in status_set]
         if candidates:
             return max(candidates, key=lambda v: v.version_number)
     return versions[0] if versions else None
+
+
+def _operative_reference_versions(version: BridgeVersion) -> set[int]:
+    """Return explicit same-thread version references from verdict metadata."""
+    try:
+        content = version.abs_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return set()
+    thread_name = re.sub(r"-\d+\.md$", "", Path(version.rel_path).name)
+    return {int(match.group(2)) for match in OPERATIVE_REFERENCE_RE.finditer(content) if match.group(1) == thread_name}
 
 
 def extract_spec_links(content: str) -> set[str]:
@@ -270,6 +328,15 @@ def extract_target_paths(content: str) -> set[str]:
         token = match.group(1).replace("\\", "/").strip("/")
         if token and not token.startswith(("http:/", "https:/")):
             paths.add(token)
+    return paths
+
+
+def extract_declared_target_paths(content: str) -> set[str]:
+    paths: set[str] = set()
+    for line in content.splitlines():
+        target_match = TARGET_PATH_RE.match(line)
+        if target_match:
+            paths.update(_parse_declared_path_values(target_match.group(1)))
     return paths
 
 
@@ -348,8 +415,8 @@ def compute_missing_parent_dir_warnings(project_root: Path, paths: set[str]) -> 
     return warnings
 
 
-def load_rules(config_path: Path) -> list[ApplicabilityRule]:
-    data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+def _parse_rules(content: str) -> list[ApplicabilityRule]:
+    data = tomllib.loads(content)
     rules: list[ApplicabilityRule] = []
     for raw in data.get("rules", []):
         rules.append(
@@ -363,6 +430,10 @@ def load_rules(config_path: Path) -> list[ApplicabilityRule]:
             )
         )
     return rules
+
+
+def load_rules(config_path: Path) -> list[ApplicabilityRule]:
+    return _parse_rules(config_path.read_text(encoding="utf-8"))
 
 
 def _match_path(pattern: str, path: str) -> bool:
@@ -423,6 +494,219 @@ def enrich_from_membase(applicable: dict[str, ApplicableSpec], db_path: Path) ->
         conn.close()
 
 
+def _load_json_fence(content: str) -> dict[str, Any] | None:
+    for match in JSON_FENCE_RE.finditer(content):
+        try:
+            parsed = json.loads(match.group(1))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+def _current_pauth_specs(db_path: Path, authorization_id: str) -> set[str]:
+    if not db_path.is_file():
+        return set()
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2.0)
+    except sqlite3.Error:
+        return set()
+    try:
+        row = conn.execute(
+            "SELECT included_spec_ids FROM current_project_authorizations WHERE id = ? LIMIT 1",
+            (authorization_id,),
+        ).fetchone()
+    except sqlite3.Error:
+        return set()
+    finally:
+        conn.close()
+    if not row or not row[0]:
+        return set()
+    try:
+        parsed = json.loads(row[0])
+    except json.JSONDecodeError:
+        return set()
+    if not isinstance(parsed, list):
+        return set()
+    return {str(item) for item in parsed}
+
+
+def _pauth_amendment_blocking_errors(content: str, project_root: Path, db_path: Path) -> list[str]:
+    if PAUTH_AMENDMENT_SPEC_ID not in content:
+        return []
+    envelope = _load_json_fence(content)
+    if envelope is None:
+        return ["PAUTH amendment approval check failed: no structured amendment envelope found."]
+    project_id = str(envelope.get("project_id") or "")
+    authorization_id = str(envelope.get("id") or "")
+    included_specs = {str(item) for item in envelope.get("included_spec_ids", []) if str(item)}
+    previous_specs = _current_pauth_specs(db_path, authorization_id)
+    added_specs = included_specs - previous_specs or included_specs
+
+    evidence_match = OWNER_EVIDENCE_RE.search(content)
+    if evidence_match is None:
+        return ["PAUTH amendment approval check failed: No packet path detected in owner evidence."]
+    raw_path = evidence_match.group(1).strip().rstrip("\"',;}")
+    approval_root = (project_root / ".groundtruth" / "formal-artifact-approvals").resolve(strict=False)
+    candidate = (project_root / raw_path).resolve(strict=False)
+    try:
+        candidate.relative_to(approval_root)
+    except ValueError:
+        return [
+            "PAUTH amendment approval check failed: approval packet path is outside the in-root approval directory."
+        ]
+    try:
+        approval_packet = json.loads(candidate.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ["PAUTH amendment approval check failed: approval packet is not readable JSON."]
+    if not isinstance(approval_packet, dict) or not all(
+        approval_packet.get(field)
+        for field in (
+            "artifact_type",
+            "artifact_id",
+            "action",
+            "approval_mode",
+            "approved_by",
+            "full_content",
+            "explicit_change_request",
+        )
+    ):
+        return ["PAUTH amendment approval check failed: approval packet fails schema validation."]
+    if approval_packet.get("approval_mode") != "approve" or approval_packet.get("approved_by") != "owner":
+        return ["PAUTH amendment approval check failed: approval packet is not owner-approved."]
+
+    approval_text = " ".join(
+        str(approval_packet.get(field, ""))
+        for field in ("artifact_id", "full_content", "explicit_change_request", "change_reason", "source_ref")
+    )
+    if project_id not in approval_text or authorization_id not in approval_text:
+        return ["PAUTH amendment approval check failed: approval packet does not mention project authorization."]
+    if added_specs and not any(spec_id in approval_text for spec_id in added_specs):
+        return ["PAUTH amendment approval check failed: approval packet does not cover the amendment."]
+    return []
+
+
+def _check_author_metadata_presence(content: str) -> list[str]:
+    """Check for missing required author-metadata fields in bridge content."""
+    warnings: list[str] = []
+    for field_name in REQUIRED_AUTHOR_METADATA_FIELDS:
+        pattern = re.compile(r"^" + re.escape(field_name) + r"\s*:\s*(.+)$", re.MULTILINE | re.IGNORECASE)
+        if not pattern.search(content):
+            warnings.append(field_name)
+    return warnings
+
+
+def _check_unclassified_target_paths(target_paths: set[str]) -> list[str]:
+    """Classify declared target paths and return any that are 'unclassified'."""
+    if _classify_target is None:
+        return []  # fail-soft when classifier unavailable
+    unclassified: list[str] = []
+    for path in sorted(target_paths):
+        try:
+            result = _classify_target(path)
+            if result.mutation_class == "unclassified":
+                unclassified.append(path)
+        except Exception:
+            pass  # fail-soft on classifier error
+    return unclassified
+
+
+def _normalize_lf(content: str) -> str:
+    return content.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _text_sha256(content: str) -> str:
+    normalized = _normalize_lf(content).encode("utf-8")
+    return "sha256:" + hashlib.sha256(normalized).hexdigest()
+
+
+def _canonical_explicit_version(
+    *,
+    bridge_id: str,
+    bridge_dir: Path,
+    content_file: Path,
+    content: str,
+) -> BridgeVersion | None:
+    """Resolve an explicit canonical bridge source without scanning siblings."""
+    bridge_root = bridge_dir.resolve()
+    source_path = content_file.resolve()
+    if source_path.parent != bridge_root:
+        return None
+
+    versioned = re.fullmatch(r"(?P<document>.+)-(?P<version>\d+)\.md", source_path.name)
+    looks_canonical = versioned is not None or source_path.name.startswith(f"{bridge_id}-")
+    if versioned is None:
+        if looks_canonical:
+            raise SystemExit(
+                "ERR_EXPLICIT_BRIDGE_SOURCE_MISMATCH: canonical-looking source does not have a numeric version"
+            )
+        return None
+    if versioned.group("document") != bridge_id:
+        raise SystemExit(
+            "ERR_EXPLICIT_BRIDGE_SOURCE_MISMATCH: explicit versioned source belongs to another bridge thread"
+        )
+
+    status = _status_from_content(content)
+    if status is None:
+        raise SystemExit(
+            "ERR_EXPLICIT_BRIDGE_SOURCE_STATUS: canonical explicit source lacks a recognized first-line status"
+        )
+    try:
+        rel_path = source_path.relative_to(bridge_root.parent).as_posix()
+    except ValueError as exc:
+        raise SystemExit("ERR_EXPLICIT_BRIDGE_SOURCE_ESCAPE: canonical source escapes the project root") from exc
+    return BridgeVersion(
+        status=status,
+        rel_path=rel_path,
+        abs_path=source_path,
+        version_number=int(versioned.group("version")),
+    )
+
+
+def _source_identity(version: BridgeVersion | None) -> dict[str, Any] | None:
+    if version is None:
+        return None
+    return {
+        "path": version.rel_path,
+        "status": version.status,
+        "version_number": version.version_number,
+    }
+
+
+def _stable_applicable_specs(applicable: dict[str, ApplicableSpec]) -> dict[str, dict[str, Any]]:
+    return {
+        spec_id: {
+            "spec_id": item.spec_id,
+            "severity": item.severity,
+            "rationale": item.rationale,
+            "matched_by": list(item.matched_by),
+        }
+        for spec_id, item in sorted(applicable.items())
+    }
+
+
+def _packet_hash_material(packet: dict[str, Any], applicable: dict[str, ApplicableSpec]) -> dict[str, Any]:
+    material = {
+        "packet_hash_schema_version": PACKET_HASH_SCHEMA_VERSION,
+        "bridge_document_name": packet["bridge_document_name"],
+        "source_identity": packet["source_identity"],
+        "source_content_hash": packet["source_content_hash"],
+        "rules_content_hash": packet["rules_content_hash"],
+        "cited_specs": packet["cited_specs"],
+        "target_paths": packet["target_paths"],
+        "declared_target_paths": packet["declared_target_paths"],
+        "applicability_path_evidence": packet["applicability_path_evidence"],
+        "work_items": packet["work_items"],
+        "applicable_specs": _stable_applicable_specs(applicable),
+        "missing_required_specs": packet["missing_required_specs"],
+        "missing_advisory_specs": packet["missing_advisory_specs"],
+    }
+    if set(material) != PACKET_HASH_MATERIAL_KEYS:  # pragma: no cover - construction invariant
+        raise RuntimeError("packet hash material key set drifted")
+    return material
+
+
 def build_packet(
     *,
     bridge_id: str,
@@ -432,20 +716,28 @@ def build_packet(
     content_file: Path | None = None,
 ) -> dict[str, Any]:
     versions = parse_index_for_document(bridge_dir, bridge_id)
-    operative = choose_operative_version(versions)
-    if operative is None and content_file is None:
+    scanned_operative = choose_operative_version(versions)
+    if scanned_operative is None and content_file is None:
         raise SystemExit(
             f"ERR_NO_BRIDGE_THREAD: no versioned bridge files found for bridge_id={bridge_id!r} under {bridge_dir}"
         )
-    if operative is not None and not operative.abs_path.is_file():
-        raise SystemExit(f"ERR_BRIDGE_FILE_MISSING: {operative.rel_path}")
+    if scanned_operative is not None and not scanned_operative.abs_path.is_file():
+        raise SystemExit(f"ERR_BRIDGE_FILE_MISSING: {scanned_operative.rel_path}")
     if content_file is not None:
         content = content_file.read_text(encoding="utf-8")
+        explicit_version = _canonical_explicit_version(
+            bridge_id=bridge_id,
+            bridge_dir=bridge_dir,
+            content_file=content_file,
+            content=content,
+        )
+        operative = explicit_version or scanned_operative
         content_source = {
             "mode": "pending_content",
             "path": _display_path(content_file),
         }
-    elif operative is not None:
+    elif scanned_operative is not None:
+        operative = scanned_operative
         content = operative.abs_path.read_text(encoding="utf-8")
         content_source = {
             "mode": "bridge_file_operative",
@@ -456,15 +748,17 @@ def build_packet(
             f"ERR_NO_BRIDGE_THREAD: no versioned bridge files found for bridge_id={bridge_id!r} under {bridge_dir}"
         )
     cited_specs = extract_spec_links(content)
-    target_paths = extract_target_paths(content)
+    declared_target_paths = extract_declared_target_paths(content)
+    applicability_path_evidence = extract_target_paths(content)
     cited_implementation_paths = collect_cited_implementation_paths(content)
     project_root = bridge_dir.parent
     work_items = sorted(set(WORK_ITEM_RE.findall(content)))
+    rules_content = config_path.read_text(encoding="utf-8")
     applicable = compute_applicable_specs(
         bridge_id=bridge_id,
         content=content,
-        target_paths=target_paths,
-        rules=load_rules(config_path),
+        target_paths=applicability_path_evidence,
+        rules=_parse_rules(rules_content),
     )
     enrich_from_membase(applicable, db_path)
     required = {sid for sid, item in applicable.items() if item.severity == "blocking"}
@@ -472,9 +766,14 @@ def build_packet(
     advisory_missing = sorted(
         sid for sid, item in applicable.items() if item.severity != "blocking" and sid not in cited_specs
     )
+    blocking_errors = _pauth_amendment_blocking_errors(content, project_root, db_path)
     packet: dict[str, Any] = {
+        "packet_hash_schema_version": PACKET_HASH_SCHEMA_VERSION,
         "bridge_document_name": bridge_id,
         "content_source": content_source,
+        "source_identity": _source_identity(operative),
+        "source_content_hash": _text_sha256(content),
+        "rules_content_hash": _text_sha256(rules_content),
         "operative_version": (
             {
                 "status": operative.status,
@@ -485,18 +784,24 @@ def build_packet(
             else None
         ),
         "cited_specs": sorted(cited_specs),
-        "target_paths": sorted(target_paths),
+        "target_paths": sorted(declared_target_paths),
+        "declared_target_paths": sorted(declared_target_paths),
+        "applicability_path_evidence": sorted(applicability_path_evidence),
         "warnings": {
             "missing_parent_dirs": compute_missing_parent_dir_warnings(project_root, cited_implementation_paths),
             "spec_links_section": classify_spec_links_section(content),
+            "author_metadata_warnings": _check_author_metadata_presence(content),
+            "unclassified_target_paths": _check_unclassified_target_paths(declared_target_paths),
         },
         "work_items": work_items,
         "applicable_specs": {sid: asdict(item) for sid, item in sorted(applicable.items())},
         "missing_required_specs": missing_required,
         "missing_advisory_specs": advisory_missing,
-        "preflight_passed": not missing_required,
+        "blocking_errors": blocking_errors,
+        "preflight_passed": not missing_required and not blocking_errors,
     }
-    canonical = json.dumps(packet, sort_keys=True, separators=(",", ":"))
+    packet["packet_hash_material"] = _packet_hash_material(packet, applicable)
+    canonical = json.dumps(packet["packet_hash_material"], sort_keys=True, separators=(",", ":"))
     packet["packet_hash"] = "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return packet
 
@@ -527,14 +832,19 @@ def format_markdown(packet: dict[str, Any]) -> str:
         "",
         f"- packet_hash: `{packet['packet_hash']}`",
         f"- bridge_document_name: `{packet['bridge_document_name']}`",
+        f"- declared_target_paths: {json.dumps(packet.get('declared_target_paths', []))}",
+        f"- applicability_path_evidence: {json.dumps(packet.get('applicability_path_evidence', []))}",
         f"- content_source: `{content_source.get('mode', 'indexed_operative')}`",
         f"- content_file: `{content_source.get('path', operative_path)}`",
         f"- operative_file: `{operative_path}`",
         f"- preflight_passed: `{str(packet['preflight_passed']).lower()}`",
         f"- warnings.missing_parent_dirs: {json.dumps(packet.get('warnings', {}).get('missing_parent_dirs', []))}",
         f"- warnings.spec_links_section: {json.dumps(spec_links_diag)}",
+        f"- warnings.author_metadata_warnings: {json.dumps(packet.get('warnings', {}).get('author_metadata_warnings', []))}",
+        f"- warnings.unclassified_target_paths: {json.dumps(packet.get('warnings', {}).get('unclassified_target_paths', []))}",
         f"- missing_required_specs: {json.dumps(packet['missing_required_specs'])}",
         f"- missing_advisory_specs: {json.dumps(packet['missing_advisory_specs'])}",
+        f"- blocking_errors: {json.dumps(packet.get('blocking_errors', []))}",
     ]
     if packet.get("missing_required_specs") and spec_links_diag.get("status") == "heading_unrecognized":
         lines.append(

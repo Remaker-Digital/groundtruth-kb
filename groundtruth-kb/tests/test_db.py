@@ -716,6 +716,202 @@ class TestWorkItems:
         assert "WI-001" in open_ids
         assert "WI-002" not in open_ids
 
+    @staticmethod
+    def _reopen_threads() -> str:
+        return json.dumps(
+            [
+                "bridge/gtkb-wi5441-registry-control-plane-reverse-coverage-007.md",
+                "bridge/gtkb-wi5441-registry-control-plane-reverse-coverage-008.md",
+            ]
+        )
+
+    @staticmethod
+    def _reopen_reason() -> str:
+        return (
+            "WI-5441 owner-approved terminal repair under "
+            "PAUTH-PROJECT-GTKB-HOUSEKEEPING-HARDENING-WI5441-REGISTRY-CONTROL-PLANE-20260724"
+        )
+
+    def test_reopen_terminal_work_item_appends_one_version_and_event(self, db):
+        db.insert_work_item(
+            id="WI-5441",
+            title="Registry control plane",
+            origin="defect",
+            component="core",
+            resolution_status="open",
+            changed_by="test",
+            change_reason="seed false terminal state",
+            stage="resolved",
+        )
+        before_events = (
+            db._get_conn()
+            .execute(
+                "SELECT COUNT(*) FROM pipeline_events WHERE artifact_id = ? AND event_type = 'wi_reopened'",
+                ("WI-5441",),
+            )
+            .fetchone()[0]
+        )
+
+        row = db.reopen_terminal_work_item(
+            "WI-5441",
+            "prime-builder/codex",
+            self._reopen_reason(),
+            resolution_status="open",
+            stage="backlogged",
+            related_bridge_threads=self._reopen_threads(),
+            owner_approved=True,
+            bridge_evidence_validated=True,
+            required_bridge_threads=set(json.loads(self._reopen_threads())),
+            exact_related_bridge_threads=False,
+            expected_current_version=1,
+        )
+
+        assert row is not None
+        assert row["version"] == 2
+        assert row["resolution_status"] == "open"
+        assert row["stage"] == "backlogged"
+        assert len(db.get_work_item_history("WI-5441")) == 2
+        events = (
+            db._get_conn()
+            .execute(
+                "SELECT * FROM pipeline_events WHERE artifact_id = ? AND event_type = 'wi_reopened'",
+                ("WI-5441",),
+            )
+            .fetchall()
+        )
+        assert len(events) == before_events + 1
+        assert events[-1]["artifact_version"] == 2
+
+    @pytest.mark.parametrize(
+        ("owner_approved", "bridge_evidence_validated"),
+        [(False, True), (True, False)],
+    )
+    def test_reopen_terminal_work_item_rejects_incomplete_authority_without_writes(
+        self, db, owner_approved, bridge_evidence_validated
+    ):
+        db.insert_work_item(
+            id="WI-5441",
+            title="Registry control plane",
+            origin="defect",
+            component="core",
+            resolution_status="open",
+            changed_by="test",
+            change_reason="seed false terminal state",
+            stage="resolved",
+        )
+        with pytest.raises(ValueError, match="Terminal reopen requires"):
+            db.reopen_terminal_work_item(
+                "WI-5441",
+                "prime-builder/codex",
+                self._reopen_reason(),
+                resolution_status="open",
+                stage="backlogged",
+                related_bridge_threads=self._reopen_threads(),
+                owner_approved=owner_approved,
+                bridge_evidence_validated=bridge_evidence_validated,
+                required_bridge_threads=set(json.loads(self._reopen_threads())),
+                exact_related_bridge_threads=False,
+                expected_current_version=1,
+            )
+        assert len(db.get_work_item_history("WI-5441")) == 1
+        assert (
+            db._get_conn()
+            .execute(
+                "SELECT COUNT(*) FROM pipeline_events WHERE artifact_id = ? AND event_type = 'wi_reopened'",
+                ("WI-5441",),
+            )
+            .fetchone()[0]
+            == 0
+        )
+
+    def test_reopen_terminal_work_item_requires_explicit_non_empty_path_policy(self, db):
+        db.insert_work_item(
+            id="WI-5441",
+            title="Registry control plane",
+            origin="defect",
+            component="core",
+            resolution_status="open",
+            changed_by="test",
+            change_reason="seed false terminal state",
+            stage="resolved",
+        )
+
+        with pytest.raises(ValueError, match="explicit non-empty required bridge path policy"):
+            db.reopen_terminal_work_item(
+                "WI-5441",
+                "prime-builder/codex",
+                self._reopen_reason(),
+                resolution_status="open",
+                stage="backlogged",
+                related_bridge_threads=self._reopen_threads(),
+                owner_approved=True,
+                bridge_evidence_validated=True,
+                required_bridge_threads=set(),
+                exact_related_bridge_threads=False,
+                expected_current_version=1,
+            )
+
+        assert len(db.get_work_item_history("WI-5441")) == 1
+
+    def test_reopen_terminal_work_item_enforces_exact_path_policy(self, db):
+        db.insert_work_item(
+            id="WI-5640",
+            title="File move canonicalization",
+            origin="defect",
+            component="core",
+            resolution_status="resolved",
+            changed_by="test",
+            change_reason="seed false terminal state",
+            stage="resolved",
+        )
+        supplied = [*json.loads(self._reopen_threads()), "bridge/unrelated-001.md"]
+
+        with pytest.raises(ValueError, match="exact related bridge path policy"):
+            db.reopen_terminal_work_item(
+                "WI-5640",
+                "prime-builder/codex",
+                "WI-5640 owner-approved terminal repair under PAUTH-WI5640-TEST",
+                resolution_status="open",
+                stage="implementing",
+                related_bridge_threads=json.dumps(supplied),
+                owner_approved=True,
+                bridge_evidence_validated=True,
+                required_bridge_threads=set(json.loads(self._reopen_threads())),
+                exact_related_bridge_threads=True,
+                expected_current_version=1,
+            )
+
+        assert len(db.get_work_item_history("WI-5640")) == 1
+
+    def test_reopen_terminal_work_item_rejects_stale_expected_version(self, db):
+        db.insert_work_item(
+            id="WI-5441",
+            title="Registry control plane",
+            origin="defect",
+            component="core",
+            resolution_status="open",
+            changed_by="test",
+            change_reason="seed false terminal state",
+            stage="resolved",
+        )
+
+        with pytest.raises(ValueError, match="version changed after live validation"):
+            db.reopen_terminal_work_item(
+                "WI-5441",
+                "prime-builder/codex",
+                self._reopen_reason(),
+                resolution_status="open",
+                stage="backlogged",
+                related_bridge_threads=self._reopen_threads(),
+                owner_approved=True,
+                bridge_evidence_validated=True,
+                required_bridge_threads=set(json.loads(self._reopen_threads())),
+                exact_related_bridge_threads=False,
+                expected_current_version=999,
+            )
+
+        assert len(db.get_work_item_history("WI-5441")) == 1
+
 
 class TestTests:
     """Tests for test artifact CRUD."""
@@ -972,6 +1168,46 @@ def test_insert_spec_with_source_paths(tmp_path):
     assert row[0] is not None
     stored = json.loads(row[0])
     assert stored == ["src/auth.py", "src/auth_utils.py"]
+
+
+def test_registry_path_observations_use_only_typed_current_fields(db):
+    db.insert_spec(
+        id="SPEC-PATH-OBS",
+        title="Path observation",
+        status="specified",
+        changed_by="test",
+        change_reason="fixture",
+        source_paths=["src/one.py", "src/*.toml"],
+    )
+    db.insert_test(
+        id="TEST-PATH-OBS",
+        title="Path observation test",
+        spec_id="SPEC-PATH-OBS",
+        test_type="unit",
+        expected_outcome="passes",
+        changed_by="test",
+        change_reason="fixture",
+        test_file="tests/test_one.py::test_one",
+    )
+    db.insert_document(
+        id="DOC-PATH-OBS",
+        title="Path observation document",
+        category="reference",
+        status="active",
+        changed_by="test",
+        change_reason="fixture",
+        source_path="docs/one.md",
+    )
+
+    rows = db.list_registry_path_observations()
+
+    assert {row["path"] for row in rows} == {
+        "docs/one.md",
+        "src/*.toml",
+        "src/one.py",
+        "tests/test_one.py",
+    }
+    assert all(set(row) == {"path", "source_kind", "source_id", "field"} for row in rows)
 
 
 def test_update_spec_preserves_source_paths(tmp_path):

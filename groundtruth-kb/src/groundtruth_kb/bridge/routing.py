@@ -21,9 +21,9 @@ from pathlib import Path
 from groundtruth_kb.bridge.checkpoint import Transition
 
 # Status vocabulary mapping: which agent authored a status transition.
-# - NEW / REVISED are Prime Builder authoring acts.
+# - NEW / REVISED / NO-ACTION are Prime Builder authoring acts.
 # - GO / NO-GO / VERIFIED are Loyal Opposition (Codex) authoring acts.
-_PRIME_STATUSES = frozenset({"NEW", "REVISED"})
+_PRIME_STATUSES = frozenset({"NEW", "REVISED", "NO-ACTION"})
 _CODEX_STATUSES = frozenset({"GO", "NO-GO", "VERIFIED"})
 
 

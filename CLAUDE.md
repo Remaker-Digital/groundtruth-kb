@@ -4,12 +4,9 @@ This document provides active guidance for AI assistants working on the GroundTr
 
 For application-scope guidance (Application Identity, Copyright, Adding Commercial Features, Branching Strategy, Hotfix Workflow), see [`applications/Agent_Red/CLAUDE.md`](applications/Agent_Red/CLAUDE.md). Application-scope files are consulted only when the active work subject is `application` and the named application is Agent Red.
 
-**Role precedence:** active role is resolved at session start from `harness-state/harness-identities.json` (persistent harness identity) and `harness-state/harness-registry.json` (canonical role registry), read through `groundtruth_kb.harness_projection.read_roles` or the `roles` subcommand under `gt harness`. `.claude/rules/operating-role.md`, `AGENTS.md`, and `.claude/rules/*.md` files are explanatory guidance only — they describe behavior contracts but cannot override the durable role assignment map. If markdown text and the durable map differ, the durable map wins for durable assignment and headless dispatch; surface the divergence as a defect rather than acting on the markdown. Interactive sessions MAY override the durable role for in-session surfaces (SessionStart disclosure, AXIS 2 Claude-native surface, focus menu, MemBase attribution, AUQ routing) when the owner gives explicit role direction in the transcript, including the canonical init keyword `::init gtkb (pb|lo)`. That transcript-defined role persists across compaction, resume, and contiguous SessionStart-like boundaries within the same interactive context until the owner explicitly changes it. Runtime marker files such as `.claude/session/active-session-role.json` may cache the resolved role, but they are not durable authority. Headless dispatch routing remains keyed to the durable role per `GOV-SESSION-ROLE-AUTHORITY-001`, `DCL-SESSION-ROLE-RESOLUTION-001`, `ADR-ROLE-AUTHORITY-INTERACTIVE-PERSISTENCE-001`, and `DCL-INTERACTIVE-SESSION-ROLE-PERSISTENCE-001`.
+**Role precedence:** Your role is identified in prompts by the "::init" command line, which also indicates the subject of the session envelope (e.g., "gtkb") and the role of the session-context should take when processing the inputs during contiguous session-context turns (e.g., "pb" for Prime Builder and "lo" for Loyal Opposition, or the `roles` subcommand under `gt harness`.  Remember: no session context may ever formally review its own prior work. Interactive sessions MAY override dispatcher/default role metadata for in-session surfaces (SessionStart disclosure, AXIS 2 Claude-native surface, focus menu, MemBase attribution, AUQ routing) when the owner gives explicit role direction in the transcript, including the canonical init keyword `::init gtkb (pb|lo)`. That transcript-defined role persists across compaction, resume, and contiguous SessionStart-like boundaries within the same interactive context until the owner explicitly changes it. Runtime marker files such as `.claude/session/active-session-role.json` may cache the resolved role, but they are not dispatcher/default authority. Headless dispatch routing remains keyed to the dispatcher role set per `GOV-SESSION-ROLE-AUTHORITY-001`, `DCL-SESSION-ROLE-RESOLUTION-001`, `ADR-ROLE-AUTHORITY-INTERACTIVE-PERSISTENCE-001`, and `DCL-INTERACTIVE-SESSION-ROLE-PERSISTENCE-001`.
 
-> **📁 Application-scope reference** (Agent Red legal, pricing, infrastructure, AGNTCY rules): [`applications/Agent_Red/CLAUDE-REFERENCE.md`](applications/Agent_Red/CLAUDE-REFERENCE.md) — read on demand when working on Agent Red.
-> **📁 Application-scope architecture** (Agent Red project structure, module inventory): [`applications/Agent_Red/CLAUDE-ARCHITECTURE.md`](applications/Agent_Red/CLAUDE-ARCHITECTURE.md) — read on demand.
-> **📁 Application-scope historical archive** (Agent Red session logs, technical decisions): [`applications/Agent_Red/CLAUDE_ARCHIVE.md`](applications/Agent_Red/CLAUDE_ARCHIVE.md) — read when investigating Agent Red historical decisions.
-> **📁 Platform session memory** (operational patterns, lessons): `memory/MEMORY.md` — the in-repo GT-KB notepad is authoritative; home-directory auto-memory is a non-authoritative harness cache and must be reconciled only through an owner-approved in-root export/snapshot.
+**📁 Platform session memory** (state and bootstrap): `memory/MEMORY.md` — the in-repo GT-KB notepad preserves session state and artifact access hints; authoritative project knowledge lives in MemBase and governed in-root artifacts. Home-directory auto-memory is a non-authoritative harness cache and must be reconciled only through an owner-approved in-root export/snapshot.
 
 ### Canonical Terminology
 
@@ -20,7 +17,7 @@ Load `.claude/rules/canonical-terminology.md` at session start; the operating-mo
 All active files for the GT-KB project MUST be within `E:\GT-KB`. No GT-KB
 artifact may be created, read as a live dependency, updated, verified, or
 required from outside that root. GT-KB application files MUST be within
-`E:\GT-KB\applications\`; Agent Red application files MUST be within
+`E:\GT-KB\applications\`; Application files MUST be within
 `E:\GT-KB\applications\Agent_Red\`. There are no exceptions.
 `E:\Claude-Playground` is an archive only and must not be used as a live
 GT-KB, Agent Red, harness-state, bridge, dashboard, memory, source,
@@ -37,7 +34,7 @@ CLAUDE.md = rules & behavior (how to work: procedures, mandates; updated rarely)
 
 ### Session ID Convention
 
-`S{N}` format; N is a monotonically increasing integer derived by reading MEMORY.md's "Recent Sessions" section.
+Recent Sessions entries key off the session's own session_context_id (the session envelope's `session_id` field -- typically the harness's native session UUID, or `{harness_id}-{opened_at-ISO}` when no native session UUID is available, e.g. `A-2026-07-16T12-17-36Z`). This replaces the historical sequential `S{N}` convention; `S{N}` labels in older artifacts (bridge threads, deliberations, archived MEMORY.md history) are historical only.
 
 ---
 
@@ -63,7 +60,7 @@ CLAUDE.md = rules & behavior (how to work: procedures, mandates; updated rarely)
 - **All implementation proposals MUST be reviewed by Codex before any code is written.**
 - **All post-implementation reports MUST be reviewed by Codex before committing.**
 - **Propose:** Save proposal to `bridge/{name}-001.md` through the governed dispatcher-backed bridge path.
-- **Review:** an eligible Loyal Opposition target receives dispatcher-routed NEW/REVISED work, reviews, adds GO or NO-GO version.
+- **Review:** an eligible Loyal Opposition target receives dispatcher-routed NEW/REVISED/NO-ACTION work and writes the required governance-compliant verdict.
 - **Review independence:** same-session review is self-review and fails closed;
   same harness ID alone is not a blocker when author and reviewer session
   contexts are unrelated and the reviewer has a valid Loyal Opposition role or
@@ -71,7 +68,7 @@ CLAUDE.md = rules & behavior (how to work: procedures, mandates; updated rarely)
 - **Execute:** After Codex GO, implement code, tests, and verify.
 - **Report:** Save post-implementation report as new version, publish it through the dispatcher-backed bridge path for verification.
 - **Verify:** an eligible Loyal Opposition target reviews report and adds VERIFIED or NO-GO version.
-- **Dispatch:** Bridge dispatch automation is the **cross-harness event-driven trigger** at `scripts/cross_harness_bridge_trigger.py`, registered as PostToolUse and Stop hooks in `.claude/settings.json` and `.codex/hooks.json`. The trigger fires on tool-use and Stop events. It dispatches latest `NEW` or `REVISED` items to eligible Loyal Opposition targets and latest `GO` or `NO-GO` items to eligible Prime Builder targets. `VERIFIED` is terminal and not dispatched. Candidate eligibility and ranking come from `config/dispatcher/rules.toml`; inspect with the `bridge-config` skill or `gt bridge dispatch status`. The retired OS pollers and the retired smart poller are archived; do not re-enable without owner approval per `.claude/rules/bridge-essential.md` §"Re-Enabling Pollers".
+- **Dispatch:** Bridge dispatch automation is the **dispatcher daemon** at `scripts/gtkb_dispatcher_daemon.py`. It dispatches latest `NEW`, `REVISED`, or `NO-ACTION` items to eligible Loyal Opposition targets and latest `GO` or `NO-GO` items to eligible Prime Builder targets. `NO-ACTION` uses the generic `review_no_action` path for a corrected governance-compliant verdict. `VERIFIED` is terminal and not dispatched. Candidate eligibility and ranking come from `config/dispatcher/rules.toml`; inspect with the `bridge-config` skill or `gt bridge dispatch status`. Retired hook-trigger and poller paths are archived; do not re-enable them.
 - **Retired bridge aggregate:** Do not recreate aggregate queue artifacts. Any helper that requires them is defective and must be repaired.
 
 ---
@@ -198,7 +195,17 @@ For application-specific origin/component taxonomy, see application-side archite
 
 ### Starting a New Session
 
+Send startup keywords and task content as separate messages:
+
+```text
+::init gtkb pb
 ```
+
+```text
+::open project
+```
+
+```text
 Continue work on GroundTruth-KB platform.
 Location: E:\GT-KB
 Key files: CLAUDE.md, memory/MEMORY.md
@@ -209,7 +216,7 @@ Next: [describe task].
 
 ### Session Start (Mandatory)
 
-Use the `bridge-config` skill or `gt bridge dispatch status|health` for dispatcher topology, dispatchability, selected targets, and health evidence. Use TAFE-backed bridge-state surfaces and status-bearing numbered bridge files for canonical bridge queue/actionability claims. Then review the active MemBase backlog (`gt backlog list`). Full step-by-step and role-specific bridge handling: `config/agent-control/SESSION-STARTUP-INDEX.md` + the role overlays. The cross-harness event-driven trigger (PostToolUse + Stop hooks per `.claude/rules/bridge-essential.md`) handles inter-session dispatch. Implementable backlog items follow the standard bridge protocol (propose → GO → implement → report → VERIFIED → commit); items already authorized (project authorization or recorded owner decision) need no fresh approval. **Antigravity startup optimization**: For the Antigravity harness (ID C), skip loading non-essential rules/logs (exempt from Phase B steps 9-18a) and run startup services with `--fast-hook` and `--skip-bridge-maintenance` to omit non-local checks.
+Use the `bridge-config` skill or `gt bridge dispatch status|health` for dispatcher topology, dispatchability, selected targets, and health evidence. Use TAFE-backed bridge-state surfaces and status-bearing numbered bridge files for canonical bridge queue/actionability claims. Then review the active MemBase backlog (`gt backlog list`). Full step-by-step and role-specific bridge handling: `config/agent-control/SESSION-STARTUP-INDEX.md` + the role overlays. The dispatcher daemon handles inter-session dispatch; manual owner assignment/scanning is the only fallback when the daemon is unhealthy. Implementable backlog items follow the standard bridge protocol (propose → GO → implement → report → VERIFIED → commit); items already authorized (project authorization or recorded owner decision) need no fresh approval. **Antigravity startup optimization**: For the Antigravity harness (ID C), skip loading non-essential rules/logs (exempt from Phase B steps 9-18a) and run startup services with `--fast-hook` and `--skip-bridge-maintenance` to omit non-local checks.
 
 ### Protected Behaviors & Removal Rule
 
@@ -228,7 +235,7 @@ Use the `bridge-config` skill or `gt bridge dispatch status|health` for dispatch
 **Anti-drift rules:**
 - **All project knowledge lives in the KB.** Specifications, tests, work items, procedures, documents → use the appropriate `db.insert_*()` method.
 - **DO NOT create new markdown files** to store canonical project knowledge or session memory outside approved exception paths.
-- **Permitted markdown:** CLAUDE.md (platform rules), `applications/<name>/CLAUDE.md` (application rules), MEMORY.md + `memory/*.md` topic files (session state, operational patterns), `bridge/` (file-bridge proposals and reviews), `independent-progress-assessments/` Loyal Opposition reports/logs, `.claude/rules/` local control rules/runbooks/checklists, external-facing published docs (wiki, website, legal).
+- **Permitted markdown:** CLAUDE.md (platform rules), `applications/<name>/CLAUDE.md` (application rules), MEMORY.md + `memory/*.md` topic files (session state, operational patterns), `bridge/` (file-bridge proposals, reviews, and Advisory Proposal reports), `.claude/rules/` local control rules/runbooks/checklists, external-facing published docs (wiki, website, legal).
 - **Topic files are NOT canonical** — they are Claude's operational memory. The KB is the source of truth.
 
 ### Deliberation Archive Protocol
@@ -244,7 +251,7 @@ Use the `bridge-config` skill or `gt bridge dispatch status|health` for dispatch
 ### Session Wrap-Up & Handoff
 
 - **Prime Builder sessions:** Execute `/kb-session-wrap <session-id>` for the full 5-phase procedure. Every 5th session is an **audit session** (extra hygiene steps included in the skill).
-- **Loyal Opposition sessions:** default wrap-up is an evidence-based report in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/` plus unresolved-item updates in `independent-progress-assessments/loyal-opposition-log.md`. Do not update KB, MEMORY.md, push, or deploy unless Mike explicitly asked for it.
+- **Loyal Opposition sessions:** default wrap-up is an evidence-based Advisory Proposal bridge entry when it may create Prime Builder work, or a Deliberation Archive record for process/review findings with no derived-work implication. Governed work items live in MemBase. Do not update MEMORY.md, push, or deploy unless Mike explicitly asked for it.
 
 ### Continuous Improvement Feedback
 

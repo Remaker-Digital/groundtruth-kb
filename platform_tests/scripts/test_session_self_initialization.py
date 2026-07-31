@@ -15,6 +15,10 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "session_self_initialization.py"
+WORKSTREAM_FOCUS_HOOK_PATH = REPO_ROOT / ".claude" / "hooks" / "workstream-focus.py"
+PACKAGE_SRC = REPO_ROOT / "groundtruth-kb" / "src"
+if str(PACKAGE_SRC) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_SRC))
 
 
 @pytest.fixture(autouse=True)
@@ -128,6 +132,51 @@ def _load_module(*, live_dashboard_probes: bool = False):
     return module
 
 
+def _load_workstream_focus_hook_adapter():
+    spec = importlib.util.spec_from_file_location("_test_workstream_focus_hook_adapter", WORKSTREAM_FOCUS_HOOK_PATH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["_test_workstream_focus_hook_adapter"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _seed_session_envelope_harness(
+    root: Path,
+    *,
+    harness_name: str = "claude",
+    harness_id: str = "B",
+    durable_role: str = "loyal-opposition",
+) -> None:
+    state = root / "harness-state"
+    state.mkdir(parents=True, exist_ok=True)
+    (state / "harness-identities.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": {harness_name: {"id": harness_id}}}),
+        encoding="utf-8",
+    )
+    (state / "harness-registry.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": [{"id": harness_id, "harness_name": harness_name, "role": [durable_role]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _clear_session_id_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in (
+        "GTKB_BRIDGE_POLLER_RUN_ID",
+        "GTKB_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+        "CLAUDE_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
 def _startup_service_result(module, model: dict, report_text: str) -> dict:
     dashboard_dir = REPO_ROOT / "docs" / "gtkb-dashboard"
     return {
@@ -144,6 +193,159 @@ def _startup_service_result(module, model: dict, report_text: str) -> dict:
         "wrapup_path": dashboard_dir / "session-wrapup-report.md",
         "wrapup_text": "",
     }
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_role", "durable_role"),
+    [
+        ("pb", "prime-builder", "loyal-opposition"),
+        ("lo", "loyal-opposition", "prime-builder"),
+    ],
+)
+def test_wi5328_workstream_focus_init_keyword_writes_authoritative_session_envelope(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mode: str,
+    expected_role: str,
+    durable_role: str,
+) -> None:
+    _clear_session_id_env(monkeypatch)
+    _seed_session_envelope_harness(tmp_path, durable_role=durable_role)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "B")
+    adapter = _load_workstream_focus_hook_adapter()
+
+    assert (
+        adapter._persist_interactive_session_envelope(
+            {"prompt": f"::init gtkb {mode}", "session_id": f"session-{mode}"},
+            tmp_path,
+        )
+        is True
+    )
+
+    envelope_path = tmp_path / "harness-state" / "claude" / "session-envelopes" / f"session-{mode}.json"
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    projection = json.loads((tmp_path / ".claude" / "session" / "envelope.json").read_text(encoding="utf-8"))
+
+    assert projection["session_id"] == f"session-{mode}"
+    assert projection["role_resolved"] == expected_role
+    assert envelope["init_keyword"] == f"::init gtkb {mode}"
+    assert envelope["role"] == expected_role
+    assert envelope["role_asserted"] == expected_role
+    assert envelope["role_resolved"] == expected_role
+    assert envelope["role_resolution"]["interactive_resolved_role"] == expected_role
+    assert envelope["role_resolution"]["interactive_role_source"] == "transcript_init_keyword"
+    assert envelope["role_resolution"]["durable_registry_role"] == durable_role
+    assert envelope["role_resolution"]["authority_mode"] == "interactive_transcript"
+    assert "non-overriding" in envelope["role_resolution"]["durable_registry_authority"]
+    assert envelope["worker_role_provenance"]["role"] == expected_role
+    assert envelope["worker_role_provenance"]["role_resolution_source"] == "transcript_init_keyword"
+    assert envelope["worker_role_provenance"]["session_id"] == f"session-{mode}"
+
+
+def test_wi5328_interactive_envelope_writeback_is_session_isolated(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_session_id_env(monkeypatch)
+    _seed_session_envelope_harness(tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "B")
+    adapter = _load_workstream_focus_hook_adapter()
+
+    assert adapter._persist_interactive_session_envelope(
+        {"prompt": "::init gtkb pb", "session_id": "session-one"}, tmp_path
+    )
+    assert adapter._persist_interactive_session_envelope(
+        {"prompt": "::init gtkb lo", "session_id": "session-two"}, tmp_path
+    )
+
+    first = json.loads(
+        (tmp_path / "harness-state" / "claude" / "session-envelopes" / "session-one.json").read_text(encoding="utf-8")
+    )
+    second = json.loads(
+        (tmp_path / "harness-state" / "claude" / "session-envelopes" / "session-two.json").read_text(encoding="utf-8")
+    )
+    projection = json.loads((tmp_path / ".claude" / "session" / "envelope.json").read_text(encoding="utf-8"))
+
+    assert first["role_resolved"] == "prime-builder"
+    assert second["role_resolved"] == "loyal-opposition"
+    assert projection["session_id"] == "session-two"
+    assert projection["role_resolved"] == "loyal-opposition"
+
+
+def test_wi5328_subject_only_or_headless_init_keyword_does_not_write_worker_envelope(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_session_id_env(monkeypatch)
+    _seed_session_envelope_harness(tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "B")
+    adapter = _load_workstream_focus_hook_adapter()
+
+    assert (
+        adapter._persist_interactive_session_envelope(
+            {"prompt": "::init gtkb", "session_id": "subject-only"},
+            tmp_path,
+        )
+        is False
+    )
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-run")
+    assert (
+        adapter._persist_interactive_session_envelope(
+            {"prompt": "::init gtkb pb", "session_id": "headless"},
+            tmp_path,
+        )
+        is False
+    )
+
+    assert not (tmp_path / "harness-state" / "claude" / "session-envelopes").exists()
+
+
+def test_wi5328_worker_provenance_rejects_transcript_resolution_mismatch(tmp_path: Path) -> None:
+    from groundtruth_kb.session.envelope import (
+        EnvelopeError,
+        resolve_worker_role_provenance,
+        worker_session_envelope_path,
+    )
+
+    path = worker_session_envelope_path(tmp_path, "claude", "session-mismatch")
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "status": "open",
+                "session_id": "session-mismatch",
+                "harness_id": "B",
+                "harness_name": "claude",
+                "role": "prime-builder",
+                "role_asserted": "prime-builder",
+                "role_resolved": "prime-builder",
+                "role_resolution": {
+                    "interactive_resolved_role": "prime-builder",
+                    "interactive_role_source": "transcript_init_keyword",
+                    "durable_registry_role": "loyal-opposition",
+                    "durable_registry_authority": "non-overriding",
+                    "authority_mode": "interactive_transcript",
+                },
+                "worker_role_provenance": {
+                    "schema_version": 1,
+                    "session_id": "session-mismatch",
+                    "harness_id": "B",
+                    "harness_name": "claude",
+                    "role": "prime-builder",
+                    "role_resolution_source": "session_resolver_fallback",
+                    "dispatch_run_id": None,
+                    "issued_at": "2026-07-16T18:00:00Z",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(EnvelopeError, match="claims transcript role resolution"):
+        resolve_worker_role_provenance(tmp_path, current_session_id="session-mismatch", harness_name="claude")
 
 
 def _make_synthetic_doctor_check(status: str = "pass", message: str = "synthetic"):
@@ -274,10 +476,10 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
         model["role"]["bridge"]
         == "always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup"
     )
-    assert "cross-harness event-driven trigger" in model["role"]["bridge_dispatch"]
+    assert "dispatcher daemon" in model["role"]["bridge_dispatch"]
     assert "retired smart poller and OS poller remain archived" in model["role"]["bridge_dispatch"]
     assert "gtkb-bridge" in model["role"]["bridge_operation_instructions"]
-    assert "scripts/cross_harness_bridge_trigger.py" in model["role"]["bridge_operation_instructions"]
+    assert "scripts/dispatcher_runtime.py" in model["role"]["bridge_operation_instructions"]
     assert "two complementary axes" in model["role"]["bridge_operation_instructions"]
     assert "DISPATCHABLE WORK" in model["role"]["bridge_operation_instructions"]
     assert "NON-DISPATCHABLE WORK" in model["role"]["bridge_operation_instructions"]
@@ -1085,7 +1287,7 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     assert "routes the first owner message through the init-keyword matcher" in loyal_context
     assert "SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001" in loyal_context
     assert "execute the harness-only Loyal Opposition startup action before ordinary task work" in loyal_context
-    assert "process actionable `NEW` / `REVISED` entries oldest-to-newest by default" in loyal_context
+    assert "process actionable `NEW` / `REVISED` / `NO-ACTION` entries oldest-to-newest by default" in loyal_context
     assert "ask Mike whether to switch to auto-process before writing verdict files" in loyal_context
     assert "render the startup disclosure and wait for the next message" not in loyal_context
     assert "wait for the next owner message before tool use" not in loyal_context
@@ -1179,7 +1381,7 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
         model["role"]["bridge"]
         == "always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup"
     )
-    assert "cross-harness event-driven trigger" in model["role"]["bridge_dispatch"]
+    assert "dispatcher daemon" in model["role"]["bridge_dispatch"]
     assert "retired smart poller and OS poller remain archived" in model["role"]["bridge_dispatch"]
     assert model["role"]["role_mapping_source"] == "harness-state/harness-registry.json"
     assert model["role"]["harness_id"] == "B"
@@ -1197,7 +1399,10 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     assert "Commit and push to GitHub" not in report
     assert "Default session purpose: process Prime Builder reviews and verifications on the file bridge." not in report
     assert "Session-focus menu: not presented in Loyal Opposition mode" not in report
-    assert "Bridge/poller distinction: the file bridge is the durable role handoff and review mechanism" not in report
+    assert (
+        "Bridge/dispatch distinction: the file bridge is the Prime Builder/Loyal Opposition "
+        "handoff and review mechanism"
+    ) not in report
     assert (
         "Bridge startup rule: check the file bridge in both Prime Builder and Loyal Opposition startup." not in report
     )
@@ -1211,7 +1416,7 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
         "summary counts, or hook-generated summaries" not in report
     )
     assert "do not display this checklist as a substitute for performing the verification" not in report
-    assert "Bridge dispatch startup rule: rely on the cross-harness event-driven trigger" not in report
+    assert "Bridge dispatch startup rule: rely on the dispatcher daemon" not in report
     assert "First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning." not in report
     assert "permanent owner permission to diagnose and repair bridge function/use" not in report
     assert (
@@ -1450,13 +1655,16 @@ def test_loyal_opposition_bridge_scan_uses_unscoped_protocol_queue(tmp_path) -> 
         "NEW\n\n# GT-KB Current Main Integration\n\nGroundTruth-KB bridge proposal.",
         encoding="utf-8",
     )
+    (bridge_dir / "gtkb-verdict-correction-001.md").write_text("NEW\n\n# Proposal", encoding="utf-8")
+    (bridge_dir / "gtkb-verdict-correction-002.md").write_text("GO\n\n# Verdict", encoding="utf-8")
+    (bridge_dir / "gtkb-verdict-correction-003.md").write_text("NO-ACTION\n\n# Correct the verdict", encoding="utf-8")
 
     contention = module._bridge_metrics(tmp_path)
 
-    assert contention["latest_status_counts"] == {"NEW": 1}
-    assert contention["actionable_count"] == 1
-    assert contention["raw_latest_status_counts"] == {"NEW": 1}
-    assert contention["raw_review_queue_count"] == 1
+    assert contention["latest_status_counts"] == {"NEW": 1, "NO-ACTION": 1}
+    assert contention["actionable_count"] == 2
+    assert contention["raw_latest_status_counts"] == {"NEW": 1, "NO-ACTION": 1}
+    assert contention["raw_review_queue_count"] == 2
     assert contention["raw_prime_response_queue_count"] == 0
     assert contention["source"] == "bridge/*.md"
     assert contention["source_read_mode"] == "versioned_bridge_file_chain"
@@ -1464,7 +1672,7 @@ def test_loyal_opposition_bridge_scan_uses_unscoped_protocol_queue(tmp_path) -> 
     assert contention["live_bridge_directory_available"] is True
     assert module._render_file_bridge_scan({"metrics": {"contention": contention}}) == (
         "- Generated-time file bridge scan, non-authoritative after report generation: "
-        "1 latest NEW/REVISED entry identified."
+        "2 latest NEW/REVISED/NO-ACTION entries identified."
     )
 
 
@@ -1547,7 +1755,7 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     history = json.loads(history_path.read_text(encoding="utf-8"))
 
     panel_titles = set(_panel_titles(dashboard_json["panels"]))
-    assert dashboard_json["title"] == "Agent Red GT-KB Dashboard"
+    assert dashboard_json["title"] == "GT-KB Operations Dashboard"
     assert "Shortcuts" in panel_titles
     assert "Health Signals" in panel_titles
     assert [panel["title"] for panel in dashboard_json["panels"][:10]] == [
@@ -1616,13 +1824,13 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
         "Bridge: always available through TAFE/dispatcher state plus versioned bridge "
         "files and checked at session startup" in report_text
     )
-    assert "Bridge dispatch: cross-harness event-driven trigger registered as PostToolUse and Stop hooks" in report_text
+    assert "Bridge dispatch: dispatcher daemon registered as PostToolUse and Stop hooks" in report_text
     assert "Bridge operation instructions: Bridge automation has two complementary axes" in report_text
     assert "DISPATCHABLE WORK" in report_text
     assert "NON-DISPATCHABLE WORK" in report_text
     assert "Both axes are required" in report_text
     assert "Do NOT create new bridge automations" in report_text
-    assert "scripts/cross_harness_bridge_trigger.py" in report_text
+    assert "scripts/dispatcher_runtime.py" in report_text
     assert "retired smart poller and OS poller remain archived" in report_text
     assert "Startup Disclosure" in report_text
     assert "Strategic self-improvement directive" in report_text
@@ -1674,10 +1882,10 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "GTKB-GOV-006" not in report_text
     assert "GTKB-GOV-007" not in report_text
     top_action_ids = [item["id"] for item in dashboard_data["model"]["top_priority_actions"]]
-    # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: top-3 requires
-    # approval_state='implementation_authorized' AND a non-terminal resolution
-    # status. The list can legitimately be empty when no authorized agent_red
-    # items exist in MemBase at test-run time; assert structure, not population.
+    # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: top-3 requires non-terminal
+    # resolution status and must not use legacy approval metadata authority.
+    # The list can legitimately be empty at test-run time; assert structure,
+    # not population.
     assert isinstance(top_action_ids, list)
     assert "Startup Focus Input Gate" not in report_text
     assert "Skills, Plug-ins, Directives, And Hooks" not in report_text
@@ -2144,13 +2352,13 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
         "Bridge: always available through TAFE/dispatcher state plus versioned bridge "
         "files and checked at session startup" in context
     )
-    assert "Bridge dispatch: cross-harness event-driven trigger registered as PostToolUse and Stop hooks" in context
+    assert "Bridge dispatch: dispatcher daemon registered as PostToolUse and Stop hooks" in context
     assert "Bridge operation instructions: Bridge automation has two complementary axes" in context
     assert "DISPATCHABLE WORK" in context
     assert "NON-DISPATCHABLE WORK" in context
     assert "Both axes are required" in context
     assert "Do NOT create new bridge automations" in context
-    assert "scripts/cross_harness_bridge_trigger.py" in context
+    assert "scripts/dispatcher_runtime.py" in context
     assert "retired smart poller and OS poller remain archived" in context
     assert "Role mapping source: harness-state/harness-registry.json" in context
     assert "Harness self-identification: B" in context
@@ -2179,6 +2387,20 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
         guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
         assert guard_state["discard_next_user_prompt"] is True
         assert guard_state["suppress_next_wrapup"] is True
+
+
+def test_harness_parity_status_uses_resolved_non_codex_harness_scope() -> None:
+    module = _load_module()
+
+    status = module._harness_parity_status(REPO_ROOT, harness_name="cursor", role_profile="prime-builder")
+
+    assert status["harness_scope"] == "cursor"
+    assert status["scope_kind"] == "assigned_harness"
+    assert status["evidence_type"] == "phase-1 catalog parity"
+    assert "phase-2 readiness" in status["operational_readiness"]
+    assert "--harness cursor --role prime-builder" in status["verification_command"]
+    assert status["phase2_command"] == "python scripts/harness_parity_phase2.py --project-root . --format markdown"
+    assert status["discovery_diff_command"] == "python scripts/parity_discovery_diff.py --project-root . --markdown"
 
 
 def test_emit_wrapup_uses_session_start_hook_context_json(tmp_path, capsys, monkeypatch) -> None:
@@ -2214,6 +2436,161 @@ def test_emit_wrapup_uses_session_start_hook_context_json(tmp_path, capsys, monk
     assert "Proactive Session Wrap-Up" in context
     assert "GroundTruth-KB Project Dashboard" in context
     assert "Suggested Next User Actions" in context
+
+
+def test_fast_wrapup_notice_is_byte_identical_to_equivalent_full_model(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    generated_at = "2026-07-12T02:00:00Z"
+    backlog = {
+        "active_item_count": 3,
+        "visible_non_terminal_item_count": 8,
+        "source": "MemBase work_items",
+    }
+    top_actions = [
+        {"id": "WI-5206", "title": "Fast wrap-up", "priority": "P1"},
+        {"id": "WI-5207", "title": "Batch completion", "priority": "P2"},
+    ]
+    membase = {
+        "open_work_items": 4,
+        "raw_open_work_items": 9,
+        "test_records": 12,
+    }
+    blockers = ["Release blocker one", "Release blocker two"]
+    contention = {"actionable_count": 2, "raw_actionable_count": 7}
+    drift = {"changed_path_count": 5, "raw_changed_path_count": 11}
+
+    monkeypatch.setattr(module, "_now_iso", lambda: generated_at)
+    monkeypatch.setattr(module, "_database_metrics", lambda project_root: {"membase": membase})
+    monkeypatch.setattr(module, "_backlog_metrics", lambda project_root: (backlog, top_actions))
+    monkeypatch.setattr(module, "_release_blockers", lambda project_root: blockers)
+    monkeypatch.setattr(module, "_bridge_metrics", lambda project_root: contention)
+    monkeypatch.setattr(module, "_git_drift", lambda project_root: drift)
+
+    minimal_model = module.build_fast_wrapup_model(tmp_path)
+    full_model = {
+        "generated_at": generated_at,
+        "metrics": {
+            "backlog": backlog,
+            "membase": membase,
+            "regression": {"release_blocker_count": len(blockers), "blockers": blockers},
+            "contention": contention,
+            "drift": drift,
+            "unconsumed_full_model_group": {"value": "ignored"},
+        },
+        "top_priority_actions": top_actions,
+        "unconsumed_full_model_field": "ignored",
+    }
+
+    assert minimal_model == {
+        "generated_at": generated_at,
+        "metrics": {
+            "backlog": {"active_item_count": 3},
+            "membase": {"open_work_items": 4, "raw_open_work_items": 9},
+            "regression": {"release_blocker_count": 2},
+            "contention": {"actionable_count": 2},
+            "drift": {"changed_path_count": 5},
+        },
+        "top_priority_actions": [
+            {"id": "WI-5206", "title": "Fast wrap-up"},
+            {"id": "WI-5207", "title": "Batch completion"},
+        ],
+    }
+    dashboard_link = module._markdown_url_link(module.GRAFANA_DASHBOARD_URL)
+    assert (
+        module.render_wrapup_notice(minimal_model, dashboard_link).encode()
+        == module.render_wrapup_notice(full_model, dashboard_link).encode()
+    )
+
+
+def test_emit_wrapup_fast_hook_uses_minimal_writer_only(tmp_path, capsys, monkeypatch) -> None:
+    module = _load_module()
+    dashboard_dir = tmp_path / "dashboard"
+    history_path = tmp_path / "history.json"
+    model = {
+        "generated_at": "2026-07-12T02:00:00Z",
+        "metrics": {
+            "backlog": {"active_item_count": 1},
+            "membase": {"open_work_items": 2, "raw_open_work_items": 2},
+            "regression": {"release_blocker_count": 0},
+            "contention": {"actionable_count": 1},
+            "drift": {"changed_path_count": 0},
+        },
+        "top_priority_actions": [{"id": "WI-5206", "title": "Fast wrap-up"}],
+    }
+
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root, **kwargs: "prime-builder")
+    monkeypatch.setattr(module, "build_fast_wrapup_model", lambda project_root: model)
+
+    def fail_full_writer(*args, **kwargs):
+        raise AssertionError("fast wrap-up must not call the full startup/dashboard writer")
+
+    monkeypatch.setattr(module, "write_dashboard_and_report", fail_full_writer)
+
+    exit_code = module.main(
+        [
+            "--project-root",
+            str(REPO_ROOT),
+            "--dashboard-dir",
+            str(dashboard_dir),
+            "--history-path",
+            str(history_path),
+            "--emit-wrapup",
+            "--fast-hook",
+            "--force-wrapup",
+            "--lifecycle-guard-path",
+            str(tmp_path / "guard.json"),
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    wrapup_path = dashboard_dir / "session-wrapup-report.md"
+    assert payload["additionalContext"] == wrapup_path.read_text(encoding="utf-8")
+    assert not (dashboard_dir / "dashboard-data.json").exists()
+    assert not (dashboard_dir / "session-startup-report.md").exists()
+    assert not history_path.exists()
+    assert not (dashboard_dir / module.PDF_EXPORT_FILENAME).exists()
+
+
+def test_emit_wrapup_without_fast_hook_uses_full_writer(tmp_path, capsys, monkeypatch) -> None:
+    module = _load_module()
+    calls: list[str] = []
+    result = _startup_service_result(module, {}, "startup report")
+    result["wrapup_text"] = "full wrap-up report"
+
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root, **kwargs: "prime-builder")
+    monkeypatch.setattr(
+        module,
+        "write_fast_wrapup_report",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("ordinary non-fast wrap-up must not call the minimal writer")
+        ),
+    )
+
+    def fake_full_writer(*args, **kwargs):
+        calls.append("full")
+        return result
+
+    monkeypatch.setattr(module, "write_dashboard_and_report", fake_full_writer)
+
+    exit_code = module.main(
+        [
+            "--project-root",
+            str(REPO_ROOT),
+            "--dashboard-dir",
+            str(tmp_path / "dashboard"),
+            "--history-path",
+            str(tmp_path / "history.json"),
+            "--emit-wrapup",
+            "--force-wrapup",
+            "--lifecycle-guard-path",
+            str(tmp_path / "guard.json"),
+        ]
+    )
+
+    assert exit_code == 0
+    assert calls == ["full"]
+    assert json.loads(capsys.readouterr().out) == {"additionalContext": "full wrap-up report"}
 
 
 def test_emit_wrapup_suppresses_first_stop_after_startup_focus_gate(tmp_path, capsys, monkeypatch) -> None:
@@ -2799,7 +3176,7 @@ def test_wi3332_t4_pending_decisions_block_renders_question_stop_safe() -> None:
 # Smart-poller orient section retirement (Slice 4, 2026-05-09)
 # The smart-poller mechanism was retired; _render_smart_poller_section
 # is now a stub returning []. Bridge dispatch is governed by the
-# cross-harness event-driven trigger.
+# dispatcher daemon.
 # =====================================================================
 
 
@@ -3091,14 +3468,13 @@ def _make_recommender_fixture(tmp_path, backlog_items: list[dict[str, str]], ind
 def test_recommender_1_top_priority_excludes_verified_bridge_thread(tmp_path, monkeypatch) -> None:
     """T-recommender-1: items whose mapped bridge thread is VERIFIED are filtered."""
     module = _load_module()
-    # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: top-3 requires implementation_authorized
-    # + open/in_progress/blocked resolution status.
+    # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: top-3 requires
+    # open/in_progress/blocked resolution status.
     backlog_items = [
         {
             "id": "GTKB-SHIPPED-ITEM-001",
             "title": "Already shipped",
             "body": "Body of done item.",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         },
@@ -3106,7 +3482,6 @@ def test_recommender_1_top_priority_excludes_verified_bridge_thread(tmp_path, mo
             "id": "GTKB-ACTIVE-ITEM-002",
             "title": "Still in flight",
             "body": "Body of active item.",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         },
@@ -3114,7 +3489,6 @@ def test_recommender_1_top_priority_excludes_verified_bridge_thread(tmp_path, mo
             "id": "GTKB-ACTIVE-ITEM-003",
             "title": "Also in flight",
             "body": "Body of third item.",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         },
@@ -3158,7 +3532,6 @@ def test_recommender_3_unmapped_work_item_treated_as_active(tmp_path, monkeypatc
             "id": "GTKB-NO-BRIDGE-001",
             "title": "Item without a bridge thread",
             "body": "Body.",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         },
@@ -3173,26 +3546,24 @@ def test_recommender_3_unmapped_work_item_treated_as_active(tmp_path, monkeypatc
     metrics, top = module._backlog_metrics(root)
     assert "GTKB-NO-BRIDGE-001" in [item["id"] for item in top]
     assert metrics["filtered_verified_ids"] == []
-    assert metrics["active_item_count"] == 1
+    assert metrics["visible_non_terminal_item_count"] == 1
 
 
-def test_backlog_metrics_counts_only_implementation_active_items(tmp_path, monkeypatch) -> None:
+def test_backlog_metrics_counts_only_status_active_items(tmp_path, monkeypatch) -> None:
     module = _load_module()
     backlog_items = [
         {
             "id": "GTKB-FUTURE-001",
-            "title": "Future unapproved work",
+            "title": "Future open work",
             "body": "Body.",
-            "approval_state": "unapproved",
             "resolution_status": "open",
             "priority": "P1",
         },
         {
-            "id": "GTKB-AUTHORIZED-002",
-            "title": "Authorized work",
+            "id": "GTKB-ACTIVE-002",
+            "title": "Active work",
             "body": "Body.",
-            "approval_state": "implementation_authorized",
-            "resolution_status": "open",
+            "resolution_status": "in_progress",
             "priority": "P2",
         },
     ]
@@ -3207,7 +3578,7 @@ def test_backlog_metrics_counts_only_implementation_active_items(tmp_path, monke
     assert metrics["visible_non_terminal_item_count"] == 2
     assert metrics["active_item_count"] == 1
     assert metrics["non_implementation_future_item_count"] == 1
-    assert [item["id"] for item in top] == ["GTKB-AUTHORIZED-002"]
+    assert [item["id"] for item in top] == ["GTKB-FUTURE-001", "GTKB-ACTIVE-002"]
 
 
 def test_recommender_4_residual_override_keeps_verified_item_active(tmp_path, monkeypatch) -> None:
@@ -3220,7 +3591,6 @@ def test_recommender_4_residual_override_keeps_verified_item_active(tmp_path, mo
             "body": (
                 "**Status:** VERIFIED (residual: SonarCloud URL still unverified)\n\nBody explaining the residual work."
             ),
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         },
@@ -3402,7 +3772,7 @@ def test_t_compat_4_role_profiles_enumeration_retains_acting_prime_builder() -> 
     assert profile["role_mapping_source"] == ".claude/rules/acting-prime-builder.md", (
         "acting-prime-builder profile must continue to reference its rule file "
         "for narrative continuity (the rule file is the historical authority "
-        "record; the durable role record is harness-state/role-assignments.json)."
+        "record; the dispatcher/default role record is harness-state/role-assignments.json)."
     )
 
 
@@ -3569,8 +3939,8 @@ def test_backlog_fetch_is_in_process_no_child_interpreter(monkeypatch) -> None:
                     "id": "WI-9001",
                     "title": "Synthetic item",
                     "description": "body text",
-                    "approval_state": "auq_resolved",
                     "resolution_status": "open",
+                    "stage": "backlogged",
                     "priority": "P1",
                 }
             ]
@@ -3601,14 +3971,14 @@ def test_backlog_fetch_is_in_process_no_child_interpreter(monkeypatch) -> None:
 
     items = module._backlog_items_from_membase(REPO_ROOT)
 
-    # Shape preserved (id/title/body/approval_state/resolution_status/priority).
+    # Shape preserved (id/title/body/resolution_status/stage/priority).
     assert items == [
         {
             "id": "WI-9001",
             "title": "Synthetic item",
             "body": "body text",
-            "approval_state": "auq_resolved",
             "resolution_status": "open",
+            "stage": "backlogged",
             "priority": "P1",
         }
     ]

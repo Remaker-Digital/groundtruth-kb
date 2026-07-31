@@ -39,6 +39,7 @@ if TYPE_CHECKING:
 
 # Default DB path — overridden by GTConfig.db_path or constructor arg
 DB_PATH = Path("./groundtruth.db")
+DEFAULT_SQLITE_BUSY_TIMEOUT_MS = 30_000
 _VALID_APPLICATION_SCOPES = frozenset({"gtkb_platform", "agent_red_application"})
 
 
@@ -123,6 +124,15 @@ _CHROMA_STALE_SEGMENT_ERROR_PATTERNS = (
     "hnsw segment",
     "error querying knn",
 )
+
+
+class DeliberationSearchDegradedError(RuntimeError):
+    """Raised when required semantic deliberation search degrades."""
+
+    def __init__(self, message: str, *, status: dict[str, Any]):
+        super().__init__(message)
+        self.status = dict(status)
+
 
 # WI-4453: the index/record path (collection.add) triggers the SAME first-embed
 # DefaultEmbeddingFunction model load as the query path, so `gt deliberations
@@ -501,6 +511,13 @@ CREATE TABLE IF NOT EXISTS project_dependencies (
     from_project_id TEXT NOT NULL,
     to_project_id TEXT NOT NULL,
     dependency_type TEXT NOT NULL DEFAULT 'depends_on',
+    dependent_project_id TEXT NOT NULL,
+    prerequisite_project_id TEXT NOT NULL,
+    dependency_kind TEXT NOT NULL DEFAULT 'requires_project_state',
+    required_prerequisite_state TEXT NOT NULL DEFAULT 'retired',
+    affected_gate TEXT NOT NULL DEFAULT 'readiness',
+    provenance TEXT NOT NULL,
+    registry_version INTEGER NOT NULL DEFAULT 1,
     rationale TEXT,
     blocking_status TEXT NOT NULL DEFAULT 'open',
     related_work_item_id TEXT,
@@ -714,6 +731,101 @@ CREATE TABLE IF NOT EXISTS agent_capability_snapshots (
     source TEXT,
     status TEXT NOT NULL DEFAULT 'active',
     metadata TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS dispatch_lanes (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    harness_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model_route TEXT NOT NULL,
+    role TEXT NOT NULL,
+    activity_type TEXT NOT NULL,
+    lifecycle TEXT NOT NULL,
+    dispatch_enabled INTEGER NOT NULL DEFAULT 0,
+    shadow_enabled INTEGER NOT NULL DEFAULT 1,
+    route_selectable INTEGER NOT NULL DEFAULT 0,
+    waiver_id TEXT,
+    blockage_reasons TEXT,
+    score_components TEXT,
+    caps TEXT,
+    evidence_refs TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    metadata TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS dispatch_lane_score_dimensions (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    weight_profile_id TEXT,
+    dimension_type TEXT NOT NULL,
+    default_weight REAL,
+    status TEXT NOT NULL DEFAULT 'active',
+    metadata TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS dispatch_lane_scoring_evidence (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    lane_id TEXT NOT NULL,
+    evidence_type TEXT NOT NULL,
+    evidence_status TEXT NOT NULL,
+    captured_at TEXT NOT NULL,
+    expires_at TEXT,
+    evidence_ref TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    metadata TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS dispatch_lane_score_snapshots (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    snapshot_kind TEXT NOT NULL,
+    weight_profile_id TEXT,
+    lane_scores TEXT NOT NULL,
+    promoted_from_snapshot_id TEXT,
+    status TEXT NOT NULL DEFAULT 'candidate',
+    metadata TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS dispatch_lane_projection_snapshots (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    source_snapshot_id TEXT,
+    projection_mode TEXT NOT NULL,
+    projection_payload TEXT NOT NULL,
+    ranked_lanes TEXT NOT NULL,
+    blocked_lanes TEXT NOT NULL,
+    freshness TEXT NOT NULL,
+    runtime_suppression TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'candidate',
+    generated_at TEXT NOT NULL,
     changed_by TEXT NOT NULL,
     changed_at TEXT NOT NULL,
     change_reason TEXT NOT NULL,
@@ -960,6 +1072,23 @@ CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_id_version ON agent_ca
 CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_harness ON agent_capability_snapshots(harness_id);
 CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_health ON agent_capability_snapshots(health_status);
 CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_captured ON agent_capability_snapshots(captured_at);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lanes_id_version ON dispatch_lanes(id, version);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lanes_identity
+    ON dispatch_lanes(harness_id, provider, model_route, role, activity_type);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lanes_lifecycle ON dispatch_lanes(lifecycle);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lanes_status ON dispatch_lanes(status);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lane_dimensions_id_version
+    ON dispatch_lane_score_dimensions(id, version);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lane_evidence_id_version
+    ON dispatch_lane_scoring_evidence(id, version);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lane_evidence_lane ON dispatch_lane_scoring_evidence(lane_id);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lane_evidence_type ON dispatch_lane_scoring_evidence(evidence_type);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lane_score_snapshots_id_version
+    ON dispatch_lane_score_snapshots(id, version);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lane_projection_snapshots_id_version
+    ON dispatch_lane_projection_snapshots(id, version);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lane_projection_snapshots_mode
+    ON dispatch_lane_projection_snapshots(projection_mode);
 CREATE INDEX IF NOT EXISTS idx_backlog_id_version ON backlog_snapshots(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_id_version ON testable_elements(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_subsystem ON testable_elements(subsystem);
@@ -1085,6 +1214,31 @@ SELECT a.* FROM agent_capability_snapshots a
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM agent_capability_snapshots GROUP BY id) m
 ON a.id = m.id AND a.version = m.max_v;
 
+CREATE VIEW IF NOT EXISTS current_dispatch_lanes AS
+SELECT l.* FROM dispatch_lanes l
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM dispatch_lanes GROUP BY id) m
+ON l.id = m.id AND l.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_dispatch_lane_score_dimensions AS
+SELECT d.* FROM dispatch_lane_score_dimensions d
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM dispatch_lane_score_dimensions GROUP BY id) m
+ON d.id = m.id AND d.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_dispatch_lane_scoring_evidence AS
+SELECT e.* FROM dispatch_lane_scoring_evidence e
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM dispatch_lane_scoring_evidence GROUP BY id) m
+ON e.id = m.id AND e.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_dispatch_lane_score_snapshots AS
+SELECT s.* FROM dispatch_lane_score_snapshots s
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM dispatch_lane_score_snapshots GROUP BY id) m
+ON s.id = m.id AND s.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_dispatch_lane_projection_snapshots AS
+SELECT p.* FROM dispatch_lane_projection_snapshots p
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM dispatch_lane_projection_snapshots GROUP BY id) m
+ON p.id = m.id AND p.version = m.max_v;
+
 CREATE VIEW IF NOT EXISTS current_backlog_snapshots AS
 SELECT b.* FROM backlog_snapshots b
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM backlog_snapshots GROUP BY id) m
@@ -1164,6 +1318,7 @@ CREATE TABLE IF NOT EXISTS sot_artifacts (
     changed_by TEXT NOT NULL,
     changed_at TEXT NOT NULL,
     change_reason TEXT NOT NULL,
+    coverage_mode TEXT,
     UNIQUE(id, version)
 );
 
@@ -1176,6 +1331,128 @@ SELECT s.* FROM sot_artifacts s
 INNER JOIN (
     SELECT id, MAX(version) AS max_version FROM sot_artifacts GROUP BY id
 ) latest ON s.id = latest.id AND s.version = latest.max_version;
+
+-- WI-5441 Phase 1B: artifact-registry observed-revision ledger (append-only).
+-- Observed revisions record digest/state history for concrete registry members;
+-- they never grant membership (DCL-SOT-REGISTRY-PROJECTION-PARITY-001 v2).
+CREATE TABLE IF NOT EXISTS sot_artifact_revisions (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    revision_id TEXT NOT NULL,
+    entry_id TEXT NOT NULL,
+    canonical_relative_path TEXT NOT NULL,
+    object_kind TEXT NOT NULL,
+    content_digest TEXT NOT NULL,
+    size_bytes INTEGER,
+    observed_at TEXT NOT NULL,
+    actor_session TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    predecessor_revision_id TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    capability_hash TEXT,
+    bridge_id TEXT,
+    start_packet_hash TEXT,
+    pauth_decision TEXT,
+    journal_id TEXT,
+    UNIQUE(revision_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sot_artifact_revisions_entry ON sot_artifact_revisions(entry_id);
+CREATE INDEX IF NOT EXISTS idx_sot_artifact_revisions_observed ON sot_artifact_revisions(observed_at);
+
+-- WI-5441 Phase 1B: registry transaction journal (intent + completion) enabling
+-- deterministic recovery after partial failure
+-- (DCL-ARTIFACT-REGISTRY-MUTATION-AUTHORIZATION-001 v1).
+CREATE TABLE IF NOT EXISTS sot_registry_transaction_journal (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    journal_id TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    entry_id TEXT,
+    intent_recorded_at TEXT NOT NULL,
+    declaration_digest TEXT,
+    prior_revision_id TEXT,
+    current_revision_id TEXT,
+    filesystem_result TEXT,
+    projection_transaction TEXT,
+    receipt_digest TEXT,
+    journal_state TEXT NOT NULL,
+    completed_at TEXT,
+    actor_session TEXT NOT NULL,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    old_canonical_digest TEXT,
+    new_canonical_digest TEXT,
+    old_packaged_digest TEXT,
+    new_packaged_digest TEXT,
+    old_projection_digest TEXT,
+    new_projection_digest TEXT,
+    request_digest TEXT,
+    payload_json TEXT,
+    expected_record_count INTEGER,
+    start_packet_hash TEXT,
+    pauth_id TEXT,
+    bridge_id TEXT,
+    receipt_seed TEXT,
+    error_message TEXT,
+    UNIQUE(journal_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sot_registry_txn_journal_state ON sot_registry_transaction_journal(journal_state);
+
+CREATE TABLE IF NOT EXISTS sot_registry_observation_capabilities (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    capability_hash TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    tool_event_id TEXT NOT NULL,
+    paths_json TEXT NOT NULL,
+    preimage_digests_json TEXT NOT NULL,
+    bridge_id TEXT NOT NULL,
+    start_packet_hash TEXT NOT NULL,
+    pauth_decision_json TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    capability_state TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    consumed_at TEXT,
+    result_digest TEXT,
+    UNIQUE(capability_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sot_registry_observation_state
+    ON sot_registry_observation_capabilities(capability_state, expires_at);
+
+-- WI-5441 Phase 1B: quarantine receipts. Each receipt binds identity, source stat,
+-- digests, and immutable quarantined_at/expires_at plus restore_pending
+-- (DCL-QUARANTINE-RETENTION-EXPIRY-001 v1). Retention/expiry ENFORCEMENT is not in
+-- this schema-only slice; it lands in a later phase.
+CREATE TABLE IF NOT EXISTS sot_quarantine_receipts (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    receipt_id TEXT NOT NULL,
+    original_relative_path TEXT NOT NULL,
+    object_kind TEXT NOT NULL,
+    source_stat_evidence TEXT NOT NULL,
+    payload_path TEXT NOT NULL,
+    content_digest TEXT NOT NULL,
+    logical_size INTEGER,
+    registry_declaration_digest TEXT NOT NULL,
+    observed_revision_cutoff TEXT,
+    inventory_digest TEXT NOT NULL,
+    sweep_plan_digest TEXT NOT NULL,
+    actor_session TEXT NOT NULL,
+    quarantined_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    restore_pending INTEGER NOT NULL DEFAULT 0,
+    receipt_state TEXT NOT NULL,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(receipt_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sot_quarantine_receipts_expiry ON sot_quarantine_receipts(expires_at);
+CREATE INDEX IF NOT EXISTS idx_sot_quarantine_receipts_restore ON sot_quarantine_receipts(restore_pending);
 
 -- Work intent claims registry for bridge thread coordination
 CREATE TABLE IF NOT EXISTS work_intent_claims (
@@ -1391,15 +1668,98 @@ class KnowledgeDB:
         """Return metadata for the most recent ``search_deliberations`` call."""
         return dict(self._last_deliberation_search_status)
 
+    def deliberation_search_backend_status(self) -> dict[str, Any]:
+        """Inspect semantic deliberation-search backend health without writing.
+
+        The canonical SQLite deliberation rows remain the source of truth. The
+        ChromaDB store is a rebuildable index, so this check reports whether the
+        optional dependency is available, whether the canonical on-disk store and
+        collection can be opened, and whether the indexed deliberation ids cover
+        the current SQLite population.
+        """
+        conn = self._get_conn()
+        current_deliberation_count = int(conn.execute("SELECT COUNT(*) FROM current_deliberations").fetchone()[0])
+        chroma_path = getattr(self, "_chroma_path", None)
+        if chroma_path is None:
+            chroma_path = self.db_path.parent / self._canonical_chroma_dirname()
+        chroma_path = Path(chroma_path)
+        status: dict[str, Any] = {
+            "chromadb_importable": bool(HAS_CHROMADB),
+            "canonical_chroma_path": str(chroma_path),
+            "index_path_exists": chroma_path.exists(),
+            "collection_available": False,
+            "indexed_chunk_count": 0,
+            "indexed_deliberation_count": 0,
+            "current_deliberation_count": current_deliberation_count,
+            "fresh": current_deliberation_count == 0,
+            "healthy": False,
+            "degraded": True,
+            "degradation_reason": None,
+        }
+        if not HAS_CHROMADB:
+            status["degradation_reason"] = "chromadb_unavailable"
+            return status
+
+        if current_deliberation_count == 0 and not chroma_path.exists():
+            status.update({"fresh": True, "healthy": True, "degraded": False})
+            return status
+
+        if not chroma_path.exists():
+            status["degradation_reason"] = "index_path_missing"
+            return status
+
+        _chromadb = _load_chromadb()
+        if _chromadb is None:
+            status["degradation_reason"] = "chromadb_import_failed"
+            return status
+
+        try:
+            client = _chromadb.PersistentClient(path=str(chroma_path))
+            collection = client.get_collection(name=_CHROMA_COLLECTION_NAME)
+        except Exception as exc:  # intentional-catch: optional semantic index probe
+            status["degradation_reason"] = "collection_unavailable"
+            status["error"] = str(exc)
+            return status
+
+        status["collection_available"] = True
+        try:
+            status["indexed_chunk_count"] = int(collection.count())
+        except Exception as exc:  # intentional-catch: optional semantic index probe
+            status["degradation_reason"] = "index_count_unavailable"
+            status["error"] = str(exc)
+            return status
+
+        try:
+            raw = collection.get(include=["metadatas"])
+        except Exception as exc:  # intentional-catch: optional semantic index probe
+            status["degradation_reason"] = "index_metadata_unavailable"
+            status["error"] = str(exc)
+            return status
+
+        metadatas = raw.get("metadatas") if isinstance(raw, dict) else None
+        indexed_ids = {
+            metadata.get("delib_id")
+            for metadata in metadatas or []
+            if isinstance(metadata, dict) and isinstance(metadata.get("delib_id"), str)
+        }
+        status["indexed_deliberation_count"] = len(indexed_ids)
+        if current_deliberation_count == 0 or len(indexed_ids) >= current_deliberation_count:
+            status.update({"fresh": True, "healthy": True, "degraded": False, "degradation_reason": None})
+        else:
+            status["degradation_reason"] = "index_stale"
+        return status
+
     def _get_conn(self) -> sqlite3.Connection:
         if self._conn is None:
             self._conn = sqlite3.connect(
                 str(self.db_path),
+                timeout=DEFAULT_SQLITE_BUSY_TIMEOUT_MS / 1000,
                 check_same_thread=self._check_same_thread,
             )
             self._conn.row_factory = sqlite3.Row
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.execute("PRAGMA foreign_keys=ON")
+            self._conn.execute(f"PRAGMA busy_timeout={DEFAULT_SQLITE_BUSY_TIMEOUT_MS}")
         return self._conn
 
     def _ensure_schema(self) -> None:
@@ -1497,6 +1857,57 @@ class KnowledgeDB:
         conn.commit()
         if added_work_item_cols:
             _log.debug("Applied migration: unified backlog work item columns %s", added_work_item_cols)
+
+        # Migration 6b: WI-5441 Phase 1B — additive nullable coverage_mode column on
+        # sot_artifacts (no default) per DCL-SOT-REGISTRY-RECORD-SCHEMA-001 v3, which
+        # forbids a silent default that would classify existing declarations. The new
+        # registry tables (sot_artifact_revisions, sot_registry_transaction_journal,
+        # sot_quarantine_receipts) are created via SCHEMA_SQL CREATE TABLE IF NOT EXISTS
+        # and need no migration here.
+        sot_cols = {row[1] for row in conn.execute("PRAGMA table_info(sot_artifacts)").fetchall()}
+        if "coverage_mode" not in sot_cols:
+            conn.execute("ALTER TABLE sot_artifacts ADD COLUMN coverage_mode TEXT")
+            conn.commit()
+            _log.debug("Applied migration: add coverage_mode column to sot_artifacts")
+
+        registry_journal_columns = {
+            "old_canonical_digest": "TEXT",
+            "new_canonical_digest": "TEXT",
+            "old_packaged_digest": "TEXT",
+            "new_packaged_digest": "TEXT",
+            "old_projection_digest": "TEXT",
+            "new_projection_digest": "TEXT",
+            "request_digest": "TEXT",
+            "payload_json": "TEXT",
+            "expected_record_count": "INTEGER",
+            "start_packet_hash": "TEXT",
+            "pauth_id": "TEXT",
+            "bridge_id": "TEXT",
+            "receipt_seed": "TEXT",
+            "error_message": "TEXT",
+        }
+        journal_columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(sot_registry_transaction_journal)").fetchall()
+        }
+        for column_name, declaration in registry_journal_columns.items():
+            if column_name not in journal_columns:
+                conn.execute(f"ALTER TABLE sot_registry_transaction_journal ADD COLUMN {column_name} {declaration}")
+        registry_revision_columns = {
+            "capability_hash": "TEXT",
+            "bridge_id": "TEXT",
+            "start_packet_hash": "TEXT",
+            "pauth_decision": "TEXT",
+            "journal_id": "TEXT",
+        }
+        revision_columns = {row[1] for row in conn.execute("PRAGMA table_info(sot_artifact_revisions)").fetchall()}
+        for column_name, declaration in registry_revision_columns.items():
+            if column_name not in revision_columns:
+                conn.execute(f"ALTER TABLE sot_artifact_revisions ADD COLUMN {column_name} {declaration}")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_sot_registry_txn_journal_request "
+            "ON sot_registry_transaction_journal(operation, request_digest)"
+        )
+        conn.commit()
 
         # Migration 7: first-class project layer over canonical work_items.
         self._backfill_project_artifacts_from_work_items()
@@ -3582,6 +3993,70 @@ class KnowledgeDB:
         rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
 
+    def list_registry_path_observations(self) -> list[dict[str, str]]:
+        """Return current governed in-root path fields for registry reconciliation.
+
+        The result is deliberately limited to typed path-bearing columns.  It
+        does not mine narrative descriptions, change reasons, or deliberation
+        prose for path-looking strings.
+        """
+
+        observations: list[dict[str, str]] = []
+
+        def append(source_kind: str, source_id: Any, field: str, value: Any) -> None:
+            if not isinstance(value, str):
+                return
+            path = value.strip().split("::", 1)[0]
+            if not path:
+                return
+            observations.append(
+                {
+                    "path": path,
+                    "source_kind": source_kind,
+                    "source_id": str(source_id),
+                    "field": field,
+                }
+            )
+
+        for spec in self.list_specs():
+            values = spec.get("source_paths_parsed") or spec.get("_source_paths_parsed") or ()
+            if isinstance(values, str):
+                try:
+                    values = json.loads(values)
+                except json.JSONDecodeError:
+                    values = ()
+            for value in values if isinstance(values, list | tuple) else ():
+                append("specification", spec.get("id"), "source_paths", value)
+
+        for test in self.list_tests():
+            append("test", test.get("id"), "test_file", test.get("test_file"))
+
+        for document in self.list_documents():
+            append("document", document.get("id"), "source_path", document.get("source_path"))
+
+        conn = self._get_conn()
+        link_view_exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type IN ('table', 'view') AND name = 'current_project_artifact_links'"
+        ).fetchone()
+        if link_view_exists:
+            rows = conn.execute(
+                "SELECT id, artifact_type, artifact_ref FROM current_project_artifact_links "
+                "WHERE status = 'active' ORDER BY id"
+            ).fetchall()
+            path_types = {"configuration", "document", "file", "path", "source_file", "test"}
+            for row in rows:
+                payload = _row_to_dict(row)
+                if str(payload.get("artifact_type") or "").casefold() in path_types:
+                    append("project_artifact_link", payload.get("id"), "artifact_ref", payload.get("artifact_ref"))
+
+        unique = {
+            (row["path"].casefold(), row["source_kind"], row["source_id"], row["field"]): row for row in observations
+        }
+        return sorted(
+            unique.values(),
+            key=lambda row: (row["path"].casefold(), row["source_kind"], row["source_id"], row["field"]),
+        )
+
     # ------------------------------------------------------------------
     # GOV-20: Architecture Decision Governance helpers
     # ------------------------------------------------------------------
@@ -3768,6 +4243,7 @@ class KnowledgeDB:
         last_result: str | None = None,
         last_executed_at: str | None = None,
         application_scope: str | None = None,
+        commit: bool = True,
     ) -> dict[str, Any] | None:
         """Insert a new version of a test artifact.
 
@@ -3825,7 +4301,8 @@ class KnowledgeDB:
                     "last_executed_at": last_executed_at,
                 },
             )
-            conn.commit()
+            if commit:
+                conn.commit()
         except Exception:
             conn.rollback()
             raise
@@ -4121,6 +4598,7 @@ class KnowledgeDB:
         test_ids: list[str] | None = None,
         last_result: str | None = None,
         last_executed_at: str | None = None,
+        commit: bool = True,
     ) -> dict[str, Any] | None:
         """Insert a new version of a test plan phase.
 
@@ -4155,7 +4633,8 @@ class KnowledgeDB:
                 change_reason,
             ),
         )
-        conn.commit()
+        if commit:
+            conn.commit()
         return self.get_test_plan_phase(id)
 
     def update_test_plan_phase(
@@ -4344,6 +4823,7 @@ class KnowledgeDB:
         completion_evidence: str | None = None,
         supersedes: str | None = None,
         superseded_by: str | None = None,
+        commit: bool = True,
     ) -> dict[str, Any] | None:
         """Insert a new version of a work item.
 
@@ -4440,7 +4920,8 @@ class KnowledgeDB:
                     "source_test_id": source_test_id,
                 },
             )
-            conn.commit()
+            if commit:
+                conn.commit()
         except Exception:
             conn.rollback()
             raise
@@ -4453,6 +4934,7 @@ class KnowledgeDB:
         change_reason: str,
         *,
         owner_approved: bool = False,
+        commit: bool = True,
         **fields: Any,
     ) -> dict[str, Any] | None:
         """Create a new version of a work item, carrying forward unchanged fields.
@@ -4556,7 +5038,148 @@ class KnowledgeDB:
                         "source_test_id": source_test_id,
                     },
                 )
-            conn.commit()
+            if commit:
+                conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        return self.get_work_item(id)
+
+    def reopen_terminal_work_item(
+        self,
+        id: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        resolution_status: str,
+        stage: str,
+        related_bridge_threads: str,
+        owner_approved: bool,
+        bridge_evidence_validated: bool,
+        required_bridge_threads: set[str],
+        exact_related_bridge_threads: bool,
+        expected_current_version: int,
+        commit: bool = True,
+    ) -> dict[str, Any] | None:
+        """Append one narrowly authorized terminal-reopen version and event.
+
+        This is intentionally separate from ``_VALID_STAGE_TRANSITIONS``.  The
+        governed backlog service must validate the live bridge evidence first;
+        this primitive repeats all structural checks before one atomic append.
+        """
+        if not owner_approved:
+            raise ValueError("Terminal reopen requires explicit owner approval")
+        if not bridge_evidence_validated:
+            raise ValueError("Terminal reopen requires validated bridge evidence")
+        if not change_reason or id not in change_reason:
+            raise ValueError("Terminal reopen reason must identify the work item")
+        reason_folded = change_reason.casefold()
+        if "pauth-" not in reason_folded or "owner-approved" not in reason_folded:
+            raise ValueError("Terminal reopen reason must cite active PAUTH and owner-approved repair evidence")
+        if "terminal" not in reason_folded or "repair" not in reason_folded:
+            raise ValueError("Terminal reopen reason must identify the owner-approved terminal repair")
+        if resolution_status in WORK_ITEM_TERMINAL_RESOLUTION_STATUSES:
+            raise ValueError("Terminal reopen requires an explicit nonterminal resolution status")
+        if stage not in {"created", "tested", "backlogged", "implementing"}:
+            raise ValueError("Terminal reopen requires an explicit nonterminal stage")
+        try:
+            bridge_threads = json.loads(related_bridge_threads)
+        except json.JSONDecodeError as exc:
+            raise ValueError("Terminal reopen requires valid related bridge JSON") from exc
+        if (
+            not isinstance(bridge_threads, list)
+            or not bridge_threads
+            or any(not isinstance(value, str) for value in bridge_threads)
+        ):
+            raise ValueError("Terminal reopen requires a non-empty related bridge string array")
+        if not required_bridge_threads or any(
+            not isinstance(value, str) or not value for value in required_bridge_threads
+        ):
+            raise ValueError("Terminal reopen requires an explicit non-empty required bridge path policy")
+        if len(set(bridge_threads)) != len(bridge_threads):
+            raise ValueError("Terminal reopen related bridge paths must be unique")
+        observed_threads = set(bridge_threads)
+        if exact_related_bridge_threads:
+            if observed_threads != required_bridge_threads:
+                raise ValueError("Terminal reopen requires the exact related bridge path policy")
+        elif not required_bridge_threads.issubset(observed_threads):
+            raise ValueError("Terminal reopen requires every required bridge path")
+
+        conn = self._get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            current_row = conn.execute("SELECT * FROM current_work_items WHERE id = ?", (id,)).fetchone()
+            if current_row is None:
+                raise ValueError(f"Work item {id} not found")
+            current = _row_to_dict(current_row)
+            if current.get("version") != expected_current_version:
+                raise ValueError(
+                    "Terminal reopen work-item version changed after live validation: "
+                    f"expected {expected_current_version}, got {current.get('version')}"
+                )
+            if current.get("stage") != "resolved":
+                raise ValueError(f"Terminal reopen requires current stage 'resolved', got {current.get('stage')!r}")
+
+            version = self._next_work_item_version(id)
+            backlog_values = {field: current.get(field) for field in WORK_ITEM_BACKLOG_FIELDS}
+            backlog_values["related_bridge_threads"] = related_bridge_threads
+            columns = [
+                "id",
+                "version",
+                "title",
+                "description",
+                "origin",
+                "component",
+                "source_spec_id",
+                "source_test_id",
+                "failure_description",
+                "resolution_status",
+                "priority",
+                "stage",
+                *WORK_ITEM_BACKLOG_FIELDS,
+                "changed_by",
+                "changed_at",
+                "change_reason",
+            ]
+            values = [
+                id,
+                version,
+                current["title"],
+                current.get("description"),
+                current["origin"],
+                current["component"],
+                current.get("source_spec_id"),
+                current.get("source_test_id"),
+                current.get("failure_description"),
+                resolution_status,
+                current.get("priority"),
+                stage,
+                *(backlog_values[field] for field in WORK_ITEM_BACKLOG_FIELDS),
+                changed_by,
+                _now(),
+                change_reason,
+            ]
+            conn.execute(
+                f"INSERT INTO work_items ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)})",
+                values,
+            )
+            self._record_event(
+                conn,
+                "wi_reopened",
+                changed_by,
+                artifact_id=id,
+                artifact_type="work_item",
+                artifact_version=version,
+                metadata={
+                    "previous_resolution_status": current.get("resolution_status"),
+                    "previous_stage": current.get("stage"),
+                    "resolution_status": resolution_status,
+                    "stage": stage,
+                    "related_bridge_threads": bridge_threads,
+                },
+            )
+            if commit:
+                conn.commit()
         except Exception:
             conn.rollback()
             raise
@@ -4796,6 +5419,7 @@ class KnowledgeDB:
         status: str = "active",
         source: str | None = None,
         id: str | None = None,
+        commit: bool = True,
     ) -> dict[str, Any] | None:
         """Link a project to a canonical work item without duplicating the work item."""
         if self.get_project(project_id) is None:
@@ -4824,7 +5448,8 @@ class KnowledgeDB:
                 change_reason,
             ),
         )
-        conn.commit()
+        if commit:
+            conn.commit()
         return self.get_project_work_item_membership(membership_id)
 
     def get_project_work_item_membership(self, membership_id: str) -> dict[str, Any] | None:
@@ -4860,6 +5485,7 @@ class KnowledgeDB:
         """
         query = """SELECT
                       m.id AS membership_id,
+                      m.version AS membership_version,
                       m.project_id AS project_id,
                       m.membership_role AS membership_role,
                       m.membership_order AS membership_order,
@@ -4900,46 +5526,69 @@ class KnowledgeDB:
         related_work_item_id: str | None = None,
         status: str = "active",
         id: str | None = None,
+        dependent_project_id: str | None = None,
+        prerequisite_project_id: str | None = None,
+        dependency_kind: str | None = None,
+        required_prerequisite_state: str | None = None,
+        affected_gate: str | None = None,
+        provenance: str | None = None,
+        registry_version: int = 1,
+        commit: bool = True,
     ) -> dict[str, Any] | None:
-        """Record a dependency between two projects.
+        """Record one append-only project dependency version.
 
-        Args:
-            from_project_id: Project that has the dependency.
-            to_project_id: Project that is depended upon.
-            changed_by: Person or agent performing the change.
-            change_reason: Explanatory rationale for the change.
-            dependency_type: Type classification of the dependency.
-            rationale: Optional text rationale for the dependency.
-            blocking_status: The current block status.
-            related_work_item_id: Optional linked work item ID.
-            status: Dependency record lifecycle status.
-            id: Optional stable record identifier.
-
-        Returns:
-            The newly created project dependency record.
+        ``from_project_id``/``to_project_id`` and ``dependency_type`` remain
+        physical compatibility fields. Governed callers provide the canonical
+        directional fields; legacy callers are normalized conservatively.
+        Business validation and transaction ownership live in
+        ``ProjectLifecycleService``.
         """
-        if self.get_project(from_project_id) is None:
-            raise ValueError(f"Project {from_project_id} not found")
-        if self.get_project(to_project_id) is None:
-            raise ValueError(f"Project {to_project_id} not found")
+        dependent = dependent_project_id or from_project_id
+        prerequisite = prerequisite_project_id or to_project_id
+        kind = dependency_kind or ("requires_project_state" if dependency_type == "depends_on" else dependency_type)
+        required_state = required_prerequisite_state or self._legacy_required_project_state(blocking_status)
+        gate = affected_gate or "readiness"
+        source_provenance = provenance or f"legacy-project-dependency:{changed_by}"
+        if self.get_project(dependent) is None:
+            raise ValueError(f"Project {dependent} not found")
+        if self.get_project(prerequisite) is None:
+            raise ValueError(f"Project {prerequisite} not found")
         if related_work_item_id and self.get_work_item(related_work_item_id) is None:
             raise ValueError(f"Work item {related_work_item_id} not found")
-        dependency_id = id or _stable_project_link_id("PDEP", from_project_id, to_project_id, dependency_type)
+        dependency_id = id or _stable_project_link_id(
+            "PDEP",
+            dependent,
+            prerequisite,
+            kind,
+            required_state,
+            gate,
+        )
+        self._ensure_project_dependency_write_schema()
         version = self._next_project_dependency_version(dependency_id)
         conn = self._get_conn()
         conn.execute(
             """INSERT INTO project_dependencies
-               (id, version, from_project_id, to_project_id, dependency_type, rationale,
-                blocking_status, related_work_item_id, status, changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               (id, version, from_project_id, to_project_id, dependency_type,
+                dependent_project_id, prerequisite_project_id, dependency_kind,
+                required_prerequisite_state, affected_gate, provenance, registry_version,
+                rationale, blocking_status, related_work_item_id, status,
+                changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 dependency_id,
                 version,
-                from_project_id,
-                to_project_id,
+                dependent,
+                prerequisite,
                 dependency_type,
+                dependent,
+                prerequisite,
+                kind,
+                required_state,
+                gate,
+                source_provenance,
+                registry_version,
                 rationale,
-                blocking_status,
+                required_state,
                 related_work_item_id,
                 status,
                 changed_by,
@@ -4947,8 +5596,85 @@ class KnowledgeDB:
                 change_reason,
             ),
         )
-        conn.commit()
+        if commit:
+            conn.commit()
         return self.get_project_dependency(dependency_id)
+
+    @staticmethod
+    def _legacy_required_project_state(blocking_status: str | None) -> str:
+        """Map primitive dependency state to a conservative required state."""
+        normalized = str(blocking_status or "").strip().lower()
+        if normalized in {"active", "completed", "retired", "cancelled"}:
+            return normalized
+        if normalized in {"closed", "resolved", "verified"}:
+            return "completed"
+        return "retired"
+
+    def _ensure_project_dependency_write_schema(self) -> None:
+        """Lazily add canonical columns for an existing database on mutation.
+
+        Read-only project commands never migrate a live store. The governed
+        dependency mutation transaction owns this compatibility migration.
+        """
+        conn = self._get_conn()
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(project_dependencies)").fetchall()}
+        additions = {
+            "dependent_project_id": "TEXT",
+            "prerequisite_project_id": "TEXT",
+            "dependency_kind": "TEXT",
+            "required_prerequisite_state": "TEXT",
+            "affected_gate": "TEXT",
+            "provenance": "TEXT",
+            "registry_version": "INTEGER",
+        }
+        for column, column_type in additions.items():
+            if column not in columns:
+                conn.execute(f"ALTER TABLE project_dependencies ADD COLUMN {column} {column_type}")
+        conn.execute(
+            """
+            UPDATE project_dependencies
+            SET dependent_project_id = COALESCE(dependent_project_id, from_project_id),
+                prerequisite_project_id = COALESCE(prerequisite_project_id, to_project_id),
+                dependency_kind = COALESCE(
+                    dependency_kind,
+                    CASE WHEN dependency_type = 'depends_on'
+                         THEN 'requires_project_state'
+                         ELSE dependency_type END
+                ),
+                required_prerequisite_state = COALESCE(
+                    required_prerequisite_state,
+                    CASE
+                        WHEN blocking_status IN ('active', 'completed', 'retired', 'cancelled')
+                            THEN blocking_status
+                        WHEN blocking_status IN ('closed', 'resolved', 'verified')
+                            THEN 'completed'
+                        ELSE 'retired'
+                    END
+                ),
+                affected_gate = COALESCE(affected_gate, 'readiness'),
+                provenance = COALESCE(provenance, 'legacy-project-dependency:' || changed_by),
+                registry_version = COALESCE(registry_version, 1)
+            """
+        )
+
+    def _canonical_project_dependency(self, row: sqlite3.Row | None) -> dict[str, Any] | None:
+        if row is None:
+            return None
+        record = _row_to_dict(row)
+        record["dependent_project_id"] = record.get("dependent_project_id") or record["from_project_id"]
+        record["prerequisite_project_id"] = record.get("prerequisite_project_id") or record["to_project_id"]
+        record["dependency_kind"] = record.get("dependency_kind") or (
+            "requires_project_state" if record.get("dependency_type") == "depends_on" else record.get("dependency_type")
+        )
+        record["required_prerequisite_state"] = record.get(
+            "required_prerequisite_state"
+        ) or self._legacy_required_project_state(record.get("blocking_status"))
+        record["affected_gate"] = record.get("affected_gate") or "readiness"
+        record["provenance"] = record.get("provenance") or (
+            f"legacy-project-dependency:{record.get('changed_by') or 'unknown'}"
+        )
+        record["registry_version"] = record.get("registry_version") or 1
+        return record
 
     def get_project_dependency(self, dependency_id: str) -> dict[str, Any] | None:
         """Retrieve a project dependency record by ID.
@@ -4964,31 +5690,33 @@ class KnowledgeDB:
             .execute("SELECT * FROM current_project_dependencies WHERE id = ?", (dependency_id,))
             .fetchone()
         )
-        return _row_to_dict(row) if row else None
+        return self._canonical_project_dependency(row)
 
     def list_project_dependencies(
         self,
-        project_id: str,
+        project_id: str | None = None,
         *,
         include_inactive: bool = False,
     ) -> list[dict[str, Any]]:
-        """List dependencies where the given project is the source or target.
+        """List current dependencies, optionally scoped to one endpoint.
 
         Args:
-            project_id: The project identifier.
+            project_id: Optional project identifier.
             include_inactive: If True, inactive records are included.
 
         Returns:
             A list of project dependency dictionaries.
         """
-        query = """SELECT * FROM current_project_dependencies
-                   WHERE (from_project_id = ? OR to_project_id = ?)"""
-        params: list[Any] = [project_id, project_id]
+        query = "SELECT * FROM current_project_dependencies WHERE 1 = 1"
+        params: list[Any] = []
+        if project_id is not None:
+            query += " AND (from_project_id = ? OR to_project_id = ?)"
+            params.extend([project_id, project_id])
         if not include_inactive:
             query += " AND status = 'active'"
         query += " ORDER BY blocking_status, dependency_type, id"
         rows = self._get_conn().execute(query, params).fetchall()
-        return [_row_to_dict(r) for r in rows]
+        return [record for row in rows if (record := self._canonical_project_dependency(row)) is not None]
 
     def add_project_artifact_link(
         self,
@@ -6485,6 +7213,334 @@ class KnowledgeDB:
         query += " ORDER BY harness_id, captured_at, id"
         rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
+
+    def _next_dispatch_lane_version(self, lane_id: str) -> int:
+        row = self._get_conn().execute("SELECT MAX(version) FROM dispatch_lanes WHERE id = ?", (lane_id,)).fetchone()
+        return (row[0] or 0) + 1
+
+    def insert_dispatch_lane(
+        self,
+        id: str,
+        harness_id: str,
+        provider: str,
+        model_route: str,
+        role: str,
+        activity_type: str,
+        lifecycle: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        dispatch_enabled: bool = False,
+        shadow_enabled: bool = True,
+        route_selectable: bool = False,
+        waiver_id: str | None = None,
+        blockage_reasons: list[str] | None = None,
+        score_components: dict[str, Any] | None = None,
+        caps: dict[str, Any] | None = None,
+        evidence_refs: dict[str, Any] | None = None,
+        status: str = "active",
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Append a governed dispatch lane registry row.
+
+        The row records lane identity and advisory/prod gating fields only. It
+        does not select dispatch targets or activate production lane ranking.
+        """
+        lane_id = _require_text("dispatch lane id", id)
+        version = self._next_dispatch_lane_version(lane_id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO dispatch_lanes
+               (id, version, harness_id, provider, model_route, role, activity_type,
+                lifecycle, dispatch_enabled, shadow_enabled, route_selectable,
+                waiver_id, blockage_reasons, score_components, caps, evidence_refs,
+                status, metadata, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                lane_id,
+                version,
+                _require_text("harness_id", harness_id),
+                _require_text("provider", provider),
+                _require_text("model_route", model_route),
+                _require_text("role", role),
+                _require_text("activity_type", activity_type),
+                _require_text("lifecycle", lifecycle),
+                1 if dispatch_enabled else 0,
+                1 if shadow_enabled else 0,
+                1 if route_selectable else 0,
+                waiver_id,
+                _encode_json(blockage_reasons or []),
+                _encode_json(score_components or {}),
+                _encode_json(caps or {}),
+                _encode_json(evidence_refs or {}),
+                _require_text("status", status),
+                _encode_json(metadata or {}),
+                _require_text("changed_by", changed_by),
+                _now(),
+                _require_text("change_reason", change_reason),
+            ),
+        )
+        conn.commit()
+        return self.get_dispatch_lane(lane_id)
+
+    def get_dispatch_lane(self, lane_id: str) -> dict[str, Any] | None:
+        """Return the current version of a dispatch lane registry row."""
+        row = self._get_conn().execute("SELECT * FROM current_dispatch_lanes WHERE id = ?", (lane_id,)).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def list_dispatch_lanes(
+        self,
+        *,
+        harness_id: str | None = None,
+        role: str | None = None,
+        activity_type: str | None = None,
+        lifecycle: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List current dispatch lane registry rows with optional filters."""
+        query = "SELECT * FROM current_dispatch_lanes WHERE 1=1"
+        params: list[Any] = []
+        if harness_id:
+            query += " AND harness_id = ?"
+            params.append(harness_id)
+        if role:
+            query += " AND role = ?"
+            params.append(role)
+        if activity_type:
+            query += " AND activity_type = ?"
+            params.append(activity_type)
+        if lifecycle:
+            query += " AND lifecycle = ?"
+            params.append(lifecycle)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        query += " ORDER BY harness_id, role, activity_type, provider, model_route, id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def _next_dispatch_lane_projection_snapshot_version(self, snapshot_id: str) -> int:
+        row = (
+            self._get_conn()
+            .execute("SELECT MAX(version) FROM dispatch_lane_projection_snapshots WHERE id = ?", (snapshot_id,))
+            .fetchone()
+        )
+        return (row[0] or 0) + 1
+
+    def insert_dispatch_lane_projection_snapshot(
+        self,
+        id: str,
+        projection_mode: str,
+        projection_payload: dict[str, Any],
+        changed_by: str,
+        change_reason: str,
+        *,
+        source_snapshot_id: str | None = None,
+        status: str = "candidate",
+        generated_at: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Append a compact dispatch lane projection snapshot.
+
+        Projection payloads are append-only evidence for later dispatcher
+        consumption. This writer intentionally stores compact payload sections
+        only and does not write dispatcher runtime configuration.
+        """
+        snapshot_id = _require_text("dispatch lane projection snapshot id", id)
+        payload = dict(projection_payload)
+        version = self._next_dispatch_lane_projection_snapshot_version(snapshot_id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO dispatch_lane_projection_snapshots
+               (id, version, source_snapshot_id, projection_mode, projection_payload,
+                ranked_lanes, blocked_lanes, freshness, runtime_suppression,
+                status, generated_at, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                snapshot_id,
+                version,
+                source_snapshot_id,
+                _require_text("projection_mode", projection_mode),
+                _encode_json(payload),
+                _encode_json(payload.get("effective_ranked_lanes") or {}),
+                _encode_json(payload.get("blocked_lanes") or []),
+                _encode_json(payload.get("freshness") or {}),
+                _encode_json(payload.get("runtime_suppression") or {}),
+                _require_text("status", status),
+                generated_at or str(payload.get("generated_at") or _now()),
+                _require_text("changed_by", changed_by),
+                _now(),
+                _require_text("change_reason", change_reason),
+            ),
+        )
+        conn.commit()
+        return self.get_dispatch_lane_projection_snapshot(snapshot_id)
+
+    def get_dispatch_lane_projection_snapshot(self, snapshot_id: str) -> dict[str, Any] | None:
+        """Return the current dispatch lane projection snapshot version."""
+        row = (
+            self._get_conn()
+            .execute("SELECT * FROM current_dispatch_lane_projection_snapshots WHERE id = ?", (snapshot_id,))
+            .fetchone()
+        )
+        return _row_to_dict(row) if row else None
+
+    def get_dispatch_lane_projection_snapshot_history(self, snapshot_id: str) -> list[dict[str, Any]]:
+        """Return all projection snapshot versions, newest-first."""
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM dispatch_lane_projection_snapshots WHERE id = ? ORDER BY version DESC",
+                (snapshot_id,),
+            )
+            .fetchall()
+        )
+        return [_row_to_dict(r) for r in rows]
+
+    def insert_dispatch_default_metric_event(
+        self,
+        id: str,
+        event: dict[str, Any],
+        changed_by: str,
+        change_reason: str,
+        *,
+        status: str = "active",
+    ) -> dict[str, Any] | None:
+        """Append one privacy-bounded canonical default-metrics event.
+
+        The projection module supplies an allowlisted event. Repeating the
+        same event id is intentionally idempotent so a dispatch completion
+        retry cannot create a second observation.
+        """
+        event_id = _require_text("dispatch default metric event id", id)
+        existing = self.get_dispatch_default_metric_event(event_id)
+        if existing is not None:
+            return existing
+        self.insert_dispatch_event(
+            event_id=event_id,
+            rule_id=_require_text("event_schema_id", event["event_schema_id"]),
+            target_kind="dispatch_default_metric",
+            target_value=event_id,
+            trigger_at=event["event_at"],
+            gate_result=event.get("queue_outcome") or "observed",
+            spawn_outcome=event.get("selection_outcome") or "observed",
+            spawn_exit_status=event.get("exit_status"),
+            activity_gate=event.get("role") or "unknown",
+            dry_run=True,
+            payload=event,
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+        return self.get_dispatch_default_metric_event(event_id)
+
+    def get_dispatch_default_metric_event(self, event_id: str) -> dict[str, Any] | None:
+        row = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM dispatch_events WHERE id = ? AND rule_id = ? ORDER BY version DESC LIMIT 1",
+                (_require_text("dispatch default metric event id", event_id), "gtkb.dispatch_default_metric_event.v1"),
+            )
+            .fetchone()
+        )
+        if row is None or not row["payload"]:
+            return None
+        try:
+            event = json.loads(row["payload"])
+        except (TypeError, json.JSONDecodeError):
+            return None
+        if not isinstance(event, dict):
+            return None
+        event["version"] = row["version"]
+        event["changed_at"] = row["changed_at"]
+        event["tool_counts_parsed"] = event.get("tool_counts")
+        return event
+
+    def list_dispatch_default_metric_events(
+        self,
+        *,
+        bridge_document_id: str | None = None,
+        event_at_start: str | None = None,
+        event_at_end: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        query = "SELECT * FROM dispatch_events WHERE rule_id = ?"
+        params: list[Any] = ["gtkb.dispatch_default_metric_event.v1"]
+        if bridge_document_id:
+            query += " AND json_extract(payload, '$.bridge_document_id') = ?"
+            params.append(bridge_document_id)
+        if event_at_start:
+            query += " AND trigger_at >= ?"
+            params.append(event_at_start)
+        if event_at_end:
+            query += " AND trigger_at <= ?"
+            params.append(event_at_end)
+        query += " ORDER BY trigger_at, id LIMIT ?"
+        params.append(limit)
+        rows = self._get_conn().execute(query, params).fetchall()
+        events: list[dict[str, Any]] = []
+        for row in rows:
+            try:
+                event = json.loads(row["payload"])
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if isinstance(event, dict):
+                event["version"] = row["version"]
+                event["tool_counts_parsed"] = event.get("tool_counts")
+                events.append(event)
+        return events
+
+    def insert_dispatch_default_metrics_snapshot(
+        self,
+        id: str,
+        snapshot: dict[str, Any],
+        changed_by: str,
+        change_reason: str,
+        *,
+        status: str = "active",
+    ) -> dict[str, Any] | None:
+        """Append one canonical bounded default-metrics snapshot idempotently."""
+        snapshot_id = _require_text("dispatch default metrics snapshot id", id)
+        existing = self.get_dispatch_default_metrics_snapshot(snapshot_id)
+        if existing is not None:
+            return existing
+        self.insert_document(
+            id=snapshot_id,
+            title="Canonical default dispatch metrics snapshot",
+            category="dispatch_default_metrics_snapshot",
+            status=_require_text("status", status),
+            changed_by=_require_text("changed_by", changed_by),
+            change_reason=_require_text("change_reason", change_reason),
+            content=json.dumps(snapshot, sort_keys=True, separators=(",", ":")),
+            tags=["WI-5180", snapshot["snapshot_schema_id"]],
+        )
+        return self.get_dispatch_default_metrics_snapshot(snapshot_id)
+
+    def get_dispatch_default_metrics_snapshot(self, snapshot_id: str) -> dict[str, Any] | None:
+        row = self.get_document(_require_text("dispatch default metrics snapshot id", snapshot_id))
+        if row is None or row.get("category") != "dispatch_default_metrics_snapshot":
+            return None
+        try:
+            snapshot = json.loads(row.get("content") or "")
+        except (TypeError, json.JSONDecodeError):
+            return None
+        if not isinstance(snapshot, dict):
+            return None
+        snapshot["version"] = row.get("version")
+        snapshot["freshness_parsed"] = snapshot.get("freshness")
+        snapshot["provenance_parsed"] = snapshot.get("provenance")
+        return snapshot
+
+    def list_dispatch_default_metrics_snapshots(self, *, limit: int = 20) -> list[dict[str, Any]]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        rows = self.list_documents(category="dispatch_default_metrics_snapshot")
+        snapshots: list[dict[str, Any]] = []
+        for row in rows[:limit]:
+            snapshot = self.get_dispatch_default_metrics_snapshot(row["id"])
+            if snapshot is not None:
+                snapshots.append(snapshot)
+        return snapshots
 
     def insert_flow_event(
         self,
@@ -8532,7 +9588,13 @@ class KnowledgeDB:
                 }
         return seen_delib_ids
 
-    def search_deliberations(self, query: str, *, limit: int = 5) -> list[dict[str, Any]]:
+    def search_deliberations(
+        self,
+        query: str,
+        *,
+        limit: int = 5,
+        require_semantic: bool = False,
+    ) -> list[dict[str, Any]]:
         """Search deliberations via ChromaDB semantic search merged with an
         always-on SQLite LIKE pass.
 
@@ -8558,6 +9620,12 @@ class KnowledgeDB:
           - score: float (L2 distance, lower=better) | None for text_match
           - matched_chunk_id: str | None
           - matched_chunk_preview: str | None (first 200 chars of matched chunk)
+
+        Set ``require_semantic=True`` for governance paths where SQLite LIKE
+        fallback must not masquerade as a complete semantic search. In that
+        mode, unavailable or degraded ChromaDB raises
+        :class:`DeliberationSearchDegradedError` before LIKE results are
+        returned.
         """
         # Semantic pass — bounded so chroma contention degrades to an empty
         # semantic set (FAB-17 / HYG-048) instead of crashing (the count() probe
@@ -8569,9 +9637,17 @@ class KnowledgeDB:
             "semantic_succeeded": False,
             "semantic_degraded": False,
             "degradation_reason": None,
+            "semantic_required": require_semantic,
         }
         self._last_deliberation_search_status = semantic_status
         semantic_results: list[dict[str, Any]] = []
+        if require_semantic and not semantic_status["semantic_expected"]:
+            semantic_status["semantic_degraded"] = True
+            semantic_status["degradation_reason"] = "chromadb_unavailable"
+            raise DeliberationSearchDegradedError(
+                "Semantic deliberation search is required, but ChromaDB is unavailable.",
+                status=semantic_status,
+            )
         collection = self._get_chroma_collection()
         if collection is None and semantic_status["semantic_expected"]:
             semantic_status["semantic_degraded"] = True
@@ -8633,6 +9709,13 @@ class KnowledgeDB:
                         row["matched_chunk_id"] = match_info["matched_chunk_id"]
                         row["matched_chunk_preview"] = match_info["matched_chunk_preview"]
                         semantic_results.append(row)
+
+        if require_semantic and not semantic_status["semantic_succeeded"]:
+            reason = semantic_status.get("degradation_reason") or "semantic_search_unavailable"
+            raise DeliberationSearchDegradedError(
+                f"Semantic deliberation search is required, but search degraded ({reason}).",
+                status=semantic_status,
+            )
 
         # Always-on SQLite LIKE pass (WI-4519). Runs on every call — not only as
         # a fallback — so fresh-but-unindexed deliberations are never crowded out
@@ -8887,6 +9970,34 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "test_summary",
         "recovery_actions",
         "artifact_links",
+        "blockage_reasons",
+        "score_components",
+        "caps",
+        "evidence_refs",
+        "lane_scores",
+        "projection_payload",
+        "ranked_lanes",
+        "blocked_lanes",
+        "freshness",
+        "runtime_suppression",
+        "tool_counts",
+        "coverage",
+        "unavailable_reasons",
+        "source_refs",
+        "source_event_ids",
+        "counts_by_harness",
+        "counts_by_model_profile",
+        "counts_by_role",
+        "counts_by_bridge_outcome",
+        "counts_by_failure_class",
+        "elapsed_distribution",
+        "turns_distribution",
+        "tools_distribution",
+        "usage_coverage",
+        "cost_coverage",
+        "quality_coverage",
+        "adaptation_coverage",
+        "provenance",
     ):
         if key in d and d[key] and isinstance(d[key], str):
             try:

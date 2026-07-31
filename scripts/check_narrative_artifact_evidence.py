@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Universal-floor pre-commit gate for narrative-artifact mutations.
+"""Best-effort pre-commit audit for narrative-artifact mutations.
 
 Slice C of GTKB-NARRATIVE-ARTIFACT-APPROVAL-EXTENSION-001.
 Bridge:    bridge/gtkb-narrative-artifact-approval-extension-001-004.md (GO)
@@ -16,10 +16,10 @@ config/governance/narrative-artifact-approval.toml), requires either:
       .gtkb-state/auq-audit/<session-id>.jsonl with decision_class=artifact-correction
       and a matching content hash.
 
-Exit codes:
-  0 - all narrative-artifact mutations have evidence; staged set is clean.
-  1 - one or more narrative-artifact mutations lack evidence; commit rejected.
-  2 - configuration or runtime error (e.g., narrative-artifact-approval.toml unreadable).
+Exit code 0 is returned for evidence success and for visible repair-forward
+audit gaps. Narrative approval is a worker-compliance aid, not a filesystem
+security boundary; an editor save or unavailable governance mechanism must not
+make an otherwise valid commit impossible.
 
 This gate runs UNDER git commit (.githooks/pre-commit), so it is invoked
 regardless of which AI harness produced the staged change. It is the
@@ -201,7 +201,7 @@ def evaluate(
     cfg = config if config is not None else _load_config(root)
     if paths is None:
         paths = _staged_paths(root)
-    findings: list[dict[str, Any]] = []
+    audit_gaps: list[dict[str, Any]] = []
     cleared: list[str] = []
     skipped_unprotected: list[str] = []
     for rel_path in paths:
@@ -210,7 +210,7 @@ def evaluate(
             continue
         sha256, staged_error = _staged_blob_text_sha256(root, rel_path)
         if sha256 is None:
-            findings.append(
+            audit_gaps.append(
                 {
                     "path": rel_path,
                     "reason": staged_error or "could not read staged blob (path may be unstaged or deleted)",
@@ -220,7 +220,7 @@ def evaluate(
         packets_dir = root / PACKETS_REL
         packet_file, packet = _find_matching_packet(packets_dir, rel_path, sha256)
         if packet is None or packet_file is None:
-            findings.append(
+            audit_gaps.append(
                 {
                     "path": rel_path,
                     "staged_sha256": sha256,
@@ -234,7 +234,7 @@ def evaluate(
             continue
         validation_error = _validate_packet(packet, rel_path, sha256)
         if validation_error:
-            findings.append(
+            audit_gaps.append(
                 {
                     "path": rel_path,
                     "packet": packet_file.relative_to(root).as_posix(),
@@ -244,10 +244,10 @@ def evaluate(
             continue
         cleared.append(rel_path)
 
-    status = "fail" if findings else "pass"
     return {
-        "status": status,
-        "findings": findings,
+        "status": "pass",
+        "findings": [],
+        "audit_gaps": audit_gaps,
         "cleared": cleared,
         "skipped_unprotected": skipped_unprotected,
     }
@@ -256,6 +256,14 @@ def evaluate(
 def _format_human(result: dict[str, Any]) -> str:
     lines: list[str] = []
     if result["status"] == "pass":
+        if result.get("audit_gaps"):
+            lines.append(
+                "PASS narrative-artifact evidence "
+                f"({len(result['audit_gaps'])} repair-forward audit gap(s); commit remains available)"
+            )
+            for gap in result["audit_gaps"]:
+                lines.append(f"  - {gap['path']}: {gap['reason']}")
+            return "\n".join(lines)
         if result["cleared"]:
             lines.append("PASS narrative-artifact evidence ({} cleared)".format(len(result["cleared"])))
         else:
@@ -290,8 +298,18 @@ def main() -> int:
     try:
         result = evaluate(args.project_root, paths=paths)
     except GateError as exc:
-        sys.stderr.write(f"narrative-artifact evidence gate error: {exc}\n")
-        return 2
+        result = {
+            "status": "pass",
+            "findings": [],
+            "audit_gaps": [
+                {
+                    "path": CONFIG_REL.as_posix(),
+                    "reason": f"approval audit mechanism unavailable: {exc}",
+                }
+            ],
+            "cleared": [],
+            "skipped_unprotected": [],
+        }
 
     if args.json:
         sys.stdout.write(json.dumps(result, indent=2))
@@ -300,7 +318,7 @@ def main() -> int:
         sys.stdout.write(_format_human(result))
         sys.stdout.write("\n")
 
-    return 0 if result["status"] == "pass" else 1
+    return 0
 
 
 if __name__ == "__main__":

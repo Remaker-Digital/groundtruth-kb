@@ -72,6 +72,15 @@ def test_bootstrap_all_records_have_valid_enums() -> None:
             "shared",
             "automated_only",
         }
+        assert r.restore_action in {
+            "manual",
+            "visibility_only",
+            "git_restore",
+            "membase_export_restore",
+            "regenerate_from_source",
+            "ensure_alive",
+            "noop",
+        }
 
 
 def test_bootstrap_no_duplicate_ids() -> None:
@@ -98,6 +107,7 @@ def test_loader_rejects_missing_required_field(tmp_path: Path) -> None:
         id = "missing-storage-path"
         domain = "control_surface"
         lifecycle = "active"
+        coverage_mode = "exact"
         # storage_path missing
         authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
         mutation_api = "n/a"
@@ -117,6 +127,7 @@ def test_loader_rejects_invalid_domain(tmp_path: Path) -> None:
         id = "bad-domain"
         domain = "not-a-real-domain"
         lifecycle = "active"
+        coverage_mode = "exact"
         storage_path = "x"
         authority_spec_id = "GOV-X"
         mutation_api = "n/a"
@@ -136,6 +147,7 @@ def test_loader_rejects_invalid_lifecycle(tmp_path: Path) -> None:
         id = "bad-lifecycle"
         domain = "control_surface"
         lifecycle = "invented"
+        coverage_mode = "exact"
         storage_path = "x"
         authority_spec_id = "GOV-X"
         mutation_api = "n/a"
@@ -155,6 +167,7 @@ def test_loader_rejects_generated_without_mutation_api(tmp_path: Path) -> None:
         id = "generated-without-generator"
         domain = "control_surface"
         lifecycle = "generated"
+        coverage_mode = "exact"
         storage_path = "x"
         authority_spec_id = "GOV-X"
         mutation_api = ""
@@ -174,6 +187,7 @@ def test_loader_rejects_duplicate_id(tmp_path: Path) -> None:
         id = "dup"
         domain = "control_surface"
         lifecycle = "active"
+        coverage_mode = "exact"
         storage_path = "a"
         authority_spec_id = "GOV-X"
         mutation_api = "n/a"
@@ -186,6 +200,7 @@ def test_loader_rejects_duplicate_id(tmp_path: Path) -> None:
         id = "dup"
         domain = "control_surface"
         lifecycle = "active"
+        coverage_mode = "exact"
         storage_path = "b"
         authority_spec_id = "GOV-X"
         mutation_api = "n/a"
@@ -205,6 +220,7 @@ def test_loader_rejects_unknown_field(tmp_path: Path) -> None:
         id = "with-unknown"
         domain = "control_surface"
         lifecycle = "active"
+        coverage_mode = "exact"
         storage_path = "x"
         authority_spec_id = "GOV-X"
         mutation_api = "n/a"
@@ -225,6 +241,7 @@ def test_loader_accepts_optional_fields(tmp_path: Path) -> None:
         id = "with-optionals"
         domain = "control_surface"
         lifecycle = "active"
+        coverage_mode = "exact"
         storage_path = "x"
         authority_spec_id = "GOV-X"
         mutation_api = "n/a"
@@ -245,12 +262,34 @@ def test_loader_accepts_optional_fields(tmp_path: Path) -> None:
     assert r.notes == "Optional fields exercise."
 
 
+def test_loader_rejects_invalid_restore_action(tmp_path: Path) -> None:
+    body = """
+        [[artifacts]]
+        id = "bad-restore"
+        domain = "control_surface"
+        lifecycle = "active"
+        coverage_mode = "exact"
+        storage_path = "x"
+        authority_spec_id = "GOV-X"
+        mutation_api = "n/a"
+        versioning_policy = "git_tracked"
+        backup_policy = "git_tracked"
+        restore_action = "invented"
+        health_check_function = ""
+        owner_role = "shared"
+    """
+    path = _write_toml(tmp_path, body)
+    with pytest.raises(InvalidSoTRecord, match="restore_action"):
+        load_toml(path)
+
+
 def test_loader_health_check_can_be_null(tmp_path: Path) -> None:
     body = """
         [[artifacts]]
         id = "null-health"
         domain = "control_surface"
         lifecycle = "active"
+        coverage_mode = "exact"
         storage_path = "x"
         authority_spec_id = "GOV-X"
         mutation_api = "n/a"
@@ -330,6 +369,38 @@ def test_parity_detects_field_divergence() -> None:
     report = validate_projection_parity([toml_rec], [proj_rec])
     assert report.in_sync is False
     assert report.field_divergences == (("x", "lifecycle"),)
+
+
+def test_parity_detects_restore_action_divergence() -> None:
+    toml_rec = SoTArtifact(
+        id="x",
+        domain="control_surface",
+        lifecycle="active",
+        storage_path="path",
+        authority_spec_id="GOV-X",
+        mutation_api="n/a",
+        versioning_policy="git_tracked",
+        backup_policy="git_tracked",
+        health_check_function=None,
+        owner_role="shared",
+        restore_action="ensure_alive",
+    )
+    proj_rec = SoTArtifact(
+        id="x",
+        domain="control_surface",
+        lifecycle="active",
+        storage_path="path",
+        authority_spec_id="GOV-X",
+        mutation_api="n/a",
+        versioning_policy="git_tracked",
+        backup_policy="git_tracked",
+        health_check_function=None,
+        owner_role="shared",
+        restore_action="manual",
+    )
+    report = validate_projection_parity([toml_rec], [proj_rec])
+    assert report.in_sync is False
+    assert report.field_divergences == (("x", "restore_action"),)
 
 
 # ---------------------------------------------------------------------------

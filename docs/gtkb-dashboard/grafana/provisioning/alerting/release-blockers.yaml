@@ -10,11 +10,11 @@ apiVersion: 1
 
 groups:
   - orgId: 1
-    name: agent-red-release-readiness
+    name: gtkb-release-readiness
     folder: GroundTruth-KB
     interval: 1m
     rules:
-      - uid: agent-red-release-blockers
+      - uid: gtkb-release-blockers
         title: Release Blockers
         condition: B
         for: 0s

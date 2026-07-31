@@ -505,3 +505,108 @@ def test_projects_reorder_requires_exact_active_membership_set(tmp_path: Path) -
 
     assert result.exit_code != 0
     assert "active membership set exactly" in result.output
+
+
+def test_projects_dependencies_cli_exposes_complete_governed_lifecycle(tmp_path: Path) -> None:
+    config_path = _write_config(tmp_path)
+    for project_id, name in (
+        ("PROJECT-FOUNDATION", "Foundation"),
+        ("PROJECT-DOWNSTREAM", "Downstream"),
+    ):
+        _invoke_json(
+            config_path,
+            "projects",
+            "create",
+            name,
+            "--id",
+            project_id,
+            "--change-reason",
+            f"create {project_id}",
+        )
+
+    added = _invoke_json(
+        config_path,
+        "projects",
+        "dependencies",
+        "add",
+        "--dependent-project",
+        "PROJECT-DOWNSTREAM",
+        "--prerequisite-project",
+        "PROJECT-FOUNDATION",
+        "--required-state",
+        "active",
+        "--affected-gate",
+        "authorization",
+        "--rationale",
+        "Downstream implementation requires the foundation.",
+        "--provenance",
+        "TEST-11325",
+        "--change-reason",
+        "add dependency",
+    )
+    dependency_id = added["id"]
+    assert added["dependent_project_id"] == "PROJECT-DOWNSTREAM"
+    assert added["prerequisite_project_id"] == "PROJECT-FOUNDATION"
+    assert added["readiness"]["satisfied"] is True
+    assert "from_project_id" not in added
+    assert "to_project_id" not in added
+
+    shown = _invoke_json(config_path, "projects", "dependencies", "show", dependency_id)
+    listed = _invoke_json(
+        config_path,
+        "projects",
+        "dependencies",
+        "list",
+        "--dependent-project",
+        "PROJECT-DOWNSTREAM",
+    )
+    validated = _invoke_json(config_path, "projects", "dependencies", "validate")
+    assert shown["id"] == dependency_id
+    assert [row["id"] for row in listed] == [dependency_id]
+    assert validated["valid"] is True
+    assert validated["registry"]["version"] == 1
+
+    retired = _invoke_json(
+        config_path,
+        "projects",
+        "dependencies",
+        "retire",
+        dependency_id,
+        "--change-reason",
+        "retire dependency",
+    )
+    recovered = _invoke_json(
+        config_path,
+        "projects",
+        "dependencies",
+        "recover",
+        dependency_id,
+        "--change-reason",
+        "recover dependency",
+    )
+    assert retired["status"] == "retired"
+    assert retired["version"] == 2
+    assert recovered["status"] == "active"
+    assert recovered["version"] == 3
+
+    with sqlite3.connect(tmp_path / "groundtruth.db") as conn:
+        history = conn.execute(
+            "SELECT version, status FROM project_dependencies WHERE id = ? ORDER BY version",
+            (dependency_id,),
+        ).fetchall()
+    assert history == [(1, "active"), (2, "retired"), (3, "active")]
+
+
+def test_projects_dependencies_help_uses_directional_worker_terms(tmp_path: Path) -> None:
+    config_path = _write_config(tmp_path)
+    group_help = _invoke(config_path, "projects", "dependencies", "--help")
+    add_help = _invoke(config_path, "projects", "dependencies", "add", "--help")
+
+    assert group_help.exit_code == 0
+    for command in ("add", "show", "list", "validate", "retire", "recover"):
+        assert command in group_help.output
+    assert add_help.exit_code == 0
+    assert "--dependent-project" in add_help.output
+    assert "--prerequisite-project" in add_help.output
+    assert "--from" not in add_help.output
+    assert "--to" not in add_help.output

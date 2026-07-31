@@ -31,6 +31,7 @@ surface classes are a Slice-6 coverage-audit expansion.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 from dataclasses import asdict, dataclass, field
@@ -67,6 +68,10 @@ HOOK_CONFIG_FILES: dict[str, str] = {
     "claude": ".claude/settings.json",
     "codex": ".codex/hooks.json",
 }
+SCOPE_NOTE = (
+    "Hook-config discovery only: Claude `.claude/settings.json` and Codex `.codex/hooks.json` when present. "
+    "API/provider and non-hook startup/command surfaces require phase-2 readiness or later coverage-audit evidence."
+)
 
 # The five hook event arrays both config schemas share.
 HOOK_EVENTS = ("PreToolUse", "PostToolUse", "UserPromptSubmit", "SessionStart", "Stop")
@@ -76,6 +81,7 @@ HOOK_EVENTS = ("PreToolUse", "PostToolUse", "UserPromptSubmit", "SessionStart", 
 # forward-slash relative paths under `$CLAUDE_PROJECT_DIR`; Codex uses absolute
 # back-slash paths and `cmd /d /s /c <wrapper>.cmd`).
 _SURFACE_TOKEN_RE = re.compile(r"[A-Za-z0-9_./\\:$-]+\.(?:py|cmd)")
+_BATCH_ARG_RE = re.compile(r"(?:^|\s)--batch(?:\s+|=)([A-Za-z0-9_.-]+)")
 
 
 @dataclass(frozen=True)
@@ -112,7 +118,53 @@ def _surface_stem(token: str) -> str:
     return Path(normalized).stem
 
 
-def enumerate_hook_surfaces(config_data: dict[str, Any]) -> set[str]:
+def _batch_surfaces(project_root: Path, batch_name: str) -> set[str]:
+    """Return hook stems referenced by a Codex ``run_py_no_window`` batch.
+
+    Codex registers one no-window wrapper per hook event and fans out to the
+    actual hook scripts through the wrapper's declarative ``BATCHES`` table.
+    The parity scanner reads that table as data so discovery reflects actual
+    execution without requiring duplicate hook commands in ``.codex/hooks.json``.
+    """
+    runner = project_root / ".codex" / "gtkb-hooks" / "run_py_no_window.py"
+    try:
+        tree = ast.parse(runner.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return set()
+
+    for node in tree.body:
+        is_batches_assign = isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "BATCHES" for target in node.targets
+        )
+        is_batches_annassign = (
+            isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "BATCHES"
+        )
+        value_node = getattr(node, "value", None) if is_batches_assign or is_batches_annassign else None
+        if value_node is None:
+            continue
+        try:
+            batches = ast.literal_eval(value_node)
+        except (ValueError, SyntaxError):
+            return set()
+        entries = batches.get(batch_name) if isinstance(batches, dict) else None
+        if not isinstance(entries, tuple):
+            return set()
+        stems: set[str] = set()
+        for entry in entries:
+            if not isinstance(entry, tuple):
+                continue
+            for value in entry:
+                if not isinstance(value, str):
+                    continue
+                for token in _SURFACE_TOKEN_RE.findall(value):
+                    stem = _surface_stem(token)
+                    if stem:
+                        stems.add(stem)
+        return stems
+    return set()
+
+
+def enumerate_hook_surfaces(config_data: dict[str, Any], *, project_root: Path | None = None) -> set[str]:
     """Return the set of hook surface stems referenced anywhere in a config.
 
     Parses the shared ``hooks[event] -> [ {hooks: [{command}]} ]`` structure of
@@ -135,6 +187,9 @@ def enumerate_hook_surfaces(config_data: dict[str, Any]) -> set[str]:
                     stem = _surface_stem(token)
                     if stem:
                         stems.add(stem)
+                if project_root is not None:
+                    for match in _BATCH_ARG_RE.finditer(command):
+                        stems.update(_batch_surfaces(project_root, match.group(1)))
     return stems
 
 
@@ -161,7 +216,7 @@ def discover_surfaces_by_harness(
         except (OSError, json.JSONDecodeError) as exc:
             errors.append(f"{rel}: unreadable hook config ({exc})")
             continue
-        surfaces[harness] = enumerate_hook_surfaces(data)
+        surfaces[harness] = enumerate_hook_surfaces(data, project_root=project_root)
     return surfaces, errors
 
 
@@ -239,21 +294,33 @@ def compute_diff(
 
     # Build capability-key presence: key -> {harness} (population only).
     # A discovered (harness, stem) upgrades to its registry capability id when
-    # registered; otherwise keys as "hook:<stem>".
+    # registered; otherwise keys as "hook:<stem>". Raw same-stem aliases are
+    # retained only when at least one population member exposes that stem as an
+    # unregistered surface. This preserves genuinely unregistered asymmetry
+    # detection while avoiding false positives where another harness has the
+    # same stem registered as a fallback for a broader canonical capability.
     presence: dict[str, set[str]] = {}
     key_is_registered: dict[str, bool] = {}
     key_capability_id: dict[str, str] = {}
+    raw_presence: dict[str, set[str]] = {}
+    raw_unregistered_keys: set[str] = set()
     for harness in population:
         for stem in surfaces_by_harness.get(harness, set()):
+            raw_key = f"hook:{stem}"
+            raw_presence.setdefault(raw_key, set()).add(harness)
             cap_id = surface_index.get((harness, stem))
             if cap_id is not None:
                 key = cap_id
                 key_is_registered[key] = True
                 key_capability_id[key] = cap_id
             else:
-                key = f"hook:{stem}"
+                key = raw_key
+                raw_unregistered_keys.add(raw_key)
                 key_is_registered.setdefault(key, False)
             presence.setdefault(key, set()).add(harness)
+    for raw_key in raw_unregistered_keys:
+        presence[raw_key] = set(raw_presence.get(raw_key, set()))
+        key_is_registered[raw_key] = False
 
     findings: list[AsymmetryFinding] = []
     for key, present_on in presence.items():
@@ -352,6 +419,7 @@ def format_markdown(report: DiffReport) -> str:
         f"- Overall status: {report.overall_status}",
         f"- Project root: {report.project_root}",
         f"- Hook-surface population: {', '.join(report.population) or 'none'}",
+        f"- Scope note: {SCOPE_NOTE}",
         f"- Unwaived asymmetries: {len(report.findings)}",
     ]
     if report.errors:

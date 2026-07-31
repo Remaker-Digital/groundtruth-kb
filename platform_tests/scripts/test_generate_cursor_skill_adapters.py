@@ -1,0 +1,152 @@
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+SCRIPT = ROOT / "scripts" / "generate_cursor_skill_adapters.py"
+
+
+def _load_module():
+    spec = importlib.util.spec_from_file_location("test_cursor_adapter_generator", SCRIPT)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _fixture(root: Path, names: tuple[str, ...] = ("alpha", "beta")) -> None:
+    registry = root / "config/agent-control/gtkb-harness-capability-registry.toml"
+    registry.parent.mkdir(parents=True)
+    rows: list[str] = []
+    for name in names:
+        rows.extend(
+            [
+                "[[capabilities]]",
+                f'id = "skill.{name}"',
+                'kind = "skill"',
+                f'canonical_name = "{name}"',
+                f'canonical_source = ".claude/skills/{name}/SKILL.md"',
+                "[capabilities.cursor]",
+                f'surface = ".cursor/skills/{name}/SKILL.md"',
+                'status = "fallback"',
+                "",
+            ]
+        )
+        skill = root / ".claude" / "skills" / name / "SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text(
+            f"---\nname: {name}\ndescription: {name} skill\n---\n\n"
+            f"Run `.claude/skills/{name}/helpers/run.py` and read "
+            f"[notes](.claude/skills/{name}/references/notes.md).\n",
+            encoding="utf-8",
+        )
+        helper = skill.parent / "helpers/run.py"
+        helper.parent.mkdir()
+        helper.write_bytes(b"print('ok')\r\n")
+        reference = skill.parent / "references/notes.md"
+        reference.parent.mkdir()
+        reference.write_text("notes\n", encoding="utf-8")
+    registry.write_text("\n".join(rows), encoding="utf-8")
+
+
+def test_registry_drives_exact_cursor_surface_set_and_manifest(tmp_path: Path) -> None:
+    module = _load_module()
+    _fixture(tmp_path)
+    changed, adapters, orphans = module.generate(tmp_path)
+    assert adapters == [".cursor/skills/alpha/SKILL.md", ".cursor/skills/beta/SKILL.md"]
+    assert not orphans
+    assert ".cursor/skills/MANIFEST.json" in changed
+    manifest = json.loads((tmp_path / ".cursor/skills/MANIFEST.json").read_text(encoding="utf-8"))
+    assert [row["adapter_relative_path"] for row in manifest["adapters"]] == adapters
+
+
+def test_cursor_output_has_native_marker_rewrites_resources_and_is_lf(tmp_path: Path) -> None:
+    module = _load_module()
+    _fixture(tmp_path, ("alpha",))
+    module.generate(tmp_path)
+    target = tmp_path / ".cursor/skills/alpha/SKILL.md"
+    raw = target.read_bytes()
+    text = raw.decode("utf-8")
+    assert raw.startswith(b"---\n") and b"\r" not in raw
+    assert "GTKB-CURSOR-SKILL-ADAPTER" in text
+    assert "Generated at:" not in text
+    assert ".cursor/skills/alpha/helpers/run.py" in text
+    assert ".cursor/skills/alpha/references/notes.md" in text
+    assert (tmp_path / ".cursor/skills/alpha/helpers/run.py").read_bytes() == b"print('ok')\r\n"
+
+
+def test_check_detects_crlf_without_writing(tmp_path: Path) -> None:
+    module = _load_module()
+    _fixture(tmp_path, ("alpha",))
+    module.generate(tmp_path)
+    target = tmp_path / ".cursor/skills/alpha/SKILL.md"
+    target.write_bytes(target.read_bytes().replace(b"\n", b"\r\n"))
+    before = target.read_bytes()
+    changed, _, _ = module.generate(tmp_path, check=True)
+    assert ".cursor/skills/alpha/SKILL.md" in changed
+    assert target.read_bytes() == before
+
+
+def test_render_outputs_is_side_effect_free_and_uses_source_overrides(tmp_path: Path) -> None:
+    module = _load_module()
+    _fixture(tmp_path, ("alpha",))
+    source = ".claude/skills/alpha/SKILL.md"
+    resource = ".claude/skills/alpha/helpers/run.py"
+    before = sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*"))
+    outputs, adapters, orphans = module.render_outputs(
+        tmp_path,
+        source_overrides={
+            source: b"---\nname: alpha\ndescription: replacement\n---\n\nReplacement.\n",
+            resource: b"print('planned')\n",
+        },
+    )
+    after = sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*"))
+    assert len(adapters) == 1
+    assert not orphans
+    assert b"description: replacement" in outputs[".cursor/skills/alpha/SKILL.md"]
+    assert outputs[".cursor/skills/alpha/helpers/run.py"] == b"print('planned')\n"
+    assert not (tmp_path / ".cursor").exists()
+    assert before == after
+
+
+def test_owned_orphan_is_reported_but_never_deleted(tmp_path: Path) -> None:
+    module = _load_module()
+    _fixture(tmp_path, ("alpha",))
+    orphan = tmp_path / ".cursor/skills/orphan/SKILL.md"
+    orphan.parent.mkdir(parents=True)
+    orphan.write_text("<!-- GTKB-CURSOR-SKILL-ADAPTER -->\n", encoding="utf-8")
+    _, _, orphans = module.generate(tmp_path)
+    assert orphans == [".cursor/skills/orphan/SKILL.md"]
+    assert orphan.is_file()
+
+
+def test_fresh_roots_and_second_run_are_byte_deterministic(tmp_path: Path) -> None:
+    module = _load_module()
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    _fixture(first, ("alpha",))
+    _fixture(second, ("alpha",))
+    module.generate(first)
+    module.generate(second)
+    left = (first / ".cursor/skills/alpha/SKILL.md").read_bytes()
+    right = (second / ".cursor/skills/alpha/SKILL.md").read_bytes()
+    assert left == right
+    changed, _, orphans = module.generate(first)
+    assert changed == [] and orphans == []
+
+
+def test_generator_does_not_touch_harness_or_database_state(tmp_path: Path) -> None:
+    module = _load_module()
+    _fixture(tmp_path, ("alpha",))
+    db = tmp_path / "groundtruth.db"
+    state = tmp_path / "harness-state/identity.json"
+    state.parent.mkdir()
+    db.write_bytes(b"sentinel-db")
+    state.write_bytes(b"sentinel-state")
+    module.generate(tmp_path)
+    assert db.read_bytes() == b"sentinel-db"
+    assert state.read_bytes() == b"sentinel-state"

@@ -24,7 +24,7 @@ def _resolve_root() -> Path:
 
     Order:
       1. ``groundtruth_kb.bridge.paths.resolve_project_root`` if importable
-         (the canonical resolver shared with the cross-harness trigger).
+         (the canonical resolver shared with the dispatcher daemon).
       2. ``GTKB_PROJECT_ROOT`` env var fallback for environments where the
          package self-import path is not yet active.
 

@@ -24,6 +24,7 @@ Licensed under AGPL-3.0-or-later.
 from __future__ import annotations
 
 import importlib.util
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -131,6 +132,11 @@ def test_autostart_probe_detects_windows_task(verify_module) -> None:
     kwargs = captured["kwargs"]
     assert kwargs["stdin"] is subprocess.DEVNULL
     assert kwargs["creationflags"] & getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    startupinfo = kwargs.get("startupinfo")
+    if sys.platform == "win32":
+        assert startupinfo is not None
+        assert startupinfo.dwFlags & getattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001)
+        assert startupinfo.wShowWindow == getattr(subprocess, "SW_HIDE", 0)
 
 
 def test_autostart_probe_warns_when_no_task_or_service(verify_module) -> None:
@@ -293,8 +299,105 @@ def test_dispatch_bash_nonzero_returns_model_visible_evidence(ollama_harness_mod
     assert "STDERR:\nerr" in result
 
 
+def test_default_subprocess_runners_pin_utf8_decode_options(ollama_harness_module, tmp_path, monkeypatch) -> None:
+    captured: list[dict[str, object]] = []
+
+    def fake_run(args, **kwargs):  # noqa: ANN001, ANN202
+        captured.append(dict(kwargs))
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="out", stderr="err")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    guard_path = tmp_path / "guard.py"
+    guard_path.write_text("# fixture guard\n", encoding="utf-8")
+
+    guard_result = ollama_harness_module._default_guard_runner(
+        guard_path,
+        {"cwd": str(tmp_path)},
+        os.environ,
+        5.0,
+    )
+    command_result = ollama_harness_module._default_command_runner(
+        "fixture command",
+        tmp_path,
+        os.environ,
+        5.0,
+    )
+
+    assert guard_result.stdout == "out"
+    assert command_result.stdout == "out"
+    assert len(captured) == 2
+    assert all(call["text"] is True for call in captured)
+    assert all(call["encoding"] == "utf-8" for call in captured)
+    assert all(call["errors"] == "replace" for call in captured)
+
+
+def test_default_guard_runner_captures_utf8_bytes_invalid_under_cp1252(ollama_harness_module, tmp_path) -> None:
+    guard_path = tmp_path / "guard.py"
+    guard_path.write_text(
+        "import sys\n"
+        "sys.stdout.buffer.write(b'stdout:\\xe2\\x81\\xa0')\n"
+        "sys.stderr.buffer.write(b'stderr:\\xe2\\x81\\xa0')\n",
+        encoding="utf-8",
+    )
+
+    result = ollama_harness_module._default_guard_runner(
+        guard_path,
+        {"cwd": str(tmp_path)},
+        os.environ,
+        5.0,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == "stdout:\u2060"
+    assert result.stderr == "stderr:\u2060"
+
+
 def test_dispatch_readiness_requires_full_lo_tool_set(verify_module) -> None:
     assert verify_module.OLLAMA_DISPATCH_REQUIRED_TOOLS == ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
+
+
+def test_default_ollama_bridge_review_route_uses_deepseek_v4_flash_cloud(ollama_harness_module, tmp_path) -> None:
+    (tmp_path / ".api-harness").mkdir()
+    (tmp_path / ".api-harness" / "routing.toml").write_text(
+        "schema_version = 1\n"
+        "[models.deepseek-v4-flash-cloud]\n"
+        'model_id = "deepseek-v4-flash:cloud"\n'
+        'provider = "ollama"\n'
+        "tool_calling_supported = true\n"
+        'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
+        "[models.kimi-k2-7-code-cloud]\n"
+        'model_id = "kimi-k2.7-code:cloud"\n'
+        'provider = "ollama"\n'
+        "tool_calling_supported = true\n"
+        'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
+        "[models.deepseek-v4-pro-cloud]\n"
+        'model_id = "deepseek-v4-pro:cloud"\n'
+        'provider = "ollama"\n'
+        "tool_calling_supported = true\n"
+        'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
+        "[models.deepseek-v4-pro]\n"
+        'model_id = "deepseek/deepseek-v4-pro"\n'
+        'provider = "openrouter"\n'
+        "tool_calling_supported = true\n"
+        'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
+        "[routing.ollama]\n"
+        'default_model = "deepseek-v4-flash-cloud"\n'
+        "timeout_seconds = 3600\n"
+        "[routing.ollama.skills]\n"
+        'bridge-review = "deepseek-v4-flash-cloud"\n'
+        'verification = "deepseek-v4-flash-cloud"\n'
+        'implementation = "deepseek-v4-flash-cloud"\n',
+        encoding="utf-8",
+    )
+
+    config = ollama_harness_module.load_routing_config(tmp_path)
+    route = ollama_harness_module.resolve_model(config, None, skill="bridge-review")
+
+    assert route.key == "deepseek-v4-flash-cloud"
+    assert route.model_id == "deepseek-v4-flash:cloud"
+    assert config.timeout_seconds == 3600
+    assert ollama_harness_module.derive_session_timeout_from_route_timeout(config.timeout_seconds) == 3660
 
 
 def test_bridge_filing_writes_fixture_file_with_NEW_first_line(verify_module, ollama_harness_module, tmp_path) -> None:

@@ -3,13 +3,28 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "impl_report_bridge.py"
+
+
+def _resolve_repo_helper(*relative_candidates: str) -> Path:
+    for relative in relative_candidates:
+        candidate = REPO_ROOT / relative
+        if candidate.is_file():
+            return candidate
+    return REPO_ROOT / relative_candidates[0]
+
+
+HELPER_PATH = _resolve_repo_helper(
+    ".claude/skills/gtkb-bridge/helpers/impl_report_bridge.py",
+    ".claude/skills/bridge/helpers/impl_report_bridge.py",
+)
 
 
 def _load_helper_module():
@@ -20,6 +35,27 @@ def _load_helper_module():
     sys.modules["bridge_impl_report_helper_under_test"] = module
     spec.loader.exec_module(module)
     return module
+
+
+def test_governed_bridge_helper_paths_prefer_canonical_gtkb_prefix():
+    """WI-5651 regression: tracked bridge helpers resolve the canonical gtkb-
+    prefixed skill path (not only the pre-rename unprefixed path)."""
+    src = str(REPO_ROOT / "groundtruth-kb" / "src")
+    if src not in sys.path:
+        sys.path.insert(0, src)
+    from groundtruth_kb.bridge import proposal_filing
+
+    module = proposal_filing._load_bridge_writer(REPO_ROOT)
+    assert hasattr(module, "propose_bridge"), "proposal filer must load the write helper"
+
+    for tracked in (
+        REPO_ROOT / "groundtruth-kb/src/groundtruth_kb/bridge/proposal_filing.py",
+        REPO_ROOT / "groundtruth-kb/src/groundtruth_kb/modernization/workflow.py",
+        REPO_ROOT / "groundtruth-kb/templates/skills/bridge/helpers/impl_report_bridge.py",
+    ):
+        assert "gtkb-bridge-propose" in tracked.read_text(encoding="utf-8"), (
+            f"{tracked} must reference the canonical gtkb-bridge-propose path"
+        )
 
 
 @pytest.fixture()
@@ -37,15 +73,41 @@ def author_metadata_env(monkeypatch):
     monkeypatch.setenv("GTKB_AUTHOR_MODEL_CONFIGURATION", "Extra High")
 
 
-def _stage_thread(tmp_path: Path, *, latest_status: str = "GO", slug: str = "test-impl-report") -> Path:
+@pytest.fixture(autouse=True)
+def temp_bridge_writer(helper, monkeypatch):
+    def fake_write_bridge_file(slug, version, content, project_root, *, require_author_metadata=True):
+        target = project_root / "bridge" / f"{slug}-{version:03d}.md"
+        if target.exists():
+            raise helper.WriterBridgeConflictError(f"already exists: {target}")
+        target.write_text(content, encoding="utf-8", newline="\n")
+        return target
+
+    monkeypatch.setattr(helper, "write_bridge_file", fake_write_bridge_file)
+
+
+def _stage_thread(
+    tmp_path: Path,
+    *,
+    latest_status: str = "GO",
+    slug: str = "test-impl-report",
+    target_paths: list[str] | None = None,
+) -> Path:
+    targets = target_paths or ["scripts/example.py"]
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     (bridge_dir / f"{slug}-001.md").write_text(
         "NEW\n\n"
         "# Test Proposal\n\n"
+        "bridge_kind: prime_proposal\n"
+        "Project Authorization: PAUTH-PROJECT-TEST\n"
+        "Project: PROJECT-TEST\n"
+        "Work Item: WI-1234\n"
+        f"target_paths: {json.dumps(targets)}\n\n"
         "## Specification Links\n\n"
-        "- GOV-FILE-BRIDGE-AUTHORITY-001\n"
-        "- DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001\n\n"
+        "- `GOV-FILE-BRIDGE-AUTHORITY-001` - bridge authority.\n"
+        "- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` - spec-derived testing.\n\n"
+        "## Requirement Sufficiency\n\n"
+        "Existing requirements sufficient.\n\n"
         "## Acceptance Criteria\n\n"
         "- [ ] Helper files a post-implementation report.\n"
         "- [ ] Helper carries specification links forward.\n",
@@ -65,11 +127,18 @@ def _stage_thread(tmp_path: Path, *, latest_status: str = "GO", slug: str = "tes
     return bridge_dir
 
 
+def _git(cwd: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
+
+
 def _completed_report() -> str:
     return (
         "NEW\n\n"
         "# Test Implementation Report\n\n"
         "bridge_kind: implementation_report\n\n"
+        "Project Authorization: PAUTH-PROJECT-TEST\n"
+        "Project: PROJECT-TEST\n"
+        "Work Item: WI-1234\n\n"
         "## Implementation Claim\n\n"
         "Implemented the helper.\n\n"
         "## Specification Links\n\n"
@@ -116,6 +185,21 @@ def test_latest_go_thread_produces_dry_run_plan(helper, tmp_path):
     assert plan.report_path == "bridge/test-impl-report-003.md"
     assert plan.index_line == "NEW: bridge/test-impl-report-003.md"
     assert "GOV-FILE-BRIDGE-AUTHORITY-001" in plan.linked_specs
+
+
+def test_latest_go_thread_produces_compact_plan_summary(helper, tmp_path):
+    bridge_dir = _stage_thread(tmp_path)
+
+    compact = helper.plan_report(
+        "test-impl-report", bridge_dir=bridge_dir, draft_dir=tmp_path / "drafts"
+    ).to_compact_dict()
+
+    assert compact["compact"] is True
+    assert compact["latest_status"] == "GO"
+    assert compact["report_path"] == "bridge/test-impl-report-003.md"
+    assert compact["version_count"] == 2
+    assert "version_chain" not in compact
+    assert "files_changed" not in compact
 
 
 def test_write_mode_creates_report_without_index_mutation(helper, tmp_path):
@@ -174,6 +258,8 @@ def test_scaffold_content_is_compatible_with_report_validator(helper, tmp_path):
     live_text = live.read_text(encoding="utf-8")
     assert ("bridge_kind: " + "implementation_report") in live_text
     assert ("Recommended commit " + "type:") in live_text
+    assert "\nVersion: 003\n" in live_text
+    assert "\nResponds to: bridge/test-impl-report-002.md\n" in live_text
 
 
 def test_non_go_latest_status_refuses_write_mode(helper, tmp_path):
@@ -200,7 +286,8 @@ def test_exact_document_matching_avoids_slug_prefix_false_positive(helper, tmp_p
 
 def test_credential_content_aborts_before_live_mutation(helper, tmp_path):
     bridge_dir = _stage_thread(tmp_path)
-    content = _completed_report() + "\nsecret = 'abcdabcdabcdabcd'\n"
+    secret_assignment = "secret" + " = " + "'abcdabcdabcdabcd'"
+    content = _completed_report() + f"\n{secret_assignment}\n"
 
     with pytest.raises(RuntimeError, match="Credential-shaped content detected"):
         helper.file_report("test-impl-report", content=content, bridge_dir=bridge_dir)
@@ -277,6 +364,9 @@ def test_proposal_spec_links_are_carried_forward_into_skeleton(helper, tmp_path)
 
     skeleton = helper.build_report_skeleton("test-impl-report", bridge_dir=bridge_dir)
 
+    assert "Project Authorization: PAUTH-PROJECT-TEST" in skeleton
+    assert "Project: PROJECT-TEST" in skeleton
+    assert "Work Item: WI-1234" in skeleton
     assert "## Specification Links" in skeleton
     assert "- `GOV-FILE-BRIDGE-AUTHORITY-001`" in skeleton
     assert "- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`" in skeleton
@@ -291,6 +381,52 @@ def test_files_changed_and_recommended_commit_type_sections_are_present(helper, 
     assert "## Files Changed" in skeleton
     assert "## Recommended Commit Type" in skeleton
     assert "Recommended commit type:" in skeleton
+    assert "Excluded out-of-scope dirty paths:" in skeleton
+
+
+def test_plan_report_scopes_dirty_files_to_approved_target_paths(helper, tmp_path):
+    bridge_dir = _stage_thread(
+        tmp_path,
+        target_paths=["scripts/example.py", "scripts/staged.py", "docs/approved/"],
+    )
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "example.py").write_text("print('old')\n", encoding="utf-8")
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "tests@example.invalid")
+    _git(tmp_path, "config", "user.name", "Tests")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-m", "baseline")
+
+    (tmp_path / "scripts" / "example.py").write_text("print('new')\n", encoding="utf-8")
+    (tmp_path / "scripts" / "staged.py").write_text("print('staged')\n", encoding="utf-8")
+    _git(tmp_path, "add", "scripts/staged.py")
+    (tmp_path / "docs" / "approved").mkdir(parents=True)
+    (tmp_path / "docs" / "approved" / "note.md").write_text("approved\n", encoding="utf-8")
+    (tmp_path / "outside.py").write_text("print('outside')\n", encoding="utf-8")
+
+    plan = helper.plan_report("test-impl-report", bridge_dir=bridge_dir)
+    skeleton = helper.build_report_skeleton("test-impl-report", bridge_dir=bridge_dir)
+
+    assert set(plan.files_changed) == {
+        "scripts/example.py",
+        "scripts/staged.py",
+        "docs/approved/note.md",
+    }
+    assert plan.excluded_dirty_count == 1
+    assert "- `outside.py`" not in skeleton
+    assert "Excluded out-of-scope dirty paths: 1." in skeleton
+
+
+def test_missing_target_paths_fails_closed(helper, tmp_path):
+    bridge_dir = _stage_thread(tmp_path)
+    proposal_path = bridge_dir / "test-impl-report-001.md"
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8").replace('target_paths: ["scripts/example.py"]\n\n', ""),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(helper.BridgeImplReportError, match="target_paths"):
+        helper.plan_report("test-impl-report", bridge_dir=bridge_dir)
 
 
 # ---------------------------------------------------------------------------

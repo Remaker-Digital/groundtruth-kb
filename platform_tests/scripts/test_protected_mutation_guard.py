@@ -27,6 +27,7 @@ from scripts.protected_mutation_guard import evaluate_mutation
 def root(tmp_path: Path, monkeypatch) -> Path:
     """Fixture that initializes a temporary project root with harness-registry."""
     monkeypatch.delenv("GTKB_HARNESS_REGISTRY_PATH", raising=False)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "fixture")
 
     registry_dir = tmp_path / "harness-state"
     registry_dir.mkdir(parents=True, exist_ok=True)
@@ -42,13 +43,34 @@ def root(tmp_path: Path, monkeypatch) -> Path:
     }
     registry_file.write_text(json.dumps(registry_content), encoding="utf-8")
 
-    # Write interactive session marker fallback so that we are prime-eligible
-    marker_dir = tmp_path / ".claude" / "session"
-    marker_dir.mkdir(parents=True, exist_ok=True)
-    marker_file = marker_dir / "active-session-role.json"
-    marker_file.write_text(json.dumps({"role": "prime-builder"}), encoding="utf-8")
-
     return tmp_path
+
+
+def _write_prime_worker_session(root: Path, session_id: str) -> None:
+    document = {
+        "status": "open",
+        "session_id": session_id,
+        "harness_id": "T",
+        "harness_name": "fixture",
+        "worker_role_provenance": {
+            "schema_version": 1,
+            "session_id": session_id,
+            "harness_id": "T",
+            "harness_name": "fixture",
+            "role": "prime-builder",
+            "role_resolution_source": "test-fixture",
+            "issued_at": "2026-07-11T00:00:00Z",
+            "dispatch_run_id": None,
+        },
+    }
+    path = root / "harness-state" / "fixture" / "session-envelopes" / f"{session_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+
+def _acquire_claim(root: Path, bridge_id: str, session_id: str) -> None:
+    _write_prime_worker_session(root, session_id)
+    assert bridge_work_intent_registry.acquire(bridge_id, session_id, project_root=root)
 
 
 def _write_bridge_files(project_root: Path, bridge_id: str, status: str = "GO") -> None:
@@ -146,8 +168,34 @@ def test_target_outside_project_root_denied(root: Path) -> None:
 def test_forbidden_operation_bridge_index_denied(root: Path) -> None:
     res = evaluate_mutation(root, ["bridge/INDEX.md"], harness_id="A", session_id="session-1")
     assert res.allowed is False
-    assert res.reason_code == "forbidden_operation"
+    assert res.reason_code == "bridge_index_direct_mutation"
     assert "bridge/INDEX.md" in res.details
+
+
+@pytest.mark.parametrize(
+    ("path", "reason_code"),
+    [
+        ("bridge/example-001.md", "bridge_status_file_direct_mutation"),
+        ("groundtruth.db", "membase_direct_mutation"),
+        (".gtkb-state/implementation-authorizations/current.json", "runtime_authority_state_direct_mutation"),
+        (".gtkb-state/work-intent/thread.json", "runtime_authority_state_direct_mutation"),
+        (".gtkb-state/bridge-poller/dispatch-state.json", "runtime_authority_state_direct_mutation"),
+        (".gtkb-state/dispatcher-daemon/status.json", "runtime_authority_state_direct_mutation"),
+    ],
+)
+def test_direct_controlled_artifact_targets_denied_with_stable_reason(root: Path, path: str, reason_code: str) -> None:
+    res = evaluate_mutation(root, [path], harness_id="A", session_id="session-1")
+
+    assert res.allowed is False
+    assert res.reason_code == reason_code
+    assert "Direct mutation of controlled artifact" in res.details
+
+
+def test_non_status_bridge_target_remains_unprotected(root: Path) -> None:
+    res = evaluate_mutation(root, ["bridge/example-note.md"], harness_id="A", session_id="session-1")
+
+    assert res.allowed is True
+    assert res.reason_code == "not_protected"
 
 
 def test_dispatcher_rules_toml_direct_target_denied_with_stable_reason(root: Path) -> None:
@@ -221,7 +269,7 @@ def test_missing_implementation_packet_denied(root: Path) -> None:
     _write_bridge_files(root, bridge_id, status="GO")
 
     # Acquire claim in DB
-    bridge_work_intent_registry.acquire(bridge_id, session_id, project_root=root)
+    _acquire_claim(root, bridge_id, session_id)
 
     res = evaluate_mutation(root, ["scripts/dummy.py"], harness_id="A", session_id=session_id)
     assert res.allowed is False
@@ -237,7 +285,7 @@ def test_stale_implementation_packet_denied(root: Path) -> None:
     _write_packet(root, bridge_id, ["scripts/dummy.py"], expired_str)  # Expired
 
     # Acquire claim in DB
-    bridge_work_intent_registry.acquire(bridge_id, session_id, project_root=root)
+    _acquire_claim(root, bridge_id, session_id)
 
     res = evaluate_mutation(root, ["scripts/dummy.py"], harness_id="A", session_id=session_id)
     assert res.allowed is False
@@ -253,7 +301,7 @@ def test_missing_bridge_go_denied(root: Path) -> None:
     _write_packet(root, bridge_id, ["scripts/dummy.py"], future_str)
 
     # Acquire claim in DB
-    bridge_work_intent_registry.acquire(bridge_id, session_id, project_root=root)
+    _acquire_claim(root, bridge_id, session_id)
 
     res = evaluate_mutation(root, ["scripts/dummy.py"], harness_id="A", session_id=session_id)
     assert res.allowed is False
@@ -268,7 +316,7 @@ def test_target_out_of_scope_denied(root: Path) -> None:
     _write_packet(root, bridge_id, ["scripts/dummy.py"], future_str)
 
     # Acquire claim in DB
-    bridge_work_intent_registry.acquire(bridge_id, session_id, project_root=root)
+    _acquire_claim(root, bridge_id, session_id)
 
     res = evaluate_mutation(
         root,
@@ -289,7 +337,7 @@ def test_fully_authorized_mutation_allowed(root: Path) -> None:
     _write_packet(root, bridge_id, ["scripts/dummy.py"], future_str)
 
     # Acquire claim in DB
-    bridge_work_intent_registry.acquire(bridge_id, session_id, project_root=root)
+    _acquire_claim(root, bridge_id, session_id)
 
     res = evaluate_mutation(root, ["scripts/dummy.py"], harness_id="A", session_id=session_id)
     assert res.allowed is True

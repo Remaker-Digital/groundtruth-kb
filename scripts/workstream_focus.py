@@ -18,12 +18,18 @@ import os
 import queue
 import re
 import threading
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 try:
-    from scripts._session_init_keyword import InitKeywordMatch, match_init_keyword
+    from scripts._session_init_keyword import (
+        CANONICAL_INIT_KEYWORD_REGEX,
+        InitKeywordMatch,
+        match_canonical_init_keyword,
+        match_init_keyword,
+    )
     from scripts.harness_roles import (
         DEFAULT_HARNESS_IDS,
         ROLE_ACTING_PRIME_BUILDER,
@@ -44,7 +50,12 @@ try:
         resolved_harness_id as _resolved_harness_id_from_roles,
     )
 except ImportError:  # pragma: no cover - direct script execution path
-    from _session_init_keyword import InitKeywordMatch, match_init_keyword  # type: ignore[no-redef]
+    from _session_init_keyword import (  # type: ignore[no-redef]
+        CANONICAL_INIT_KEYWORD_REGEX,
+        InitKeywordMatch,
+        match_canonical_init_keyword,
+        match_init_keyword,
+    )
     from harness_roles import (  # type: ignore[no-redef]
         DEFAULT_HARNESS_IDS,
         ROLE_ACTING_PRIME_BUILDER,
@@ -101,7 +112,26 @@ DEFAULT_DASHBOARD_PREFERENCES_PATH = GTKB_HARNESS_STATE_ROOT / "codex" / "sessio
 STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS = 30 * 60
 STARTUP_RELAY_CACHE_MAX_AGE_SECONDS = STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS
 STARTUP_RELAY_CACHE_FUTURE_SKEW_SECONDS = 5 * 60
-STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS = 2.0
+_STARTUP_INPUT_CONTENT_STATE_FIELDS = frozenset({"startup_prompt_preview"})
+# Local startup-report rendering can exceed two seconds while remaining well
+# within the interactive hook budget. Keep this bounded and overrideable for
+# fail-visible timeout coverage.
+STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS = 5.0
+# WI-5083: SessionStart 'source' values that mark a mid-session continuation
+# (resume/compact). A startup-input gate armed under one of these is never a
+# legitimate fresh-start relay window. Duplicated (not imported) in
+# scripts/session_self_initialization.py and
+# .codex/gtkb-hooks/session_wrapup_trigger_dispatch.py to keep each hot path
+# import-light; a parity test asserts the copies stay equal.
+_SESSION_CONTINUATION_SOURCES = frozenset({"resume", "compact"})
+
+
+def _armed_source_is_session_continuation(state: dict[str, Any]) -> bool:
+    """WI-5083: True when the lifecycle-guard state records that the current
+    startup-input gate was armed under a mid-session continuation source."""
+    return str(state.get("armed_source") or "").strip().lower() in _SESSION_CONTINUATION_SOURCES
+
+
 HARNESS_LIFECYCLE_GUARDS = {
     "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
     "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
@@ -227,6 +257,18 @@ CURRENT_REPO_BRIDGE_OR_GOVERNANCE_PREFIXES = (
     ".codex/",
     ".groundtruth/",
     "bridge/",
+    # WI-5100: GT-KB platform config subdirs are governance surfaces, not
+    # application product. classify_root matches governance prefixes BEFORE
+    # the blanket ``config/`` APPLICATION_PREFIXES entry, so carving these out
+    # lets GT-KB-subject sessions edit platform config (dispatcher rules,
+    # governance preflight configs, SoT registry, agent-control config, etc.).
+    # Any ``config/<other>`` path still falls through to application_product.
+    "config/agent-control/",
+    "config/dispatcher/",
+    "config/governance/",
+    "config/harness-parity/",
+    "config/project-templates/",
+    "config/registry/",
     "docs/gtkb-dashboard/",
     "scripts/gtkb_dashboard/",
     "independent-progress-assessments/",
@@ -381,7 +423,18 @@ def _read_lifecycle_guard(project_root: Path | None = None) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def _drop_startup_input_content(state: dict[str, Any]) -> bool:
+    """Remove legacy owner-content fields from lifecycle state in place."""
+    removed = False
+    for key in _STARTUP_INPUT_CONTENT_STATE_FIELDS:
+        if key in state:
+            state.pop(key, None)
+            removed = True
+    return removed
+
+
 def _write_lifecycle_guard(state: dict[str, Any], project_root: Path | None = None) -> None:
+    _drop_startup_input_content(state)
     path = lifecycle_guard_path(project_root)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -1061,7 +1114,7 @@ def system_message_for_state(state: dict[str, Any], *, changed: bool = False) ->
     )
 
 
-_CANONICAL_DISPATCH_INIT_RE = re.compile(r"^::init\s+gtkb\s+(?P<role_mode>pb|lo)\s*$", re.IGNORECASE)
+_CANONICAL_DISPATCH_INIT_RE = CANONICAL_INIT_KEYWORD_REGEX
 
 _PROMPT_EXPLICIT_ROLE_HINTS = (
     (
@@ -1096,19 +1149,20 @@ _PROMPT_EXPLICIT_ROLE_HINTS = (
 
 
 def _match_startup_init_keyword(prompt: str) -> InitKeywordMatch | None:
+    canonical = match_canonical_init_keyword(prompt)
+    if canonical is not None:
+        return InitKeywordMatch(app_scope=canonical.subject, mode="default")
     match = match_init_keyword(prompt)
     if match is not None:
         return match
-    if _CANONICAL_DISPATCH_INIT_RE.match(prompt.strip()):
-        return InitKeywordMatch(app_scope="gtkb", mode="default")
     return None
 
 
 def _startup_role_mode_from_prompt(prompt: str) -> str | None:
-    match = _CANONICAL_DISPATCH_INIT_RE.match(prompt.strip())
+    match = match_canonical_init_keyword(prompt)
     if match is None:
         return None
-    return match.group("role_mode").lower()
+    return match.role_mode
 
 
 def _explicit_role_hint_mode_from_prompt(prompt: str) -> str | None:
@@ -1395,6 +1449,75 @@ def _record_explicit_role_hint_from_prompt(
     return True
 
 
+def _record_mid_session_init_keyword_role_from_prompt(
+    prompt: str,
+    state: dict[str, Any],
+    project_root: Path | None = None,
+    *,
+    session_id: str | None = None,
+) -> dict[str, Any] | None:
+    role_mode = _startup_role_mode_from_prompt(prompt)
+    role_profile = _MODE_TO_ROLE_PROFILE.get(role_mode or "")
+    if not role_profile:
+        return None
+
+    state["prompt_init_keyword_role"] = role_profile
+    role_label = "Prime Builder" if role_profile == "prime-builder" else "Loyal Opposition"
+
+    if os.environ.get(_BRIDGE_DISPATCH_RUN_ID_ENV):
+        state["prompt_init_keyword_marker_skipped_at"] = _now_iso()
+        state["prompt_init_keyword_marker_skipped_reason"] = "headless_dispatch"
+        return {
+            "systemMessage": (
+                f"Session role switch to {role_label} was ignored because this is a headless bridge dispatch; "
+                "no interactive session marker was written."
+            )
+        }
+
+    resolved_id, source_label = _resolve_session_id(session_id)
+    if resolved_id is None:
+        state["prompt_init_keyword_marker_failsoft_at"] = _now_iso()
+        state["prompt_init_keyword_marker_failsoft_reason"] = "session_id_unresolved"
+        return {
+            "systemMessage": (
+                f"Session role switch to {role_label} could not be persisted because no session id was available; "
+                "no interactive session marker was written."
+            )
+        }
+
+    wrote = _write_session_role_marker(
+        role_profile,
+        resolved_id,
+        source_label or "",
+        project_root,
+        source="init_keyword",
+    )
+    if wrote:
+        state["prompt_init_keyword_marker_written_at"] = _now_iso()
+        state["prompt_init_keyword_session_id_source"] = source_label
+    else:
+        state["prompt_init_keyword_marker_failsoft_at"] = _now_iso()
+        state["prompt_init_keyword_marker_failsoft_reason"] = "marker_write_oserror"
+
+    per_session_written = _write_per_session_role_markers(
+        role_profile,
+        _candidate_marker_session_ids(session_id),
+        project_root,
+        source="init_keyword",
+    )
+    if per_session_written:
+        state["prompt_init_keyword_per_session_markers_written"] = per_session_written
+
+    if wrote or per_session_written:
+        return {"systemMessage": f"Session role set to {role_label} for this interactive session."}
+    return {
+        "systemMessage": (
+            f"Session role switch to {role_label} could not be persisted because marker writes failed; "
+            "no interactive session marker was written."
+        )
+    }
+
+
 def _set_work_subject_from_init_match(
     init_match: InitKeywordMatch,
     project_root: Path | None = None,
@@ -1407,6 +1530,14 @@ def _set_work_subject_from_init_match(
             source="startup init keyword",
         )
         return FOCUS_GTKB_INFRASTRUCTURE
+    if init_match.app_scope == "application":
+        save_state(
+            FOCUS_APPLICATION,
+            project_root,
+            updated_by="startup_init_keyword",
+            source="startup init keyword",
+        )
+        return FOCUS_APPLICATION
     if init_match.app_scope == "agent_red":
         save_state(
             FOCUS_APPLICATION,
@@ -1487,6 +1618,41 @@ def _startup_relay_refresh_timeout_seconds() -> float:
     return max(0.01, min(value, STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS))
 
 
+STARTUP_RELAY_REFRESH_DIAGNOSTIC_NAME = "startup-relay-refresh.jsonl"
+
+
+def _record_startup_relay_refresh(
+    root: Path,
+    *,
+    outcome: str,
+    elapsed_seconds: float,
+    budget_seconds: float,
+    role_mode: str | None,
+) -> None:
+    """Append a fail-soft diagnostic record for one bounded relay-refresh attempt.
+
+    Records the outcome (``completed`` / ``timeout_abandoned`` / ``error``), the
+    measured wall-clock duration, the budget in force, and the role mode to the
+    harness-scoped startup diagnostic directory. Any failure to write the record
+    is swallowed: this runs inside a fail-soft UserPromptSubmit hook path and must
+    never raise (WI-5650 Slice A acceptance criterion 4).
+    """
+    try:
+        record = {
+            "recorded_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "outcome": outcome,
+            "elapsed_seconds": round(float(elapsed_seconds), 3),
+            "budget_seconds": round(float(budget_seconds), 3),
+            "role_mode": role_mode,
+        }
+        diag = _startup_diagnostic_dir(root)
+        diag.mkdir(parents=True, exist_ok=True)
+        with (diag / STARTUP_RELAY_REFRESH_DIAGNOSTIC_NAME).open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record) + "\n")
+    except Exception:  # noqa: BLE001 - fail-soft: diagnostic write must never break the hook.
+        pass
+
+
 def _refresh_startup_relay_cache_bounded(root: Path, *, role_mode: str | None, meta: dict[str, Any]) -> bool:
     """Best-effort stale relay-cache refresh, bounded for UserPromptSubmit hooks."""
 
@@ -1518,16 +1684,42 @@ def _refresh_startup_relay_cache_bounded(root: Path, *, role_mode: str | None, m
             except queue.Full:
                 pass
 
+    budget_seconds = _startup_relay_refresh_timeout_seconds()
+    effective_role_mode = role_mode if role_mode is not None else meta.get("role_mode")
     worker = threading.Thread(target=_refresh, name="gtkb-startup-relay-refresh", daemon=True)
+    started_at = time.monotonic()
     worker.start()
-    worker.join(_startup_relay_refresh_timeout_seconds())
+    worker.join(budget_seconds)
     if worker.is_alive():
         cancel.set()
+        _record_startup_relay_refresh(
+            root,
+            outcome="timeout_abandoned",
+            elapsed_seconds=time.monotonic() - started_at,
+            budget_seconds=budget_seconds,
+            role_mode=effective_role_mode,
+        )
         return False
+    elapsed_seconds = time.monotonic() - started_at
     try:
-        return result_queue.get_nowait()
+        refreshed = result_queue.get_nowait()
     except queue.Empty:
+        _record_startup_relay_refresh(
+            root,
+            outcome="error",
+            elapsed_seconds=elapsed_seconds,
+            budget_seconds=budget_seconds,
+            role_mode=effective_role_mode,
+        )
         return False
+    _record_startup_relay_refresh(
+        root,
+        outcome="completed" if refreshed else "error",
+        elapsed_seconds=elapsed_seconds,
+        budget_seconds=budget_seconds,
+        role_mode=effective_role_mode,
+    )
+    return refreshed
 
 
 def _allowed_startup_relay_cache_reads(root: Path) -> set[Path]:
@@ -1641,6 +1833,7 @@ def _startup_relay_pointer(project_root: Path | None = None, *, role_mode: str |
         "role_mode": meta.get("role_mode"),
         "generated_at": meta.get("generated_at"),
         "fresh": freshness_ok,
+        "consistent_except_freshness": consistent_except_freshness,
         "consistent": consistent,
     }
 
@@ -1734,7 +1927,8 @@ def _startup_gate_response(
     *,
     role_mode: str | None = None,
     init_mode: str | None = None,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], bool]:
+    """Build the relay response and report whether its disclosure source validated."""
     pointer = _startup_relay_pointer(project_root, role_mode=role_mode)
     if pointer is None and role_mode is not None:
         pointer = _startup_relay_pointer(project_root, role_mode=None)
@@ -1742,27 +1936,42 @@ def _startup_gate_response(
         diagnostic = _startup_relay_failure_context(
             "the cache file or its metadata sidecar is missing, empty, or malformed"
         )
-        return {
-            "systemMessage": diagnostic,
-            "hookSpecificOutput": {
-                "hookEventName": "UserPromptSubmit",
-                "additionalContext": diagnostic,
+        return (
+            {
+                "systemMessage": diagnostic,
+                "hookSpecificOutput": {
+                    "hookEventName": "UserPromptSubmit",
+                    "additionalContext": diagnostic,
+                },
             },
-        }
+            False,
+        )
     message = _startup_gate_message(role_mode or pointer.get("role_mode"), init_mode=init_mode)
     if not pointer["consistent"]:
-        diagnostic = _startup_relay_failure_context(
-            f"cache file {pointer['cache_path']} does not match its metadata sidecar "
-            "(sha256, byte-length, harness id, role, freshness, or startup-disclosure shape mismatch); "
-            "it may be stale, wrong-role, or displaced by a non-disclosure payload"
-        )
-        return {
-            "systemMessage": diagnostic,
-            "hookSpecificOutput": {
-                "hookEventName": "UserPromptSubmit",
-                "additionalContext": diagnostic,
+        if pointer.get("consistent_except_freshness"):
+            diagnostic = _startup_relay_failure_context(
+                f"cache file {pointer['cache_path']} is identity-intact and content-consistent with its "
+                f"metadata sidecar but STALE: its generated-at timestamp is older than the "
+                f"{STARTUP_RELAY_CACHE_MAX_AGE_SECONDS}s freshness TTL, and the bounded self-heal refresh was "
+                f"abandoned after its {_startup_relay_refresh_timeout_seconds():g}s budget. The disclosure is "
+                "well-formed but simply too old to relay"
+            )
+        else:
+            diagnostic = _startup_relay_failure_context(
+                f"cache file {pointer['cache_path']} does not match its metadata sidecar "
+                "(sha256, byte-length, harness id, role, freshness, or startup-disclosure shape mismatch); "
+                "it may be stale, wrong-role, or displaced by a non-disclosure payload"
+            )
+        return (
+            {
+                "systemMessage": diagnostic,
+                "hookSpecificOutput": {
+                    "hookEventName": "UserPromptSubmit",
+                    "additionalContext": diagnostic,
+                },
             },
-        }
+            False,
+        )
     pointer_block = (
         "\n\n## Startup Disclosure Relay Source\n\n"
         f"- cache file: {pointer['cache_path']}\n"
@@ -1771,13 +1980,16 @@ def _startup_gate_response(
         "Read that cache file once (a single read-only filesystem read), then "
         "relay its full content verbatim as the owner-visible startup disclosure."
     )
-    return {
-        "systemMessage": message,
-        "hookSpecificOutput": {
-            "hookEventName": "UserPromptSubmit",
-            "additionalContext": f"{message}{pointer_block}",
+    return (
+        {
+            "systemMessage": message,
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": f"{message}{pointer_block}",
+            },
         },
-    }
+        True,
+    )
 
 
 def _consume_discard_first_prompt_gate(
@@ -1787,10 +1999,12 @@ def _consume_discard_first_prompt_gate(
     session_id: str | None = None,
 ) -> dict[str, Any] | None:
     state = _read_lifecycle_guard(project_root)
+    content_scrubbed = _drop_startup_input_content(state)
     if state.get("discard_next_user_prompt") is not True:
+        if content_scrubbed:
+            _write_lifecycle_guard(state, project_root)
         return None
 
-    trimmed_prompt = " ".join(prompt.strip().split())
     init_match = _match_startup_init_keyword(prompt)
     if state.get("first_wrapup_suppressed") is True and state.get("startup_response_pending") is not True:
         state.update(
@@ -1799,7 +2013,6 @@ def _consume_discard_first_prompt_gate(
                 "stale_startup_gate_cleared": True,
                 "stale_startup_gate_cleared_at": _now_iso(),
                 "stale_startup_gate_reason": "startup_stop_already_suppressed",
-                "startup_prompt_preview": trimmed_prompt[:160],
             }
         )
         _write_lifecycle_guard(state, project_root)
@@ -1813,7 +2026,6 @@ def _consume_discard_first_prompt_gate(
                 "startup_response_pending": False,
                 "startup_gate_no_match_passed_through": True,
                 "startup_gate_no_match_at": _now_iso(),
-                "startup_prompt_preview": trimmed_prompt[:160],
             }
         )
         _write_lifecycle_guard(state, project_root)
@@ -1825,7 +2037,6 @@ def _consume_discard_first_prompt_gate(
             "discard_next_user_prompt": False,
             "startup_prompt_discarded": True,
             "startup_prompt_discarded_at": _now_iso(),
-            "startup_prompt_preview": trimmed_prompt[:160],
             "startup_response_pending": True,
             "startup_init_app_scope": init_match.app_scope,
             "startup_init_mode": init_match.mode,
@@ -1879,31 +2090,95 @@ def _consume_discard_first_prompt_gate(
     if role_mode:
         state["startup_init_role_mode"] = role_mode
     _write_lifecycle_guard(state, project_root)
-    return _startup_gate_response(project_root, role_mode=role_mode, init_mode=init_match.mode)
+    response, relay_validated = _startup_gate_response(project_root, role_mode=role_mode, init_mode=init_match.mode)
+    if role_mode == "lo" and relay_validated:
+        _clear_startup_response_pending(state, project_root, clear_reason="lo_startup_relay")
+    return response
 
 
-def _clear_startup_response_pending_for_followup(project_root: Path | None = None) -> None:
-    state = _read_lifecycle_guard(project_root)
+def _clear_startup_response_pending(
+    state: dict[str, Any],
+    project_root: Path | None = None,
+    *,
+    clear_reason: str,
+) -> bool:
+    """Clear a pending gate without retaining any owner-input content."""
+    changed = _drop_startup_input_content(state)
     if state.get("startup_response_pending") is not True:
-        return
+        if changed:
+            _write_lifecycle_guard(state, project_root)
+        return False
     state.update(
         {
             "startup_response_pending": False,
             "startup_input_gate_cleared_at": _now_iso(),
+            "startup_input_gate_clear_reason": clear_reason,
         }
     )
     _write_lifecycle_guard(state, project_root)
+    return True
+
+
+def _clear_startup_response_pending_for_followup(project_root: Path | None = None) -> bool:
+    return _clear_startup_response_pending(
+        _read_lifecycle_guard(project_root),
+        project_root,
+        clear_reason="owner_followup",
+    )
+
+
+def acknowledge_startup_owner_input(session_id: str | None, project_root: Path | None = None) -> bool:
+    """Acknowledge a completed owner-input tool round trip for its own session.
+
+    The caller supplies only the session identifier. A missing or mismatched
+    identifier cannot clear a pending gate, and no prompt or answer content is
+    accepted or written to lifecycle state.
+    """
+    normalized_session_id = str(session_id or "").strip()
+    state = _read_lifecycle_guard(project_root)
+    if not normalized_session_id or state.get("startup_guard_id") != normalized_session_id:
+        if _drop_startup_input_content(state):
+            _write_lifecycle_guard(state, project_root)
+        return False
+    return _clear_startup_response_pending(
+        state,
+        project_root,
+        clear_reason="ask_user_question_completed",
+    )
 
 
 def _startup_response_pending(project_root: Path | None = None) -> bool:
     state = _read_lifecycle_guard(project_root)
+    content_scrubbed = _drop_startup_input_content(state)
     if state.get("startup_response_pending") is not True:
+        if content_scrubbed:
+            _write_lifecycle_guard(state, project_root)
+        return False
+    # WI-5083 belt-and-suspenders: a gate armed under a mid-session continuation
+    # source (resume/compact) is never a genuine fresh-start await. If such an
+    # arm ever leaks through (e.g., a harness/SessionStart path that did not
+    # thread the source), clear it and do not block. Fix (a) prevents the
+    # continuation arm at the source, so this branch is defense in depth.
+    if _armed_source_is_session_continuation(state):
+        state.update(
+            {
+                "startup_response_pending": False,
+                "stale_startup_response_pending_cleared": True,
+                "stale_startup_response_pending_cleared_at": _now_iso(),
+                "stale_startup_response_pending_cleared_reason": "session_continuation_armed_source",
+            }
+        )
+        _write_lifecycle_guard(state, project_root)
         return False
     started_at = _parse_iso8601(state.get("startup_prompt_discarded_at") or state.get("armed_at"))
     if started_at is None:
+        if content_scrubbed:
+            _write_lifecycle_guard(state, project_root)
         return True
     age_seconds = (datetime.now(UTC) - started_at).total_seconds()
     if age_seconds <= STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS:
+        if content_scrubbed:
+            _write_lifecycle_guard(state, project_root)
         return True
     state.update(
         {
@@ -2155,6 +2430,17 @@ def handle_user_prompt(
         return startup_gate_response
 
     state = _read_lifecycle_guard(project_root)
+    init_role_response = _record_mid_session_init_keyword_role_from_prompt(
+        prompt,
+        state,
+        project_root,
+        session_id=session_id,
+    )
+    if init_role_response is not None:
+        _write_lifecycle_guard(state, project_root)
+        _clear_startup_response_pending_for_followup(project_root)
+        return init_role_response
+
     if _record_explicit_role_hint_from_prompt(prompt, state, project_root, session_id=session_id):
         _write_lifecycle_guard(state, project_root)
 

@@ -82,3 +82,6 @@ def test_build_system_prompt_uses_no_index_bridge_instructions() -> None:
     assert "gt bridge dispatch config" in prompt
     assert "gt bridge dispatch status" in prompt
     assert "gt bridge dispatch\nhealth" in prompt
+    assert "latest NEW, REVISED,\nor NO-ACTION" in prompt
+    assert "governance-compliant verdict through review_no_action" in prompt
+    assert "Do not encode an\nexclusive corrected-verdict status set" in prompt

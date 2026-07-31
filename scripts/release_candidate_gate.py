@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+TRACKED_SECRET_REPORT = Path(".gtkb-state") / "modernization-release-candidate" / "release-gate-tracked-secrets.json"
 
 
 class GateFailure(RuntimeError):
@@ -165,6 +166,86 @@ def _check_secret_ci_workflow_present() -> None:
     print("PASS broad GT-KB secret-scan workflow presence")
 
 
+def _check_tracked_secret_scan() -> None:
+    """Run the tracked secret gate and retain its redacted machine evidence."""
+
+    report_path = PROJECT_ROOT / TRACKED_SECRET_REPORT
+    report_path.unlink(missing_ok=True)
+    command = [
+        sys.executable,
+        "-m",
+        "groundtruth_kb",
+        "secrets",
+        "scan",
+        "--tracked",
+        "--redacted",
+        "--fail-on",
+        "verified-provider",
+        "--report-json",
+        TRACKED_SECRET_REPORT.as_posix(),
+    ]
+    result = subprocess.run(
+        command,
+        cwd=PROJECT_ROOT,
+        text=True,
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=300,
+    )
+
+    if not report_path.is_file():
+        raise GateFailure(
+            "Tracked redacted secret scan did not produce machine evidence at "
+            f"{TRACKED_SECRET_REPORT.as_posix()} (exit {result.returncode})"
+        )
+    try:
+        evidence = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise GateFailure(f"Tracked redacted secret scan evidence is unreadable: {exc}") from exc
+
+    if not isinstance(evidence, dict):
+        raise GateFailure("Tracked redacted secret scan evidence must be a JSON object")
+    findings = evidence.get("findings")
+    finding_count = evidence.get("finding_count")
+    paths_scanned = evidence.get("paths_scanned")
+    if evidence.get("mode") != "tracked":
+        raise GateFailure("Tracked redacted secret scan evidence has the wrong scan mode")
+    if not isinstance(paths_scanned, int) or isinstance(paths_scanned, bool) or paths_scanned <= 0:
+        raise GateFailure("Tracked redacted secret scan evidence has an invalid paths_scanned count")
+    if (
+        not isinstance(finding_count, int)
+        or isinstance(finding_count, bool)
+        or finding_count < 0
+        or not isinstance(findings, list)
+        or finding_count != len(findings)
+    ):
+        raise GateFailure("Tracked redacted secret scan evidence has inconsistent finding counts")
+
+    receipt = {
+        "schema_version": "gtkb-release-tracked-secret-scan-v1",
+        "command": command,
+        "fail_on": "verified-provider",
+        "exit_code": result.returncode,
+        "scan": evidence,
+    }
+    try:
+        report_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    except OSError as exc:
+        raise GateFailure(f"Tracked redacted secret scan receipt could not be retained: {exc}") from exc
+
+    if result.returncode != 0:
+        raise GateFailure(
+            "Tracked redacted secret scan failed "
+            f"(exit {result.returncode}, {finding_count} finding(s)); evidence retained at "
+            f"{TRACKED_SECRET_REPORT.as_posix()}"
+        )
+    print(
+        "PASS tracked redacted secret scan "
+        f"({paths_scanned} paths, {finding_count} findings; {TRACKED_SECRET_REPORT.as_posix()})"
+    )
+
+
 def _dev_inventory_helpers():
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
@@ -281,6 +362,33 @@ def _check_project_resource_registry() -> None:
     )
 
 
+def _check_sot_registry_authority() -> None:
+    """Fail release on incoherent identity, incomplete membership, or pruned census."""
+    package_src = PROJECT_ROOT / "groundtruth-kb" / "src"
+    if str(package_src) not in sys.path:
+        sys.path.insert(0, str(package_src))
+    try:
+        from groundtruth_kb.project.registry_control_plane import validate_registry
+
+        report = validate_registry(project_root=PROJECT_ROOT, require_reverse_closure=True)
+    except Exception as exc:  # noqa: BLE001 - release must fail closed on authority errors
+        raise GateFailure(f"SoT registry authority unavailable: {exc}") from exc
+    if not report.get("valid"):
+        raise GateFailure("SoT registry validation failed: " + json.dumps(report, sort_keys=True, default=str))
+    membership = report["membership_reconciliation"]
+    if not membership["release_eligible"]:
+        raise GateFailure(
+            "SoT registry release census is incomplete: "
+            f"membership_complete={membership['membership_complete']}, "
+            f"pruned_envelope_count={membership['pruned_envelope_count']}"
+        )
+    print(
+        "PASS SoT registry authority "
+        f"({report['record_count']} records, generation={report['generation_digest']}, "
+        "membership_complete=true, pruned=0)"
+    )
+
+
 def _standing_backlog_health_helpers():
     package_src = PROJECT_ROOT / "groundtruth-kb" / "src"
     if str(package_src) not in sys.path:
@@ -328,6 +436,35 @@ def _check_isolation_program_backstop() -> None:
     if not script_path.is_file():
         raise GateFailure("Isolation program backstop script is missing: scripts/isolation_program_backstop.py")
     _run([sys.executable, "scripts/isolation_program_backstop.py"], timeout=60)
+
+
+def _check_no_window_spawn_audit() -> None:
+    script_path = PROJECT_ROOT / "scripts" / "windows_no_window_spawn_audit.py"
+    if not script_path.is_file():
+        raise GateFailure("No-window spawn audit script is missing: scripts/windows_no_window_spawn_audit.py")
+    # WI-5071 reintroduction guard (DELIB-20260707): the audit exits 1 when any
+    # release-runtime launch site lacks a Windows no-window disposition, which
+    # _run() converts into a GateFailure.
+    _run([sys.executable, "scripts/windows_no_window_spawn_audit.py"], timeout=120)
+
+
+def _check_modernization_scope() -> None:
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from scripts.check_modernization_release_candidate import (  # noqa: PLC0415
+        DEFAULT_MANIFEST,
+        load_manifest,
+        validate_manifest,
+    )
+
+    manifest = load_manifest(DEFAULT_MANIFEST)
+    errors = validate_manifest(manifest, project_root=PROJECT_ROOT, require_test_paths=True)
+    if errors:
+        raise GateFailure("Modernization acceptance scope: " + "; ".join(errors))
+    print(
+        "PASS modernization acceptance scope "
+        f"({len(manifest['capabilities'])} capabilities, {manifest['program']['expected_handle_count']} handles)"
+    )
 
 
 def _python_gates(skip_pip_audit: bool = False) -> None:
@@ -449,24 +586,20 @@ def _frontend_gates() -> None:
     powershell = shutil.which("powershell.exe") or shutil.which("powershell") or shutil.which("pwsh")
     if not powershell:
         raise GateFailure("PowerShell executable not found on PATH")
-    frontend_projects = [
-        "widget",
-        os.path.join("admin", "standalone"),
-        os.path.join("admin", "provider"),
-        os.path.join("admin", "shopify"),
+    agent_red_root = os.path.join("applications", "Agent_Red")
+    widget_project = os.path.join(agent_red_root, "widget")
+    admin_projects = [
+        os.path.join(agent_red_root, "admin", "standalone"),
+        os.path.join(agent_red_root, "admin", "provider"),
+        os.path.join(agent_red_root, "admin", "shopify"),
     ]
-    _run([npm, "--prefix", "widget", "test"], timeout=180)
-    for project in frontend_projects:
-        if project.startswith("admin"):
-            break
-        _run([npm, "--prefix", project, "run", "build"], timeout=240)
+    _run([npm, "--prefix", widget_project, "test"], timeout=180)
+    _run([npm, "--prefix", widget_project, "run", "build"], timeout=240)
 
     _run([powershell, "-ExecutionPolicy", "Bypass", "-File", "scripts/sync-admin-env.ps1"], timeout=60)
     admin_build_env = os.environ.copy()
     admin_build_env["npm_config_ignore_scripts"] = "true"
-    for project in frontend_projects:
-        if not project.startswith("admin"):
-            continue
+    for project in admin_projects:
         _run([npm, "--prefix", project, "run", "build"], timeout=240, env=admin_build_env)
 
 
@@ -477,6 +610,11 @@ def main() -> int:
     parser.add_argument("--skip-pip-audit", action="store_true", help="Skip python dependencies check.")
     parser.add_argument("--skip-frontend", action="store_true", help="Skip frontend widget/admin gates.")
     parser.add_argument("--include-frontend", action="store_true", help="Run frontend widget/admin gates.")
+    parser.add_argument(
+        "--modernization-scope",
+        action="store_true",
+        help="Require the frozen modernization scope and every objective acceptance-test path.",
+    )
     parser.add_argument(
         "--skip-dev-inventory", action="store_true", help="Skip the GT-KB dev-environment inventory gate."
     )
@@ -495,12 +633,17 @@ def main() -> int:
 
     try:
         _check_python_version(args.require_python or None)
+        _check_sot_registry_authority()
         _check_secret_manifest_removed()
         _check_secret_gate_present()
         _check_secret_ci_workflow_present()
+        _check_tracked_secret_scan()
         _check_project_resource_registry()
         _check_standing_backlog_health()
         _check_agent_red_app_root_minimization()
+        _check_no_window_spawn_audit()
+        if args.modernization_scope:
+            _check_modernization_scope()
         if not args.skip_dev_inventory:
             _check_dev_environment_inventory(args.dev_inventory_max_age_hours)
         # Narrative-artifact evidence rollup runs BEFORE the inventory-drift check

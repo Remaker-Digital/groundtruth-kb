@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -143,3 +144,36 @@ def test_cleanup_mode_requires_explicit_dry_run_or_yes() -> None:
         guard.run(["--cleanup"], collector=list)
 
     assert exc.value.code == 2
+
+
+def test_collect_windows_processes_uses_no_window_kwargs(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict] = []
+    monkeypatch.setattr(guard.os, "name", "nt")
+    monkeypatch.setattr(guard, "no_window_subprocess_kwargs", lambda: {"creationflags": 0x08000000})
+
+    def fake_run(*args, **kwargs):
+        calls.append(kwargs)
+        return subprocess.CompletedProcess(args[0], 0, stdout="[]", stderr="")
+
+    monkeypatch.setattr(guard.subprocess, "run", fake_run)
+
+    assert guard.collect_windows_processes() == []
+    assert calls[0]["creationflags"] == 0x08000000
+
+
+def test_terminate_windows_process_uses_no_window_kwargs(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict] = []
+    monkeypatch.setattr(guard.os, "name", "nt")
+    monkeypatch.setattr(guard, "no_window_subprocess_kwargs", lambda: {"creationflags": 0x08000000})
+
+    def fake_run(*args, **kwargs):
+        calls.append(kwargs)
+        return subprocess.CompletedProcess(args[0], 0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(guard.subprocess, "run", fake_run)
+
+    ok, detail = guard.terminate_process(123)
+
+    assert ok is True
+    assert detail == "ok"
+    assert calls[0]["creationflags"] == 0x08000000

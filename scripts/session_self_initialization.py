@@ -16,6 +16,7 @@ import sys
 import tomllib
 import urllib.error
 import urllib.request
+import webbrowser
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
@@ -40,12 +41,14 @@ if hasattr(sys.stderr, "reconfigure"):
 # Ensure E:\GT-KB project root is on sys.path so `from scripts.<sibling>` imports
 # resolve when this script is invoked as `python scripts/session_self_initialization.py`
 # (where sys.path[0] is the scripts/ directory, not the project root).
-# Per gtkb-claude-session-start-parity-001 GO Change 3 — repairs the
+# Per gtkb-claude-session-start-parity-001 GO Change 3 â€” repairs the
 # `No module named 'scripts.check_harness_parity'` error that surfaced in the
 # `Harness parity` field of every startup payload.
 _PROJECT_ROOT_FOR_IMPORTS = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT_FOR_IMPORTS) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT_FOR_IMPORTS))
+
+from scripts.windows_subprocess import no_window_subprocess_kwargs  # noqa: E402
 
 try:
     from scripts.workstream_focus import (
@@ -138,7 +141,7 @@ HARNESS_REGISTRY_RELATIVE_PATH = Path("harness-state") / "harness-registry.json"
 # state unless Mike explicitly switches the session to Agent Red work.
 GTKB_HARNESS_STATE_ROOT = PROJECT_ROOT / "harness-state"
 # DEFAULT_DASHBOARD_DIR / DEFAULT_HISTORY_PATH removed per
-# bridge/generator-hardening-001-003.md Â§4.6: argparse defaults to None;
+# bridge/generator-hardening-001-003.md Ã‚Â§4.6: argparse defaults to None;
 # main() derives both from resolved --project-root post-parse.
 # Codex GO -004 implementation constraint (i): PROJECT_ROOT only as CLI
 # fallback for --project-root, never as internal output/read-path fallback.
@@ -166,21 +169,21 @@ HARNESS_LIFECYCLE_GUARDS = {
     "openrouter": GTKB_HARNESS_STATE_ROOT / "openrouter" / "session-lifecycle-guard.json",
 }
 BRIDGE_DISPATCH_ROLE_TEXT = (
-    "cross-harness event-driven trigger registered as PostToolUse and Stop hooks "
+    "dispatcher daemon registered as PostToolUse and Stop hooks "
     "(.claude/settings.json, .codex/hooks.json, .cursor/hooks.json); fires on tool-use and Stop "
     "rather than on a fixed interval; manual TAFE/dispatcher bridge scans "
     "available as fallback; retired smart poller and OS poller remain archived"
 )
 BRIDGE_OPERATION_INSTRUCTIONS_TEXT = (
     "Bridge automation has two complementary axes. "
-    "AXIS 1 (DISPATCHABLE WORK): the cross-harness event-driven trigger "
-    "(`scripts/cross_harness_bridge_trigger.py`) is the canonical mechanism for "
-    "self-contained work — reviews, verdicts, tests, work that a freshly-spawned "
+    "AXIS 1 (DISPATCHABLE WORK): the dispatcher daemon "
+    "(`scripts/dispatcher_runtime.py`) is the canonical mechanism for "
+    "self-contained work â€” reviews, verdicts, tests, work that a freshly-spawned "
     "counterpart harness can complete without further owner input. Registered as "
     "PostToolUse and Stop hooks. "
     "AXIS 2 (NON-DISPATCHABLE WORK): an owner-approved thread automation pattern "
     "may wake the interactive chat session to inspect TAFE/dispatcher bridge "
-    "state and surface work that requires interactive owner input mid-stream — owner-AUQ-required "
+    "state and surface work that requires interactive owner input mid-stream â€” owner-AUQ-required "
     "decisions, multi-turn review with accumulating context, cross-thread "
     "coordination, AUQ-heavy implementation. "
     "Both axes are required; their roles do not overlap. "
@@ -191,17 +194,17 @@ BRIDGE_OPERATION_INSTRUCTIONS_TEXT = (
     "Do NOT create new bridge automations (Codex-app-side, Claude-side, or otherwise) "
     "without owner approval; any new automation must be classified by axis "
     "(dispatchable vs non-dispatchable) and inventoried in "
-    "`config/agent-control/system-interface-map.toml`."
+    "`config/agent-control/gtkb-system-interface-map.toml`."
 )
 SESSION_CONTEXT_REVIEW_INDEPENDENCE_INDEX_REF = (
-    "config/agent-control/SESSION-STARTUP-INDEX.md § Session-context review independence (normative)"
+    "config/agent-control/gtkb-session-startup-index.md Â§ Session-context review independence (normative)"
 )
 SESSION_CONTEXT_REVIEW_INDEPENDENCE_CANONICAL = """## Session-context review independence (normative)
 
 Formal bridge review (GO / NO-GO / VERIFIED) must come from a **different model
 session context** than the one that authored or implemented the artifact under
 review. Shared session context means the verifier likely inherits the same
-assumptions and errors as the author — same-session formal review is prohibited
+assumptions and errors as the author â€” same-session formal review is prohibited
 and must fail closed.
 
 - **Blocker:** reviewer session context equals artifact `author_session_context_id`
@@ -513,14 +516,7 @@ def _dashboard_reachability_probes(*, fast_hook: bool = False) -> list[dict[str,
 
 def _open_dashboard_url_in_system_browser(url: str) -> bool:
     try:
-        if sys.platform.startswith("win") and hasattr(os, "startfile"):
-            os.startfile(url)  # type: ignore[attr-defined]
-            return True
-        opener = shutil.which("xdg-open") or shutil.which("open")
-        if not opener:
-            return False
-        subprocess.Popen([opener, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return True
+        return bool(webbrowser.open(url, new=2))
     except Exception:
         return False
 
@@ -543,8 +539,8 @@ NON_TERMINAL_WORK_ITEM_STATUSES = {
     "specified",
     "unresolved",
 }
-ACTIONABLE_BRIDGE_STATUSES = {"NEW", "REVISED", "GO", "NO-GO"}
-REVIEW_QUEUE_BRIDGE_STATUSES = {"NEW", "REVISED"}
+ACTIONABLE_BRIDGE_STATUSES = {"NEW", "REVISED", "NO-ACTION", "GO", "NO-GO"}
+REVIEW_QUEUE_BRIDGE_STATUSES = {"NEW", "REVISED", "NO-ACTION"}
 PRIME_RESPONSE_BRIDGE_STATUSES = {"GO", "NO-GO"}
 ADVISORY_BRIDGE_STATUSES = {"ADVISORY"}
 PRIORITY_SORT_ORDER = {
@@ -897,7 +893,7 @@ def _read_text(path: Path) -> str:
         return ""
 
 
-# Per bridge/generator-hardening-001-003.md Â§4.7 + Codex -004 GO:
+# Per bridge/generator-hardening-001-003.md Ã‚Â§4.7 + Codex -004 GO:
 # _LOCAL_ENV_CACHE dropped. With project_root threaded, the cache would
 # need a per-root key; the .env.local parse is trivial work and
 # eliminates the multi-root cache-correctness question.
@@ -906,7 +902,7 @@ def _read_text(path: Path) -> str:
 def _local_env_values(project_root: Path) -> dict[str, str]:
     """Read non-secret routing values from local env files without logging them.
 
-    Per bridge/generator-hardening-001-003.md Â§4.7: project_root is now
+    Per bridge/generator-hardening-001-003.md Ã‚Â§4.7: project_root is now
     a required parameter (was: bound to module-level PROJECT_ROOT).
     """
 
@@ -926,7 +922,7 @@ def _local_env_values(project_root: Path) -> dict[str, str]:
 def _local_env_value(project_root: Path, name: str, default: str = "") -> str:
     """Read one local-env value with environment-variable override.
 
-    Per bridge/generator-hardening-001-003.md Â§4.7 + Codex -002 Finding 2:
+    Per bridge/generator-hardening-001-003.md Ã‚Â§4.7 + Codex -002 Finding 2:
     project_root is now a required parameter (was: parameterless wrapper).
     """
     return os.environ.get(name) or _local_env_values(project_root).get(name, default)
@@ -1268,10 +1264,10 @@ def _database_metrics(project_root: Path) -> dict[str, Any]:
 def _backlog_items_from_membase(project_root: Path) -> list[dict[str, Any]]:
     """Query MemBase work_items via ``gt backlog list --json`` (canonical backlog surface).
 
-    Returns a list of dicts with ``id``, ``title``, ``body``, ``approval_state``,
-    ``resolution_status``, and ``priority`` keys. The approval_state /
-    resolution_status / priority fields are required by the top-3 priority
-    selection in ``_backlog_metrics`` per SPEC-ENVELOPE-DISCLOSURE-UI-001.
+    Returns a list of dicts with ``id``, ``title``, ``body``,
+    ``resolution_status``, ``stage``, and ``priority`` keys. The status and
+    priority fields drive top-3 priority selection in ``_backlog_metrics`` per
+    SPEC-ENVELOPE-DISCLOSURE-UI-001.
 
     Per DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION, the canonical
     backlog is MemBase ``work_items``; the legacy markdown backlog view is retired.
@@ -1302,8 +1298,8 @@ def _backlog_items_from_membase(project_root: Path) -> list[dict[str, Any]]:
                 "id": str(row.get("id", "")),
                 "title": str(row.get("title", "")),
                 "body": str(row.get("description") or row.get("status_detail") or ""),
-                "approval_state": str(row.get("approval_state") or ""),
                 "resolution_status": str(row.get("resolution_status") or ""),
+                "stage": str(row.get("stage") or ""),
                 "priority": row.get("priority"),
             }
         )
@@ -1314,7 +1310,7 @@ _RESIDUAL_OVERRIDE_RE = re.compile(r"\*\*Status:\*\*\s+VERIFIED\s*\(residual:", 
 _STALE_PRIORITY_RE = re.compile(r"\*\*Priority:\*\*\s+Stale\b", re.IGNORECASE)
 _BRIDGE_VERSION_FILE_RE = re.compile(r"^(?P<document>.+)-(?P<version>\d{3})\.md$")
 _BRIDGE_STATUS_LINE_RE = re.compile(
-    r"^#?\s*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|PAUSED)\b",
+    r"^#?\s*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|PAUSED)\b",
     re.IGNORECASE,
 )
 
@@ -1332,9 +1328,9 @@ def _residual_override_present(body: str) -> bool:
 
 
 _PRIORITY_RANK = {"P0": 0, "P1": 1, "P2": 2, "P3": 3, "P4": 4}
-_IMPLEMENTATION_ACTIVE_APPROVAL_STATES = {"implementation_authorized"}
 _IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES = {"in_progress"}
 _IMPLEMENTATION_ACTIVE_STAGES = {"implementing"}
+_TOP_PRIORITY_RESOLUTION_STATUSES = {"", "open", "in_progress", "blocked"}
 
 
 def _top_priority_sort_key(item: dict[str, Any]) -> tuple[int, str]:
@@ -1349,14 +1345,9 @@ def _top_priority_sort_key(item: dict[str, Any]) -> tuple[int, str]:
 
 
 def _is_implementation_active_backlog_item(item: dict[str, Any]) -> bool:
-    approval_state = str(item.get("approval_state") or "").strip()
     resolution_status = str(item.get("resolution_status") or "").strip()
     stage = str(item.get("stage") or "").strip()
-    return (
-        approval_state in _IMPLEMENTATION_ACTIVE_APPROVAL_STATES
-        or resolution_status in _IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES
-        or stage in _IMPLEMENTATION_ACTIVE_STAGES
-    )
+    return resolution_status in _IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES or stage in _IMPLEMENTATION_ACTIVE_STAGES
 
 
 def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -1392,8 +1383,9 @@ def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str,
     # Top-3 selection per SPEC-ENVELOPE-DISCLOSURE-UI-001:
     # Operates on ALL classified items (bypasses the agent_red scope filter so
     # GT-KB infrastructure WIs appear in the session-startup priority surface).
-    # Applies: VERIFIED bridge filter, stale priority filter,
-    # approval_state='implementation_authorized', resolution_status open/in_progress/blocked.
+    # Applies: VERIFIED bridge filter, stale priority filter, and
+    # open/in_progress/blocked resolution status. Legacy work-item approval
+    # metadata is not authority and must not affect priority selection.
     # Computed once; reused at both consumption sites (dict field and tuple return).
     top_eligible: list[dict[str, Any]] = []
     for _item in classified:
@@ -1405,11 +1397,7 @@ def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str,
             continue
         if _STALE_PRIORITY_RE.search(_body):
             continue
-        if _is_implementation_active_backlog_item(_item) and _item.get("resolution_status") in (
-            "open",
-            "in_progress",
-            "blocked",
-        ):
+        if str(_item.get("resolution_status") or "") in _TOP_PRIORITY_RESOLUTION_STATUSES:
             top_eligible.append(_item)
     top_eligible.sort(key=_top_priority_sort_key)
     top_priority = top_eligible[:3]
@@ -1589,8 +1577,6 @@ def _dev_environment_inventory_status(project_root: Path) -> dict[str, Any]:
 
 def _harness_parity_status(project_root: Path, *, harness_name: str | None, role_profile: str) -> dict[str, Any]:
     harness_scope = _normalize_harness_name(harness_name) or "all"
-    if harness_scope not in {"claude", "codex"}:
-        harness_scope = "all"
     try:
         from scripts.check_harness_parity import check_harness_parity  # noqa: PLC0415
 
@@ -1605,20 +1591,30 @@ def _harness_parity_status(project_root: Path, *, harness_name: str | None, role
             "status": "unavailable",
             "harness_scope": harness_scope,
             "role_scope": role_profile,
+            "scope_kind": "assigned_harness" if harness_scope != "all" else "fleet",
+            "evidence_type": "phase-1 catalog parity",
+            "operational_readiness": "not evaluated; run phase-2 readiness and hook discovery diff",
             "counts": {},
             "verification_command": "python scripts/check_harness_parity.py --all --markdown",
+            "phase2_command": "python scripts/harness_parity_phase2.py --project-root . --format markdown",
+            "discovery_diff_command": "python scripts/parity_discovery_diff.py --project-root . --markdown",
             "error": str(exc),
         }
     return {
         "status": report.overall_status.lower(),
         "harness_scope": harness_scope,
         "role_scope": role_profile,
+        "scope_kind": "assigned_harness" if harness_scope != "all" else "fleet",
+        "evidence_type": "phase-1 catalog parity",
+        "operational_readiness": "not evaluated; run phase-2 readiness and hook discovery diff",
         "counts": report.counts,
         "verification_command": (
             f"python scripts/check_harness_parity.py --harness {harness_scope} --role {role_profile} --markdown"
             if harness_scope != "all"
             else "python scripts/check_harness_parity.py --all --markdown"
         ),
+        "phase2_command": "python scripts/harness_parity_phase2.py --project-root . --format markdown",
+        "discovery_diff_command": "python scripts/parity_discovery_diff.py --project-root . --markdown",
     }
 
 
@@ -1627,7 +1623,9 @@ def _harness_parity_compact_text(status: dict[str, Any]) -> str:
     count_text = ", ".join(f"{key}={value}" for key, value in sorted(counts.items())) or "no counts"
     text = (
         f"{status.get('status', 'unknown')} "
-        f"(harness={status.get('harness_scope', 'unknown')}, "
+        f"({status.get('evidence_type', 'phase-1 catalog parity')}; "
+        f"operational_readiness={status.get('operational_readiness', 'not evaluated')}; "
+        f"harness={status.get('harness_scope', 'unknown')}, "
         f"role={status.get('role_scope', 'unknown')}, {count_text})"
     )
     if status.get("error"):
@@ -1640,7 +1638,7 @@ def _harness_launchability_status(project_root: Path) -> dict[str, Any]:
 
     Reuses the doctor's ``_check_harness_launchability`` (FAB-01 / HYG-001) so a
     static dispatch-config defect (e.g. a hollow venv interpreter that would make
-    the cross-harness trigger spawn into a silent WinError-2 / exit-127) is
+    the dispatcher runtime spawn into a silent WinError-2 / exit-127) is
     visible at the next interactive SessionStart, not only on an explicit
     ``gt doctor`` run. Startup must continue even if the check raises.
     """
@@ -1792,6 +1790,7 @@ def _git_remote_origin(project_root: Path) -> dict[str, Any]:
             errors="replace",
             timeout=10,
             check=False,
+            **no_window_subprocess_kwargs(),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {"present": False, "host": None, "repository": None, "error": str(exc)}
@@ -1822,6 +1821,7 @@ def _command_output(command: list[str], cwd: Path, timeout: int = 10) -> dict[st
             errors="replace",
             timeout=timeout,
             check=False,
+            **no_window_subprocess_kwargs(),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {"ok": False, "stdout": "", "stderr": str(exc), "returncode": None}
@@ -2129,6 +2129,7 @@ def _gh_auth_status(project_root: Path) -> str:
             errors="replace",
             timeout=10,
             check=False,
+            **no_window_subprocess_kwargs(),
         )
     except (OSError, subprocess.TimeoutExpired):
         return "unknown"
@@ -2198,6 +2199,7 @@ def _latest_github_workflow_runs(project_root: Path, gh_auth_status: str) -> dic
                 errors="replace",
                 timeout=5,
                 check=False,
+                **no_window_subprocess_kwargs(),
             )
         except (OSError, subprocess.TimeoutExpired):
             agent_red_remote = None
@@ -2236,6 +2238,7 @@ def _latest_github_workflow_runs(project_root: Path, gh_auth_status: str) -> dic
             errors="replace",
             timeout=8,
             check=False,
+            **no_window_subprocess_kwargs(),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {
@@ -2708,7 +2711,7 @@ def _testing_service_integrations(project_root: Path, plugins: list[str], *, fas
     accessibility_tests_present = (
         (project_root / "platform_tests" / "accessibility").is_dir()
         or (project_root / "tests" / "accessibility").is_dir()
-        or (application_subject and (project_root / "applications" / "Agent_Red" / "tests" / "accessibility").is_dir())
+        or (project_root / "applications" / "Agent_Red" / "tests" / "accessibility").is_dir()
     )
     locust_profile_present = (
         (project_root / "tests" / "performance" / "locustfile.py").is_file()
@@ -3446,7 +3449,7 @@ def discover_role_profile(
     harness_id: str | None = None,
     role_record_path: Path | None = None,
 ) -> str:
-    """Read the durable role assignment from the single harness role map."""
+    """Read the dispatcher/default role assignment from the single harness role map."""
 
     role_profile, _document, _path = role_for_harness(
         project_root,
@@ -3657,6 +3660,33 @@ def build_startup_model(
     }
 
 
+def build_fast_wrapup_model(project_root: Path) -> dict[str, Any]:
+    """Collect only the fields consumed by ``render_wrapup_notice``."""
+
+    generated_at = _now_iso()
+    database = _database_metrics(project_root)
+    backlog, top_actions = _backlog_metrics(project_root)
+    blockers = _release_blockers(project_root)
+    contention = _bridge_metrics(project_root)
+    drift = _git_drift(project_root)
+    membase = database.get("membase", {})
+
+    return {
+        "generated_at": generated_at,
+        "metrics": {
+            "backlog": {"active_item_count": backlog.get("active_item_count")},
+            "membase": {
+                "open_work_items": membase.get("open_work_items"),
+                "raw_open_work_items": membase.get("raw_open_work_items"),
+            },
+            "regression": {"release_blocker_count": len(blockers)},
+            "contention": {"actionable_count": contention.get("actionable_count")},
+            "drift": {"changed_path_count": drift.get("changed_path_count")},
+        },
+        "top_priority_actions": [{"id": item.get("id"), "title": item.get("title")} for item in top_actions],
+    }
+
+
 def _collect_work_subject(project_root: Path) -> dict[str, Any]:
     """Collect the active work-subject for the dashboard.
 
@@ -3848,7 +3878,7 @@ def _sentence_fragment(value: Any, default: str) -> str:
 
 
 def _protocol_review_queue_count(contention: dict[str, Any]) -> int:
-    """Count latest NEW/REVISED bridge entries without dashboard scope filtering."""
+    """Count latest NEW/REVISED/NO-ACTION entries without dashboard scope filtering."""
 
     if "raw_review_queue_count" in contention:
         return int(contention.get("raw_review_queue_count") or 0)
@@ -4455,17 +4485,17 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
             "- Startup mode: Loyal Opposition review and verification.",
             "- Default session purpose: process Prime Builder reviews and verifications on the file bridge.",
             "- Session-focus menu: not presented in Loyal Opposition mode; numbered focus choices are Prime Builder startup controls.",
-            "- Bridge/dispatch distinction: the file bridge is the durable role handoff and review mechanism; the cross-harness event-driven trigger is the dispatch automation registered as PostToolUse and Stop hooks (retired smart poller and OS poller archived per Slice 4).",
+            "- Bridge/dispatch distinction: the file bridge is the Prime Builder/Loyal Opposition handoff and review mechanism; the dispatcher daemon is the dispatch automation registered as PostToolUse and Stop hooks (retired smart poller and OS poller archived per Slice 4).",
             "- Bridge startup rule: check the file bridge in both Prime Builder and Loyal Opposition startup.",
             "- Live bridge authority: current bridge state must be determined from TAFE/dispatcher bridge state and the status-bearing versioned files under `bridge/`; this generated report is not authoritative after generation.",
             "- Mandatory direct-read rule: before reporting the live bridge scan count, read current TAFE/dispatcher bridge state and versioned bridge files directly; do not derive bridge state from startup reports, dashboard JSON, cached documents, copied excerpts, summary counts, or hook-generated summaries.",
             "- Project-state startup rule: include a compact current-state report for every active MemBase project group using `current_project_work_item_memberships.project_id`; distinguish bridge queue state, git drift, release blockers, and Prime-actionable bridge responses.",
             "- Startup execution rule: execute live bridge verification before using this section in owner-facing chat; do not display this checklist as a substitute for performing the verification.",
-            "- Bridge dispatch startup rule: rely on the cross-harness event-driven trigger registered as PostToolUse and Stop hooks; do not restore the retired smart poller or OS poller. Manual TAFE/dispatcher bridge scans remain available as fallback when separate-harness or asynchronous monitoring is needed.",
+            "- Bridge dispatch startup rule: rely on the dispatcher daemon registered as PostToolUse and Stop hooks; do not restore the retired smart poller or OS poller. Manual TAFE/dispatcher bridge scans remain available as fallback when separate-harness or asynchronous monitoring is needed.",
             f"- Bridge operation instructions: {BRIDGE_OPERATION_INSTRUCTIONS_TEXT}.",
             "- First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning.",
             _render_file_bridge_scan(model),
-            "- If the live bridge verification succeeds, report the live scan result and auto-process actionable NEW/REVISED bridge entries oldest-to-newest by default (per ADR-LOYAL-OPPOSITION-STARTUP-AUTO-PROCESS-DEFAULT-001).",
+            "- If the live bridge verification succeeds, report the live scan result and auto-process actionable NEW/REVISED/NO-ACTION bridge entries oldest-to-newest by default (per ADR-LOYAL-OPPOSITION-STARTUP-AUTO-PROCESS-DEFAULT-001).",
             "- Advisory mode opt-in: when the session was opened with `init gtkb advisory`, report the scan and ask Mike whether to switch to auto-process; do not write verdict files in advisory mode.",
             "- If the bridge is not functioning, diagnose and repair the bridge before ordinary review work.",
             "- Bridge authority: Loyal Opposition has permanent owner permission to diagnose and repair bridge function/use and downstream bridge-dependent artifacts needed to sustain the bridge.",
@@ -4479,7 +4509,7 @@ def _render_fresh_session_input_semantics(model: dict[str, Any]) -> str:
     ]
     if _is_loyal_opposition_model(model):
         lines.append(
-            "- After presenting this startup disclosure in default mode, execute the harness-only Loyal Opposition startup action before ordinary task work: verify live bridge state, report the live scan, and process actionable `NEW` / `REVISED` entries oldest-to-newest by default."
+            "- After presenting this startup disclosure in default mode, execute the harness-only Loyal Opposition startup action before ordinary task work: verify live bridge state, report the live scan, and process actionable `NEW` / `REVISED` / `NO-ACTION` entries oldest-to-newest by default."
         )
         lines.append(
             "- In `init gtkb advisory` mode, report the live scan and ask Mike whether to switch to auto-process before writing verdict files or processing bridge entries."
@@ -4581,7 +4611,7 @@ def _render_current_project_state(model: dict[str, Any]) -> str:
     harness_parity = model.get("infrastructure", {}).get("harness_parity", {})
     subject_label = _active_subject_label(model)
 
-    # Â§A hard-rejection: a combined application + GT-KB green claim may not be
+    # Ã‚Â§A hard-rejection: a combined application + GT-KB green claim may not be
     # emitted without an explicit dual-scope declaration at the readiness/report
     # layer. This is defense-in-depth against future code paths that might
     # assemble dual-subject readiness outputs without the guard.
@@ -4612,7 +4642,7 @@ def _render_current_project_state(model: dict[str, Any]) -> str:
 
         # WI-3342 IP-4: role map resolves from the harness registry projection
         # via the IP-3 foundational loader (load_role_assignments now reads the
-        # projection). load_role_assignments is fail-soft — a missing or
+        # projection). load_role_assignments is fail-soft â€” a missing or
         # malformed projection yields an empty document, preserving the
         # canonical-helper fail-closed path below.
         assignment_path = role_assignments_path(_PROJECT_ROOT_FOR_IMPORTS)
@@ -4749,10 +4779,10 @@ def _render_file_bridge_scan(model: dict[str, Any]) -> str:
     if actionable_review_count:
         return (
             f"- Generated-time file bridge scan, non-authoritative after report generation: "
-            f"{actionable_review_count} latest NEW/REVISED entr"
+            f"{actionable_review_count} latest NEW/REVISED/NO-ACTION entr"
             f"{'y' if actionable_review_count == 1 else 'ies'} identified."
         )
-    return "- Generated-time file bridge scan, non-authoritative after report generation: 0 latest NEW/REVISED entries identified."
+    return "- Generated-time file bridge scan, non-authoritative after report generation: 0 latest NEW/REVISED/NO-ACTION entries identified."
 
 
 def _render_wrapup_trigger_commands() -> str:
@@ -4777,7 +4807,7 @@ def _markdown_url_link(url: str) -> str:
 
 
 # _atomic_write_text relocated to scripts/_wrap_io.py per
-# bridge/gtkb-wrapup-enhancements-slice1-005.md Â§2.4 (REVISED-2 binding,
+# bridge/gtkb-wrapup-enhancements-slice1-005.md Ã‚Â§2.4 (REVISED-2 binding,
 # GO at -006). Re-imported here as a module-level alias so the four
 # existing call sites at lines ~2744, ~4886, ~4891, ~4892 continue to
 # resolve to the same function object without behavior change.
@@ -4795,11 +4825,11 @@ from _wrap_io import _atomic_write_text  # noqa: E402,F401,I001
 
 # Pending owner-decisions surfacing
 # ---------------------------------
-# The .claude/hooks/owner-decision-tracker.py hook is the canonical
+# The config/hooks/gtkb-owner-decision-tracker.py hook is the canonical
 # writer of memory/pending-owner-decisions.md. This renderer reads the
 # same file and surfaces any `## Pending` entries in the startup
 # disclosure so owner decisions don't drown in inline message flow.
-# Authority: bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md Â§2.6;
+# Authority: bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md Ã‚Â§2.6;
 # Codex GO at -004 with condition "keep visibility through this script,
 # do not reintroduce a separate SessionStart hook as primary surface."
 
@@ -4836,7 +4866,7 @@ def _parse_pending_block(text: str) -> list[dict[str, str]]:
     """Parse the `## Pending` section into a list of decision dicts.
 
     Format matches the YAML-frontmatter list shape that
-    .claude/hooks/owner-decision-tracker.py writes:
+    config/hooks/gtkb-owner-decision-tracker.py writes:
 
       - id: DECISION-NNNN
         asked_at: 2026-04-25T07:30:00Z
@@ -4911,13 +4941,13 @@ def _unquote_pending_value(value: str) -> str:
 
 
 def _render_smart_poller_section(project_root: Path, role: dict[str, Any]) -> list[str]:
-    """Retired stub — smart-poller startup-orient surface removed in Slice 4.
+    """Retired stub â€” smart-poller startup-orient surface removed in Slice 4.
 
     The smart-poller mechanism was retired on 2026-05-09 in favor of the
-    cross-harness event-driven trigger (see Slice 4 of
+    dispatcher daemon (see Slice 4 of
     ``bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*``).
-    The cross-harness trigger does not surface a startup-orient section
-    — actionable bridge work is dispatched via PostToolUse + Stop hooks
+    The dispatcher runtime does not surface a startup-orient section
+    â€” actionable bridge work is dispatched via PostToolUse + Stop hooks
     rather than read from notification artifacts at session start.
 
     The function is preserved as a stub returning ``[]`` so that the
@@ -4932,15 +4962,15 @@ def _render_diagnostic_section(health: Any) -> list[str]:
     """Render a single-section diagnostic for an unhealthy smart poller.
 
     Per ``bridge/smart-poller-orient-verification-2026-04-29-005.md`` (carry
-    forward of ``-003 §3-§4``) + GO at ``-006``: when the doctor reports
+    forward of ``-003 Â§3-Â§4``) + GO at ``-006``: when the doctor reports
     ``warning`` or ``fail``, the diagnostic supersedes notification rendering
     because notifications cannot be trusted when the poller itself is
-    unhealthy. The doctor message is reused verbatim — it already contains
+    unhealthy. The doctor message is reused verbatim â€” it already contains
     specific remediation hints (file paths, command strings).
     """
-    icon = "⚠️" if health.status == "warning" else "❌"
+    icon = "âš ï¸" if health.status == "warning" else "âŒ"
     return [
-        f"### Smart-poller diagnostic — {health.status.upper()}",
+        f"### Smart-poller diagnostic â€” {health.status.upper()}",
         "",
         f"{icon} {health.message}",
         "",
@@ -5037,7 +5067,13 @@ def _render_startup_glossary_section(project_root: Path, *, max_terms: int = 8) 
         )
         return "\n".join(lines)
 
-    lines.append(f"- Source: `{source}`")
+    full_count = int(glossary.get("full_term_count") or 0)
+    lines.append(f"- Source: `{source}` (core startup subset; activity-specific terms load on `::open <activity>`)")
+    if full_count and full_count > len(term_order):
+        lines.append(
+            f"- Progressive disclosure: {len(term_order)} core term(s) at startup; "
+            f"{full_count - len(term_order)} additional term(s) available via activity envelopes."
+        )
     for name in [str(item) for item in term_order[:max_terms]]:
         entry = terms.get(name)
         if not isinstance(entry, dict):
@@ -5076,7 +5112,7 @@ def render_session_context_review_independence_disclosure(role_profile: str | No
 def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path) -> str:
     """Render the startup report markdown.
 
-    Per bridge/generator-hardening-001-003.md Â§4.5 + Codex -004 GO:
+    Per bridge/generator-hardening-001-003.md Ã‚Â§4.5 + Codex -004 GO:
     project_root is now a required parameter (was: model lacked
     project_root, so the function read PROJECT_ROOT global directly).
     """
@@ -5123,7 +5159,7 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             f"- ALERT: {launchability.get('message') or 'one or more active dispatch targets are unlaunchable'}",
             (
                 "- A static dispatch-target config defect (e.g. a missing or hollow "
-                "interpreter) makes the cross-harness trigger spawn into a silent "
+                "interpreter) makes the dispatcher runtime spawn into a silent "
                 "WinError-2 / exit-127 and trips the per-recipient circuit breaker. "
                 "Repair the harness registry argv head, then re-run `gt project doctor` "
                 "to confirm launchability before relying on auto-dispatch."
@@ -6540,6 +6576,42 @@ def _write_dashboard_pdf(dashboard_path: Path, pdf_path: Path) -> dict[str, Any]
     return {"available": True, "path": str(pdf_path), "error": None}
 
 
+def write_fast_wrapup_report(
+    project_root: Path,
+    dashboard_dir: Path,
+) -> dict[str, Any]:
+    """Write the fast-hook wrap-up without refreshing startup/dashboard artifacts."""
+
+    model = build_fast_wrapup_model(project_root)
+    dashboard_dir.mkdir(parents=True, exist_ok=True)
+
+    dashboard_path = project_root / "docs" / "gtkb-dashboard" / "grafana" / "dashboards" / "gtkb-dashboard.json"
+    data_path = dashboard_dir / "dashboard-data.json"
+    pdf_path = dashboard_dir / PDF_EXPORT_FILENAME
+    report_path = dashboard_dir / "session-startup-report.md"
+    wrapup_path = dashboard_dir / "session-wrapup-report.md"
+    dashboard_link = _markdown_url_link(GRAFANA_DASHBOARD_URL)
+    wrapup_text = render_wrapup_notice(model, dashboard_link)
+    _atomic_write_text(wrapup_path, wrapup_text)
+
+    return {
+        "project_root": project_root,
+        "model": model,
+        "dashboard_path": dashboard_path,
+        "dashboard_url": GRAFANA_DASHBOARD_URL,
+        "pdf_path": pdf_path,
+        "pdf_export": {
+            "available": False,
+            "path": str(pdf_path),
+            "error": "Skipped by minimal fast wrap-up path.",
+        },
+        "data_path": data_path,
+        "report_path": report_path,
+        "wrapup_path": wrapup_path,
+        "wrapup_text": wrapup_text,
+    }
+
+
 def write_dashboard_and_report(
     project_root: Path,
     dashboard_dir: Path,
@@ -6908,7 +6980,7 @@ def _startup_service_context(result: dict[str, Any]) -> str:
         "### Codex Operating Resource Map",
         "",
         "- Resource authority: live project files under `E:\\GT-KB` are canonical; session overlays and generated startup/dashboard summaries are routing context only.",
-        "- Role authority: resolve `harness-state/harness-identities.json` first, then `harness-state/harness-registry.json` (canonical role registry per Slice 1 retirement); role records may be list-valued role sets.",
+        "- Role routing/default fallback: resolve `harness-state/harness-identities.json` first, then `harness-state/harness-registry.json` (canonical role registry per Slice 1 retirement); role records may be list-valued role sets, and explicit session role evidence governs interactive surfaces.",
         "- Bridge authority: read TAFE/dispatcher bridge state and status-bearing versioned files under `bridge/` before bridge queue claims; generated bridge counts are non-authoritative after startup generation.",
         "- Work subject authority: `.claude/session/work-subject.json`; GT-KB infrastructure is default unless owner direction names an application/adopter.",
         "- Knowledge surfaces: use `groundtruth.db` (MemBase), `memory/release-readiness.md`, `.claude/rules/`, `.codex/skills/`, and `docs/gtkb-dashboard/session-startup-report.md` as targeted context sources. Backlog is queried via `gt backlog list`.",
@@ -7013,7 +7085,7 @@ def _suggested_skills_lines(model: dict[str, Any]) -> list[str]:
             f"- Suggested skills ({suggestion.scenario}): required {required}; "
             f"recommended {recommended} (report-only).",
         ]
-    except Exception:  # noqa: BLE001 — report-only fail-safe: never break startup (R7)
+    except Exception:  # noqa: BLE001 â€” report-only fail-safe: never break startup (R7)
         return []
 
 
@@ -7222,7 +7294,7 @@ def _write_session_start_json(
     """Write ``.claude/session/session-start.json`` for the spec-event-surfacer.
 
     Per bridge ``gtkb-membase-effective-use-recovery-slice-a-event-surfacer-
-    2026-04-29-005`` REVISED-2 §1.3 + Codex GO at -006: the surfacer hook
+    2026-04-29-005`` REVISED-2 Â§1.3 + Codex GO at -006: the surfacer hook
     reads ``session_started_at`` from this file as the lower bound for
     "in-session" spec rows. Atomic-rename pattern; graceful degradation on
     filesystem errors (the surfacer's fallback to ``now() - 1 hour`` is the
@@ -7271,6 +7343,8 @@ def _read_lifecycle_guard(path: Path) -> dict[str, Any]:
 
 
 def _write_lifecycle_guard(path: Path, state: dict[str, Any]) -> None:
+    # WI-5118: lifecycle state may record transition metadata, never owner input.
+    state.pop("startup_prompt_preview", None)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -7282,12 +7356,32 @@ def _startup_guard_id() -> str:
     return os.environ.get("GTKB_STARTUP_GUARD_ID") or _utc_now_iso()
 
 
+# WI-5083: SessionStart 'source' values that mark a mid-session continuation
+# (resume/compact). On these the startup-input gate MUST NOT be (re-)armed: it
+# is cleared only by a subsequent UserPromptSubmit, so a mid-session re-arm
+# followed by a tool call / AUQ answer (neither a UserPromptSubmit) would leave
+# the gate armed and spuriously block tool use. Duplicated (not imported) in
+# scripts/workstream_focus.py and .codex/gtkb-hooks/session_wrapup_trigger_dispatch.py
+# to keep each hot path import-light; a parity test asserts the copies stay
+# equal (mirrors the existing _SESSION_ROLE_MARKER_NAME duplicate-with-parity
+# pattern already used by session_start_dispatch_core.py).
+_SESSION_CONTINUATION_SOURCES = frozenset({"resume", "compact"})
+
+
+def _is_session_continuation_source(session_start_source: str | None) -> bool:
+    """WI-5083: True when the threaded SessionStart source denotes a mid-session
+    continuation (resume/compact). Absent / unknown / 'startup' / 'clear' all
+    read as fresh (pre-WI-5083 behavior)."""
+    return (session_start_source or "").strip().lower() in _SESSION_CONTINUATION_SOURCES
+
+
 def _arm_startup_interaction_guard(
     path: Path,
     guard_id: str,
     *,
     suppress_next_wrapup: bool,
     current_subject: str | None = None,
+    armed_source: str | None = None,
 ) -> None:
     state = _read_lifecycle_guard(path)
     if (
@@ -7302,6 +7396,9 @@ def _arm_startup_interaction_guard(
     update: dict[str, Any] = {
         "armed_at": _utc_now_iso(),
         "armed_reason": "startup_first_owner_prompt_must_be_discarded",
+        # WI-5083: record which SessionStart source armed the gate so the
+        # readers can treat a continuation-armed gate as stale (fix b).
+        "armed_source": armed_source or "startup",
         "discard_next_user_prompt": True,
         "startup_prompt_discarded": False,
         "startup_response_pending": False,
@@ -7311,11 +7408,35 @@ def _arm_startup_interaction_guard(
     }
     # Persist the active harness's current work subject so the counterpart
     # harness's detect_counterpart_state() can detect divergence against a
-    # live-populated durable source (Phase 7 Â§E live-wiring, per bridge -012).
+    # live-populated durable source (Phase 7 Ã‚Â§E live-wiring, per bridge -012).
     if current_subject is not None:
         update["current_subject"] = current_subject
     state.update(update)
     _write_lifecycle_guard(path, state)
+
+
+def _maybe_arm_startup_interaction_guard(
+    path: Path,
+    guard_id: str,
+    *,
+    suppress_next_wrapup: bool,
+    current_subject: str | None = None,
+    session_start_source: str | None = None,
+) -> bool:
+    """WI-5083: arm the startup-input gate unless this SessionStart is a
+    mid-session continuation (resume/compact). Returns True if armed, False if
+    skipped. A skipped arm leaves any prior gate state untouched, so a session
+    that already consumed its fresh-start gate is not spuriously re-armed."""
+    if _is_session_continuation_source(session_start_source):
+        return False
+    _arm_startup_interaction_guard(
+        path,
+        guard_id,
+        suppress_next_wrapup=suppress_next_wrapup,
+        current_subject=current_subject,
+        armed_source=(session_start_source or "").strip().lower() or "startup",
+    )
+    return True
 
 
 def _consume_startup_wrapup_guard(path: Path) -> bool:
@@ -7339,7 +7460,7 @@ def _consume_startup_wrapup_guard(path: Path) -> bool:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT)
-    # Per bridge/generator-hardening-001-003.md Â§4.6: dashboard-dir and
+    # Per bridge/generator-hardening-001-003.md Ã‚Â§4.6: dashboard-dir and
     # history-path default to None; main() derives them from the resolved
     # --project-root post-parse. This means a caller passing only
     # --project-root <child-root> gets all output under <child-root>, not
@@ -7380,13 +7501,13 @@ def main(argv: list[str] | None = None) -> int:
         "--role-record-path",
         type=Path,
         default=None,
-        help="Deprecated alias: override the single durable role-assignment map path.",
+        help="Deprecated alias: override the single dispatcher/default role-assignment map path.",
     )
     parser.add_argument(
         "--role-assignment-path",
         type=Path,
         default=None,
-        help="Override the single durable role-assignment map path.",
+        help="Override the single dispatcher/default role-assignment map path.",
     )
     parser.add_argument(
         "--user-preferences-path",
@@ -7437,6 +7558,16 @@ def main(argv: list[str] | None = None) -> int:
         "--skip-bridge-maintenance",
         action="store_true",
         help="Skip startup archival/pruning of legacy VERIFIED bridge compatibility-view entries.",
+    )
+    parser.add_argument(
+        "--session-start-source",
+        default=None,
+        help=(
+            "SessionStart hook 'source' (startup/resume/compact/clear) threaded "
+            "from the SessionStart dispatcher. WI-5083: 'resume'/'compact' mark "
+            "a mid-session continuation, so the startup-input gate is NOT "
+            "re-armed; absent/'startup'/'clear' is a genuinely-fresh start."
+        ),
     )
     args = parser.parse_args(argv)
     if not args.project_root.is_absolute():
@@ -7505,6 +7636,42 @@ def main(argv: list[str] | None = None) -> int:
         )
         role_profile_explicit = False
 
+    # WI-5171: establish explicit worker-role evidence before marker, activity,
+    # dashboard, or lifecycle work. The durable registry selected dispatch routing;
+    # it is not re-read here as behavior authority.
+    if startup_emit_requested:
+        try:
+            from groundtruth_kb.session.envelope import ensure_worker_session
+
+            from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+        except ImportError:  # pragma: no cover - direct script execution path
+            from groundtruth_kb.session.envelope import ensure_worker_session
+            from gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+
+        worker_session_id = resolve_session_id(order=BRIDGE_WORK_INTENT_ORDER)
+        if worker_session_id:
+            runtime_harness_name = (
+                args.harness_name
+                or os.environ.get("GTKB_HARNESS_NAME")
+                or ("claude" if (os.environ.get("CLAUDECODE") or os.environ.get("CLAUDE_CODE_SESSION_ID")) else "codex")
+            )
+            dispatch_run_id = os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID") or None
+            role_source = (
+                "dispatcher_composition"
+                if dispatch_run_id
+                else ("transcript_init_keyword" if role_profile_explicit else "session_resolver_fallback")
+            )
+            ensure_worker_session(
+                project_root,
+                harness_name=runtime_harness_name,
+                harness_id=args.harness_id,
+                session_id=worker_session_id,
+                role=role_profile,
+                role_source=role_source,
+                init_keyword=(os.environ.get("GTKB_BRIDGE_DISPATCH_KEYWORD") or None),
+                dispatch_run_id=dispatch_run_id,
+            )
+
     # Persist interactive role overrides (marker files) per WI-4673
     if override_role and args.harness_name:
         try:
@@ -7550,18 +7717,22 @@ def main(argv: list[str] | None = None) -> int:
             )
         except Exception:
             current_subject_for_guard = None
-        _arm_startup_interaction_guard(
+        # WI-5083: skip arming on a mid-session continuation (resume/compact) so
+        # the startup-input gate is not spuriously re-armed after the session
+        # already consumed its fresh-start gate.
+        _maybe_arm_startup_interaction_guard(
             lifecycle_guard_path,
             _startup_guard_id(),
             suppress_next_wrapup=role_profile != "loyal-opposition",
             current_subject=current_subject_for_guard,
+            session_start_source=args.session_start_source,
         )
 
     if args.emit_wrapup and not args.force_wrapup and _consume_startup_wrapup_guard(lifecycle_guard_path):
         _emit_no_hook_context()
         return 0
 
-    # Per bridge/generator-hardening-001-003.md Â§4.6: derive output paths
+    # Per bridge/generator-hardening-001-003.md Ã‚Â§4.6: derive output paths
     # from resolved project_root when CLI args are omitted, so a caller
     # passing only --project-root <child> gets all output under <child>.
     dashboard_dir = (
@@ -7575,7 +7746,7 @@ def main(argv: list[str] | None = None) -> int:
     bridge_maintenance = None
     startup_pruning = _startup_pruning_scan(project_root, bridge_maintenance) if startup_emit_requested else None
 
-    # Per bridge/generator-hardening-001-003.md Â§4.6: derive output paths
+    # Per bridge/generator-hardening-001-003.md Ã‚Â§4.6: derive output paths
     # from resolved project_root when CLI args are omitted, so a caller
     # passing only --project-root <child> gets all output under <child>.
     dashboard_dir = (
@@ -7586,21 +7757,27 @@ def main(argv: list[str] | None = None) -> int:
         if args.history_path is not None
         else project_root / "memory" / "gtkb-dashboard-history.json"
     )
-    result = write_dashboard_and_report(
-        project_root=project_root,
-        dashboard_dir=dashboard_dir,
-        history_path=history_path,
-        generate_pdf=not args.fast_hook,
-        seed_historical_backfill=not args.fast_hook,
-        startup_bridge_maintenance=bridge_maintenance,
-        startup_pruning=startup_pruning,
-        role_profile=role_profile,
-        harness_name=args.harness_name,
-        harness_id=args.harness_id,
-        role_record_path=role_record_path,
-        role_profile_explicit=role_profile_explicit,
-        fast_hook=args.fast_hook,
-    )
+    if args.emit_wrapup and args.fast_hook:
+        result = write_fast_wrapup_report(
+            project_root=project_root,
+            dashboard_dir=dashboard_dir,
+        )
+    else:
+        result = write_dashboard_and_report(
+            project_root=project_root,
+            dashboard_dir=dashboard_dir,
+            history_path=history_path,
+            generate_pdf=not args.fast_hook,
+            seed_historical_backfill=not args.fast_hook,
+            startup_bridge_maintenance=bridge_maintenance,
+            startup_pruning=startup_pruning,
+            role_profile=role_profile,
+            harness_name=args.harness_name,
+            harness_id=args.harness_id,
+            role_record_path=role_record_path,
+            role_profile_explicit=role_profile_explicit,
+            fast_hook=args.fast_hook,
+        )
     if startup_emit_requested:
         _maybe_open_dashboard_on_session_start(result["dashboard_url"])
     if args.json:

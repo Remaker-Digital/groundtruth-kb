@@ -37,6 +37,7 @@ def test_watchdog_detects_ollama_and_openrouter_backends() -> None:
     assert "openrouter_harness.py" in text
     assert "cursor_harness.py" in text
     assert "$NONCODEX_HARNESS_SCRIPT_PATTERN" in text
+    assert "$RUN_WITH_STATUS_SCRIPT_PATTERN" in text
     assert "$GTKB_VENV_PYTHON_PATTERN" in text
 
 
@@ -78,7 +79,7 @@ def test_watchdog_covers_registry_python_dispatch_harnesses() -> None:
         surfaces = harness.get("invocation_surfaces", {})
         for surface in surfaces.values():
             argv = surface.get("argv", [])
-            if not any(str(part).lower().endswith(("python.exe", "python")) for part in argv):
+            if not any(str(part).lower().endswith(("python.exe", "pythonw.exe", "python")) for part in argv):
                 continue
             for part in argv:
                 path = Path(str(part).replace("\\", "/"))
@@ -105,6 +106,21 @@ def test_watchdog_never_kills_claude() -> None:
     assert "$GTKB_VENV_PYTHON_PATTERN" in text
 
 
+def test_watchdog_tracks_daemon_run_with_status_wrappers() -> None:
+    text = _watchdog_text()
+
+    assert "$PYTHON_PROCESS_NAMES" in text
+    assert "pythonw.exe" in text
+    assert "run_with_status" in text
+    assert "Get-RunWithStatusLifetimeSeconds" in text
+    assert "max_lifetime_seconds" in text
+    assert "$CODEX_EXEC_PATTERN" in text
+    assert "wrapped=$dispatchWrapperCount" in text
+    assert "$CURSOR_AGENT_PROCESS_NAMES" in text
+    assert "$cursorAgents" in text
+    assert "cursorAgents=$cursorAgentCount" in text
+
+
 def test_watchdog_preserves_heartbeat_and_logrotate() -> None:
     text = _watchdog_text()
 
@@ -113,23 +129,32 @@ def test_watchdog_preserves_heartbeat_and_logrotate() -> None:
     assert "codex=$codexCount" in text
     assert "family=$familyCount" in text
     assert "noncodex=$noncodexCount" in text
+    assert "wrapped=$dispatchWrapperCount" in text
+    assert "cursorAgents=$cursorAgentCount" in text
     # WI-4780: kill-switch-presence assertion removed (the watchdog no longer
     # auto-asserts it); heartbeat + logrotate observability is preserved.
     assert "Move-Item $log" in text
     assert "1MB" in text
 
 
-def test_watchdog_uses_headless_python_for_reap_decider() -> None:
-    """The scheduled watchdog runs every minute; the reap decider must use
-    pythonw.exe so a visible console is not allocated on each tick."""
+def test_watchdog_uses_headless_python_file_transport_for_reap_decider() -> None:
+    """The scheduled watchdog must not allocate a visible console or depend on
+    stdout capture from pythonw.exe."""
     text = _watchdog_text()
+
     assert "pythonw.exe" in text
     assert "storm_watchdog_reap.py" in text
+    assert "Start-Process -FilePath $pythonExe" in text
+    assert "-Wait -PassThru -WindowStyle Hidden" in text
+    assert "'--output-file'" in text
+    assert "$decisionFile" in text
+    assert "[System.IO.File]::ReadAllText($decisionFile)" in text
+    assert "decisionRaw = (& $pythonExe" not in text
 
 
 def test_watchdog_does_not_auto_assert_kill_switch() -> None:
     """WI-4780 / SPEC-DISPATCH-KILL-SWITCH-EMERGENCY-ONLY-001 A.1: the watchdog
-    MUST NOT auto-assert the global GTKB_NO_CROSS_HARNESS_TRIGGER kill-switch.
+    MUST NOT auto-assert the global GTKB_DISPATCHER_DAEMON_DISABLED kill-switch.
 
     Storm protection is the verified concurrency cap (WI-4472) and the
     worker-lifetime timeout (WI-4806); corpse-reaping is retained but the
@@ -137,7 +162,7 @@ def test_watchdog_does_not_auto_assert_kill_switch() -> None:
     """
     text = _watchdog_text()
 
-    assert "SetEnvironmentVariable('GTKB_NO_CROSS_HARNESS_TRIGGER'" not in text
+    assert "SetEnvironmentVariable('GTKB_DISPATCHER_DAEMON_DISABLED'" not in text
     assert "kill-switch=not-asserted" in text
     # corpse-reaping retained (WI-4780 option a: reap, do not latch)
     assert "Stop-Process -Id $p.ProcessId" in text

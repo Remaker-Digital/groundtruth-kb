@@ -19,6 +19,8 @@ from pathlib import Path
 
 from groundtruth_kb.project.doctor import _check_external_harness_exec_boundary
 
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 _PARAMETRIZED_TRIGGER = '''"""Stub trigger; parametrized command from registry projection."""
 import shutil
 import subprocess
@@ -79,7 +81,7 @@ def _build_project(
             encoding="utf-8",
         )
     if trigger_text is not None:
-        (tmp_path / "scripts" / "cross_harness_bridge_trigger.py").write_text(
+        (tmp_path / "scripts" / "dispatcher_runtime.py").write_text(
             trigger_text,
             encoding="utf-8",
         )
@@ -138,7 +140,7 @@ def test_fail_when_non_harness_literal_subprocess_call_introduced(
 
     assert result.status == "fail", f"expected fail; got {result.status}: {result.message}"
     assert "wget" in result.message
-    assert "cross_harness_bridge_trigger.py" in result.message
+    assert "dispatcher_runtime.py" in result.message
     assert "non-harness" in result.message.lower()
 
 
@@ -187,3 +189,10 @@ def test_check_is_deterministic_and_read_only(tmp_path: Path) -> None:
     assert result_first.status == result_second.status
     assert result_first.message == result_second.message
     assert files_before == files_after, "check mutated filesystem state — must be strictly read-only"
+
+
+def test_live_dispatcher_runtime_has_no_literal_non_harness_exec_resolution() -> None:
+    """The live dispatcher surfaces must satisfy the external exec boundary."""
+    result = _check_external_harness_exec_boundary(_PROJECT_ROOT)
+
+    assert result.status == "pass", f"expected pass; got {result.status}: {result.message}"

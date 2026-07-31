@@ -1,247 +1,99 @@
-"""Slice 6: MemBase attribution follows the resolved interactive session role.
-
-bridge/gtkb-interactive-session-role-override-slice-6-attribution-role-awareness-001.md
-(Codex GO at -002).
-
-Covers:
-- A declared interactive session role overrides the durable role for the
-  ``changed_by`` LABEL (ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 Decision 1).
-- The override is layered on the fail-closed durable resolution: no durable role
-  -> RuntimeError BEFORE any marker can affect the result (the
-  gtkb-kb-attribution-harness-aware mis-attribution invariant is preserved).
-- The override is interactive-only (headless dispatch keeps durable attribution).
-- The override layer is fail-soft (resolver error -> keep durable label), and it
-  never masks a durable-attribution failure.
-"""
+"""Validation coverage for document-authoritative worker-role provenance."""
 
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import pytest
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-import scripts._kb_attribution as kb  # noqa: E402
-
-_LO = "loyal-opposition"
-_PB = "prime-builder"
-_ENV_VAR_HARNESS_NAME = "GTKB_HARNESS_NAME"
-_VENDOR_ENV_VARS = (
-    "CLAUDECODE",
-    "CLAUDE_CODE_SESSION_ID",
-    "CLAUDE_PROJECT_DIR",
-    "CODEX_HOME",
-    "CODEX_THREAD_ID",
+from groundtruth_kb.session.envelope import (
+    EnvelopeError,
+    resolve_worker_role_provenance,
+    worker_session_envelope_path,
 )
 
 
-# ---------------------------------------------------------------------------
-# resolve_changed_by composition: durable (fail-closed) + marker label override.
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def stub_harness(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Stub the harness-id lookup so resolve_changed_by reaches the role step.
-
-    Tests set _role_for_harness_id and _session_role_override per case.
-    """
-    monkeypatch.setattr(kb, "_harness_id_for_name", lambda name: "B")
-
-
-def test_attribution_lo_marker_overrides_durable_pb(monkeypatch: pytest.MonkeyPatch, stub_harness: None) -> None:
-    monkeypatch.setattr(kb, "_role_for_harness_id", lambda hid: _PB)  # durable PB
-    monkeypatch.setattr(kb, "_session_role_override", lambda name: _LO)  # declared LO
-    assert kb.resolve_changed_by(harness_name="claude") == "loyal-opposition/claude"
-
-
-def test_attribution_pb_marker_overrides_durable_lo(monkeypatch: pytest.MonkeyPatch, stub_harness: None) -> None:
-    monkeypatch.setattr(kb, "_role_for_harness_id", lambda hid: _LO)  # durable LO
-    monkeypatch.setattr(kb, "_session_role_override", lambda name: _PB)  # declared PB
-    assert kb.resolve_changed_by(harness_name="codex") == "prime-builder/codex"
-
-
-def test_attribution_no_marker_uses_durable(monkeypatch: pytest.MonkeyPatch, stub_harness: None) -> None:
-    monkeypatch.setattr(kb, "_role_for_harness_id", lambda hid: _PB)
-    monkeypatch.setattr(kb, "_session_role_override", lambda name: None)  # no marker
-    assert kb.resolve_changed_by(harness_name="claude") == "prime-builder/claude"
-
-
-def test_attribution_failclosed_when_no_durable_role(monkeypatch: pytest.MonkeyPatch, stub_harness: None) -> None:
-    """No durable role -> RuntimeError BEFORE any marker override can apply."""
-    monkeypatch.setattr(kb, "_role_for_harness_id", lambda hid: None)  # no durable role
-
-    called = {"override": False}
-
-    def _tracking_override(name: str) -> str | None:
-        called["override"] = True
-        return _LO
-
-    monkeypatch.setattr(kb, "_session_role_override", _tracking_override)
-    with pytest.raises(RuntimeError):
-        kb.resolve_changed_by(harness_name="claude")
-    assert called["override"] is False, "override ran before the fail-closed durable check"
-
-
-# ---------------------------------------------------------------------------
-# _session_role_override behavior (resolver + headless guard + fail-soft).
-# ---------------------------------------------------------------------------
-
-
-def _patch_resolver(monkeypatch: pytest.MonkeyPatch, result: object) -> None:
-    import scripts.session_role_resolution as srr
-
-    if isinstance(result, Exception):
-
-        def _boom(*a: object, **k: object) -> tuple[str, str]:
-            raise result
-
-        monkeypatch.setattr(srr, "resolve_interactive_session_role", _boom)
-    else:
-        monkeypatch.setattr(srr, "resolve_interactive_session_role", lambda *a, **k: result)
-
-
-@pytest.mark.parametrize("source", ["marker", "marker_session_id_unverified"])
-def test_override_returns_role_for_marker_sources(monkeypatch: pytest.MonkeyPatch, source: str) -> None:
-    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
-    _patch_resolver(monkeypatch, (_LO, source))
-    assert kb._session_role_override("claude") == _LO
-
-
-@pytest.mark.parametrize(
-    "source",
-    ["durable_marker_absent", "durable_marker_invalid_role", "durable_marker_stale_session"],
-)
-def test_override_returns_none_for_durable_sources(monkeypatch: pytest.MonkeyPatch, source: str) -> None:
-    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
-    _patch_resolver(monkeypatch, (_PB, source))
-    assert kb._session_role_override("claude") is None
-
-
-def test_override_none_under_headless_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Headless dispatch (env-var present) -> no override even with a marker."""
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "run-123")
-    # Resolver would return a marker role, but the headless guard returns first.
-    called = {"resolver": False}
-
-    import scripts.session_role_resolution as srr
-
-    def _should_not_run(*a: object, **k: object) -> tuple[str, str]:
-        called["resolver"] = True
-        return (_LO, "marker")
-
-    monkeypatch.setattr(srr, "resolve_interactive_session_role", _should_not_run)
-    assert kb._session_role_override("claude") is None
-    assert called["resolver"] is False, "resolver consulted under headless dispatch"
-
-
-def test_override_fail_soft_on_resolver_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A resolver error returns None (keep durable label), never raises."""
-    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
-    _patch_resolver(monkeypatch, RuntimeError("resolver unavailable"))
-    assert kb._session_role_override("claude") is None
-
-
-def test_headless_attribution_keeps_durable(monkeypatch: pytest.MonkeyPatch, stub_harness: None) -> None:
-    """End-to-end: under headless dispatch, resolve_changed_by keeps the durable role."""
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "run-123")
-    monkeypatch.setattr(kb, "_role_for_harness_id", lambda hid: _PB)  # durable PB
-
-    import scripts.session_role_resolution as srr
-
-    # Even if a marker would say LO, the headless guard inside _session_role_override
-    # suppresses it, so attribution stays durable PB.
-    monkeypatch.setattr(srr, "resolve_interactive_session_role", lambda *a, **k: (_LO, "marker"))
-    assert kb.resolve_changed_by(harness_name="claude") == "prime-builder/claude"
-
-
-# ---------------------------------------------------------------------------
-# _resolve_harness_name envelope source: interactive harness name precedes
-# vendor signals and durable Prime fallback.
-# ---------------------------------------------------------------------------
-
-
-def _write_session_envelope(project_root: Path, harness_name: str, *, status: str = "open") -> None:
-    envelope_path = project_root / "harness-state" / harness_name / "session-envelope.json"
-    envelope_path.parent.mkdir(parents=True, exist_ok=True)
-    envelope_path.write_text(
+def _write_envelope(
+    root: Path,
+    *,
+    harness_name: str = "codex",
+    session_id: str = "session-5171",
+    role: str = "prime-builder",
+    provenance_session_id: str | None = None,
+    provenance_role: str | None = None,
+    status: str = "open",
+) -> None:
+    harness_id = "A" if harness_name == "codex" else "B"
+    path = worker_session_envelope_path(root, harness_name, session_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
         json.dumps(
             {
-                "schema_version": 1,
                 "status": status,
+                "session_id": session_id,
+                "harness_id": harness_id,
                 "harness_name": harness_name,
-                "role_resolved": _PB,
+                "worker_role_provenance": {
+                    "schema_version": 1,
+                    "session_id": provenance_session_id or session_id,
+                    "harness_id": harness_id,
+                    "harness_name": harness_name,
+                    "role": provenance_role or role,
+                    "role_resolution_source": "dispatcher_composition",
+                    "dispatch_run_id": session_id,
+                    "issued_at": "2026-07-10T18:00:00Z",
+                },
             }
         ),
         encoding="utf-8",
     )
 
 
-@pytest.fixture
-def envelope_harness_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    monkeypatch.setattr(kb, "PROJECT_ROOT", tmp_path)
-    monkeypatch.setattr(kb, "_active_prime_builder_harness_name", lambda: "codex")
-    monkeypatch.setattr(kb, "_harness_id_for_name", lambda name: {"claude": "B", "codex": "A"}.get(name))
-    monkeypatch.setattr(kb, "_role_for_harness_id", lambda hid: {"A": _LO, "B": _LO}.get(hid))
-    monkeypatch.setattr(kb, "_session_role_override", lambda name: _PB if name == "claude" else None)
-    monkeypatch.delenv(_ENV_VAR_HARNESS_NAME, raising=False)
-    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
-    for env_var in _VENDOR_ENV_VARS:
-        monkeypatch.delenv(env_var, raising=False)
-    return tmp_path
+def test_valid_document_provenance_is_returned(tmp_path: Path) -> None:
+    _write_envelope(tmp_path, harness_name="claude", role="loyal-opposition")
+
+    result = resolve_worker_role_provenance(tmp_path, current_session_id="session-5171", harness_name="claude")
+
+    assert result["role"] == "loyal-opposition"
+    assert result["dispatch_run_id"] == "session-5171"
 
 
-def test_attribution_uses_open_envelope_harness_over_durable_prime(
-    envelope_harness_state: Path,
-) -> None:
-    _write_session_envelope(envelope_harness_state, "claude")
-    assert kb.resolve_changed_by() == "prime-builder/claude"
+def test_role_dcl_a5_rejects_missing_or_malformed_explicit_document(tmp_path: Path) -> None:
+    with pytest.raises(EnvelopeError, match="missing"):
+        resolve_worker_role_provenance(tmp_path, current_session_id="session-5171", harness_name="codex")
+
+    path = worker_session_envelope_path(tmp_path, "codex", "session-5171")
+    path.parent.mkdir(parents=True)
+    path.write_text("not-json", encoding="utf-8")
+    with pytest.raises(EnvelopeError, match="malformed"):
+        resolve_worker_role_provenance(tmp_path, current_session_id="session-5171", harness_name="codex")
 
 
-def test_attribution_env_var_overrides_open_envelope(
-    envelope_harness_state: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _write_session_envelope(envelope_harness_state, "claude")
-    monkeypatch.setenv(_ENV_VAR_HARNESS_NAME, "codex")
-    assert kb.resolve_changed_by() == "loyal-opposition/codex"
+def test_role_dcl_a5_rejects_stale_session_and_conflicting_provenance(tmp_path: Path) -> None:
+    _write_envelope(tmp_path, session_id="stale-session")
+    with pytest.raises(EnvelopeError, match="session id does not match"):
+        resolve_worker_role_provenance(tmp_path, current_session_id="session-5171", harness_name="codex")
+
+    _write_envelope(tmp_path, provenance_session_id="other-session")
+    with pytest.raises(EnvelopeError, match="conflicts with its session envelope"):
+        resolve_worker_role_provenance(tmp_path, current_session_id="session-5171", harness_name="codex")
 
 
-def test_attribution_open_envelope_precedes_vendor_signal(
-    envelope_harness_state: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _write_session_envelope(envelope_harness_state, "claude")
-    monkeypatch.setenv("CODEX_HOME", "C:/Users/example/.codex")
-    assert kb.resolve_changed_by() == "prime-builder/claude"
+def test_worker_document_role_is_independent_of_dispatch_audit_metadata(tmp_path: Path) -> None:
+    _write_envelope(tmp_path, role="prime-builder")
+
+    result = resolve_worker_role_provenance(
+        tmp_path,
+        current_session_id="session-5171",
+        harness_name="codex",
+    )
+
+    assert result["role"] == "prime-builder"
 
 
-def test_attribution_falls_back_to_durable_prime_when_no_open_envelope(
-    envelope_harness_state: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(kb, "_role_for_harness_id", lambda hid: {"A": _PB, "B": _LO}.get(hid))
-    monkeypatch.setattr(kb, "_session_role_override", lambda name: None)
-    assert kb.resolve_changed_by() == "prime-builder/codex"
+def test_ambiguous_documents_fail_closed(tmp_path: Path) -> None:
+    _write_envelope(tmp_path, harness_name="codex")
+    _write_envelope(tmp_path, harness_name="claude")
 
-
-def test_attribution_envelope_source_skipped_under_headless_dispatch(
-    envelope_harness_state: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _write_session_envelope(envelope_harness_state, "claude")
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "run-123")
-    monkeypatch.setattr(kb, "_role_for_harness_id", lambda hid: {"A": _PB, "B": _LO}.get(hid))
-    monkeypatch.setattr(kb, "_session_role_override", lambda name: None)
-    assert kb.resolve_changed_by() == "prime-builder/codex"
-
-
-def test_attribution_multiple_open_envelopes_defer_to_fallback(
-    envelope_harness_state: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _write_session_envelope(envelope_harness_state, "claude")
-    _write_session_envelope(envelope_harness_state, "codex")
-    monkeypatch.setattr(kb, "_role_for_harness_id", lambda hid: {"A": _PB, "B": _LO}.get(hid))
-    monkeypatch.setattr(kb, "_session_role_override", lambda name: None)
-    assert kb.resolve_changed_by() == "prime-builder/codex"
+    with pytest.raises(EnvelopeError, match="ambiguous"):
+        resolve_worker_role_provenance(tmp_path, current_session_id="session-5171")

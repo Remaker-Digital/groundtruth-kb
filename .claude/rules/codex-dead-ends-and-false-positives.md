@@ -20,8 +20,7 @@ Purpose: preserve failed approaches, avoidable errors, and false positives so fu
   For any claim about Claude-resolved memory or session artifacts, verify both:
   1. repo-local path
   2. user-local Claude path
-- source:
-  `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-03-17-18-09.md`
+- source: retired 2026-07-17 Loyal Opposition report; lesson preserved as historical context, not a live dependency.
 
 ### 2026-03-17 - Audit signal fragmentation across overlapping files
 
@@ -30,10 +29,10 @@ Purpose: preserve failed approaches, avoidable errors, and false positives so fu
 - why it happened:
   There was no hard rule enforcing one canonical report per session.
 - prevention rule:
-  Produce one canonical `INSIGHTS-YYYY-MM-DD-HH-mm.md` file per session.
-  Use appendices only for raw evidence or supporting material.
-- source:
-  `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-03-17-18-09.md`
+  Produce one canonical report artifact per session in the approved bridge or
+  Deliberation Archive destination. Use appendices only for raw evidence or
+  supporting material.
+- source: retired 2026-07-17 Loyal Opposition report; lesson preserved as historical context, not a live dependency.
 
 ### 2026-03-25 - Review recommendations should separate immediate controls from optional later hardening
 

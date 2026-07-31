@@ -55,6 +55,21 @@ def test_ac2_each_scenario_returns_table_content(router_module, scenario: str) -
 def test_ac3_unknown_inputs_yield_empty_advisory(router_module) -> None:
     assert router_module.suggest(scenario="not-a-real-scenario").is_empty
     assert router_module.suggest(bridge_status="WITHDRAWN").is_empty
+    assert router_module.suggest(activity="not-a-canonical-activity").is_empty
+
+
+def test_activity_envelope_skill_advisory_uses_disposition_profile(router_module) -> None:
+    result = router_module.suggest(activity="spec")
+    assert result.scenario == "activity:spec"
+    assert result.matched_by == "activity_envelope"
+    assert "kb-spec" in result.recommended or "spec-intake" in result.recommended
+
+
+def test_ops_activity_recommends_deep_clean_reclaim_skill(router_module) -> None:
+    result = router_module.suggest(activity="ops")
+    assert result.scenario == "activity:ops"
+    assert result.matched_by == "activity_envelope"
+    assert "gtkb-hygiene-reclaim" in result.recommended
 
 
 def test_ac4_table_edit_changes_output_without_router_code_change(router_module, tmp_path: Path) -> None:

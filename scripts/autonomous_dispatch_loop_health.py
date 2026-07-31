@@ -35,7 +35,7 @@ REFERENCE_SESSION_ID = "019eec48-908b-7592-a0c6-4e25b7ca4df0"
 REQUIRED_LIFECYCLE_PHASES = ["proposal", "go", "implementation_report", "verified"]
 
 _STATUS_TOKEN_RE = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\s*$",
+    r"^(NEW|REVISED|NO-ACTION|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\s*$",
     re.IGNORECASE,
 )
 
@@ -119,6 +119,8 @@ def _classify_version(version: BridgeVersion, prev_status: str | None) -> str:
         return "go"
     if s == "NO-GO":
         return "no_go"
+    if s == "NO-ACTION":
+        return "no_action"
     if s == "VERIFIED":
         return "verified"
     if s == "ADVISORY":
@@ -239,7 +241,13 @@ def validate_loop(
             f"Expected session id {expected_session_id} not found; found: " + (", ".join(set(all_sessions)) or "(none)")
         )
 
-    complete = not phases_missing and wi_found and (not expected_session_id or session_found)
+    latest_status = versions[-1].status
+    if latest_status != "VERIFIED":
+        errors.append(f"Latest bridge status is {latest_status}, not terminal VERIFIED")
+
+    complete = (
+        not phases_missing and wi_found and (not expected_session_id or session_found) and latest_status == "VERIFIED"
+    )
 
     return HealthResult(
         slug=slug,

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib.util
-import re
 import sys
 from pathlib import Path
 
@@ -11,29 +10,6 @@ from groundtruth_kb.db import KnowledgeDB
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "audit_standing_backlog_sources.py"
-DROPBOX_DIR = REPO_ROOT / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-
-_DATED_SNAPSHOT_RE = re.compile(r"STANDING-BACKLOG-HARVEST-(\d{4}-\d{2}-\d{2}).*\.md$")
-
-
-def _most_recent_dated_snapshot(dropbox_dir: Path) -> Path:
-    """Return the most-recent ``STANDING-BACKLOG-HARVEST-YYYY-MM-DD*.md`` snapshot.
-
-    Per ``GTKB-GOV-010-FOLLOWUP-OBSERVATIONS-S342`` item 3, this glob-based lookup
-    decouples the harvest regression test from any specific dated snapshot filename
-    so future refreshes (additive new dated files) are durable without test churn.
-    Ordering key is the ``YYYY-MM-DD`` prefix; ties broken by full filename
-    descending so additive same-day refreshes sort after a plain same-day base file.
-    """
-    matches: list[tuple[str, str, Path]] = []
-    for path in dropbox_dir.glob("STANDING-BACKLOG-HARVEST-*.md"):
-        match = _DATED_SNAPSHOT_RE.search(path.name)
-        if match:
-            matches.append((match.group(1), path.name, path))
-    if not matches:
-        raise FileNotFoundError(f"No STANDING-BACKLOG-HARVEST-YYYY-MM-DD*.md files found in {dropbox_dir}")
-    matches.sort(key=lambda item: (item[0], item[1]), reverse=True)
-    return matches[0][2]
 
 
 def _load_module():
@@ -113,45 +89,36 @@ def test_standing_backlog_audit_summarizes_membase_work_items_and_release_blocke
 
 
 def test_standing_backlog_contains_harvested_source_items() -> None:
-    """Verifies that harvest disposition and snapshot reports contain expected items.
+    """Verify current structured backlog ownership and live audit evidence."""
+    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
+    try:
+        items = {item_id: db.get_work_item(item_id) for item_id in ("GTKB-GOV-004", "GTKB-GOV-009", "GTKB-GOV-010")}
+    finally:
+        db.close()
 
-    The standing backlog was migrated to MemBase per DELIB-S337; the former
-    markdown standing-backlog file is retired. Assertions that read that file
-    are removed; remaining assertions verify the LO disposition and harvest
-    snapshot reports.
-    """
-    disposition_report = (
-        REPO_ROOT
-        / "independent-progress-assessments"
-        / "CODEX-INSIGHT-DROPBOX"
-        / "STANDING-BACKLOG-BRIDGE-DISPOSITIONS-2026-04-20.md"
-    ).read_text(encoding="utf-8")
-    azure_verified_baseline_harvest_report = (
-        REPO_ROOT
-        / "independent-progress-assessments"
-        / "CODEX-INSIGHT-DROPBOX"
-        / "STANDING-BACKLOG-HARVEST-2026-04-23-AZURE-VERIFIED.md"
-    ).read_text(encoding="utf-8")
-    current_harvest_report = _most_recent_dated_snapshot(DROPBOX_DIR).read_text(encoding="utf-8")
+    assert all(items.values()), f"expected canonical backlog records; got {items}"
 
-    assert "`gtkb-azure-cicd-gates` `GO`" in disposition_report
-    assert "`gtkb-azure-cicd-gates` at `VERIFIED`" in azure_verified_baseline_harvest_report
-    assert "bridge/gtkb-azure-cicd-gates-010.md" in azure_verified_baseline_harvest_report
-    assert "It is assigned to `GTKB-GOV-009`" in disposition_report
-    assert "`agent-red-bridge-dispatcher-deferral-enforcement-implementation` `NO-GO`" in disposition_report
-    assert "`commercial-readiness-spec-1831-startup-wiring` `NO-GO`" in disposition_report
-    assert "`commercial-readiness-spec-verification` `NO-GO`" in disposition_report
-    assert "`commercial-readiness-spec-1833-ready-propagation` `NO-GO`" in disposition_report
+    harvest_parent = items["GTKB-GOV-004"]
+    assert harvest_parent["project_name"] == "GTKB-GOV-004"
+    assert harvest_parent["resolution_status"] == "retired"
+    assert "unified backlog" in harvest_parent["title"].lower()
 
-    assert "GTKB-GOV-010" in current_harvest_report, (
-        "current harvest snapshot must reference the GTKB-GOV-010 parent directive"
-    )
-    assert "status_counts" in current_harvest_report, (
-        "current harvest snapshot must contain the bridge status_counts shape key"
-    )
-    assert "release_blockers" in current_harvest_report, (
-        "current harvest snapshot must contain the release_blockers shape key"
-    )
+    azure_gate = items["GTKB-GOV-009"]
+    assert azure_gate["resolution_status"] == "verified"
+    assert "bridge/gtkb-azure-cicd-gates-010.md" in azure_gate["status_detail"]
+
+    audit_owner = items["GTKB-GOV-010"]
+    assert audit_owner["resolution_status"] == "retired"
+    assert "audit as release-gate input" in audit_owner["title"].lower()
+    assert "gtkb-standing-backlog-harvest-audit-maintenance VERIFIED@-006" in audit_owner["status_detail"]
+
+    module = _load_module()
+    audit = module.build_audit(REPO_ROOT)
+
+    assert set(audit) == {"bridge", "work_items", "release_blockers"}
+    assert isinstance(audit["bridge"]["status_counts"], dict)
+    assert isinstance(audit["work_items"]["status_counts"], dict)
+    assert isinstance(audit["release_blockers"], list)
 
 
 def test_standing_backlog_audit_treats_withdrawn_as_terminal_not_actionable(tmp_path: Path) -> None:

@@ -30,7 +30,7 @@ DEFAULT_BENCHMARKS_DIR = Path(".gtkb-state") / "benchmarks"
 ITEMS_FILE = "backlog_triage_items.json"
 RUN_FILE = "run.json"
 BACKLOG_TRIAGE_BENCHMARK_ID = "backlog_triage"
-LABEL_RETIRE_UNAPPROVED_NOISE = "retire_candidate_unapproved_noise"
+LABEL_RETIRE_ROUTER_LOW_SIGNAL = "retire_candidate_router_low_signal"
 PLATFORM_SCOPE = "platform"
 MAX_BATCH_SIZE = 50
 OPEN_STATES = {None, "", "open"}
@@ -126,7 +126,7 @@ def _cohort_items(manifest: Manifest) -> list[dict[str, Any]]:
     cohort = [
         item
         for item in manifest.items
-        if item.get("label") == LABEL_RETIRE_UNAPPROVED_NOISE and item.get("scope") == PLATFORM_SCOPE
+        if item.get("label") == LABEL_RETIRE_ROUTER_LOW_SIGNAL and item.get("scope") == PLATFORM_SCOPE
     ]
     return sorted(cohort, key=lambda item: str(item.get("id") or ""))
 
@@ -186,7 +186,6 @@ def build_dry_run(
             "label": item.get("label"),
             "scope": item.get("scope"),
             "router_generated": item.get("router_generated"),
-            "approval_state": item.get("approval_state"),
         }
         candidates.append(enriched)
 

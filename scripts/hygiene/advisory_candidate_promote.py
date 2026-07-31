@@ -89,6 +89,8 @@ def _candidate_view(candidate: dict[str, Any]) -> dict[str, Any]:
         "relative_path": candidate.get("relative_path"),
         "advisory_date": candidate.get("advisory_date"),
         "related_bridge_threads": candidate.get("related_bridge_threads"),
+        "related_bridge_threads_role": candidate.get("related_bridge_threads_role"),
+        "provenance_bridge_thread": candidate.get("provenance_bridge_thread"),
     }
 
 
@@ -221,6 +223,8 @@ def _append_candidate_event(
         "priority",
         "severity_token",
         "related_bridge_threads",
+        "related_bridge_threads_role",
+        "provenance_bridge_thread",
         "advisory_date",
         "origin",
         "component",
@@ -264,6 +268,15 @@ def _candidate_title(candidate: dict[str, Any]) -> str:
     return str(candidate.get("proposed_title") or candidate.get("title") or candidate["source_key"])
 
 
+def _implementation_related_bridge_threads(candidate: dict[str, Any]) -> Any:
+    """Return implementation bridge links, never advisory provenance links."""
+
+    role = str(candidate.get("related_bridge_threads_role") or "").strip().lower()
+    if role == "implementation":
+        return candidate.get("related_bridge_threads")
+    return None
+
+
 def _insert_promoted_work_item(
     db: KnowledgeDB,
     candidate: dict[str, Any],
@@ -289,12 +302,11 @@ def _insert_promoted_work_item(
         source_spec_id=str(candidate.get("source_spec_id") or router.SOURCE_SPEC_ID),
         priority=candidate.get("priority"),
         stage="backlogged",
-        approval_state="auq_resolved",
         source_owner_directive=f"Per-batch owner AUQ {packet['auq_id']}",
         source_deliberation_query=f"Stage 3 advisory candidate {candidate['source_key']}",
         related_deliberation_ids=str(candidate["source_key"]),
         related_spec_ids_at_creation=json.dumps([router.SOURCE_SPEC_ID]),
-        related_bridge_threads=candidate.get("related_bridge_threads"),
+        related_bridge_threads=_implementation_related_bridge_threads(candidate),
         acceptance_summary="Promoted from Stage 3 advisory candidate after owner batch AUQ.",
         regression_visibility="visible",
     )

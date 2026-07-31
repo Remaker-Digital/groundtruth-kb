@@ -2,20 +2,19 @@
 """GroundTruth-KB bridge package.
 
 RETIRED: The smart-poller mechanism was retired on 2026-05-09 in favor of the
-cross-harness event-driven trigger at ``scripts/cross_harness_bridge_trigger.py``.
+dispatcher daemon.
 The runtime entrypoint (``bridge_poller_runner``) and OS-task install scripts
 have been archived to ``archive/smart-poller-2026-05-09/``. The detector,
 checkpoint, routing, audit, registry, paths, notify, and handshake modules in
 this package are retained for compatibility and historical reference; they are
-no longer the active dispatch surface. Bridge dispatch is now governed by
-``.claude/settings.json`` and ``.codex/hooks.json`` PostToolUse + Stop hooks.
+no longer the active dispatch surface. Bridge dispatch is now governed by the
+dispatcher daemon.
 
 The legacy SQLite/MCP message bridge is also retained for compatibility with
 projects that still depend on the older database-backed Prime Bridge runtime.
 New GroundTruth dual-agent projects should use the file bridge pattern
-documented in ``docs/method/12-file-bridge-automation.md`` and the
-cross-harness event-driven trigger described in
-``docs/tutorials/dual-agent-setup.md``.
+documented in ``docs/method/12-file-bridge-automation.md`` and the dispatcher
+daemon described in ``docs/tutorials/dual-agent-setup.md``.
 
 Historical references in code comments below to "smart-poller P1/P2/P2.5/P3"
 work programs describe the now-retired runtime; the modules themselves remain

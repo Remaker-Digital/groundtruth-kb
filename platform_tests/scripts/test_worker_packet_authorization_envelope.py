@@ -37,6 +37,11 @@ def _write_proposal(project_root: Path, slug: str, target_paths: list[str]) -> N
     path.write_text(
         "\n".join(
             [
+                "NEW",
+                "author_identity: prime-builder/test",
+                "author_harness_id: T",
+                "author_session_context_id: test-prime-session",
+                "",
                 f"# Fixture proposal {slug}",
                 "",
                 f"target_paths: {json.dumps(target_paths)}",
@@ -58,7 +63,14 @@ def _write_proposal(project_root: Path, slug: str, target_paths: list[str]) -> N
         ),
         encoding="utf-8",
     )
-    (project_root / "bridge" / f"{slug}-002.md").write_text("GO\n\nFixture GO.\n", encoding="utf-8")
+    (project_root / "bridge" / f"{slug}-002.md").write_text(
+        "GO\n"
+        "author_identity: loyal-opposition/test\n"
+        "author_harness_id: T\n"
+        "author_session_context_id: test-lo-session\n"
+        "\nFixture GO.\n",
+        encoding="utf-8",
+    )
 
 
 def _setup_go(project_root: Path, slug: str, target_paths: list[str]) -> None:
@@ -67,7 +79,31 @@ def _setup_go(project_root: Path, slug: str, target_paths: list[str]) -> None:
     _write_index(project_root, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
 
 
-def test_dispatch_issue_writes_named_packets_and_current_pointer(auth_module, tmp_path: Path) -> None:
+def _write_prime_worker_session(project_root: Path, session_id: str) -> None:
+    document = {
+        "status": "open",
+        "session_id": session_id,
+        "harness_id": "T",
+        "harness_name": "fixture",
+        "worker_role_provenance": {
+            "schema_version": 1,
+            "session_id": session_id,
+            "harness_id": "T",
+            "harness_name": "fixture",
+            "role": "prime-builder",
+            "role_resolution_source": "test-fixture",
+            "issued_at": "2026-07-13T00:00:00Z",
+            "dispatch_run_id": "dispatch-123",
+        },
+    }
+    path = project_root / "harness-state" / "fixture" / "session-envelopes" / f"{session_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+
+def test_dispatch_issue_writes_named_packets_and_current_pointer(
+    auth_module, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _setup_go(tmp_path, "bridge-a", ["scripts/a.py"])
     _setup_go(tmp_path, "bridge-b", ["scripts/b.py"])
     _write_index(
@@ -77,11 +113,17 @@ def test_dispatch_issue_writes_named_packets_and_current_pointer(auth_module, tm
             "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a.md\n",
         ],
     )
+    session_id = "dispatch-session"
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "fixture")
+    _write_prime_worker_session(tmp_path, session_id)
+    assert auth_module.bridge_work_intent_registry.acquire("bridge-a", session_id, project_root=tmp_path)
+    assert auth_module.bridge_work_intent_registry.acquire("bridge-b", session_id, project_root=tmp_path)
 
     context = auth_module.issue_dispatch_authorization_packets(
         tmp_path,
         ["bridge-a", "bridge-b"],
         dispatch_id="dispatch-123",
+        session_id=session_id,
     )
 
     assert context["dispatch_id"] == "dispatch-123"
@@ -90,9 +132,12 @@ def test_dispatch_issue_writes_named_packets_and_current_pointer(auth_module, tm
     assert json.loads(auth_module.packet_path(tmp_path).read_text(encoding="utf-8"))["bridge_id"] == "bridge-a"
     assert auth_module.packet_path_for_bridge(tmp_path, "bridge-a").is_file()
     assert auth_module.packet_path_for_bridge(tmp_path, "bridge-b").is_file()
+    assert json.loads(auth_module.packet_path(tmp_path).read_text(encoding="utf-8"))["schema_version"] == 3
 
 
-def test_dispatch_issue_fails_without_partial_writes(auth_module, tmp_path: Path) -> None:
+def test_dispatch_issue_fails_without_partial_writes(
+    auth_module, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _setup_go(tmp_path, "bridge-a", ["scripts/a.py"])
     _write_index(
         tmp_path,
@@ -101,12 +146,17 @@ def test_dispatch_issue_fails_without_partial_writes(auth_module, tmp_path: Path
             "Document: missing-bridge\nGO: bridge/missing-bridge-002.md\nNEW: bridge/missing-bridge.md\n",
         ],
     )
+    session_id = "dispatch-session"
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "fixture")
+    _write_prime_worker_session(tmp_path, session_id)
+    assert auth_module.bridge_work_intent_registry.acquire("bridge-a", session_id, project_root=tmp_path)
 
     with pytest.raises(auth_module.AuthorizationError):
         auth_module.issue_dispatch_authorization_packets(
             tmp_path,
             ["bridge-a", "missing-bridge"],
             dispatch_id="dispatch-123",
+            session_id=session_id,
         )
 
     assert not auth_module.packet_path(tmp_path).exists()

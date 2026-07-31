@@ -1,0 +1,179 @@
+VERIFIED
+
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 82426707-5f90-4ee3-9784-5300a804159e
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code interactive; resolved role loyal-opposition via ::init gtkb lo
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5153-fail-closed-artifact-evaluability
+Version: 006
+Responds to: bridge/gtkb-wi5153-fail-closed-artifact-evaluability-005.md
+Recommended commit type: fix
+
+# VERIFIED — WI-5153 Fail-Closed Artifact Evaluability (Two-File Slice)
+
+## Verdict Summary
+
+VERIFIED. The implementation report at version 005 satisfies the version-004
+GO's approved scope (exactly `groundtruth-kb/src/groundtruth_kb/assertions.py`
+and `groundtruth-kb/tests/test_assertions.py`). Independently reran the full
+integrated test boundary, both mandatory mechanical preflights, lint/format/
+compile gates, and hash/diff isolation checks; every result matches the
+report's claims exactly. Also independently ran a verification-plan row the
+report's "Commands Run" section had omitted (schema/gate nonimpairment) and
+confirmed it passes cleanly with zero regression risk (import-graph analysis
+confirms neither omitted test file imports any function the diff touches).
+
+## Independently Re-Verified Evidence
+
+1. **Thread currency confirmed.** `gt bridge show
+   gtkb-wi5153-fail-closed-artifact-evaluability --json --compact` →
+   `latest_status: NEW`, `version_count: 5`.
+
+2. **Hash verification, independently recomputed.**
+   `Get-FileHash -Algorithm SHA256` on both target files →
+   `assertions.py`: `4B23634A43171094D576438C806B26D132307CBE6B23F3AFC54A07201750F71C`;
+   `test_assertions.py`: `F83C87A27F2D0F0CC87959A1021552E76FC13418E32F02D8C1E78453E9BFA8EE` —
+   exact match to the report's claimed hashes.
+
+3. **Full integrated test boundary independently re-run.**
+   `pytest groundtruth-kb/tests/test_assertions.py
+   platform_tests/scripts/test_check_artifact_evaluability.py
+   platform_tests/scripts/test_modernization_authority_foundations.py -q
+   --tb=short` → **95 passed, 1 warning in 7.75s** — exact match to the
+   report's claimed 95/95 (timing naturally differs run-to-run).
+
+4. **Diff isolation confirmed.** `git status --porcelain` on both target
+   paths shows only `assertions.py` modified; `test_assertions.py` is
+   byte-identical to HEAD. Diff confined to result/status/composition
+   plumbing (`_fail`/`_pass`/`_skip`, `_result_status`/`_composition_status`,
+   `_run_all_of`, `_run_any_of`, `run_spec_assertions`,
+   `run_all_assertions`, `format_summary`) — no foreign hunks.
+
+5. **Predecessor bridge chain confirmed intact.** No version in this
+   thread's chain has been deleted. `-001.md`/`-002.md` already committed;
+   `-003.md`/`-004.md`/`-005.md` untracked and required in the finalization
+   `--include` set.
+
+6. **Downstream consumer compatibility independently traced.** `cli.py`'s
+   `gt assert` and `.claude/hooks/assertion-check.py` consume only field
+   names that remain present and type-compatible after the diff; the change
+   is additive (new keys only, no removed/retyped key). One intended
+   behavior change confirmed: specs with mixed executed/unsupported
+   assertions will newly report `overall_passed=False` — the disclosed,
+   intended fix, not a regression.
+
+7. **Omitted verification-plan row independently closed.** The approved
+   v003 proposal's Spec-Derived Verification Plan required a "schema/gate
+   nonimpairment" check
+   (`pytest groundtruth-kb/tests/test_assertion_schema.py
+   groundtruth-kb/tests/test_gates.py`) that the v005 report's evidence
+   trail omitted. Independently ran it: **49 passed in 3.65s**, exact match
+   to the proposal's stated pre-filing baseline. Import-graph analysis
+   confirms neither test file imports any function this diff touches —
+   zero regression risk, and now genuinely executed.
+
+8. **Both mandatory preflights independently re-confirmed.** Applicability:
+   `preflight_passed: true`, 0 missing required/advisory specs. Clause: 5
+   clauses evaluated, 4 must_apply, 0 blocking gaps, exit 0.
+
+9. **Lint/format/compile independently reproduced.** `ruff check` → all
+   checks passed. `ruff format --check` → 2 files already formatted.
+   `py_compile` → exit 0.
+
+10. **All 17 cited specifications spot-checked, exist in MemBase.**
+
+11. **Review independence confirmed.** Report author session
+    `019f5f6d-60cd-7040-b73f-c7d23757c4bc` (Codex/A) differs from this
+    reviewer's session context.
+
+## Non-Blocking Finding
+
+**P2 — Implementation report omitted a required verification-plan row,
+independently closed during this review.** See Evidence item 7. Recommend a
+lightweight backlog hygiene note (log every approved verification-plan row
+verbatim, even when the result is unsurprising) rather than a REVISED cycle,
+since the check is now genuinely executed with a clean, exact-baseline match
+and carried zero regression risk by construction (import-graph disjoint from
+the diff).
+
+## Specification Links
+
+- `DCL-CHANGE-CONTROLLED-ARTIFACT-EVALUABILITY-001`
+- `GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001`
+- `GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001`
+- `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`
+- `DCL-PROJECT-AUTHORIZATION-OPERATION-TIME-ENFORCEMENT-001`
+- `DCL-PROJECT-AUTHORIZATION-ENVELOPE-001`
+- `GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001`
+- `PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001`
+- `GOV-FILE-BRIDGE-AUTHORITY-001`
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`
+- `DCL-PROJECT-DEPENDENCY-ORDERING-001`
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`
+- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
+- `ADR-ISOLATION-APPLICATION-PLACEMENT-001`
+
+## Spec-to-Test Mapping
+
+| Specification | Test | Executed | Result |
+| --- | --- | --- | --- |
+| `DCL-CHANGE-CONTROLLED-ARTIFACT-EVALUABILITY-001` | Integrated 95-test boundary | yes | 95 passed |
+| `GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001` | Schema/gate nonimpairment suite (LO-supplied) | yes | 49 passed, exact baseline match |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | Applicability preflight | yes | preflight_passed=true |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | Clause preflight | yes | exit 0, 0 blocking gaps |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | `gt bridge show` thread-currency check | yes | unchanged throughout review |
+| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | Path inspection | yes | both targets in-root |
+
+## Commands Executed
+
+- `gt bridge show gtkb-wi5153-fail-closed-artifact-evaluability --json --compact` (start and immediately before filing)
+- `Get-FileHash -Algorithm SHA256 groundtruth-kb\src\groundtruth_kb\assertions.py, groundtruth-kb\tests\test_assertions.py`
+- `groundtruth-kb/.venv/Scripts/python.exe -m pytest groundtruth-kb/tests/test_assertions.py platform_tests/scripts/test_check_artifact_evaluability.py platform_tests/scripts/test_modernization_authority_foundations.py -q --tb=short` → 95 passed
+- `groundtruth-kb/.venv/Scripts/python.exe -m pytest groundtruth-kb/tests/test_assertion_schema.py groundtruth-kb/tests/test_gates.py -q --tb=short` → 49 passed
+- `groundtruth-kb\.venv\Scripts\python.exe scripts\bridge_applicability_preflight.py --bridge-id gtkb-wi5153-fail-closed-artifact-evaluability`
+- `groundtruth-kb\.venv\Scripts\python.exe scripts\adr_dcl_clause_preflight.py --bridge-id gtkb-wi5153-fail-closed-artifact-evaluability`
+- `git status --porcelain -- groundtruth-kb/src/groundtruth_kb/assertions.py groundtruth-kb/tests/test_assertions.py`
+
+## Prior Deliberations
+
+- `DELIB-202666274` — owner authorization for the bounded modernization
+  Assurance project.
+- `DELIB-20260710-GTKB-MODERNIZATION-GATE-1-ASSURANCE-INVARIANT-PLAN` — the
+  Gate-1 hard-invariant plan originally cataloging this exact defect
+  (`INV-AUTH-003`: "unsupported assertions cannot count as PASS").
+- `bridge/gtkb-wi5153-fail-closed-artifact-evaluability-001.md` through
+  `-005.md` — this thread's full chain.
+- Deliberation search ("fail-closed artifact evaluability assertion
+  assertions.py WI-5153") returned no directly on-point prior deliberation
+  beyond the two above.
+
+## Applicability Preflight
+
+- packet_hash: `sha256:fa8766f1827868974ebfdc9cc526efdb93ef958278ab2645a349386d6794a3db`
+- operative_file: `bridge/gtkb-wi5153-fail-closed-artifact-evaluability-005.md`
+- preflight_passed: `true`
+- missing_required_specs: `[]`
+- missing_advisory_specs: `[]`
+
+## Clause Applicability
+
+- Clauses evaluated: 5; must_apply: 4, may_apply: 1
+- Blocking gaps (gate-failing): 0
+- Mode: mandatory; exit code: `0` (pass)
+
+## Methodology Trail
+
+Read all five version files in full. Independently recomputed SHA-256
+hashes for both target files, exact match. Independently re-ran the full
+95-test integrated boundary and the 49-test schema/gate nonimpairment suite
+the report's evidence trail had omitted. Independently confirmed diff
+isolation and predecessor-chain integrity via git. Re-ran both mandatory
+preflights. Re-ran `gt bridge show --json --compact` immediately before
+filing to confirm thread currency (unchanged: NEW, version 5).

@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py"
+HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py"
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -41,7 +41,11 @@ def _ensure_bridge_dir(bridge_dir: Path) -> None:
 def _proposal_body(text: str = "Clean bridge body.") -> str:
     return "\n".join(
         [
+            "NEW",
+            "",
             "# Test Bridge Proposal",
+            "",
+            "bridge_kind: governance_advisory",
             "",
             "## Summary",
             "",
@@ -56,6 +60,22 @@ def _proposal_body(text: str = "Clean bridge body.") -> str:
             "_No prior deliberations: focused helper test._",
             "",
         ]
+    )
+
+
+@pytest.fixture(autouse=True)
+def _central_writer_unit_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
+    from scripts import gtkb_bridge_writer
+
+    monkeypatch.setenv("GTKB_AUTHOR_IDENTITY", "prime-builder/test")
+    monkeypatch.setenv("GTKB_AUTHOR_HARNESS_ID", "test-harness")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL", "fixture-model")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL_VERSION", "fixture-version")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL_CONFIGURATION", "unit-test")
+    monkeypatch.setattr(
+        gtkb_bridge_writer,
+        "run_bridge_compliance_audit",
+        lambda **_kwargs: {"decision": "pass"},
     )
 
 
@@ -176,14 +196,15 @@ def test_propose_bridge_does_not_release_when_file_write_fails(
     bridge_dir = tmp_path / "bridge"
     _ensure_bridge_dir(bridge_dir)
     monkeypatch.setenv("CLAUDE_SESSION_ID", "session-c")
-    original_write_bytes = Path.write_bytes
+    original_open = Path.open
 
-    def _fail_target_write(path: Path, data: bytes) -> int:
-        if path.name == "conflict-topic-001.md":
+    def _fail_target_write(path: Path, *args, **kwargs):
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if path.name == "conflict-topic-001.md" and mode == "x":
             raise OSError("simulated bridge file write failure")
-        return original_write_bytes(path, data)
+        return original_open(path, *args, **kwargs)
 
-    monkeypatch.setattr(Path, "write_bytes", _fail_target_write)
+    monkeypatch.setattr(Path, "open", _fail_target_write)
 
     with pytest.raises(OSError, match="simulated bridge file write failure"):
         helper.propose_bridge(

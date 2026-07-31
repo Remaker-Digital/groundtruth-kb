@@ -14,10 +14,9 @@ Mirrors the gather-vs-pure-decision split used by
 randomness inside), so they are fully unit-testable; the thin gather + JSON emit
 live in ``main``.
 
-State-dir roots scanned by ``main`` (per the -002 GO review note): BOTH
-``.gtkb-state/cross-harness-trigger`` and ``.gtkb-state/bridge-poller`` -- the two
-dispatch-state directories the cross-harness trigger uses -- so the snapshot
-reflects all dispatch evidence regardless of which substrate produced it.
+State-dir roots scanned by ``main``: the live bridge-poller dispatch state
+directory used by the dispatcher daemon. Retired dispatch-substrate state
+directories are intentionally not scanned as live release evidence.
 
 ``classify_outcome`` defines the CANONICAL run-outcome error-class taxonomy for
 monitoring. It is intentionally NOT byte-for-byte parity with the trigger's
@@ -38,10 +37,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-DEFAULT_STATE_DIRS = (
-    ".gtkb-state/cross-harness-trigger",
-    ".gtkb-state/bridge-poller",
-)
+DEFAULT_STATE_DIRS = (".gtkb-state/bridge-poller",)
 DISPATCH_RUNS_SUBDIR = "dispatch-runs"
 DISPATCH_FAILURES_FILENAME = "dispatch-failures.jsonl"
 

@@ -178,7 +178,7 @@ class TestDeliberationsAdd:
         # ``--content-file`` content flows through the same redaction layer
         # as inline ``--content``; it is NOT asserting anything about the
         # pattern catalog itself.
-        secret = "AKIAIOSFODNN7EXAMPLE"
+        secret = "AKIAIOSFODNN7EXAMPLE"  # placeholder
         content_file = tmp_path / "content.txt"
         content_file.write_text(
             f"This contains an AWS key: {secret}\nHere is a phone: +15551234567",
@@ -713,7 +713,10 @@ class TestDeliberationsSearch:
             "score": None,
         }
 
-        def _fake_search(self, query, *, limit=5):  # noqa: ARG001
+        semantic_requirements: list[bool] = []
+
+        def _fake_search(self, query, *, limit=5, require_semantic=False):  # noqa: ARG001
+            semantic_requirements.append(require_semantic)
             return [canned_text_row]
 
         monkeypatch.setattr(_db_mod.KnowledgeDB, "search_deliberations", _fake_search)
@@ -723,6 +726,7 @@ class TestDeliberationsSearch:
             config=project_dir / "groundtruth.toml",
         )
         assert result.exit_code == 0, result.output
+        assert semantic_requirements == [True]
         # The canned text_match row must be filtered out, so either the
         # DELIB ID is absent or the CLI reports "no ... match"
         assert "DELIB-SEARCH-0003" not in result.output

@@ -15,7 +15,14 @@ HARNESS_NAME = "codex"
 
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "groundtruth-kb" / "src"))
-from groundtruth_kb.session.envelope import EnvelopeError  # noqa: E402
+from groundtruth_kb.context.resource_routing import render_resource_context  # noqa: E402
+from groundtruth_kb.session.envelope import (  # noqa: E402
+    EnvelopeError,
+    load_current,
+    open_session,
+    resolve_harness_identity,
+    route_prompt_resources,
+)
 from groundtruth_kb.session.topic_router import (  # noqa: E402
     handle_topic_command,
     parse_topic_command,
@@ -23,7 +30,9 @@ from groundtruth_kb.session.topic_router import (  # noqa: E402
 )
 from groundtruth_kb.session.wrap import is_canonical_wrap_trigger, run_wrap  # noqa: E402
 
+from scripts.gtkb_session_id import MARKER_CONTINUITY_ORDER, resolve_session_id  # noqa: E402
 from scripts.harness_identity import resolved_harness_id  # noqa: E402
+from scripts.session_role_resolution import resolve_interactive_session_role_details  # noqa: E402
 
 ACCEPTED_TRIGGER_PHRASES = {
     "wrap up",
@@ -55,6 +64,7 @@ ACCEPTED_TRIGGER_PHRASES = {
     "start fresh",
     "begin fresh",
 }
+_VALID_ROLE_PROFILES = frozenset({"prime-builder", "loyal-opposition"})
 
 
 def _no_window_subprocess_kwargs() -> dict[str, object]:
@@ -135,12 +145,23 @@ def _lifecycle_guard_path() -> Path:
     return PROJECT_ROOT / "harness-state" / HARNESS_NAME / "session-lifecycle-guard.json"
 
 
+# WI-5083: SessionStart 'source' values that mark a mid-session continuation
+# (resume/compact). Kept in sync (parity test) with the same-named constant in
+# scripts/workstream_focus.py and scripts/session_self_initialization.py.
+_SESSION_CONTINUATION_SOURCES = frozenset({"resume", "compact"})
+
+
 def _startup_input_gate_active() -> bool:
     try:
         state = json.loads(_lifecycle_guard_path().read_text(encoding="utf-8-sig"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return False
     if not isinstance(state, dict):
+        return False
+    # WI-5083 belt-and-suspenders: a gate armed under a mid-session continuation
+    # source is never a legitimate fresh-start relay window; treat it as
+    # inactive rather than standing the topic router / wrap-trigger down.
+    if str(state.get("armed_source") or "").strip().lower() in _SESSION_CONTINUATION_SOURCES:
         return False
     return state.get("discard_next_user_prompt") is True or state.get("startup_response_pending") is True
 
@@ -150,6 +171,95 @@ def _persistent_harness_id() -> str:
     if not harness_id:
         raise RuntimeError(f"Could not resolve persistent harness identity for {HARNESS_NAME}")
     return harness_id
+
+
+def _current_session_id() -> str | None:
+    try:
+        session_id = resolve_session_id(order=MARKER_CONTINUITY_ORDER)
+    except Exception:  # noqa: BLE001 - prompt hook must fail soft.
+        return None
+    return session_id or None
+
+
+def _interactive_role_details() -> dict[str, str | None]:
+    try:
+        return resolve_interactive_session_role_details(
+            PROJECT_ROOT,
+            current_session_id=_current_session_id(),
+            harness_name=HARNESS_NAME,
+        )
+    except Exception:  # noqa: BLE001 - role evidence must not block normal prompt handling.
+        return {}
+
+
+def _interactive_role_profile() -> str | None:
+    role = _interactive_role_details().get("interactive_resolved_role")
+    return role if role in _VALID_ROLE_PROFILES else None
+
+
+def _write_role_latch_diagnostic(
+    *,
+    details: dict[str, str | None],
+    current_role: str | None,
+    opened_envelope: bool,
+) -> None:
+    try:
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
+        (OUT_DIR / "last-session-role-latch.json").write_text(
+            json.dumps(
+                {
+                    "harness_name": HARNESS_NAME,
+                    "interactive_resolved_role": details.get("interactive_resolved_role"),
+                    "interactive_role_source": details.get("interactive_role_source"),
+                    "durable_registry_role": details.get("durable_registry_role"),
+                    "authority_mode": details.get("authority_mode"),
+                    "current_envelope_role": current_role,
+                    "opened_envelope": opened_envelope,
+                },
+                ensure_ascii=True,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+
+def _ensure_session_role_latched() -> str | None:
+    """Ensure hook-created envelopes start from session-role evidence."""
+
+    details = _interactive_role_details()
+    role = details.get("interactive_resolved_role")
+    if role not in _VALID_ROLE_PROFILES:
+        return None
+    try:
+        harness_id = _persistent_harness_id()
+        resolved_name, resolved_id = resolve_harness_identity(
+            PROJECT_ROOT,
+            harness_name=HARNESS_NAME,
+            harness_id=harness_id,
+        )
+        current = load_current(PROJECT_ROOT, resolved_name)
+        current_role = str(current.get("role_resolved") or current.get("role") or "") if current else None
+        opened_envelope = False
+        if not (isinstance(current, dict) and current.get("status") == "open"):
+            open_session(
+                PROJECT_ROOT,
+                harness_name=resolved_name,
+                harness_id=resolved_id,
+                role=role,
+            )
+            opened_envelope = True
+        _write_role_latch_diagnostic(
+            details=details,
+            current_role=current_role or None,
+            opened_envelope=opened_envelope,
+        )
+    except Exception:  # noqa: BLE001 - prompt hook must not block topic/wrap handling.
+        return role
+    return role
 
 
 def main() -> int:
@@ -165,6 +275,7 @@ def main() -> int:
     topic_command = parse_topic_command(prompt)
     if topic_command is not None:
         try:
+            _ensure_session_role_latched()
             result = handle_topic_command(
                 PROJECT_ROOT,
                 topic_command,
@@ -186,12 +297,27 @@ def main() -> int:
         return 0
 
     if not _is_wrapup_trigger(prompt):
-        _emit_no_context()
+        try:
+            _ensure_session_role_latched()
+            selection = route_prompt_resources(
+                PROJECT_ROOT,
+                prompt,
+                harness_name=HARNESS_NAME,
+                harness_id=_persistent_harness_id(),
+            )
+            context = render_resource_context(selection)
+        except Exception:  # noqa: BLE001 - ordinary prompt routing must fail soft.
+            context = ""
+        if context:
+            print(_dump_payload(_hook_payload(context)))
+        else:
+            _emit_no_context()
         return 0
 
     runtime_context = ""
     if is_canonical_wrap_trigger(prompt):
         try:
+            _ensure_session_role_latched()
             wrap_result = run_wrap(
                 PROJECT_ROOT,
                 harness_name=HARNESS_NAME,
@@ -213,20 +339,25 @@ def main() -> int:
         except EnvelopeError as exc:
             runtime_context = f"# GroundTruth-KB Session Envelope Wrap Failed\n\n{exc}"
 
+    command = [
+        sys.executable,
+        str(PROJECT_ROOT / "scripts" / "session_self_initialization.py"),
+        "--project-root",
+        str(PROJECT_ROOT),
+        "--emit-wrapup",
+        "--force-wrapup",
+        "--fast-hook",
+        "--harness-name",
+        HARNESS_NAME,
+        "--harness-id",
+        _persistent_harness_id(),
+    ]
+    role_profile = _interactive_role_profile()
+    if role_profile:
+        command.extend(["--role-profile", role_profile])
+
     result = subprocess.run(
-        [
-            sys.executable,
-            str(PROJECT_ROOT / "scripts" / "session_self_initialization.py"),
-            "--project-root",
-            str(PROJECT_ROOT),
-            "--emit-wrapup",
-            "--force-wrapup",
-            "--fast-hook",
-            "--harness-name",
-            HARNESS_NAME,
-            "--harness-id",
-            _persistent_harness_id(),
-        ],
+        command,
         cwd=str(PROJECT_ROOT),
         capture_output=True,
         text=True,

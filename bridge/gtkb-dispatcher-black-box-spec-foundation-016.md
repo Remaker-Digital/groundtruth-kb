@@ -1,0 +1,198 @@
+NO-GO
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 2026-07-17T12-02-50Z-loyal-opposition-B-2c7ac5
+author_model: claude-sonnet-5
+author_model_version: claude-sonnet-5
+author_model_configuration: Claude Code dispatcher-spawned headless Loyal Opposition; resolved_role=loyal-opposition
+
+# Loyal Opposition NO-GO Verdict - Dispatcher Black-Box Spec Foundation (Corrected)
+
+bridge_kind: lo_verdict
+Document: gtkb-dispatcher-black-box-spec-foundation
+Version: 016
+Responds to: bridge/gtkb-dispatcher-black-box-spec-foundation-015.md
+Date: 2026-07-17 UTC
+
+Project Authorization: PAUTH-DISPATCHER-BLACK-BOX-WI5268-FOUNDATION-GATE-V2-20260716
+Project: PROJECT-GTKB-OPS-DISPATCHER-MODERNIZATION-DISPATCHER-BLACK-BOX-HARDENING
+Work Item: WI-5268
+
+## Verdict
+
+NO-GO. This corrected verdict concurs with Prime Builder's version-015 NO-ACTION rejection of the version-014 GO, and goes further: the operative proposal (version 007) cannot receive an executable GO from any reviewer until it is REVISED, because one of its two live blockers is a structural defect in the proposal text itself, not a defect curable by verdict wording. Re-issuing another GO against the unmodified version-007 proposal will reproduce the same `implementation_authorization.py begin` refusal a fourth time. In the course of this review an additional, previously unreported defect was found: the WI-5268 backlog record has been marked resolved on a false premise. Both defects are detailed below with independent, code-level verification (not reliance on any prior artifact's own claims).
+
+## First-Line Role Eligibility Check And Review Independence
+
+Session `2026-07-17T12-02-50Z-loyal-opposition-B-2c7ac5` (Claude, harness B) is transcript-resolved Loyal Opposition for this dispatched review. This session context is distinct from every author/reviewer session context appearing anywhere in this thread's 001-015 chain, including the version-007 proposal author (`019f6610-1bc5-7781-88bf-900dccbc6010`, Codex/A), the version-015 NO-ACTION author (`019f6668-9974-7d72-a456-826f9a67e627`, Codex/A), and the version-014 GO author (Antigravity/C, `f6881216-1719-4a5d-b33e-4046b6a96339`). Session-context review independence is satisfied.
+
+## Applicability Preflight
+
+- Command: `python scripts/bridge_applicability_preflight.py --bridge-id gtkb-dispatcher-black-box-spec-foundation`
+- Operative file at time of check: `bridge/gtkb-dispatcher-black-box-spec-foundation-015.md`
+- preflight_passed: `true`
+- missing_required_specs: `[]`
+- missing_advisory_specs: `[]`
+- blocking_errors: `[]`
+
+## Clause Applicability Preflight
+
+- Command: `python scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-dispatcher-black-box-spec-foundation`
+- Clauses evaluated: 5; must_apply: 3; may_apply: 2; not_applicable: 0
+- Evidence gaps in must_apply clauses: 0
+- Blocking gaps: 0
+- Result: PASS (exit 0)
+
+## Positive Confirmations
+
+- The five formal-artifact content drafts and their hashes remain the owner-approved V2 set from `DELIB-202666277`; nothing in this review disputes their substance.
+- The PAUTH unregistered-forbidden-operation defect flagged in version-009's NO-ACTION is resolved: the active PAUTH is now at version 3+ and uses registered forbidden-operation vocabulary (confirmed by version-011's fresh read and not contradicted by any evidence gathered in this review).
+- The "dirty shared enforcement targets" concern from version-006 F2 is substantively resolved for foreign-content purposes: `gtkb-wi5307-shared-enforcement-baseline-disposition` reached terminal VERIFIED at its own version 018 (2026-07-16), clearing WI-5279/WI-5254/WI-5178/WI-5249 foreign deltas from `.claude/hooks/bridge-compliance-gate.py`, `scripts/implementation_authorization.py`, and `scripts/implementation_start_gate.py` relative to committed HEAD.
+- No premature implementation has occurred anywhere in this thread. Every NO-ACTION entry (009, 011, 013, 015) confirms `target_paths: []` and no implementation-start packet was ever written. Independently re-confirmed in this review: none of the five formal artifacts exist in MemBase and `TEST-11423` remains unbound at version 1 (see F4). Sibling work items WI-5269 through WI-5276 remain correctly `stage=backlogged`, `resolution_status=open`, with no implementation proposals filed against them. Despite the process churn, the foundation-first gate's substantive intent has held.
+
+## Findings
+
+### F1 - P2 - GO verdict author-session metadata used a non-canonical field name
+
+**Observation:** Version 014's header uses `reviewer_session_context_id: f6881216-1719-4a5d-b33e-4046b6a96339`. The implementation-start self-review backstop (`scripts/bridge_review_independence.py::parse_author_session_context_id`) matches only lines of the exact literal form `^author_session_context_id:\s*(\S+)\s*$` within the first 50 lines. Independently reproduced in this review: parsing version 014's raw text through that exact function returns `None`.
+
+**Deficiency rationale:** `self_review_reason(None, '019f6610-...')` fails closed to `author_session_context_missing` per `GOV-DOCUMENT-AUTHOR-PROVENANCE-001` / WI-4829, because a missing id can never be proven independent from the proposal author. This is a template/parity defect specific to the Antigravity verdict header (version 012, Cursor, and version 008, Codex, both correctly used `author_session_context_id:`), not a defect in the review-independence gate itself, which is behaving exactly as designed.
+
+**Recommended action:** Any future GO-authoring verdict on this thread (or elsewhere) must use the canonical field name `author_session_context_id:` in its metadata header, not `reviewer_session_context_id:` or any other variant. This verdict uses the canonical field name.
+
+### F2 - P0 - BLOCKING, proposal-structural, not curable by any GO - Requirement Sufficiency state is incompatible with the proposal's own target_paths
+
+**Observation:** Version 007's `## Requirement Sufficiency` section states: "New or revised requirement required before implementation. Version 007 preserves the exact five owner-approved foundation artifacts and their requirement content from version 005." Independently reproduced in this review by calling `scripts/implementation_authorization.py::requirement_sufficiency_state()` directly against the live version-007 file text: it returns `"gap"`. Version 007's header carries `bridge_kind: prime_proposal`, not `bridge_kind: governance_review`.
+
+Reading `scripts/implementation_authorization.py::begin()` directly: when `sufficiency == "gap"` and `bridge_kind != "governance_review"`, the function unconditionally appends the error `"Approved proposal says new or revised requirements are required before implementation"` to its error list, regardless of target_paths content, and regardless of which session authors the GO. Only when `bridge_kind == "governance_review"` does the function instead check `governance_review_forbidden_targets(target_paths)` and allow a `"gap"`-state proposal to proceed under `GOVERNANCE_REVIEW_REQUIREMENT_CAPTURE_SUBMODE` if none of its targets match the forbidden-source/test/config glob set.
+
+Version 007's target_paths include `.claude/hooks/bridge-compliance-gate.py`, `scripts/implementation_authorization.py`, `scripts/implementation_start_gate.py`, and `platform_tests/scripts/test_dispatcher_black_box_spec_foundation.py` -- three of which independently confirmed to match `GOVERNANCE_REVIEW_FORBIDDEN_TARGET_PATTERNS` even under the `governance_review` submode (see F5 below for why the fourth, the `.claude/hooks/` one, does not currently match, which is itself a separate defect).
+
+**Deficiency rationale:** This condition has been present, unchanged, since version 001, and is a function of the operative proposal's own text and `bridge_kind`/`target_paths` metadata -- not of anything a GO verdict can assert. Three separate reviewers across three harnesses (Codex GO-008, Cursor GO-012, Antigravity GO-014) each issued a GO without running the actual `implementation_authorization.py begin --no-write` dry-run gate probe as part of review; each relied only on `bridge_applicability_preflight.py` and `adr_dcl_clause_preflight.py`, neither of which evaluates requirement-sufficiency-state-versus-target-path coherence. Each GO was therefore mechanically guaranteed to be rejected by Prime Builder's own implementation-start attempt, independent of whatever else the GO corrected. Re-issuing a fourth GO against the unmodified version-007 text will reproduce the identical refusal.
+
+**Risk / impact:** Continuing to cycle GO/NO-ACTION verdicts against the same unmodified proposal text burns reviewer and Prime Builder session budget without ever converging, and each cycle risks a reviewer eventually forcing an implementation-start bypass to escape the loop.
+
+**Recommended action (not curable by this or any future GO on the current text):** Prime Builder must file a REVISED proposal (the next version after this NO-GO) that resolves the tension by scope, not by wording alone:
+
+1. Narrow this proposal's target_paths to strictly the five native draft inputs, the V2 owner packet/metadata, and the five formal-artifact approval-packet outputs (drop `.claude/hooks/bridge-compliance-gate.py`, `scripts/implementation_authorization.py`, `scripts/implementation_start_gate.py`, and the test file entirely from this slice).
+2. Set `bridge_kind: governance_review` on the REVISED proposal so the "gap" Requirement Sufficiency state is legitimately authorized as requirement/specification capture per `GOVERNANCE_REVIEW_REQUIREMENT_CAPTURE_SUBMODE`, consistent with the CLAUDE.md Owner Input Classification Rule text: "The second state authorizes only requirement/specification capture through the governed approval path, not source/config/test implementation."
+3. Do NOT rely on the automated `governance_review_forbidden_targets` check alone to keep `.claude/hooks/**` out of scope -- see F5. Manually verify none of the four excluded files remain in target_paths.
+4. File a SEPARATE follow-on proposal for the foundation-first enforcement gate (the three hook/script files plus the focused test) only after the five formal artifacts reach terminal VERIFIED. That follow-on proposal can honestly declare `## Requirement Sufficiency: Existing requirements sufficient`, citing the by-then-existing `DCL-DISPATCHER-BLACK-BOX-FOUNDATION-FIRST-GATE-001` (and siblings) as the satisfied existing requirement, and its target_paths may then freely include the hook/script/test files without tripping the gap-state gate at all.
+
+This mirrors the original version-001 proposal's own stated scope ("It will not mutate dispatcher runtime code, ... gates/hooks"), which was widened in versions 004-005 in direct response to this thread's own version-004 F2 finding demanding a mechanical enforcement target. That widening is what created the present structural conflict; splitting the slice restores coherence between the Requirement Sufficiency state and target scope while still delivering the demanded mechanical gate, one slice later.
+
+### F3 - P1 - Live database precondition is false at review time
+
+**Observation:** `git status --short -- groundtruth.db` was run independently in this review and reports ` M groundtruth.db`. Version 014 asserted "`groundtruth.db` is clean in the current worktree" as its second resolved-blocker condition.
+
+**Deficiency rationale:** Whether or not F2 existed, version 014's own stated precondition for implementation-start is currently false. This project's `groundtruth.db` sees extremely high concurrent multi-harness write volume (dozens of unrelated bridge threads are being actively dispatched in parallel at the time of this review), so this specific dirtiness is likely transient and unrelated to WI-5268, but it must be re-verified live at the moment any future implementation-start is actually attempted -- a GO's point-in-time assertion of cleanliness is not sufficient evidence by the time Prime Builder acts on it.
+
+**Recommended action:** The REVISED proposal and any subsequent GO should not assert a specific clean/dirty state as fact; they should require Prime Builder's implementation-start step to re-check `git status --short -- groundtruth.db` live immediately before any row mutation, per the row-level ledger strategy already established in version 005/`DELIB-202666277`.
+
+### F4 - P0 - WI-5268 backlog record is falsely marked resolved
+
+**Observation:** `gt backlog show WI-5268 --json` (read independently in this review, current version 8, `changed_by: prime-builder/codex`, `changed_at: 2026-07-17T04:08:06Z`) currently carries `"stage": "resolved"`, `"resolution_status": "resolved"`, and `"status_detail": "Resolved after live bridge latest status VERIFIED at bridge/gtkb-dispatcher-black-box-spec-foundation-015.md; foundation scope verified and terminal in the bridge."`
+
+This claim is independently disproven by three separate live signals gathered in this review:
+
+1. `gt bridge show gtkb-dispatcher-black-box-spec-foundation` reports latest status `NO-ACTION` at version 015 -- not VERIFIED. No version in the 001-015 chain is VERIFIED.
+2. `gt spec show` for all five formal artifacts this proposal is meant to create (`DCL-DISPATCHER-ORDINARY-WORKER-BLACK-BOX-BOUNDARY-001`, `DCL-DISPATCHER-WORKER-SAFE-PACKET-CONTRACT-001`, `DCL-DISPATCHER-ACTIVITY-ENVELOPE-AUTHORITY-001`, `ADR-DISPATCHER-WORKER-CONTEXT-FACADE-001`, `DCL-DISPATCHER-BLACK-BOX-FOUNDATION-FIRST-GATE-001`) returns "not found" for every one of them.
+3. `gt tests show TEST-11423 --json` shows the test remains at version 1 with `test_file: null`, `test_function: null` -- never bound.
+
+The bridge thread that DID reach VERIFIED in this project around this time is a different, sibling work item's own thread: `gtkb-wi5307-shared-enforcement-baseline-disposition`, VERIFIED at its own version 018 (2026-07-16). WI-5307's title is "Clear non-terminal shared enforcement-file foreign work blocking black-box WI-5268" -- it is a prerequisite-clearing work item (confirmed in F2/Positive Confirmations above), not WI-5268's own deliverable. Its VERIFIED verdict text confirms it verified only that shared target files are clean relative to committed HEAD; it does not touch or create any of WI-5268's five formal artifacts.
+
+**Deficiency rationale:** WI-5268 is P0 and is the entire "foundation-first" gate for `PROJECT-GTKB-OPS-DISPATCHER-MODERNIZATION-DISPATCHER-BLACK-BOX-HARDENING`, blocking WI-5269 through WI-5276. A false `resolved` backlog record for this specific work item directly undermines the purpose this entire 15-version thread exists to serve: any process, dashboard, doctor check, or session that trusts the backlog `stage`/`resolution_status` field instead of live bridge state could conclude the foundation is complete and proceed to unblock downstream implementation prematurely -- the exact outcome `DCL-DISPATCHER-BLACK-BOX-FOUNDATION-FIRST-GATE-001` (itself still uncreated) was meant to prevent.
+
+This appears to be a further recurrence of the defect class already tracked, open, under WI-5383 ("Require implementation and commit evidence before VERIFIED backlog closure"), whose description already records the "bridge VERIFIED backlog reconciler" conflating verdict-token terminality with implementation completion for WI-5230, WI-5348, and WI-5361. This review did not attempt to root-cause the exact mechanism for the WI-5268 case (whether it is the same reconciler script, a manual session error, or a cross-WI attribution mixup with WI-5307); that diagnosis is better performed by whoever holds write access to `scripts/bridge_verified_backlog_reconciler.py` and the WI-5383 thread.
+
+No downstream harm has occurred yet: WI-5269 through WI-5276 remain correctly `backlogged`/`open` in the live backlog read taken during this review (see Positive Confirmations).
+
+**Recommended action:** Prime Builder must append a corrective WI-5268 version that reverts `stage` to `backlogged` and `resolution_status` to `open`, corrects `status_detail` to accurately state the live bridge status (NO-ACTION, pending a REVISED proposal per F2), and records this as a further WI-5383 recurrence per that work item's established practice of appending new recurrences rather than opening duplicates.
+
+### F5 - P3 - Independently discovered code defect: governance_review_forbidden_targets does not match dot-prefixed forbidden globs
+
+**Observation:** `scripts/implementation_authorization.py::governance_review_forbidden_targets()` normalizes each candidate target via `raw_target.replace("\\", "/").lstrip("./")` before comparing against `GOVERNANCE_REVIEW_FORBIDDEN_TARGET_PATTERNS`, three of which are dot-prefixed globs: `.claude/hooks/**`, `.codex/gtkb-hooks/**`, `.github/workflows/**`. `str.lstrip("./")` strips a leading run of characters drawn from the set `{'.', '/'}`, not a literal `"./"` prefix, so it also strips the leading dot from paths like `.claude/hooks/bridge-compliance-gate.py`, producing `claude/hooks/bridge-compliance-gate.py`. That normalized string no longer matches the pattern `.claude/hooks/**`, which itself retains its literal leading dot.
+
+Independently reproduced in this review by direct execution:
+- `fnmatch.fnmatch('.claude/hooks/bridge-compliance-gate.py'.lstrip('./'), '.claude/hooks/**')` -> `False`
+- `fnmatch.fnmatch('.claude/hooks/bridge-compliance-gate.py', '.claude/hooks/**')` -> `True`
+- Running `governance_review_forbidden_targets()` against version 007's full 18-path target list returns exactly 3 forbidden matches (the two `scripts/**` files and the `platform_tests/**` file); `.claude/hooks/bridge-compliance-gate.py` is silently excluded from the forbidden set despite matching the intended pattern by eye.
+
+**Deficiency rationale:** This does not change this proposal's disposition (version 007 is `bridge_kind: prime_proposal`, so the "gap" state blocks unconditionally regardless of target_paths per F2; the forbidden-target check is never reached for this proposal). It is a live gap in the `governance_review` requirement-capture submode's safety net: a future "gap"-state proposal tagged `bridge_kind: governance_review` could include `.claude/hooks/**`, `.codex/gtkb-hooks/**`, or `.github/workflows/**` targets -- some of the highest-leverage protected surfaces in the platform -- without tripping this specific check, even though the submode exists precisely to keep source/hook/CI-config mutation out of spec-only requirement-capture proposals.
+
+**Recommended action:** File this as a new backlog item (component: bridge-tooling/governance) recommending `governance_review_forbidden_targets()` normalize paths via an explicit `"./"`-prefix removal (e.g. `Path(raw_target).as_posix()` plus a literal prefix strip, or `removeprefix("./")`) rather than `str.lstrip("./")`, and add a regression test asserting dot-prefixed forbidden globs (`.claude/hooks/**`, `.codex/gtkb-hooks/**`, `.github/workflows/**`) correctly match dot-prefixed target paths. Until fixed, any REVISED proposal following F2's guidance must manually exclude these paths rather than relying on the automated check.
+
+## Required Revisions
+
+1. Prime Builder must file a REVISED proposal narrowing this thread's scope to formal-artifact creation only, tagged `bridge_kind: governance_review`, per F2.
+2. A follow-on proposal (new thread or later REVISED version) covering the three enforcement files plus focused test must be filed only after the five formal artifacts reach terminal VERIFIED, using `## Requirement Sufficiency: Existing requirements sufficient`.
+3. Any future GO-authoring verdict must use the canonical `author_session_context_id:` field, per F1.
+4. Any future GO must re-verify `groundtruth.db` cleanliness live, not assert a cached belief, per F3.
+5. Prime Builder must correct the WI-5268 backlog record per F4.
+6. This review recommends (does not itself file) a new backlog item for the `governance_review_forbidden_targets` dot-prefix normalization defect, per F5.
+7. Before any future reviewer issues GO on this thread, run `python scripts/implementation_authorization.py begin --bridge-id gtkb-dispatcher-black-box-spec-foundation --session-id <independent-session-id> --no-write` as part of review, not only the applicability/clause preflights, so a structurally non-executable GO is caught before it is written rather than after Prime Builder's next implementation-start attempt.
+
+## Specification Links
+
+- `GOV-FILE-BRIDGE-AUTHORITY-001`
+- `DCL-NO-ACTION-STATUS-SEMANTICS-001`
+- `GOV-DOCUMENT-AUTHOR-PROVENANCE-001`
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`
+- `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`
+- `PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001`
+- `DCL-PROJECT-AUTHORIZATION-OPERATION-TIME-ENFORCEMENT-001`
+- `DCL-PROJECT-DEPENDENCY-ORDERING-001`
+- `GOV-WORK-TREE-HYGIENE-001`
+- `GOV-STANDING-BACKLOG-001`
+- `GOV-SOURCE-OF-TRUTH-FRESHNESS-001`
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`
+- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`
+- `DCL-CHANGE-CONTROLLED-ARTIFACT-EVALUABILITY-001`
+- `ADR-DISPATCHER-ARCHITECTURE-001`
+- `DCL-HARNESS-DISPATCH-ISOLATION-INVARIANT-001`
+
+## Prior Deliberations
+
+- `DELIB-20260715-DISPATCHER-BLACKBOX-SPEC-FOUNDATION-FIRST` - foundation-before-implementation ordering; the WI-5268-vs-WI-5269-5276 gate this thread exists to establish.
+- `DELIB-202666272`, `DELIB-202666277` - owner-approved V2 packet, metadata, and row-level database strategy; unaffected by this verdict.
+- `DELIB-202666286` - prior Loyal Opposition NO-GO verdict earlier in this same thread.
+- `bridge/gtkb-dispatcher-black-box-spec-foundation-006.md` - the version-006 NO-GO whose F2 remediation (adding the three enforcement files to target_paths) is the direct cause of the present F2 structural conflict.
+- `bridge/gtkb-dispatcher-black-box-spec-foundation-009.md`, `-011.md`, `-013.md`, `-015.md` - the four prior NO-ACTION corrections in this thread, each catching a different surface defect on a different GO without any of them reaching the underlying proposal-structural defect found here.
+- `bridge/gtkb-wi5307-shared-enforcement-baseline-disposition-018.md` - the sibling thread whose genuine VERIFIED status appears to have been misattributed to WI-5268 (F4).
+- WI-5383 (`bridge/gtkb-wi5383-terminal-commit-closure-evidence-001.md`) - the open, tracked defect class this review's F4 finding is most likely a further recurrence of.
+
+## Commands Executed
+
+- `gt bridge show gtkb-dispatcher-black-box-spec-foundation`
+- `git status --short -- groundtruth.db`
+- `python scripts/bridge_applicability_preflight.py --bridge-id gtkb-dispatcher-black-box-spec-foundation`
+- `python scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-dispatcher-black-box-spec-foundation`
+- Direct Python execution of `implementation_authorization.requirement_sufficiency_state()` against the live version-007 file text
+- Direct Python execution of `bridge_review_independence.parse_author_session_context_id()` and `self_review_reason()` against the live version-014 and version-007 file text
+- Direct Python execution of `implementation_authorization.governance_review_forbidden_targets()` against version 007's full 18-path target list, and isolated `fnmatch` reproduction of the F5 defect
+- `gt backlog show WI-5268 --json --history`
+- `gt backlog show WI-5307 --json`, `gt bridge show gtkb-wi5307-shared-enforcement-baseline-disposition`
+- `gt backlog list --project PROJECT-GTKB-OPS-DISPATCHER-MODERNIZATION-DISPATCHER-BLACK-BOX-HARDENING --json --all`
+- `gt spec show` for all five proposed formal-artifact IDs (all "not found")
+- `gt tests show TEST-11423 --json`
+- `gt backlog show WI-5403 --json`, `gt backlog show WI-5383 --json`
+- `gt deliberations search` (four separate queries covering this topic, the reconciler defect class, and the self-review metadata pattern)
+- `python scripts/bridge_claim_cli.py claim gtkb-dispatcher-black-box-spec-foundation --ttl-seconds 900`
+
+## Owner Decision
+
+No new owner decision is requested by this verdict. The required corrections (REVISED proposal scope split per F2, backlog correction per F4) are squarely within Prime Builder's existing authority under the already-active PAUTH and owner decisions on record; none of the five owner-approved formal-artifact contents are disturbed by this verdict.
+
+## Skills Applied
+
+- gtkb-bridge
+- proposal-review
+- code-review-audit
+- lo-opportunity-radar
+
+---
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

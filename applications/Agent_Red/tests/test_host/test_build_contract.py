@@ -1,22 +1,25 @@
-# tests/test_host/test_build_contract.py — AI Software Quality Prevention Tests
-# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+# tests/test_host/test_build_contract.py â€” AI Software Quality Prevention Tests
+# Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 #
 # 7 test classes that catch the 7 systematic failure modes identified in S209
 # for AI-generated software. Each class validates cross-layer consistency
 # between .dockerignore, Dockerfile*, suites.py, CI workflow, and test
-# expectations — without requiring a running container.
+# expectations â€” without requiring a running container.
 #
 # Run: pytest tests/test_host/test_build_contract.py -v
 
 from __future__ import annotations
 
+import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
 # ---------------------------------------------------------------------------
-# Project root — two levels up from this test file (tests/test_host/)
+# Project root â€” two levels up from this test file (tests/test_host/)
 # ---------------------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -84,11 +87,7 @@ def _get_req_test() -> str:
 
 def _active_dockerignore_patterns() -> set[str]:
     """Return the set of uncommented, non-empty lines from .dockerignore."""
-    return {
-        line.strip()
-        for line in _get_dockerignore()
-        if line.strip() and not line.strip().startswith("#")
-    }
+    return {line.strip() for line in _get_dockerignore() if line.strip() and not line.strip().startswith("#")}
 
 
 def _extract_copy_sources(lines: list[str]) -> list[str]:
@@ -122,43 +121,39 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from test_host.suites import SUITE_CONFIGS  # noqa: E402
 
-
 # ===========================================================================
 # 1. TestConfigurationDriftAcrossLayers
 # ===========================================================================
+
 
 class TestConfigurationDriftAcrossLayers:
     """Failure mode: .dockerignore, Dockerfiles, suite configs, and CI workflow
     form an implicit contract that drifts silently between sessions.
 
-    Metric: inconsistencies / cross_layer_checks — target: 0/12
+    Metric: inconsistencies / cross_layer_checks â€” target: 0/12
     """
 
-    @pytest.mark.parametrize("path", [
-        "tests/",
-        "src/",
-        "config/",
-        "pyproject.toml",
-        "CLAUDE.md",
-    ])
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "tests/",
+            "src/",
+            "config/",
+            "pyproject.toml",
+            "CLAUDE.md",
+        ],
+    )
     def test_dockerignore_does_not_exclude_test_host_paths(self, path: str):
-        """Dockerfile.test needs these paths — .dockerignore must not exclude them."""
+        """Dockerfile.test needs these paths â€” .dockerignore must not exclude them."""
         patterns = _active_dockerignore_patterns()
         # Check both exact match and trailing-slash variant
-        assert path not in patterns, (
-            f".dockerignore excludes '{path}' which is required by Dockerfile.test"
-        )
+        assert path not in patterns, f".dockerignore excludes '{path}' which is required by Dockerfile.test"
         bare = path.rstrip("/")
-        assert bare not in patterns, (
-            f".dockerignore excludes '{bare}' which is required by Dockerfile.test"
-        )
+        assert bare not in patterns, f".dockerignore excludes '{bare}' which is required by Dockerfile.test"
 
     def test_dockerfile_test_copies_playwright_deps_when_required(self):
         """Suites with requires_playwright=True need Playwright in the container."""
-        playwright_suites = [
-            s for s in SUITE_CONFIGS.values()
-            if s.requires_playwright and not s.is_composite
-        ]
+        playwright_suites = [s for s in SUITE_CONFIGS.values() if s.requires_playwright and not s.is_composite]
         assert playwright_suites, "Expected at least one Playwright suite"
         text = "\n".join(_get_dockerfile_test())
         assert "playwright install" in text.lower(), (
@@ -167,15 +162,10 @@ class TestConfigurationDriftAcrossLayers:
 
     def test_dockerfile_test_copies_locust_deps_when_required(self):
         """Suites with requires_locust=True need Locust in the requirements."""
-        locust_suites = [
-            s for s in SUITE_CONFIGS.values()
-            if s.requires_locust and not s.is_composite
-        ]
+        locust_suites = [s for s in SUITE_CONFIGS.values() if s.requires_locust and not s.is_composite]
         assert locust_suites, "Expected at least one Locust suite"
         req_text = _get_req_test()
-        assert "locust" in req_text.lower(), (
-            "requirements-test.txt must include locust for locust-requiring suites"
-        )
+        assert "locust" in req_text.lower(), "requirements-test.txt must include locust for locust-requiring suites"
 
     def test_both_dockerfiles_use_same_base_image(self):
         """Both Dockerfiles must use the same Python base image for consistency."""
@@ -184,8 +174,7 @@ class TestConfigurationDriftAcrossLayers:
         assert prod_base is not None, "Dockerfile missing FROM"
         assert test_base is not None, "Dockerfile.test missing FROM"
         assert prod_base == test_base, (
-            f"Base image mismatch: Dockerfile uses {prod_base}, "
-            f"Dockerfile.test uses {test_base}"
+            f"Base image mismatch: Dockerfile uses {prod_base}, Dockerfile.test uses {test_base}"
         )
 
     def test_both_dockerfiles_copy_src_and_config(self):
@@ -195,34 +184,23 @@ class TestConfigurationDriftAcrossLayers:
             ("Dockerfile.test", _get_dockerfile_test()),
         ]:
             sources = _extract_copy_sources(lines)
-            assert any(s.startswith("src/") or s == "src/" for s in sources), (
-                f"{label} must COPY src/"
-            )
-            assert any(s.startswith("config/") or s == "config/" for s in sources), (
-                f"{label} must COPY config/"
-            )
+            assert any(s.startswith("src/") or s == "src/" for s in sources), f"{label} must COPY src/"
+            assert any(s.startswith("config/") or s == "config/" for s in sources), f"{label} must COPY config/"
 
     def test_github_workflow_references_dockerfile_test(self):
         """CI workflow must build with Dockerfile.test, not Dockerfile."""
         workflow = _get_workflow()
-        assert "Dockerfile.test" in workflow, (
-            "build-test-host.yml must reference Dockerfile.test"
-        )
+        assert "Dockerfile.test" in workflow, "build-test-host.yml must reference Dockerfile.test"
         # Should NOT build with the production Dockerfile
-        assert "docker build -f Dockerfile.test" in workflow or \
-               "-f Dockerfile.test" in workflow, (
+        assert "docker build -f Dockerfile.test" in workflow or "-f Dockerfile.test" in workflow, (
             "Workflow must use '-f Dockerfile.test' flag"
         )
 
     def test_production_dockerfile_avoids_curl_healthcheck_dependency(self):
         """Production image healthcheck must not pull curl/libnghttp2 into the image."""
         text = "\n".join(_get_dockerfile())
-        assert "apt-get upgrade -y" in text, (
-            "Dockerfile must upgrade base OS packages before Docker Scout scanning"
-        )
-        assert "curl" not in text, (
-            "Production Dockerfile must not install curl just for HEALTHCHECK"
-        )
+        assert "apt-get upgrade -y" in text, "Dockerfile must upgrade base OS packages before Docker Scout scanning"
+        assert "curl" not in text, "Production Dockerfile must not install curl just for HEALTHCHECK"
         assert "urllib.request.urlopen" in text, (
             "Production Dockerfile must use Python stdlib healthcheck instead of curl"
         )
@@ -232,10 +210,11 @@ class TestConfigurationDriftAcrossLayers:
 # 2. TestEnvironmentAssumptionMismatch
 # ===========================================================================
 
+
 class TestEnvironmentAssumptionMismatch:
     """Failure mode: Code works locally but fails in container due to missing files.
 
-    Metric: missing_copies / required_copies — target: 0/5
+    Metric: missing_copies / required_copies â€” target: 0/5
     """
 
     def test_dockerfile_test_copies_all_suite_test_dirs(self):
@@ -250,13 +229,10 @@ class TestEnvironmentAssumptionMismatch:
                     # The COPY line needs to cover this path.
                     # Dockerfile.test copies "tests/" which covers all subdirs.
                     found = any(
-                        s.rstrip("/") == "tests" or s == "tests/" or
-                        arg.startswith(s.rstrip("/"))
-                        for s in test_sources
+                        s.rstrip("/") == "tests" or s == "tests/" or arg.startswith(s.rstrip("/")) for s in test_sources
                     )
                     assert found, (
-                        f"Suite '{name}' references {arg} but Dockerfile.test "
-                        f"does not COPY a parent directory"
+                        f"Suite '{name}' references {arg} but Dockerfile.test does not COPY a parent directory"
                     )
 
     def test_dockerfile_test_copies_essential_project_files(self):
@@ -264,16 +240,13 @@ class TestEnvironmentAssumptionMismatch:
         sources = _extract_copy_sources(_get_dockerfile_test())
         for required in ["src/", "config/", "pyproject.toml"]:
             found = any(s.rstrip("/") == required.rstrip("/") for s in sources)
-            assert found, (
-                f"Dockerfile.test must COPY {required}"
-            )
+            assert found, f"Dockerfile.test must COPY {required}"
 
     def test_requirements_test_includes_base(self):
         """requirements-test.txt must chain to production requirements.txt."""
         req_text = _get_req_test()
         assert "-r requirements.txt" in req_text, (
-            "requirements-test.txt must include '-r requirements.txt' "
-            "to chain production dependencies"
+            "requirements-test.txt must include '-r requirements.txt' to chain production dependencies"
         )
 
 
@@ -281,17 +254,21 @@ class TestEnvironmentAssumptionMismatch:
 # 3. TestDockerfileCacheInvalidation
 # ===========================================================================
 
+
 class TestDockerfileCacheInvalidation:
     """Failure mode: Dockerfile changes invalidate Docker layer cache,
     causing slow or failing builds.
 
-    Metric: ordering_violations / ordering_checks — target: 0/4
+    Metric: ordering_violations / ordering_checks â€” target: 0/4
     """
 
-    @pytest.mark.parametrize("label,lines_fn", [
-        ("Dockerfile", _get_dockerfile),
-        ("Dockerfile.test", _get_dockerfile_test),
-    ])
+    @pytest.mark.parametrize(
+        "label,lines_fn",
+        [
+            ("Dockerfile", _get_dockerfile),
+            ("Dockerfile.test", _get_dockerfile_test),
+        ],
+    )
     def test_requirements_copied_before_src(self, label: str, lines_fn):
         """requirements*.txt COPY must appear before src/ COPY for layer caching."""
         lines = lines_fn()
@@ -299,12 +276,10 @@ class TestDockerfileCacheInvalidation:
         src_line = None
         for i, line in enumerate(lines):
             stripped = line.strip()
-            if stripped.startswith("COPY") and "requirements" in stripped:
-                if req_line is None:
-                    req_line = i
-            if stripped.startswith("COPY") and "src/" in stripped:
-                if src_line is None:
-                    src_line = i
+            if req_line is None and stripped.startswith("COPY") and "requirements" in stripped:
+                req_line = i
+            if src_line is None and stripped.startswith("COPY") and "src/" in stripped:
+                src_line = i
         assert req_line is not None, f"{label}: no COPY requirements* found"
         assert src_line is not None, f"{label}: no COPY src/ found"
         assert req_line < src_line, (
@@ -323,14 +298,13 @@ class TestDockerfileCacheInvalidation:
             for i, line in enumerate(lines):
                 if "pip install" in line:
                     last_pip_line = i
-                if "apt-get install" in line and last_pip_line >= 0:
-                    # Exception: Dockerfile.test installs Node.js after system deps
-                    # but before pip. Check only if apt-get is AFTER pip.
-                    if i > last_pip_line:
-                        pytest.fail(
-                            f"{label}: apt-get install at line {i + 1} appears "
-                            f"after pip install at line {last_pip_line + 1}"
-                        )
+                # Exception: Dockerfile.test installs Node.js after system deps
+                # but before pip. Check only if apt-get is AFTER pip.
+                if "apt-get install" in line and 0 <= last_pip_line < i:
+                    pytest.fail(
+                        f"{label}: apt-get install at line {i + 1} appears "
+                        f"after pip install at line {last_pip_line + 1}"
+                    )
 
     def test_pip_uses_no_cache_dir(self):
         """All pip install commands must use --no-cache-dir."""
@@ -341,19 +315,18 @@ class TestDockerfileCacheInvalidation:
             lines = lines_fn()
             for i, line in enumerate(lines):
                 if "pip install" in line and "upgrade pip" not in line:
-                    assert "--no-cache-dir" in line, (
-                        f"{label} line {i + 1}: pip install without --no-cache-dir"
-                    )
+                    assert "--no-cache-dir" in line, f"{label} line {i + 1}: pip install without --no-cache-dir"
 
 
 # ===========================================================================
 # 4. TestStaleInterfaceContracts
 # ===========================================================================
 
+
 class TestStaleInterfaceContracts:
     """Failure mode: Suite configs reference paths or files that no longer exist.
 
-    Metric: stale_paths / total_paths — target: 0
+    Metric: stale_paths / total_paths â€” target: 0
     """
 
     def test_suite_test_directories_exist(self):
@@ -367,10 +340,7 @@ class TestStaleInterfaceContracts:
                     full_path = PROJECT_ROOT / arg.rstrip("/")
                     if not full_path.exists():
                         missing.append(f"Suite '{name}': {arg}")
-        assert not missing, (
-            "Suite test directories missing from filesystem:\n"
-            + "\n".join(f"  - {m}" for m in missing)
-        )
+        assert not missing, "Suite test directories missing from filesystem:\n" + "\n".join(f"  - {m}" for m in missing)
 
     def test_ignore_targets_exist(self):
         """Every --ignore= target in suite configs must exist on the filesystem."""
@@ -384,10 +354,7 @@ class TestStaleInterfaceContracts:
                     full_path = PROJECT_ROOT / target
                     if not full_path.exists():
                         missing.append(f"Suite '{name}': --ignore={target}")
-        assert not missing, (
-            "Ignore targets missing from filesystem:\n"
-            + "\n".join(f"  - {m}" for m in missing)
-        )
+        assert not missing, "Ignore targets missing from filesystem:\n" + "\n".join(f"  - {m}" for m in missing)
 
     def test_composite_suites_reference_valid_individuals(self):
         """Composite suites must only reference defined individual suites."""
@@ -395,13 +362,9 @@ class TestStaleInterfaceContracts:
             if not cfg.is_composite:
                 continue
             for member in cfg.composite_suites:
-                assert member in SUITE_CONFIGS, (
-                    f"Composite suite '{name}' references undefined "
-                    f"suite '{member}'"
-                )
+                assert member in SUITE_CONFIGS, f"Composite suite '{name}' references undefined suite '{member}'"
                 assert not SUITE_CONFIGS[member].is_composite, (
-                    f"Composite suite '{name}' references another composite "
-                    f"'{member}' (nesting not supported)"
+                    f"Composite suite '{name}' references another composite '{member}' (nesting not supported)"
                 )
 
 
@@ -409,11 +372,12 @@ class TestStaleInterfaceContracts:
 # 5. TestSpeculativeBreadthGuard
 # ===========================================================================
 
+
 class TestSpeculativeBreadthGuard:
     """Failure mode: Suites created speculatively without verification,
     composites missing members.
 
-    Metric: coverage_gaps / total_suites — target: 0
+    Metric: coverage_gaps / total_suites â€” target: 0
     """
 
     def test_individual_suites_have_test_paths(self):
@@ -421,13 +385,8 @@ class TestSpeculativeBreadthGuard:
         for name, cfg in SUITE_CONFIGS.items():
             if cfg.is_composite or cfg.requires_locust:
                 continue  # Load suites use wrapper scripts, not pytest paths
-            test_paths = [
-                a for a in cfg.pytest_args
-                if a.startswith("tests/") and not a.startswith("--")
-            ]
-            assert test_paths, (
-                f"Suite '{name}' has no test paths in pytest_args"
-            )
+            test_paths = [a for a in cfg.pytest_args if a.startswith("tests/") and not a.startswith("--")]
+            assert test_paths, f"Suite '{name}' has no test paths in pytest_args"
 
     def test_individual_suites_have_estimated_tests(self):
         """Every non-composite suite must declare estimated_tests > 0."""
@@ -435,23 +394,17 @@ class TestSpeculativeBreadthGuard:
             if cfg.is_composite:
                 continue
             assert cfg.estimated_tests > 0, (
-                f"Suite '{name}' has estimated_tests={cfg.estimated_tests} — "
-                f"must be positive"
+                f"Suite '{name}' has estimated_tests={cfg.estimated_tests} â€” must be positive"
             )
 
     def test_full_composite_includes_all_individuals(self):
         """The 'full' composite suite must include every individual suite."""
-        individual_names = {
-            name for name, cfg in SUITE_CONFIGS.items()
-            if not cfg.is_composite
-        }
+        individual_names = {name for name, cfg in SUITE_CONFIGS.items() if not cfg.is_composite}
         full_suite = SUITE_CONFIGS.get("full")
         assert full_suite is not None, "Missing 'full' composite suite"
         full_members = set(full_suite.composite_suites)
         missing = individual_names - full_members
-        assert not missing, (
-            f"'full' composite is missing individual suites: {sorted(missing)}"
-        )
+        assert not missing, f"'full' composite is missing individual suites: {sorted(missing)}"
 
     def test_ignore_patterns_target_files_not_directories(self):
         """--ignore= patterns should target specific files, not entire directories."""
@@ -473,9 +426,7 @@ class TestSpeculativeBreadthGuard:
             if not cfg.is_composite:
                 continue
             component_sum = sum(
-                SUITE_CONFIGS[member].estimated_tests
-                for member in cfg.composite_suites
-                if member in SUITE_CONFIGS
+                SUITE_CONFIGS[member].estimated_tests for member in cfg.composite_suites if member in SUITE_CONFIGS
             )
             if component_sum == 0:
                 continue
@@ -483,7 +434,7 @@ class TestSpeculativeBreadthGuard:
             assert 0.8 <= ratio <= 1.2, (
                 f"Composite '{name}' estimated_tests={cfg.estimated_tests} "
                 f"but component sum={component_sum} (ratio={ratio:.2f}, "
-                f"expected 0.80–1.20)"
+                f"expected 0.80â€“1.20)"
             )
 
 
@@ -491,15 +442,17 @@ class TestSpeculativeBreadthGuard:
 # 6. TestErrorMessageOpacity
 # ===========================================================================
 
+
 class TestErrorMessageOpacity:
     """Failure mode: Diagnostic output truncated or missing, hiding root causes.
 
-    Metric: suites_with_diagnostics / applicable_suites — target: 100%
+    Metric: suites_with_diagnostics / applicable_suites â€” target: 100%
     """
 
     def test_runstate_has_diagnostic_fields(self):
         """RunState must have failures list and stdout_tail for debugging."""
         from test_host.cosmos_writer import RunState
+
         state = RunState(run_id="test", environment="test", suite="test")
         assert hasattr(state, "failures"), "RunState missing 'failures' field"
         assert isinstance(state.failures, list), "RunState.failures must be a list"
@@ -508,6 +461,7 @@ class TestErrorMessageOpacity:
     def test_testresult_has_detail_field(self):
         """TestResult must have a detail field for error messages."""
         from test_host.cosmos_writer import TestResult
+
         result = TestResult(name="x", category="x", status="fail", detail="msg")
         assert result.detail == "msg", "TestResult.detail not stored"
 
@@ -517,38 +471,33 @@ class TestErrorMessageOpacity:
             if cfg.is_composite or cfg.requires_locust:
                 continue
             timeout_args = [a for a in cfg.pytest_args if a.startswith("--timeout=")]
-            assert timeout_args, (
-                f"Suite '{name}' missing --timeout=N in pytest_args"
-            )
+            assert timeout_args, f"Suite '{name}' missing --timeout=N in pytest_args"
 
     def test_suites_have_verbosity_flag(self):
         """Every non-composite suite must specify -v or -q for output control."""
         for name, cfg in SUITE_CONFIGS.items():
             if cfg.is_composite or cfg.requires_locust:
                 continue
-            has_verbosity = any(
-                a in ("-v", "-q", "--verbose", "--quiet")
-                for a in cfg.pytest_args
-            )
-            assert has_verbosity, (
-                f"Suite '{name}' missing verbosity flag (-v or -q) in pytest_args"
-            )
+            has_verbosity = any(a in ("-v", "-q", "--verbose", "--quiet") for a in cfg.pytest_args)
+            assert has_verbosity, f"Suite '{name}' missing verbosity flag (-v or -q) in pytest_args"
 
 
 # ===========================================================================
 # 7. TestDiagnosticHypothesisStructure
 # ===========================================================================
 
+
 class TestDiagnosticHypothesisStructure:
     """Failure mode: Failures lumped into single bucket, preventing structured
     diagnosis and pattern recognition.
 
-    Metric: diagnostic_fields_present / diagnostic_fields_required — target: 10/10
+    Metric: diagnostic_fields_present / diagnostic_fields_required â€” target: 10/10
     """
 
     def test_testresult_status_values_cover_required_set(self):
         """TestResult status should accept pass, fail, skip, and error."""
         from test_host.cosmos_writer import TestResult
+
         for status in ("pass", "fail", "skip", "error"):
             r = TestResult(name="x", category="test", status=status)
             assert r.status == status
@@ -556,6 +505,7 @@ class TestDiagnosticHypothesisStructure:
     def test_runstate_has_separate_counters(self):
         """RunState must have separate failed, errored, and skipped counters."""
         from test_host.cosmos_writer import RunState
+
         state = RunState(run_id="x", environment="x", suite="x")
         assert hasattr(state, "failed"), "RunState missing 'failed' counter"
         assert hasattr(state, "errored"), "RunState missing 'errored' counter"
@@ -579,14 +529,14 @@ class TestDiagnosticHypothesisStructure:
                     has_comment = prev.startswith("#")
                 if not has_comment:
                     violations.append(f"Line {i + 1}: {stripped}")
-        assert not violations, (
-            "--ignore= patterns without explanatory comments:\n"
-            + "\n".join(f"  - {v}" for v in violations)
+        assert not violations, "--ignore= patterns without explanatory comments:\n" + "\n".join(
+            f"  - {v}" for v in violations
         )
 
     def test_testresult_has_category_and_latency(self):
         """TestResult must have category and latency_ms for structured diagnosis."""
         from test_host.cosmos_writer import TestResult
+
         r = TestResult(
             name="test_example",
             category="unit",
@@ -599,8 +549,116 @@ class TestDiagnosticHypothesisStructure:
     def test_runstate_tracks_phase_progress(self):
         """RunState must track phase progress for composite suite diagnosis."""
         from test_host.cosmos_writer import RunState
+
         state = RunState(run_id="x", environment="x", suite="x")
         assert hasattr(state, "current_phase")
         assert hasattr(state, "phases_completed")
         assert hasattr(state, "phases_total")
         assert isinstance(state.phases_completed, list)
+
+
+# ===========================================================================
+# 8. TestApplicationRootSelfContainment
+# ===========================================================================
+
+
+class TestApplicationRootSelfContainment:
+    """WI-5381: build, workflow, registry, and env sync stay application-local."""
+
+    NEW_TOP_LEVEL = {
+        ".github",
+        "Dockerfile",
+        "Dockerfile.test",
+        "Dockerfile.ui",
+        "docker-compose.yml",
+        "pyproject.toml",
+        "requirements.txt",
+        "requirements-test.txt",
+        "requirements-local.txt",
+        "test_host",
+    }
+
+    def test_isolation_registry_covers_new_top_level_artifacts(self):
+        registry = json.loads(_read_text(".gtkb-app-isolation.json"))
+        entries = {entry["name"]: entry for entry in registry["top_level_artifacts"]}
+        missing = self.NEW_TOP_LEVEL - set(entries)
+        assert not missing, f"New top-level artifacts missing registry entries: {sorted(missing)}"
+        for name in self.NEW_TOP_LEVEL:
+            entry = entries[name]
+            assert entry["bucket"] in {"A", "B"}
+            assert entry.get("purpose") or (entry.get("tool") and entry.get("justification"))
+
+    def test_workflow_builds_from_application_root(self):
+        workflow = _get_workflow()
+        assert "working-directory: applications/Agent_Red" in workflow
+        assert "docker build -f Dockerfile.test" in workflow
+        assert "applications/Agent_Red/Dockerfile.test" not in workflow
+
+    def test_dockerfiles_use_application_relative_copy_sources(self):
+        for label, lines in [
+            ("Dockerfile", _get_dockerfile()),
+            ("Dockerfile.test", _get_dockerfile_test()),
+        ]:
+            text = "\n".join(lines)
+            assert "applications/Agent_Red/" not in text, f"{label} uses root-relative application path"
+            assert "COPY src/ ./src/" in text
+            assert "COPY config/ ./config/" in text
+
+    def test_dependency_manifests_and_pyproject_are_application_local(self):
+        assert "-r requirements.txt" in _get_req_test()
+        assert "locust" in _get_req_test().lower()
+        pyproject = _read_text("pyproject.toml")
+        assert 'name = "agent-red"' in pyproject
+        assert 'include = ["src*", "test_host*"]' in pyproject
+
+    def test_compose_uses_application_contexts(self):
+        compose = _read_text("docker-compose.yml")
+        assert "context: ." in compose
+        assert "dockerfile: Dockerfile" in compose
+        assert "dockerfile: Dockerfile.test" in compose
+        assert "applications/Agent_Red" not in compose
+
+    def test_admin_package_scripts_resolve_application_sync_script(self):
+        script = PROJECT_ROOT / "scripts" / "sync-admin-env.ps1"
+        assert script.is_file()
+        for package in [
+            "admin/standalone/package.json",
+            "admin/provider/package.json",
+            "admin/shopify/package.json",
+        ]:
+            text = _read_text(package)
+            assert "../../scripts/sync-admin-env.ps1" in text
+
+    def test_sync_admin_env_temp_root_does_not_print_secret(self, tmp_path):
+        source = tmp_path / ".env.local"
+        source.write_text(
+            "VITE_API_BASE=/api\nAGENT_RED_TEST_SECRET=super-secret-value\n",  # placeholder
+            encoding="utf-8",
+        )
+        env = os.environ.copy()
+        env["AGENT_RED_APP_ROOT_OVERRIDE"] = str(tmp_path)
+        completed = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(PROJECT_ROOT / "scripts" / "sync-admin-env.ps1"),
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+        )
+        assert completed.returncode == 0, completed.stderr
+        combined_output = completed.stdout + completed.stderr
+        assert "super-secret-value" not in combined_output
+        for relpath in [
+            "admin/standalone/.env.local",
+            "admin/provider/.env.local",
+            "admin/shopify/.env.local",
+        ]:
+            target = tmp_path / relpath
+            assert target.is_file()
+            assert "AGENT_RED_TEST_SECRET=super-secret-value" in target.read_text(encoding="utf-8")  # placeholder

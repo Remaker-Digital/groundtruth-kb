@@ -1,0 +1,1070 @@
+schema_version = 2
+migration_id = "WI-5640"
+main_bridge_id = "gtkb-file-move-rename-canonicalization-v4"
+child_bridge_id = "gtkb-file-move-rename-canonicalization-v4-plan-approval"
+manifest_path = "gtkb-file-move-and-rename-list.csv"
+runtime_directory = ".gtkb-state/file-reference-migration/wi5640"
+canonical_root = "."
+
+[scan]
+inventory_mode = "artifact-registry"
+legacy_encodings = ["cp1252"]
+max_inline_text_bytes = 67108864
+max_catalog_probe_bytes = 268435456
+follow_reparse_points = false
+require_every_path_classified = true
+require_readable_directories = true
+inventory_excluded_children = true
+retain_observed_records = false
+catalog_probe_classifications = [
+  "application_boundary",
+  "binary",
+  "canonical_destination",
+  "generated_text",
+  "immutable_audit",
+  "input_authority",
+  "mutable_text",
+  "native_compatibility_projection",
+  "retained_obsolete_source",
+]
+unicode_normalization = "NFC"
+windows_component_casefold = true
+
+[alias_catalog]
+required_dispositions = ["rewrite", "generator-regenerate", "immutable-audit", "retained-compatibility", "external", "application-boundary", "unresolved"]
+candidate_only_origins = ["skill-inventory", "rename-metadata", "inferred-prefix"]
+
+[[obsolete_aliases]]
+id = "A001-CLAUDE"
+source = ".claude/skills/bridge-propose"
+canonical = ".claude/skills/gtkb-bridge-propose"
+origin = "explicit-reviewed"
+authority = "rewrite"
+match_mode = "longest-path-components"
+forms = ["direct", "absolute", "uri", "relative", "segmented", "structured", "glob", "regex", "sqlite"]
+retain_source = true
+
+[[obsolete_aliases]]
+id = "A001-CODEX"
+source = ".codex/skills/bridge-propose"
+canonical = ".codex/skills/gtkb-bridge-propose"
+origin = "explicit-reviewed-family"
+authority = "rewrite"
+match_mode = "longest-path-components"
+forms = ["direct", "absolute", "uri", "relative", "segmented", "structured", "glob", "regex", "sqlite"]
+retain_source = true
+
+[[obsolete_aliases]]
+id = "A001-AGENT"
+source = ".agent/skills/bridge-propose"
+canonical = ".agent/skills/gtkb-bridge-propose"
+origin = "explicit-reviewed-family"
+authority = "rewrite"
+match_mode = "longest-path-components"
+forms = ["direct", "absolute", "uri", "relative", "segmented", "structured", "glob", "regex", "sqlite"]
+retain_source = true
+
+[[obsolete_aliases]]
+id = "A001-CURSOR"
+source = ".cursor/skills/bridge-propose"
+canonical = ".cursor/skills/gtkb-bridge-propose"
+origin = "explicit-reviewed-family"
+authority = "rewrite"
+match_mode = "longest-path-components"
+forms = ["direct", "absolute", "uri", "relative", "segmented", "structured", "glob", "regex", "sqlite"]
+retain_source = true
+
+[[obsolete_aliases]]
+id = "A001-GOOSE"
+source = ".goose/skills/bridge-propose"
+canonical = ".goose/skills/gtkb-bridge-propose"
+origin = "explicit-reviewed-family"
+authority = "rewrite"
+match_mode = "longest-path-components"
+forms = ["direct", "absolute", "uri", "relative", "segmented", "structured", "glob", "regex", "sqlite"]
+retain_source = true
+
+[[obsolete_aliases]]
+id = "A001-API"
+source = ".api-harness/skills/bridge-propose"
+canonical = ".api-harness/skills/gtkb-bridge-propose"
+origin = "explicit-reviewed-family"
+authority = "rewrite"
+match_mode = "longest-path-components"
+forms = ["direct", "absolute", "uri", "relative", "segmented", "structured", "glob", "regex", "sqlite"]
+retain_source = true
+
+[[physical_alias_roots]]
+id = "PA001"
+alias_id = "A001-CLAUDE"
+source = "groundtruth-kb/templates/skills/bridge-propose"
+canonical = "groundtruth-kb/templates/skills/gtkb-bridge-propose"
+disposition = "rewrite"
+operation = "materialize-copy"
+owner = "scripts/gtkb_file_reference_migration.py"
+retain_source = true
+
+[[physical_alias_roots]]
+id = "PA002"
+alias_id = "A001-CLAUDE"
+source = "groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/bridge-propose"
+canonical = "groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/gtkb-bridge-propose"
+disposition = "generator-regenerate"
+operation = "generator-regenerate"
+owner = "scripts/_capture_scaffold_golden.py"
+retain_source = true
+
+[retention]
+retain_all_old_paths = true
+inert_source_count = 52
+native_rule_projection_count = 38
+allow_delete = false
+allow_move = false
+allow_rename = false
+allow_unlink = false
+
+[hash_contract]
+algorithm = "sha256"
+canonical_json_encoding = "utf-8"
+canonical_json_newline = "LF"
+exclude_volatile_fields = ["created_at", "duration_ms", "process_id", "report_path", "run_id"]
+closure_components = ["schema_version", "csv_sha256", "policy_sha256", "scanner_sha256", "closure_inventory_sha256", "classification_sha256", "residual_sha256", "exception_sha256", "projection_sha256", "proposed_write_sha256", "git_index_sha256"]
+
+[categories.hooks]
+source_prefix = ".claude/hooks/"
+destination_prefix = "config/hooks/"
+compatibility_mode = "retained_inert_source"
+canonical_eol = "LF"
+
+[categories.rules]
+source_prefix = ".claude/rules/"
+destination_prefix = "config/agent-control/"
+compatibility_mode = "generated_native_projection"
+projection_generator = "scripts/generate_rule_compatibility_projections.py"
+
+[categories.agent_control]
+source_prefix = "config/agent-control/"
+destination_prefix = "config/agent-control/gtkb-"
+compatibility_mode = "retained_inert_source"
+canonical_eol = "LF"
+
+[mutation]
+mutable_roots = [".agent", ".api-harness", ".claude", ".codex", ".cursor", ".github", ".goose", "config", "docs", "groundtruth-kb", "memory", "platform_tests", "scripts", "tests", "tools"]
+root_file_allowlist = [".gitattributes", ".gitignore", "AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md", "README.md", "preflight-validation.ps1", "pyproject.toml"]
+forbidden_roots = ["applications", "archive", "archives", "bridge", "retired"]
+require_exact_plan_paths = true
+allow_globs_at_apply = false
+
+[encoding]
+decode_order = ["bom", "python_pep263", "utf-8", "declared_legacy"]
+preserve_bom = true
+preserve_codec = true
+preserve_unrelated_bytes = true
+canonical_hook_eol = "LF"
+rule_projection_eol = "canonical_source"
+
+[residuals]
+required_fields = ["mapping_id", "variant", "classification", "path", "location", "load_bearing", "exception_id", "evidence"]
+unresolved_live_blocks_apply = true
+history_is_observed_not_rewritten = true
+application_boundary_is_observed_not_rewritten = true
+
+[verification]
+clean_process_passes_before_closure = 2
+post_suite_passes = 1
+require_identical_closure_fingerprint = true
+require_zero_unresolved_live_residuals = true
+require_zero_proposed_writes = true
+require_old_sources_present = true
+
+[allowed_baseline_failures.cross_harness]
+owner_project = "PROJECT-GTKB-PLATFORM-MODERNIZATION-HARNESS-PARITY"
+owner_work_items = ["WI-5428", "WI-5646"]
+head = "ef6ba79c7527190606e41267bd45e6732c405e43"
+collected_node_count = 209
+required_identical_runs = 3
+latest_bridge_evidence = ["bridge/gtkb-wi5364-codex-hook-parity-batch-002.md", "bridge/gtkb-wi5646-skill-rollout-003.md"]
+node_ids = [
+  "platform_tests/scripts/test_check_harness_parity.py::test_repository_registry_covers_project_skills",
+  "platform_tests/scripts/test_codex_hook_parity.py::test_codex_hook_parity_passes_for_repository_configuration",
+  "platform_tests/scripts/test_codex_hook_parity.py::test_codex_userpromptsubmit_wrapup_hook_has_headroom_timeout",
+  "platform_tests/scripts/test_codex_hook_parity.py::test_codex_hook_parity_requires_session_lifecycle_hook_intent",
+  "platform_tests/scripts/test_codex_hook_parity.py::test_codex_hook_commands_avoid_shell_specific_command_substitution",
+  "platform_tests/scripts/test_codex_hook_parity.py::test_codex_parity_repository_configuration_wires_bridge_compliance",
+]
+normalized_checker_findings = [
+  "hooks=false",
+  "missing formal-artifact PreToolUse",
+  "missing workstream-focus PreToolUse",
+  "missing Bash matcher",
+  "missing apply_patch matcher",
+  "missing workstream-focus UserPromptSubmit",
+  "missing session-lifecycle UserPromptSubmit",
+  "wrap-up dispatcher forces a role profile",
+]
+
+[observed_residual_failures.governance]
+owner_project = "PROJECT-GTKB-PLATFORM-MODERNIZATION-AUTHORITY-FOUNDATIONS"
+owner_work_item = "WI-5178"
+observed_collected_node_count = 475
+passing_node_count = 471
+failing_node_count = 4
+node_list_lf_sha256 = "sha256:3ddb040eacb28b101c93a45f59707e20e6ea84aff199a733d50854569ce7868b"
+allowed_for_stage_b = false
+stage_b_requires_all_pass = true
+node_ids = [
+  "platform_tests/scripts/test_implementation_start_gate.py::test_work_intent_acquire_denial_creates_no_claim",
+  "platform_tests/scripts/test_implementation_start_gate.py::test_work_intent_extension_denial_leaves_claim_unchanged",
+  "platform_tests/scripts/test_implementation_start_gate.py::test_work_intent_reclassify_denial_leaves_draft_claim_unchanged",
+  "platform_tests/scripts/test_implementation_start_gate.py::test_work_intent_renew_denial_leaves_go_claim_unchanged",
+]
+
+[generator_execution]
+enabled_during_analysis = true
+timeout_seconds = 120
+
+[[generator_checks]]
+id = "codex-skills"
+command = ["python", "scripts/generate_codex_skill_adapters.py", "--check"]
+owner = "scripts/generate_codex_skill_adapters.py"
+
+[[generator_checks]]
+id = "antigravity-skills"
+command = ["python", "scripts/generate_antigravity_skill_adapters.py", "--check"]
+owner = "scripts/generate_antigravity_skill_adapters.py"
+
+[[generator_checks]]
+id = "api-skills"
+command = ["python", "scripts/generate_api_skill_adapters.py", "--check"]
+owner = "scripts/generate_api_skill_adapters.py"
+
+[[generator_checks]]
+id = "goose-api-skills"
+command = ["python", "scripts/generate_api_skill_adapters.py", "--output-dir", ".goose/skills", "--check"]
+owner = "scripts/generate_api_skill_adapters.py"
+disposition = "blocked_by_shared_manifest_owner_conflict"
+
+[[generator_checks]]
+id = "goose-manifest"
+command = ["python", "scripts/generate_goose_manifest.py", "--check"]
+owner = "scripts/generate_goose_manifest.py"
+disposition = "blocked_by_shared_manifest_owner_conflict"
+
+[[generator_checks]]
+id = "cursor-skills"
+command = ["python", "scripts/generate_cursor_skill_adapters.py", "--check"]
+owner = "scripts/generate_cursor_skill_adapters.py"
+
+[[generator_checks]]
+id = "rule-compatibility"
+command = ["python", "scripts/generate_rule_compatibility_projections.py", "--check"]
+owner = "scripts/generate_rule_compatibility_projections.py"
+
+[[generator_checks]]
+id = "harness-parity"
+command = ["python", "scripts/check_harness_parity.py"]
+owner = "scripts/check_harness_parity.py"
+disposition = "requires_cursor_marker_support_in_exact_stage_b_plan"
+
+[[classification_rules]]
+id = "structured-groundtruth-db"
+pattern = "groundtruth.db"
+class = "structured_sqlite"
+priority = 200
+comparison = "full"
+mutable = false
+
+[[classification_rules]]
+id = "manifest-input-authority"
+pattern = "gtkb-file-move-and-rename-list.csv"
+class = "input_authority"
+priority = 200
+comparison = "full"
+mutable = false
+
+[[classification_rules]]
+id = "bridge-audit-history"
+pattern = "bridge/**"
+class = "immutable_audit"
+priority = 190
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "formal-approval-history"
+pattern = ".groundtruth/formal-artifact-approvals/**"
+class = "immutable_audit"
+priority = 190
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "modernization-wheel-fixture"
+pattern = "platform_tests/fixtures/modernization/*.whl"
+class = "immutable_audit"
+priority = 195
+comparison = "full"
+mutable = false
+
+[[classification_rules]]
+id = "session-evidence-history"
+pattern = ".groundtruth/session/**"
+class = "immutable_audit"
+priority = 190
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "groundtruth-generated-inventory"
+pattern = ".groundtruth/inventory/**"
+class = "runtime_non_authoritative"
+priority = 190
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "git-metadata"
+pattern = ".git/**"
+class = "runtime_non_authoritative"
+priority = 180
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "migration-runtime"
+pattern = ".gtkb-state/file-reference-migration/wi5640/**"
+class = "runtime_non_authoritative"
+priority = 185
+comparison = "fixed_root"
+mutable = true
+
+[[classification_rules]]
+id = "other-runtime-state"
+pattern = ".gtkb-state/**"
+class = "runtime_non_authoritative"
+priority = 170
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "nested-runtime-state"
+pattern = "**/.gtkb-state/**"
+class = "runtime_non_authoritative"
+priority = 170
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "harness-session-envelope-history"
+pattern = "harness-state/*/session-envelope-archive/**"
+class = "runtime_non_authoritative"
+priority = 180
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "harness-session-envelope-runtime"
+pattern = "harness-state/*/session-envelopes/**"
+class = "runtime_non_authoritative"
+priority = 180
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "harness-blocker-history"
+pattern = "harness-state/blockers/**"
+class = "immutable_audit"
+priority = 180
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "harness-registry-generated-projection"
+pattern = "harness-state/harness-registry.json"
+class = "generated_text"
+priority = 180
+comparison = "full"
+mutable = false
+
+[[classification_rules]]
+id = "nested-worktrees"
+pattern = ".claude/worktrees/**"
+class = "separate_worktree"
+priority = 195
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "application-boundary"
+pattern = "applications/**"
+class = "application_boundary"
+priority = 160
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "retired-history"
+pattern = "retired/**"
+class = "immutable_audit"
+priority = 150
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "archive-history"
+pattern = "archive/**"
+class = "immutable_audit"
+priority = 150
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "archives-history"
+pattern = "archives/**"
+class = "immutable_audit"
+priority = 150
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "legacy-retired-assessments"
+pattern = "RETIRED-independent-progress-assessments/**"
+class = "immutable_audit"
+priority = 150
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "barred-assessments"
+pattern = "BARRED - DO NOT USE - independent-progress-assessments/**"
+class = "immutable_audit"
+priority = 150
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "temporary-work-products"
+pattern = ".tmp/**"
+class = "runtime_non_authoritative"
+priority = 150
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "gtkb-temporary-work-products"
+pattern = ".gtkb-tmp/**"
+class = "runtime_non_authoritative"
+priority = 150
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "scratch-work-products"
+pattern = "scratch/**"
+class = "runtime_non_authoritative"
+priority = 150
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "scratchpad-work-products"
+pattern = "scratchpad/**"
+class = "runtime_non_authoritative"
+priority = 150
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "memory-archive-history"
+pattern = "memory/archive/**"
+class = "immutable_audit"
+priority = 155
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "root-memory-notepad"
+pattern = "MEMORY.md"
+class = "runtime_non_authoritative"
+priority = 155
+comparison = "full"
+mutable = false
+
+[[classification_rules]]
+id = "root-temp-python"
+pattern = "temp_*.py"
+class = "runtime_non_authoritative"
+priority = 155
+comparison = "full"
+mutable = false
+
+[[classification_rules]]
+id = "quality-runtime-evidence"
+pattern = ".quality/**"
+class = "runtime_non_authoritative"
+priority = 150
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "ruff-cache"
+pattern = "**/.ruff_cache/**"
+class = "runtime_non_authoritative"
+priority = 150
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "groundtruth-vector-runtime"
+pattern = ".groundtruth-chroma/**"
+class = "runtime_non_authoritative"
+priority = 150
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "dashboard-generated-data"
+pattern = "dashboard/dashboard-data.json"
+class = "generated_text"
+priority = 150
+comparison = "full"
+mutable = false
+
+[[classification_rules]]
+id = "published-dashboard-generated-data"
+pattern = "docs/gtkb-dashboard/dashboard-data.json"
+class = "generated_text"
+priority = 150
+comparison = "full"
+mutable = false
+
+[[classification_rules]]
+id = "dashboard-session-report"
+pattern = "dashboard/session-startup-report.md"
+class = "runtime_non_authoritative"
+priority = 150
+comparison = "full"
+mutable = false
+
+[[classification_rules]]
+id = "python-bytecode"
+pattern = "**/__pycache__/**"
+class = "runtime_non_authoritative"
+priority = 140
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "pytest-cache"
+pattern = "**/.pytest_cache/**"
+class = "runtime_non_authoritative"
+priority = 140
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "root-pytest-tmp"
+pattern = ".pytest-tmp/**"
+class = "runtime_non_authoritative"
+priority = 175
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "pytest-temp"
+pattern = "**/pytest-*/**"
+class = "runtime_non_authoritative"
+priority = 135
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "virtual-environment"
+pattern = "**/.venv/**"
+class = "runtime_non_authoritative"
+priority = 140
+comparison = "fixed_root"
+mutable = false
+
+[[classification_rules]]
+id = "node-modules"
+pattern = "**/node_modules/**"
+class = "runtime_non_authoritative"
+priority = 140
+comparison = "fixed_root"
+mutable = false
+
+[[sqlite_scans]]
+id = "current-harness-capabilities"
+path = "groundtruth.db"
+query = "SELECT id, version, capabilities_ref FROM current_harnesses WHERE capabilities_ref IS NOT NULL ORDER BY id"
+identity_columns = ["id", "version"]
+text_columns = ["capabilities_ref"]
+history = false
+
+[[sqlite_scans]]
+id = "harness-capabilities-history"
+path = "groundtruth.db"
+query = "SELECT id, version, capabilities_ref FROM harnesses WHERE capabilities_ref IS NOT NULL ORDER BY id, version"
+identity_columns = ["id", "version"]
+text_columns = ["capabilities_ref"]
+history = true
+
+[[content_reconciliation]]
+mapping_id = "M001"
+source = ".claude/hooks/_delib_common.py"
+destination = "config/hooks/gtkb_delib_common.py"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M002"
+source = ".claude/hooks/advisory-router-scan.py"
+destination = "config/hooks/gtkb-advisory-router-scan.py"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M003"
+source = ".claude/hooks/assertion-check.py"
+destination = "config/hooks/gtkb-assertion-check.py"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M004"
+source = ".claude/hooks/bridge-axis-2-surface.py"
+destination = "config/hooks/gtkb-bridge-axis-2-surface.py"
+authority = "transformed_source_with_known_adaptation"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M009"
+source = ".claude/hooks/delib-search-gate.py"
+destination = "config/hooks/gtkb-delib-search-gate.py"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M010"
+source = ".claude/hooks/delib-search-tracker.py"
+destination = "config/hooks/gtkb-delib-search-tracker.py"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M012"
+source = ".claude/hooks/directive-enforcement-claude-adapter.py"
+destination = "config/hooks/gtkb-directive-enforcement-claude-adapter.py"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M013"
+source = ".claude/hooks/document_author_provenance_gate.py"
+destination = "config/hooks/gtkb-document_author_provenance_gate.py"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M015"
+source = ".claude/hooks/glossary-expansion.py"
+destination = "config/hooks/gtkb-glossary-expansion.py"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M016"
+source = ".claude/hooks/gov09-capture.py"
+destination = "config/hooks/gtkb-gov-capture.py"
+authority = "transformed_source_with_known_adaptation"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M017"
+source = ".claude/hooks/implementation-start-gate.py"
+destination = "config/hooks/gtkb-implementation-start-gate.py"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M019"
+source = ".claude/hooks/kb-not-markdown.py"
+destination = "config/hooks/gtkb-not-markdown.py"
+authority = "transformed_source_with_known_adaptation"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M022"
+source = ".claude/hooks/owner-decision-capture.py"
+destination = "config/hooks/gtkb-owner-decision-capture.py"
+authority = "transformed_source_with_known_adaptation"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M023"
+source = ".claude/hooks/owner-decision-tracker.py"
+destination = "config/hooks/gtkb-owner-decision-tracker.py"
+authority = "transformed_source_with_known_adaptation"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M024"
+source = ".claude/hooks/spec-before-code.py"
+destination = "config/hooks/gtkb-spec-before-code.py"
+authority = "transformed_source_with_known_adaptation"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M025"
+source = ".claude/hooks/project-completion-surface.py"
+destination = "config/hooks/gtkb-project-completion-surface.py"
+authority = "transformed_source_with_manual_policy"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M027"
+source = ".claude/hooks/session_start_dispatch.py"
+destination = "config/hooks/gtkb-session_start_dispatch.py"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M028"
+source = ".claude/hooks/session-start-governance.py"
+destination = "config/hooks/gtkb-session-start-governance.py"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M029"
+source = ".claude/hooks/session-topic-envelope-router.py"
+destination = "config/hooks/gtkb-session-topic-envelope-router.py"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M030"
+source = ".claude/hooks/sot-read-discipline.py"
+destination = "config/hooks/gtkb-sot-read-discipline.py"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M031"
+source = ".claude/hooks/spec-classifier.py"
+destination = "config/hooks/gtkb-spec-classifier.py"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M032"
+source = ".claude/hooks/spec-event-surfacer.py"
+destination = "config/hooks/gtkb-spec-event-surfacer.py"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M076"
+source = "config/agent-control/CONTROL-MAP.md"
+destination = "config/agent-control/gtkb-control-map.md"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[content_reconciliation]]
+mapping_id = "M078"
+source = "config/agent-control/harness-capability-registry.toml"
+destination = "config/agent-control/gtkb-harness-capability-registry.toml"
+authority = "clean_source_all_manifest_transforms"
+divergence = "substantive"
+
+[[content_reconciliation]]
+mapping_id = "M084"
+source = "config/agent-control/REVIEW-MODE-SETUP.md"
+destination = "config/agent-control/gtkb-review-mode-setup.md"
+authority = "transformed_source"
+divergence = "newline_only"
+
+[[known_adaptations]]
+id = "hook-bridge-axis-helper-route"
+path = "config/hooks/gtkb-bridge-axis-2-surface.py"
+kind = "literal_replace"
+old = ".claude/skills/bridge/helpers/scan_bridge.py"
+new = ".claude/skills/gtkb-bridge/helpers/scan_bridge.py"
+
+[[known_adaptations]]
+id = "hook-gov-capture-module"
+path = "config/hooks/gtkb-gov-capture.py"
+kind = "python_import"
+old = "_delib_common"
+new = "gtkb_delib_common"
+
+[[known_adaptations]]
+id = "hook-owner-capture-module"
+path = "config/hooks/gtkb-owner-decision-capture.py"
+kind = "python_import"
+old = "_delib_common"
+new = "gtkb_delib_common"
+
+[[known_adaptations]]
+id = "hook-not-markdown-sibling"
+path = "config/hooks/gtkb-not-markdown.py"
+kind = "literal_replace"
+old = "spec-before-code.py"
+new = "gtkb-spec-before-code.py"
+
+[[known_adaptations]]
+id = "hook-owner-tracker-ownership"
+path = "config/hooks/gtkb-owner-decision-tracker.py"
+kind = "literal_replace"
+old = ".claude/hooks/owner-decision-tracker.py"
+new = "config/hooks/gtkb-owner-decision-tracker.py"
+
+[[known_adaptations]]
+id = "hook-spec-before-code-sibling"
+path = "config/hooks/gtkb-spec-before-code.py"
+kind = "literal_replace"
+old = "kb-not-markdown.py"
+new = "gtkb-not-markdown.py"
+
+[[known_adaptations]]
+id = "hook-project-completion-authority-contract"
+path = "config/hooks/gtkb-project-completion-surface.py"
+kind = "manual_policy"
+old = "byte-identical .claude/hooks and .codex/gtkb-hooks contract"
+new = "canonical config hook with behaviorally equivalent native projections"
+
+[[known_adaptations]]
+id = "harness-capability-registry-clean-reconstruction"
+path = "config/agent-control/gtkb-harness-capability-registry.toml"
+kind = "manifest_transform_from_clean_source"
+old = "config/agent-control/harness-capability-registry.toml"
+new = "apply every CSV mapping, preserve Unicode, and reject the mojibake destination as authority"
+
+[[rule_projections]]
+source = ".claude/rules/acting-prime-builder.md"
+canonical = "config/agent-control/gtkb-acting-prime-builder.md"
+class = "projection"
+load_policy = "explicit_query"
+
+[[rule_projections]]
+source = ".claude/rules/active-workspace.md"
+canonical = "config/agent-control/gtkb-active-workspace.md"
+class = "machine_compatibility"
+load_policy = "machine_only"
+
+[[rule_projections]]
+source = ".claude/rules/auto-finalization-sweep.md"
+canonical = "config/agent-control/gtkb-auto-finalization-sweep.md"
+class = "active_authority"
+load_policy = "activity:ops,build"
+
+[[rule_projections]]
+source = ".claude/rules/backlog-approval-state.md"
+canonical = "config/agent-control/gtkb-backlog-approval-state.md"
+class = "active_authority"
+load_policy = "activity:project,build"
+
+[[rule_projections]]
+source = ".claude/rules/bridge-essential.md"
+canonical = "config/agent-control/gtkb-bridge-essential.md"
+class = "active_authority"
+load_policy = "global_compact"
+
+[[rule_projections]]
+source = ".claude/rules/bridge-permanent-operations-runbook.md"
+canonical = "config/agent-control/gtkb-bridge-permanent-operations-runbook.md"
+class = "deprecated"
+load_policy = "never_startup"
+
+[[rule_projections]]
+source = ".claude/rules/bridge-poller-canonical.md"
+canonical = "config/agent-control/gtkb-bridge-poller-canonical.md"
+class = "deprecated_template"
+load_policy = "never_startup"
+
+[[rule_projections]]
+source = ".claude/rules/canonical-terminology.md"
+canonical = "config/agent-control/gtkb-canonical-terminology.md"
+class = "canonical_authority"
+load_policy = "global_core"
+
+[[rule_projections]]
+source = ".claude/rules/canonical-terminology.toml"
+canonical = "config/agent-control/gtkb-canonical-terminology.toml"
+class = "canonical_machine_authority"
+load_policy = "machine_only"
+
+[[rule_projections]]
+source = ".claude/rules/codex-dead-ends-and-false-positives.md"
+canonical = "config/agent-control/gtkb-dead-ends-and-false-positives.md"
+class = "projection"
+load_policy = "explicit_query"
+
+[[rule_projections]]
+source = ".claude/rules/codex-decision-ledger.md"
+canonical = "config/agent-control/gtkb-decision-ledger.md"
+class = "projection"
+load_policy = "explicit_query"
+
+[[rule_projections]]
+source = ".claude/rules/codex-knowledge-base-index.md"
+canonical = "config/agent-control/gtkb-knowledge-base-index.md"
+class = "projection"
+load_policy = "explicit_query"
+
+[[rule_projections]]
+source = ".claude/rules/codex-loyal-opposition-runbook.md"
+canonical = "config/agent-control/gtkb-loyal-opposition-runbook.md"
+class = "active_authority"
+load_policy = "activity:test,lo-review;exclude:build"
+
+[[rule_projections]]
+source = ".claude/rules/codex-review-checklists.md"
+canonical = "config/agent-control/gtkb-review-checklists.md"
+class = "active_authority"
+load_policy = "activity:test"
+
+[[rule_projections]]
+source = ".claude/rules/codex-review-gate.md"
+canonical = "config/agent-control/gtkb-review-gate.md"
+class = "active_authority"
+load_policy = "global_pb_guardrail"
+
+[[rule_projections]]
+source = ".claude/rules/codex-review-operating-contract.md"
+canonical = "config/agent-control/gtkb-review-operating-contract.md"
+class = "active_authority"
+load_policy = "activity:test,lo-review;exclude:build"
+
+[[rule_projections]]
+source = ".claude/rules/codex-session-bootstrap.md"
+canonical = "config/agent-control/gtkb-session-bootstrap.md"
+class = "projection"
+load_policy = "global_restart_pointer"
+
+[[rule_projections]]
+source = ".claude/rules/codex-standing-priorities.md"
+canonical = "config/agent-control/gtkb-standing-priorities.md"
+class = "active_authority"
+load_policy = "activity:project"
+
+[[rule_projections]]
+source = ".claude/rules/codex-way-of-working.md"
+canonical = "config/agent-control/gtkb-way-of-working.md"
+class = "active_authority"
+load_policy = "activity:deliberation"
+
+[[rule_projections]]
+source = ".claude/rules/deliberation-protocol.md"
+canonical = "config/agent-control/gtkb-deliberation-protocol.md"
+class = "active_authority"
+load_policy = "global_until_separate_optimization"
+
+[[rule_projections]]
+source = ".claude/rules/dispatcher-daemon-substrate-rollback-runbook.md"
+canonical = "config/agent-control/gtkb-dispatcher-daemon-substrate-rollback-runbook.md"
+class = "active_authority"
+load_policy = "explicit_query:ops_incident"
+
+[[rule_projections]]
+source = ".claude/rules/file-bridge-protocol.md"
+canonical = "config/agent-control/gtkb-file-bridge-protocol.md"
+class = "canonical_authority"
+load_policy = "global"
+
+[[rule_projections]]
+source = ".claude/rules/governance-emergency-bootstrap-protocol.md"
+canonical = "config/agent-control/gtkb-governance-emergency-bootstrap-protocol.md"
+class = "active_authority"
+load_policy = "global_compact"
+
+[[rule_projections]]
+source = ".claude/rules/groundtruth-kb-vision.md"
+canonical = "config/agent-control/gtkb-vision.md"
+class = "active_authority"
+load_policy = "activity:project"
+
+[[rule_projections]]
+source = ".claude/rules/gtkb-capability-import-policy.md"
+canonical = "config/agent-control/gtkb-capability-import-policy.md"
+class = "active_authority"
+load_policy = "activity:build,spec_dependency_import"
+
+[[rule_projections]]
+source = ".claude/rules/loyal-opposition.md"
+canonical = "config/agent-control/gtkb-loyal-opposition.md"
+class = "active_authority"
+load_policy = "role:loyal-opposition"
+
+[[rule_projections]]
+source = ".claude/rules/operating-model.md"
+canonical = "config/agent-control/gtkb-operating-model.md"
+class = "canonical_authority"
+load_policy = "explicit_query:project_requirement"
+
+[[rule_projections]]
+source = ".claude/rules/operating-role.md"
+canonical = "config/agent-control/gtkb-operating-role.md"
+class = "projection"
+load_policy = "global_compact_pointer"
+
+[[rule_projections]]
+source = ".claude/rules/peer-solution-advisory-loop.md"
+canonical = "config/agent-control/gtkb-peer-solution-advisory-loop.md"
+class = "active_authority"
+load_policy = "activity:deliberation"
+
+[[rule_projections]]
+source = ".claude/rules/prime-bridge-collaboration-protocol.md"
+canonical = "config/agent-control/gtkb-prime-bridge-collaboration-protocol.md"
+class = "projection"
+load_policy = "explicit_query"
+
+[[rule_projections]]
+source = ".claude/rules/prime-builder.md"
+canonical = "config/agent-control/gtkb-prime-builder.md"
+class = "projection"
+load_policy = "explicit_query;prime-builder-role-wins"
+
+[[rule_projections]]
+source = ".claude/rules/prime-builder-role.md"
+canonical = "config/agent-control/gtkb-prime-builder-role.md"
+class = "active_authority"
+load_policy = "role:prime-builder"
+
+[[rule_projections]]
+source = ".claude/rules/project-root-boundary.md"
+canonical = "config/agent-control/gtkb-project-root-boundary.md"
+class = "active_authority"
+load_policy = "global_compact"
+
+[[rule_projections]]
+source = ".claude/rules/report-depth.md"
+canonical = "config/agent-control/gtkb-report-depth.md"
+class = "active_authority"
+load_policy = "activity:test,build-review"
+
+[[rule_projections]]
+source = ".claude/rules/report-depth-prime-builder-context.md"
+canonical = "config/agent-control/gtkb-report-depth-prime-builder-context.md"
+class = "machine_compatibility"
+load_policy = "pointer_only"
+
+[[rule_projections]]
+source = ".claude/rules/sot-read-discipline.md"
+canonical = "config/agent-control/gtkb-sot-read-discipline.md"
+class = "active_authority"
+load_policy = "machine_enforced;explicit_query:rationale"
+
+[[rule_projections]]
+source = ".claude/rules/template-code-review.md"
+canonical = "config/agent-control/gtkb-template-code-review.md"
+class = "template"
+load_policy = "activity:test"
+
+[[rule_projections]]
+source = ".claude/rules/template-decision-memo.md"
+canonical = "config/agent-control/gtkb-template-decision-memo.md"
+class = "template"
+load_policy = "activity:test;manifest_entry_required"

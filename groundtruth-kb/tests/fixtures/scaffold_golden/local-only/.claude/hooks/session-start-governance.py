@@ -92,6 +92,14 @@ def _refresh_core_spec_intake(cwd: str) -> None:
         return
 
 
+SHELL_HINT = (
+    "[Shell] Run `gt` via PowerShell — the Claude Bash tool's PATH lacks `gt` "
+    "(it is a uv-tool `.cmd` on the Windows PATH, not the Git-Bash PATH). "
+    "For project Python, use `groundtruth-kb/.venv/Scripts/python.exe` "
+    "(imports `groundtruth_kb` without PYTHONPATH)."
+)
+
+
 def main() -> None:
     try:
         from groundtruth_kb.governance.output import emit_additional_context, emit_pass
@@ -134,7 +142,7 @@ def main() -> None:
             "KB-not-markdown, destructive gate, credential scan)."
         )
 
-    emit_additional_context("SessionStart", msg)
+    emit_additional_context("SessionStart", f"{msg}\n{SHELL_HINT}")
     sys.exit(0)
 
 

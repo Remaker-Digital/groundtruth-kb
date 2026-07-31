@@ -1,0 +1,184 @@
+schema_version = 1
+evaluator_id = "project-authorization-operation-time-enforcement"
+evaluator_version = "1"
+taxonomy_version = "1"
+
+[[mutation_class]]
+name = "bridge"
+aliases = ["bridge_proposal", "bridge_proposal_authoring", "bridge_report_write"]
+
+[[mutation_class]]
+name = "configuration"
+aliases = [
+  "config",
+  "config_files",
+  "configuration_change",
+  "governance_config_additive",
+  "hook",
+  "hook_upgrade",
+  "registry_config_update",
+  "rule_files",
+  "rules",
+  "settings_hook_registration",
+  "skill",
+  "skill_update",
+  "skills",
+]
+
+[[mutation_class]]
+name = "documentation"
+aliases = [
+  "design_documentation",
+  "docs",
+  "narrative",
+  "narrative_artifact",
+  "narrative_artifact_write",
+  "protected_narrative_edit_with_packet",
+]
+
+[[mutation_class]]
+name = "governance_evidence"
+aliases = [
+  "approval_packet_creation",
+  "formal_artifact_mutation",
+  "governance",
+  "governance_record",
+  "spec",
+]
+
+[[mutation_class]]
+name = "metadata"
+aliases = [
+  "backlog_decomposition",
+  "kb",
+  "kb_mutation",
+  "membase",
+  "membase_work_item_update",
+  "project_artifact_link",
+  "project_authorization_completion",
+  "project_backlog_metadata",
+  "project_retirement_reconciliation",
+  "spec_status_promotion",
+  "work_item_lifecycle_update",
+  "work_item_status_promotion",
+]
+
+[[mutation_class]]
+name = "repository_metadata"
+aliases = ["git_mv_operation", "repository_state"]
+
+[[mutation_class]]
+name = "runtime_state"
+aliases = ["generated_projection", "harness_state"]
+
+[[mutation_class]]
+name = "source"
+aliases = [
+  "cli_extension",
+  "code",
+  "helper_cli",
+  "helper_script_addition",
+  "new_source_script",
+  "script",
+  "source_code",
+  "source_code_mutation",
+  "source_file",
+  "source_file_creation",
+]
+
+[[mutation_class]]
+name = "test"
+aliases = [
+  "regression_tests",
+  "test_addition",
+  "test_change",
+  "test_code",
+  "test_creation",
+  "test_file",
+  "test_fixture_update",
+  "test_modification",
+  "tests",
+]
+
+[[operation]]
+name = "bridge_proposal_filing"
+aliases = ["file_implementation_proposal"]
+
+[[operation]]
+name = "implementation_packet_create"
+aliases = ["implementation_authorization_packet_create"]
+
+[[operation]]
+name = "implementation_packet_load"
+aliases = ["implementation_authorization_packet_load"]
+
+[[operation]]
+name = "implementation_start"
+aliases = []
+
+[[operation]]
+name = "protected_mutation"
+aliases = ["protected_effect"]
+
+[[operation]]
+name = "credential_lifecycle"
+aliases = [
+  "credential_action",
+  "credential_change",
+  "credential_lifecycle_change",
+  "credential_operations",
+  "credential_or_secret_mutation",
+  "provider_key_rotation",
+]
+
+[[operation]]
+name = "destructive_cleanup"
+aliases = ["clean", "destructive_bulk_cleanup", "destructive_command", "prune", "untracked_file_deletion"]
+
+[[operation]]
+name = "dispatcher_mutation"
+aliases = ["dispatcher_config_change", "dispatcher_routing_change", "dispatcher_topology_activation"]
+
+[[operation]]
+name = "external_system_mutation"
+aliases = ["external_publish", "github_mutation", "provider_account_mutation"]
+
+[[operation]]
+name = "git_commit"
+aliases = ["commit", "scoped_commit"]
+
+[[operation]]
+name = "git_history_rewrite"
+aliases = ["force_push", "force_update", "git_push_force", "history_rewrite"]
+
+[[operation]]
+name = "git_push"
+aliases = ["push", "push_or_github_mutation"]
+
+[[operation]]
+name = "production_deployment"
+aliases = ["deploy", "deployment", "production_deploy"]
+
+[[operation]]
+name = "release"
+aliases = ["production_release"]
+
+[[operation]]
+name = "specification_deletion"
+aliases = ["spec_deletion", "delete_spec", "spec_delete"]
+
+[[operation]]
+name = "work_intent_acquire"
+aliases = []
+
+[[operation]]
+name = "work_intent_extend"
+aliases = []
+
+[[operation]]
+name = "work_intent_reclassify"
+aliases = []
+
+[[operation]]
+name = "work_intent_renew"
+aliases = []

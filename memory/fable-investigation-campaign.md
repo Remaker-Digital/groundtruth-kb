@@ -8,7 +8,7 @@ author_model_configuration: interactive owner session, ::init gtkb pb
 # PROJECT-FABLE-INVESTIGATION — Proposal Campaign Notes
 
 Operational notepad (not canonical). Canonical state: the advisory, the project
-record, WI-4413..4435, the bridge INDEX, and per-cluster DELIB/PAUTH rows.
+record, WI-4413..4435, dispatcher/TAFE bridge state, and per-cluster DELIB/PAUTH rows.
 
 ## Charter
 Owner (2026-06-10) directed creating ALL 23 implementation proposals for
@@ -60,7 +60,7 @@ PROJECT-FABLE-INVESTIGATION (FAB-01..FAB-23 = WI-4413..WI-4435), chartered by
    author_model, author_model_version, author_model_configuration.
 7. Claim BEFORE Write: `python scripts/bridge_claim_cli.py claim <slug> --session-id <TRANSCRIPT-UUID>`
    (transcript UUID, NOT CLAUDE_CODE_SESSION_ID). Auto-releases on successful Write. File via Write
-   tool + manual INDEX prepend (Document:/NEW:).
+   tool plus governed dispatcher/TAFE bridge-state publication (Document:/NEW:).
 8. Verify: `python scripts/bridge_applicability_preflight.py --bridge-id <slug>` (preflight_passed:true)
    + `python scripts/adr_dcl_clause_preflight.py --bridge-id <slug>` (exit 0).
 - `gt` not on PATH → `python -c "from groundtruth_kb.cli import main; import sys; sys.argv=[...]; main()"`.
@@ -114,9 +114,9 @@ assumed decision; real filing needs the captured owner decision).
 - **TRIAGE CORRECTION:** most clusters carry an "Owner Touchpoint Required" in their findings, so
   the campaign is MORE owner-gated than the provisional triage guessed (FAB-01 was mislabeled
   determined-fix). READ each cluster's findings before assuming determined-fix.
-- **Gate lesson:** bridge-substrate clusters (FAB-01/FAB-10) trigger
-  `GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-INDEX-IS-CANONICAL` as must_apply → include a
-  "## Bridge Protocol Compliance" assertion (filed under bridge/, NEW INDEX entry, append-only).
+- **Gate lesson:** bridge-substrate clusters (FAB-01/FAB-10) trigger bridge-authority
+  clause evidence as must_apply -> include a "## Bridge Protocol Compliance" assertion
+  for the numbered bridge-file chain and dispatcher/TAFE state.
 - **Owner working-style feedback (2026-06-10):** do NOT checkpoint-and-ask "say continue" between
   clusters. Proceed autonomously; pause ONLY for genuine owner-gated AUQ batches (those are real
   decisions, not permission-checks).
@@ -162,8 +162,8 @@ assumed decision; real filing needs the captured owner decision).
   + Codex parity; retire dead scheduler; implement owner-decision-capture + gov09-capture hooks
   (owner-decision-capture AUTOMATES the manual AUQ→DA capture that's been 255-ing).
   FAB-10 (gtkb-fab-10-dispatch-telemetry-claim-contract): bare-id claim + 600s TTL; sanitize ':' + revive dead
-  worker telemetry (orchestrator measurement foundation); half-open breaker + GTKB_DISPATCH_* knobs; INDEX
-  well-formedness lint + helper-only follow-on.
+  worker telemetry (orchestrator measurement foundation); half-open breaker + GTKB_DISPATCH_* knobs; retired
+  aggregate well-formedness lint + helper-only follow-on.
 - **DELIB-255 observation:** background decision-capture commits SQLite (rows valid) but throws exit-255 on the
   post-commit Chroma index under load; each PAUTH success validates its DELIB by id. FAB-09's
   owner-decision-capture hook is the deterministic fix. Hygiene note for FAB-17 (DA/Chroma read-path).
@@ -307,7 +307,7 @@ Paste the block below to resume:
 Continue PROJECT-FABLE-INVESTIGATION — file implementation proposals for the remaining FAB clusters (FAB-20..23).
 READ FIRST: memory/fable-investigation-campaign.md (this file — playbook + cheap-drafting recipe + operating model
 + per-cluster status + the consolidated gate lessons); bridge/gtkb-fable-investigation-advisory-001.md (charter,
-Q1-Q7, anti-duplication, the per-FAB WI/findings/overlap table); bridge/INDEX.md (live queue);
+Q1-Q7, anti-duplication, the per-FAB WI/findings/overlap table); current dispatcher/TAFE bridge state;
 independent-progress-assessments/GT-KB-ARCHITECTURE-HYGIENE-INVESTIGATION-2026-06-10.md (frozen findings HYG-001..068).
 
 DONE: 19 of 23 FAB clusters filed (FAB-01..FAB-19) + draft-linter = 20 proposals NEW. Codex (Loyal Opposition) is
@@ -336,7 +336,7 @@ bounded PAUTH (gt projects authorize PROJECT-FABLE-INVESTIGATION --id PAUTH-FABx
 --allowed-mutation ... --forbid ...; verify specs exist+approved first via read-only sqlite) → author (Opus for
 owner-gated/protected-narrative/KB-mutating; cheap-draftable for mechanical once GO'd) → claim slug
 (python scripts/bridge_claim_cli.py claim <slug> --session-id <NEWEST-TRANSCRIPT-UUID>) → Write bridge file +
-prepend INDEX entry (Document:/NEW:) → both preflights green (applicability preflight_passed:true + clause exit 0).
+publish bridge state (Document:/NEW:) -> both preflights green (applicability preflight_passed:true + clause exit 0).
 
 CRITICAL GATE LESSONS (apply to all 4): (a) EVERY proposal MUST cite ADR-ISOLATION-APPLICATION-PLACEMENT-001 in
 `## Specification Links` AND add a `## Isolation Placement Compliance` section with explicit E:\GT-KB/in-root
@@ -365,7 +365,7 @@ invariant (DELIB-REVIEW-INDEPENDENCE-INVARIANT-20260610) — candidate formal GO
 ## STAND-DOWN — two-session collision (2026-06-11 ~00:41Z, session 07ef97df)
 This session (07ef97df) committed FAB-01..10 + draft-linter at commit `d64abaec`, then detected a CONCURRENT
 Prime session **d2f32e6b** running the same campaign. d2f32e6b filed FAB-11
-(`bridge/gtkb-fab-11-regression-signal-revival-001.md`, NEW in INDEX) at ~00:33Z. Owner AUQ (~00:41Z) chose:
+(`bridge/gtkb-fab-11-regression-signal-revival-001.md`, NEW in bridge state) at ~00:33Z. Owner AUQ (~00:41Z) chose:
 **"Other session (d2f32e6b) drives; I stand down."** No further FAB work from 07ef97df.
 
 CORRECTIVE CONTEXT FOR THE DRIVING SESSION (d2f32e6b) — FAB-11-001 is filed against **SUPERSEDED** decisions:
@@ -396,7 +396,7 @@ all preflights GREEN; owner AUQ captured for the owner-gated clusters.
   DELIB-FAB21; PAUTH-FAB21 (rowid 187). Protected-narrative + No KB mutation. packet `sha256:e6ce07df...`;
   clause exit 0. **Codex already NO-GO@-002.**
 - **FAB-22 FILED** `bridge/gtkb-fab-22-architecture-cluster-001.md` (NEW). 5 owner AUQ grill-me depth (all
-  recommended): HYG-009=mechanical INDEX auto-trim + versions-per-change KPI (lightweight-lane DEFERRED);
+  recommended): HYG-009=mechanical retired-aggregate auto-trim + versions-per-change KPI (lightweight-lane DEFERRED);
   HYG-010=registry-discovery ADR + on-touch doctor.py (db.py last/never); HYG-011=groundtruth-kb/.venv
   canonical (delete root stub, venv-first _check_ruff, py3.14 CI); HYG-023=live-is-canonical templates (regen
   + hash-parity doctor + replace DEPRECATED poller prompt + fix file-bridge-protocol.md:273); HYG-052=feed
@@ -418,8 +418,8 @@ content. (Clause-gate is exit-5 BLOCK, unlike the WI-collision WARN.)
 
 **Other this-run confirmations:** newest transcript UUID for claims = e45ccf07-99f6-4ad6-b572-570a76a264a2;
 `gt projects authorize | Out-Null` then verify PAUTH via read-only sqlite (pipe to a second `python -c` JSON
-parse fails because CLI output isn't pure stdout JSON — the authorize itself still lands); INDEX shifts
-between read and edit (Codex active + reviewing fast) — re-read top before each prepend.
+parse fails because CLI output isn't pure stdout JSON - the authorize itself still lands); bridge state shifts
+between read and edit (Codex active + reviewing fast) - re-read current state before each publication.
 
 **CODEX (ACTIVE, fast) is producing verdicts in real time.** As of this run's end the Prime-actionable bridge
 queue includes: GO on FAB-01/02/08/10/16 + draft-linter; NO-GO on FAB-03/05/06/07/09/11/12/13/14/15/17/18/19
@@ -438,7 +438,7 @@ un-writable. This single defect explains FAB-19 P1, FAB-21 P1, and almost certai
 protected-narrative / KB-mutating NO-GOs (FAB-05/06/09/11/12/13/14/15/18). FAB-20 is the exception (pure
 sequencing block on FAB-19).
 
-REVISEDs filed this run (all preflights GREEN, all REVISED in INDEX, claim per slug w/ session e45ccf07):
+REVISEDs filed this run (all preflights GREEN, all REVISED in bridge state, claim per slug w/ session e45ccf07):
 - **FAB-19 -003 REVISED**: added `.groundtruth/formal-artifact-approvals/fab-19-hygiene-sweep-patterns-registry-header.json`
   to target_paths (sole P1 fix). Unblocks FAB-20's dependency.
 - **FAB-21 -003 REVISED**: P1 = added 5 concrete per-rule-file packet paths; P2 = added on-demand detail
@@ -453,8 +453,8 @@ REVISEDs filed this run (all preflights GREEN, all REVISED in INDEX, claim per s
 
 **REUSABLE REVISE-CYCLE LESSON:** for the remaining packet-omission NO-GOs, the fix is mechanical — add the
 `.groundtruth/formal-artifact-approvals/<fab-NN-...>.json` path(s) per promised packet + any generated-artifact
-paths to target_paths, bump version, add `## Revision Scope`, re-claim slug, Write `-NNN`, prepend REVISED to
-INDEX, preflights. REVISED versions are monotonic across the whole thread (FAB-19 was at -002 NO-GO → REVISED
+paths to target_paths, bump version, add `## Revision Scope`, re-claim slug, Write `-NNN`, publish REVISED to
+bridge state, preflights. REVISED versions are monotonic across the whole thread (FAB-19 was at -002 NO-GO -> REVISED
 is -003). Author metadata = this session (e45ccf07); -001 authors differed (d2f32e6b for the 11-19 batch).
 
 REMAINING NO-GOs to clear (cold-read each NO-GO's Findings first to confirm the specific defect): FAB-03, 04,
@@ -483,16 +483,16 @@ leak pattern but aren't in target_paths; shared-util consolidation deferred.
 **TWO NEW REUSABLE GATE LESSONS (post-impl reports):** (a) `SPEC_LINK_HEADING_RE` rejects a heading SUFFIX —
 `## Specification Links (carried forward)` harvests ZERO specs → bridge-compliance-gate HARD-BLOCKS the Write
 (missing_required_specs=all). Use EXACTLY `## Specification Links`; put "carried forward" in body text. (b)
-`GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-INDEX-IS-CANONICAL` is must_apply on post-impl reports too (clause exit
-5) — include a `## Bridge Protocol Compliance` section naming `bridge/INDEX.md` + "inserted at the top of the
-entry" (regex `bridge/INDEX\.md|INDEX update|insert.+top of.+(?:INDEX|entry)`). (c) reconfirmed:
+bridge-authority clause evidence is must_apply on post-impl reports too (clause exit
+5) - include a `## Bridge Protocol Compliance` section naming the numbered bridge-file chain plus dispatcher/TAFE
+state publication. (c) reconfirmed:
 CLAUSE-VISIBILITY-BULK-OPS fires on a bulk purge + GOV-STANDING-BACKLOG citation → add Backlog Visibility note
 w/ "inventory" token. Impl-auth `begin` packet is per-bridge-id and gates Write/Edit to the GO'd target_paths
 (out-of-scope files like test_core_spec_intake.py would be DENIED).
 
 ## GO/NO-GO CYCLE — FAB-02 (P0 secrets) verification NO-GO CLEARED (2026-06-11 ~04:38-04:46Z, session 430d5513, Opus 4.8, harness B)
 
-Owner resumed the GO/NO-GO cycle. **Live-INDEX state delta from the 04:26Z handoff:** FAB-02 had
+Owner resumed the GO/NO-GO cycle. **Live bridge-state delta from the 04:26Z handoff:** FAB-02 had
 advanced GO@-002 → implemented → NEW@-003 (post-impl report, author session 4490dc1a) → **NO-GO@-004**
 (Codex verification verdict) — i.e., FAB-02 was implemented + post-impl-reported + got a verification
 NO-GO since the handoff was written. The uncommitted `infrastructure/terraform/*` + `scripts/hygiene/
@@ -514,9 +514,9 @@ preferred fix = make the claim mechanically true.
   fixture (so clean tree still passes the new invariant) + negative test `test_missing_backend_hcl_exclusion_fails`.
 - Verification ALL GREEN: guard `ok=true` **11/11** checks (backend_hcl_excluded matched on live tree);
   pytest **10 passed** (was 9); `ruff check` clean; `ruff format --check` 2 files already formatted.
-- Filed `bridge/gtkb-fab-02-secrets-remediation-005.md` (REVISED) + INDEX prepend. Applicability
+- Filed `bridge/gtkb-fab-02-secrets-remediation-005.md` (REVISED) plus governed bridge-state publication. Applicability
   `preflight_passed:true` packet `sha256:3d03cc90...`; clause exit 0 (4 must_apply, 0 blocking gaps —
-  the `## Bridge Protocol Compliance` section made CLAUSE-INDEX-IS-CANONICAL must_apply-with-evidence).
+  the `## Bridge Protocol Compliance` section made bridge-authority evidence must_apply-with-evidence).
 - Still UNCOMMITTED (commit pending owner direction + Codex VERIFIED). On Codex VERIFIED → commit the
   FAB-02 cluster `feat:` + resolve WI-4414.
 
@@ -564,7 +564,7 @@ The 04:26Z handoff's "MOST share ONE fix" is only partly true. Cold-reading is l
   (destructive ~11GB deletions — almost certainly needs an owner decision); possibly FAB-13/14/18 if their
   NO-GOs raise policy questions beyond packet paths. COLD-READ each before assuming mechanical.
 
-**Remaining Prime-actionable (live INDEX ~05:01Z):** implement GOs — FAB-01, FAB-10, FAB-16, draft-linter;
+**Remaining Prime-actionable (live bridge state ~05:01Z):** implement GOs - FAB-01, FAB-10, FAB-16, draft-linter;
 revise NO-GO@-002 proposals — FAB-04 (owner-gated, cold-read first), 06, 07, 09, 11, 12, 13, 14, 15, 17, 18.
 FAB-02 REVISED@-005, FAB-03 REVISED@-003, FAB-05 REVISED@-003 all now in Codex's queue (not Prime-actionable).
 FAB-08 still NEW@-003 (awaiting Codex VERIFIED — do NOT commit); FAB-19/20/21 still REVISED@-003.
@@ -611,9 +611,9 @@ Compliance` section + ADR-ISOLATION in `## Specification Links`:
   keyed to ...B and FORBIDS `off_root_telemetry_archive`. Redraft the WHOLE proposal against ...B (HYG-029 hybrid +
   HYG-044 re-register are unchanged), then enumerate the formal packets. No new AUQ (the ...B decision exists).
 
-Filing remains SERIAL (one bridge/INDEX.md, session-scoped claims/packets — parallel gated writes would corrupt the
+Filing remains SERIAL (one governed bridge state update, session-scoped claims/packets - parallel gated writes would corrupt the
 bridge per bridge-essential.md). The parallel win is the triage; the filing is per-cluster: claim → read -001 → Write
--003 (add paths + Revision Scope) → INDEX prepend → both preflights green.
+-003 (add paths + Revision Scope) -> bridge-state publication -> both preflights green.
 
 **FILED THIS PASS (~05:12-05:14Z):** FAB-06 REVISED-003 (added packet glob; gate-green) + FAB-09 REVISED-003 (added
 packet glob; gate-green). Both back in Codex's queue. **STATE DELTAS observed mid-pass (Codex is fast):**
@@ -654,7 +654,7 @@ worth a backlog item independent of FAB-16.
 
 Continue PROJECT-FABLE-INVESTIGATION — work the GO/NO-GO cycle.
 READ FIRST: memory/fable-investigation-campaign.md (this notepad — full state, the consolidated GATE LESSONS,
-the systematic NO-GO pattern, and the per-cluster cycle); bridge/INDEX.md (live authoritative queue);
+the systematic NO-GO pattern, and the per-cluster cycle); current dispatcher/TAFE bridge state;
 bridge/gtkb-fable-investigation-advisory-001.md (charter); independent-progress-assessments/
 GT-KB-ARCHITECTURE-HYGIENE-INVESTIGATION-2026-06-10.md (frozen findings HYG-001..068).
 
@@ -667,9 +667,9 @@ UNCOMMITTED working tree (commit pending owner direction — do NOT commit witho
   groundtruth-kb/tests/test_cli.py, groundtruth-kb/src/groundtruth_kb/project/doctor.py,
   platform_tests/scripts/test_fab08_slot_leak_fix.py (new). Verified GREEN (5/5 new test; ruff clean; 234
   slots purged). On Codex VERIFIED → commit these with `fix:` (the report's Recommended Commit Type).
-- Bridge files + bridge/INDEX.md + this notepad (bridge/governance work; commit separately if owner asks).
+- Bridge files, dispatcher/TAFE bridge state, and this notepad (bridge/governance work; commit separately if owner asks).
 
-FIRST ACTIONS (read live bridge/INDEX.md — it is authoritative; Codex changes it in real time):
+FIRST ACTIONS (read live dispatcher/TAFE bridge state - it is authoritative; Codex changes it in real time):
 1. Check FAB-08 latest status. If VERIFIED → (with owner OK) commit the 5 FAB-08 source files `fix:`, then
    resolve WI-4420 in MemBase (gt-style, GOV-15/origin=defect). If NO-GO → address + REVISED.
 2. Check FAB-19/20/21 latest status (REVISED → may be GO or NO-GO). On GO → tiered implementation; on NO-GO →
@@ -677,7 +677,7 @@ FIRST ACTIONS (read live bridge/INDEX.md — it is authoritative; Codex changes 
 3. Remaining NO-GOs to clear (cold-read each NO-GO Findings first): FAB-03, 04, 05, 06, 07, 09, 11, 12, 13,
    14, 15, 17, 18. MOST share ONE mechanical fix — add the promised .groundtruth/formal-artifact-approvals/
    *.json packet path(s) + any generated-artifact paths to target_paths, bump version, add ## Revision Scope,
-   re-claim slug, Write -NNN, prepend REVISED to INDEX, both preflights green.
+   re-claim slug, Write -NNN, publish REVISED to bridge state, both preflights green.
 4. Other GO'd clusters ready to implement: FAB-01, FAB-02 (secrets, P0-aligned per standing priorities),
    FAB-10, FAB-16, draft-linter. FAB-22/23 are still NEW (Codex's queue — NOT Prime-actionable).
 
@@ -690,14 +690,14 @@ proposal + GO verdict (note GO constraints), run `python scripts/implementation_
 --bridge-id <slug>` (8h packet; gates Write/Edit to the GO'd target_paths), implement, run pytest + `ruff
 check` + `ruff format --check` via the venv (E:\GT-KB\groundtruth-kb\.venv\Scripts\python.exe — the canonical
 interpreter; gt/ruff/pytest live ONLY there), file the post-impl report as the next version (status NEW),
-prepend NEW to INDEX, both preflights green.
+publish NEW to bridge state, both preflights green.
 
 GATE LESSONS (all consolidated above in this notepad — read them): (a) EVERY proposal cites
 ADR-ISOLATION-APPLICATION-PLACEMENT-001 in `## Specification Links` AND has a `## Isolation Placement
 Compliance` section. (b) Promised packets → list .groundtruth/formal-artifact-approvals/*.json in
 target_paths (the systematic NO-GO fix). (c) Heading must be EXACTLY `## Specification Links` (no suffix — a
 suffix harvests zero specs and HARD-BLOCKS the Write). (d) Post-impl reports need a `## Bridge Protocol
-Compliance` section (names bridge/INDEX.md + "top of the entry") for CLAUSE-INDEX-IS-CANONICAL. (e) Citing
+Compliance` section (names numbered bridge files and dispatcher/TAFE state publication) for bridge-authority evidence. (e) Citing
 GOV-STANDING-BACKLOG-001 + backlog/bulk content → add a `## Backlog Visibility` note with an `inventory`/
 `formal-artifact-approval` token (CLAUSE-VISIBILITY-BULK-OPS, exit-5 BLOCK). (f) KB-mutating → groundtruth.db
 in target_paths + "KB mutation: YES"; else FAB-10 "No KB mutation" note. (g) No bare foreign WI-NNNN (use "the
@@ -712,7 +712,7 @@ formally reviews artifacts it created).
 
 ## DRAFT-LINTER IMPLEMENTED end-to-end + FAB-02 commit BLOCKED (2026-06-11 ~05:05-05:25Z, session f2bde760, Opus 4.8, harness B, AUTONOMOUS keep-working-pb)
 
-Autonomous scheduled Prime Builder run. Live-INDEX delta since the 05:01Z handoff: **FAB-02 advanced
+Autonomous scheduled Prime Builder run. Live bridge-state delta since the 05:01Z handoff: **FAB-02 advanced
 REVISED@-005 → VERIFIED@-006** (Codex, `feat:`); FAB-04 now GO@-004; FAB-19/20/21 now GO@-004 (were
 REVISED@-003); FAB-08 NO-GO@-004 (post-impl verification rejected); FAB-22/23 now GO@-002.
 
@@ -725,7 +725,7 @@ exit-code, **AST read-only contract test for DELIB-S312** asserting no write-mod
 mutating SQL literal / no subprocess|shutil|os import). Verification ALL GREEN: pytest **14 passed**; ruff
 check + `format --check` clean (1 format pass applied); acceptance-3 smoke = linter on
 `bridge/gtkb-fab-08-slot-leak-fix-001.md` against canonical 1.37GB MemBase → `ok:true` 6/6, exit 0. Filed
-`bridge/gtkb-cheap-draft-linter-003.md` (NEW) + INDEX prepend; both preflights GREEN (applicability
+`bridge/gtkb-cheap-draft-linter-003.md` (NEW) plus governed bridge-state publication; both preflights GREEN (applicability
 `preflight_passed:true` packet `sha256:9d353c43...`; clause exit 0, 4 must_apply 0 blocking gaps). **Source
 UNCOMMITTED** (awaiting Codex VERIFIED per discipline). A DIFFERENT session must verify (review-independence).
 
@@ -841,7 +841,7 @@ REVISED -003 (substantive redraft vs DELIB-...B).
 FAB-06/09 GO@-004 (protected-narrative → narrative packets), FAB-01/10 GO@-002 (bridge-substrate, load-bearing),
 FAB-19/20/21 GO@-004, FAB-22/23 GO@-002, FAB-04 GO@-004 (**owner-AUQ-gate the ~11GB destructive deletions**),
 FAB-16 (only after a FRESH GO on the -003 narrowed scope). Several REVISEDs filed this session may flip to GO as Codex
-reviews — re-read live INDEX. **Commit blocker (separate owner decision):** draft-linter + FAB-02 are VERIFIED but the
+reviews - re-read live bridge state. **Commit blocker (separate owner decision):** draft-linter + FAB-02 are VERIFIED but the
 inventory-drift pre-commit gate blocks ALL commits until the uncommitted harness-registry role-topology projection is
 reconciled with .groundtruth/inventory/dev-environment-inventory.json (regen+commit as chore, OR revert the stray
 registry change). Do NOT process NEW/REVISED/VERIFIED as Prime; act only on latest GO/NO-GO.
@@ -853,7 +853,7 @@ registry change). Do NOT process NEW/REVISED/VERIFIED as Prime; act only on late
 
 Continue PROJECT-FABLE-INVESTIGATION — the REVISE/redraft phase is COMPLETE; you are now in the GO-IMPLEMENTATION phase.
 READ FIRST: memory/fable-investigation-campaign.md (full state — the consolidated GATE LESSONS, the per-cluster status,
-the "NEXT PHASE — GO IMPLEMENTATIONS" list, and this handoff); bridge/INDEX.md (live authoritative queue — Codex changes
+the "NEXT PHASE - GO IMPLEMENTATIONS" list, and this handoff); dispatcher/TAFE bridge state (live authoritative queue - Codex changes
 it in real time and is FAST, trust it over any cached state); bridge/gtkb-fable-investigation-advisory-001.md (charter);
 independent-progress-assessments/GT-KB-ARCHITECTURE-HYGIENE-INVESTIGATION-2026-06-10.md (frozen findings HYG-001..068).
 
@@ -874,11 +874,11 @@ below):
 - FAB-02 secrets source (infrastructure/terraform/*, scripts/hygiene/secret_at_rest_guard.py, platform_tests/scripts/
   test_secret_at_rest_guard.py, .driveignore, .gitignore) — VERIFIED@-006, commit-blocked. On unblock → commit `feat:` +
   resolve WI-4414.
-- Bridge REVISED files + bridge/INDEX.md + this notepad (governance; commit separately if owner asks).
+- Bridge REVISED files, dispatcher/TAFE bridge state, and this notepad (governance; commit separately if owner asks).
 
 ACT ONLY on latest GO (implement) or NO-GO (revise); never process NEW/REVISED/VERIFIED as Prime. Work order:
 
-1. RE-READ live bridge/INDEX.md FIRST. Address any NO-GO that lands on a REVISED I filed this session (cold-read the
+1. RE-READ live dispatcher/TAFE bridge state FIRST. Address any NO-GO that lands on a REVISED I filed this session (cold-read the
    NO-GO Findings; most are mechanical packet/path additions per the PARALLEL TRIAGE MAP).
 2. GO IMPLEMENTATIONS (item 5; VERIFY LIVE CODE STATE FIRST — proposals were written 2026-06-10 and the tree has moved;
    gate lesson k). Likely-GO targets (confirm live): FAB-05 (rule-file retirement, protected-narrative → narrative
@@ -888,8 +888,8 @@ ACT ONLY on latest GO (implement) or NO-GO (revise); never process NEW/REVISED/V
    FAB-22/FAB-23 (architecture + demoted cleanup). To IMPLEMENT a GO'd cluster: read the proposal + GO verdict (note GO
    constraints), `python scripts/implementation_authorization.py begin --bridge-id <slug>` (8h packet, gates Write/Edit
    to the GO'd target_paths), implement, verify (pytest + ruff check + ruff format --check via the venv WITH
-   PYTHONPATH=E:\GT-KB\groundtruth-kb\src), file the post-impl report as the next version (status NEW), prepend NEW to
-   INDEX, both preflights green. A DIFFERENT session verifies (review-independence).
+   PYTHONPATH=E:\GT-KB\groundtruth-kb\src), file the post-impl report as the next version (status NEW), publish NEW to
+   bridge state, both preflights green. A DIFFERENT session verifies (review-independence).
 3. FAB-04 (storage reclamation, GO@-004, destructive ~11GB): **owner-AUQ-gate the deletions via AskUserQuestion** before
    implementing. Coordinate the 2 dead root DB snapshots with FAB-11 HYG-014 (DELIB-FAB11-...B Decision 4 also lists
    them; idempotent deletion = no double-delete; whichever runs first).
@@ -908,7 +908,7 @@ CONSOLIDATED GATE LESSONS (full text in the notepad): (a) EVERY proposal cites A
 Write on a missing citation; clause preflight exit-5 on missing in-root evidence). (b) Promised packets/generated
 artifacts → enumerate `.groundtruth/formal-artifact-approvals/*.json` + archive dests/sources/test globs in target_paths
 (the systematic NO-GO fix). (c) Heading EXACTLY `## Specification Links` (a suffix harvests zero specs → HARD-BLOCK).
-(d) Post-impl reports need `## Bridge Protocol Compliance` (names bridge/INDEX.md + "top of the entry"). (e) KB-mutating →
+(d) Post-impl reports need `## Bridge Protocol Compliance` (names numbered bridge files and dispatcher/TAFE state publication). (e) KB-mutating ->
 groundtruth.db in target_paths + "KB mutation: YES"; else the "No KB mutation:" negation note. (f) bare foreign WI-NNNN →
 WI-collision WARNING (non-blocking). (g) `## Requirement Sufficiency` must be h2; first line status token; bridge_kind:
 prime_proposal; 6 author-metadata fields. (h) claim survives a FAILED Write (releases only on success). (i) impl-start
@@ -923,7 +923,7 @@ venv Scripts — invoke via `python -c "from groundtruth_kb.cli import main; ...
 TOOLING: gt not on PATH → E:\GT-KB\groundtruth-kb\.venv\Scripts\python.exe (the canonical interpreter; ruff/pytest live
 ONLY there); canonical MemBase = root groundtruth.db; use the PowerShell tool (Bash root-boundary parser broken —
 FAB-14/HYG-042). Parallelize READ-ONLY triage via Explore sub-agents (write-incapable = bridge-safe); serialize gated
-WRITES (single bridge/INDEX.md + session-scoped claims/packets). Pause ONLY for genuine owner-gated AUQ (FAB-04 deletions,
+WRITES (single governed bridge-state publication path plus session-scoped claims/packets). Pause ONLY for genuine owner-gated AUQ (FAB-04 deletions,
 the commit-blocker decision, any new governance exception); do NOT checkpoint-and-ask "say continue" between clusters —
 proceed autonomously otherwise.
 

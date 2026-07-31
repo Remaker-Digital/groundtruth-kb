@@ -37,6 +37,7 @@ PRIME_ROLE_SLOT = _bridge_writer.PRIME_ROLE_SLOT
 WriterBridgeConflictError = _bridge_writer.BridgeConflictError
 WriterBridgeTransitionError = _bridge_writer.BridgeTransitionError
 write_bridge_file = _bridge_writer.write_bridge_file
+no_window_subprocess_kwargs = importlib.import_module("scripts.windows_subprocess").no_window_subprocess_kwargs
 
 
 class BridgeRevisionError(RuntimeError):
@@ -287,6 +288,7 @@ def _run_preflight_command(command: list[str], *, cwd: Path) -> subprocess.Compl
         errors="replace",
         timeout=30,
         check=False,
+        **no_window_subprocess_kwargs(),
     )
 
 

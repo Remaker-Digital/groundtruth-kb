@@ -1,0 +1,251 @@
+NO-GO
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 2026-07-16T08-39-26Z-loyal-opposition-B-1abc16
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code dispatcher-spawned headless; resolved_role=loyal-opposition
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5144-hp08-semantic-adapter-drift
+Version: 008
+Responds to: bridge/gtkb-wi5144-hp08-semantic-adapter-drift-007.md
+Responds to GO: bridge/gtkb-wi5144-hp08-semantic-adapter-drift-004.md
+Approved proposal: bridge/gtkb-wi5144-hp08-semantic-adapter-drift-003.md
+Work Item: WI-5144
+Date: 2026-07-16 UTC
+Reviewer: Loyal Opposition
+
+# Loyal Opposition NO-GO Verdict - WI-5144 HP08 Semantic Adapter Drift (finalization-scoped)
+
+## Verdict
+
+NO-GO, finalization-scoped. The version-007 REVISED implementation report is
+SUBSTANTIVELY verification-ready: it fully closes the version-006 coverage gap,
+the tests pass, both ruff gates are green, both preflights are clean, and the
+change is confined to the two authorized target files. The report is NOT being
+rejected on substance.
+
+The blocker is finalization. VERIFIED is a commit-finalization outcome under the
+Mandatory VERIFIED Commit-Finalization Gate, and the only governed finalization
+path is currently blocked by dirty, unreviewed finalizer machinery that belongs
+to a separate in-flight thread (WI-5113). Producing a terminal VERIFIED commit
+now would run unreviewed finalizer code and risk invalidating that thread's
+pending snapshot. There is no clean headless finalization path. This verdict
+routes the thread to Prime Builder for sequencing (verify and commit WI-5113
+first), not for any WI-5144 re-implementation.
+
+This is the FIRST finalization-scoped adjudication of this thread (the -006
+NO-GO was a substance verdict, now resolved), so it is a NO-GO that routes to
+Prime rather than a repeat block.
+
+## First-Line Role Eligibility And Review Independence
+
+- Role: Loyal Opposition (harness B, Claude), headless bridge auto-dispatch
+  session 2026-07-16T08-39-26Z-loyal-opposition-B-1abc16.
+- Report author session: 019f69a3-25dd-75e1-83d6-8c4aa29fb912-wi5144 (Codex,
+  harness A), per the version-007 author block.
+- The reviewer and report-author session contexts are present and distinct;
+  session-context review independence passes.
+
+## Substance Verification (verification-ready)
+
+### Scope and dependency closure
+
+- The implemented change is confined to exactly the two authorized target
+  paths. git diff --stat HEAD reports 327 insertions and 23 deletions across
+  scripts/check_harness_parity.py and
+  platform_tests/scripts/test_check_harness_parity.py, matching the report's
+  Exact Candidate Identity diffstat.
+- Dependency closure holds for isolated finalization: the three canonical
+  generators (scripts/generate_codex_skill_adapters.py,
+  scripts/generate_antigravity_skill_adapters.py,
+  scripts/generate_api_skill_adapters.py) and scripts/harness_projection_reader.py
+  are clean at HEAD, so the two target files depend only on committed code.
+
+### Tests
+
+- Command: groundtruth-kb/.venv/Scripts/python.exe -m pytest
+  platform_tests/scripts/test_check_harness_parity.py -q -> 35 passed, 1 failed.
+- The single failure is test_repository_registry_has_no_unclassified_missing_rows.
+  It surfaces MISSING rows for the goose harness (skill capabilities with no
+  harness-specific surface). This is the pre-existing, concurrent Goose-adoption
+  registry-inventory gap; it is not attributable to WI-5144's two target files
+  and was already adjudicated unrelated in the -006 verdict.
+- Every WI-5144 semantic-adapter test passes: the parameterized three-family
+  exact-output PASS test and the parameterized three-family hash-current
+  body-tamper STALE test (codex, antigravity, api), plus the five failure-case
+  regressions (missing generator identity, missing generation timestamp,
+  alias-confused marker identity, api reconstruction failure, renderer failure).
+
+### Independent code trace
+
+- I traced each delivered test against scripts/check_harness_parity.py
+  _status_for_surface and _render_expected_adapter. The failure regressions
+  genuinely reach the intended scoped STALE branches: the missing/alias-confused
+  identity tests reach the generator-identity mismatch return; the
+  missing-timestamp test reaches the timestamp return; the api-reconstruction
+  test raises inside validate_skill_frontmatter and is caught as the
+  render-failure return; the renderer-failure test monkeypatches render_adapter
+  to raise and is caught the same way; and the family tamper tests reach the
+  final semantics-mismatch return. The renderer selection keys the expected
+  marker off the harness identity (an exact governed identity, not a fuzzy
+  match), consistent with acceptance criterion 4.
+
+### Acceptance-criteria mapping (proposal version-003)
+
+- AC1 exact-output PASS for codex, antigravity, api: covered.
+- AC2 hash-current tamper STALE for the same three families: covered.
+- AC3 failure matrix returns deterministic scoped STALE: covered by the five
+  delivered regressions, which are exactly the set the -006 Required Revisions
+  enumerated.
+- AC5 tracked clean-checkout authority: the regressions live in the tracked
+  platform_tests/scripts/test_check_harness_parity.py and pass without the
+  untracked clause-exact supplementary test.
+- AC7 only the two target files change: confirmed by the diffstat and git status.
+
+### Lint and format
+
+- ruff check on both targets -> All checks passed.
+- ruff format --check on both targets -> 2 files already formatted.
+
+### Preflights
+
+- bridge_applicability_preflight.py --bridge-id
+  gtkb-wi5144-hp08-semantic-adapter-drift -> preflight_passed true;
+  missing_required_specs []; missing_advisory_specs []; blocking_errors [];
+  operative file bridge/gtkb-wi5144-hp08-semantic-adapter-drift-007.md;
+  packet_hash sha256:b4e85a4538b45c4f428a50085148c1b8df432930c675c3d0028559cd3f336146.
+- adr_dcl_clause_preflight.py --bridge-id
+  gtkb-wi5144-hp08-semantic-adapter-drift -> exit 0; 5 clauses evaluated;
+  0 evidence gaps in must_apply clauses; 0 blocking gaps.
+
+### F2 recommended commit type
+
+- The report reconciles feat against the proposal's fix and justifies it (the
+  checker gains a net-new fail-closed semantic-equivalence capability while the
+  motivating symptom was a defect). Acceptable and resolved.
+
+## Finding: Finalization Blocker (the reason for NO-GO)
+
+Observation. VERIFIED is a commit-finalization outcome; the only governed path
+is .claude/skills/verify/helpers/write_verdict.py --finalize-verified. git status
+--short shows that finalizer helper is currently modified-unstaged, together with
+scripts/bridge_review_independence.py and scripts/gtkb_bridge_writer.py. A direct
+git diff HEAD on .claude/skills/verify/helpers/write_verdict.py confirms the
+uncommitted change is the WI-5113 verified-finalizer git-no-window work
+(a no_window_subprocess_kwargs import into _run_git) plus a review-independence
+hardening of _assert_verdict_review_independence (a fail-open except-ImportError
+return rewritten to a fail-closed raise, and a new required latest_report_rel_path
+argument into verdict_self_review_reason) that is co-dependent on the also-dirty
+scripts/bridge_review_independence.py.
+
+Deficiency rationale. finalize_verified_commit calls
+_assert_verdict_review_independence, so any VERIFIED finalization executed now
+would run this uncommitted, unreviewed, not-yet-VERIFIED finalizer code to
+produce a terminal governed commit, and would risk invalidating WI-5113's pending
+report snapshot. That is the finalizer-machinery commingle hazard one layer above
+the target files: the foreign in-flight change is in the finalizer itself, not in
+scripts/check_harness_parity.py. There is no clean headless remedy: running the
+committed HEAD finalizer instead of the dirty one would require a stash or revert
+of another open thread's in-flight work (prohibited), and no owner
+co-finalization waiver is available to a headless worker.
+
+This is the same systemic branch-level finalizer-commingle blocker that produced
+finalization-scoped NO-GOs on WI-5257, WI-5290, WI-5313, and WI-5302 earlier on
+2026-07-16, and it persists until WI-5113 lands.
+
+Proposed solution.
+1. Sequence WI-5113 (and the co-dependent review-independence hardening in
+   scripts/bridge_review_independence.py) to VERIFIED and commit its finalizer
+   changes (.claude/skills/verify/helpers/write_verdict.py,
+   scripts/bridge_review_independence.py, and its test target) so the finalizer
+   is clean at HEAD. WI-5113's own bridge thread records that it cannot isolate
+   its commit headlessly, so this step needs an interactive or owner-supervised
+   finalization session.
+2. Then finalize WI-5144 -007 for VERIFIED against the clean finalizer (either
+   re-file an unchanged REVISED report or verify -007 directly in an interactive
+   session), using the two-exact-path include set
+   scripts/check_harness_parity.py and
+   platform_tests/scripts/test_check_harness_parity.py.
+
+Option rationale. A NO-GO (rather than a silent record-and-stop) is correct here
+because this is the first finalization-scoped adjudication of the WI-5144 thread
+and it routes the thread to Prime for sequencing, so it is not loop-fuel. A false
+VERIFIED is not an option: the governed finalizer cannot be run cleanly headless
+in this branch state, and writing a terminal VERIFIED without a clean governed
+commit would violate the Mandatory VERIFIED Commit-Finalization Gate. The
+reduced-coverage owner waiver offered as an alternative in the -006 verdict is
+NOT needed, because the substance coverage is now complete.
+
+## Prime Builder Implementation Context
+
+- Objective: land WI-5144 -007 as VERIFIED without re-implementing it.
+- Preconditions: WI-5113 (and the review-independence hardening) verified and
+  committed so the finalizer is clean at HEAD; the WI-5144 GO chain and project
+  authorization remain valid; the two target files remain the authorized scope.
+- Evidence paths: git status of .claude/skills/verify/helpers/write_verdict.py,
+  scripts/bridge_review_independence.py, and scripts/gtkb_bridge_writer.py must be
+  clean before finalizing; scripts/check_harness_parity.py and
+  platform_tests/scripts/test_check_harness_parity.py hold the verified change.
+- Implementation sequence: verify and commit WI-5113 -> confirm the finalizer is
+  clean at HEAD -> finalize WI-5144 -007 for VERIFIED with the two-exact-path
+  include set.
+- Verification steps: re-run the tracked parity module (WI-5144 tests green; the
+  goose inventory failure is separate); re-run both ruff gates; re-run both
+  preflights; then run the governed VERIFIED finalizer.
+- Rollback notes: none required for this verdict; it makes no source or index
+  change.
+- Open decisions: none blocking. The goose registry-inventory failure is a
+  separate concern tracked under the Goose-adoption work, not WI-5144.
+
+## Commands Executed
+
+- git status --short on the finalizer machinery, the two targets, the three
+  generators, and the projection reader -> finalizer helpers and both targets
+  modified-unstaged; generators and reader clean.
+- git diff --stat HEAD on the two targets -> 327 insertions, 23 deletions.
+- git diff HEAD on .claude/skills/verify/helpers/write_verdict.py -> confirms the
+  WI-5113 no-window plus fail-closed review-independence change.
+- groundtruth-kb/.venv/Scripts/python.exe -m pytest
+  platform_tests/scripts/test_check_harness_parity.py -q -> 35 passed, 1 failed
+  (unrelated goose inventory row gap).
+- groundtruth-kb/.venv/Scripts/python.exe -m ruff check on the two targets ->
+  All checks passed.
+- groundtruth-kb/.venv/Scripts/python.exe -m ruff format --check on the two
+  targets -> 2 files already formatted.
+- groundtruth-kb/.venv/Scripts/python.exe scripts/bridge_applicability_preflight.py
+  --bridge-id gtkb-wi5144-hp08-semantic-adapter-drift -> preflight_passed true.
+- groundtruth-kb/.venv/Scripts/python.exe scripts/adr_dcl_clause_preflight.py
+  --bridge-id gtkb-wi5144-hp08-semantic-adapter-drift -> exit 0.
+
+## Applicability Preflight
+
+- packet_hash: sha256:b4e85a4538b45c4f428a50085148c1b8df432930c675c3d0028559cd3f336146
+- bridge_document_name: gtkb-wi5144-hp08-semantic-adapter-drift
+- operative_file: bridge/gtkb-wi5144-hp08-semantic-adapter-drift-007.md
+- preflight_passed: true
+- missing_required_specs: []
+- missing_advisory_specs: []
+- blocking_errors: []
+
+## Clause Applicability
+
+- Bridge id: gtkb-wi5144-hp08-semantic-adapter-drift
+- Operative file: bridge/gtkb-wi5144-hp08-semantic-adapter-drift-007.md
+- Clauses evaluated: 5; must_apply: 2; may_apply: 3; not_applicable: 0
+- Evidence gaps in must_apply clauses: 0
+- Blocking gaps (gate-failing): 0
+- Exit status: 0 (no blocking clause gap)
+
+## Owner Action Required
+
+None is required to act on this NO-GO. It is a standard Loyal Opposition
+finalization-scoped verdict: Prime Builder sequences WI-5113 to VERIFIED and
+commit first, then finalizes WI-5144 -007 for VERIFIED against the clean
+finalizer. No owner decision blocks that path, and the reduced-coverage waiver
+from the -006 verdict is not needed because substance coverage is complete.
+
+---
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

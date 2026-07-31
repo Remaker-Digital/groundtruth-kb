@@ -16,8 +16,14 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "harness-capability-registry.toml"
-API_SKILLS_RELATIVE_PATH = Path(".api-harness") / "skills"
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+from _wrap_io import _atomic_write_bytes  # noqa: E402
+
+REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "gtkb-harness-capability-registry.toml"
+DEFAULT_SKILLS_RELATIVE_PATH = Path(".api-harness") / "skills"
+API_SKILLS_RELATIVE_PATH = DEFAULT_SKILLS_RELATIVE_PATH
 MANIFEST_NAME = "MANIFEST.json"
 GENERATED_MARKER = "<!-- GTKB-API-SKILL-ADAPTER"
 GENERATED_END_MARKER = "GTKB-API-SKILL-ADAPTER -->"
@@ -207,7 +213,8 @@ def _write_if_changed(path: Path, content: str, *, check: bool) -> bool:
     if check:
         return True
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8", newline="\n")
+    # WI-5117: atomic write; encode to LF bytes so the LF-only contract survives.
+    _atomic_write_bytes(path, content.encode("utf-8"))
     return True
 
 
@@ -265,10 +272,16 @@ def generate(project_root: Path, *, check: bool = False) -> tuple[list[str], lis
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    global API_SKILLS_RELATIVE_PATH
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output-dir", type=str, default=None, help="Override the output skills directory (e.g. .goose/skills)."
+    )
     parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT)
     parser.add_argument("--check", action="store_true", help="Report drift without writing files.")
     args = parser.parse_args(argv)
+    if getattr(args, "output_dir", None):
+        API_SKILLS_RELATIVE_PATH = Path(args.output_dir)
 
     try:
         changed, adapter_paths = generate(args.project_root, check=args.check)

@@ -320,6 +320,61 @@ def test_harness_set_precedence_cli(tmp_path: Path) -> None:
     assert _harness_current(db_path, "B")["reviewer_precedence"] == 7
 
 
+# --- T-HC-6b: set-invocation-surface ----------------------------------------
+
+
+def test_harness_set_invocation_surface_cli_refreshes_projection(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    db_path = root / "groundtruth.db"
+    _invoke(config, "register", "--id", "A", "--name", "codex", "--type", "codex-cli")
+    surface = {
+        "argv": [
+            "codex",
+            "exec",
+            "--model",
+            "gpt-5.5",
+            "-c",
+            'approval_policy="never"',
+            "-c",
+            'model_reasoning_effort="xhigh"',
+            "--sandbox",
+            "workspace-write",
+            "{{PROMPT}}",
+            "--cd",
+            "{{PROJECT_ROOT}}",
+        ],
+        "can_receive_dispatch": True,
+    }
+
+    result = _invoke(
+        config,
+        "set-invocation-surface",
+        "--harness",
+        "A",
+        "--surface",
+        "headless",
+        "--value-json",
+        json.dumps(surface),
+    )
+
+    assert result.exit_code == 0, result.output
+    row = _harness_current(db_path, "A")
+    assert row is not None
+    assert json.loads(row["invocation_surfaces"])["headless"]["argv"][2:10] == [
+        "--model",
+        "gpt-5.5",
+        "-c",
+        'approval_policy="never"',
+        "-c",
+        'model_reasoning_effort="xhigh"',
+        "--sandbox",
+        "workspace-write",
+    ]
+    role_map = _read_role_map(root)
+    assert role_map["A"]["invocation_surfaces"]["headless"]["argv"] == surface["argv"]
+    assert role_map["A"]["invocation_surfaces"]["headless"]["can_receive_dispatch"] is True
+
+
 # --- T-HC-7: set-role assigns one role and preserves active PB/LO invariant ---
 
 
@@ -443,6 +498,25 @@ def test_harness_set_role_emits_role_holder_sets(tmp_path: Path) -> None:
     assert payload["verified_loyal_opposition"] == "A"
     assert payload["verified_loyal_oppositions"] == ["A"]
     assert payload["new_role_set"] == ["prime-builder"]
+
+
+def test_harness_diagnostic_json_is_local_and_structured(tmp_path: Path) -> None:
+    _, config = _project(tmp_path)
+    _register_active(config, "A", "codex-cli", role=["prime-builder"])
+
+    result = _invoke(config, "diagnostic", "--harness-id", "A", "--json")
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["schema_id"] == "gtkb.harness_diagnostic.v1"
+    assert payload["harness"]["harness_id"] == "A"
+    assert payload["provider_health"] == {
+        "coverage": "not_requested",
+        "freshness": "local",
+        "mode": "local",
+        "status": "unavailable",
+        "unavailable_reason": "provider_request_forbidden",
+    }
 
 
 # --- T-HC-8: the gt mode set-role command is unaffected ---------------------

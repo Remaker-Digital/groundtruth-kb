@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import cross_harness_bridge_trigger as trigger
+from scripts import dispatcher_runtime as trigger
 from scripts import verify_ollama_dispatch as verify
 
 OLLAMA_MODEL_ID = "fixture-review:current"

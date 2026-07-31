@@ -14,10 +14,59 @@ from groundtruth_kb.cli import main  # noqa: E402
 
 
 def _project(tmp_path: Path) -> tuple[Path, Path]:
+    from groundtruth_kb.db import KnowledgeDB
+    from groundtruth_kb.harness_projection import generate_harness_projection
+
     root = tmp_path / "project"
     root.mkdir()
     config = root / "groundtruth.toml"
     config.write_text('[groundtruth]\ndb_path = "./groundtruth.db"\nproject_root = "."\n', encoding="utf-8")
+
+    # Seed KnowledgeDB harnesses
+    db = KnowledgeDB(db_path=root / "groundtruth.db")
+    db.insert_harness(
+        id="A",
+        harness_name="codex",
+        harness_type="codex",
+        role=["prime-builder"],
+        changed_by="test",
+        change_reason="seed",
+        status="active",
+        reviewer_precedence=20,
+        invocation_surfaces={
+            "dispatch": {
+                "can_receive_dispatch": True,
+                "can_fire_events": True,
+                "dispatch_cost": 60,
+                "dispatch_quality": 90,
+                "dispatch_availability": 90,
+                "dispatch_tags": ["prime-builder"],
+            }
+        },
+    )
+    db.insert_harness(
+        id="D",
+        harness_name="ollama",
+        harness_type="ollama",
+        role=["loyal-opposition"],
+        changed_by="test",
+        change_reason="seed",
+        status="active",
+        reviewer_precedence=10,
+        invocation_surfaces={
+            "dispatch": {
+                "can_receive_dispatch": True,
+                "can_fire_events": False,
+                "dispatch_cost": 30,
+                "dispatch_quality": 80,
+                "dispatch_availability": 95,
+                "dispatch_max_items": 2,
+                "dispatch_tags": ["loyal-opposition"],
+            }
+        },
+    )
+    generate_harness_projection(db, root)
+
     (root / "config" / "dispatcher").mkdir(parents=True)
     (root / "config" / "dispatcher" / "rules.toml").write_text(
         """
@@ -69,6 +118,10 @@ def _rules(root: Path) -> dict:
     return tomllib.loads((root / "config" / "dispatcher" / "rules.toml").read_text(encoding="utf-8"))
 
 
+def _registry(root: Path) -> dict:
+    return json.loads((root / "harness-state" / "harness-registry.json").read_text(encoding="utf-8"))
+
+
 def _audit_records(root: Path) -> list[dict]:
     path = root / ".gtkb-state" / "bridge-dispatch-config-transactions" / "audit.jsonl"
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
@@ -88,6 +141,8 @@ def test_config_read_command_still_reports_and_subcommands_are_discoverable(tmp_
 
 
 def test_transaction_commands_update_known_schema_and_append_audit(tmp_path: Path) -> None:
+    from groundtruth_kb.db import KnowledgeDB
+
     root, config = _project(tmp_path)
 
     commands = [
@@ -118,14 +173,6 @@ def test_transaction_commands_update_known_schema_and_append_audit(tmp_path: Pat
             "F",
             "--description",
             "OpenRouter",
-            "--can-receive-dispatch",
-            "--no-can-fire-events",
-            "--quality",
-            "80",
-            "--cost",
-            "20",
-            "--availability",
-            "90",
             "--tag",
             "loyal-opposition",
         ),
@@ -138,15 +185,24 @@ def test_transaction_commands_update_known_schema_and_append_audit(tmp_path: Pat
         assert json.loads(result.output)["status"] == "applied"
 
     payload = _rules(root)
+    registry = _registry(root)
+    harness_a = next(h for h in registry["harnesses"] if h["id"] == "A")
+
+    db = KnowledgeDB(db_path=root / "groundtruth.db")
+    harness_a_db = db.get_harness("A")
+    surfaces = json.loads(harness_a_db["invocation_surfaces"])
+
     assert payload["owner_note"] == "preserve-me"
-    assert payload["harnesses"]["A"]["can_receive_dispatch"] is False
-    assert payload["harnesses"]["A"]["can_fire_events"] is True
-    assert payload["harnesses"]["A"]["dispatch_quality"] == 91
-    assert payload["harnesses"]["A"]["dispatch_cost"] == 55
-    assert payload["harnesses"]["A"]["dispatch_availability"] == 88
+    assert harness_a["can_receive_dispatch"] is False
+    assert harness_a["can_fire_events"] is False  # neutralized in flat projection per WI-5020
+    assert surfaces["dispatch"]["can_fire_events"] is True  # preserved in DB
+    assert harness_a["dispatch_quality"] == 91
+    assert harness_a["dispatch_cost"] == 55
+    assert harness_a["dispatch_availability"] == 88
     assert payload["harnesses"]["A"]["max_items"] == 4
     assert "D" not in payload["harnesses"]
-    assert payload["harnesses"]["F"]["dispatch_cost"] == 20
+    assert payload["harnesses"]["F"]["description"] == "OpenRouter"
+    assert "loyal-opposition" in payload["harnesses"]["F"]["tags"]
     lo_rule = next(rule for rule in payload["rules"] if rule["id"] == "bridge-loyal-opposition-default")
     assert lo_rule["prefer"] == ["cost", "availability", "harness_id"]
     assert [row["transaction"] for row in _audit_records(root)] == [

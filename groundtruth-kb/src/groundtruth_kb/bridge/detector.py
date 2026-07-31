@@ -26,6 +26,7 @@ class BridgeStatus(StrEnum):
     REVISED = "REVISED"
     GO = "GO"
     NO_GO = "NO-GO"
+    NO_ACTION = "NO-ACTION"
     VERIFIED = "VERIFIED"
     ADVISORY = "ADVISORY"
     DEFERRED = "DEFERRED"
@@ -36,7 +37,7 @@ class BridgeStatus(StrEnum):
 
 # Match status lines: ``<STATUS>: bridge/<name>-<NNN>.md``.
 _STATUS_LINE_RE = re.compile(
-    r"^(?P<status>NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|ACCEPTED|BLOCKED):\s+"
+    r"^(?P<status>NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|ACCEPTED|BLOCKED):\s+"
     r"bridge/(?P<name>[A-Za-z0-9._-]+?)-(?P<version>\d+)\.md\s*$"
 )
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s+(?P<name>[A-Za-z0-9._-]+)\s*$")

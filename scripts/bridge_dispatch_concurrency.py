@@ -1,13 +1,14 @@
 """Per-role bridge dispatch concurrency - bridge scheduler Slice 4 (WI-3375).
 
-Standalone, stdlib-only module. It resolves a per-role dispatch concurrency
-limit and tracks in-flight dispatch workers as a bounded pool of atomically
-acquired slot files, so the bridge scheduler can replace the flat
-DEFAULT_MAX_ITEMS = 2 cap with role-aware capacity (default: loyal-opposition
-3, prime-builder 2). The module imports no dispatch code, the Slice 2 lease
-registry, or the Slice 3 writer; wiring it into the dispatch path is
-integration work deferred to a later slice, so live dispatch behavior is
-unchanged by this module's existence.
+Standalone, stdlib-only module. It owns the shared per-role dispatch
+concurrency limit contract (default: loyal-opposition 3, prime-builder 2) and
+also retains the WI-3375 slot-file bounded-pool primitive for future scheduler
+integration. The live dispatcher imports role_limit() from this module for its
+authoritative defaults and per-role environment overrides, but live worker
+counting/enforcement remains PID-sidecar based in scripts/dispatcher_runtime.py.
+Do not read the slot files below as evidence of live dispatcher capacity until
+a later bridge explicitly wires worker-slot lifecycle ownership into the
+spawned worker runtime.
 
 Each role's in-flight workers are tracked as files
 <state_dir>/workers/<role>/slot-<n>.lock for n in 0 .. role_limit(role) - 1.
@@ -19,7 +20,8 @@ heartbeat has aged past its ttl is reclaimed; long-running workers call
 refresh_worker to extend their heartbeat.
 
 Implements WI-3375 per bridge/gtkb-bridge-scheduler-lanes-leases-slice-4-001.md
-(Loyal Opposition GO at -002).
+(Loyal Opposition GO at -002). WI-5029 reconciled the default contract with the
+live CA9165 dispatcher gate without making this slot pool the live gate.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -31,7 +33,7 @@ import json
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Slot-record schema version. Bumped only on an incompatible record-shape change.
@@ -63,7 +65,7 @@ class DispatchCapacityExhausted(RuntimeError):
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _validate_role(role: str) -> str:
@@ -182,8 +184,8 @@ def _heartbeat_age_seconds(record: dict) -> float | None:
     except ValueError:
         return None
     if hb.tzinfo is None:
-        hb = hb.replace(tzinfo=timezone.utc)
-    return (datetime.now(timezone.utc) - hb).total_seconds()
+        hb = hb.replace(tzinfo=UTC)
+    return (datetime.now(UTC) - hb).total_seconds()
 
 
 def _slot_is_stale(record: dict) -> bool:

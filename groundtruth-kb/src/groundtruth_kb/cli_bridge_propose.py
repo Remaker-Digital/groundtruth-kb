@@ -24,7 +24,9 @@ from groundtruth_kb.bridge.proposal_autoload import (
 from groundtruth_kb.bridge.proposal_filing import (
     FilingRequest,
     ProposalFilingError,
+    draft_nonimpairment_disposition,
     file_implementation_proposal,
+    render_nonimpairment_disposition,
 )
 from groundtruth_kb.bridge.taxonomy import BridgeKind
 from groundtruth_kb.config import GTConfig
@@ -103,6 +105,7 @@ ${auto_owner_decisions}
 
 ${proposed_scope_ip_blocks}
 
+${nonimpairment_section}
 ## Specification-Derived Verification Plan
 
 ${verification_plan_table}
@@ -258,6 +261,11 @@ def build_propose_context(
         ),
         "kind_specific_intro": KIND_INTROS[kind],
         "recommended_commit_type": RECOMMENDED_COMMIT_TYPES[kind],
+        "nonimpairment_section": (
+            render_nonimpairment_disposition(draft_nonimpairment_disposition()) + "\n"
+            if kind == "implementation"
+            else ""
+        ),
     }
 
 
@@ -347,6 +355,13 @@ def bridge_propose(
 @click.option("--scope", "scope_lines", multiple=True, help="Repeatable proposed-scope bullet.")
 @click.option("--acceptance", "acceptance_criteria", multiple=True, help="Repeatable acceptance-criteria bullet.")
 @click.option("--verification", multiple=True, help="Repeatable SPEC_ID=verification text row.")
+@click.option(
+    "--cross-harness-disposition",
+    "cross_harness_dispositions",
+    multiple=True,
+    metavar="HARNESS_OR_SURFACE=DISPOSITION",
+    help="Repeatable explicit parity disposition for a harness or managed surface.",
+)
 @click.option("--summary", help="Override generated proposal summary.")
 @click.option(
     "--create-missing-state",
@@ -367,6 +382,7 @@ def bridge_file_implementation_proposal(
     scope_lines: tuple[str, ...],
     acceptance_criteria: tuple[str, ...],
     verification: tuple[str, ...],
+    cross_harness_dispositions: tuple[str, ...],
     summary: str | None,
     create_missing_state: bool,
     dry_run: bool,
@@ -385,6 +401,7 @@ def bridge_file_implementation_proposal(
         scope_lines=scope_lines,
         acceptance_criteria=acceptance_criteria,
         verification=verification,
+        cross_harness_dispositions=cross_harness_dispositions,
         summary=summary,
         create_missing_state=create_missing_state,
         dry_run=dry_run,
@@ -400,6 +417,9 @@ def bridge_file_implementation_proposal(
         "bridge_path": str(result.bridge_path) if result.bridge_path is not None else None,
         "project_id": result.project_id,
         "project_authorization_id": result.project_authorization_id,
+        "project_authorization_candidates": [
+            candidate.to_dict() for candidate in result.project_authorization_candidates
+        ],
         "preflights": [
             {
                 "name": preflight.name,
@@ -416,6 +436,14 @@ def bridge_file_implementation_proposal(
         return
     click.echo(f"Wrote NEW: {result.bridge_path}")
     click.echo(f"Project Authorization: {result.project_authorization_id}")
+    click.echo(
+        "Project Authorization Candidates: "
+        + json.dumps(
+            [candidate.to_dict() for candidate in result.project_authorization_candidates],
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
     for preflight in result.preflight_results:
         click.echo(f"preflight {preflight.name}: exit {preflight.returncode}")
 

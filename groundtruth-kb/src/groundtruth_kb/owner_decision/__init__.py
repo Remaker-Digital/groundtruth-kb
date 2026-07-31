@@ -10,9 +10,21 @@ from groundtruth_kb.owner_decision.auto_archive import (
     archive_decision,
     should_auto_archive,
 )
+from groundtruth_kb.owner_decision.resolution_signals import (
+    ResolutionSignal,
+    build_live_bridge_status_reader,
+    extract_bridge_slugs,
+    read_owner_decision_deliberations,
+    resolve_pending_entries,
+)
 
 __all__ = [
     "DecisionForArchive",
+    "ResolutionSignal",
     "archive_decision",
+    "build_live_bridge_status_reader",
+    "extract_bridge_slugs",
+    "read_owner_decision_deliberations",
+    "resolve_pending_entries",
     "should_auto_archive",
 ]

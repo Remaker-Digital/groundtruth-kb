@@ -27,6 +27,12 @@ If a file appears to contain errors:
 - Non-blocking: Prime Builder may proceed before receiving the review.
 - Output: findings report with severity ratings and recommendations.
 - No verdict required, but may include one if warranted.
+- When the output is an **Advisory Report**, classify the recommendation as
+  `adopt`, `adapt`, `reject`, `defer`, or `monitor`.
+- Advisory Reports classified `adopt` or `adapt` MUST include a `Required Prime
+  Builder Owner-Grilling Gate` section before any derived implementation
+  proposal is filed. The gate names the owner questions, practical options,
+  tradeoffs, and intended durable artifact outcome.
 
 ### GO / NO-GO Review
 
@@ -74,6 +80,9 @@ Every review output includes:
    recommended action.
 3. **Verdict.** GO, NO-GO, or VERIFIED when the review type requires a verdict.
 4. **Open questions.** Items that need owner decision or clarification.
+5. **Advisory disposition.** For Advisory Reports, state `adopt`, `adapt`,
+   `reject`, `defer`, or `monitor`; include the `Required Prime Builder
+   Owner-Grilling Gate` section for `adopt` or `adapt`.
 
 Reviews are written to:
 ```

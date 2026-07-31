@@ -69,3 +69,17 @@ def test_ollama_registry_declares_adapter_support() -> None:
     assert ollama["skill_adapter_manifest"] == ".api-harness/skills/MANIFEST.json"
     assert ollama["skill_adapter_drift_check_supported"] is True
     assert ollama["phase_1_only"] is True
+    assert ollama["activity_envelope_projection_mode"] == "compact-provider"
+    assert ollama["compact_result_envelope_mode"] == "compact-provider"
+    assert ollama["compact_session_envelope_mode"] == "compact-provider"
+    assert ollama["full_transcript_archive_required"] is False
+
+
+def test_openrouter_registry_declares_compact_provider_envelopes() -> None:
+    registry = tomllib.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+    openrouter = registry["harnesses"]["openrouter"]
+
+    assert openrouter["activity_envelope_projection_mode"] == "compact-provider"
+    assert openrouter["compact_result_envelope_mode"] == "compact-provider"
+    assert openrouter["compact_session_envelope_mode"] == "compact-provider"
+    assert openrouter["full_transcript_archive_required"] is False

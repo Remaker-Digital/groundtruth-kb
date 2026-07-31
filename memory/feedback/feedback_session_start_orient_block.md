@@ -4,7 +4,7 @@ description: At S301+ session start, after memory read and bridge scan, produce 
 type: feedback
 originSessionId: S300
 ---
-**Rule:** At session start, after the mandatory memory read and `bridge/INDEX.md` scan,
+**Rule:** At session start, after the mandatory memory read and bridge-state scan,
 produce an ORIENT block as the first substantive output to the owner. Seven items,
 fixed format, each answer sourced from a live command (not from memory).
 
@@ -21,17 +21,17 @@ Output format (verbatim, mirrors POLLER block discipline):
 
 ```
 ORIENT S{N} @ HH:MMZ
-  1 bridge:     <status>              # from bridge/INDEX.md head scan
+  1 bridge:     <status>              # from dispatcher/TAFE bridge-state scan
   2 branch:     <repo>@<sha-short>  (<ahead/behind N>)   # git rev-parse + git status -sb
   3 worktree:   <N modified, M untracked>  [relevant: <scoped subset>]   # git status --short
   4 wrap:       DELIB-<id> / INSIGHTS-<date>-<topic>.md  # DA search + CODEX-INSIGHT-DROPBOX latest
-  5 blockers:   <list or 'none'>       # bridge/INDEX.md active NO-GO + GO-unverified + release-blocking
+  5 blockers:   <list or 'none'>       # active NO-GO + GO-unverified + release-blocking bridge items
   6 refresh:    <list or 'none'>       # evidence that must be refreshed before acting
   7 next:       <action>               # synthesis of 1-6
 ```
 
 Each answer must come from a live source, not from memory. Acceptable sources:
-`git` commands, `bridge/INDEX.md` read, `search_deliberations()` call, `gh run list`,
+`git` commands, dispatcher/TAFE bridge-state read, `search_deliberations()` call, `gh run list`,
 file reads. If a live source can't be obtained for any of the 7 items, mark it
 `UNKNOWN — <reason>` rather than inferring from memory.
 

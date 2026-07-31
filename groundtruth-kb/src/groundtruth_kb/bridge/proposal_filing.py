@@ -27,6 +27,23 @@ from groundtruth_kb.db import KnowledgeDB
 
 APPROVED_SPEC_STATUSES = {"specified", "implemented", "verified"}
 CHANGED_BY = "prime-builder/codex"
+NONIMPAIRMENT_REQUIRED_FIELDS = (
+    "applicability",
+    "provenance",
+    "canonical_authority",
+    "primary_route",
+    "before_behavior",
+    "after_behavior",
+    "self_descriptive_naming",
+    "obsolete_guidance_disposition",
+    "history_preservation",
+    "baseline",
+    "expected_result",
+    "rollback",
+    "hard_invariants",
+    "fail_closed_conditions",
+    "essential_context_preservation",
+)
 
 
 class ProposalFilingError(RuntimeError):
@@ -44,6 +61,7 @@ class FilingRequest:
     scope_lines: tuple[str, ...] = ()
     acceptance_criteria: tuple[str, ...] = ()
     verification: tuple[str, ...] = ()
+    cross_harness_dispositions: tuple[str, ...] = ()
     summary: str | None = None
     create_missing_state: bool = False
     dry_run: bool = False
@@ -58,11 +76,30 @@ class PreflightResult:
 
 
 @dataclass(frozen=True)
+class AuthorizationCandidateRank:
+    project_authorization_id: str
+    coverage: str
+    included_work_item_count: int | None
+    specificity_rank: tuple[int, int]
+    selected: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "project_authorization_id": self.project_authorization_id,
+            "coverage": self.coverage,
+            "included_work_item_count": self.included_work_item_count,
+            "specificity_rank": list(self.specificity_rank),
+            "selected": self.selected,
+        }
+
+
+@dataclass(frozen=True)
 class FilingResult:
     bridge_path: Path | None
     content: str
     project_id: str
     project_authorization_id: str
+    project_authorization_candidates: tuple[AuthorizationCandidateRank, ...] = field(default_factory=tuple)
     preflight_results: tuple[PreflightResult, ...] = field(default_factory=tuple)
 
 
@@ -70,6 +107,7 @@ class FilingResult:
 class _ProjectState:
     project_id: str
     project_authorization_id: str
+    project_authorization_candidates: tuple[AuthorizationCandidateRank, ...]
     membership_created: bool
     authorization_created: bool
 
@@ -97,16 +135,73 @@ def _authorization_covers_work_item(authorization: dict[str, Any], wi_id: str) -
     return wi_id not in excluded and (not included or wi_id in included)
 
 
+def _authorization_candidate_rank(
+    authorization: dict[str, Any],
+    wi_id: str,
+) -> AuthorizationCandidateRank | None:
+    if not _authorization_covers_work_item(authorization, wi_id):
+        return None
+
+    authorization_id = str(authorization.get("id") or "").strip()
+    included = tuple(dict.fromkeys(_parsed_list(authorization, "included_work_item_ids")))
+    if included == (wi_id,):
+        coverage = "exact_singleton"
+        rank = (0, 1)
+        included_count: int | None = 1
+    elif included:
+        coverage = "explicit_list"
+        rank = (1, len(included))
+        included_count = len(included)
+    else:
+        coverage = "project_membership_fallback"
+        rank = (2, 0)
+        included_count = None
+
+    return AuthorizationCandidateRank(
+        project_authorization_id=authorization_id,
+        coverage=coverage,
+        included_work_item_count=included_count,
+        specificity_rank=rank,
+    )
+
+
 def _active_authorization_for_work_item(
     db: KnowledgeDB,
     *,
     project_id: str,
     wi_id: str,
-) -> dict[str, Any] | None:
+) -> tuple[dict[str, Any] | None, tuple[AuthorizationCandidateRank, ...]]:
+    candidates: list[tuple[dict[str, Any], AuthorizationCandidateRank]] = []
     for authorization in db.list_project_authorizations(project_id, status="active"):
-        if _authorization_covers_work_item(authorization, wi_id):
-            return authorization
-    return None
+        candidate = _authorization_candidate_rank(authorization, wi_id)
+        if candidate is not None:
+            candidates.append((authorization, candidate))
+
+    if not candidates:
+        return None, ()
+
+    candidates.sort(key=lambda item: (item[1].specificity_rank, item[1].project_authorization_id))
+    best_rank = candidates[0][1].specificity_rank
+    best = [item for item in candidates if item[1].specificity_rank == best_rank]
+    if len(best) > 1:
+        authorization_ids = ", ".join(item[1].project_authorization_id for item in best)
+        raise ProposalFilingError(
+            f"Ambiguous active project authorizations cover {wi_id} at specificity rank "
+            f"{list(best_rank)}: {authorization_ids}"
+        )
+
+    selected_authorization, selected_candidate = best[0]
+    ranked_candidates = tuple(
+        AuthorizationCandidateRank(
+            project_authorization_id=candidate.project_authorization_id,
+            coverage=candidate.coverage,
+            included_work_item_count=candidate.included_work_item_count,
+            specificity_rank=candidate.specificity_rank,
+            selected=candidate.project_authorization_id == selected_candidate.project_authorization_id,
+        )
+        for _, candidate in candidates
+    )
+    return selected_authorization, ranked_candidates
 
 
 def _require_owner_decision(db: KnowledgeDB, owner_decision: str | None) -> str:
@@ -165,7 +260,11 @@ def _resolve_project_state(
         )
         membership_created = True
 
-    authorization = _active_authorization_for_work_item(db, project_id=project_id, wi_id=request.wi_id)
+    authorization, authorization_candidates = _active_authorization_for_work_item(
+        db,
+        project_id=project_id,
+        wi_id=request.wi_id,
+    )
     authorization_created = False
     if authorization is None:
         if not request.create_missing_state:
@@ -192,6 +291,18 @@ def _resolve_project_state(
             allowed_mutation_classes=["bridge", "metadata"],
         )
         authorization_created = True
+        created_candidate = _authorization_candidate_rank(authorization, request.wi_id)
+        if created_candidate is None:
+            raise ProposalFilingError("Created project authorization does not cover the requested work item")
+        authorization_candidates = (
+            AuthorizationCandidateRank(
+                project_authorization_id=created_candidate.project_authorization_id,
+                coverage=created_candidate.coverage,
+                included_work_item_count=created_candidate.included_work_item_count,
+                specificity_rank=created_candidate.specificity_rank,
+                selected=True,
+            ),
+        )
 
     if authorization is None:
         raise ProposalFilingError("Project authorization insert did not return a current row")
@@ -199,6 +310,7 @@ def _resolve_project_state(
     return _ProjectState(
         project_id=project_id,
         project_authorization_id=str(authorization.get("id") or ""),
+        project_authorization_candidates=authorization_candidates,
         membership_created=membership_created,
         authorization_created=authorization_created,
     )
@@ -220,6 +332,27 @@ def _validate_target_paths(project_root: Path, target_paths: tuple[str, ...]) ->
             raise ProposalFilingError("Agent Red targets are out of scope for this platform bridge filing command.")
         normalized.append(rel_path)
     return tuple(_dedupe(tuple(normalized)))
+
+
+def _validate_cross_harness_dispositions(entries: tuple[str, ...]) -> tuple[str, ...]:
+    normalized: list[str] = []
+    seen_keys: set[str] = set()
+    for entry in entries:
+        if "=" not in entry:
+            raise ProposalFilingError("--cross-harness-disposition entries must use HARNESS_OR_SURFACE=DISPOSITION")
+        key, disposition = (part.strip() for part in entry.split("=", 1))
+        if not key or not disposition:
+            raise ProposalFilingError(
+                "--cross-harness-disposition requires a non-empty harness/surface and disposition"
+            )
+        if any(character in key or character in disposition for character in "\r\n"):
+            raise ProposalFilingError("--cross-harness-disposition entries must be single-line values")
+        normalized_key = key.casefold()
+        if normalized_key in seen_keys:
+            raise ProposalFilingError(f"Duplicate --cross-harness-disposition key: {key}")
+        seen_keys.add(normalized_key)
+        normalized.append(f"{key}={disposition}")
+    return tuple(normalized)
 
 
 def _format_bullets(values: list[str] | tuple[str, ...], *, empty: str) -> str:
@@ -262,6 +395,89 @@ def _format_verification_plan(spec_ids: list[str], explicit: tuple[str, ...]) ->
     return "\n".join(rows)
 
 
+def _format_cross_harness_dispositions(entries: tuple[str, ...]) -> str:
+    return "\n".join(f"- **{key}**: {disposition}" for key, disposition in (entry.split("=", 1) for entry in entries))
+
+
+def draft_nonimpairment_disposition() -> dict[str, Any]:
+    """Return the complete, deliberately non-fileable draft schema."""
+    return {
+        "schema_version": 1,
+        **{field: "TODO" for field in NONIMPAIRMENT_REQUIRED_FIELDS},
+    }
+
+
+def build_nonimpairment_disposition(
+    *,
+    wi_id: str,
+    project_id: str,
+    project_authorization_id: str,
+    target_paths: tuple[str, ...],
+    summary: str,
+    description: str,
+    scope_lines: tuple[str, ...],
+    acceptance_criteria: tuple[str, ...],
+    spec_links: list[str],
+) -> dict[str, Any]:
+    """Build a concrete request-derived non-impairment disposition."""
+    return {
+        "schema_version": 1,
+        "applicability": "applicable",
+        "provenance": f"{wi_id}; {project_authorization_id}; generated by gt bridge file-implementation-proposal",
+        "canonical_authority": ("GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001 and the governed bridge proposal generators"),
+        "primary_route": "gt bridge file-implementation-proposal",
+        "before_behavior": description or f"{wi_id} has no implemented behavior yet; this proposal defines the slice.",
+        "after_behavior": summary,
+        "self_descriptive_naming": (
+            "The generated title, work-item id, target paths, scope, and acceptance criteria name the proposed effect."
+        ),
+        "obsolete_guidance_disposition": (
+            "No guidance is retired by proposal filing; implementation must explicitly disposition obsolete guidance."
+        ),
+        "history_preservation": (
+            "The numbered bridge chain remains append-only; rollback never deletes proposal or verdict artifacts."
+        ),
+        "baseline": {
+            "work_item": wi_id,
+            "project": project_id,
+            "target_paths": list(target_paths),
+            "linked_specifications": list(spec_links),
+        },
+        "expected_result": {
+            "summary": summary,
+            "scope": list(scope_lines),
+            "acceptance_criteria": list(acceptance_criteria),
+        },
+        "rollback": {
+            "instructions": "Revert only the approved source and test implementation targets under separate authority.",
+            "verification": "Rerun the proposal's specification-derived tests and bridge preflights.",
+        },
+        "hard_invariants": [
+            "Bridge review, implementation-start, and independent verification gates remain mandatory.",
+            "Only the declared in-root target paths are attributable to this implementation proposal.",
+            "Dispatcher, TAFE, credential, deployment, release, and unrelated work remain outside generated authority.",
+        ],
+        "fail_closed_conditions": [
+            "Project membership or active PAUTH coverage is missing.",
+            "Target paths escape the project root or candidate/live preflights fail.",
+            "Required proposal evidence is empty, malformed, duplicated, or still contains authoring placeholders.",
+        ],
+        "essential_context_preservation": (
+            "The generated proposal retains PAUTH, project, work item, targets, specifications, prior deliberations, "
+            "owner decisions, scope, verification, acceptance, risk, rollback, and expected file changes."
+        ),
+    }
+
+
+def render_nonimpairment_disposition(disposition: dict[str, Any]) -> str:
+    return (
+        "## Intuitiveness / Non-Impairment Disposition\n\n"
+        "```json\n"
+        f"{json.dumps(disposition, ensure_ascii=True, indent=2)}\n"
+        "```"
+    )
+
+
 def _build_content(
     db: KnowledgeDB,
     project_root: Path,
@@ -295,6 +511,24 @@ def _build_content(
         f"File a governed implementation proposal for `{request.wi_id}` using deterministic project, "
         "authorization, target-path, and preflight wiring."
     )
+    cross_harness_section = (
+        f"## Cross-Harness Disposition\n\n{_format_cross_harness_dispositions(request.cross_harness_dispositions)}\n\n"
+        if request.cross_harness_dispositions
+        else ""
+    )
+    nonimpairment_section = render_nonimpairment_disposition(
+        build_nonimpairment_disposition(
+            wi_id=request.wi_id,
+            project_id=project_state.project_id,
+            project_authorization_id=project_state.project_authorization_id,
+            target_paths=request.target_paths,
+            summary=summary,
+            description=description,
+            scope_lines=scope_lines,
+            acceptance_criteria=acceptance,
+            spec_links=spec_links,
+        )
+    )
     date = f"{datetime.now(UTC).date().isoformat()} UTC"
     return f"""NEW
 
@@ -306,6 +540,7 @@ Version: 001
 Date: {date}
 
 Project Authorization: {project_state.project_authorization_id}
+Project Authorization Candidates: {json.dumps([candidate.to_dict() for candidate in project_state.project_authorization_candidates], ensure_ascii=True, separators=(",", ":"))}
 Project: {project_state.project_id}
 Work Item: {request.wi_id}
 
@@ -350,6 +585,8 @@ Existing requirements are sufficient for filing this proposal. The work item and
 
 {_format_bullets(scope_lines, empty="_No proposed scope supplied._")}
 
+{cross_harness_section}{nonimpairment_section}
+
 ## Specification-Derived Verification Plan
 
 {_format_verification_plan(spec_links, request.verification)}
@@ -380,6 +617,8 @@ def _project_root_from_module() -> Path:
 
 def _load_bridge_writer(project_root: Path) -> ModuleType:
     candidates = [
+        project_root / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py",
+        _project_root_from_module() / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py",
         project_root / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py",
         _project_root_from_module() / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py",
     ]
@@ -450,12 +689,14 @@ def file_implementation_proposal(
 ) -> FilingResult:
     """File a dispatchable ``NEW`` implementation proposal through the bridge writer."""
     normalized_targets = _validate_target_paths(project_root, request.target_paths)
+    normalized_dispositions = _validate_cross_harness_dispositions(request.cross_harness_dispositions)
     request = FilingRequest(
         **{
             **request.__dict__,
             "wi_id": _require(request.wi_id, "wi"),
             "slug": _require(request.slug, "slug"),
             "target_paths": normalized_targets,
+            "cross_harness_dispositions": normalized_dispositions,
         }
     )
     spec_links = auto_spec_links(
@@ -478,6 +719,7 @@ def file_implementation_proposal(
             content=content,
             project_id=project_state.project_id,
             project_authorization_id=project_state.project_authorization_id,
+            project_authorization_candidates=project_state.project_authorization_candidates,
             preflight_results=tuple(preflight_results),
         )
 
@@ -501,5 +743,6 @@ def file_implementation_proposal(
         content=content,
         project_id=project_state.project_id,
         project_authorization_id=project_state.project_authorization_id,
+        project_authorization_candidates=project_state.project_authorization_candidates,
         preflight_results=tuple(preflight_results),
     )

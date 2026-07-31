@@ -4,8 +4,7 @@
 approval_env_var = "GTKB_LO_FILE_SAFETY_APPROVAL_PACKET"
 
 allow_patterns = [
-  "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/**",
-  "independent-progress-assessments/LOYAL-OPPOSITION-LOG.md",
-  "independent-progress-assessments/KNOWLEDGE-PROJECT.md",
   "memory/MEMORY.md",
+  ".gtkb-state/propose-drafts/**",
+  ".gtkb-state/owner-decisions/**",
 ]

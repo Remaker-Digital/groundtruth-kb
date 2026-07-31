@@ -266,6 +266,83 @@ def test_secret_ci_workflow_presence_fails_when_path_filtered(tmp_path, monkeypa
         gate._check_secret_ci_workflow_present()
 
 
+def test_tracked_secret_scan_executes_gate_and_retains_machine_evidence(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+    commands = []
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        assert kwargs["cwd"] == tmp_path
+        assert kwargs["capture_output"] is True
+        report_path = tmp_path / gate.TRACKED_SECRET_REPORT
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps({"mode": "tracked", "paths_scanned": 41, "finding_count": 0, "findings": []}),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0, stdout="redacted scan passed", stderr="")
+
+    monkeypatch.setattr(gate.subprocess, "run", fake_run)
+
+    gate._check_tracked_secret_scan()
+
+    expected = [
+        sys.executable,
+        "-m",
+        "groundtruth_kb",
+        "secrets",
+        "scan",
+        "--tracked",
+        "--redacted",
+        "--fail-on",
+        "verified-provider",
+        "--report-json",
+        gate.TRACKED_SECRET_REPORT.as_posix(),
+    ]
+    assert commands == [expected]
+    evidence = json.loads((tmp_path / gate.TRACKED_SECRET_REPORT).read_text(encoding="utf-8"))
+    assert evidence == {
+        "schema_version": "gtkb-release-tracked-secret-scan-v1",
+        "command": expected,
+        "fail_on": "verified-provider",
+        "exit_code": 0,
+        "scan": {"mode": "tracked", "paths_scanned": 41, "finding_count": 0, "findings": []},
+    }
+
+
+def test_tracked_secret_scan_fails_closed_and_retains_finding_evidence(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+    finding = {
+        "provider_class": "test-provider",
+        "severity": "verified-provider",
+        "path": "tracked-fixture.txt",
+        "line": 1,
+        "fingerprint_prefix": "sha256:test",
+        "description": "verified provider credential",
+    }
+
+    def fake_run(command, **_kwargs):
+        report_path = tmp_path / gate.TRACKED_SECRET_REPORT
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps({"mode": "tracked", "paths_scanned": 42, "finding_count": 1, "findings": [finding]}),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 5, stdout="redacted finding", stderr="")
+
+    monkeypatch.setattr(gate.subprocess, "run", fake_run)
+
+    with pytest.raises(gate.GateFailure, match=r"failed \(exit 5, 1 finding\(s\)\)"):
+        gate._check_tracked_secret_scan()
+
+    retained = json.loads((tmp_path / gate.TRACKED_SECRET_REPORT).read_text(encoding="utf-8"))
+    assert retained["exit_code"] == 5
+    assert retained["fail_on"] == "verified-provider"
+    assert retained["scan"]["findings"] == [finding]
+
+
 def test_dev_environment_inventory_gate_passes_valid_public_inventory(tmp_path, monkeypatch):
     gate = _load_gate_module()
     monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
@@ -458,17 +535,21 @@ def test_frontend_gate_syncs_admin_env_once_and_disables_admin_lifecycle(monkeyp
 
     gate._frontend_gates()
 
-    sync_commands = [cmd for cmd in commands if cmd[:4] == ["powershell", "-ExecutionPolicy", "Bypass", "-File"]]
-    admin_build_envs = [
-        env
-        for cmd, env in zip(commands, envs)
-        if cmd[:3] == ["npm", "--prefix", os.path.join("admin", "standalone")]
-        or cmd[:3] == ["npm", "--prefix", os.path.join("admin", "provider")]
-        or cmd[:3] == ["npm", "--prefix", os.path.join("admin", "shopify")]
+    agent_red_root = os.path.join("applications", "Agent_Red")
+    widget_project = os.path.join(agent_red_root, "widget")
+    admin_projects = [
+        os.path.join(agent_red_root, "admin", "standalone"),
+        os.path.join(agent_red_root, "admin", "provider"),
+        os.path.join(agent_red_root, "admin", "shopify"),
     ]
-    assert len(sync_commands) == 1
-    assert len(admin_build_envs) == 3
-    assert all(env and env.get("npm_config_ignore_scripts") == "true" for env in admin_build_envs)
+    assert commands == [
+        ["npm", "--prefix", widget_project, "test"],
+        ["npm", "--prefix", widget_project, "run", "build"],
+        ["powershell", "-ExecutionPolicy", "Bypass", "-File", "scripts/sync-admin-env.ps1"],
+        *[["npm", "--prefix", project, "run", "build"] for project in admin_projects],
+    ]
+    assert envs[:3] == [None, None, None]
+    assert all(env and env.get("npm_config_ignore_scripts") == "true" for env in envs[3:])
 
 
 def test_python_gate_runs_codex_hook_parity_before_pytest(monkeypatch):
@@ -609,12 +690,15 @@ def test_narrative_artifact_lane_reached_before_inventory_drift_failure(monkeypa
 
     # Stub out lanes that come earlier in the pipeline so they pass quickly.
     monkeypatch.setattr(gate, "_check_python_version", lambda *a, **kw: None)
+    monkeypatch.setattr(gate, "_check_sot_registry_authority", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_manifest_removed", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_gate_present", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_ci_workflow_present", lambda: None)
+    monkeypatch.setattr(gate, "_check_tracked_secret_scan", lambda: None)
     monkeypatch.setattr(gate, "_check_project_resource_registry", lambda: None)
     monkeypatch.setattr(gate, "_check_standing_backlog_health", lambda: None)
     monkeypatch.setattr(gate, "_check_agent_red_app_root_minimization", lambda: None)
+    monkeypatch.setattr(gate, "_check_no_window_spawn_audit", lambda: None)
     monkeypatch.setattr(gate, "_check_dev_environment_inventory", lambda *a, **kw: None)
     monkeypatch.setattr(gate, "_check_dev_environment_inventory_drift", fake_inventory_drift)
     monkeypatch.setattr(gate, "_check_narrative_artifact_evidence", fake_narrative_lane)
@@ -663,12 +747,15 @@ def test_narrative_artifact_lane_runs_when_drift_lane_skipped(monkeypatch, capsy
         print("PASS narrative-artifact evidence (no protected paths in staged set)")
 
     monkeypatch.setattr(gate, "_check_python_version", lambda *a, **kw: None)
+    monkeypatch.setattr(gate, "_check_sot_registry_authority", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_manifest_removed", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_gate_present", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_ci_workflow_present", lambda: None)
+    monkeypatch.setattr(gate, "_check_tracked_secret_scan", lambda: None)
     monkeypatch.setattr(gate, "_check_project_resource_registry", lambda: None)
     monkeypatch.setattr(gate, "_check_standing_backlog_health", lambda: None)
     monkeypatch.setattr(gate, "_check_agent_red_app_root_minimization", lambda: None)
+    monkeypatch.setattr(gate, "_check_no_window_spawn_audit", lambda: None)
     monkeypatch.setattr(gate, "_check_dev_environment_inventory", lambda *a, **kw: None)
     monkeypatch.setattr(gate, "_check_narrative_artifact_evidence", fake_narrative_lane)
 
@@ -691,3 +778,71 @@ def test_narrative_artifact_lane_runs_when_drift_lane_skipped(monkeypatch, capsy
     captured = capsys.readouterr()
     assert "PASS narrative-artifact evidence" in captured.out
     assert "RELEASE GATE: PASS" in captured.out
+
+
+def test_sot_registry_authority_requires_membership_closed_unpruned_validation(monkeypatch, capsys):
+    gate = _load_gate_module()
+    from groundtruth_kb.project import registry_control_plane
+
+    calls = []
+
+    def valid_registry(**kwargs):
+        calls.append(kwargs)
+        return {
+            "valid": True,
+            "record_count": 50,
+            "generation_digest": "sha256:test-generation",
+            "membership_reconciliation": {
+                "membership_complete": True,
+                "pruned_envelope_count": 0,
+                "release_eligible": True,
+            },
+        }
+
+    monkeypatch.setattr(registry_control_plane, "validate_registry", valid_registry)
+
+    gate._check_sot_registry_authority()
+
+    assert calls == [{"project_root": gate.PROJECT_ROOT, "require_reverse_closure": True}]
+    assert "PASS SoT registry authority (50 records, generation=sha256:test-generation" in capsys.readouterr().out
+
+
+def test_sot_registry_authority_fails_closed_on_membership_gap(monkeypatch):
+    gate = _load_gate_module()
+    from groundtruth_kb.project import registry_control_plane
+
+    monkeypatch.setattr(
+        registry_control_plane,
+        "validate_registry",
+        lambda **_kwargs: {
+            "valid": False,
+            "coherent": True,
+            "errors": ["registry_membership_incomplete"],
+        },
+    )
+
+    with pytest.raises(gate.GateFailure, match="registry_membership_incomplete"):
+        gate._check_sot_registry_authority()
+
+
+def test_sot_registry_authority_blocks_pruned_release_census(monkeypatch):
+    gate = _load_gate_module()
+    from groundtruth_kb.project import registry_control_plane
+
+    monkeypatch.setattr(
+        registry_control_plane,
+        "validate_registry",
+        lambda **_kwargs: {
+            "valid": True,
+            "record_count": 50,
+            "generation_digest": "sha256:test-generation",
+            "membership_reconciliation": {
+                "membership_complete": True,
+                "pruned_envelope_count": 2,
+                "release_eligible": False,
+            },
+        },
+    )
+
+    with pytest.raises(gate.GateFailure, match="pruned_envelope_count=2"):
+        gate._check_sot_registry_authority()

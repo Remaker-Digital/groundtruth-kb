@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-07-17T10:05:05Z",
+  "bridge_thread": "gtkb-wi5370-mixed-target-wi5166-wi5307-disposition",
+  "work_item": "WI-5370",
+  "project_id": "PROJECT-GTKB-TREE-STABILIZATION",
+  "project_authorization_id": "PAUTH-PROJECT-GTKB-TREE-STABILIZATION-20260715-PROJECT-SCOPE",
+  "purpose": "Record current disposition evidence for the WI-5166/WI-5307 mixed target overlap without mutating source, tests, rules, configuration, database files, or terminal verdict content.",
+  "authority": {
+    "go_file": "bridge/gtkb-wi5370-mixed-target-wi5166-wi5307-disposition-002.md",
+    "go_latest_status_when_started": "GO",
+    "claim": {
+      "rowid": 32118,
+      "claim_kind": "go_implementation",
+      "session_id": "019f6bf6-3e6d-7761-be14-fb894a0e84d2",
+      "acquired_at_utc": "2026-07-17T10:04:42Z",
+      "ttl_expires_at_utc": "2026-07-17T10:44:42Z",
+      "acting_role": "prime-builder"
+    },
+    "implementation_start": {
+      "created_at_utc": "2026-07-17T10:05:05Z",
+      "expires_at_utc": "2026-07-17T12:05:05Z",
+      "packet_hash": "sha256:94c74286ea917f1d73108e97b471b9955baa7d244b549feba96c65daf68b7554",
+      "pre_start_packet_hash": "sha256:2aa8c32896433971e403aababe88c6eedd10459004f441dbeeebc6b66af2e54c",
+      "role_resolution_source": "transcript_init_keyword",
+      "target_path_globs": [
+        "bridge/gtkb-wi5166-nonimpairment-proposal-gate-parity-004.md",
+        "bridge/gtkb-wi5307-shared-enforcement-baseline-disposition-018.md",
+        "independent-progress-assessments/WI-5370-wi5166-wi5307-target-disposition.json"
+      ]
+    }
+  },
+  "preflights": {
+    "bridge_applicability_preflight": {
+      "command": "python scripts/bridge_applicability_preflight.py --bridge-id gtkb-wi5370-mixed-target-wi5166-wi5307-disposition --json",
+      "exit_code": 0,
+      "packet_hash": "sha256:1d917618721e5b4cdc0081596c441e54e2062d74c5ef9572c6970e59b8a9fe43",
+      "missing_required_specs": [],
+      "missing_advisory_specs": []
+    },
+    "adr_dcl_clause_preflight": {
+      "command": "python scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-wi5370-mixed-target-wi5166-wi5307-disposition",
+      "exit_code": 0,
+      "clauses_evaluated": 5,
+      "must_apply": 1,
+      "blocking_gaps": 0
+    }
+  },
+  "scoped_git_status": [
+    {
+      "status": "M",
+      "path": "platform_tests/hooks/test_modernization_nonimpairment_proposal_gate.py"
+    },
+    {
+      "status": "M",
+      "path": "scripts/bridge_applicability_preflight.py"
+    },
+    {
+      "status": "??",
+      "path": "bridge/gtkb-wi5166-nonimpairment-proposal-gate-parity-004.md"
+    },
+    {
+      "status": "??",
+      "path": "bridge/gtkb-wi5307-shared-enforcement-baseline-disposition-018.md"
+    }
+  ],
+  "current_byte_identities": {
+    "bridge/gtkb-wi5166-nonimpairment-proposal-gate-parity-004.md": {
+      "exists": true,
+      "first_line": "NO-GO",
+      "length_bytes": 7291,
+      "sha256": "D6ACC024750BAD047A1BF12579BDA4909ADD219BB9BA0B0675F14CA0F45B90BD",
+      "git_blob_nofilter": "9ed1e492530b97b1d374a1de73408b4dea378a8d",
+      "proposal_recorded_identity": {
+        "length_bytes": 4666,
+        "sha256": "DE4216E097517EA789A39301EF8681E1DB0C36403C9703FAFC198A97E5729452",
+        "git_blob": "0d8d659570cfdb4d0e7f2a87d4bf9ad55783945c"
+      },
+      "identity_delta_from_proposal": "changed"
+    },
+    "bridge/gtkb-wi5307-shared-enforcement-baseline-disposition-018.md": {
+      "exists": true,
+      "first_line": "VERIFIED",
+      "length_bytes": 10815,
+      "sha256": "2BBD8C423DB856A6250471135ACB33C9045060812370BC6D92557A7F9B2E1CED",
+      "git_blob_nofilter": "c6958f51a24b616c057856fd912c6b23ad4bf0be",
+      "proposal_recorded_identity": {
+        "latest_status": "VERIFIED",
+        "length_bytes": null,
+        "sha256": null,
+        "git_blob": null
+      },
+      "identity_delta_from_proposal": "proposal_did_not_record_hash"
+    }
+  },
+  "planner_command": "python scripts/per_thread_finalization_repair.py --format json --exclude-wi WI-5320 --exclude-wi WI-5328 --exclude-wi WI-5330",
+  "planner_rows": [
+    {
+      "thread_slug": "gtkb-wi5166-modernization-nonimpairment-enforcement",
+      "classification": "terminal_verified_blocked_missing_scope",
+      "latest_status": "VERIFIED",
+      "latest_path": "bridge/gtkb-wi5166-modernization-nonimpairment-enforcement-016.md",
+      "reason": "latest VERIFIED verdict has no Responds to report reference",
+      "stop": true,
+      "work_items": [
+        "WI-5154",
+        "WI-5163",
+        "WI-5166",
+        "WI-5178",
+        "WI-5254"
+      ]
+    },
+    {
+      "thread_slug": "gtkb-wi5166-nonimpairment-proposal-gate-parity",
+      "classification": "in_flight_bridge_chain",
+      "latest_status": "NO-GO",
+      "latest_path": "bridge/gtkb-wi5166-nonimpairment-proposal-gate-parity-004.md",
+      "reason": "latest bridge status is not terminal VERIFIED; do not finalize as implementation work",
+      "stop": true,
+      "work_items": [
+        "WI-4883",
+        "WI-5166",
+        "WI-5254",
+        "WI-5346",
+        "WI-9999"
+      ]
+    },
+    {
+      "thread_slug": "gtkb-wi5307-shared-enforcement-baseline-disposition",
+      "classification": "mixed_provenance_stop",
+      "latest_status": "VERIFIED",
+      "latest_path": "bridge/gtkb-wi5307-shared-enforcement-baseline-disposition-018.md",
+      "responds_to": "bridge/gtkb-wi5307-shared-enforcement-baseline-disposition-017.md",
+      "reason": "one or more target paths are claimed by multiple dirty terminal VERIFIED threads",
+      "stop": true,
+      "target_paths": [
+        ".claude/hooks/bridge-compliance-gate.py",
+        "scripts/bridge_applicability_preflight.py",
+        "scripts/bridge_work_intent_registry.py",
+        "scripts/implementation_authorization.py"
+      ],
+      "conflicting_target_owners": {
+        ".claude/hooks/bridge-compliance-gate.py": [
+          "gtkb-cross-harness-parity-slice-4-disposition-gate",
+          "gtkb-wi5307-shared-enforcement-baseline-disposition"
+        ],
+        "scripts/implementation_authorization.py": [
+          "gtkb-wi4854-extract-target-paths-cross-gate-consistency",
+          "gtkb-wi5307-shared-enforcement-baseline-disposition"
+        ]
+      },
+      "work_items": [
+        "WI-5113",
+        "WI-5139",
+        "WI-5166",
+        "WI-5178",
+        "WI-5229",
+        "WI-5237",
+        "WI-5249",
+        "WI-5254",
+        "WI-5255",
+        "WI-5268",
+        "WI-5279",
+        "WI-5307",
+        "WI-5337"
+      ]
+    },
+    {
+      "thread_slug": "gtkb-wi5370-mixed-target-wi5166-wi5307-disposition",
+      "classification": "excluded_active_program",
+      "latest_status": "GO",
+      "latest_path": "bridge/gtkb-wi5370-mixed-target-wi5166-wi5307-disposition-002.md",
+      "reason": "thread matches an explicitly excluded active handoff scope",
+      "stop": true,
+      "work_items": [
+        "WI-5027",
+        "WI-5166",
+        "WI-5307",
+        "WI-5320",
+        "WI-5328",
+        "WI-5330",
+        "WI-5370"
+      ]
+    }
+  ],
+  "sequencing_recommendation": {
+    "summary": "Fail closed for finalization. WI-5166 nonimpairment proposal gate parity is latest NO-GO/in-flight and must not be finalized. WI-5307 remains a mixed_provenance_stop because dirty terminal VERIFIED source targets overlap with other terminal threads. The overlap is documented here only; ownership is not inferred.",
+    "actions_taken": [
+      "No source or test files were changed.",
+      "No bridge terminal verdict was removed, restored, rewritten, or committed.",
+      "The independent-progress manifest records current bytes and planner disposition for later Loyal Opposition review."
+    ],
+    "next_safe_steps": [
+      "Leave WI-5166 nonimpairment proposal gate parity to its own NO-GO response path.",
+      "Do not finalize WI-5307 source/test targets until overlapping owner threads are independently reconciled or a later GO provides exact byte ownership.",
+      "A future planner refinement may treat clean target overlap separately only after an independently reviewed proposal; this manifest does not authorize that behavior."
+    ]
+  }
+}

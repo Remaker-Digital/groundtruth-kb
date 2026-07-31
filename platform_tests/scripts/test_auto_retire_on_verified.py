@@ -87,6 +87,36 @@ def _write_verified_threads(project_root: Path, db: KnowledgeDB, work_item_ids: 
         )
 
 
+def _write_open_project_authorization_thread(
+    project_root: Path,
+    *,
+    project_id: str = "PROJECT-X",
+    authorization_id: str = "PAUTH-X",
+    slug: str = "gtkb-auto-retire-open-pauth-fixture",
+) -> None:
+    bridge = project_root / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    (bridge / f"{slug}-001.md").write_text(
+        "\n".join(
+            [
+                "NEW",
+                "",
+                "# Fixture open PAUTH proposal",
+                "",
+                f"Project Authorization: {authorization_id}",
+                f"Project: {project_id}",
+                "Work Item: WI-OPEN-PAUTH",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (bridge / f"{slug}-002.md").write_text(
+        "GO\n\n# Fixture GO verdict\n",
+        encoding="utf-8",
+    )
+
+
 def _add_completion_guard(db: KnowledgeDB) -> None:
     db.add_project_artifact_link(
         "PROJECT-X",
@@ -101,6 +131,7 @@ def _add_completion_guard(db: KnowledgeDB) -> None:
 def test_auto_retire_completed_projects_retires_all_terminal_members(tmp_path: Path) -> None:
     db = _seed_project(tmp_path, {"WI-1": "verified", "WI-2": "resolved"})
     try:
+        _write_verified_threads(tmp_path, db, ["WI-1", "WI-2"])
         service = ProjectLifecycleService(db)
         records = service.auto_retire_completed_projects(project_root=tmp_path)
 
@@ -135,6 +166,23 @@ def test_auto_retire_skips_zero_member_project(tmp_path: Path) -> None:
 
         assert service.auto_retire_completed_projects(project_root=tmp_path) == []
         assert "zero_active_members" in service.member_completion_status("PROJECT-X")["exclusion_reasons"]
+        assert db.get_project("PROJECT-X")["status"] == "active"
+    finally:
+        db.close()
+
+
+def test_auto_retire_skips_open_project_authorization_go_thread(tmp_path: Path) -> None:
+    db = _seed_project(tmp_path, {"WI-1": "verified"})
+    try:
+        _seed_authorization(db, ["WI-1"])
+        _write_verified_threads(tmp_path, db, ["WI-1"])
+        _write_open_project_authorization_thread(tmp_path)
+        service = ProjectLifecycleService(db)
+
+        assert service.auto_retire_completed_projects(project_root=tmp_path) == []
+        status = service.member_completion_status("PROJECT-X", project_root=tmp_path)
+        assert status["open_project_authorization_bridge_threads"] == ["gtkb-auto-retire-open-pauth-fixture"]
+        assert "open_project_authorization_bridge_threads" in status["exclusion_reasons"]
         assert db.get_project("PROJECT-X")["status"] == "active"
     finally:
         db.close()
@@ -184,6 +232,7 @@ def test_scanner_member_completion_view_matches_lifecycle_predicate(tmp_path: Pa
     scanner = _load_module(SCANNER_PATH, "project_verified_completion_scanner_auto_retire_test")
     db = _seed_project(tmp_path, {"WI-1": "verified", "WI-2": "wont_fix"})
     try:
+        _write_verified_threads(tmp_path, db, ["WI-1", "WI-2"])
         service_status = ProjectLifecycleService(db).member_completion_status("PROJECT-X")
     finally:
         db.close()

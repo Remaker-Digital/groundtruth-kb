@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
 from groundtruth_kb.db import KnowledgeDB
+
+from scripts.windows_subprocess import no_window_subprocess_kwargs
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "bridge_verified_backlog_reconciler.py"
@@ -62,6 +66,12 @@ def _write_work_item_metadata(root: Path, slug: str, item_id: str, *, version: s
     path.write_text(f"{existing}\nWork Item: {item_id}\n", encoding="utf-8")
 
 
+def _write_bridge_kind(root: Path, slug: str, bridge_kind: str, *, version: str = "001") -> None:
+    path = root / "bridge" / f"{slug}-{version}.md"
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    path.write_text(f"{existing}\nbridge_kind: {bridge_kind}\n", encoding="utf-8")
+
+
 def _db(root: Path) -> KnowledgeDB:
     return KnowledgeDB(root / "groundtruth.db")
 
@@ -84,6 +94,116 @@ def _insert_work_item(
         "seed",
         stage=stage,
         related_bridge_threads=json.dumps(related) if not isinstance(related, str) else related,
+    )
+
+
+def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+        **no_window_subprocess_kwargs(),
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+    return result
+
+
+def _init_git(root: Path) -> None:
+    _git(root, "init", "-q")
+    _git(root, "config", "user.email", "test@example.invalid")
+    _git(root, "config", "user.name", "GT-KB Test")
+
+
+def _write_strict_thread(
+    root: Path,
+    item_id: str,
+    *,
+    target_paths: list[str] | str,
+    slug: str = "strict-thread",
+    response_status: str = "NEW",
+    waiver: bool = False,
+    include_verdict: bool = True,
+) -> dict[str, Path]:
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True, exist_ok=True)
+    target_value = json.dumps(target_paths) if isinstance(target_paths, list) else target_paths
+    paths = {
+        "proposal": bridge_dir / f"{slug}-001.md",
+        "go": bridge_dir / f"{slug}-002.md",
+        "report": bridge_dir / f"{slug}-003.md",
+        "verdict": bridge_dir / f"{slug}-004.md",
+    }
+    paths["proposal"].write_text(
+        "\n".join(
+            [
+                "NEW",
+                "bridge_kind: prime_proposal",
+                f"Work Item: {item_id}",
+                f"target_paths: {target_value}",
+                "",
+                "# Implementation Proposal - strict closure fixture",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    paths["go"].write_text(
+        "\n".join(
+            [
+                "GO",
+                f"Responds to: bridge/{slug}-001.md",
+                f"Work Item: {item_id}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    report_lines = [
+        response_status,
+        "bridge_kind: implementation_report"
+        if response_status != "NO-ACTION"
+        else "bridge_kind: operational_state_change",
+        f"Approved proposal: bridge/{slug}-001.md",
+        f"Work Item: {item_id}",
+    ]
+    if waiver:
+        report_lines.extend(
+            [
+                "",
+                "## By-Reference Finalization Waiver",
+                "Owner-approved by-reference waiver: DELIB-TEST-BY-REFERENCE-001.",
+            ]
+        )
+    paths["report"].write_text("\n".join(report_lines), encoding="utf-8")
+    if include_verdict:
+        paths["verdict"].write_text(
+            "\n".join(
+                [
+                    "VERIFIED",
+                    f"Responds to: bridge/{slug}-003.md",
+                    f"Work Item: {item_id}",
+                ]
+            ),
+            encoding="utf-8",
+        )
+    return paths
+
+
+def _classify_strict_thread(root: Path, item_id: str) -> dict[str, object]:
+    module = _load_module()
+    statuses = module.collect_latest_bridge_statuses(root)
+    return module.classify_work_item(
+        {
+            "id": item_id,
+            "title": "strict closure fixture",
+            "resolution_status": "open",
+            "stage": "backlogged",
+            "related_bridge_threads": '["strict-thread"]',
+        },
+        statuses,
+        project_root=root,
     )
 
 
@@ -153,6 +273,106 @@ def test_shared_parent_resolves_when_all_links_are_verified(tmp_path: Path) -> N
         assert row is not None
         assert row["resolution_status"] == "resolved"
         assert summary["resolved_ids"] == ["WI-0003"]
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize("status", ["ADVISORY", "WITHDRAWN"])
+def test_non_implementation_terminal_link_does_not_block_verified_implementation(tmp_path: Path, status: str) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"impl-thread": "VERIFIED", "traceability-thread": status})
+    _write_parent_evidence(tmp_path, "impl-thread", "WI-0201")
+    db = _db(tmp_path)
+    try:
+        _insert_work_item(db, "WI-0201", ["impl-thread", "traceability-thread"])
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0201")
+        assert row is not None
+        assert row["resolution_status"] == "resolved"
+        assert summary["resolved_ids"] == ["WI-0201"]
+        candidate = summary["candidates"][0]
+        assert candidate["reason"] == "non_implementation_links_ignored"
+        assert candidate["satisfied_implementation_bridge_threads"] == ["impl-thread"]
+        assert candidate["non_blocking_bridge_threads"] == ["traceability-thread"]
+        assert "traceability-thread" in row["completion_evidence"]
+    finally:
+        db.close()
+
+
+def test_advisory_kind_go_link_does_not_block_verified_implementation(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"impl-thread": "VERIFIED", "advisory-go": "GO"})
+    _write_parent_evidence(tmp_path, "impl-thread", "WI-0202")
+    _write_bridge_kind(tmp_path, "advisory-go", "governance_advisory_revision")
+    db = _db(tmp_path)
+    try:
+        _insert_work_item(db, "WI-0202", ["impl-thread", "advisory-go"])
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0202")
+        assert row is not None
+        assert row["resolution_status"] == "resolved"
+        assert summary["resolved_ids"] == ["WI-0202"]
+        candidate = summary["candidates"][0]
+        assert candidate["reason"] == "non_implementation_links_ignored"
+        assert candidate["non_blocking_bridge_threads"] == ["advisory-go"]
+    finally:
+        db.close()
+
+
+def test_advisory_link_alone_does_not_resolve_without_verified_implementation(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"advisory": "ADVISORY"})
+    db = _db(tmp_path)
+    try:
+        _insert_work_item(db, "WI-0203", ["advisory"])
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0203")
+        assert row is not None
+        assert row["resolution_status"] == "open"
+        assert summary["resolved_ids"] == []
+        assert summary["candidates"][0]["reason"] == "linked_bridge_not_verified"
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize("blocking_status", ["NEW", "REVISED", "NO-ACTION", "NO-GO", "DEFERRED"])
+def test_implementation_like_non_verified_links_still_block_resolution(tmp_path: Path, blocking_status: str) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"impl-thread": "VERIFIED", "blocking-thread": blocking_status})
+    _write_parent_evidence(tmp_path, "impl-thread", "WI-0204")
+    db = _db(tmp_path)
+    try:
+        _insert_work_item(db, "WI-0204", ["impl-thread", "blocking-thread"])
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0204")
+        assert row is not None
+        assert row["resolution_status"] == "open"
+        assert summary["resolved_ids"] == []
+        assert summary["candidates"][0]["reason"] == "linked_bridge_not_verified"
     finally:
         db.close()
 
@@ -295,6 +515,39 @@ def test_contextual_verified_bridge_reference_without_parent_evidence_is_skipped
         assert summary["resolved_ids"] == []
         assert summary["candidates"][0]["reason"] == "missing_parent_evidence"
         assert summary["candidates"][0]["missing_parent_evidence"] == ["thread-a"]
+    finally:
+        db.close()
+
+
+def test_related_deliberation_bridge_provenance_is_not_an_implementation_link(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"thread-a": "VERIFIED"})
+    db = _db(tmp_path)
+    try:
+        db.insert_work_item(
+            "WI-0016",
+            "WI-0016 title",
+            "hygiene",
+            "backlog",
+            "open",
+            "test",
+            "seed bridge advisory provenance",
+            stage="backlogged",
+            related_deliberation_ids="thread-a",
+            related_bridge_threads=None,
+        )
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0016")
+        assert row is not None
+        assert row["resolution_status"] == "open"
+        assert summary["resolved_ids"] == []
+        assert summary["candidate_count"] == 0
     finally:
         db.close()
 
@@ -505,14 +758,17 @@ def test_classify_work_item_without_derived_links_is_byte_identical(tmp_path: Pa
 def test_claude_and_codex_hooks_register_reconciler_command() -> None:
     claude = json.loads((REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
     codex = json.loads((REPO_ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8"))
+    codex_runner = (REPO_ROOT / ".codex" / "gtkb-hooks" / "run_py_no_window.py").read_text(encoding="utf-8")
 
     claude_text = json.dumps(claude)
     codex_text = json.dumps(codex)
 
     assert "scripts/bridge_verified_backlog_reconciler.py" in claude_text
-    assert "bridge_verified_backlog_reconciler.py" in codex_text
+    assert "--batch stop" in codex_text
+    assert "scripts/bridge_verified_backlog_reconciler.py" in codex_runner
     assert "--apply --quiet" in claude_text
-    assert "--apply --quiet" in codex_text
+    assert '"--apply"' in codex_runner
+    assert '"--quiet"' in codex_runner
 
 
 # --- WI-4704: umbrella auto-closure + parent-evidence relaxation -------------
@@ -703,3 +959,186 @@ def test_reverse_link_construction_scans_bridge_dir_once_at_scale(tmp_path: Path
 
     assert scan_count["n"] <= 2, f"bridge dir scanned {scan_count['n']}x; expected one-pass (<=2), not per-slug"
     assert len(derived) == 25
+
+
+def test_verified_on_no_action_is_not_implementation_closure(tmp_path: Path) -> None:
+    target = tmp_path / "scripts" / "impl.py"
+    target.parent.mkdir(parents=True)
+    target.write_text("VALUE = 1\n", encoding="utf-8")
+    _write_strict_thread(
+        tmp_path,
+        "WI-11498-A",
+        target_paths=["scripts/impl.py"],
+        response_status="NO-ACTION",
+    )
+
+    row = _classify_strict_thread(tmp_path, "WI-11498-A")
+
+    assert row["action"] == "skip"
+    assert row["reason"] == "no_action_verified"
+    assert row["closure_reason"] == "no_action_verified"
+
+
+def test_malformed_approved_target_metadata_fails_closed(tmp_path: Path) -> None:
+    _write_strict_thread(
+        tmp_path,
+        "WI-11498-B",
+        target_paths='["scripts/impl.py"',
+    )
+
+    row = _classify_strict_thread(tmp_path, "WI-11498-B")
+
+    assert row["action"] == "skip"
+    assert row["reason"] == "malformed_target_metadata"
+    evidence = row["verified_closure_evidence"]["strict-thread"]
+    assert evidence["detail"] == "target_paths_not_json"
+
+
+def test_untracked_terminal_verdict_lacks_commit_coverage(tmp_path: Path) -> None:
+    _init_git(tmp_path)
+    target = tmp_path / "scripts" / "impl.py"
+    target.parent.mkdir(parents=True)
+    target.write_text("VALUE = 1\n", encoding="utf-8")
+    _write_strict_thread(
+        tmp_path,
+        "WI-11498-C",
+        target_paths=["scripts/impl.py"],
+        include_verdict=False,
+    )
+    _git(tmp_path, "add", "scripts/impl.py", "bridge")
+    _git(tmp_path, "commit", "-q", "-m", "implementation without verdict")
+    _write_strict_thread(tmp_path, "WI-11498-C", target_paths=["scripts/impl.py"])
+
+    row = _classify_strict_thread(tmp_path, "WI-11498-C")
+
+    assert row["action"] == "skip"
+    assert row["reason"] == "missing_implementation_commit_coverage"
+    evidence = row["verified_closure_evidence"]["strict-thread"]
+    assert evidence["commit_coverage"]["verdict_state"] == "uncommitted_or_untracked"
+
+
+def test_terminal_commit_omitting_approved_target_fails_closed(tmp_path: Path) -> None:
+    _init_git(tmp_path)
+    target = tmp_path / "scripts" / "impl.py"
+    target.parent.mkdir(parents=True)
+    target.write_text("VALUE = 1\n", encoding="utf-8")
+    _git(tmp_path, "add", "scripts/impl.py")
+    _git(tmp_path, "commit", "-q", "-m", "implementation only")
+    _write_strict_thread(tmp_path, "WI-11498-D", target_paths=["scripts/impl.py"])
+    _git(tmp_path, "add", "bridge")
+    _git(tmp_path, "commit", "-q", "-m", "terminal bridge only")
+
+    row = _classify_strict_thread(tmp_path, "WI-11498-D")
+
+    assert row["action"] == "skip"
+    assert row["reason"] == "missing_implementation_commit_coverage"
+    evidence = row["verified_closure_evidence"]["strict-thread"]
+    assert evidence["commit_coverage"]["missing_paths"] == ["scripts/impl.py"]
+
+
+def test_focused_commit_with_verdict_and_all_targets_is_genuinely_closable(tmp_path: Path) -> None:
+    _init_git(tmp_path)
+    target = tmp_path / "scripts" / "impl.py"
+    target.parent.mkdir(parents=True)
+    target.write_text("VALUE = 1\n", encoding="utf-8")
+    _write_strict_thread(tmp_path, "WI-11498-E", target_paths=["scripts/impl.py"])
+    _git(tmp_path, "add", "scripts/impl.py", "bridge")
+    _git(tmp_path, "commit", "-q", "-m", "focused implementation and verdict")
+
+    row = _classify_strict_thread(tmp_path, "WI-11498-E")
+
+    assert row["action"] == "resolve"
+    assert row["closure_reason"] == "genuinely_closable"
+    evidence = row["verified_closure_evidence"]["strict-thread"]
+    assert evidence["mode"] == "focused_commit"
+    assert evidence["commit_coverage"]["missing_paths"] == []
+
+
+def test_reconcile_reuses_batched_git_provenance_for_many_verified_threads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+    _init_git(tmp_path)
+    expected_ids: list[str] = []
+    db = _db(tmp_path)
+    try:
+        for index in range(8):
+            item_id = f"WI-5397-{index:02d}"
+            slug = f"strict-thread-{index:02d}"
+            target_rel_path = f"scripts/impl_{index}.py"
+            target = tmp_path / target_rel_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(f"VALUE = {index}\n", encoding="utf-8")
+            _write_strict_thread(tmp_path, item_id, target_paths=[target_rel_path], slug=slug)
+            _insert_work_item(db, item_id, [slug])
+            expected_ids.append(item_id)
+    finally:
+        db.close()
+    _git(tmp_path, "add", "scripts", "bridge")
+    _git(tmp_path, "commit", "-q", "-m", "focused implementations and verdicts")
+
+    calls: list[tuple[str, ...]] = []
+    original_run_git = module._run_git
+
+    def counting_run_git(project_root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        return original_run_git(project_root, *args)
+
+    monkeypatch.setattr(module, "_run_git", counting_run_git)
+
+    summary = module.reconcile(project_root=tmp_path, apply=False)
+
+    assert sorted(summary["would_resolve_ids"]) == expected_ids
+    assert [args for args in calls if args[:1] == ("status",)] == [
+        ("status", "--porcelain=v1", "-z", "--untracked-files=all", "--")
+    ]
+    assert [args for args in calls if args[:1] == ("ls-files",)] == [("ls-files", "-z", "--")]
+    assert [args for args in calls if args[:1] == ("log",)] == [("log", "--format=commit:%H", "--name-only", "--")]
+    assert [args for args in calls if args[:1] == ("diff-tree",)] == []
+
+
+def test_owner_by_reference_waiver_preserves_committed_verdict_closure(tmp_path: Path) -> None:
+    _init_git(tmp_path)
+    target = tmp_path / "scripts" / "impl.py"
+    target.parent.mkdir(parents=True)
+    target.write_text("VALUE = 1\n", encoding="utf-8")
+    _git(tmp_path, "add", "scripts/impl.py")
+    _git(tmp_path, "commit", "-q", "-m", "implementation by reference")
+    _write_strict_thread(
+        tmp_path,
+        "WI-11498-F",
+        target_paths=["scripts/impl.py"],
+        waiver=True,
+    )
+    _git(tmp_path, "add", "bridge")
+    _git(tmp_path, "commit", "-q", "-m", "waived terminal bridge")
+
+    row = _classify_strict_thread(tmp_path, "WI-11498-F")
+
+    assert row["action"] == "resolve"
+    assert row["closure_reason"] == "genuinely_closable"
+    evidence = row["verified_closure_evidence"]["strict-thread"]
+    assert evidence["mode"] == "by_reference_waiver"
+
+
+def test_waiver_reference_outside_report_does_not_bypass_commit_coverage(tmp_path: Path) -> None:
+    _init_git(tmp_path)
+    target = tmp_path / "scripts" / "impl.py"
+    target.parent.mkdir(parents=True)
+    target.write_text("VALUE = 1\n", encoding="utf-8")
+    _git(tmp_path, "add", "scripts/impl.py")
+    _git(tmp_path, "commit", "-q", "-m", "implementation only")
+    paths = _write_strict_thread(tmp_path, "WI-11498-G", target_paths=["scripts/impl.py"])
+    with paths["proposal"].open("a", encoding="utf-8") as handle:
+        handle.write(
+            "\n\n## Owner Decisions / Input\nA DELIB-TEST-BY-REFERENCE-WAIVER exists for an unrelated sibling thread.\n"
+        )
+    _git(tmp_path, "add", "bridge")
+    _git(tmp_path, "commit", "-q", "-m", "terminal bridge without report waiver")
+
+    row = _classify_strict_thread(tmp_path, "WI-11498-G")
+
+    assert row["action"] == "skip"
+    assert row["reason"] == "missing_implementation_commit_coverage"
+    evidence = row["verified_closure_evidence"]["strict-thread"]
+    assert "mode" not in evidence

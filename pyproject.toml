@@ -7,6 +7,7 @@
 
 [tool.pytest.ini_options]
 testpaths = ["platform_tests"]
+norecursedirs = [".*", "pytest-tmp-*"]
 pythonpath = [".", "applications/Agent_Red"]
 asyncio_mode = "auto"
 python_files = ["test_*.py"]
@@ -114,4 +115,3 @@ skip-magic-trailing-comma = false
 # builders use fixed Cosmos SQL fragments with parameterized user values; keep
 # injection review in code review/tests instead of blocking CI on this heuristic.
 skips = ["B608"]
-

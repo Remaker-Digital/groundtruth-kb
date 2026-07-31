@@ -21,8 +21,11 @@ import importlib.util
 import re
 from pathlib import Path
 from types import ModuleType
+from unittest.mock import patch
 
 import pytest
+
+from scripts.gtkb_bridge_writer import normalize_bridge_envelope_head
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
@@ -80,7 +83,7 @@ _AUTHOR_METADATA = (
 
 def _complete_verified_verdict() -> str:
     """A VERIFIED verdict carrying every element the gate requires."""
-    return (
+    content = (
         "VERIFIED\n" + _AUTHOR_METADATA + "\n"
         "# Loyal Opposition Verification - Sample\n\n"
         + _SPEC_LINKS
@@ -93,6 +96,7 @@ def _complete_verified_verdict() -> str:
         + "\n"
         + _COMMIT_FINALIZATION
     )
+    return normalize_bridge_envelope_head(content)
 
 
 # --- tests ------------------------------------------------------------------
@@ -112,12 +116,13 @@ def test_spec_derived_verification_detects_present_mapping(gate: ModuleType) -> 
 
 def test_complete_verified_verdict_not_blocked(gate: ModuleType, tmp_path: Path) -> None:
     """A complete VERIFIED verdict is no longer hard-blocked by _deny_reason_for_content."""
-    reason = gate._deny_reason_for_content(
-        cwd_path=tmp_path,
-        file_path="bridge/test-sample-thread-003.md",
-        content=_complete_verified_verdict(),
-        run_pending_preflight=False,
-    )
+    with patch.object(gate, "_verdict_self_review_deny", return_value=None):
+        reason = gate._deny_reason_for_content(
+            cwd_path=tmp_path,
+            file_path="bridge/test-sample-thread-003.md",
+            content=_complete_verified_verdict(),
+            run_pending_preflight=False,
+        )
     assert reason is None
 
 

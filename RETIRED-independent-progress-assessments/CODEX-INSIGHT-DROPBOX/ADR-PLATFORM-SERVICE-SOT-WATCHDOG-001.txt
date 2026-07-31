@@ -1,0 +1,22 @@
+# ADR-PLATFORM-SERVICE-SOT-WATCHDOG-001 — Platform-wide Service & SoT Availability Watchdog
+
+## Context
+GT-KB services (Deliberation Archive/ChromaDB, dashboard cache, MemBase, resource-registry) and the SoT-registry artifact classes can silently go unavailable, with no scheduled verification and no automatic restoration. On 2026-07-06 the DA semantic tier was found offline (ChromaDB uninstalled) and unmonitored — surfaced only by an accidental query. The dispatcher self-healing program (DELIB-20266276, D2 full-auto-recovery / D4 alert-and-degrade) proved the supervision pattern, but its owner-locked scope is the dispatcher/fleet only.
+
+## Decision
+Establish a platform-wide watchdog generalizing that D2/D4 posture to every gt-status component and every SoT-registry health_check_function: scheduled availability verification plus tiered restoration (safe/idempotent auto-heals; canonical/at-risk fails loud and escalates). The detection path is dependency-light (must not depend on the services it watches).
+
+## Rationale
+Reduces the owner's role to specifications and decisions instead of manually noticing and repairing silent outages (GT-KB vision). Reuses the already-owner-approved self-healing model rather than re-litigating it; extending it platform-wide closes the coverage gap that hid the DA outage.
+
+## Rejected Alternatives
+1. Per-service ad-hoc health checks — no unified coverage; drift; the DA gap recurs elsewhere.
+2. Extend PROJECT-GTKB-DISPATCHER-RELIABILITY to all services — dilutes that program's owner-locked dispatcher/fleet scope.
+3. Detect-and-alert only (no auto-restore) — leaves routine restoration with the owner, defeating the self-healing goal.
+4. Full auto-restore for everything including canonical stores — unacceptable blast radius (auto-overwriting groundtruth.db from a stale backup).
+
+## Consequences
+(+) Unified platform self-healing; silent outages become auto-healed or loudly escalated. (+) Reuses the SoT-registry health_check_function + backup_policy. (-) Restoration actions carry collateral risk (a heavy safe restore can saturate the host), so restoration must be resource-bounded and probe-gated (see DCL-SERVICE-SOT-WATCHDOG-RESTORATION-SAFETY-001). (-) Adds a scheduled task plus per-artifact restore recipes to maintain.
+
+## Related
+DELIB-20260706-WATCHDOG-RESTORATION-SAFETY-TIERED (owner decision), DELIB-20266276 (dispatcher self-healing pattern), DELIB-20266140 (visibility-only precedent), PROJECT-GTKB-SERVICE-SOT-WATCHDOG, GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001.

@@ -218,7 +218,7 @@ cp "$TEMPLATES/rules/"*.toml .claude/rules/
 > **Deprecated stub:** `bridge-os-poller-setup-prompt.md` is retained as a
 > compatibility stub for two release cycles after the Slice 4 smart-poller
 > retirement (2026-05-09). Bridge dispatch is now automated by the
-> cross-harness event-driven trigger registered in `.claude/settings.json`
+> dispatcher daemon registered in `.claude/settings.json`
 > and `.codex/hooks.json`; do not follow the legacy prompt content. See
 > `groundtruth-kb/docs/tutorials/dual-agent-setup.md`.
 

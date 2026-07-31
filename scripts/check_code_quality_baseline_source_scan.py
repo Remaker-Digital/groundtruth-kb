@@ -68,6 +68,12 @@ def _complexity_violations(project_root: Path, since: str, paths: list[str]) -> 
 
 
 def main() -> int:
+    import sys
+
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except AttributeError:
+        pass
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--since", required=True)
     parser.add_argument("--project-root", type=Path, default=Path(__file__).resolve().parent.parent)

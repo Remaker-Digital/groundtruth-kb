@@ -9,9 +9,10 @@ Covers all five Codex conditions from
 - **C2** — ``MalformedSettingsError`` raises before any git/file work in
   ``execute_upgrade``; dry-run preserves the diagnostic skip row; CLI
   exits 4.
-- **C3** — ``_check_bridge_inflight`` parses by ``Document:`` and inspects
-  only the first status line per block; older statuses under a terminal or
-  parked ``VERIFIED``/``NO-GO``/``DEFERRED`` state are silent.
+- **C3** — ``_check_bridge_inflight`` groups status-bearing numbered bridge
+  files by slug, inspects only each thread's latest version file, and reads
+  only the first non-blank status line; older version files under a terminal or
+  parked ``VERIFIED``/``NO-GO``/``DEFERRED`` latest status are silent.
 - **C4** — ``enumerate_scaffold_outputs`` is read-only, profile+registry-
   guaranteed only, and ``_check_scaffold_coverage`` performs no target
   writes.
@@ -27,6 +28,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
+import groundtruth_kb.project.preflight as preflight
 from groundtruth_kb.cli import main
 from groundtruth_kb.project.preflight import (
     _check_bridge_inflight,
@@ -63,6 +65,14 @@ created_at = "2026-01-01T00:00:00Z"
 """,
         encoding="utf-8",
     )
+
+
+def _write_bridge_status(target: Path, slug: str, version: int, status: str, *, body: str = "") -> Path:
+    bridge_dir = target / "bridge"
+    bridge_dir.mkdir(exist_ok=True)
+    path = bridge_dir / f"{slug}-{version:03d}.md"
+    path.write_text(f"{status}\n\n# {slug}\n{body}", encoding="utf-8")
+    return path
 
 
 def _init_git_repo_with_snapshot(target: Path) -> None:
@@ -115,11 +125,7 @@ def test_C1_execute_upgrade_never_called_for_warning_only_plan(tmp_path: Path) -
             full.parent.mkdir(parents=True, exist_ok=True)
             full.write_text("# stub\n", encoding="utf-8")
 
-    (tmp_path / "bridge").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "bridge" / "INDEX.md").write_text(
-        "Document: test-inflight\nNEW: bridge/test-inflight-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_status(tmp_path, "test-inflight", 1, "NEW")
 
     # Confirm plan produces only non-mutating rows before running the CLI.
     planned = plan_upgrade(tmp_path)
@@ -269,29 +275,20 @@ def test_C2_cli_malformed_settings_exits_code_4(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_C3_empty_or_missing_index_is_silent(tmp_path: Path) -> None:
+def test_C3_empty_or_missing_bridge_dir_is_silent(tmp_path: Path) -> None:
     assert _check_bridge_inflight(tmp_path) == []
     (tmp_path / "bridge").mkdir()
-    (tmp_path / "bridge" / "INDEX.md").write_text("", encoding="utf-8")
     assert _check_bridge_inflight(tmp_path) == []
 
 
 def test_C3_only_comments_no_warnings(tmp_path: Path) -> None:
-    (tmp_path / "bridge").mkdir()
-    (tmp_path / "bridge" / "INDEX.md").write_text(
-        "<!-- intro comment -->\n<!-- another -->\n\n",
-        encoding="utf-8",
-    )
+    _write_bridge_status(tmp_path, "comments-only", 1, "<!-- intro comment -->", body="<!-- another -->\n")
     assert _check_bridge_inflight(tmp_path) == []
 
 
 @pytest.mark.parametrize("status", ["NEW", "REVISED", "GO"])
 def test_C3_latest_non_terminal_status_emits_warning(tmp_path: Path, status: str) -> None:
-    (tmp_path / "bridge").mkdir()
-    (tmp_path / "bridge" / "INDEX.md").write_text(
-        f"Document: foo\n{status}: bridge/foo-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_status(tmp_path, "foo", 1, status)
     warnings = _check_bridge_inflight(tmp_path)
     assert len(warnings) == 1
     assert warnings[0].action == "warning"
@@ -301,75 +298,64 @@ def test_C3_latest_non_terminal_status_emits_warning(tmp_path: Path, status: str
 
 @pytest.mark.parametrize("status", ["VERIFIED", "NO-GO", "DEFERRED"])
 def test_C3_latest_terminal_or_parked_status_is_silent(tmp_path: Path, status: str) -> None:
-    (tmp_path / "bridge").mkdir()
-    (tmp_path / "bridge" / "INDEX.md").write_text(
-        f"Document: foo\n{status}: bridge/foo-002.md\nNEW: bridge/foo-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_status(tmp_path, "foo", 1, "NEW")
+    _write_bridge_status(tmp_path, "foo", 2, status)
     assert _check_bridge_inflight(tmp_path) == []
 
 
 def test_C3_older_new_below_terminal_verified_is_silent(tmp_path: Path) -> None:
     """Key C3 regression: NEW/REVISED/GO below a terminal VERIFIED/NO-GO must NOT warn."""
-    (tmp_path / "bridge").mkdir()
-    (tmp_path / "bridge" / "INDEX.md").write_text(
-        "Document: closed-thread\n"
-        "VERIFIED: bridge/closed-thread-004.md\n"
-        "NEW: bridge/closed-thread-003.md\n"
-        "GO: bridge/closed-thread-002.md\n"
-        "REVISED: bridge/closed-thread-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_status(tmp_path, "closed-thread", 1, "REVISED")
+    _write_bridge_status(tmp_path, "closed-thread", 2, "GO")
+    _write_bridge_status(tmp_path, "closed-thread", 3, "NEW")
+    _write_bridge_status(tmp_path, "closed-thread", 4, "VERIFIED")
     assert _check_bridge_inflight(tmp_path) == []
 
 
 def test_C3_multiple_documents_mixed_terminal_and_active(tmp_path: Path) -> None:
-    (tmp_path / "bridge").mkdir()
-    (tmp_path / "bridge" / "INDEX.md").write_text(
-        "<!-- header -->\n\n"
-        "Document: closed-one\n"
-        "VERIFIED: bridge/closed-one-002.md\n"
-        "NEW: bridge/closed-one-001.md\n\n"
-        "Document: active-one\n"
-        "REVISED: bridge/active-one-003.md\n"
-        "NO-GO: bridge/active-one-002.md\n"
-        "NEW: bridge/active-one-001.md\n\n"
-        "Document: closed-two\n"
-        "NO-GO: bridge/closed-two-002.md\n"
-        "NEW: bridge/closed-two-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_status(tmp_path, "closed-one", 1, "NEW")
+    _write_bridge_status(tmp_path, "closed-one", 2, "VERIFIED")
+    _write_bridge_status(tmp_path, "active-one", 1, "NEW")
+    _write_bridge_status(tmp_path, "active-one", 2, "NO-GO")
+    _write_bridge_status(tmp_path, "active-one", 3, "REVISED")
+    _write_bridge_status(tmp_path, "closed-two", 1, "NEW")
+    _write_bridge_status(tmp_path, "closed-two", 2, "NO-GO")
     warnings = _check_bridge_inflight(tmp_path)
     assert [w.file for w in warnings] == ["bridge/active-one"]
     assert "REVISED" in warnings[0].reason
 
 
 def test_C3_ignore_flag_suppresses_all(tmp_path: Path) -> None:
-    (tmp_path / "bridge").mkdir()
-    (tmp_path / "bridge" / "INDEX.md").write_text(
-        "Document: foo\nNEW: bridge/foo-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_status(tmp_path, "foo", 1, "NEW")
     assert _check_bridge_inflight(tmp_path, ignore=True) == []
 
 
-def test_C3_header_text_between_documents_tolerated(tmp_path: Path) -> None:
-    """Markdown headers, table rows, and prose between Document: blocks must not trigger false status matches."""
-    (tmp_path / "bridge").mkdir()
-    (tmp_path / "bridge" / "INDEX.md").write_text(
-        "# Bridge Index\n\n"
-        "## Statuses\n\n"
-        "| Status | Set by | Meaning |\n"
-        "|--------|--------|---------|\n"
-        "| NEW | Prime | Fresh proposal |\n"
-        "| VERIFIED | Codex | Done |\n\n"
-        "<!-- entries below -->\n\n"
-        "Document: real-one\n"
-        "NEW: bridge/real-one-001.md\n",
-        encoding="utf-8",
-    )
+def test_C3_malformed_bridge_files_are_ignored(tmp_path: Path) -> None:
+    """Markdown prose without a status token must not trigger false status matches."""
+    _write_bridge_status(tmp_path, "prose-only", 1, "# Bridge status table", body="| NEW | Prime |\n")
+    _write_bridge_status(tmp_path, "real-one", 1, "NEW")
     warnings = _check_bridge_inflight(tmp_path)
     assert [w.file for w in warnings] == ["bridge/real-one"]
+
+
+def test_C3_reads_only_latest_version_candidates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    for version in range(1, 101):
+        _write_bridge_status(tmp_path, "busy-thread", version, "NEW")
+    _write_bridge_status(tmp_path, "closed-thread", 1, "NEW")
+    _write_bridge_status(tmp_path, "closed-thread", 2, "VERIFIED")
+    read_names: list[str] = []
+    original = preflight._read_bridge_status_token
+
+    def _record_read(path: Path) -> str | None:
+        read_names.append(path.name)
+        return original(path)
+
+    monkeypatch.setattr(preflight, "_read_bridge_status_token", _record_read)
+
+    warnings = _check_bridge_inflight(tmp_path)
+
+    assert [w.file for w in warnings] == ["bridge/busy-thread"]
+    assert sorted(read_names) == ["busy-thread-100.md", "closed-thread-002.md"]
 
 
 # ---------------------------------------------------------------------------
@@ -387,7 +373,7 @@ def test_C4_enumerate_local_only_returns_stable_path_set() -> None:
     # Registry-backed hook path (one representative)
     assert any(p.startswith(".claude/hooks/") for p in paths)
     # local-only does NOT have bridge bootstrap
-    assert "bridge/INDEX.md" not in paths
+    assert not any(p.startswith("bridge/") for p in paths)
     assert "AGENTS.md" not in paths
     # local-only does NOT have docker
     assert "Dockerfile" not in paths
@@ -395,7 +381,7 @@ def test_C4_enumerate_local_only_returns_stable_path_set() -> None:
 
 def test_C4_enumerate_dual_agent_adds_bridge_bootstrap() -> None:
     paths = set(enumerate_scaffold_outputs("dual-agent"))
-    assert "bridge/INDEX.md" in paths
+    assert "bridge/.gitkeep" in paths
     assert "AGENTS.md" in paths
     assert ".claude/settings.json" in paths
     assert ".claude/settings.local.json" in paths
@@ -405,7 +391,7 @@ def test_C4_enumerate_dual_agent_adds_bridge_bootstrap() -> None:
 
 def test_C4_enumerate_dual_agent_webapp_adds_docker() -> None:
     paths = set(enumerate_scaffold_outputs("dual-agent-webapp"))
-    assert "bridge/INDEX.md" in paths
+    assert "bridge/.gitkeep" in paths
     assert "Dockerfile" in paths
     assert "docker-compose.yml" in paths
     assert ".env.example" in paths
@@ -464,11 +450,7 @@ def test_C5_cli_dry_run_shows_warning_and_informational_labels(tmp_path: Path) -
     from groundtruth_kb import __version__
 
     _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
-    (tmp_path / "bridge").mkdir()
-    (tmp_path / "bridge" / "INDEX.md").write_text(
-        "Document: some-thread\nNEW: bridge/some-thread-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_status(tmp_path, "some-thread", 1, "NEW")
     runner = CliRunner()
     result = runner.invoke(main, ["project", "upgrade", "--dry-run", "--dir", str(tmp_path)])
     assert result.exit_code == 0, result.output
@@ -481,11 +463,7 @@ def test_C5_cli_ignore_flag_suppresses_warning(tmp_path: Path) -> None:
     from groundtruth_kb import __version__
 
     _write_minimal_toml(tmp_path, profile="dual-agent", version=__version__)
-    (tmp_path / "bridge").mkdir()
-    (tmp_path / "bridge" / "INDEX.md").write_text(
-        "Document: some-thread\nNEW: bridge/some-thread-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_status(tmp_path, "some-thread", 1, "NEW")
     runner = CliRunner()
     result = runner.invoke(
         main,

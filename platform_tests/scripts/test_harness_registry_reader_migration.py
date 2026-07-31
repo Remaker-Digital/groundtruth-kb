@@ -185,17 +185,17 @@ def test_kb_attribution_raw_reader_resolves_from_projection(tmp_path: Path, monk
     assert identities["claude"]["id"] == "B"
 
 
-def test_cross_harness_trigger_raw_readers_resolve_from_projection(
+def test_dispatcher_runtime_raw_readers_resolve_from_projection(
     tmp_path: Path,
 ) -> None:
-    """Migrated raw-reader site ``scripts/cross_harness_bridge_trigger.py``:
+    """Migrated raw-reader site ``scripts/dispatcher_runtime.py``:
     ``_read_role_assignments`` / ``_read_harness_identities`` resolve the legacy
     document shape from the registry projection (WI-3342 IP-4).
     """
     import importlib.util
 
-    trigger_path = _REPO_ROOT / "scripts" / "cross_harness_bridge_trigger.py"
-    spec = importlib.util.spec_from_file_location("cross_harness_bridge_trigger_readermig", trigger_path)
+    trigger_path = _REPO_ROOT / "scripts" / "dispatcher_runtime.py"
+    spec = importlib.util.spec_from_file_location("dispatcher_runtime_readermig", trigger_path)
     assert spec is not None and spec.loader is not None
     trigger = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = trigger

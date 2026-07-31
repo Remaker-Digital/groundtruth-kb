@@ -58,7 +58,6 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-INSIGHT_DIR = REPO_ROOT / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
 BRIDGE_DIR = REPO_ROOT / "bridge"
 KB_PATH = REPO_ROOT / "groundtruth.db"
 
@@ -231,22 +230,22 @@ def _simulate_redaction(content: str):
 
 
 def collect_lo_reports(session_filter: str | None = None) -> list[tuple[str, Path]]:
-    """Collect INSIGHTS-*.md files, optionally filtered by session."""
-    if not INSIGHT_DIR.exists():
-        return []
-    files = sorted(INSIGHT_DIR.glob("INSIGHTS-*.md"))
-    results = []
-    for f in files:
-        if f.stat().st_size < 100:
-            continue
-        source_ref = f"independent-progress-assessments/CODEX-INSIGHT-DROPBOX/{f.name}"
-        if session_filter:
-            content = f.read_text(encoding="utf-8", errors="ignore")
-            session = extract_session(content, f.name)
-            if session != session_filter:
-                continue
-        results.append((source_ref, f))
-    return results
+    """Retired discovery route (WI-5589); always returns no sources.
+
+    The LO insight dropbox was a non-canonical filesystem carrier. Per
+    ``DCL-CANONICAL-CARRIER-NONAUTHORITY-001`` and
+    ``DELIB-20260717-CANONICAL-ARTIFACT-REFERENCE-BOUNDARY``, harvest inputs
+    derive only from canonical MemBase, Deliberation Archive, and
+    status-bearing numbered bridge artifacts. Loyal Opposition findings now
+    reach the archive as ``ADVISORY`` bridge entries, which
+    :func:`collect_bridge_threads` already discovers.
+
+    Historical ``independent-progress-assessments/...`` ``source_ref`` values
+    remain queryable data in already-archived rows; they are never resolved as
+    live filesystem dependencies (``DCL-SUPERSEDED-SOT-LEAKAGE-001``).
+    """
+    del session_filter  # retired route: no filesystem discovery remains
+    return []
 
 
 def collect_bridge_threads() -> list[tuple[str, Path, str]]:

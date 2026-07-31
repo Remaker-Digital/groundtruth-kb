@@ -25,15 +25,15 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-_SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "cross_harness_bridge_trigger.py"
+_SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "dispatcher_runtime.py"
 
 _CODEX_INVOCATION_SURFACES = {"headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}}
 
 
 def _load_trigger() -> ModuleType:
-    """Load scripts/cross_harness_bridge_trigger.py with sys.modules registration."""
+    """Load scripts/dispatcher_runtime.py with sys.modules registration."""
     assert _SCRIPT_PATH.is_file(), f"Expected trigger at {_SCRIPT_PATH}"
-    module_name = "cross_harness_bridge_trigger"
+    module_name = "dispatcher_runtime"
     if module_name in sys.modules:
         return sys.modules[module_name]
     spec = importlib.util.spec_from_file_location(module_name, _SCRIPT_PATH)

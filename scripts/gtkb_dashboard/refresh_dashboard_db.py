@@ -8,6 +8,8 @@ import hashlib
 import importlib.util
 import json
 import logging
+import multiprocessing as mp
+import os
 import sqlite3
 import subprocess
 import sys
@@ -49,6 +51,31 @@ _REQUIRED_MIGRATION_COLUMNS: tuple[tuple[str, str], ...] = (
 )
 
 _ROLLBACK_LINK_WINDOW_SECONDS = 7 * 24 * 60 * 60
+_TAFE_PROJECTION_TIMEOUT_SECONDS = 20
+_GITHUB_WORKFLOW_REPOSITORY = "Remaker-Digital/groundtruth-kb"
+_GITHUB_WORKFLOW_BRANCH = "main"
+_TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
+_AZURE_CONTAINER_APP_MAP_ENV = "GTKB_DASHBOARD_AZURE_CONTAINER_APP_MAP"
+_AZURE_RESOURCE_GROUP_ENV = "GTKB_DASHBOARD_AZURE_RESOURCE_GROUP"
+_EXTERNAL_CLI_AUTH_ENV_KEYS = ("GH_CONFIG_DIR", "XDG_CONFIG_HOME")
+_DEFERRAL_STATUS_KEYS = ("status", "state", "outcome", "resolution_status", "lifecycle_state")
+_DEFERRAL_BOUNDARY_KEYS = (
+    "expires_at",
+    "expiry",
+    "expiry_at",
+    "expiration",
+    "expiration_at",
+    "defer_until",
+    "deferred_until",
+    "review_after",
+    "review_at",
+    "resume_at",
+    "resume_trigger",
+    "resume_condition",
+    "expiry_condition",
+    "time_limit",
+    "trigger",
+)
 
 
 class IncidentIngestError(RuntimeError):
@@ -56,6 +83,8 @@ class IncidentIngestError(RuntimeError):
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 DEFAULT_DB_PATH = PROJECT_ROOT / "memory" / "gtkb-dashboard.sqlite"
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 SESSION_SCRIPT_PATH = PROJECT_ROOT / "scripts" / "session_self_initialization.py"
@@ -84,9 +113,9 @@ SETUP_STEPS = [
         "section": "Install",
         "title": "Clone or enter the project repository",
         "instruction": "Run the dashboard from the project root so the refresh job can collect repo, CI, and governance evidence.",
-        "command": "cd agent-red-customer-engagement",
-        "link_label": "Agent Red repository",
-        "link_url": "https://github.com/Remaker-Digital/agent-red-customer-engagement",
+        "command": "cd <groundtruth-enabled-project>",
+        "link_label": "GT-KB repository",
+        "link_url": "https://github.com/Remaker-Digital/groundtruth-kb",
     },
     {
         "section": "Configure",
@@ -176,9 +205,10 @@ REQUIRED_TOOLS = [
     {
         "name": "Azure CLI",
         "category": "Cloud CLI",
-        "purpose": "Supports Azure resource inspection, deployments, and staging/production environment checks.",
+        "purpose": "Supports optional adopter-owned Azure resource inspection and deployment reconciliation.",
         "check_command": "az version",
         "install_reference": "https://learn.microsoft.com/cli/azure/install-azure-cli",
+        "status": "optional",
     },
     {
         "name": "Playwright browsers",
@@ -194,73 +224,37 @@ THIRD_PARTY_SERVICES = [
         "name": "GitHub Actions",
         "category": "CI/CD",
         "purpose": "Runs build, test, docs quality, security, and release candidate workflows.",
-        "required_env_vars": "AGENT_RED_GITHUB_REPO, GROUND_TRUTH_GITHUB_REPO; gh authentication for local inspection",
+        "required_env_vars": "GROUND_TRUTH_GITHUB_REPO; gh authentication for local inspection",
         "setup_summary": "Authenticate gh, confirm repository access, and verify required workflows under .github/workflows.",
-        "console_url": "https://github.com/Remaker-Digital/agent-red-customer-engagement/actions",
+        "console_url": "https://github.com/Remaker-Digital/groundtruth-kb/actions",
         "health_signal": "workflow run status and local gh availability",
     },
     {
-        "name": "Azure OpenAI",
-        "category": "AI service",
-        "purpose": "Provides chat/completion and embedding deployments for Agent Red runtime behavior.",
-        "required_env_vars": "AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_API_VERSION",
-        "setup_summary": "Create or select Azure OpenAI deployments and map deployment names into .env.local.",
-        "console_url": "https://portal.azure.com/",
-        "health_signal": "environment variables plus application health checks",
+        "name": "Application deployment connector",
+        "category": "Application-owned integration",
+        "purpose": "Supplies live deployment topology, container, infrastructure, and runtime health rows to the GT-KB dashboard.",
+        "required_env_vars": "Application-defined; GT-KB ships mock data and table contracts only",
+        "setup_summary": "Implement in the application repository for the chosen deployment environment.",
+        "console_url": "",
+        "health_signal": "application-provided deployment signal freshness",
     },
     {
-        "name": "Azure Cosmos DB",
-        "category": "Database",
-        "purpose": "Stores tenant, conversation, configuration, memory, and operational records.",
-        "required_env_vars": "COSMOS_DB_ENDPOINT, COSMOS_DB_KEY, COSMOS_DB_DATABASE",
-        "setup_summary": "Use staging by default; production database values require explicit release approval.",
-        "console_url": "https://portal.azure.com/",
-        "health_signal": "API readiness and Cosmos connectivity checks",
+        "name": "Application security connector",
+        "category": "Application-owned integration",
+        "purpose": "Supplies security posture summaries such as vulnerability, dependency, auth, and policy signals.",
+        "required_env_vars": "Application-defined",
+        "setup_summary": "Map the application's selected scanners and policy systems into dashboard rows.",
+        "console_url": "",
+        "health_signal": "application-provided security signal freshness",
     },
     {
-        "name": "Azure Key Vault",
-        "category": "Secrets and encryption",
-        "purpose": "Holds HSM-backed key encryption keys and tenant secret material.",
-        "required_env_vars": "AZURE_KEYVAULT_URL, MASTER_KEK_KEY_ID",
-        "setup_summary": "Create staging and production vault references and grant the runtime identity read/use permissions.",
-        "console_url": "https://portal.azure.com/",
-        "health_signal": "runtime secret access and envelope encryption tests",
-    },
-    {
-        "name": "Shopify Partners",
-        "category": "Commerce integration",
-        "purpose": "Supports embedded Shopify admin install, storefront data, billing, and merchant workflows.",
-        "required_env_vars": "SHOPIFY_STORE_URL, SHOPIFY_API_KEY, SHOPIFY_API_SECRET, SHOPIFY_ACCESS_TOKEN",
-        "setup_summary": "Create or configure the Shopify custom app, callback URLs, scopes, and test store credentials.",
-        "console_url": "https://partners.shopify.com/",
-        "health_signal": "Shopify app/auth integration tests",
-    },
-    {
-        "name": "Stripe",
-        "category": "Billing",
-        "purpose": "Handles subscription, checkout, catalog, overage, and webhook billing flows.",
-        "required_env_vars": "STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET",
-        "setup_summary": "Create test products/prices, configure webhook endpoint, and store test keys in .env.local.",
-        "console_url": "https://dashboard.stripe.com/",
-        "health_signal": "Stripe catalog and webhook tests",
-    },
-    {
-        "name": "Zendesk",
-        "category": "Support integration",
-        "purpose": "Connects escalation and customer support handoff workflows.",
-        "required_env_vars": "ZENDESK_SUBDOMAIN, ZENDESK_EMAIL, ZENDESK_API_TOKEN",
-        "setup_summary": "Create API token, confirm support subdomain, and validate escalation credentials.",
-        "console_url": "https://www.zendesk.com/login/",
-        "health_signal": "integration configuration and escalation tests",
-    },
-    {
-        "name": "Mailchimp",
-        "category": "Marketing integration",
-        "purpose": "Supports customer communication and marketing integration surfaces.",
-        "required_env_vars": "MAILCHIMP_API_KEY",
-        "setup_summary": "Create API key in the target Mailchimp account and set it only in local/staging secrets.",
-        "console_url": "https://mailchimp.com/",
-        "health_signal": "integration configuration checks",
+        "name": "Application observability connector",
+        "category": "Application-owned integration",
+        "purpose": "Supplies throughput, latency, error-rate, defect, incident, and infrastructure summaries.",
+        "required_env_vars": "Application-defined",
+        "setup_summary": "Map the application's selected telemetry platform into dashboard rows.",
+        "console_url": "",
+        "health_signal": "application-provided observability signal freshness",
     },
     {
         "name": "Langfuse",
@@ -298,6 +292,33 @@ THIRD_PARTY_SERVICES = [
         "console_url": "https://scout.docker.com/",
         "health_signal": "Docker Scout workflow result",
     },
+]
+
+APPLICATION_DEPLOYMENT_SIGNALS = [
+    (
+        "Deployment topology",
+        "Mock service topology",
+        "web -> api -> worker -> datastore",
+        "green",
+        "application_deployment.topology",
+    ),
+    ("Containers", "Mock running containers", "4 healthy / 0 degraded", "green", "application_deployment.containers"),
+    ("Security", "Mock vulnerability posture", "0 critical / 2 medium", "yellow", "application_security.summary"),
+    (
+        "Throughput and latency",
+        "Mock request SLO",
+        "p95 240 ms / 1.2k rpm",
+        "green",
+        "application_observability.latency",
+    ),
+    ("Defects", "Mock active defects", "1 release-scoped defect", "yellow", "application_quality.defects"),
+    (
+        "Infrastructure health",
+        "Mock infrastructure summary",
+        "compute green / data green / queue yellow",
+        "yellow",
+        "application_infrastructure.summary",
+    ),
 ]
 
 
@@ -630,6 +651,17 @@ def _refresh_tafe_projection(db_path: Path, project_root: Path) -> dict[str, int
     return counts
 
 
+def _refresh_tafe_projection_worker(db_path: str, project_root: str, queue: mp.Queue) -> None:
+    try:
+        db = Path(db_path)
+        root = Path(project_root)
+        _migrate_tafe_projection_schema(db)
+        counts = _refresh_tafe_projection(db, root)
+        queue.put({"status": "completed", "counts": counts})
+    except Exception as exc:
+        queue.put({"status": "failed", "error": repr(exc)})
+
+
 def _refresh_tafe_projection_safe(db_path: Path, project_root: Path) -> None:
     """Run `_refresh_tafe_projection` but never abort the dashboard refresh on failure.
 
@@ -637,11 +669,31 @@ def _refresh_tafe_projection_safe(db_path: Path, project_root: Path) -> None:
     observability panels are an additive surface; their absence must not
     break the rest of the dashboard refresh.
     """
+    queue: mp.Queue = mp.Queue()
+    process = mp.Process(
+        target=_refresh_tafe_projection_worker,
+        args=(str(db_path), str(project_root), queue),
+        daemon=True,
+    )
+    process.start()
+    process.join(_TAFE_PROJECTION_TIMEOUT_SECONDS)
+    if process.is_alive():
+        process.terminate()
+        process.join(5)
+        logger.warning("TAFE projection refresh timed out; dashboard refresh continues")
+        return
+    if process.exitcode not in (0, None):
+        logger.warning("TAFE projection refresh exited %s; dashboard refresh continues", process.exitcode)
+        return
     try:
-        _migrate_tafe_projection_schema(db_path)
-        _refresh_tafe_projection(db_path, project_root)
+        result = queue.get_nowait()
     except Exception:
-        logger.warning("TAFE projection refresh failed; dashboard refresh continues", exc_info=True)
+        logger.warning("TAFE projection refresh produced no result; dashboard refresh continues")
+        return
+    if result.get("status") != "completed":
+        logger.warning(
+            "TAFE projection refresh failed: %s; dashboard refresh continues", result.get("error", "unknown")
+        )
 
 
 def refresh_database(
@@ -649,8 +701,12 @@ def refresh_database(
     project_root: Path = PROJECT_ROOT,
     model: dict[str, Any] | None = None,
     history: list[dict[str, Any]] | None = None,
+    *,
+    fast_startup_model: bool = True,
+    probe_live: bool = False,
 ) -> dict[str, Any]:
     started_at = datetime.now(UTC).isoformat()
+    probe_live_release_health = model is None and probe_live
     initialize_database(db_path)
     _migrate_schema(db_path)
     run_id: int | None = None
@@ -665,14 +721,25 @@ def refresh_database(
         session_module = None
         if model is None:
             session_module = _load_session_module()
-            model = session_module.build_startup_model(project_root)
+            external_cli_auth_env = _snapshot_external_cli_auth_env()
+            try:
+                model = session_module.build_startup_model(project_root, fast_hook=fast_startup_model)
+            finally:
+                _restore_external_cli_auth_env(external_cli_auth_env)
         if history is None:
             if session_module is None:
                 session_module = _load_session_module()
             snapshot = session_module._snapshot_from_model(model)
             previous_history = _read_existing_history(db_path)
             history = _append_snapshot(previous_history, snapshot)
-        _write_model_to_db(db_path, model, history, project_root)
+        _write_model_to_db(
+            db_path,
+            model,
+            history,
+            project_root,
+            probe_live_release_health=probe_live_release_health,
+            probe_live_workflows=probe_live_release_health,
+        )
         _write_bridge_swimlane_safe(project_root)
         _refresh_tafe_projection_safe(db_path, project_root)
         completed_at = datetime.now(UTC).isoformat()
@@ -700,7 +767,10 @@ def _write_bridge_swimlane_safe(project_root: Path) -> None:
     warning and returns silently so the rest of the refresh is unaffected.
     """
     try:
-        from .generate_bridge_swimlane import write_swimlane
+        try:
+            from .generate_bridge_swimlane import write_swimlane
+        except ImportError:
+            from scripts.gtkb_dashboard.generate_bridge_swimlane import write_swimlane
 
         out_path = project_root / "docs" / "gtkb-dashboard" / "bridge-swimlane.json"
         write_swimlane(project_root, out_path)
@@ -745,11 +815,20 @@ def _write_model_to_db(
     model: dict[str, Any],
     history: list[dict[str, Any]],
     project_root: Path = PROJECT_ROOT,
+    *,
+    probe_live_release_health: bool = False,
+    probe_live_workflows: bool = False,
 ) -> None:
     metrics = model.get("metrics", {})
     intelligence = model.get("dashboard_intelligence", {})
     infrastructure = model.get("infrastructure", {})
     delivery = infrastructure.get("delivery_timeline", {})
+    release_health_findings = _release_health_findings(
+        project_root,
+        intelligence,
+        model=model,
+        probe_live=probe_live_release_health,
+    )
 
     with sqlite3.connect(db_path) as conn:
         conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
@@ -769,6 +848,7 @@ def _write_model_to_db(
         _replace_table(conn, "setup_steps")
         _replace_table(conn, "required_tools")
         _replace_table(conn, "third_party_services")
+        _replace_table(conn, "application_deployment_signals")
 
         metadata = {
             "generated_at": model.get("generated_at", ""),
@@ -794,7 +874,9 @@ def _write_model_to_db(
                     item.get("status", ""),
                     item.get("tooltip", ""),
                 )
-                for idx, item in enumerate(intelligence.get("health", []), start=1)
+                for idx, item in enumerate(
+                    _reconciled_health_cards(metrics, intelligence, release_health_findings), start=1
+                )
             ],
         )
 
@@ -892,20 +974,20 @@ def _write_model_to_db(
         _load_incidents(project_root, conn, known_deploy_ids)
 
         # DORA-001b Track 2 (S308): ingest canonical pipeline manifests as
-        # structured deployment evidence + reconcile against Azure revisions
-        # for the deployed-state cross-check. Both functions are graceful-
-        # degradation by design: ingest skips invalid manifests; reconciliation
-        # catches all subprocess/auth/network failures and degrades affected
-        # rows to _consistency='unknown' without affecting refresh_runs.status.
+        # structured deployment evidence. Live Azure Container Apps
+        # reconciliation is an optional adopter diagnostic and is disabled
+        # by default for GT-KB release-health refreshes.
         # Per bridge/gtkb-dora-001b-track2-implementation-003.md sec 2.4-2.5
         # (Codex GO at -004).
         _ingest_canonical_pipeline_manifests(conn, project_root)
-        _reconcile_against_azure_revisions(conn, ["staging", "production"])
+        if _azure_reconciliation_enabled():
+            _reconcile_against_azure_revisions(conn, ["staging", "production"])
 
         release = intelligence.get("release_readiness", {})
+        release_blockers = _release_blocker_messages(release, release_health_findings)
         conn.executemany(
             "INSERT INTO release_blockers (sort_order, blocker) VALUES (?, ?)",
-            [(idx, blocker) for idx, blocker in enumerate(release.get("blockers", []), start=1)],
+            [(idx, blocker) for idx, blocker in enumerate(release_blockers, start=1)],
         )
 
         quality = intelligence.get("quality_rollup", {})
@@ -948,19 +1030,7 @@ def _write_model_to_db(
             (sort_order, key, display_name, health, status, latest_run_summary, gate_role, remediation)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            [
-                (
-                    int(details.get("order", idx)),
-                    key,
-                    details.get("display_name", key),
-                    details.get("health", ""),
-                    details.get("status", ""),
-                    details.get("latest_run_summary", ""),
-                    details.get("gate_role", ""),
-                    details.get("remediation", ""),
-                )
-                for idx, (key, details) in enumerate(integrations.items(), start=1)
-            ],
+            _integration_status_rows(integrations, project_root, probe_live_workflows=probe_live_workflows),
         )
 
         conn.executemany(
@@ -969,7 +1039,15 @@ def _write_model_to_db(
         )
         conn.executemany(
             "INSERT INTO current_metrics (metric_key, metric_label, value, status, description) VALUES (?, ?, ?, ?, ?)",
-            _current_metric_rows(metrics, intelligence),
+            _current_metric_rows(metrics, intelligence, release_health_findings),
+        )
+        # GTKB-DORA-002: four-keys metrics derived from the authoritative
+        # deployment/incident telemetry ingested above (canonical manifests +
+        # incidents). Runs after _ingest_canonical_pipeline_manifests so
+        # canonical_deploy rows are present.
+        conn.executemany(
+            "INSERT INTO current_metrics (metric_key, metric_label, value, status, description) VALUES (?, ?, ?, ?, ?)",
+            _dora_four_keys_metric_rows(conn),
         )
         conn.executemany(
             "INSERT INTO data_freshness (key, label, value) VALUES (?, ?, ?)",
@@ -998,6 +1076,14 @@ def _write_model_to_db(
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             _third_party_service_rows(),
+        )
+        conn.executemany(
+            """
+            INSERT INTO application_deployment_signals
+            (sort_order, surface, signal, mock_value, status, source_contract)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            _application_deployment_signal_rows(),
         )
 
 
@@ -1227,6 +1313,31 @@ def _ingest_canonical_pipeline_manifests(
     return counts
 
 
+def _azure_reconciliation_enabled() -> bool:
+    """Return true only when live Azure reconciliation is explicitly enabled."""
+    return os.environ.get("GTKB_DASHBOARD_AZURE_RECONCILE", "").strip().lower() in _TRUE_ENV_VALUES
+
+
+def _azure_container_app_map(environments: list[str]) -> dict[str, str]:
+    """Return an application-supplied environment -> container-app map.
+
+    GT-KB owns only the dashboard contract. The active application owns the
+    concrete deployment environment and supplies this mapping when it opts into
+    Azure reconciliation.
+    """
+    raw = os.environ.get(_AZURE_CONTAINER_APP_MAP_ENV, "").strip()
+    if not raw:
+        return {}
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    allowed = set(environments)
+    return {str(env): str(app).strip() for env, app in payload.items() if str(env) in allowed and str(app).strip()}
+
+
 def _reconcile_against_azure_revisions(
     conn: sqlite3.Connection,
     environments: list[str],
@@ -1257,17 +1368,21 @@ def _reconcile_against_azure_revisions(
     if not environments:
         return counts
 
+    container_apps = _azure_container_app_map(environments)
+    resource_group = os.environ.get(_AZURE_RESOURCE_GROUP_ENV, "").strip()
+    if not container_apps or not resource_group:
+        print(
+            "[refresh_dashboard_db] WARNING: Azure reconciliation skipped; "
+            f"application-owned {_AZURE_CONTAINER_APP_MAP_ENV} and {_AZURE_RESOURCE_GROUP_ENV} are required.",
+            file=sys.stderr,
+        )
+        return counts
+
     azure_revisions: dict[str, list[dict[str, Any]]] = {}
     az_failure_logged = False
     for env in environments:
         try:
-            # Map env to gateway container app name. Hardcoded here to avoid
-            # importing scripts/lib/scaling_targets.py from the dashboard module
-            # (separate concern); keep the mapping explicit.
-            container_app = {
-                "production": "agent-red-api-gateway",
-                "staging": "agent-red-staging",
-            }.get(env)
+            container_app = container_apps.get(env)
             if container_app is None:
                 continue
             result = subprocess.run(
@@ -1279,7 +1394,7 @@ def _reconcile_against_azure_revisions(
                     "--name",
                     container_app,
                     "--resource-group",
-                    "Agent-Red",
+                    resource_group,
                     "-o",
                     "json",
                 ],
@@ -1597,13 +1712,594 @@ def _dashboard_subject_scope_label(model: dict[str, Any]) -> str:
     return "Combined operations: GT-KB platform + active adopter/application"
 
 
-def _current_metric_rows(metrics: dict[str, Any], intelligence: dict[str, Any]) -> list[tuple[Any, ...]]:
+def _normalize_release_finding(item: Any, *, default_source: str = "release-health") -> dict[str, str]:
+    if isinstance(item, str):
+        return {"source": default_source, "message": item, "severity": "red"}
+    if not isinstance(item, dict):
+        return {"source": default_source, "message": str(item), "severity": "yellow"}
+    message = str(item.get("message") or item.get("finding") or item.get("summary") or "").strip()
+    if not message:
+        message = json.dumps(item, sort_keys=True)
+    return {
+        "source": str(item.get("source") or item.get("category") or default_source).strip() or default_source,
+        "message": message,
+        "severity": str(item.get("severity") or item.get("status") or "red").strip().lower() or "red",
+    }
+
+
+def _explicit_release_health_findings(intelligence: dict[str, Any]) -> list[dict[str, str]]:
+    raw_findings: list[Any] = []
+    raw_findings.extend(intelligence.get("release_health_findings") or [])
+    release_health = intelligence.get("release_health") or {}
+    if isinstance(release_health, dict):
+        raw_findings.extend(release_health.get("findings") or [])
+    return [_normalize_release_finding(item) for item in raw_findings]
+
+
+def _has_deferral_boundary(record: dict[str, Any]) -> bool:
+    for key in _DEFERRAL_BOUNDARY_KEYS:
+        if str(record.get(key) or "").strip():
+            return True
+    nested = record.get("deferral")
+    if isinstance(nested, dict):
+        return _has_deferral_boundary(nested)
+    return False
+
+
+def _is_deferred_record(record: dict[str, Any]) -> bool:
+    return any(str(record.get(key) or "").strip().lower() == "deferred" for key in _DEFERRAL_STATUS_KEYS)
+
+
+def _deferred_records_missing_expiry(value: Any, *, path: str = "$", out: list[str] | None = None) -> list[str]:
+    missing = [] if out is None else out
+    if isinstance(value, dict):
+        if _is_deferred_record(value) and not _has_deferral_boundary(value):
+            identifier = (
+                value.get("id")
+                or value.get("work_item_id")
+                or value.get("spec_id")
+                or value.get("document")
+                or value.get("title")
+                or path
+            )
+            missing.append(str(identifier))
+        for key, nested in value.items():
+            if key == "raw_model_json":
+                continue
+            _deferred_records_missing_expiry(nested, path=f"{path}.{key}", out=missing)
+    elif isinstance(value, list):
+        for idx, nested in enumerate(value):
+            _deferred_records_missing_expiry(nested, path=f"{path}[{idx}]", out=missing)
+    return missing
+
+
+def _deferral_expiry_findings(model: dict[str, Any] | None) -> list[dict[str, str]]:
+    if not model:
+        return []
+    missing = _deferred_records_missing_expiry(model)
+    if not missing:
+        return []
+    examples = ", ".join(missing[:5])
+    suffix = f": {examples}" if examples else ""
+    return [
+        {
+            "source": "deferral-expiry",
+            "message": (f"{len(missing)} deferred record(s) lack an expiry, time limit, or resume trigger{suffix}"),
+            "severity": "yellow",
+        }
+    ]
+
+
+def _run_release_probe(
+    project_root: Path, args: list[str], *, timeout: int = 20
+) -> subprocess.CompletedProcess[str] | None:
+    resolved_args = list(args)
+    if resolved_args and resolved_args[0] == "gt":
+        resolved_args = [sys.executable, "-m", "groundtruth_kb.cli", *resolved_args[1:]]
+    try:
+        return subprocess.run(
+            resolved_args,
+            cwd=project_root,
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        logger.warning("release-health probe failed: %s", " ".join(args), exc_info=True)
+        return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr=str(exc))
+
+
+def _run_release_json_probe(project_root: Path, args: list[str], *, timeout: int = 20) -> dict[str, Any] | None:
+    result = _run_release_probe(project_root, args, timeout=timeout)
+    if result is None:
+        return None
+    if result.returncode != 0:
+        return {"_probe_error": (result.stderr or result.stdout or f"exit {result.returncode}").strip()}
+    try:
+        return json.loads(result.stdout or "{}")
+    except json.JSONDecodeError as exc:
+        return {"_probe_error": f"invalid JSON from {' '.join(args)}: {exc}"}
+
+
+def _snapshot_external_cli_auth_env() -> dict[str, str | None]:
+    return {key: os.environ.get(key) for key in _EXTERNAL_CLI_AUTH_ENV_KEYS}
+
+
+def _restore_external_cli_auth_env(snapshot: dict[str, str | None]) -> None:
+    for key, value in snapshot.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
+
+
+def _github_workflow_live_status(project_root: Path) -> dict[str, Any]:
+    workflow_dir = project_root / ".github" / "workflows"
+    workflow_files = (
+        sorted(path for path in workflow_dir.glob("*.yml") if path.is_file())
+        + sorted(path for path in workflow_dir.glob("*.yaml") if path.is_file())
+        if workflow_dir.is_dir()
+        else []
+    )
+    base = {
+        "order": 1,
+        "display_name": "GitHub Actions",
+        "gate_role": "release gate",
+    }
+    if not workflow_files:
+        return {
+            **base,
+            "health": "red",
+            "status": "not_wired",
+            "latest_run_summary": "No local GitHub Actions workflow files found.",
+            "remediation": "Add or restore required workflows under .github/workflows before release signoff.",
+        }
+
+    result = _run_release_probe(
+        project_root,
+        [
+            "gh",
+            "run",
+            "list",
+            "--repo",
+            _GITHUB_WORKFLOW_REPOSITORY,
+            "--branch",
+            _GITHUB_WORKFLOW_BRANCH,
+            "--limit",
+            "20",
+            "--json",
+            "status,conclusion,workflowName,displayTitle,headBranch,event,createdAt",
+        ],
+        timeout=20,
+    )
+    if result is None or result.returncode != 0:
+        detail = "probe did not return" if result is None else (result.stderr or result.stdout or "gh run list failed")
+        return {
+            **base,
+            "health": "yellow",
+            "status": "live_state_unavailable",
+            "latest_run_summary": detail.strip(),
+            "remediation": "Authenticate gh and rerun dashboard refresh to collect live workflow state.",
+        }
+    try:
+        runs = json.loads(result.stdout or "[]")
+    except json.JSONDecodeError as exc:
+        return {
+            **base,
+            "health": "yellow",
+            "status": "live_state_unavailable",
+            "latest_run_summary": f"Invalid gh run list JSON: {exc}",
+            "remediation": "Inspect gh CLI output before using workflow state for release signoff.",
+        }
+    if not isinstance(runs, list) or not runs:
+        return {
+            **base,
+            "health": "yellow",
+            "status": "no_recent_run",
+            "latest_run_summary": f"No recent runs returned for {_GITHUB_WORKFLOW_REPOSITORY}@{_GITHUB_WORKFLOW_BRANCH}.",
+            "remediation": "Trigger or inspect required main-branch workflows before release signoff.",
+        }
+
+    latest = runs[0] if isinstance(runs[0], dict) else {}
+    workflow_name = str(latest.get("workflowName") or latest.get("displayTitle") or "GitHub Actions")
+    status = str(latest.get("status") or "").lower()
+    conclusion = str(latest.get("conclusion") or "").lower()
+    created_at = str(latest.get("createdAt") or "").strip()
+    summary = f"{workflow_name}: status={status or 'unknown'} conclusion={conclusion or 'none'}"
+    if created_at:
+        summary += f" created_at={created_at}"
+    if status and status != "completed":
+        return {
+            **base,
+            "health": "yellow",
+            "status": "running",
+            "latest_run_summary": summary,
+            "remediation": "Wait for in-progress main-branch workflow runs to finish before release signoff.",
+        }
+    if conclusion == "success":
+        return {
+            **base,
+            "health": "green",
+            "status": "passing",
+            "latest_run_summary": summary,
+            "remediation": "No action required for latest returned main-branch run.",
+        }
+    return {
+        **base,
+        "health": "red",
+        "status": "failing",
+        "latest_run_summary": summary,
+        "remediation": "Inspect and repair failing main-branch workflow runs before release signoff.",
+    }
+
+
+def _dispatcher_supervisor_live_status(project_root: Path) -> dict[str, Any]:
+    base = {
+        "order": 2,
+        "display_name": "Dispatcher Daemon Supervisor",
+        "gate_role": "release infrastructure",
+    }
+    status = _run_release_json_probe(
+        project_root,
+        ["gt", "bridge", "dispatch", "daemon", "supervisor", "status", "--json"],
+        timeout=20,
+    )
+    if not status:
+        return {
+            **base,
+            "health": "yellow",
+            "status": "live_state_unavailable",
+            "latest_run_summary": "Supervisor status probe did not return.",
+            "remediation": "Rerun the dispatcher supervisor status probe before release signoff.",
+        }
+    probe_error = status.get("_probe_error")
+    if probe_error:
+        return {
+            **base,
+            "health": "yellow",
+            "status": "live_state_unavailable",
+            "latest_run_summary": str(probe_error),
+            "remediation": "Repair the dispatcher supervisor status probe before release signoff.",
+        }
+    registered = bool(status.get("registered"))
+    enabled = bool(status.get("enabled"))
+    hidden = bool(status.get("hidden"))
+    uses_pythonw = bool(status.get("uses_pythonw"))
+    healthy = bool(status.get("healthy"))
+    summary = f"registered={registered} enabled={enabled} hidden={hidden} uses_pythonw={uses_pythonw} healthy={healthy}"
+    if healthy and registered and enabled and hidden and uses_pythonw:
+        return {
+            **base,
+            "health": "green",
+            "status": "healthy_headless",
+            "latest_run_summary": summary,
+            "remediation": "No supervisor action required; route/runtime WARNs are tracked separately.",
+        }
+    return {
+        **base,
+        "health": "red",
+        "status": "unhealthy_or_visible",
+        "latest_run_summary": summary,
+        "remediation": "Register and enable the dispatcher supervisor as a hidden pythonw-backed task.",
+    }
+
+
+def _integration_status_rows(
+    integrations: dict[str, Any],
+    project_root: Path,
+    *,
+    probe_live_workflows: bool = False,
+) -> list[tuple[Any, ...]]:
+    merged: dict[str, dict[str, Any]] = {}
+    for key, details in integrations.items():
+        merged[key] = dict(details) if isinstance(details, dict) else {"display_name": str(details)}
+    if probe_live_workflows:
+        merged["github"] = {**merged.get("github", {}), **_github_workflow_live_status(project_root)}
+        merged["dispatcher_supervisor"] = {
+            **merged.get("dispatcher_supervisor", {}),
+            **_dispatcher_supervisor_live_status(project_root),
+        }
+    return [
+        (
+            int(details.get("order", idx)),
+            key,
+            details.get("display_name", key),
+            details.get("health", ""),
+            details.get("status", ""),
+            details.get("latest_run_summary", ""),
+            details.get("gate_role", ""),
+            details.get("remediation", ""),
+        )
+        for idx, (key, details) in enumerate(merged.items(), start=1)
+    ]
+
+
+def _live_release_health_findings(project_root: Path) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+
+    git_status = _run_release_probe(project_root, ["git", "status", "--short", "--branch"], timeout=15)
+    if git_status and git_status.returncode == 0:
+        dirty_paths = [line for line in git_status.stdout.splitlines() if line and not line.startswith("## ")]
+        findings.append(
+            {
+                "source": "git",
+                "message": f"Live git dirty worktree path count: {len(dirty_paths)}",
+                "severity": "green" if not dirty_paths else "red",
+                "metric_key": "dirty_worktree_paths",
+                "metric_value": len(dirty_paths),
+                "release_visible": False,
+            }
+        )
+        if dirty_paths:
+            findings.append(
+                {
+                    "source": "git",
+                    "message": f"Dirty worktree has {len(dirty_paths)} path(s); classify before release commit/push.",
+                    "severity": "red",
+                }
+            )
+    elif git_status:
+        findings.append(
+            {
+                "source": "git",
+                "message": f"git status probe failed: {(git_status.stderr or git_status.stdout).strip()}",
+                "severity": "yellow",
+            }
+        )
+
+    dispatch_health = _run_release_json_probe(
+        project_root, ["gt", "bridge", "dispatch", "health", "--json"], timeout=30
+    )
+    if dispatch_health:
+        probe_error = dispatch_health.get("_probe_error")
+        health_status = str(dispatch_health.get("health_status") or "").upper()
+        if probe_error:
+            findings.append({"source": "dispatcher", "message": probe_error, "severity": "yellow"})
+        elif health_status and health_status not in {"PASS", "GREEN", "OK", "HEALTHY"}:
+            health_findings = dispatch_health.get("findings") or []
+            detail = "; ".join(str(item) for item in health_findings[:3]) or f"status {health_status}"
+            findings.append(
+                {
+                    "source": "dispatcher",
+                    "message": f"Dispatcher health is {health_status}: {detail}",
+                    "severity": "red" if health_status in {"FAIL", "WARN"} else "yellow",
+                }
+            )
+
+    daemon_status = _run_release_json_probe(
+        project_root, ["gt", "bridge", "dispatch", "daemon", "status", "--json"], timeout=20
+    )
+    if daemon_status:
+        probe_error = daemon_status.get("_probe_error")
+        if probe_error:
+            findings.append({"source": "dispatcher-daemon", "message": probe_error, "severity": "yellow"})
+        else:
+            running = bool(daemon_status.get("running"))
+            heartbeat_age = daemon_status.get("heartbeat_age_seconds")
+            try:
+                heartbeat_age_float = float(heartbeat_age)
+            except (TypeError, ValueError):
+                heartbeat_age_float = None
+            if not running:
+                findings.append(
+                    {"source": "dispatcher-daemon", "message": "Dispatcher daemon is not running.", "severity": "red"}
+                )
+            elif heartbeat_age_float is not None and heartbeat_age_float > 120:
+                findings.append(
+                    {
+                        "source": "dispatcher-daemon",
+                        "message": f"Dispatcher daemon heartbeat is stale ({heartbeat_age_float:.0f}s).",
+                        "severity": "red",
+                    }
+                )
+
+    supervisor_status = _run_release_json_probe(
+        project_root, ["gt", "bridge", "dispatch", "daemon", "supervisor", "status", "--json"], timeout=20
+    )
+    if supervisor_status:
+        probe_error = supervisor_status.get("_probe_error")
+        if probe_error:
+            findings.append({"source": "dispatcher-supervisor", "message": probe_error, "severity": "yellow"})
+        else:
+            supervisor_unhealthy = not (
+                bool(supervisor_status.get("healthy"))
+                and bool(supervisor_status.get("registered"))
+                and bool(supervisor_status.get("enabled"))
+                and bool(supervisor_status.get("hidden"))
+                and bool(supervisor_status.get("uses_pythonw"))
+            )
+            if supervisor_unhealthy:
+                findings.append(
+                    {
+                        "source": "dispatcher-supervisor",
+                        "message": "Dispatcher daemon supervisor is not healthy, enabled, and headless.",
+                        "severity": "red",
+                    }
+                )
+
+    dispatch_status = _run_release_json_probe(
+        project_root, ["gt", "bridge", "dispatch", "status", "--json"], timeout=30
+    )
+    if dispatch_status:
+        probe_error = dispatch_status.get("_probe_error")
+        if probe_error:
+            findings.append({"source": "bridge", "message": probe_error, "severity": "yellow"})
+        else:
+            runtime = dispatch_status.get("runtime_classifications") or []
+            pending = sum(int(item.get("pending_count") or 0) for item in runtime if isinstance(item, dict))
+            live = sum(int(item.get("live_inflight_dispatch_count") or 0) for item in runtime if isinstance(item, dict))
+            if pending or live:
+                findings.append(
+                    {
+                        "source": "bridge",
+                        "message": f"Bridge dispatch still has {pending} pending and {live} live in-flight item(s).",
+                        "severity": "yellow",
+                    }
+                )
+
+    return findings[:12]
+
+
+def _release_health_findings(
+    project_root: Path,
+    intelligence: dict[str, Any],
+    *,
+    model: dict[str, Any] | None = None,
+    probe_live: bool,
+) -> list[dict[str, Any]]:
+    findings = _explicit_release_health_findings(intelligence)
+    findings.extend(_deferral_expiry_findings(model))
+    if probe_live:
+        findings.extend(_live_release_health_findings(project_root))
+    deduped: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for finding in findings:
+        key = (finding.get("source", ""), finding.get("message", ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(finding)
+    return deduped
+
+
+def _release_blocker_messages(release: dict[str, Any], findings: list[dict[str, str]]) -> list[str]:
+    messages: list[str] = [str(blocker) for blocker in release.get("blockers", []) if str(blocker).strip()]
+    messages.extend(f"[{item['source']}] {item['message']}" for item in _visible_release_findings(findings))
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for message in messages:
+        if message in seen:
+            continue
+        seen.add(message)
+        deduped.append(message)
+    return deduped
+
+
+def _visible_release_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [finding for finding in findings if finding.get("release_visible", True)]
+
+
+def _finding_count(findings: list[dict[str, Any]], *sources: str) -> int:
+    wanted = set(sources)
+    return sum(1 for finding in _visible_release_findings(findings) if finding.get("source") in wanted)
+
+
+def _finding_status(findings: list[dict[str, Any]]) -> str:
+    visible_findings = _visible_release_findings(findings)
+    if not visible_findings:
+        return "green"
+    severities = {str(finding.get("severity") or "").strip().lower() for finding in visible_findings}
+    if severities & {"red", "fail", "failed", "failure", "blocker", "critical"}:
+        return "red"
+    return "yellow"
+
+
+def _finding_metric_value(findings: list[dict[str, Any]], metric_key: str) -> int | None:
+    for finding in findings:
+        if finding.get("metric_key") == metric_key:
+            return _num(finding.get("metric_value"))
+    return None
+
+
+def _status_rank(status: str) -> int:
+    return {"green": 0, "yellow": 1, "red": 2}.get(str(status).strip().lower(), 1)
+
+
+def _format_count(value: Any, singular: str, plural: str) -> str:
+    count = _num(value)
+    return f"{count} {singular if count == 1 else plural}"
+
+
+def _reconciled_health_cards(
+    metrics: dict[str, Any],
+    intelligence: dict[str, Any],
+    release_health_findings: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    cards = [dict(item) for item in intelligence.get("health", []) if isinstance(item, dict)]
+    metric_rows = {
+        row[0]: {"label": row[1], "value": row[2], "status": row[3], "description": row[4]}
+        for row in _current_metric_rows(metrics, intelligence, release_health_findings)
+    }
+
+    def upsert(label: str, metric_key: str, singular: str, plural: str, tooltip: str) -> None:
+        metric = metric_rows.get(metric_key)
+        if not metric:
+            return
+        replacement = {
+            "label": label,
+            "value": _format_count(metric["value"], singular, plural),
+            "status": metric["status"],
+            "tooltip": tooltip,
+        }
+        for card in cards:
+            if str(card.get("label") or "").strip().lower() == label.lower():
+                card.update(replacement)
+                return
+        cards.append(replacement)
+
+    upsert(
+        "Project Health",
+        "project_health_issues",
+        "issue",
+        "issues",
+        "Failing checks plus visible release blockers.",
+    )
+    upsert(
+        "Release Readiness",
+        "release_blockers",
+        "blocker",
+        "blockers",
+        "Visible release blockers from release readiness and live release-health findings.",
+    )
+    cards.sort(
+        key=lambda card: (_status_rank(str(card.get("status") or "")), str(card.get("label") or "")), reverse=True
+    )
+    return cards
+
+
+def _current_metric_rows(
+    metrics: dict[str, Any],
+    intelligence: dict[str, Any],
+    release_health_findings: list[dict[str, Any]] | None = None,
+) -> list[tuple[Any, ...]]:
+    release_health_findings = release_health_findings or []
+    visible_findings = _visible_release_findings(release_health_findings)
     release = intelligence.get("release_readiness", {})
     quality = intelligence.get("quality_rollup", {})
-    project_health = _num(quality.get("failing", 0)) + _num(release.get("blocker_count", 0))
-    release_blockers = release.get("blocker_count", metrics.get("regression", {}).get("release_blocker_count", 0))
+    release_blocker_messages = _release_blocker_messages(release, release_health_findings)
+    release_blockers = max(
+        _num(release.get("blocker_count", metrics.get("regression", {}).get("release_blocker_count", 0))),
+        len(release_blocker_messages),
+    )
+    explicit_release_blockers = bool(release.get("blockers")) or _num(
+        release.get("blocker_count", metrics.get("regression", {}).get("release_blocker_count", 0))
+    )
+    release_health_status = _finding_status(release_health_findings)
+    release_blocker_status = (
+        "green"
+        if release_blockers == 0
+        else "red"
+        if explicit_release_blockers or release_health_status == "red"
+        else "yellow"
+    )
+    project_health = _num(quality.get("failing", 0)) + _num(release_blockers)
     ci_failing = quality.get("failing", 0)
     bridge_actionable = metrics.get("contention", {}).get("actionable_count", 0)
+    live_dirty_paths = _finding_metric_value(release_health_findings, "dirty_worktree_paths")
+    dirty_paths = (
+        live_dirty_paths if live_dirty_paths is not None else metrics.get("drift", {}).get("changed_path_count", 0)
+    )
+    dirty_path_description = (
+        "Changed paths from live git status; release prep must classify dirty paths before push."
+        if live_dirty_paths is not None
+        else "Changed paths from the current dashboard model; release prep must classify dirty paths before push."
+    )
+    dispatcher_findings = _finding_count(
+        release_health_findings, "dispatcher", "dispatcher-daemon", "dispatcher-supervisor"
+    )
+    bridge_findings = _finding_count(release_health_findings, "bridge")
+    docs_drift_findings = _finding_count(release_health_findings, "readme", "wiki", "docs", "readme-wiki")
     return [
         (
             "project_health_issues",
@@ -1616,8 +2312,43 @@ def _current_metric_rows(metrics: dict[str, Any], intelligence: dict[str, Any]) 
             "release_blockers",
             "Release Blockers",
             release_blockers,
-            _metric_count_status(release_blockers),
+            release_blocker_status,
             "Visible release blocker count.",
+        ),
+        (
+            "release_health_findings",
+            "Release Health Findings",
+            len(visible_findings),
+            release_health_status,
+            "Live release-health findings from git, bridge, dispatcher, README/wiki, and supplied model evidence.",
+        ),
+        (
+            "dirty_worktree_paths",
+            "Dirty Worktree Paths",
+            dirty_paths,
+            _metric_count_status(dirty_paths),
+            dirty_path_description,
+        ),
+        (
+            "dispatcher_health_findings",
+            "Dispatcher Health Findings",
+            dispatcher_findings,
+            _metric_count_status(dispatcher_findings),
+            "Dispatcher daemon/control-surface findings that block a clean release-health read.",
+        ),
+        (
+            "bridge_actionability_findings",
+            "Bridge Actionability Findings",
+            bridge_findings,
+            _metric_count_status(bridge_findings, positive="yellow"),
+            "Live bridge actionability or in-flight dispatch findings.",
+        ),
+        (
+            "readme_wiki_drift",
+            "README / Wiki Drift",
+            docs_drift_findings,
+            _metric_count_status(docs_drift_findings),
+            "README/wiki drift findings from the governed wiki comparison source.",
         ),
         (
             "ci_testing_failing",
@@ -1641,6 +2372,147 @@ def _current_metric_rows(metrics: dict[str, Any], intelligence: dict[str, Any]) 
             "Actionable bridge/contention entries.",
         ),
         ("data_freshness", "Data Freshness", 1, "green", "Live probe freshness status."),
+    ]
+
+
+# GTKB-DORA-002: DORA four-keys consumer of the DORA-001 telemetry foundation.
+# Status is informational (the four keys are not simple good/bad counters); the
+# stat-panel color comes from the panel thresholds, not this column. A value of
+# None renders a null/annotated state per GOV-SESSION-SELF-INITIALIZATION-001 (no
+# fabricated telemetry) and the DORA-002 acceptance criteria.
+_DORA_PRESENT_STATUS = "green"
+_DORA_INSUFFICIENT_STATUS = "yellow"
+
+
+def _dora_deploy_kind_placeholders() -> tuple[str, tuple[str, ...]]:
+    """SQL ``IN`` placeholders + ordered params for authoritative deploy kinds."""
+    kinds = tuple(sorted(_DORA_DEPLOYMENT_EVENT_KINDS))
+    placeholders = ", ".join("?" for _ in kinds)
+    return placeholders, kinds
+
+
+def _dora_deployment_frequency(conn: sqlite3.Connection) -> int | None:
+    """Count authoritative deployment events (``canonical_deploy``).
+
+    Returns ``None`` when no authoritative deployment telemetry exists so the
+    dashboard renders a null/annotated state instead of a fabricated zero
+    (``_is_deployment_event`` defines the authoritative deploy kind set).
+    """
+    placeholders, kinds = _dora_deploy_kind_placeholders()
+    row = conn.execute(
+        f"SELECT COUNT(*) FROM delivery_timeline_events WHERE event_kind IN ({placeholders})",
+        kinds,
+    ).fetchone()
+    count = int(row[0]) if row and row[0] is not None else 0
+    return count if count > 0 else None
+
+
+def _dora_change_failure_rate(conn: sqlite3.Connection) -> float | None:
+    """Percent of deployed changes linked to a rollback, hotfix, or incident.
+
+    Denominator is the set of distinct ``deployable_change_id`` values on
+    authoritative deploy events; numerator is that set intersected with the
+    deploy ids referenced by rollback/hotfix linkage or incident causation.
+    Returns ``None`` when no attributable deployment telemetry exists.
+    """
+    placeholders, kinds = _dora_deploy_kind_placeholders()
+    deploy_ids = {
+        str(r[0]).strip()
+        for r in conn.execute(
+            f"SELECT deployable_change_id FROM delivery_timeline_events WHERE event_kind IN ({placeholders})",
+            kinds,
+        )
+        if str(r[0] or "").strip()
+    }
+    if not deploy_ids:
+        return None
+    reverted: set[str] = set()
+    for column in ("rollback_of_deploy_id", "hotfix_of_deploy_id"):
+        reverted |= {
+            str(r[0]).strip()
+            for r in conn.execute(f"SELECT {column} FROM delivery_timeline_events")
+            if str(r[0] or "").strip()
+        }
+    incident_ids = {
+        str(r[0]).strip() for r in conn.execute("SELECT caused_by_deploy_id FROM incidents") if str(r[0] or "").strip()
+    }
+    failed = deploy_ids & (reverted | incident_ids)
+    return round(100.0 * len(failed) / len(deploy_ids), 1)
+
+
+def _dora_mttr_hours(conn: sqlite3.Connection) -> float | None:
+    """Mean hours from incident detection to mitigation (falls back to closure).
+
+    Returns ``None`` when no incident carries both a detection timestamp and a
+    resolution timestamp, so the panel renders a null/annotated state.
+    """
+    durations: list[float] = []
+    for detected_at, mitigated_at, closed_at in conn.execute(
+        "SELECT detected_at, mitigated_at, closed_at FROM incidents"
+    ):
+        start = _timestamp_unix(detected_at)
+        end = _timestamp_unix(mitigated_at) or _timestamp_unix(closed_at)
+        if start and end and end >= start:
+            durations.append((end - start) / 3600.0)
+    if not durations:
+        return None
+    return round(sum(durations) / len(durations), 1)
+
+
+def _dora_four_keys_metric_rows(conn: sqlite3.Connection) -> list[tuple[Any, ...]]:
+    """Return the four DORA keys as ``current_metrics`` rows (GTKB-DORA-002).
+
+    Consumes the DORA-001 telemetry foundation persisted in
+    ``delivery_timeline_events`` + ``incidents``. Each metric renders a
+    null/annotated state when its underlying telemetry is insufficient, per the
+    DORA-002 acceptance criteria and ``GOV-SESSION-SELF-INITIALIZATION-001``.
+    Lead time is not yet computable because the foundation persists commit SHAs
+    (``commit_range_start`` / ``commit_range_end``) but not per-commit authored
+    timestamps; it is emitted null with an explanatory annotation rather than a
+    fabricated value.
+    """
+    deployment_frequency = _dora_deployment_frequency(conn)
+    change_failure_rate = _dora_change_failure_rate(conn)
+    mttr_hours = _dora_mttr_hours(conn)
+    lead_time_hours: float | None = None
+
+    def status_for(value: Any) -> str:
+        return _DORA_PRESENT_STATUS if value is not None else _DORA_INSUFFICIENT_STATUS
+
+    return [
+        (
+            "dora_deployment_frequency",
+            "Deployment Frequency",
+            deployment_frequency,
+            status_for(deployment_frequency),
+            "Authoritative canonical_deploy events in the retained delivery timeline "
+            "(DORA-001 foundation). Null when no deployment telemetry exists.",
+        ),
+        (
+            "dora_lead_time_hours",
+            "Lead Time for Changes (h)",
+            lead_time_hours,
+            status_for(lead_time_hours),
+            "Median hours from change to deployment. Null/annotated: the DORA-001 "
+            "timeline foundation persists commit SHAs but not per-commit authored "
+            "timestamps, so lead time is not yet computable.",
+        ),
+        (
+            "dora_change_failure_rate",
+            "Change Failure Rate (%)",
+            change_failure_rate,
+            status_for(change_failure_rate),
+            "Percent of deployed changes linked to a rollback, hotfix, or caused "
+            "incident. Null when no attributable deployment telemetry exists.",
+        ),
+        (
+            "dora_mttr_hours",
+            "MTTR (h)",
+            mttr_hours,
+            status_for(mttr_hours),
+            "Mean hours from incident detection to mitigation (falls back to "
+            "closure). Null when no resolved incidents exist.",
+        ),
     ]
 
 
@@ -1702,6 +2574,22 @@ def _third_party_service_rows() -> list[tuple[Any, ...]]:
     ]
 
 
+def _application_deployment_signal_rows() -> list[tuple[Any, ...]]:
+    return [
+        (
+            idx,
+            surface,
+            signal,
+            mock_value,
+            status,
+            source_contract,
+        )
+        for idx, (surface, signal, mock_value, status, source_contract) in enumerate(
+            APPLICATION_DEPLOYMENT_SIGNALS, start=1
+        )
+    ]
+
+
 def _num(value: Any) -> int:
     try:
         return int(value or 0)
@@ -1714,6 +2602,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--db-path", type=Path, default=DEFAULT_DB_PATH)
     parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT)
     parser.add_argument("--init-only", action="store_true", help="Initialize schema without collecting fresh data.")
+    parser.add_argument(
+        "--full-startup-model",
+        action="store_true",
+        help="Use the full startup model path instead of the bounded fast-hook dashboard refresh path.",
+    )
+    parser.add_argument(
+        "--probe-live",
+        action="store_true",
+        help="Run live git, bridge dispatcher, and GitHub workflow probes during refresh.",
+    )
     args = parser.parse_args(argv)
 
     if args.init_only:
@@ -1721,7 +2619,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Initialized {args.db_path}")
         return 0
 
-    result = refresh_database(args.db_path, args.project_root)
+    result = refresh_database(
+        args.db_path,
+        args.project_root,
+        fast_startup_model=not args.full_startup_model,
+        probe_live=args.probe_live,
+    )
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 

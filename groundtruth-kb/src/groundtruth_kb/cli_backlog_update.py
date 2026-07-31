@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
+from groundtruth_kb.bridge.read_commands import threads_for_work_item
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.project.lifecycle import ProjectLifecycleService
@@ -25,7 +26,9 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-# Canonical authorization-token shapes for the disjunctive text-edit gate.
+from scripts.bridge_lifecycle_resolver import BridgeLifecycleResolutionError, resolve_bridge_lifecycle  # noqa: E402
+
+# Canonical authorization-token shapes for the text-edit gate.
 # Authority: bridge/gtkb-backlog-update-title-desc-cli-001-003.md REVISED-1
 # GO at bridge/gtkb-backlog-update-title-desc-cli-001-004.md (WI-4357).
 _PAUTH_TOKEN_RE = re.compile(r"\bPAUTH-[A-Z0-9][A-Z0-9-]*\b")
@@ -52,13 +55,14 @@ class BacklogUpdateRequest:
     title: str | None = None
     description: str | None = None
     source_spec_id: str | None = None
+    reopen_terminal: bool = False
 
 
-def _resolve_changed_by() -> str:
+def _resolve_changed_by(project_root: Path) -> str:
     """Resolve ``changed_by`` via the MUTATING fail-closed resolver."""
     from scripts._kb_attribution import resolve_changed_by  # type: ignore[import-untyped]
 
-    return cast(str, resolve_changed_by())
+    return cast(str, resolve_changed_by(project_root=project_root))
 
 
 def _validate_json_string_array(value: str | None, option_name: str) -> None:
@@ -73,23 +77,208 @@ def _validate_json_string_array(value: str | None, option_name: str) -> None:
         raise BacklogUpdateError(f"{option_name} is invalid: expected a JSON array of strings")
 
 
-def _verify_text_edit_gate(db: KnowledgeDB, current: dict[str, Any], request: BacklogUpdateRequest) -> None:
-    """Enforce the disjunctive text-edit gate for ``--title`` / ``--description``.
+@dataclass(frozen=True)
+class _TerminalReopenPolicy:
+    pauth_id: str
+    bridge_threads: dict[str, tuple[str, str]]
+    strict_bridge_threads: dict[str, tuple[str, str]]
+    controlling_thread: str
+    exact_threads: bool
 
-    Raises ``BacklogUpdateError`` if none of the three disjunctive arms is
+
+_WI5441_BRIDGE_ID = "gtkb-wi5441-registry-control-plane-reverse-coverage"
+_WI5441_REOPEN_THREADS = {
+    f"bridge/{_WI5441_BRIDGE_ID}-007.md": (_WI5441_BRIDGE_ID, "REVISED"),
+    f"bridge/{_WI5441_BRIDGE_ID}-008.md": (_WI5441_BRIDGE_ID, "GO"),
+}
+_WI5441_PAUTH_ID = "PAUTH-PROJECT-GTKB-HOUSEKEEPING-HARDENING-WI5441-REGISTRY-CONTROL-PLANE-20260724"
+
+_WI5640_BRIDGE_ID = "gtkb-file-move-rename-canonicalization-v4"
+_WI5640_PAUTH_ID = "PAUTH-PROJECT-GTKB-PLATFORM-MODERNIZATION-HARNESS-PARITY-20260715-PROJECT-SCOPE"
+_WI5640_REOPEN_THREADS = {
+    "bridge/gtkb-file-move-rename-canonicalization-008.md": (
+        "gtkb-file-move-rename-canonicalization",
+        "WITHDRAWN",
+    ),
+    "bridge/gtkb-file-move-rename-canonicalization-repair-forward-004.md": (
+        "gtkb-file-move-rename-canonicalization-repair-forward",
+        "NO-GO",
+    ),
+    "bridge/gtkb-file-move-rename-canonicalization-v2-006.md": (
+        "gtkb-file-move-rename-canonicalization-v2",
+        "VERIFIED",
+    ),
+    "bridge/gtkb-file-move-rename-canonicalization-v3-006.md": (
+        "gtkb-file-move-rename-canonicalization-v3",
+        "NO-GO",
+    ),
+    f"bridge/{_WI5640_BRIDGE_ID}-012.md": (_WI5640_BRIDGE_ID, "GO"),
+    "bridge/gtkb-skill-rename-cursor-goose-parity-003.md": (
+        "gtkb-skill-rename-cursor-goose-parity",
+        "WITHDRAWN",
+    ),
+    "bridge/gtkb-skill-rename-rollout-005.md": (
+        "gtkb-skill-rename-rollout",
+        "WITHDRAWN",
+    ),
+    "bridge/gtkb-wi5640-scanner-fixture-placeholder-sweep-006.md": (
+        "gtkb-wi5640-scanner-fixture-placeholder-sweep",
+        "VERIFIED",
+    ),
+}
+_WI5640_STRICT_THREADS = {
+    f"bridge/{_WI5640_BRIDGE_ID}-011.md": (_WI5640_BRIDGE_ID, "REVISED"),
+    f"bridge/{_WI5640_BRIDGE_ID}-012.md": (_WI5640_BRIDGE_ID, "GO"),
+}
+_TERMINAL_REOPEN_POLICIES = {
+    "WI-5441": _TerminalReopenPolicy(
+        pauth_id=_WI5441_PAUTH_ID,
+        bridge_threads=_WI5441_REOPEN_THREADS,
+        strict_bridge_threads=_WI5441_REOPEN_THREADS,
+        controlling_thread=f"bridge/{_WI5441_BRIDGE_ID}-008.md",
+        exact_threads=False,
+    ),
+    "WI-5640": _TerminalReopenPolicy(
+        pauth_id=_WI5640_PAUTH_ID,
+        bridge_threads=_WI5640_REOPEN_THREADS,
+        strict_bridge_threads=_WI5640_STRICT_THREADS,
+        controlling_thread=f"bridge/{_WI5640_BRIDGE_ID}-012.md",
+        exact_threads=True,
+    ),
+}
+_WORK_ITEM_METADATA_RE = re.compile(r"^Work Item:\s*`?(WI-[A-Za-z0-9-]+)`?\s*$", re.MULTILINE)
+
+
+def _terminal_reopen_static(request: BacklogUpdateRequest) -> tuple[str, ...]:
+    """Validate the owner-approved request before attribution or DB access."""
+    policy = _TERMINAL_REOPEN_POLICIES.get(request.work_item_id)
+    if policy is None:
+        raise BacklogUpdateError("--reopen-terminal is narrowly authorized only for WI-5441 or WI-5640")
+    if not request.owner_approved:
+        raise BacklogUpdateError("--reopen-terminal requires --owner-approved")
+    if request.resolution_status is None or request.resolution_status in {
+        "resolved",
+        "verified",
+        "retired",
+        "wont_fix",
+        "not_a_defect",
+    }:
+        raise BacklogUpdateError("--reopen-terminal requires an explicit nonterminal --resolution-status")
+    if request.stage not in {"created", "tested", "backlogged", "implementing"}:
+        raise BacklogUpdateError("--reopen-terminal requires an explicit nonterminal --stage")
+    if request.related_bridge_threads is None:
+        raise BacklogUpdateError("--reopen-terminal requires --related-bridge-threads")
+    if any(
+        value is not None
+        for value in (
+            request.priority,
+            request.status_detail,
+            request.title,
+            request.description,
+            request.source_spec_id,
+        )
+    ):
+        raise BacklogUpdateError("--reopen-terminal accepts only status, stage, and bridge-link fields")
+    reason = request.change_reason.casefold()
+    if request.work_item_id.casefold() not in reason or "owner-approved" not in reason:
+        raise BacklogUpdateError("--change-reason must identify the work item and the owner-approved repair")
+    if "terminal" not in reason or "repair" not in reason:
+        raise BacklogUpdateError("--change-reason must identify the owner-approved terminal repair")
+    if policy.pauth_id.casefold() not in reason:
+        raise BacklogUpdateError("--change-reason must cite the active terminal-reopen PAUTH")
+    try:
+        values = json.loads(request.related_bridge_threads)
+    except json.JSONDecodeError as exc:
+        raise BacklogUpdateError("--related-bridge-threads is invalid: expected a JSON array of strings") from exc
+    if not isinstance(values, list) or not values or any(not isinstance(value, str) for value in values):
+        raise BacklogUpdateError("--related-bridge-threads is invalid: expected a non-empty JSON array of strings")
+    normalized = tuple(value.replace("\\", "/") for value in values)
+    required = set(policy.bridge_threads)
+    if policy.exact_threads and set(normalized) != required:
+        raise BacklogUpdateError("--reopen-terminal requires the exact reviewed bridge path set")
+    if not policy.exact_threads and not required.issubset(normalized):
+        raise BacklogUpdateError("--reopen-terminal requires every controlling bridge file")
+    return normalized
+
+
+def _validate_terminal_reopen_live(
+    project_root: Path,
+    db: KnowledgeDB,
+    request: BacklogUpdateRequest,
+    related_threads: tuple[str, ...],
+) -> int:
+    """Validate current row, active PAUTH, strict authority, and reverse index."""
+    policy = _TERMINAL_REOPEN_POLICIES[request.work_item_id]
+    current = db.get_work_item(request.work_item_id)
+    if current is None or current.get("stage") != "resolved":
+        raise BacklogUpdateError("--reopen-terminal requires the current work-item stage to be exactly resolved")
+    pauth = db.get_project_authorization(policy.pauth_id)
+    if pauth is None or pauth.get("status") != "active":
+        raise BacklogUpdateError("--reopen-terminal requires the cited PAUTH to be active")
+
+    root = project_root.resolve()
+    for rel_path in related_threads:
+        candidate = (root / rel_path).resolve()
+        if not candidate.is_relative_to(root) or not candidate.is_file():
+            raise BacklogUpdateError(f"--reopen-terminal bridge evidence is missing or outside root: {rel_path}")
+
+    lifecycles: dict[str, Any] = {}
+    for rel_path, (bridge_id, status) in policy.strict_bridge_threads.items():
+        candidate = (root / rel_path).resolve()
+        if not candidate.is_relative_to(root) or not candidate.is_file():
+            raise BacklogUpdateError(f"--reopen-terminal strict bridge evidence is missing or outside root: {rel_path}")
+        lifecycle = lifecycles.get(bridge_id)
+        if lifecycle is None:
+            try:
+                lifecycle = resolve_bridge_lifecycle(root, bridge_id)
+            except BridgeLifecycleResolutionError as exc:
+                raise BacklogUpdateError(f"--reopen-terminal bridge lifecycle is invalid: {exc}") from exc
+            lifecycles[bridge_id] = lifecycle
+        observed = {version.path: version for version in lifecycle.audit_versions}
+        version = observed.get(rel_path)
+        if version is None or not version.is_strict or version.status != status or version.document != bridge_id:
+            raise BacklogUpdateError(
+                f"--reopen-terminal bridge evidence is not the strict {status} artifact: {rel_path}"
+            )
+        text = candidate.read_text(encoding="utf-8")
+        match = _WORK_ITEM_METADATA_RE.search(text)
+        if match is None or match.group(1) != request.work_item_id:
+            raise BacklogUpdateError(f"--reopen-terminal bridge evidence has wrong Work Item metadata: {rel_path}")
+
+    controlling_bridge_id = policy.strict_bridge_threads[policy.controlling_thread][0]
+    controlling = lifecycles[controlling_bridge_id].latest_strict_state.path
+    if controlling != policy.controlling_thread:
+        raise BacklogUpdateError("--reopen-terminal controlling strict verdict changed")
+
+    if policy.exact_threads:
+        reverse_index = threads_for_work_item(root, request.work_item_id)
+        latest_rows = {str(row["latest_path"]): row for row in reverse_index["threads"]}
+        if set(latest_rows) != set(related_threads):
+            raise BacklogUpdateError("--reopen-terminal reverse index no longer matches the exact reviewed path set")
+        for rel_path, (bridge_id, status) in policy.bridge_threads.items():
+            row = latest_rows.get(rel_path)
+            if row is None or row.get("slug") != bridge_id or row.get("latest_status") != status:
+                raise BacklogUpdateError(
+                    f"--reopen-terminal reverse-index status changed for reviewed path: {rel_path}"
+                )
+    return int(current["version"])
+
+
+def _verify_text_edit_gate(db: KnowledgeDB, current: dict[str, Any], request: BacklogUpdateRequest) -> None:
+    """Enforce the text-edit gate for ``--title`` / ``--description``.
+
+    Raises ``BacklogUpdateError`` if neither live authorization arm is
     satisfied. The arms are:
 
-    1. ``current['approval_state'] == 'bridge_authorized'``
-    2. ``request.owner_approved`` is True
-    3. ``request.change_reason`` cites an active ``PAUTH-*`` token (verified
+    1. ``request.owner_approved`` is True
+    2. ``request.change_reason`` cites an active ``PAUTH-*`` token (verified
        against ``current_project_authorizations`` with status active) OR an
        existing ``DELIB-*`` token (verified against ``current_deliberations``).
 
     Substring presence is not enough: each cited token is looked up in the DB
     and rejected if the row is missing or, for PAUTH, not active.
     """
-    if current.get("approval_state") == "bridge_authorized":
-        return
+    _ = current
     if request.owner_approved:
         return
 
@@ -104,10 +293,9 @@ def _verify_text_edit_gate(db: KnowledgeDB, current: dict[str, Any], request: Ba
 
     raise BacklogUpdateError(
         f"Cannot edit title or description of work item {request.work_item_id} "
-        f"without text-edit authorization. Satisfy one of: (1) the work item "
-        f"has approval_state=bridge_authorized; (2) pass --owner-approved; "
-        f"(3) cite an active PAUTH-* token or an existing DELIB-* token in "
-        f"--change-reason."
+        f"without text-edit authorization. Satisfy one of: (1) pass "
+        f"--owner-approved; (2) cite an active PAUTH-* token or an existing "
+        f"DELIB-* token in --change-reason."
     )
 
 
@@ -149,8 +337,10 @@ def update_backlog_item(config: GTConfig, request: BacklogUpdateRequest) -> dict
 
     _validate_json_string_array(request.related_bridge_threads, "--related-bridge-threads")
 
+    reopen_threads = _terminal_reopen_static(request) if request.reopen_terminal else ()
+
     # Attribution is resolved BEFORE opening any write path
-    changed_by = _resolve_changed_by()
+    changed_by = _resolve_changed_by(Path(config.project_root))
 
     db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
     current = db.get_work_item(request.work_item_id)
@@ -170,13 +360,11 @@ def update_backlog_item(config: GTConfig, request: BacklogUpdateRequest) -> dict
             f"without explicit owner approval (--owner-approved required under GOV-15)."
         )
 
-    # Disjunctive text-edit gate: applies whenever --title or --description is
-    # provided. Satisfied if any of: WI.approval_state == bridge_authorized,
-    # --owner-approved is set, or --change-reason cites an existing active
-    # PAUTH-* token or an existing DELIB-* token. The gate composes
-    # independently with the GOV-15 terminal-resolution gate above and the
-    # stage-transition gate below (see Forbidden-Field-Combination Policy in
-    # bridge/gtkb-backlog-update-title-desc-cli-001-003.md).
+    # Text-edit gate: applies whenever --title or --description is provided.
+    # Satisfied by --owner-approved or by a real active PAUTH-* / existing
+    # DELIB-* token in --change-reason. Legacy work-item approval_state is not
+    # authority. The gate composes independently with the GOV-15
+    # terminal-resolution gate above and the stage-transition gate below.
     if request.title is not None or request.description is not None:
         _verify_text_edit_gate(db, current, request)
 
@@ -197,6 +385,47 @@ def update_backlog_item(config: GTConfig, request: BacklogUpdateRequest) -> dict
         fields["description"] = request.description
     if request.source_spec_id is not None:
         fields["source_spec_id"] = request.source_spec_id
+
+    if request.reopen_terminal:
+        expected_current_version = _validate_terminal_reopen_live(
+            Path(config.project_root), db, request, reopen_threads
+        )
+        if request.dry_run:
+            return {
+                "updated": False,
+                "dry_run": True,
+                "reopen_terminal": True,
+                "work_item_id": request.work_item_id,
+                "fields": fields,
+            }
+        try:
+            row = db.reopen_terminal_work_item(
+                request.work_item_id,
+                changed_by,
+                request.change_reason,
+                resolution_status=cast(str, request.resolution_status),
+                stage=cast(str, request.stage),
+                related_bridge_threads=cast(str, request.related_bridge_threads),
+                owner_approved=request.owner_approved,
+                bridge_evidence_validated=True,
+                required_bridge_threads=set(_TERMINAL_REOPEN_POLICIES[request.work_item_id].bridge_threads),
+                exact_related_bridge_threads=(_TERMINAL_REOPEN_POLICIES[request.work_item_id].exact_threads),
+                expected_current_version=expected_current_version,
+            )
+        except ValueError as exc:
+            raise BacklogUpdateError(str(exc)) from exc
+        if row is None:
+            raise BacklogUpdateError(
+                f"Unexpected error: reopened work item {request.work_item_id} not found on readback."
+            )
+        return {
+            "updated": True,
+            "dry_run": False,
+            "reopen_terminal": True,
+            "work_item_id": row["id"],
+            "row": row,
+            "auto_retired_projects": [],
+        }
 
     # Test the stage transition against the database logic
     current_stage = current.get("stage", "created")
@@ -238,7 +467,7 @@ def update_backlog_item(config: GTConfig, request: BacklogUpdateRequest) -> dict
         try:
             auto_retired_projects = ProjectLifecycleService(db).auto_retire_projects_for_work_item(
                 request.work_item_id,
-                project_root=_PROJECT_ROOT,
+                project_root=Path(config.project_root),
                 changed_by=changed_by,
             )
         except Exception as exc:  # noqa: BLE001 - the work-item update already committed; actuation is best-effort.

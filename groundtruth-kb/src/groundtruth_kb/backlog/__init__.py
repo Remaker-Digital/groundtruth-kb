@@ -1,9 +1,8 @@
 """Backlog helpers backed by MemBase work_items.
 
-The approval-state slice adds a package namespace below ``groundtruth_kb.backlog``.
-Preserve the legacy module-level migration helpers from ``backlog.py`` so
-existing imports keep working while new code can import
-``groundtruth_kb.backlog.approval_state``.
+The legacy approval-state compatibility module remains importable for
+historical rows only. New implementation authority must flow through
+project-level PAUTH, bridge GO, and implementation-start authorization.
 """
 
 from __future__ import annotations

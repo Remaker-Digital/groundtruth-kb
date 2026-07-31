@@ -15,7 +15,12 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "harness-capability-registry.toml"
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+from _wrap_io import _atomic_write_bytes  # noqa: E402
+
+REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "gtkb-harness-capability-registry.toml"
 CODEX_SKILLS_RELATIVE_PATH = Path(".codex") / "skills"
 GENERATED_MARKER = "<!-- GTKB-CODEX-SKILL-ADAPTER"
 GENERATED_END_MARKER = "GTKB-CODEX-SKILL-ADAPTER -->"
@@ -23,6 +28,7 @@ MANIFEST_NAME = "MANIFEST.json"
 FRONTMATTER_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 RESOURCE_DIRECTORY_NAMES = ("references", "helpers")
 RESOURCE_EXCLUDED_DIRECTORY_NAMES = frozenset({"__pycache__"})
+RESOURCE_EXCLUDED_PREFIXES = ("_temp_", "tmp_", "draft-", "draft_")
 RESOURCE_EXCLUDED_SUFFIXES = frozenset({".pyc", ".pyo"})
 SLASH_CANONICAL_HELPER_PATH_RE = re.compile(r"\.claude/skills/([^/\s`\"')]+)/helpers/")
 BACKSLASH_CANONICAL_HELPER_PATH_RE = re.compile(r"\.claude\\skills\\([^\\\s`\"')]+)\\helpers\\")
@@ -257,7 +263,9 @@ def _write_if_changed(path: Path, content: str, *, check: bool) -> bool:
     if check:
         return True
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8", newline="\n")
+    # WI-5117: atomic write; encode to LF bytes so the LF-only contract
+    # (WI-4701) survives the atomic path on Windows.
+    _atomic_write_bytes(path, content.encode("utf-8"))
     return True
 
 
@@ -268,7 +276,7 @@ def _write_bytes_if_changed(path: Path, content: bytes, *, check: bool) -> bool:
     if check:
         return True
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(content)
+    _atomic_write_bytes(path, content)  # WI-5117: atomic write
     return True
 
 
@@ -281,49 +289,58 @@ def _manifest_content(adapters: list[SkillAdapter]) -> str:
     return json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
 
-def _registry_adapter_block(adapter: SkillAdapter) -> list[str]:
-    return [
-        f'surface = "{adapter.adapter_relative_path}"',
-        'status = "adapter"',
-        f'adapter_source = "{adapter.source_relative_path}"',
-        f'source_sha256 = "{adapter.source_sha256}"',
-    ]
+def _refresh_registry_source_sha256(text: str, adapters: list[SkillAdapter], harness_table: str) -> str:
+    """Adapter-only, in-place ``source_sha256`` refresh for one harness sub-table.
 
+    For each ``[capabilities.<harness>]`` sub-table (``harness_table``) that
+    ALREADY declares ``status = "adapter"`` and whose owning capability's
+    ``canonical_source`` is a built adapter, replace ONLY its ``source_sha256``
+    line value with the freshly-computed adapter hash. This function NEVER
+    rewrites any other field, NEVER flips a non-``adapter`` status (so an
+    intentional ``status = "unsupported"`` parity override is preserved), and
+    NEVER inserts a missing sub-table.
 
-def _rewrite_registry_text(text: str, adapters: list[SkillAdapter]) -> str:
+    WI-5095: this replaces the prior whole-block rewrite, whose keying on "is a
+    skill capability" clobbered ``unsupported`` blocks to ``adapter``. Sub-table
+    parsing is two-pass (collect the block, then inspect) so ``status`` and
+    ``source_sha256`` line order within the block does not matter.
+    """
     adapters_by_source = {adapter.source_relative_path: adapter for adapter in adapters}
     lines = text.splitlines()
     output: list[str] = []
     current_source: str | None = None
-    skipping_codex_block = False
     index = 0
-    while index < len(lines):
+    total = len(lines)
+    while index < total:
         line = lines[index]
         stripped = line.strip()
 
-        if skipping_codex_block and stripped.startswith("["):
-            skipping_codex_block = False
-            while output and output[-1].strip() == "":
-                output.pop()
-            output.append("")
-            continue
-        if skipping_codex_block:
-            index += 1
-            continue
-
         if stripped.startswith("[[capabilities]]"):
             current_source = None
-        elif stripped.startswith("canonical_source"):
-            current_source = stripped.split("=", 1)[1].strip().strip('"')
-
-        if stripped == "[capabilities.codex]" and current_source in adapters_by_source:
-            while output and output[-1].strip() == "":
-                output.pop()
-            output.append("")
             output.append(line)
-            output.extend(_registry_adapter_block(adapters_by_source[current_source]))
-            skipping_codex_block = True
             index += 1
+            continue
+        if stripped.startswith("canonical_source"):
+            current_source = stripped.split("=", 1)[1].strip().strip('"')
+            output.append(line)
+            index += 1
+            continue
+
+        if stripped == harness_table:
+            # Two-pass: collect this sub-table (until the next table / array-of-
+            # tables header or EOF), inspect for status, then emit.
+            block = [line]
+            cursor = index + 1
+            while cursor < total and not lines[cursor].lstrip().startswith("["):
+                block.append(lines[cursor])
+                cursor += 1
+            adapter = adapters_by_source.get(current_source or "")
+            is_adapter_block = any(entry.strip() == 'status = "adapter"' for entry in block)
+            if adapter is not None and is_adapter_block:
+                new_sha_line = f'source_sha256 = "{adapter.source_sha256}"'
+                block = [new_sha_line if entry.strip().startswith("source_sha256") else entry for entry in block]
+            output.extend(block)
+            index = cursor
             continue
 
         output.append(line)
@@ -336,11 +353,12 @@ def update_registry(project_root: Path, adapters: list[SkillAdapter], *, check: 
     registry_path = project_root / REGISTRY_RELATIVE_PATH
     # Read bytes to detect CRLF contamination; text-mode read strips CR on Windows.
     current = registry_path.read_bytes().decode("utf-8")
-    updated = _rewrite_registry_text(current, adapters)
+    updated = _refresh_registry_source_sha256(current, adapters, "[capabilities.codex]")
     if current == updated:
         return False
     if not check:
-        registry_path.write_text(updated, encoding="utf-8", newline="\n")
+        # WI-5117: atomic write; LF bytes preserve the registry's LF contract.
+        _atomic_write_bytes(registry_path, updated.encode("utf-8"))
     return True
 
 
@@ -380,6 +398,8 @@ def _remove_empty_directories(path: Path, stop_at: Path) -> None:
 def _should_mirror_resource_file(path: Path) -> bool:
     if any(part in RESOURCE_EXCLUDED_DIRECTORY_NAMES for part in path.parts):
         return False
+    if path.name.startswith(RESOURCE_EXCLUDED_PREFIXES):
+        return False
     return path.suffix not in RESOURCE_EXCLUDED_SUFFIXES
 
 
@@ -403,7 +423,9 @@ def _sync_resource_mirror(project_root: Path, adapter: SkillAdapter, resource_na
                 changed.append(_relative_path(project_root, adapter_file))
 
     if adapter_resource_dir.is_dir():
-        for adapter_file in sorted(path for path in adapter_resource_dir.rglob("*") if path.is_file()):
+        for adapter_file in sorted(
+            path for path in adapter_resource_dir.rglob("*") if path.is_file() and _should_mirror_resource_file(path)
+        ):
             if adapter_file in expected_resource_files:
                 continue
             changed.append(_relative_path(project_root, adapter_file))
@@ -432,6 +454,11 @@ def generate(project_root: Path, *, check: bool = False) -> tuple[list[str], lis
     manifest_path = project_root / CODEX_SKILLS_RELATIVE_PATH / MANIFEST_NAME
     if _write_if_changed(manifest_path, _manifest_content(adapters), check=check):
         changed.append(_relative_path(project_root, manifest_path))
+    # WI-5095: the adapter-only registry source_sha256 refresh is part of the
+    # default flow. In --check it reports a stale adapter-block source_sha256 as
+    # drift without writing.
+    if update_registry(project_root, adapters, check=check):
+        changed.append(REGISTRY_RELATIVE_PATH.as_posix())
     orphans = _remove_orphan_adapters(project_root, adapters, check=check)
     changed.extend(orphans)
     return changed, [adapter.adapter_relative_path for adapter in adapters]
@@ -444,18 +471,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--update-registry",
         action="store_true",
-        help="Point Codex skill capability entries at generated adapters.",
+        help="Deprecated no-op; registry source_sha256 refresh is now part of the default flow.",
     )
     args = parser.parse_args(argv)
 
     try:
         changed, adapter_paths = generate(args.project_root, check=args.check)
-        adapters = build_adapters(args.project_root.resolve())
     except SkillFrontmatterError as exc:
         print(f"Codex skill adapters: FAIL ({exc})", file=sys.stderr)
         return 1
-    if args.update_registry and update_registry(args.project_root.resolve(), adapters, check=args.check):
-        changed.append(REGISTRY_RELATIVE_PATH.as_posix())
+    if args.update_registry:
+        print(
+            "Codex skill adapters: --update-registry is deprecated and a no-op; "
+            "the registry source_sha256 refresh is now part of the default flow.",
+            file=sys.stderr,
+        )
     if changed:
         action = "would update" if args.check else "updated"
         print(f"Codex skill adapters: {action} {len(changed)} file(s)")

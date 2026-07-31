@@ -22,16 +22,14 @@ from scripts.hygiene import router_corpus_dispose as dispose  # noqa: E402
 def _item(
     item_id: str,
     *,
-    label: str = dispose.LABEL_RETIRE_UNAPPROVED_NOISE,
+    label: str = dispose.LABEL_RETIRE_ROUTER_LOW_SIGNAL,
     scope: str = dispose.PLATFORM_SCOPE,
-    approval_state: str = "unapproved",
 ) -> dict:
     return {
         "id": item_id,
         "label": label,
         "scope": scope,
         "router_generated": True,
-        "approval_state": approval_state,
     }
 
 
@@ -117,7 +115,6 @@ def _knowledge_db(tmp_path: Path, rows: list[dict]) -> Path:
             failure_description=row.get("failure_description"),
             priority=row.get("priority", "P3"),
             stage=row.get("stage", "backlogged"),
-            approval_state=row.get("approval_state", "unapproved"),
             project_name=row.get("project_name", "PROJECT-GTKB-LO-ADVISORY-ROUTING"),
             subproject_name=row.get("subproject_name", "router"),
             implementation_order=row.get("implementation_order", 10),
@@ -281,7 +278,6 @@ def test_refined_batch_applies_only_subset_and_preserves_fields(tmp_path: Path) 
         "source_deliberation_query",
         "acceptance_summary",
         "regression_visibility",
-        "approval_state",
     ):
         assert after[field] == before[field], field
 

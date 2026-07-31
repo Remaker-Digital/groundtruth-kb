@@ -44,6 +44,13 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def _write_session_role_marker(root: Path, session_id: str, role: str = "prime-builder") -> None:
+    _write(
+        root / ".claude" / "session" / f"role-{session_id}.json",
+        json.dumps({"role": role, "session_id": session_id}),
+    )
+
+
 HarnessSeed = tuple[str, list[str]] | tuple[str, list[str], str]
 
 # Default harnesses for a seeded workspace: harness A (codex) loyal-opposition,
@@ -209,6 +216,48 @@ def test_apply_role_switch_rejects_invalid_active_candidate_without_reassignment
     assert updated["A"] == ["prime-builder"]
     assert updated["B"] == ["loyal-opposition"]
     assert _audit_records(project_root) == []
+
+
+def test_apply_role_switch_rejects_lo_only_candidate_without_interactive_prime_anchor(project_root: Path) -> None:
+    _seed_workspace(
+        project_root,
+        harnesses={
+            "A": ("codex", ["prime-builder"]),
+            "B": ("claude", ["loyal-opposition"]),
+        },
+    )
+    with pytest.raises(TransactionValidationError, match="interactive Prime Builder anchor"):
+        apply_role_switch(project_root, "A", "loyal-opposition", change_reason="t")
+    updated = _read_role_map(project_root)
+    assert updated["A"] == ["prime-builder"]
+    assert updated["B"] == ["loyal-opposition"]
+    assert _audit_records(project_root) == []
+
+
+def test_apply_role_switch_allows_lo_only_candidate_with_interactive_prime_anchor(
+    project_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_id = "sess-pb-anchor"
+    _seed_workspace(
+        project_root,
+        harnesses={
+            "A": ("codex", ["prime-builder"]),
+            "B": ("claude", ["loyal-opposition"]),
+        },
+    )
+    _write_session_role_marker(project_root, session_id)
+    monkeypatch.setenv("CODEX_THREAD_ID", session_id)
+
+    result = apply_role_switch(project_root, "A", "loyal-opposition", change_reason="lo-only surge")
+
+    updated = _read_role_map(project_root)
+    assert updated["A"] == ["loyal-opposition"]
+    assert updated["B"] == ["loyal-opposition"]
+    assert result.harness_id == "A"
+    assert result.previous_role_set == ("prime-builder",)
+    assert result.new_role_set == ("loyal-opposition",)
+    assert result.audit_record_path.exists()
 
 
 def test_audit_record_contains_required_fields(project_root: Path) -> None:

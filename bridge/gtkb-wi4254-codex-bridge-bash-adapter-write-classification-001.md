@@ -17,7 +17,7 @@ Project Authorization: PAUTH-PROJECT-GTKB-BRIDGE-SIGNAL-QUALITY-BRIDGE-SIGNAL-QU
 Project: PROJECT-GTKB-BRIDGE-SIGNAL-QUALITY
 Work Item: WI-4254
 
-target_paths: [".codex/gtkb-hooks/bridge-compliance-gate-bash-adapter.py", ".codex/gtkb-hooks/wi-id-collision-gate-bash-adapter.py", "platform_tests/scripts/test_sdk_bridge_bash_guard.py"]
+target_paths: [".codex/gtkb-hooks/bridge-compliance-gate-bash-adapter.py", ".codex/gtkb-hooks/wi-id-collision-gate-bash-adapter.py", "platform_tests/scripts/test_sdk_bridge_bash_guard.py", ".claude/hooks/bridge-compliance-gate.py", ".claude/hooks/bridge-proposal-wi-id-collision-gate.py", ".claude/settings.json"]
 
 implementation_scope: source
 requires_review: true

@@ -38,6 +38,23 @@ def _extract_auq_content(tool_input: dict, tool_result: dict) -> str | None:
     return "\n".join(parts) if parts else None
 
 
+def _acknowledge_completed_auq(session_id: object) -> None:
+    """Clear only the matching startup gate without passing owner content."""
+    if not isinstance(session_id, str) or not session_id.strip():
+        return
+    try:
+        project_root = Path(__file__).resolve().parents[2]
+        if str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+        from scripts.workstream_focus import acknowledge_startup_owner_input
+
+        acknowledge_startup_owner_input(session_id.strip(), project_root)
+    except Exception:
+        # PostToolUse is advisory/fail-open; a capture failure cannot block the
+        # completed tool result or alter a different session's guard.
+        return
+
+
 def main() -> int:
     """Hook entry point."""
     try:
@@ -54,11 +71,13 @@ def main() -> int:
     if not tool_result:
         return 0
 
+    session_id = payload.get("session_id", "")
+    _acknowledge_completed_auq(session_id)
+
     content = _extract_auq_content(tool_input, tool_result)
     if not content:
         return 0
 
-    session_id = payload.get("session_id", "")
     insert_deliberation(
         source_type="owner_conversation",
         content=content,

@@ -35,7 +35,7 @@ SPEC_BODY = (
     "\n"
     "The keyword is emitted by:\n"
     "\n"
-    "- scripts/cross_harness_bridge_trigger.py - cross-harness event-driven trigger; emits on actionable "
+    "- scripts/gtkb_dispatcher_daemon.py - dispatcher daemon; emits on actionable "
     "INDEX change when dispatching a counterpart harness.\n"
     "- Future routines and dispatchers (e.g., the single-harness bridge dispatcher when its thread is "
     "VERIFIED).\n"

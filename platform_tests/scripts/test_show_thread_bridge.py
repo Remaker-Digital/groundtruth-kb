@@ -1,4 +1,4 @@
-"""Unit tests for .claude/skills/bridge/helpers/show_thread_bridge.py."""
+"""Unit tests for .codex/skills/bridge/helpers/show_thread_bridge.py."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-HELPER_PATH = PROJECT_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "show_thread_bridge.py"
+HELPER_PATH = PROJECT_ROOT / ".codex" / "skills" / "bridge" / "helpers" / "show_thread_bridge.py"
 
 
 def _load_helper():
@@ -29,7 +29,7 @@ def helper():
 
 @pytest.fixture()
 def fake_bridge(tmp_path):
-    """Create a temporary bridge directory with INDEX.md and version files."""
+    """Create a temporary bridge directory for numbered version files."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     return bridge_dir
@@ -44,7 +44,6 @@ def _write_version(bridge_dir: Path, slug: str, version: int, first_line: str, b
 
 
 def test_t1_slug_with_no_files_returns_empty(helper, fake_bridge) -> None:
-    (fake_bridge / "INDEX.md").write_text("", encoding="utf-8")
     result = helper.show("gtkb-nonexistent", bridge_dir=fake_bridge)
     assert result["found"] is False
     assert result["versions"] == []
@@ -55,10 +54,6 @@ def test_t2_three_versions_sorted_ascending(helper, fake_bridge) -> None:
     _write_version(fake_bridge, "gtkb-foo", 1, "NEW", "body1")
     _write_version(fake_bridge, "gtkb-foo", 2, "GO", "body2")
     _write_version(fake_bridge, "gtkb-foo", 3, "NEW", "body3")
-    (fake_bridge / "INDEX.md").write_text(
-        "Document: gtkb-foo\nNEW: bridge/gtkb-foo-003.md\nGO: bridge/gtkb-foo-002.md\nNEW: bridge/gtkb-foo-001.md\n",
-        encoding="utf-8",
-    )
 
     result = helper.show("gtkb-foo", bridge_dir=fake_bridge)
     assert result["found"] is True
@@ -74,10 +69,6 @@ def test_t3_compound_suffix_slug_handled(helper, fake_bridge) -> None:
     """Slugs ending in numeric suffix (e.g., gtkb-foo-001) use -NNN as version."""
     _write_version(fake_bridge, "gtkb-foo-001", 1, "NEW")
     _write_version(fake_bridge, "gtkb-foo-001", 2, "GO")
-    (fake_bridge / "INDEX.md").write_text(
-        "Document: gtkb-foo-001\nGO: bridge/gtkb-foo-001-002.md\nNEW: bridge/gtkb-foo-001-001.md\n",
-        encoding="utf-8",
-    )
 
     result = helper.show("gtkb-foo-001", bridge_dir=fake_bridge)
     assert result["found"] is True
@@ -85,37 +76,9 @@ def test_t3_compound_suffix_slug_handled(helper, fake_bridge) -> None:
     assert [v["version"] for v in result["versions"]] == [1, 2]
 
 
-def test_t4_drift_detection_missing_files(helper, fake_bridge) -> None:
-    """INDEX references files that don't exist on disk → drift warning."""
-    _write_version(fake_bridge, "gtkb-foo", 1, "NEW")
-    (fake_bridge / "INDEX.md").write_text(
-        "Document: gtkb-foo\nGO: bridge/gtkb-foo-002.md\nNEW: bridge/gtkb-foo-001.md\n",
-        encoding="utf-8",
-    )
-
-    result = helper.show("gtkb-foo", bridge_dir=fake_bridge)
-    assert result["found"] is True
-    assert len(result["versions"]) == 1
-    assert any("bridge/gtkb-foo-002.md" in d for d in result["drift"])
-
-
-def test_t4b_drift_detection_orphan_disk_files(helper, fake_bridge) -> None:
-    """On-disk file not referenced by INDEX → drift warning."""
-    _write_version(fake_bridge, "gtkb-foo", 1, "NEW")
-    _write_version(fake_bridge, "gtkb-foo", 2, "GO")
-    (fake_bridge / "INDEX.md").write_text(
-        "Document: gtkb-foo\nNEW: bridge/gtkb-foo-001.md\n",
-        encoding="utf-8",
-    )
-
-    result = helper.show("gtkb-foo", bridge_dir=fake_bridge)
-    assert any("orphan" in d.lower() or "not referenced" in d.lower() for d in result["drift"])
-
-
 def test_t5_content_preview_bounded(helper, fake_bridge) -> None:
     long_body = "\n".join([f"line {i}" for i in range(500)])
     _write_version(fake_bridge, "gtkb-foo", 1, "NEW", long_body)
-    (fake_bridge / "INDEX.md").write_text("Document: gtkb-foo\nNEW: bridge/gtkb-foo-001.md\n", encoding="utf-8")
 
     result = helper.show("gtkb-foo", bridge_dir=fake_bridge, preview_lines=50)
     preview = result["versions"][0]["content_preview"]
@@ -126,7 +89,6 @@ def test_t5_content_preview_bounded(helper, fake_bridge) -> None:
 
 def test_default_preview_cap(helper, fake_bridge) -> None:
     _write_version(fake_bridge, "gtkb-foo", 1, "NEW")
-    (fake_bridge / "INDEX.md").write_text("Document: gtkb-foo\nNEW: bridge/gtkb-foo-001.md\n", encoding="utf-8")
     result = helper.show("gtkb-foo", bridge_dir=fake_bridge)
     assert result["preview_lines_cap"] == 200
 
@@ -134,10 +96,6 @@ def test_default_preview_cap(helper, fake_bridge) -> None:
 def test_index_status_chain_returned(helper, fake_bridge) -> None:
     _write_version(fake_bridge, "gtkb-foo", 1, "NEW")
     _write_version(fake_bridge, "gtkb-foo", 2, "GO")
-    (fake_bridge / "INDEX.md").write_text(
-        "Document: gtkb-foo\nGO: bridge/gtkb-foo-002.md\nNEW: bridge/gtkb-foo-001.md\n",
-        encoding="utf-8",
-    )
 
     result = helper.show("gtkb-foo", bridge_dir=fake_bridge)
     chain = result["index_status_chain"]
@@ -146,12 +104,12 @@ def test_index_status_chain_returned(helper, fake_bridge) -> None:
     assert chain[1]["status"] == "NEW"
 
 
-def test_slug_not_in_index_but_files_exist(helper, fake_bridge) -> None:
-    """Files on disk but INDEX has no entry → found=True, document_entry empty."""
+def test_no_action_status_chain_returned(helper, fake_bridge) -> None:
     _write_version(fake_bridge, "gtkb-foo", 1, "NEW")
-    (fake_bridge / "INDEX.md").write_text("", encoding="utf-8")
+    _write_version(fake_bridge, "gtkb-foo", 2, "GO")
+    _write_version(fake_bridge, "gtkb-foo", 3, "NO-ACTION")
 
     result = helper.show("gtkb-foo", bridge_dir=fake_bridge)
-    assert result["found"] is True
-    assert result["document_entry"] == ""
-    assert any("not referenced by INDEX" in d for d in result["drift"])
+
+    chain = result["index_status_chain"]
+    assert [item["status"] for item in chain] == ["NO-ACTION", "GO", "NEW"]

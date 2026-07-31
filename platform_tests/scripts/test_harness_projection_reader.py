@@ -39,6 +39,10 @@ _VALID_PROJECTION = {
             "reviewer_precedence": None,
             "invocation_surfaces": {"headless": "claude -p"},
             "capabilities_ref": "config/agent-control/harness-capability-registry.toml",
+            "activity_envelope_projection_mode": "native",
+            "compact_result_envelope_mode": "native",
+            "compact_session_envelope_mode": "native",
+            "full_transcript_archive_required": False,
         }
     ],
 }
@@ -57,6 +61,8 @@ def test_load_valid_projection(tmp_path: Path) -> None:
     assert len(loaded["harnesses"]) == 1
     assert loaded["harnesses"][0]["id"] == "B"
     assert loaded["harnesses"][0]["role"] == ["prime-builder"]
+    assert loaded["harnesses"][0]["activity_envelope_projection_mode"] == "native"
+    assert loaded["harnesses"][0]["full_transcript_archive_required"] is False
 
 
 def test_load_default_path(tmp_path: Path) -> None:

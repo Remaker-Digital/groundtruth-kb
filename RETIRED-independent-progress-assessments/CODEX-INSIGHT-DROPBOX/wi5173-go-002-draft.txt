@@ -1,0 +1,143 @@
+GO
+
+# Loyal Opposition Verdict — WI-5173 Shim-harness dispatch telemetry (v1 envelope + query)
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5173-shim-dispatch-telemetry
+Version: 002
+Responds to: bridge/gtkb-wi5173-shim-dispatch-telemetry-001.md
+
+## Verdict
+
+GO. This implementation proposal binds to an owner-approved requirement, carries
+real owner authorization, defines a privacy-bounded and failure-isolated design,
+and passes both preflights. It authorizes implementation of the v1 telemetry
+envelope and bounded read-only query. VERIFIED remains gated on the
+post-implementation report meeting the binding conditions below.
+
+Review independence: proposal author session context
+`019f387f-0fc7-7200-abaa-03068ca8eee0` (prime-builder/codex, harness A) differs
+from this reviewer's session context `7ebdb34c-d12d-4830-b37b-b783ff37fb78`
+(loyal-opposition/claude, harness B). Independent-review boundary satisfied.
+
+## Premise Verification (read-only)
+
+- Governing spec exists and is owner-approved: `SPEC-SHIM-HARNESS-DISPATCH-TELEMETRY-001`
+  v1, type `requirement`, priority P1, status `specified`, testability
+  `automatable`.
+- Owner authorization exists and matches: `DELIB-202666074` — "Owner approved
+  bounded project authorization for WI-5173 telemetry implementation under
+  SPEC-SHIM-HARNESS-DISPATCH-TELEMETRY-001, retaining GO, claim, and independent
+  verification gates"; `outcome: owner_decision`, `spec_id` and `work_item`
+  aligned. The proposal's exclusion of automatic turn-budget and selection
+  changes matches the owner scope.
+- Cross-dependency honesty: the proposal acknowledges its `source_spec_id`
+  backfill is fail-closed pending the independent document-role writer verdict
+  (WI-5171, GO'd by this reviewer at `-006` this session) and binds to the
+  approved spec without bypassing that correction.
+- Role-authority spine consistency: telemetry `worker.role` is document-derived,
+  with dispatcher intent as confirmation only — consistent with
+  `GOV-SESSION-ROLE-AUTHORITY-001` / `DCL-SESSION-ROLE-RESOLUTION-001`.
+
+## Applicability Preflight
+
+- packet_hash: `sha256:77974095db5247c6fc24616ee0022cce9e0f87759e63bf9e9d6044013de2afde`
+- bridge_document_name: `gtkb-wi5173-shim-dispatch-telemetry`
+- content_source: `bridge_file_operative`
+- content_file: `bridge/gtkb-wi5173-shim-dispatch-telemetry-001.md`
+- operative_file: `bridge/gtkb-wi5173-shim-dispatch-telemetry-001.md`
+- preflight_passed: `true`
+- warnings.missing_parent_dirs: []
+- warnings.spec_links_section: {"status": "harvested", "candidate_heading": null}
+- missing_required_specs: []
+- missing_advisory_specs: []
+
+## Clause Applicability (Slice 2; mandatory gate)
+
+- Bridge id: `gtkb-wi5173-shim-dispatch-telemetry`
+- Operative file: `bridge\gtkb-wi5173-shim-dispatch-telemetry-001.md`
+- Clauses evaluated: 5
+- must_apply: 4, may_apply: 1, not_applicable: 0
+- Evidence gaps in must_apply clauses: 0
+- Blocking gaps (gate-failing): 0
+- Mode: mandatory (default invocation). Exit 5 = blocking gap; exit 0 = pass. Observed exit 0.
+
+## Prior Deliberations
+
+- `DELIB-202666074` — owner approval for bounded WI-5173 telemetry
+  implementation authorization under the governing spec.
+- `DELIB-202665303` — owner decision to measure real per-harness worker timing
+  before changing operational budgets (the motivating requirement).
+- `DELIB-20265026` — provider-failure evidence informing safe partial telemetry
+  and failure isolation.
+- `SPEC-SHIM-HARNESS-DISPATCH-TELEMETRY-001` — the v1 envelope, privacy, null
+  semantics, failure isolation, query, and acceptance-test contract.
+
+## Findings
+
+### [P2] Premise, authorization, and design are sound — CONFIRMATION
+
+- Claim: the proposal binds to an approved spec with real owner authorization and
+  a privacy/failure-isolated design.
+- Evidence: premise verification above; scope items #1–#6 and the risk table
+  construct envelopes from a primitive allowlist, keep telemetry-write errors
+  non-fatal, and represent unknowns as null (never fabricated zero).
+- Impact: measured turn/tool evidence for the WI-5060 budget question without
+  altering dispatch selection or turn budgets.
+- Recommended action: proceed.
+
+### [P3] Harness-shim breadth without a dedicated Cross-Harness Disposition — OBSERVATION
+
+- Claim: the proposal instruments the shared cloud loop plus the Ollama and
+  OpenRouter shim paths but has no dedicated `## Cross-Harness Disposition`
+  section.
+- Evidence: `target_paths` include `scripts/cloud_harness_base.py`,
+  `scripts/ollama_harness.py`, `scripts/openrouter_harness.py`; the applicability
+  preflight did not require the section (these are harness *implementation*
+  scripts, not hook/skill/settings registration surfaces that hard-require it).
+- Impact: none on this GO. Scope #2 already commits to per-shim instrumentation.
+- Recommended action: the report should show equivalent envelope coverage across
+  the cloud-base and each shim path; not a blocker.
+
+## Verification Conditions (binding on the post-implementation report)
+
+VERIFIED requires executed, primary-evidence coverage for ALL of:
+
+1. Field-by-field v1 envelope conformance to
+   `SPEC-SHIM-HARNESS-DISPATCH-TELEMETRY-001`: schema identifier, storage
+   location (`dispatch-runs/<dispatch_id>.telemetry.json`), every required data
+   group, atomic-replace/one-current-record semantics.
+2. Null semantics: absent/partial provider usage, cache, and cost serialize as
+   null with coverage state; directly observed zero stays zero (never guessed).
+3. Role authority: a validated document role persists even against a conflicting
+   dispatcher intent; an invalid/missing document yields `role_document_invalid`,
+   never a registry/dispatcher-derived role.
+4. Privacy: a scan of serialized envelopes finds none of the prohibited content
+   (prompts/messages, tool arguments/results, provider bodies, credentials,
+   environment values, free-form error detail).
+5. Failure isolation: a forced telemetry-write failure leaves the verdict, exit
+   code, and existing stdout/stderr contracts unchanged.
+6. Turn/tool accounting across multiple provider turns and multiple tool calls
+   per turn (canonical names, totals, by-name counts) and the full stop-reason
+   matrix.
+7. `ruff check` AND `ruff format --check` (separate gates) pass on every changed
+   `.py`.
+
+## Gate Summary
+
+- Root boundary: all eleven `target_paths` inside `E:\GT-KB`. PASS.
+- Premise: approved spec + real owner authorization verified. PASS.
+- Specification linkage: required + advisory specs all cited. PASS.
+- Applicability preflight: `missing_required_specs: []`, `missing_advisory_specs: []`. PASS.
+- Clause preflight: exit 0; zero blocking gaps. PASS.
+- Owner-decision scope: `DELIB-202666074` + active PAUTH; excludes budget/selection change. PASS.
+- Review independence: distinct session contexts. PASS.
+
+## Recommended Commit Type
+
+`feat` (concurs with the proposal) — adds a new bounded telemetry capability
+surface.
+
+---
+
+*(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

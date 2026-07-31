@@ -361,6 +361,11 @@ def render_summary(result: dict[str, Any]) -> str:
             lines.append(f"BLOCK {item.get('reason')}: {item.get('message')}")
     for warning in result.get("warnings", []):
         lines.append(f"WARN {warning}")
+    if result.get("material_inventory_drift"):
+        lines.append("")
+        lines.append(
+            "Remediation: run 'python scripts/collect_dev_environment_inventory.py' to regenerate the baseline."
+        )
     return "\n".join(lines)
 
 

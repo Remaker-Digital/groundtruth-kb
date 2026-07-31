@@ -30,16 +30,34 @@ _ROOT_WITH_SPACES = Path("E:/fixture root/My GT-KB")
 
 
 def test_resolve_venv_gt_exe_windows() -> None:
-    """Windows venv-exe path resolution (WI-4530 root)."""
+    """Windows legacy venv-gt path resolution for stale-shim diagnostics."""
     expected = _ROOT / "groundtruth-kb" / ".venv" / "Scripts" / "gt.exe"
     assert helper.resolve_venv_gt_exe(_ROOT, "win32") == expected
 
 
 @pytest.mark.parametrize("platform", ["linux", "darwin"])
 def test_resolve_venv_gt_exe_posix(platform: str) -> None:
-    """POSIX venv-exe path resolution for both supported POSIX tokens."""
+    """POSIX legacy venv-gt path resolution for stale-shim diagnostics."""
     expected = _ROOT / "groundtruth-kb" / ".venv" / "bin" / "gt"
     assert helper.resolve_venv_gt_exe(_ROOT, platform) == expected
+
+
+def test_resolve_venv_python_exe_windows() -> None:
+    """Windows venv-Python path resolution for the repaired WI-4954 launcher."""
+    expected = _ROOT / "groundtruth-kb" / ".venv" / "Scripts" / "python.exe"
+    assert helper.resolve_venv_python_exe(_ROOT, "win32") == expected
+
+
+@pytest.mark.parametrize("platform", ["linux", "darwin"])
+def test_resolve_venv_python_exe_posix(platform: str) -> None:
+    """POSIX venv-Python path resolution for both supported POSIX tokens."""
+    expected = _ROOT / "groundtruth-kb" / ".venv" / "bin" / "python"
+    assert helper.resolve_venv_python_exe(_ROOT, platform) == expected
+
+
+def test_resolve_source_tree() -> None:
+    """The generated shim imports from the in-root source tree."""
+    assert helper.resolve_source_tree(_ROOT) == _ROOT / "groundtruth-kb" / "src"
 
 
 def test_resolve_venv_gt_exe_unsupported_platform() -> None:
@@ -52,47 +70,69 @@ def test_resolve_venv_gt_exe_unsupported_platform() -> None:
 
 
 def test_windows_cmd_shim_forwards_args() -> None:
-    """Windows .cmd content forwards all args to the quoted venv exe."""
-    venv_exe = helper.resolve_venv_gt_exe(_ROOT, "win32")
-    content = helper.render_windows_cmd_shim(venv_exe)
+    """Windows .cmd content forwards all args to the CLI module launcher."""
+    python_exe = helper.resolve_venv_python_exe(_ROOT, "win32")
+    source_tree = helper.resolve_source_tree(_ROOT)
+    content = helper.render_windows_cmd_shim(python_exe, source_tree)
     assert content.startswith("@echo off\n")
     assert "WI-4530" in content
-    assert f'"{venv_exe}"' in content
+    assert "WI-4954" in content
+    assert f'set "PYTHONPATH={source_tree};%PYTHONPATH%"' in content
+    assert f'"{python_exe}" -m groundtruth_kb.cli %*' in content
     assert "%*" in content
 
 
 def test_posix_shell_shim_uses_exec_and_quoted_args() -> None:
     """POSIX shell shim has a shebang, uses exec, and forwards quoted "$@"."""
-    venv_exe = helper.resolve_venv_gt_exe(_ROOT, "linux")
-    content = helper.render_posix_shell_shim(venv_exe)
+    python_exe = helper.resolve_venv_python_exe(_ROOT, "linux")
+    source_tree = helper.resolve_source_tree(_ROOT)
+    content = helper.render_posix_shell_shim(python_exe, source_tree)
     assert content.startswith("#!/usr/bin/env bash\n")
     assert "WI-4530" in content
+    assert "WI-4954" in content
+    assert "export PYTHONPATH=" in content
+    assert str(source_tree) in content
     assert "exec " in content
-    assert f'"{venv_exe}"' in content
+    assert str(python_exe) in content
+    assert "-m groundtruth_kb.cli" in content
     assert '"$@"' in content
 
 
 @pytest.mark.parametrize("platform", ["win32", "linux", "darwin"])
 def test_shim_quotes_path_with_spaces(platform: str) -> None:
-    """A venv-exe path with spaces is double-quoted intact on both platforms."""
+    """Launcher paths with spaces remain quoted safely on every platform."""
     rendered = helper.render_for_platform(_ROOT_WITH_SPACES, platform)
-    venv_exe = rendered["venv_exe"]
-    assert " " in venv_exe  # the fixture really does contain a space
-    # The quoted span must appear verbatim (not split or unquoted) in content.
-    assert f'"{venv_exe}"' in rendered["content"]
+    python_exe = rendered["python_exe"]
+    source_tree = rendered["source_tree"]
+    assert " " in python_exe  # the fixture really does contain a space
+    assert " " in source_tree
+    if platform == "win32":
+        assert f'"{python_exe}"' in rendered["content"]
+        assert f'set "PYTHONPATH={source_tree};%PYTHONPATH%"' in rendered["content"]
+    else:
+        assert f"'{python_exe}'" in rendered["content"]
+        assert f"'{source_tree}'" in rendered["content"]
 
 
 def test_render_for_platform_shape() -> None:
-    """Convenience wrapper returns filename + content + venv_exe, consistently."""
+    """Convenience wrapper returns filename + content + launcher paths."""
     win = helper.render_for_platform(_ROOT, "win32")
     assert win["filename"] == "gt.cmd"
-    assert win["content"] == helper.render_windows_cmd_shim(helper.resolve_venv_gt_exe(_ROOT, "win32"))
-    assert win["venv_exe"] == str(helper.resolve_venv_gt_exe(_ROOT, "win32"))
+    assert win["content"] == helper.render_windows_cmd_shim(
+        helper.resolve_venv_python_exe(_ROOT, "win32"), helper.resolve_source_tree(_ROOT)
+    )
+    assert win["python_exe"] == str(helper.resolve_venv_python_exe(_ROOT, "win32"))
+    assert win["source_tree"] == str(helper.resolve_source_tree(_ROOT))
+    assert win["legacy_venv_gt_exe"] == str(helper.resolve_venv_gt_exe(_ROOT, "win32"))
 
     posix = helper.render_for_platform(_ROOT, "linux")
     assert posix["filename"] == "gt"
-    assert posix["content"] == helper.render_posix_shell_shim(helper.resolve_venv_gt_exe(_ROOT, "linux"))
-    assert posix["venv_exe"] == str(helper.resolve_venv_gt_exe(_ROOT, "linux"))
+    assert posix["content"] == helper.render_posix_shell_shim(
+        helper.resolve_venv_python_exe(_ROOT, "linux"), helper.resolve_source_tree(_ROOT)
+    )
+    assert posix["python_exe"] == str(helper.resolve_venv_python_exe(_ROOT, "linux"))
+    assert posix["source_tree"] == str(helper.resolve_source_tree(_ROOT))
+    assert posix["legacy_venv_gt_exe"] == str(helper.resolve_venv_gt_exe(_ROOT, "linux"))
 
 
 def test_render_for_platform_unsupported_platform() -> None:

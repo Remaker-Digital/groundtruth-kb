@@ -18,14 +18,15 @@ The owner's requirement, stated explicitly in S292:
 Two Windows scheduled tasks run the pollers every 3 minutes and are confirmed
 reliable:
 
-- `AgentRedFileBridgeIndexScan-Claude` → runs
+- the retired Claude bridge scan task -> ran
   `independent-progress-assessments/bridge-automation/claude-file-bridge-scan.ps1`
-- `AgentRedFileBridgeIndexScan-Codex` → runs
+- the retired Codex bridge scan task -> ran
   `independent-progress-assessments/bridge-automation/codex-file-bridge-scan.ps1`
 
-Each PS1 reads `bridge/INDEX.md`, checks for NEW/REVISED entries, and on
-detection spawns a headless `claude.exe -p` (or `codex exec`) to action the
-entry. Output goes to `independent-progress-assessments/bridge-automation/logs/`
+Those retired PS1 pollers read the obsolete aggregate bridge queue, checked for
+NEW/REVISED entries, and on detection spawned a headless `claude.exe -p` (or
+`codex exec`) to action the entry. Output went to
+`independent-progress-assessments/bridge-automation/logs/`
 as `claude-scan.log` / `scan.log` plus structured `claude-scan-status.json` /
 `codex-scan-status.json`.
 
@@ -100,7 +101,7 @@ broken.
 ### Session-start checklist
 
 1. Run the bridge liveness check as normal.
-2. Read `bridge/INDEX.md` for pending work.
+2. Inspect dispatcher/TAFE bridge state and the numbered bridge thread files for pending work.
 3. **Trust that the Windows Task Scheduler pollers are running.** Do not
    create CronCreate jobs or mcp__scheduled-tasks as replacements.
 4. Verify by checking that the poller-freshness hook is reporting `POLLER OK`
@@ -108,8 +109,7 @@ broken.
    `.claude/settings.local.json` UserPromptSubmit block and
    `.claude/hooks/poller-freshness.py`.
 5. If either scan-status file is showing ALARM or FILE-MISSING, investigate
-   the Windows scheduled task (`Get-ScheduledTask -TaskName
-   AgentRedFileBridgeIndexScan-*`).
+   the retired Windows scheduled bridge-scan tasks.
 
 ### Known failure modes (investigate these first when POLLER reports WARN/ALARM)
 

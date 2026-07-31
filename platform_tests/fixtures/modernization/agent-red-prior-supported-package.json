@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "baseline_id": "gtkb-pre-modernization-verified-2026-06-28",
+  "commit_sha": "fcdb84651a2f2e6427abd4b2d5474cb644dab625",
+  "groundtruth_kb_tree_sha": "5dec9a0033e42dad689805aae5fdd46ff86dbd67",
+  "package_version": "0.7.0rc1",
+  "candidate_only_module": "groundtruth_kb.modernization",
+  "wheel_file": "groundtruth_kb-0.7.0rc1-py3-none-any.whl",
+  "wheel_sha256": "5c52774a310c604a87e78177c47cd426808fd5acbfd3c59834d5eec086e1d93e",
+  "commit_timestamp": "2026-06-28T14:12:58-07:00",
+  "commit_subject": "review: VERIFIED verdict for WI-4887 dispatcher chaos harness"
+}

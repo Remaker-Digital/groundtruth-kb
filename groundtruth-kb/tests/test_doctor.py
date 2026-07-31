@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import sqlite3
 from datetime import UTC
@@ -13,6 +14,7 @@ from groundtruth_kb.project.doctor import (
     ToolCheck,
     _check_bridge_dispatch_liveness,
     _check_db_schema,
+    _check_deliberation_search_backend,
     _check_dispatcher_config_cli_only_guard,
     _check_git,
     _check_groundtruth_toml,
@@ -140,6 +142,52 @@ def _write_dispatcher_config_cli_only_guard_fixture(root: Path, *, omit_guard_ma
         json.dumps({"hooks": {"PreToolUse": [{"hooks": [{"command": "implementation-start-gate.py"}]}]}}),
         encoding="utf-8",
     )
+
+
+def _write_deliberation_db(root: Path, *ids: str) -> None:
+    from groundtruth_kb.db import KnowledgeDB
+
+    db = KnowledgeDB(root / "groundtruth.db")
+    conn = db._get_conn()
+    for delib_id in ids:
+        conn.execute(
+            """INSERT INTO deliberations
+               (id, version, source_type, title, summary, content, changed_by, changed_at, change_reason)
+               VALUES (?, 1, 'report', ?, 'summary', 'content', 'test', '2026-07-06T00:00:00Z', 'test')""",
+            (delib_id, delib_id),
+        )
+    conn.commit()
+    db.close()
+
+
+class _FakeChromaCollection:
+    def __init__(self, metadatas: list[dict[str, str]]) -> None:
+        self._metadatas = metadatas
+
+    def count(self) -> int:
+        return len(self._metadatas)
+
+    def get(self, *, include: list[str]) -> dict[str, list[dict[str, str]]]:
+        assert include == ["metadatas"]
+        return {"metadatas": self._metadatas}
+
+
+def _install_fake_chromadb(monkeypatch, metadatas: list[dict[str, str]]) -> None:
+    from groundtruth_kb import db as db_mod
+
+    class FakeClient:
+        def __init__(self, *, path: str) -> None:
+            self.path = path
+
+        def get_collection(self, *, name: str) -> _FakeChromaCollection:
+            assert name == "deliberations"
+            return _FakeChromaCollection(metadatas)
+
+    class FakeChroma:
+        PersistentClient = FakeClient
+
+    monkeypatch.setattr(db_mod, "HAS_CHROMADB", True)
+    monkeypatch.setattr(db_mod, "chromadb", FakeChroma)
 
 
 # ---------------------------------------------------------------------------
@@ -281,6 +329,62 @@ def test_check_db_schema_missing_tables(tmp_path: Path) -> None:
     conn.close()
     result = _check_db_schema(tmp_path)
     assert result.status == "fail"
+
+
+# ---------------------------------------------------------------------------
+# _check_deliberation_search_backend
+# ---------------------------------------------------------------------------
+
+
+def test_deliberation_search_backend_fresh_index_passes(monkeypatch, tmp_path: Path) -> None:
+    _write_deliberation_db(tmp_path, "DELIB-0001", "DELIB-0002")
+    (tmp_path / ".groundtruth-chroma").mkdir()
+    _install_fake_chromadb(
+        monkeypatch,
+        [{"delib_id": "DELIB-0001"}, {"delib_id": "DELIB-0002"}, {"delib_id": "DELIB-0002"}],
+    )
+
+    result = _check_deliberation_search_backend(tmp_path)
+
+    assert result.status == "pass"
+    assert result.required is True
+    assert "indexed 2/2 current deliberations" in result.message
+
+
+def test_deliberation_search_backend_stale_index_fails(monkeypatch, tmp_path: Path) -> None:
+    _write_deliberation_db(tmp_path, "DELIB-0001", "DELIB-0002")
+    (tmp_path / ".groundtruth-chroma").mkdir()
+    _install_fake_chromadb(monkeypatch, [{"delib_id": "DELIB-0001"}])
+
+    result = _check_deliberation_search_backend(tmp_path)
+
+    assert result.status == "fail"
+    assert result.required is True
+    assert result.found is True
+    assert "index_stale" in result.message
+    assert "indexed 1/2 current deliberations" in result.message
+    assert "gt deliberations rebuild-index" in result.message
+
+
+def test_deliberation_search_backend_missing_chromadb_fails(monkeypatch, tmp_path: Path) -> None:
+    from groundtruth_kb import db as db_mod
+
+    _write_deliberation_db(tmp_path, "DELIB-0001")
+    monkeypatch.setattr(db_mod, "HAS_CHROMADB", False)
+    monkeypatch.setattr(db_mod, "chromadb", None)
+
+    result = _check_deliberation_search_backend(tmp_path)
+
+    assert result.status == "fail"
+    assert result.required is True
+    assert result.found is False
+    assert "chromadb_unavailable" in result.message
+
+
+def test_run_doctor_bridge_profile_wires_deliberation_search_backend_check() -> None:
+    source = inspect.getsource(run_doctor)
+
+    assert "checks.append(_check_deliberation_search_backend(target))" in source
 
 
 # ---------------------------------------------------------------------------
@@ -473,6 +577,7 @@ def _make_status_file(
     agent: str,
     updated_at: str,
     state: str = "no_pending",
+    pending_count: int = 0,
 ) -> Path:
     """Write a smart-poller dispatch-state JSON file under the new path.
 
@@ -495,7 +600,7 @@ def _make_status_file(
             role: {
                 "updated_at": updated_at,
                 "last_result": state,
-                "pending_count": 0,
+                "pending_count": pending_count,
                 "raw_pending_count": 0,
                 "filtered_terminal_count": 0,
                 "signature": "test-fixture",
@@ -541,7 +646,7 @@ def test_bridge_poller_fresh_file_ok(tmp_path: Path) -> None:
 
 def test_bridge_poller_5_min_old_warn(tmp_path: Path) -> None:
     """dispatch-state recipient updated 5 min ago → WARN."""
-    _make_status_file(tmp_path, "codex", _utc_now_minus_seconds(5 * 60 + 10))
+    _make_status_file(tmp_path, "codex", _utc_now_minus_seconds(5 * 60 + 10), "pending", pending_count=1)
     result = _check_bridge_dispatch_liveness(tmp_path, "codex")
     assert result.status == "warning", f"Expected warning, got {result.status}: {result.message}"
     assert "WARN" in result.message
@@ -549,7 +654,7 @@ def test_bridge_poller_5_min_old_warn(tmp_path: Path) -> None:
 
 def test_bridge_poller_15_min_old_alarm(tmp_path: Path) -> None:
     """dispatch-state recipient updated 15 min ago → ALARM."""
-    _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(15 * 60))
+    _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(15 * 60), "pending", pending_count=1)
     result = _check_bridge_dispatch_liveness(tmp_path, "claude")
     assert result.status == "fail", f"Expected fail, got {result.status}: {result.message}"
     assert "ALARM" in result.message

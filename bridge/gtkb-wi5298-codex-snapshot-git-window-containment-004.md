@@ -1,0 +1,243 @@
+NO-GO
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 2026-07-16T00-17-30Z-loyal-opposition-B-a3e6dd
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code dispatcher-spawned headless; resolved_role=loyal-opposition
+
+# Loyal Opposition Verdict - NO-GO (finalization-scoped) - WI-5298 Codex Snapshot Git Window Containment
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5298-codex-snapshot-git-window-containment
+Version: 004
+Responds to: bridge/gtkb-wi5298-codex-snapshot-git-window-containment-003.md
+Approved proposal: bridge/gtkb-wi5298-codex-snapshot-git-window-containment-001.md
+GO verdict: bridge/gtkb-wi5298-codex-snapshot-git-window-containment-002.md
+Date: 2026-07-16 UTC
+Reviewer role: loyal-opposition (harness B, Claude; dispatcher-spawned headless worker)
+
+## Verdict Summary
+
+NO-GO — **finalization-scoped, NOT an implementation defect.** The WI-5298
+implementation is independently verified as substantively correct and complete
+(see Positive Confirmations and Spec-to-Test Mapping: 27 spec-derived tests
+pass, Ruff lint + format clean, all four target files are cleanly WI-5298-scoped
+with zero commingled hunks, both mandatory preflights pass, and review
+independence holds). On substance alone this work is VERIFIED-worthy and NO
+implementation change is requested.
+
+VERIFIED cannot be issued because VERIFIED is a **commit-finalization outcome**
+(`.claude/rules/file-bridge-protocol.md` § Mandatory VERIFIED Commit-Finalization
+Gate; verify skill § Gate enforcement: "The staging area must be clean before
+finalization"). This dispatched headless worker cannot perform a clean, safe
+finalization in the current worktree state (see Findings). The required action
+is a finalization-sequencing / tree-state action that only an interactive Prime
+Builder / owner can take (see Required Revisions). A headless re-dispatch of this
+same -003 report will re-hit the identical blocker; it must not be re-looped
+headlessly.
+
+## Review Independence
+
+The reviewed -003 implementation report's author session context is
+`019f5f6d-60cd-7040-b73f-c7d23757c4bc` (Codex, harness A). This reviewer is a
+dispatcher-spawned Claude worker, harness B, run id
+`2026-07-16T00-17-30Z-loyal-opposition-B-a3e6dd`. The two session contexts
+differ; same-session self-review does not apply; independent review is
+satisfied.
+
+## Applicability Preflight
+
+- packet_hash: `sha256:e47e712089434cd5231c2f21d363bbfda98c72aafab76895a22e713efe1f7a1b`
+- bridge_document_name: `gtkb-wi5298-codex-snapshot-git-window-containment`
+- content_source: `bridge_file_operative`
+- content_file: `bridge/gtkb-wi5298-codex-snapshot-git-window-containment-003.md`
+- operative_file: `bridge/gtkb-wi5298-codex-snapshot-git-window-containment-003.md`
+- preflight_passed: `true`
+- warnings.missing_parent_dirs: []
+- warnings.spec_links_section: {"status": "harvested", "candidate_heading": null}
+- missing_required_specs: []
+- missing_advisory_specs: []
+- blocking_errors: []
+
+| Spec | Severity | Cited | Matched By |
+|------|----------|-------|------------|
+| `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | `advisory` | `yes` | content:artifact, content:deliberation |
+| `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | `advisory` | `yes` | content:verified |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | `blocking` | `yes` | doc:*, content:Specification Links |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | `blocking` | `yes` | doc:*, content:VERIFIED, content:verification, content:Specification-Derived Verification |
+| `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | `advisory` | `yes` | content:owner decision, content:specification, content:ADR, content:DCL, content:work item |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | `blocking` | `yes` | doc:*, path:bridge/** |
+
+## Clause Applicability (Slice 2; mandatory gate)
+
+- Bridge id: `gtkb-wi5298-codex-snapshot-git-window-containment`
+- Operative file: `bridge\gtkb-wi5298-codex-snapshot-git-window-containment-003.md`
+- Clauses evaluated: 5
+- must_apply: 3, may_apply: 2, not_applicable: 0
+- Evidence gaps in must_apply clauses: 0
+- Blocking gaps (gate-failing): 0
+- Mode: mandatory (default invocation). Exit 5 = blocking gap; exit 0 = pass. Observed exit: 0.
+
+| Clause | Spec | Applicability | Evidence found | Severity | Enforcement |
+|---|---|---|---|---|---|
+| `ADR-ISOLATION-APPLICATION-PLACEMENT-001/CLAUSE-IN-ROOT` | `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | may_apply | — | blocking | blocking |
+| `GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-NUMBERED-FILE-CHAIN-IS-CANONICAL` | `GOV-FILE-BRIDGE-AUTHORITY-001` | must_apply | yes | blocking | blocking |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001/CLAUSE-CONCRETE-LINKS` | `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | must_apply | yes | blocking | blocking |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001/CLAUSE-SPEC-TO-TEST-MAPPING` | `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | must_apply | yes | blocking | blocking |
+| `GOV-STANDING-BACKLOG-001/CLAUSE-VISIBILITY-BULK-OPS` | `GOV-STANDING-BACKLOG-001` | may_apply | — | blocking | blocking |
+
+Both mandatory preflights pass on the operative -003 report. The NO-GO is NOT a
+preflight/applicability failure; it is a commit-finalization gate failure (see
+Findings).
+
+## Prior Deliberations
+
+Carried forward from the thread chain (no new deliberation surfaced that alters
+disposition):
+
+- `DELIB-202666274` — authorizes the modernization program while preserving the
+  bridge, implementation-start, independent-review, and mechanical-operation gates.
+- `DELIB-20260707-NO-VISIBLE-CONSOLE-WINDOWS` — background automation must not
+  surface visible consoles (the requirement WI-5298 satisfies).
+- `DELIB-20260715-WINDOW-NOT-A-WITHHOLD-REASON` — console-window spawning is not a
+  dispatch-eligibility withhold reason (the non-impairment invariant WI-5298 honors).
+- `DELIB-202666320` — WI-5113 no-window finalizer subprocess scope is distinct
+  from this interactive Codex Desktop snapshot path.
+
+## Specifications Carried Forward
+
+The eleven linked specifications from the approved -001 proposal, mirrored into
+the -003 report, are all carried forward:
+`GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001`, `ADR-CODEX-HOOK-PARITY-FALLBACK-001`,
+`ADR-CROSS-HARNESS-PARITY-001`, `DCL-CROSS-HARNESS-ENFORCEMENT-001`,
+`GOV-FILE-BRIDGE-AUTHORITY-001`, `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`,
+`DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`, `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`,
+`ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`, `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`,
+`GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`.
+
+## Spec-to-Test Mapping
+
+| Specification | Test or Verification Command (independently executed by this reviewer) | Executed | Result |
+|---|---|---|---|
+| `GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001` | Static: `test_source_contains_only_hide_side_effect_and_no_dispatch_controls` proves the source contains only `ShowWindowAsync(SW_HIDE)` and NO `.kill(`/`.terminate(`/`TerminateProcess`/`SuspendThread`/`can_receive_dispatch`/`dispatch_quality`/`harness-registry`/`git add`. The module has no dispatch-touching or process-lifecycle code path, so it cannot impair the snapshot or dispatch. Author's 120s live observer was NOT reproduced headlessly [inference: static no-op guarantee is stronger than sampling]. | yes (static/hermetic) | PASS |
+| `ADR-CODEX-HOOK-PARITY-FALLBACK-001` | `python -m pytest test_codex_snapshot_window_hider.py test_dispatcher_daemon_supervision.py` | yes | PASS (27 passed) |
+| `ADR-CROSS-HARNESS-PARITY-001` | Static: change touches no `can_receive_dispatch`/`harness-registry`/role/eligibility surface (same static assertion test); the Codex UI defect is not projected into any harness's eligibility. Author's live `gt bridge status --json` topology read NOT reproduced headlessly [inference]. | yes (static) | PASS |
+| `DCL-CROSS-HARNESS-ENFORCEMENT-001` | Hermetic near-miss rejection (4 cases) + static no-termination/no-dispatch-control assertion | yes | PASS |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | Numbered file chain 001->002(GO)->003(report) intact and canonical. **Commit-finalization sub-gate CANNOT be satisfied by this headless worker (see Findings).** | partial | BLOCKED at finalization |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | `bridge_applicability_preflight.py` -> `preflight_passed: true`, `missing_required_specs: []` | yes | PASS |
+| `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001` | -003 header carries PAUTH, project, WI-5298, and exact target_paths | yes | PASS |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | Spec-to-test mapping present + tests executed (27 passed) + `ruff check` (All checks passed) + `ruff format --check` (4 files already formatted) | yes | PASS (substance) |
+| `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | Traceable chain WI-5298 -> -001 proposal -> -002 GO -> -003 report -> this verdict | yes | PASS |
+| `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | WI-5298 remains a candidate; this NO-GO keeps it pre-finalization (not prematurely resolved) | yes | PASS |
+| `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | Defect + non-impairment invariant preserved in WI-5298 and the bridge chain | yes | PASS |
+
+Every linked specification has executed independent evidence. The sole BLOCKED
+row is `GOV-FILE-BRIDGE-AUTHORITY-001`'s commit-finalization sub-gate — a
+tree-state constraint on THIS dispatched context, not a defect in the code.
+
+## Positive Confirmations
+
+- **Tests pass, independently reproduced.** `groundtruth-kb/.venv/Scripts/python.exe -m pytest platform_tests/scripts/test_codex_snapshot_window_hider.py platform_tests/scripts/test_dispatcher_daemon_supervision.py -q` -> `27 passed, 1 warning` (the warning is a pre-existing unknown `asyncio_mode` config option, unrelated to WI-5298). This matches the -003 report exactly.
+- **Lint + format clean.** `ruff check` on all four targets -> "All checks passed!"; `ruff format --check` -> "4 files already formatted".
+- **Hide-only, no process interference.** `scripts/ops/codex_snapshot_window_hider.py`: the only Win32 side effect on a target window is `ShowWindowAsync(hwnd, SW_HIDE)`; `psutil` is used read-only (`.name()`, `.parent()`, `.cmdline()`); there is no `TerminateProcess`/`kill`/priority/Git-argument/index mutation.
+- **Conjunctive provenance + fail-open.** Hiding requires a top-level EVENT_OBJECT_SHOW window whose process is `conhost.exe`, whose parent's cmdline is the EXACT snapshot Git argv (`-c core.hooksPath=NUL -c core.fsmonitor= add -u`), with a `ChatGPT.exe` ancestor within six hops. Every inspection failure returns False (window untouched). The hermetic near-miss suite proves rejection of wrong console name, `git status`, an extra `--porcelain` arg, and a wrong (`explorer.exe`) ancestor.
+- **Singleton + Windows-only + fail-soft launcher.** A named mutex (`Local\GTKB-CodexSnapshotWindowHider-v1`) makes a second instance exit cleanly; `main()` no-ops off Windows. The launcher's `ensure_snapshot_window_hider()` starts the monitor via `pythonw.exe` with no-window + DETACHED_PROCESS + CREATE_NEW_PROCESS_GROUP + DEVNULL std streams, returns False (fail-soft) on OSError/non-Windows/missing file, and is invoked BEFORE the watchdog Popen so it can never gate watchdog execution (proven by `test_storm_watchdog_continues_when_snapshot_hider_cannot_start`).
+- **Scope is clean.** All four target files are 100% WI-5298-scoped: `harness_storm_watchdog_launcher.py` (+33, all the hider-launch helper), `test_dispatcher_daemon_supervision.py` (+57, one guard line + two new tests, no deletions), plus the two new files. No commingled hunks in any target. The launcher dependency `scripts/windows_subprocess.py` is clean/committed.
+- **Review independence** holds (Codex A author session vs Claude B reviewer session).
+
+## Findings
+
+### [P1][finalization-scoped] VERIFIED cannot be safely finalized by a headless worker in the current worktree state
+
+- **Observation.** VERIFIED is a commit-finalization outcome that must be produced by
+  `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`, which
+  requires a clean staging area and commits exactly the declared verified path
+  set plus the verdict. The current worktree carries **1,101 changed paths (342
+  staged, 66 unstaged)** — the staging area is far from clean. Worse, the
+  bridge finalization/write machinery itself is uncommitted and mid-flight:
+  `.claude/skills/verify/helpers/write_verdict.py` (unstaged), `scripts/gtkb_bridge_writer.py`
+  (unstaged), and `scripts/bridge_review_independence.py` (staged) are a matched,
+  unreviewed cross-file change to the verdict finalizer, the core bridge writer,
+  and the review-independence enforcement gate (companion `.claude/skills/verify/helpers/final-verdict-5171.md`
+  is staged; this is WI-5171 / WI-5210-family work). The `write_verdict.py` change
+  specifically flips the review-independence comparator import from fail-open
+  (`return`) to fail-closed (`raise`) and threads a new `expected_artifact_path`
+  argument into `verdict_self_review_reason`.
+- **Deficiency rationale.** Running `--finalize-verified` here would (a) execute
+  unreviewed, uncommitted governance machinery — including the exact
+  review-independence gate that makes VERIFIED trustworthy — to mint WI-5298's
+  terminal governance commit, coupling WI-5298's VERIFIED provenance to another
+  open thread's uncommitted code; and (b) violate the documented clean-staging
+  precondition for atomic finalization. Both are hard preconditions of the
+  Mandatory VERIFIED Commit-Finalization Gate. A headless worker cannot ask the
+  owner to authorize a by-reference waiver or clean the tree, so it must fail
+  closed rather than leave a terminal VERIFIED file (per the same gate).
+- **Proposed solution.** Finalize WI-5298 from an interactive Prime Builder /
+  owner context where the tree state is owner-visible. Preferred sequence:
+  (1) land the WI-5171 / WI-5210 finalizer + writer + review-independence
+  machinery through its own bridge review/commit so the finalizer that mints
+  WI-5298's VERIFIED is itself reviewed and committed; then (2) finalize WI-5298
+  on clean, committed machinery via `write_verdict.py --finalize-verified --slug
+  gtkb-wi5298-codex-snapshot-git-window-containment --commit-message "fix(ops):
+  WI-5298 hide Codex Desktop snapshot Git console without impairing dispatch"
+  --include scripts/ops/codex_snapshot_window_hider.py --include
+  scripts/ops/harness_storm_watchdog_launcher.py --include
+  platform_tests/scripts/test_codex_snapshot_window_hider.py --include
+  platform_tests/scripts/test_dispatcher_daemon_supervision.py`. The two modified
+  targets are tracked, so `--finalize-verified` will require reviewed `--hunk-patch`
+  inputs for them (their diffs above are the reviewed hunks).
+- **Option rationale.** The alternative — this headless worker attempting the
+  finalize commit now — was rejected: it hand-rolls a governance-critical commit
+  atop 342 staged files and an unreviewed, mid-rewrite finalizer, exactly the
+  class of commingled/unreviewed-machinery finalization that must not be
+  performed autonomously. Leaving the report at NEW was also rejected: it invites
+  repeated LO re-dispatch that re-hits this identical blocker. A
+  finalization-scoped NO-GO both preserves the (positive) substance verification
+  and routes the one remaining action to the only context that can perform it.
+- **Prime Builder implementation context.**
+  - Objective: get WI-5298's VERIFIED committed on clean, reviewed finalization machinery.
+  - Preconditions: interactive Prime/owner session; the WI-5171/5210 finalizer+writer+review-independence changes committed (or an explicit owner by-reference waiver for finalizing atop them); a staging area reduced to the WI-5298 target set for the finalize transaction.
+  - Evidence paths: `bridge/gtkb-wi5298-codex-snapshot-git-window-containment-001.md` (proposal), `-002.md` (GO), `-003.md` (report), this `-004.md` (substance-verified NO-GO).
+  - File touchpoints (verified, do not change): `scripts/ops/codex_snapshot_window_hider.py`, `scripts/ops/harness_storm_watchdog_launcher.py`, `platform_tests/scripts/test_codex_snapshot_window_hider.py`, `platform_tests/scripts/test_dispatcher_daemon_supervision.py`.
+  - Verification steps: re-run the two pytest files (expect 27 passed) + `ruff check` + `ruff format --check` on the four targets immediately before finalizing.
+  - Rollback notes: NO-GO is not commit-finalized; this `-004` verdict is left untracked. No dispatcher/TAFE/harness/task state was mutated by this review.
+  - Open decisions: whether to commit the WI-5171/5210 machinery first (preferred) or finalize WI-5298 under an explicit owner by-reference waiver (owner call).
+
+## Required Revisions
+
+1. Do NOT modify the WI-5298 implementation — it is substantively verified. The
+   only required action is finalization sequencing.
+2. Move WI-5298 finalization to an interactive Prime Builder / owner session and
+   finalize on clean, committed finalization machinery (commit the WI-5171/5210
+   finalizer+writer+review-independence changes first, or obtain an explicit
+   owner by-reference waiver to finalize atop them), then run the
+   `--finalize-verified` transaction shown in Findings.
+3. Do NOT headlessly re-dispatch this same -003 report for verification; it will
+   re-hit the identical clean-staging + dirty-finalizer blocker.
+
+## Commands Executed
+
+- `git status --short` (worktree: 1,101 changed paths; 342 staged, 66 unstaged) and per-target `git diff` (all four targets 100% WI-5298-scoped; `scripts/windows_subprocess.py` clean).
+- `groundtruth-kb/.venv/Scripts/python.exe -m pytest platform_tests/scripts/test_codex_snapshot_window_hider.py platform_tests/scripts/test_dispatcher_daemon_supervision.py -q --no-header --tb=short` -> `27 passed, 1 warning`.
+- `groundtruth-kb/.venv/Scripts/python.exe -m ruff check <4 targets>` -> "All checks passed!"; `... -m ruff format --check <4 targets>` -> "4 files already formatted".
+- `groundtruth-kb/.venv/Scripts/python.exe scripts/bridge_applicability_preflight.py --bridge-id gtkb-wi5298-codex-snapshot-git-window-containment` -> preflight_passed: true, missing_required_specs: [].
+- `groundtruth-kb/.venv/Scripts/python.exe scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-wi5298-codex-snapshot-git-window-containment` -> exit 0, blocking gaps 0.
+- Static inspection of `scripts/ops/codex_snapshot_window_hider.py`, the `scripts/ops/harness_storm_watchdog_launcher.py` diff, and the dirty finalizer/writer machinery (`write_verdict.py`, `gtkb_bridge_writer.py`, `bridge_review_independence.py`).
+
+## Owner Action Required
+
+Status: WI-5298 code is verified-correct; only its VERIFIED commit-finalization
+is blocked. Decision needed (interactive): finalize WI-5298 after committing the
+WI-5171/5210 finalizer+writer machinery through its own review (preferred), or
+finalize it under an explicit owner by-reference waiver atop the current dirty
+tree. This headless worker cannot make that call and has therefore failed closed
+to a finalization-scoped NO-GO.
+
+## Scope of this verdict
+
+Verdict-file only. No source, test, configuration, dispatcher/TAFE, harness, or
+runtime-state mutation was performed during this review. NO-GO is not a
+commit-finalization outcome; this -004 verdict is left untracked per protocol.
+
+*(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

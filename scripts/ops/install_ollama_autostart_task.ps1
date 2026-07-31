@@ -47,7 +47,9 @@ if ($existing -and -not $Force) {
 $action = New-ScheduledTaskAction -Execute $resolvedOllama -Argument "serve"
 $trigger = New-ScheduledTaskTrigger -AtLogOn
 $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel LeastPrivilege
-$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DisallowStartIfOnBatteries:$false -StartWhenAvailable
+# WI-5071: -Hidden keeps the logon-triggered `ollama.exe serve` console task
+# from surfacing a visible window at user logon, matching every other GT-KB task installer.
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DisallowStartIfOnBatteries:$false -StartWhenAvailable -Hidden
 
 if ($PSCmdlet.ShouldProcess($TaskName, "Register Ollama autostart scheduled task")) {
     Register-ScheduledTask `

@@ -28,8 +28,8 @@ authority must be rejected.
 ## Operational Mode (current as of 2026-05-09)
 
 **Both the retired OS bridge pollers (halted 2026-04-25) and the smart
-poller (retired 2026-05-09) are disabled. The cross-harness event-driven
-trigger is the canonical bridge automation path while it remains healthy.**
+poller (retired 2026-05-09) are disabled. The dispatcher daemon is the
+canonical bridge automation path while it remains healthy.**
 
 The owner directive that halted OS pollers on 2026-04-25 applied to the
 former blind-polling implementation: Windows scheduled tasks
@@ -48,31 +48,26 @@ uninstall scripts, and the runner `groundtruth-kb/scripts/bridge_poller_runner.p
 have all been archived to `archive/smart-poller-2026-05-09/`. The
 `_check_smart_bridge_poller` doctor check has been removed; bridge dispatch
 liveness is now reported by `_check_bridge_dispatch_liveness` and
-`_check_cross_harness_trigger` (per Slice 4 D4).
+`_check_dispatcher_daemon` (per Slice 4 D4).
 
-Bridge dispatch automation is provided by the cross-harness event-driven
-trigger at `scripts/cross_harness_bridge_trigger.py`, registered as
-PostToolUse and Stop hooks in `.claude/settings.json` and
-`.codex/hooks.json`. The trigger fires on tool-use and Stop events rather
-than on a fixed interval. When TAFE-backed bridge state changes, or the agent
-ends a turn, the trigger inspects dispatcher/TAFE state and dispatches the appropriate counterpart
-harness if a recipient's actionable queue signature has changed (Codex on
-latest NEW or REVISED; Prime on latest GO or NO-GO). ADVISORY entries are surfaced in the Prime actionable
+Bridge dispatch automation is provided by the dispatcher daemon at
+`scripts/gtkb_dispatcher_daemon.py`. On daemon ticks it inspects
+dispatcher/TAFE state and dispatches the appropriate counterpart harness if a
+recipient's actionable queue signature has changed (Codex on latest NEW or
+REVISED; Prime on latest GO or NO-GO). ADVISORY entries are surfaced in the Prime actionable
 list by `compute_actionable_pending` for interactive sessions, but the
 `_derive_dispatchable` invariant in `groundtruth_kb.bridge.notify` returns
 False for ADVISORY, so every headless dispatch surface filters them out
 before the signature is computed and they never spawn a Prime worker.
 VERIFIED is terminal, and DEFERRED and WITHDRAWN are non-actionable for
-dispatch. The trigger
-is monitoring and dispatch infrastructure only; TAFE-backed bridge state is the
+dispatch. The daemon is monitoring and dispatch infrastructure only;
+TAFE-backed bridge state is the
 canonical workflow state. Per-recipient dispatch state is recorded at
 `.gtkb-state/bridge-poller/dispatch-state.json` (path retained for
 compatibility with the smart-poller substrate).
 
-Manual fallback remains available when the trigger is unhealthy (per the
-doctor predicate above) or intentionally stopped: the owner triggers a
-Prime bridge scan with a brief prompt such as `Bridge` or `Bridge scan`,
-Prime then reads TAFE/dispatcher bridge state and acts on actionable entries.
+Manual owner assignment/scanning remains available when the daemon is unhealthy
+or intentionally stopped. No other automated fallback substrate is valid.
 Codex bridge scans are similarly owner-triggered in the Codex harness.
 
 The 2026-04-25 OS-poller halt was made after the former OS Claude poller
@@ -92,46 +87,25 @@ implementations.
 
 ## Bridge Dispatch Enablement Contract
 
-The cross-harness event-driven trigger is opt-out, not opt-in, once all of
-these are true:
+The dispatcher daemon is the only automated bridge dispatch substrate once all
+of these are true:
 
-1. The trigger script (`scripts/cross_harness_bridge_trigger.py`) is
-   present in the GT-KB platform.
-2. The trigger registrations in `.claude/settings.json` (PostToolUse +
-   Stop) and `.codex/hooks.json` (PostToolUse + Stop) are present.
-3. `gt project doctor` reports the trigger infrastructure healthy
-   (`_check_cross_harness_trigger` PASS / WARN; `_check_bridge_dispatch_liveness`
-   per recipient).
-4. The host supports the required headless AI-harness invocation.
+1. The daemon script (`scripts/gtkb_dispatcher_daemon.py`) is present in the
+   GT-KB platform.
+2. `gt project doctor` reports daemon-only automation and dispatch liveness
+   healthy (`_check_dispatcher_only_bridge_automation` PASS / WARN;
+   `_check_bridge_dispatch_liveness` per recipient).
+3. The host supports the required headless AI-harness invocation.
 
 Do not re-enable the retired OS poller implementation OR the retired
-smart poller as a substitute for the cross-harness event-driven trigger
+smart poller as a substitute for the dispatcher daemon
 unless Mike gives a new explicit directive for that legacy path.
 
-## Dual-Substrate Coexistence (Slice 2 of single-harness-bridge-dispatcher)
+## Dispatcher-Only Substrate
 
-The bridge protocol has TWO live dispatch substrates as of Slice 2 of
-``gtkb-single-harness-bridge-dispatcher-slice-2`` (Codex GO at ``-006``):
-
-1. **Cross-harness event-driven trigger** (multi-harness topology) —
-   ``scripts/cross_harness_bridge_trigger.py`` registered as PostToolUse
-   and Stop hooks in ``.claude/settings.json`` and ``.codex/hooks.json``.
-   Fires on tool-use and Stop events. Applicable when the role map records
-   two harness IDs with singleton role-sets.
-2. **Single-harness bridge dispatcher** (single-harness topology) —
-   ``scripts/single_harness_bridge_dispatcher.py`` invoked by a Windows
-   scheduled task ``GTKB-SingleHarnessBridgeDispatcher`` on a fixed
-   interval (default 5 minutes; per
-   ``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001`` § Platform Bindings).
-   Applicable when the role map records one harness ID with a multi-element
-   role-set ``["prime-builder", "loyal-opposition"]`` per
-   ``ADR-SINGLE-HARNESS-OPERATING-MODE-001``.
-
-   Activation is managed by ``scripts/single_harness_bridge_automation.py``,
-   which is registered from both ``.claude/settings.json`` and
-   ``.codex/hooks.json``. That manager enables or updates the scheduled task
-   only when the live role map is single-harness, deactivates it when the
-   topology is multi-harness, and may run a one-shot dispatch after Stop on single-harness topology.
+The bridge protocol has one live automated dispatch substrate: the dispatcher
+daemon. Single-harness or multi-harness topology affects candidate selection
+and role routing, not the creation of an alternate automation substrate.
 
 Both substrates honor the same actionable-signature scheme (byte-identical
 ``_signature`` computation), per-document lease/contention suppression, and the same fire-and-forget audit-log discipline
@@ -139,10 +113,10 @@ Both substrates honor the same actionable-signature scheme (byte-identical
 
 They are **mutually exclusive at runtime**:
 
-- In multi-harness topology: the cross-harness trigger is the active
+- In multi-harness topology: the dispatcher daemon is the active
   substrate; the single-harness dispatcher's applicability check returns
   False and the scheduled task no-ops.
-- In single-harness topology: the cross-harness trigger's topology gate
+- In single-harness topology: the dispatcher daemon's topology gate
   (per IP-8 of the slice-2 thread) inerts it with SPEC-required durable
   audit evidence (per-role entries in ``dispatch-failures.jsonl`` plus
   per-recipient ``last_result = "single_harness_topology_not_applicable"``
@@ -154,7 +128,7 @@ Substrate applicability is determined by the role-set topology in
 ``groundtruth_kb.harness_projection.read_roles`` or the ``roles`` subcommand
 under ``gt harness``. The doctor's
 ``_check_role_set_topology_consistency`` (Slice 1) validates wire form;
-``_check_single_harness_dispatcher_when_required`` (Slice 1 + Slice 2
+``_check_dispatcher_daemon_when_required`` (Slice 1 + Slice 2
 upgrade) reports applicability and registration health. Per
 ``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001`` § Doctor Check, missing-
 task severity is WARN (not FAIL) so manual-trigger fallback remains
@@ -170,15 +144,13 @@ Bridge automation has two complementary first-class axes, each with a
 distinct role in the bridge protocol's autonomous-vs-interactive dispatch
 model:
 
-### Axis 1: Dispatchable work — cross-harness event-driven trigger
+### Axis 1: Dispatchable work — dispatcher daemon
 
-The cross-harness event-driven trigger (`scripts/cross_harness_bridge_trigger.py`)
+The dispatcher daemon (`scripts/gtkb_dispatcher_daemon.py`)
 is the canonical mechanism for **dispatchable work** — work that can be
 completed by a freshly-spawned counterpart harness session without further
-owner input. Registered as PostToolUse and Stop hooks in
-`.claude/settings.json` and `.codex/hooks.json`. Fires on tool-use and Stop.
-Spawns counterpart harness sessions when actionable dispatcher/TAFE bridge-state
-changes are detected.
+owner input. It spawns counterpart harness sessions when actionable
+dispatcher/TAFE bridge-state changes are detected.
 
 Examples of dispatchable work:
 - Loyal Opposition reviews of NEW or REVISED proposals.
@@ -207,9 +179,9 @@ Examples of non-dispatchable work:
 The two-axis automation surface is implemented:
 
 - AXIS 1 (Claude→Codex and Codex→Claude when no interactive session is
-  active): the cross-harness event-driven trigger at
-  `scripts/cross_harness_bridge_trigger.py` registered as PostToolUse + Stop
-  hooks. Spawns headless counterpart harness on actionable signature change.
+  active): the dispatcher daemon at
+  `scripts/gtkb_dispatcher_daemon.py`. Spawns headless counterpart harness on
+  actionable signature change.
 - AXIS 2 Codex-side: the inventoried Codex app-thread automation under
   `config/agent-control/system-interface-map.toml`, which wakes the Codex
   interactive session periodically.
@@ -225,7 +197,7 @@ The two-axis automation surface is implemented:
 
 ### Both axes required; roles do not overlap
 
-The cross-harness trigger does NOT refresh already-running interactive
+The dispatcher daemon does NOT refresh already-running interactive
 sessions, and the thread automation does NOT spawn counterpart harness
 sessions. They are complementary, not duplicative.
 
@@ -251,7 +223,7 @@ in this slice.
 ## Invariants (Bridge Protocol Itself)
 
 These remain in force regardless of whether bridge scans are manual or handled
-by the cross-harness event-driven trigger:
+by the dispatcher daemon:
 
 - TAFE-backed bridge state plus status-bearing versioned files under `bridge/`
   are the canonical workflow state. Do not recreate aggregate queue artifacts
@@ -303,22 +275,18 @@ Do NOT, without explicit owner approval:
   investigation tokens — without a commensurate chance of value; the cheap
   fixed-interval check was never the defect, the unconditional expensive spawn
   was. The remedy is to gate the expensive action behind a cheap, deterministic
-  check (the cross-harness trigger's actionable-signature check), evaluated as
+  check (the daemon actionable-signature check), evaluated as
   relative value vs. cost per action.
 - **S339 (2026-05-09)**: Smart-poller retirement (Slice 4). Smart-poller
   scheduled task `GTKB-SmartBridgePoller` halted; runtime artifacts
   archived to `archive/smart-poller-2026-05-09/`; doctor's
-  `_check_smart_bridge_poller` removed in favor of
-  `_check_cross_harness_trigger` and `_check_bridge_dispatch_liveness`.
-  Bridge dispatch is now event-driven (PostToolUse + Stop hooks fire the
-  trigger) rather than interval-driven. Lesson: dispatch-on-actionable-
-  change is the load-bearing semantic; the substrate (interval-driven
-  poller vs. event-driven trigger) is a mechanism choice that should
-  follow the host's natural integration boundary. The cross-harness
-  trigger reuses the dispatch-state path
+  `_check_smart_bridge_poller` removed in favor of daemon-only automation and
+  dispatch-liveness checks. Lesson: dispatch-on-actionable-change is the
+  load-bearing semantic; the substrate must be the dispatcher daemon rather
+  than a hook-triggered or poller fallback. The daemon reuses the dispatch-state path
   (`.gtkb-state/bridge-poller/dispatch-state.json`) and the actionable-
   signature scheme byte-identically per
-  `platform_tests/scripts/test_cross_harness_bridge_trigger.py` to preserve the
+  `platform_tests/scripts/test_gtkb_dispatcher_daemon.py` to preserve the
   existing audit-trail invariants while changing the substrate.
 
 ## Copyright

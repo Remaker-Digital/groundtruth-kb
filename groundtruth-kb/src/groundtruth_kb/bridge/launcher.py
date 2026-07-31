@@ -3,10 +3,8 @@
 
 This module belongs to the archived SQLite/MCP bridge runtime and is retained
 for compatibility. New dual-agent projects should use the file bridge protocol
-and the cross-harness event-driven trigger
-(``scripts/cross_harness_bridge_trigger.py``) registered as PostToolUse + Stop
-hooks in ``.claude/settings.json`` and ``.codex/hooks.json``. The retired
-smart-poller and OS-poller implementations are archived under
+and dispatcher daemon. The retired smart-poller and OS-poller implementations
+are archived under
 ``archive/smart-poller-2026-05-09/``.
 
 When called from a SessionStart hook, this script:

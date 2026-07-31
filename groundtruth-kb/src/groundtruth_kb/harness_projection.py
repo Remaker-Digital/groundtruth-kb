@@ -88,25 +88,25 @@ _JSON_DECODED_FIELDS = ("role", "invocation_surfaces")
 #
 # The two axes are now derived separately:
 #
-# - ``can_fire_events``: the harness carries live event-firing hook surfaces
-#   (PostToolUse + Stop) that drive the cross-harness trigger. Only Claude Code
-#   and Codex CLI qualify (``.claude/hooks`` + ``.codex/hooks.json``; Codex on
-#   Windows per ADR-CODEX-HOOK-PARITY-FALLBACK-001). This is the honest
-#   eligibility axis for "is there an active event source".
+# - ``can_fire_events``: retained compatibility field for historical
+#   event-firing hook surfaces. The dispatcher daemon is now the only live
+#   dispatch event source, so current projections neutralize this axis even
+#   when legacy registry metadata says otherwise.
 # - ``can_receive_dispatch``: the harness can be spawned headless as a dispatch
 #   target. All registered launchable harness types qualify.
 #
-# ``event_driven_hooks`` is retained as a DEPRECATED back-compat alias for
-# ``can_fire_events`` so legacy topology readers continue to ask the event
-# source question correctly. New code MUST read ``can_fire_events`` /
+# ``event_driven_hooks`` is retained as a DEPRECATED back-compat alias for the
+# neutralized event-source axis. New code MUST read ``can_fire_events`` /
 # ``can_receive_dispatch``.
-_EVENT_FIRING_CAPABLE_TYPES = frozenset({"claude", "claude-code", "codex", "codex-cli", "cursor"})
+_EVENT_FIRING_CAPABLE_TYPES: frozenset[str] = frozenset()
 
 _DISPATCH_RECEIVE_CAPABLE_TYPES = frozenset(
     {"claude", "claude-code", "codex", "codex-cli", "cursor", "ollama", "openrouter", "antigravity"}
 )
+_PROVIDER_HARNESS_TYPES = frozenset({"ollama", "openrouter"})
 
-# Deprecated alias preserved for back-compat readers; equals the event-firing axis.
+# Deprecated alias preserved for back-compat readers; equals the neutralized
+# event-source axis.
 _EVENT_DRIVEN_HOOK_CAPABLE_TYPES = _EVENT_FIRING_CAPABLE_TYPES
 
 
@@ -146,7 +146,62 @@ def _bool_or_none(value: Any) -> bool | None:
     return None
 
 
-def _dispatch_metadata(record: dict[str, Any]) -> dict[str, bool]:
+def _float_or_none(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def _int_or_none(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def _string_list(value: Any) -> list[str]:
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, (list, tuple, set, frozenset)):
+        return []
+    return sorted({str(item).strip() for item in value if str(item).strip()})
+
+
+def _without_event_source_tag(tags: list[str]) -> list[str]:
+    return sorted({tag for tag in tags if tag != "event-source"})
+
+
+def _neutralize_event_source_metadata(surfaces: Any) -> Any:
+    if not isinstance(surfaces, dict):
+        return surfaces
+    neutralized = {key: dict(value) if isinstance(value, dict) else value for key, value in surfaces.items()}
+
+    for source in (neutralized, *(value for value in neutralized.values() if isinstance(value, dict))):
+        for key in ("can_fire_events", "fire_events", "event_source", "event_driven_hooks"):
+            if key in source:
+                source[key] = False
+        for key in ("dispatch_tags", "tags"):
+            tags = _string_list(source.get(key))
+            if tags:
+                source[key] = _without_event_source_tag(tags)
+
+    return neutralized
+
+
+def _dispatch_metadata(record: dict[str, Any]) -> dict[str, Any]:
     """Extract explicit dispatch capability metadata from invocation surfaces.
 
     ``harnesses`` has no dedicated dispatchability columns, and this bridge
@@ -169,6 +224,8 @@ def _dispatch_metadata(record: dict[str, Any]) -> dict[str, bool]:
             sources.append(value)
     headless = surfaces.get("headless")
     if isinstance(headless, dict):
+        # Compatibility fallback only: canonical top-level and dispatch
+        # declarations above remain authoritative when explicitly present.
         sources.append(headless)
 
     aliases = {
@@ -176,7 +233,7 @@ def _dispatch_metadata(record: dict[str, Any]) -> dict[str, bool]:
         "can_receive_dispatch": ("can_receive_dispatch", "receive_dispatch", "dispatch_target"),
         "event_driven_hooks": ("event_driven_hooks",),
     }
-    result: dict[str, bool] = {}
+    result: dict[str, Any] = {}
     for canonical, names in aliases.items():
         for source in sources:
             for name in names:
@@ -186,6 +243,82 @@ def _dispatch_metadata(record: dict[str, Any]) -> dict[str, bool]:
                     break
             if canonical in result:
                 break
+    numeric_aliases = {
+        "dispatch_quality": ("dispatch_quality", "quality"),
+        "dispatch_cost": ("dispatch_cost", "cost"),
+        "dispatch_availability": ("dispatch_availability", "availability"),
+    }
+    for canonical, names in numeric_aliases.items():
+        for source in sources:
+            for name in names:
+                parsed_float = _float_or_none(source.get(name))
+                if parsed_float is not None:
+                    result[canonical] = parsed_float
+                    break
+            if canonical in result:
+                break
+    for source in sources:
+        parsed_int = _int_or_none(source.get("dispatch_max_items", source.get("max_items")))
+        if parsed_int is not None:
+            result["dispatch_max_items"] = parsed_int
+            break
+    for source in sources:
+        tags = _string_list(source.get("dispatch_tags", source.get("tags")))
+        if tags:
+            result["dispatch_tags"] = tags
+            break
+    return result
+
+
+def _string_or_none(value: Any) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _envelope_metadata(record: dict[str, Any]) -> dict[str, Any]:
+    """Extract activity/result/session envelope metadata from invocation surfaces."""
+    surfaces = record.get("invocation_surfaces")
+    if not isinstance(surfaces, dict):
+        return {}
+    sources = [surfaces]
+    for key in ("activity_envelope", "result_envelope", "session_envelope", "envelope_projection"):
+        value = surfaces.get(key)
+        if isinstance(value, dict):
+            sources.append(value)
+
+    aliases = {
+        "activity_envelope_projection_mode": (
+            "activity_envelope_projection_mode",
+            "activity_projection_mode",
+            "activity_envelope_mode",
+        ),
+        "compact_result_envelope_mode": (
+            "compact_result_envelope_mode",
+            "result_envelope_mode",
+            "result_envelope",
+        ),
+        "compact_session_envelope_mode": (
+            "compact_session_envelope_mode",
+            "session_envelope_mode",
+            "session_envelope",
+        ),
+    }
+    result: dict[str, Any] = {}
+    for canonical, names in aliases.items():
+        for source in sources:
+            for name in names:
+                parsed = _string_or_none(source.get(name))
+                if parsed is not None:
+                    result[canonical] = parsed
+                    break
+            if canonical in result:
+                break
+    for source in sources:
+        parsed_bool = _bool_or_none(source.get("full_transcript_archive_required"))
+        if parsed_bool is not None:
+            result["full_transcript_archive_required"] = parsed_bool
+            break
     return result
 
 
@@ -194,21 +327,40 @@ def _project_harness_record(row: dict[str, Any], dispatch_config: Any | None = N
     record: dict[str, Any] = {field: row.get(field) for field in _PROJECTED_FIELDS}
     for field in _JSON_DECODED_FIELDS:
         record[field] = _decode_json_field(row.get(field))
+    record["invocation_surfaces"] = _neutralize_event_source_metadata(record.get("invocation_surfaces"))
     harness_type = str(record.get("harness_type") or "").strip().lower()
     explicit = _dispatch_metadata(record)
-    # Honest split axes (FAB-01 / HYG-004).
-    record["can_fire_events"] = explicit.get("can_fire_events", harness_type in _EVENT_FIRING_CAPABLE_TYPES)
+    # Honest split axes (FAB-01 / HYG-004). Event firing is schema-retained
+    # but daemon-owned after WI-5020, so legacy explicit metadata is ignored.
+    record["can_fire_events"] = False
     record["can_receive_dispatch"] = explicit.get(
         "can_receive_dispatch",
         harness_type in _DISPATCH_RECEIVE_CAPABLE_TYPES,
     )
-    # Deprecated back-compat alias for event-firing capability. New code reads
-    # the split axes above; legacy topology readers still consume this field.
-    record["event_driven_hooks"] = explicit.get("event_driven_hooks", record["can_fire_events"])
-    if dispatch_config is not None:
-        from groundtruth_kb.bridge_dispatch_config import apply_dispatch_config_to_record
-
-        record = apply_dispatch_config_to_record(record, dispatch_config)
+    # Deprecated back-compat alias for the neutralized event-source capability.
+    record["event_driven_hooks"] = False
+    for field in ("dispatch_quality", "dispatch_cost", "dispatch_availability", "dispatch_max_items"):
+        if field in explicit:
+            record[field] = explicit[field]
+    tags = explicit.get("dispatch_tags")
+    filtered_tags = _without_event_source_tag(tags) if isinstance(tags, list) else []
+    if filtered_tags:
+        record["dispatch_tags"] = filtered_tags
+    else:
+        derived_tags = _string_list(record.get("role"))
+        if record["can_fire_events"]:
+            derived_tags.append("event-source")
+        if harness_type in _PROVIDER_HARNESS_TYPES:
+            derived_tags.append("low-cost")
+        record["dispatch_tags"] = sorted(set(derived_tags))
+    envelope = _envelope_metadata(record)
+    provider_harness = harness_type in _PROVIDER_HARNESS_TYPES
+    default_mode = "compact-provider" if provider_harness else "native"
+    record["activity_envelope_projection_mode"] = envelope.get("activity_envelope_projection_mode", default_mode)
+    record["compact_result_envelope_mode"] = envelope.get("compact_result_envelope_mode", default_mode)
+    record["compact_session_envelope_mode"] = envelope.get("compact_session_envelope_mode", default_mode)
+    record["full_transcript_archive_required"] = envelope.get("full_transcript_archive_required", False)
+    _ = dispatch_config  # Back-compat parameter; WI-5012 forbids config-derived dispatch authority.
     return record
 
 
@@ -221,7 +373,8 @@ def build_projection(harness_rows: list[dict[str, Any]], *, dispatch_config: Any
     — topology is a derived pure function over the harness set (FR4), never a
     persisted value.
     """
-    records = [_project_harness_record(row, dispatch_config=dispatch_config) for row in harness_rows]
+    _ = dispatch_config  # Back-compat parameter; projection authority is MemBase-only after WI-5012.
+    records = [_project_harness_record(row) for row in harness_rows]
     records.sort(key=lambda r: str(r.get("id") or ""))
     return {
         "schema_version": PROJECTION_SCHEMA_VERSION,
@@ -292,14 +445,7 @@ def generate_harness_projection(
     function does not force a ``groundtruth_kb.db`` import). Returns the written
     path.
     """
-    dispatch_config = None
-    try:
-        from groundtruth_kb.bridge_dispatch_config import load_bridge_dispatch_config
-
-        dispatch_config = load_bridge_dispatch_config(project_root)
-    except Exception:  # intentional-catch: autogenerated check fix
-        dispatch_config = None
-    document = build_projection(db.list_harnesses(), dispatch_config=dispatch_config)
+    document = build_projection(db.list_harnesses())
     path = harness_registry_path(project_root, projection_path)
     return _write_projection(path, document)
 

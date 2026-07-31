@@ -29,3 +29,28 @@ def _atomic_write_text(path: Path, content: str) -> None:
     tmp.parent.mkdir(parents=True, exist_ok=True)
     tmp.write_text(content, encoding="utf-8")
     os.replace(tmp, path)
+
+
+def _atomic_write_bytes(path: Path, content: bytes) -> None:
+    """Write bytes to ``path`` atomically via write-to-.tmp + os.replace.
+
+    Byte-level counterpart of ``_atomic_write_text``. Because it writes raw
+    bytes, no newline translation occurs — callers that must preserve LF-only
+    output on Windows (e.g. the skill-adapter generators, whose LF contract is
+    guarded by WI-4701/WI-4717) pass already-LF-encoded bytes
+    (``text.encode("utf-8")``). Same ``.tmp`` sibling + ``os.replace``
+    same-filesystem atomicity guarantee as ``_atomic_write_text``.
+    """
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        tmp.write_bytes(content)
+        os.replace(tmp, path)
+    except BaseException:
+        # A mid-write failure (write_bytes or os.replace) must leave the
+        # pre-existing target intact and no stray sibling .tmp behind.
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise

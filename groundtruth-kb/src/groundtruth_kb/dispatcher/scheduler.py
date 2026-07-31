@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from groundtruth_kb.bridge.disposition import LOYAL_OPPOSITION_ACTIONABLE_STATUSES
 from groundtruth_kb.dispatcher.rules_loader import DispatchRule, default_rules_path, load_rules
 
 
@@ -26,7 +27,7 @@ def _no_window_subprocess_kwargs() -> dict[str, object]:
 
 
 _BRIDGE_FILE_STATUS_RE = re.compile(
-    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b",
+    r"^[#>*\-\s`]*(NEW|REVISED|NO-ACTION|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b",
     re.IGNORECASE,
 )
 
@@ -59,7 +60,7 @@ def _bridge_actionable_count_from_files(project_root: Path) -> int:
             continue
         if slug not in latest or version > latest[slug][0]:
             latest[slug] = (version, status)
-    return sum(1 for _version, status in latest.values() if status in {"NEW", "REVISED"})
+    return sum(1 for _version, status in latest.values() if status in LOYAL_OPPOSITION_ACTIONABLE_STATUSES)
 
 
 def _bridge_actionable_count(project_root: Path) -> int:

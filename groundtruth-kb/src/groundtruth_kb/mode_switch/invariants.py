@@ -1,8 +1,12 @@
 """Role-map partition checks for the operating-mode subsystem.
 
-``REQ-HARNESS-REGISTRY-001`` FR9-F12 require that active bridge dispatch leave
-the active harness set with at least one ``prime-builder`` assignment and at
-least one ``loyal-opposition`` assignment. When more than one harness is
+``REQ-HARNESS-REGISTRY-001`` FR9-F12 require active bridge dispatch to retain
+Prime Builder and Loyal Opposition lane coverage. Durable active-harness role
+membership supplies that coverage by default. A current owner-declared
+interactive Prime Builder session may supply Prime Builder coverage for an
+LO-only headless surge, but only when its per-session role marker is readable
+and proves the session is Prime Builder. Loyal Opposition coverage still comes
+from at least one active durable harness role. When more than one harness is
 active, no active harness may carry both roles. Non-active harnesses may retain
 operating roles for interactive or owner-directed work; they do not participate
 in active dispatch partitioning.
@@ -24,6 +28,9 @@ reserved.
 from __future__ import annotations
 
 import json
+import os
+import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -33,6 +40,21 @@ from typing import Any
 # ``GOV-ACTING-PRIME-BUILDER-001``; it counts toward the active-prime-builder
 # invariant so stale provenance cannot mask a missing prime-class harness.
 _PRIME_BUILDER_TOKENS = frozenset({"prime-builder", "acting-prime-builder"})
+_ROLE_PRIME_BUILDER = "prime-builder"
+_ROLE_LOYAL_OPPOSITION = "loyal-opposition"
+_INTERACTIVE_PRIME_BUILDER_PREFIX = "interactive-prime-builder"
+_SESSION_MARKER_DIR = (".claude", "session")
+_PER_SESSION_ROLE_MARKER_PREFIX = "role-"
+_PER_SESSION_ROLE_MARKER_SUFFIX = ".json"
+_MARKER_CONTINUITY_ORDER = (
+    "GTKB_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "CLAUDE_SESSION_ID",
+    "CLAUDE_CODE_SESSION_ID",
+)
+_UNSAFE_SESSION_ID_CHARS = re.compile(r"[^A-Za-z0-9._-]+")
+_MAX_SANITIZED_SESSION_ID_LEN = 128
 
 
 class RolePartitionViolation(RuntimeError):
@@ -46,6 +68,8 @@ class RolePartitionSummary:
     active_harness_ids: tuple[str, ...]
     prime_builder_ids: tuple[str, ...] = ()
     loyal_opposition_ids: tuple[str, ...] = ()
+    prime_builder_coverage_source: str = "durable"
+    interactive_prime_builder_session_id: str | None = None
 
 
 def _role_tokens(role_field: Any) -> set[str]:
@@ -89,7 +113,7 @@ def loyal_opposition_ids(role_document: dict[str, Any]) -> list[str]:
         for harness_id, record in harnesses.items()
         if isinstance(record, dict)
         and record.get("status") == "active"
-        and "loyal-opposition" in _role_tokens(record.get("role"))
+        and _ROLE_LOYAL_OPPOSITION in _role_tokens(record.get("role"))
     )
 
 
@@ -101,13 +125,85 @@ def _harnesses_by_id(raw_harnesses: Any, *, source: str) -> dict[str, Any]:
     raise RolePartitionViolation(f"{source} has no 'harnesses' map or list")
 
 
-def verify_role_document_partition(role_document: dict[str, Any]) -> RolePartitionSummary:
-    """Verify an in-memory role document's active PB/LO partition.
+def _sanitize_session_id(session_id: str) -> str:
+    cleaned = _UNSAFE_SESSION_ID_CHARS.sub("-", str(session_id)).strip("-.")
+    if not cleaned:
+        cleaned = "unknown"
+    return cleaned[:_MAX_SANITIZED_SESSION_ID_LEN]
+
+
+def _per_session_role_marker_path(project_root: Path, session_id: str) -> Path:
+    return (
+        project_root.joinpath(*_SESSION_MARKER_DIR)
+        / f"{_PER_SESSION_ROLE_MARKER_PREFIX}{_sanitize_session_id(session_id)}{_PER_SESSION_ROLE_MARKER_SUFFIX}"
+    )
+
+
+def _session_id_from_env(environ: Mapping[str, str] | None = None) -> str | None:
+    env = os.environ if environ is None else environ
+    for name in _MARKER_CONTINUITY_ORDER:
+        value = str(env.get(name) or "").strip()
+        if value:
+            return value
+    return None
+
+
+def interactive_prime_builder_session_id(
+    project_root: Path | None,
+    *,
+    session_id: str | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> str | None:
+    """Return the current interactive PB session id, if positively marked.
+
+    This mirrors the per-session marker contract used by work-intent claim
+    eligibility: the session id must resolve from the interactive marker env
+    order (or an explicit test/session argument), the corresponding
+    ``.claude/session/role-<session>.json`` file must be readable, and the
+    marker must contain the same ``session_id`` with role ``prime-builder``.
+    Missing, stale, malformed, or non-Prime markers yield ``None``.
+    """
+
+    if project_root is None:
+        return None
+    resolved_session_id = str(session_id or _session_id_from_env(environ) or "").strip()
+    if not resolved_session_id:
+        return None
+    marker_path = _per_session_role_marker_path(project_root, resolved_session_id)
+    try:
+        marker = json.loads(marker_path.read_text(encoding="utf-8", errors="replace"))
+    except (FileNotFoundError, OSError, ValueError):
+        return None
+    if not isinstance(marker, dict):
+        return None
+    if marker.get("session_id") != resolved_session_id:
+        return None
+    if marker.get("role") != _ROLE_PRIME_BUILDER:
+        return None
+    return resolved_session_id
+
+
+def _interactive_prime_builder_id(session_id: str) -> str:
+    return f"{_INTERACTIVE_PRIME_BUILDER_PREFIX}:{session_id}"
+
+
+def verify_role_document_partition(
+    role_document: dict[str, Any],
+    *,
+    project_root: Path | None = None,
+    interactive_prime_builder_session: str | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> RolePartitionSummary:
+    """Verify an in-memory role document's active PB/LO lane coverage.
 
     This is the candidate-state validator used by write paths before durable
     audit or registry mutation. It accepts the canonical dict-keyed document
     shape and the registry projection's list shape for callers that already
     loaded ``harness-state/harness-registry.json``.
+
+    Durable active Prime Builder membership supplies Prime coverage by default.
+    When no durable active Prime Builder remains, a readable per-session marker
+    for a current interactive Prime Builder session may supply Prime coverage.
     """
     if not isinstance(role_document, dict):
         raise RolePartitionViolation("role document must be a JSON object")
@@ -135,11 +231,21 @@ def verify_role_document_partition(role_document: dict[str, Any]) -> RolePartiti
         )
 
     primes = prime_builder_ids(normalized_document)
+    interactive_prime_session = None
     if len(primes) < 1:
-        raise RolePartitionViolation(
-            f"active role map must hold at least one prime-builder; found {len(primes)}: {primes if primes else '[]'}"
+        interactive_prime_session = interactive_prime_builder_session_id(
+            project_root,
+            session_id=interactive_prime_builder_session,
+            environ=environ,
         )
-    prime_id = primes[0]
+    if len(primes) < 1 and interactive_prime_session is None:
+        raise RolePartitionViolation(
+            "active lane coverage must include at least one prime-builder assignment or an "
+            f"owner-declared interactive Prime Builder anchor; found {len(primes)} durable prime-builders: "
+            f"{primes if primes else '[]'}"
+        )
+    prime_id = primes[0] if primes else _interactive_prime_builder_id(str(interactive_prime_session))
+    prime_source = "durable" if primes else "interactive-session-marker"
 
     los = loyal_opposition_ids(normalized_document)
     if len(los) < 1:
@@ -160,19 +266,28 @@ def verify_role_document_partition(role_document: dict[str, Any]) -> RolePartiti
         active_harness_ids=active_ids,
         prime_builder_ids=tuple(primes),
         loyal_opposition_ids=tuple(los),
+        prime_builder_coverage_source=prime_source,
+        interactive_prime_builder_session_id=interactive_prime_session,
     )
 
 
-def verify_active_role_partition(project_root: Path, *, role_path: Path | None = None) -> RolePartitionSummary:
-    """Verify the role map satisfies the active-harness PB/LO invariant.
+def verify_active_role_partition(
+    project_root: Path,
+    *,
+    role_path: Path | None = None,
+    interactive_prime_builder_session: str | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> RolePartitionSummary:
+    """Verify the role map satisfies active PB/LO lane coverage.
 
     Loads the harness registry projection under ``project_root`` (or the
     explicit ``role_path`` override) and raises ``RolePartitionViolation``
-    unless at least one active harness holds a prime-builder-class role and
-    at least one active harness holds loyal-opposition. With multiple active
+    unless Prime Builder coverage exists through either an active durable
+    harness role or a current owner-declared interactive Prime Builder session
+    marker, and at least one active harness holds loyal-opposition. With multiple active
     harnesses, no harness may hold both roles. Registered, inactive,
     suspended, and retired harnesses may retain roles but are ignored by the
-    active partition.
+    active lane-coverage check.
 
     WI-3342 IP-5: migrated from the retired role mirror to the DB-backed registry
     projection ``harness-state/harness-registry.json``. The projection stores
@@ -187,9 +302,25 @@ def verify_active_role_partition(project_root: Path, *, role_path: Path | None =
     projection_harnesses = projection.get("harnesses", []) if isinstance(projection, dict) else None
     if not isinstance(projection_harnesses, list):
         raise RolePartitionViolation(f"harness registry projection at {path} has no 'harnesses' list")
-    return verify_role_document_partition({"harnesses": projection_harnesses})
+    return verify_role_document_partition(
+        {"harnesses": projection_harnesses},
+        project_root=project_root,
+        interactive_prime_builder_session=interactive_prime_builder_session,
+        environ=environ,
+    )
 
 
-def verify_role_partition(project_root: Path, *, role_path: Path | None = None) -> str:
+def verify_role_partition(
+    project_root: Path,
+    *,
+    role_path: Path | None = None,
+    interactive_prime_builder_session: str | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> str:
     """Backward-compatible wrapper returning the verified Prime Builder id."""
-    return verify_active_role_partition(project_root, role_path=role_path).prime_builder_id
+    return verify_active_role_partition(
+        project_root,
+        role_path=role_path,
+        interactive_prime_builder_session=interactive_prime_builder_session,
+        environ=environ,
+    ).prime_builder_id

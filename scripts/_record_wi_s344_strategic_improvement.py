@@ -17,8 +17,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 
-from groundtruth_kb.db import KnowledgeDB
-from scripts._kb_attribution import resolve_changed_by
+from groundtruth_kb.db import KnowledgeDB  # noqa: E402
+
+from scripts._kb_attribution import resolve_changed_by  # noqa: E402
 
 
 def main() -> int:
@@ -45,7 +46,7 @@ def main() -> int:
             "reset --soft. Neither pre-commit, post-commit, pre-push, nor "
             "post-merge hook in .githooks/ or .git/hooks/ contains git push "
             "logic. The push must originate from outside git's hook surface "
-            "(Codex session, scheduled task, cross-harness trigger spawn, "
+            "(Codex session, scheduled task, dispatcher daemon spawn, "
             "or other background automation).\n\n"
             "INVESTIGATION SCOPE:\n"
             "1. Identify the process that performs the push.\n"

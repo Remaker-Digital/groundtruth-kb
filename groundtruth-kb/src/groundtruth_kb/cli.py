@@ -11,11 +11,14 @@ Licensed under AGPL-3.0-or-later.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import importlib
 import json
 import os
+import re
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -23,6 +26,14 @@ import click
 
 from groundtruth_kb import __version__
 from groundtruth_kb._logging import configure_cli_logging
+from groundtruth_kb.backlog.query import (
+    BacklogListQuery,
+    BacklogQueryError,
+    ProjectListQuery,
+    SortKey,
+    filter_projects,
+    filter_work_items,
+)
 from groundtruth_kb.bootstrap import (
     DesktopBootstrapOptions,
     bootstrap_desktop_project,
@@ -67,7 +78,7 @@ from groundtruth_kb.coherence import (
     run_all as run_coherence_checks,
 )
 from groundtruth_kb.config import GTConfig
-from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.db import DeliberationSearchDegradedError, KnowledgeDB
 from groundtruth_kb.db_snapshot import SnapshotError, create_snapshot
 from groundtruth_kb.gates import GateRegistry
 from groundtruth_kb.hygiene import (
@@ -81,21 +92,30 @@ from groundtruth_kb.hygiene import (
 )
 from groundtruth_kb.project.core_spec_intake import next_missing_slot, next_question, slot_statuses
 from groundtruth_kb.project.lifecycle import (
+    PROJECT_DEPENDENCY_KIND_REGISTRY,
     PROJECTS_CHANGED_BY,
     ProjectAuthorizationSpecLinkageError,
     ProjectLifecycleError,
     ProjectLifecycleService,
 )
-from groundtruth_kb.project.sot_registry import (
-    InvalidSoTRecord,
-    UnknownDomain,
-    default_registry_path,
-    load_projection,
-    sync_projection,
-    validate_projection_parity,
+from groundtruth_kb.project.registry_control_plane import (
+    RegistryControlPlaneError,
+    amend_artifact,
+    consume_observation_capability,
+    inspect_registry,
+    load_registry_snapshot,
+    preview_registry_registration,
+    recover_registry,
+    register_artifacts,
+)
+from groundtruth_kb.project.registry_control_plane import (
+    validate_registry as validate_registry_control_plane,
 )
 from groundtruth_kb.project.sot_registry import (
-    load_toml as load_sot_toml,
+    InvalidSoTRecord,
+    SoTArtifact,
+    UnknownDomain,
+    default_registry_path,
 )
 from groundtruth_kb.typed_artifact_flow import (
     TypedArtifactFlowService,
@@ -212,6 +232,106 @@ main.add_command(session_group)
 main.add_command(skills_group)
 
 
+@main.group("env")
+def env_cmd() -> None:
+    """Local environment source-of-truth commands."""
+
+
+def _load_env_sot_helpers() -> Any:
+    from groundtruth_kb import env_sot
+
+    return env_sot
+
+
+@env_cmd.command("plan")
+@click.option("--app", default="agent-red", show_default=True, help="Application env layout to inspect.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def env_plan_cmd(ctx: click.Context, app: str, json_output: bool) -> None:
+    """Plan Agent Red local env SoT migration without printing values."""
+
+    config = _resolve_config(ctx)
+    env_sot = _load_env_sot_helpers()
+    try:
+        plan = env_sot.build_plan(Path(config.project_root), app=app)
+    except env_sot.EnvSotError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(plan.to_dict(), indent=2, sort_keys=True))
+    else:
+        click.echo(env_sot.render_plan(plan))
+
+
+@env_cmd.command("check")
+@click.option("--app", default="agent-red", show_default=True, help="Application env layout to inspect.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def env_check_cmd(ctx: click.Context, app: str, json_output: bool) -> None:
+    """Check whether local env files are safe for app SoT migration."""
+
+    config = _resolve_config(ctx)
+    env_sot = _load_env_sot_helpers()
+    try:
+        plan = env_sot.check_plan(Path(config.project_root), app=app)
+    except env_sot.EnvSotError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(plan.to_dict(), indent=2, sort_keys=True))
+    else:
+        click.echo(env_sot.render_plan(plan))
+    if not plan.ok_for_apply:
+        raise SystemExit(1)
+
+
+@env_cmd.command("migrate")
+@click.option("--app", default="agent-red", show_default=True, help="Application env layout to migrate.")
+@click.option("--dry-run", is_flag=True, default=False, help="Plan migration without mutating files.")
+@click.option("--apply", "apply_", is_flag=True, default=False, help="Apply the migration when checks pass.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def env_migrate_cmd(ctx: click.Context, app: str, dry_run: bool, apply_: bool, json_output: bool) -> None:
+    """Move app env keys to the Agent Red SoT and generate admin views."""
+
+    if dry_run and apply_:
+        raise click.UsageError("Use either --dry-run or --apply, not both.")
+    config = _resolve_config(ctx)
+    env_sot = _load_env_sot_helpers()
+    try:
+        result = env_sot.migrate(Path(config.project_root), app=app, apply=apply_)
+    except env_sot.EnvSotError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+    else:
+        click.echo(env_sot.render_migration_result(result))
+
+
+@main.group("benchmarks")
+def benchmarks_group() -> None:
+    """Read-only GT-KB benchmark and measurement reports."""
+
+
+@benchmarks_group.command("activity-envelope-load")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def benchmarks_activity_envelope_load_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Report global and per-activity session envelope load estimates."""
+    try:
+        module = importlib.import_module("scripts.benchmarks.activity_envelope_load")
+    except ModuleNotFoundError:
+        repo_root = Path(__file__).resolve().parents[3]
+        if str(repo_root) not in sys.path:
+            sys.path.insert(0, str(repo_root))
+        module = importlib.import_module("scripts.benchmarks.activity_envelope_load")
+    config = _resolve_config(ctx)
+    report = module.build_report(project_root=config.project_root)
+    if json_output:
+        click.echo(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        click.echo(module.render_markdown(report), nl=False)
+    ctx.exit(0 if report["status"] in {"PASS", "WARN"} else 1)
+
+
 @main.group("commit")
 def commit_group() -> None:
     """Commit governance preflight commands."""
@@ -253,6 +373,84 @@ def commit_preflight_cmd(
     ctx.exit(preflight_exit_code(evidence))
 
 
+@main.group("push")
+def push_group() -> None:
+    """Push governance preflight and readiness commands."""
+
+
+@push_group.command("preflight")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.option(
+    "--evidence-out",
+    "--evidence-file",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Write the evidence packet JSON to this path.",
+)
+@click.option("--python-bin", default=None, help="Python executable used for secret range scans.")
+@click.pass_context
+def push_preflight_cmd(
+    ctx: click.Context,
+    json_output: bool,
+    evidence_out: Path | None,
+    python_bin: str | None,
+) -> None:
+    """Run pre-push redacted secret range scans from Git pre-push stdin."""
+    from groundtruth_kb.governance.push_preflight import preflight_exit_code, run_push_preflight
+
+    config = _resolve_config(ctx)
+    evidence = run_push_preflight(
+        Path(config.project_root),
+        sys.stdin.read(),
+        python_bin=python_bin,
+        evidence_path=evidence_out,
+    )
+    if evidence_out is not None:
+        evidence_out.parent.mkdir(parents=True, exist_ok=True)
+        evidence_out.write_text(evidence.to_json() + "\n", encoding="utf-8")
+    click.echo(evidence.to_json() if json_output else evidence.to_text_summary())
+    ctx.exit(preflight_exit_code(evidence))
+
+
+@push_group.command("readiness")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.option(
+    "--evidence-out",
+    "--evidence-file",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Write the evidence packet JSON to this path.",
+)
+@click.option("--remote", default="origin", show_default=True, help="Git remote name to check.")
+@click.option("--hostname", default="github.com", show_default=True, help="GitHub hostname for gh auth status.")
+@click.option("--timeout-seconds", default=15, show_default=True, type=int, help="Per-command timeout.")
+@click.pass_context
+def push_readiness_cmd(
+    ctx: click.Context,
+    json_output: bool,
+    evidence_out: Path | None,
+    remote: str,
+    hostname: str,
+    timeout_seconds: int,
+) -> None:
+    """Run a read-only non-interactive push readiness diagnostic."""
+    from groundtruth_kb.governance.push_readiness import readiness_exit_code, run_push_readiness
+
+    config = _resolve_config(ctx)
+    evidence = run_push_readiness(
+        Path(config.project_root),
+        remote=remote,
+        hostname=hostname,
+        timeout_seconds=timeout_seconds,
+        evidence_path=evidence_out,
+    )
+    if evidence_out is not None:
+        evidence_out.parent.mkdir(parents=True, exist_ok=True)
+        evidence_out.write_text(evidence.to_json() + "\n", encoding="utf-8")
+    click.echo(evidence.to_json() if json_output else evidence.to_text_summary())
+    ctx.exit(readiness_exit_code(evidence))
+
+
 @main.group("admin")
 def admin_group() -> None:
     """Administrative project tooling."""
@@ -283,6 +481,10 @@ def admin_inventory_refresh_cmd(ctx: click.Context, json_output: bool) -> None:
     click.echo(f"- artifacts: {summary['artifact_count']}")
     click.echo(f"- scanned files: {summary['scanned_file_count']}")
     click.echo(f"- missing artifacts: {summary['missing_artifact_count']}")
+    click.echo(f"- blocking findings: {summary.get('blocking_finding_count', 0)}")
+    path_classes = summary.get("path_class_counts", {})
+    if path_classes:
+        click.echo("- path classes: " + ", ".join(f"{key}={value}" for key, value in path_classes.items()))
 
 
 @admin_inventory_group.command("scan-strings")
@@ -379,50 +581,88 @@ def _emit_bridge_dispatch_config(ctx: click.Context, *, json_output: bool) -> No
 
 
 def _emit_bridge_dispatch_status(ctx: click.Context, *, json_output: bool) -> None:
-    from groundtruth_kb.bridge_dispatch_config import collect_bridge_dispatch_status, format_bridge_dispatch_status
+    from groundtruth_kb.bridge_dispatch_config import (
+        collect_bridge_dispatch_health,
+        collect_bridge_dispatch_status,
+        format_bridge_dispatch_status,
+    )
 
     config = _resolve_config(ctx)
     status = collect_bridge_dispatch_status(config.project_root)
     if json_output:
-        click.echo(json.dumps(status.to_json_dict(), indent=2, sort_keys=True))
+        payload = status.to_json_dict()
+        payload["health_rollup"] = collect_bridge_dispatch_health(config.project_root, routing_status=status)
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
         return
     click.echo(format_bridge_dispatch_status(status))
 
 
 def _emit_bridge_dispatch_health(ctx: click.Context, *, json_output: bool) -> None:
-    from groundtruth_kb.bridge_dispatch_config import collect_bridge_dispatch_status
+    from groundtruth_kb.bridge_dispatch_config import collect_bridge_dispatch_health
 
     config = _resolve_config(ctx)
-    status = collect_bridge_dispatch_status(config.project_root)
-    payload = {
-        "health_status": status.health_status,
-        "findings": list(status.health_findings),
-        "selected_by_role": status.selected_by_role,
-        "config_path": str(status.config.path),
-    }
+    payload = collect_bridge_dispatch_health(config.project_root)
     if json_output:
         click.echo(json.dumps(payload, indent=2, sort_keys=True))
     else:
-        click.echo(f"Bridge dispatch health: {status.health_status}")
-        for role, candidates in status.selected_by_role.items():
+        click.echo(f"Bridge dispatch health: {payload['health_status']}")
+        for name, dimension in payload["dimensions"].items():
+            click.echo(f"- {name}: {dimension['health_status']}")
+        for role, candidates in payload["selected_by_role"].items():
             ids = [str(row.get("id")) for row in candidates]
             click.echo(f"- {role}: {', '.join(ids) if ids else '(none)'}")
-        if status.health_findings:
+        if payload["findings"]:
             click.echo("Findings:")
-            for finding in status.health_findings:
+            for finding in payload["findings"]:
                 click.echo(f"- {finding}")
-    ctx.exit(0 if status.health_status != "FAIL" else 1)
+    ctx.exit(0 if payload["health_status"] != "FAIL" else 1)
 
 
-def _emit_bridge_dispatch_report(ctx: click.Context, *, json_output: bool) -> None:
-    from groundtruth_kb.bridge_dispatch_report import build_bridge_dispatch_report, format_bridge_dispatch_report
+def _emit_bridge_dispatch_report(ctx: click.Context, *, json_output: bool, compact: bool) -> None:
+    from groundtruth_kb.bridge_dispatch_report import (
+        build_bridge_dispatch_report,
+        build_compact_dispatch_workflow,
+        format_compact_dispatch_workflow,
+    )
 
     config = _resolve_config(ctx)
     report = build_bridge_dispatch_report(config.project_root)
     if json_output:
-        click.echo(json.dumps(report, indent=2, sort_keys=True))
+        payload = build_compact_dispatch_workflow(config.project_root, report=report) if compact else report
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
         return
-    click.echo(format_bridge_dispatch_report(report))
+    workflow = build_compact_dispatch_workflow(config.project_root, report=report)
+    click.echo(format_compact_dispatch_workflow(workflow))
+
+
+@bridge_dispatch_group.command("worker-context")
+@click.option("--self", "self_only", is_flag=True, default=False, help="Resolve the acting worker dispatch context.")
+@click.option("--dispatch-id", default=None, help="Dispatch id to resolve.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_worker_context_cmd(
+    ctx: click.Context, self_only: bool, dispatch_id: str | None, json_output: bool
+) -> None:
+    """Show the worker-safe assigned-content dispatch packet."""
+    from groundtruth_kb.bridge_dispatch_worker_context import (
+        WorkerContextError,
+        build_worker_context_packet,
+        format_worker_context_packet,
+    )
+
+    config = _resolve_config(ctx)
+    try:
+        packet = build_worker_context_packet(
+            config.project_root,
+            dispatch_id=dispatch_id,
+            self_only=self_only,
+        )
+    except WorkerContextError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(packet, indent=2, sort_keys=True))
+        return
+    click.echo(format_worker_context_packet(packet))
 
 
 def _import_benchmark_cli() -> Any:
@@ -520,6 +760,62 @@ def bridge_benchmark_manifest_cmd(ctx: click.Context, json_output: bool) -> None
     ctx.exit(0 if payload["valid"] else 1)
 
 
+def _load_bridge_metadata_audit(project_root: Path) -> Any:
+    import importlib.util
+    import sys
+
+    script_path = project_root / "scripts" / "bridge_metadata_audit.py"
+    if not script_path.is_file():
+        raise click.ClickException(f"Bridge metadata audit helper not found: {script_path}")
+    spec = importlib.util.spec_from_file_location("bridge_metadata_audit", script_path)
+    if spec is None or spec.loader is None:
+        raise click.ClickException(f"Unable to load bridge metadata audit helper: {script_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@bridge_group.group("audit")
+def bridge_audit_group() -> None:
+    """Read-only bridge artifact audits."""
+
+
+@bridge_audit_group.command("metadata")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--write-report", type=click.Path(path_type=Path), default=None, help="Write markdown report.")
+@click.option(
+    "--grandfather-report",
+    is_flag=True,
+    help="Write append-only grandfather audit JSON under .gtkb-state/.",
+)
+@click.pass_context
+def bridge_audit_metadata_cmd(
+    ctx: click.Context,
+    json_output: bool,
+    write_report: Path | None,
+    grandfather_report: bool,
+) -> None:
+    """Scan latest bridge artifacts for author-metadata compliance (read-only)."""
+    config = _resolve_config(ctx)
+    audit_module = _load_bridge_metadata_audit(config.project_root)
+    report = audit_module.audit_bridge_metadata(config.project_root)
+    if grandfather_report:
+        out_path = audit_module.write_grandfather_report(config.project_root, report)
+        if json_output:
+            payload = report.to_dict()
+            payload["grandfather_report_path"] = str(out_path)
+            click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        else:
+            click.echo(out_path)
+    elif json_output:
+        click.echo(json.dumps(report.to_dict(), indent=2, sort_keys=True))
+    else:
+        click.echo(audit_module.render_markdown_report(report))
+    if write_report is not None:
+        write_report.write_text(audit_module.render_markdown_report(report), encoding="utf-8")
+
+
 @bridge_group.command("config")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.pass_context
@@ -544,16 +840,39 @@ def bridge_health_cmd(ctx: click.Context, json_output: bool) -> None:
     _emit_bridge_dispatch_health(ctx, json_output=json_output)
 
 
+@bridge_group.command("state-report")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--markdown", "markdown_output", is_flag=True, help="Emit owner-standard Markdown tables.")
+@click.pass_context
+def bridge_state_report_cmd(ctx: click.Context, json_output: bool, markdown_output: bool) -> None:
+    """Report deterministic bridge, dispatcher, and harness state."""
+    from groundtruth_kb.bridge.state_report import build_state_report, render_markdown
+
+    if json_output and markdown_output:
+        raise click.ClickException("Choose only one output mode: --json or --markdown.")
+    config = _resolve_config(ctx)
+    report = build_state_report(config.project_root)
+    if json_output:
+        click.echo(json.dumps(report, indent=2, sort_keys=True))
+        return
+    click.echo(render_markdown(report), nl=False)
+
+
 @bridge_group.command("show")
 @click.argument("slug")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option(
+    "--compact",
+    is_flag=True,
+    help="Return latest current/actionable summary only; omit full version chain.",
+)
 @click.pass_context
-def bridge_show_cmd(ctx: click.Context, slug: str, json_output: bool) -> None:
+def bridge_show_cmd(ctx: click.Context, slug: str, json_output: bool, compact: bool) -> None:
     """Show one bridge thread's version chain."""
     from groundtruth_kb.bridge.read_commands import show_thread
 
     config = _resolve_config(ctx)
-    payload = show_thread(config.project_root, slug)
+    payload = show_thread(config.project_root, slug, compact=compact)
     if payload is None:
         if json_output:
             click.echo(json.dumps({"error": "bridge_thread_not_found", "slug": slug}, indent=2, sort_keys=True))
@@ -566,6 +885,9 @@ def bridge_show_cmd(ctx: click.Context, slug: str, json_output: bool) -> None:
     click.echo(f"Bridge thread: {payload['slug']}")
     click.echo(f"Latest status: {payload['latest_status']}")
     click.echo(f"Latest path: {payload['latest_path']}")
+    if compact:
+        click.echo(f"Version count: {payload['version_count']} (compact mode; use full mode for version chain)")
+        return
     click.echo("Versions:")
     for version in payload["version_chain"]:
         status = version["status"] or "(unknown)"
@@ -575,14 +897,19 @@ def bridge_show_cmd(ctx: click.Context, slug: str, json_output: bool) -> None:
 @bridge_group.command("threads")
 @click.option("--wi", "wi_id", required=True, help="Work item id to search for, e.g. WI-4634.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option(
+    "--compact",
+    is_flag=True,
+    help="Return current/actionable thread summaries only; omit citing-path archival detail.",
+)
 @click.pass_context
-def bridge_threads_cmd(ctx: click.Context, wi_id: str, json_output: bool) -> None:
+def bridge_threads_cmd(ctx: click.Context, wi_id: str, json_output: bool, compact: bool) -> None:
     """List bridge threads that cite a work item."""
     from groundtruth_kb.bridge.read_commands import threads_for_work_item
 
     config = _resolve_config(ctx)
     try:
-        payload = threads_for_work_item(config.project_root, wi_id)
+        payload = threads_for_work_item(config.project_root, wi_id, compact=compact)
     except ValueError as exc:
         click.echo(str(exc), err=True)
         ctx.exit(2)
@@ -600,6 +927,8 @@ def bridge_threads_cmd(ctx: click.Context, wi_id: str, json_output: bool) -> Non
         return
     for thread in payload["threads"]:
         click.echo(f"- {thread['slug']} ({thread['latest_status']} at {thread['latest_path']})")
+        if compact:
+            continue
         for citing_path in thread["citing_paths"]:
             click.echo(f"  cites: {citing_path}")
 
@@ -735,6 +1064,7 @@ def bridge_dispatch_config_set_eligibility_cmd(
 @click.option(
     "--availability", "dispatch_availability", type=float, default=None, help="Set dispatch availability, 0-100."
 )
+@click.option("--reviewer-precedence", type=int, default=None, help="Set reviewer precedence for dispatch ranking.")
 @click.option("--dry-run", is_flag=True, help="Preview the transaction without writing files.")
 @click.option("--defer-to-next-session", is_flag=True, help="Record a pending transaction without changing config.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
@@ -745,6 +1075,7 @@ def bridge_dispatch_config_set_weights_cmd(
     dispatch_quality: float | None,
     dispatch_cost: float | None,
     dispatch_availability: float | None,
+    reviewer_precedence: int | None,
     dry_run: bool,
     defer_to_next_session: bool,
     json_output: bool,
@@ -760,6 +1091,7 @@ def bridge_dispatch_config_set_weights_cmd(
             dispatch_quality=dispatch_quality,
             dispatch_cost=dispatch_cost,
             dispatch_availability=dispatch_availability,
+            reviewer_precedence=reviewer_precedence,
             dry_run=dry_run,
             defer_to_next_session=defer_to_next_session,
         ),
@@ -791,6 +1123,37 @@ def bridge_dispatch_config_set_caps_cmd(
             root,
             harness_id,
             max_items=max_items,
+            dry_run=dry_run,
+            defer_to_next_session=defer_to_next_session,
+        ),
+        json_output=json_output,
+    )
+
+
+@bridge_dispatch_config_cmd.command("set-model")
+@click.argument("harness_id")
+@click.option("--model", required=True, help="Set the budget model label for one harness overlay.")
+@click.option("--dry-run", is_flag=True, help="Preview the transaction without writing files.")
+@click.option("--defer-to-next-session", is_flag=True, help="Record a pending transaction without changing config.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_config_set_model_cmd(
+    ctx: click.Context,
+    harness_id: str,
+    model: str,
+    dry_run: bool,
+    defer_to_next_session: bool,
+    json_output: bool,
+) -> None:
+    """Set the budget model label for one harness overlay."""
+    from groundtruth_kb.bridge_dispatch_transactions import set_model
+
+    _run_dispatch_transaction(
+        ctx,
+        lambda root: set_model(
+            root,
+            harness_id,
+            model=model,
             dry_run=dry_run,
             defer_to_next_session=defer_to_next_session,
         ),
@@ -944,10 +1307,373 @@ def bridge_dispatch_health_cmd(ctx: click.Context, json_output: bool) -> None:
 
 @bridge_dispatch_group.command("report")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--compact", is_flag=True, help="Emit the bounded compact workflow view explicitly.")
 @click.pass_context
-def bridge_dispatch_report_cmd(ctx: click.Context, json_output: bool) -> None:
+def bridge_dispatch_report_cmd(ctx: click.Context, json_output: bool, compact: bool) -> None:
     """Show a comprehensive read-only bridge dispatch operations report."""
-    _emit_bridge_dispatch_report(ctx, json_output=json_output)
+    _emit_bridge_dispatch_report(ctx, json_output=json_output, compact=compact)
+
+
+@bridge_dispatch_group.group("tuning")
+def bridge_dispatch_tuning_group() -> None:
+    """Read-only dispatch tuning evaluation."""
+
+
+@bridge_dispatch_tuning_group.command("evaluate")
+@click.option(
+    "--input",
+    "input_path",
+    required=True,
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    help="In-root JSON evidence packet.",
+)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_tuning_evaluate_cmd(ctx: click.Context, input_path: Path, json_output: bool) -> None:
+    """Evaluate one offline or shadow tuning hypothesis without activation."""
+    from groundtruth_kb.dispatch_tuning_advisory import evaluate_dispatch_tuning
+
+    config = _resolve_config(ctx)
+    root = Path(config.project_root).resolve()
+    resolved_input = input_path.resolve()
+    try:
+        resolved_input.relative_to(root)
+    except ValueError as exc:
+        raise click.ClickException("tuning evidence input must be inside the project root") from exc
+    try:
+        raw = json.loads(resolved_input.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise click.ClickException(f"unable to read tuning evidence input: {exc}") from exc
+    payload = evaluate_dispatch_tuning(raw if isinstance(raw, dict) else {})
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(f"Dispatch tuning advisory: {payload['outcome']}")
+    click.echo(f"Advisory ID: {payload['advisory_id']}")
+    click.echo("Advisory only: yes")
+    click.echo(f"Rationale: {payload['rationale']}")
+
+
+def _load_dispatch_black_box_boundary_scanner(project_root: Path) -> Any:
+    script_path = project_root / "scripts" / "dispatch_blackbox_boundary_scanner.py"
+    spec = importlib.util.spec_from_file_location("dispatch_blackbox_boundary_scanner", script_path)
+    if spec is None or spec.loader is None:
+        raise click.ClickException(f"Unable to load black-box boundary scanner: {script_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@bridge_dispatch_group.group("black-box")
+def bridge_dispatch_black_box_group() -> None:
+    """Read-only dispatcher black-box boundary checks."""
+
+
+@bridge_dispatch_black_box_group.command("closure")
+@click.option("--project-id", required=True, help="Project id to evaluate for verified closure readiness.")
+@click.option(
+    "--evidence",
+    "evidence_paths",
+    multiple=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="In-root evidence file to boundary-scan; repeatable.",
+)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_black_box_closure_cmd(
+    ctx: click.Context,
+    project_id: str,
+    evidence_paths: tuple[Path, ...],
+    json_output: bool,
+) -> None:
+    """Gate black-box project closure on VERIFIED members and clean boundary evidence."""
+    config = _resolve_config(ctx)
+    project_root = Path(config.project_root).resolve()
+    resolved_evidence: list[Path] = []
+    for evidence_path in evidence_paths:
+        resolved = evidence_path.resolve()
+        try:
+            resolved.relative_to(project_root)
+        except ValueError as exc:
+            raise click.ClickException("black-box closure evidence must be inside the project root") from exc
+        resolved_evidence.append(resolved)
+
+    scanner = _load_dispatch_black_box_boundary_scanner(project_root)
+    report = scanner.closure_status(
+        project_root=project_root,
+        project_id=project_id,
+        evidence_paths=resolved_evidence,
+    )
+    if json_output:
+        click.echo(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        click.echo(scanner.format_text(report), nl=False)
+    if not report.get("ready"):
+        ctx.exit(1)
+
+
+@bridge_dispatch_group.group("complex")
+def bridge_dispatch_complex_group() -> None:
+    """Aggregate dispatcher daemon, supervisor, and watchdog controls."""
+
+
+def _emit_complex_status(payload: dict[str, Any], *, json_output: bool) -> None:
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(f"Dispatcher complex aggregate status: {payload.get('aggregate_status')}")
+    health_status = payload.get("health_status")
+    if health_status:
+        click.echo(f"Lifecycle health: {health_status}")
+    for name, component in payload.get("components", {}).items():
+        status = component.get("status") if isinstance(component, dict) else None
+        detail = ""
+        if isinstance(status, dict):
+            detail = str(status.get("state") or status.get("mode") or status.get("running") or "")
+        suffix = f" ({detail})" if detail else ""
+        click.echo(f"{name}: healthy={component.get('healthy')}{suffix}")
+    for item in payload.get("findings") or []:
+        click.echo(f"Finding: {item}")
+
+
+def _emit_complex_action_result(ctx: click.Context, payload: dict[str, Any], *, json_output: bool) -> None:
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        if not payload.get("ok"):
+            ctx.exit(1)
+        return
+    action = payload.get("action")
+    if payload.get("ok"):
+        components = ", ".join(payload.get("components", {}).keys())
+        click.echo(f"Dispatcher complex {action} complete: {components}.")
+        return
+    failures = []
+    for name, component in payload.get("components", {}).items():
+        if not component.get("ok"):
+            failures.append(f"{name}: {component.get('error')}")
+    raise click.ClickException("; ".join(failures) or f"dispatcher complex {action} failed")
+
+
+def _record_dispatch_disable_guard(
+    ctx: click.Context,
+    *,
+    task_names: list[str],
+    component: str,
+    ttl_seconds: int | None,
+    owner_quiesce_record: str | None,
+    reason: str,
+    actor: str,
+) -> dict[str, Any]:
+    from groundtruth_kb.dispatcher_disable_guard import DispatcherDisableGuardError, record_guarded_disable
+
+    config = _resolve_config(ctx)
+    try:
+        return record_guarded_disable(
+            config.project_root,
+            task_names=task_names,
+            component=component,
+            ttl_seconds=ttl_seconds,
+            owner_quiesce_record=owner_quiesce_record,
+            reason=reason,
+            actor=actor,
+        )
+    except DispatcherDisableGuardError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+def _supersede_dispatch_disable_guard(ctx: click.Context, *, task_names: list[str]) -> dict[str, Any]:
+    from groundtruth_kb.dispatcher_disable_guard import DispatcherDisableGuardError, supersede_guarded_disable
+
+    config = _resolve_config(ctx)
+    try:
+        return supersede_guarded_disable(
+            config.project_root,
+            task_names=task_names,
+            actor="gt-bridge-dispatch-cli",
+            reason="successful governed enable",
+        )
+    except DispatcherDisableGuardError as exc:
+        return {"ok": False, "changed": False, "warning": str(exc), "records": []}
+
+
+def _emit_disable_guard_resolution_warning(payload: dict[str, Any]) -> None:
+    resolution = payload.get("disable_guard_resolution")
+    if isinstance(resolution, dict) and resolution.get("warning"):
+        click.echo(f"Warning: {resolution['warning']}", err=True)
+
+
+def _validate_dispatch_disable_guard(
+    *,
+    task_names: list[str],
+    ttl_seconds: int | None,
+    owner_quiesce_record: str | None,
+    reason: str,
+    actor: str,
+) -> None:
+    from groundtruth_kb.dispatcher_disable_guard import DispatcherDisableGuardError, validate_guarded_disable_request
+
+    try:
+        validate_guarded_disable_request(
+            task_names=task_names,
+            ttl_seconds=ttl_seconds,
+            owner_quiesce_record=owner_quiesce_record,
+            reason=reason,
+            actor=actor,
+        )
+    except DispatcherDisableGuardError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+@bridge_dispatch_complex_group.command("status")
+@click.option("--supervisor-task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--watchdog-task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_complex_status_cmd(
+    ctx: click.Context,
+    supervisor_task_name: str,
+    watchdog_task_name: str,
+    json_output: bool,
+) -> None:
+    """Report dispatcher daemon complex component state."""
+    from groundtruth_kb.dispatcher_complex import collect_complex_status
+
+    config = _resolve_config(ctx)
+    payload = collect_complex_status(
+        config.project_root,
+        supervisor_task_name=supervisor_task_name,
+        watchdog_task_name=watchdog_task_name,
+    )
+    _emit_complex_status(payload, json_output=json_output)
+
+
+@bridge_dispatch_complex_group.command("health")
+@click.option("--supervisor-task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--watchdog-task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_complex_health_cmd(
+    ctx: click.Context,
+    supervisor_task_name: str,
+    watchdog_task_name: str,
+    json_output: bool,
+) -> None:
+    """Report dispatcher daemon complex lifecycle health."""
+    from groundtruth_kb.dispatcher_complex import collect_complex_health
+
+    config = _resolve_config(ctx)
+    payload = collect_complex_health(
+        config.project_root,
+        supervisor_task_name=supervisor_task_name,
+        watchdog_task_name=watchdog_task_name,
+    )
+    _emit_complex_status(payload, json_output=json_output)
+
+
+@bridge_dispatch_complex_group.command("enable")
+@click.option("--supervisor-task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--watchdog-task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_complex_enable_cmd(
+    ctx: click.Context,
+    supervisor_task_name: str,
+    watchdog_task_name: str,
+    json_output: bool,
+) -> None:
+    """Enable the dispatcher supervisor and watchdog scheduled tasks."""
+    from groundtruth_kb.dispatcher_complex import enable_complex
+
+    payload = enable_complex(supervisor_task_name=supervisor_task_name, watchdog_task_name=watchdog_task_name)
+    if payload.get("ok"):
+        payload["disable_guard_resolution"] = _supersede_dispatch_disable_guard(
+            ctx,
+            task_names=[supervisor_task_name, watchdog_task_name],
+        )
+    _emit_complex_action_result(ctx, payload, json_output=json_output)
+    if not json_output:
+        _emit_disable_guard_resolution_warning(payload)
+
+
+@bridge_dispatch_complex_group.command("disable")
+@click.option("--supervisor-task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--watchdog-task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--ttl-seconds", type=int, default=None, help="Bound the disable until this TTL expires.")
+@click.option("--owner-quiesce-record", default=None, help="Explicit owner quiesce evidence, e.g. DELIB/AUQ id.")
+@click.option("--reason", default="", help="Reason for the bounded disable.")
+@click.option("--actor", default="prime-builder/codex", show_default=True, help="Actor recorded in the guard audit.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_complex_disable_cmd(
+    ctx: click.Context,
+    supervisor_task_name: str,
+    watchdog_task_name: str,
+    ttl_seconds: int | None,
+    owner_quiesce_record: str | None,
+    reason: str,
+    actor: str,
+    json_output: bool,
+) -> None:
+    """Disable the dispatcher supervisor and watchdog scheduled tasks."""
+    from groundtruth_kb.dispatcher_complex import disable_complex
+
+    _validate_dispatch_disable_guard(
+        task_names=[supervisor_task_name, watchdog_task_name],
+        ttl_seconds=ttl_seconds,
+        owner_quiesce_record=owner_quiesce_record,
+        reason=reason,
+        actor=actor,
+    )
+    payload = disable_complex(supervisor_task_name=supervisor_task_name, watchdog_task_name=watchdog_task_name)
+    guard = _record_dispatch_disable_guard(
+        ctx,
+        task_names=[supervisor_task_name, watchdog_task_name],
+        component="dispatcher-complex",
+        ttl_seconds=ttl_seconds,
+        owner_quiesce_record=owner_quiesce_record,
+        reason=reason,
+        actor=actor,
+    )
+    payload["disable_guard"] = guard
+    _emit_complex_action_result(ctx, payload, json_output=json_output)
+
+
+@bridge_dispatch_complex_group.command("start")
+@click.option("--interval", type=int, default=30, show_default=True, help="Daemon tick interval in seconds.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_complex_start_cmd(ctx: click.Context, interval: int, json_output: bool) -> None:
+    """Start only the dispatcher daemon process."""
+    from groundtruth_kb.dispatcher_complex import DispatcherComplexError, start_complex
+
+    config = _resolve_config(ctx)
+    try:
+        payload = start_complex(config.project_root, interval=interval)
+    except DispatcherComplexError as exc:
+        if json_output:
+            click.echo(json.dumps(exc.payload, indent=2, sort_keys=True))
+            ctx.exit(1)
+        raise click.ClickException(str(exc)) from exc
+    _emit_complex_action_result(ctx, payload, json_output=json_output)
+
+
+@bridge_dispatch_complex_group.command("stop")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_complex_stop_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Stop only the dispatcher daemon process."""
+    from groundtruth_kb.dispatcher_complex import DispatcherComplexError, stop_complex
+
+    config = _resolve_config(ctx)
+    try:
+        payload = stop_complex(config.project_root)
+    except DispatcherComplexError as exc:
+        if json_output:
+            click.echo(json.dumps(exc.payload, indent=2, sort_keys=True))
+            ctx.exit(1)
+        raise click.ClickException(str(exc)) from exc
+    _emit_complex_action_result(ctx, payload, json_output=json_output)
 
 
 @bridge_dispatch_group.group("daemon")
@@ -992,11 +1718,487 @@ def bridge_dispatch_daemon_status_cmd(ctx: click.Context, json_output: bool) -> 
         )
 
 
+@bridge_dispatch_daemon_group.group("supervisor")
+def bridge_dispatch_daemon_supervisor_group() -> None:
+    """Windows GTKB-DispatcherDaemon scheduled-task supervisor (WI-4937)."""
+
+
+def _emit_supervisor_status(ctx: click.Context, *, task_name: str, json_output: bool) -> None:
+    from groundtruth_kb.dispatcher_supervisor import collect_supervisor_status
+
+    config = _resolve_config(ctx)
+    payload = collect_supervisor_status(config.project_root, task_name=task_name)
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(f"Supervisor platform: {payload.get('platform')}")
+    click.echo(f"Task: {payload.get('task_name')}")
+    click.echo(f"Registered: {payload.get('registered')}")
+    click.echo(f"State: {payload.get('state')}")
+    click.echo(f"Healthy: {payload.get('healthy')}")
+    findings = payload.get("findings") or []
+    for item in findings:
+        click.echo(f"Finding: {item}")
+
+
+@bridge_dispatch_daemon_supervisor_group.command("status")
+@click.option("--task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_supervisor_status_cmd(ctx: click.Context, task_name: str, json_output: bool) -> None:
+    """Report Windows dispatcher supervisor scheduled-task health."""
+    _emit_supervisor_status(ctx, task_name=task_name, json_output=json_output)
+
+
+@bridge_dispatch_daemon_supervisor_group.command("install")
+@click.option("--task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--interval-minutes", type=int, default=1, show_default=True)
+@click.option("--daemon-tick-seconds", type=int, default=30, show_default=True)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_supervisor_install_cmd(
+    ctx: click.Context,
+    task_name: str,
+    interval_minutes: int,
+    daemon_tick_seconds: int,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Register and enable the headless dispatcher supervisor task (Windows)."""
+    from groundtruth_kb.dispatcher_supervisor import DispatcherSupervisorError, install_supervisor
+
+    config = _resolve_config(ctx)
+    try:
+        result = install_supervisor(
+            config.project_root,
+            task_name=task_name,
+            interval_minutes=interval_minutes,
+            daemon_tick_seconds=daemon_tick_seconds,
+            dry_run=dry_run,
+        )
+    except DispatcherSupervisorError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(result.get("stdout") or f"Supervisor install complete (dry_run={dry_run}).")
+
+
+@bridge_dispatch_daemon_supervisor_group.command("enable")
+@click.option("--task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_supervisor_enable_cmd(ctx: click.Context, task_name: str, json_output: bool) -> None:
+    """Enable the dispatcher supervisor scheduled task (Windows)."""
+    from groundtruth_kb.dispatcher_supervisor import DispatcherSupervisorError, enable_supervisor
+
+    try:
+        result = enable_supervisor(task_name=task_name)
+    except DispatcherSupervisorError as exc:
+        raise click.ClickException(str(exc)) from exc
+    result["disable_guard_resolution"] = _supersede_dispatch_disable_guard(ctx, task_names=[task_name])
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(f"Enabled supervisor task {task_name}.")
+    _emit_disable_guard_resolution_warning(result)
+
+
+@bridge_dispatch_daemon_supervisor_group.command("disable")
+@click.option("--task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--ttl-seconds", type=int, default=None, help="Bound the disable until this TTL expires.")
+@click.option("--owner-quiesce-record", default=None, help="Explicit owner quiesce evidence, e.g. DELIB/AUQ id.")
+@click.option("--reason", default="", help="Reason for the bounded disable.")
+@click.option("--actor", default="prime-builder/codex", show_default=True, help="Actor recorded in the guard audit.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_supervisor_disable_cmd(
+    ctx: click.Context,
+    task_name: str,
+    ttl_seconds: int | None,
+    owner_quiesce_record: str | None,
+    reason: str,
+    actor: str,
+    json_output: bool,
+) -> None:
+    """Disable the dispatcher supervisor scheduled task (Windows)."""
+    from groundtruth_kb.dispatcher_supervisor import DispatcherSupervisorError, disable_supervisor
+
+    _validate_dispatch_disable_guard(
+        task_names=[task_name],
+        ttl_seconds=ttl_seconds,
+        owner_quiesce_record=owner_quiesce_record,
+        reason=reason,
+        actor=actor,
+    )
+    try:
+        result = disable_supervisor(task_name=task_name)
+    except DispatcherSupervisorError as exc:
+        raise click.ClickException(str(exc)) from exc
+    guard = _record_dispatch_disable_guard(
+        ctx,
+        task_names=[task_name],
+        component="dispatcher-supervisor",
+        ttl_seconds=ttl_seconds,
+        owner_quiesce_record=owner_quiesce_record,
+        reason=reason,
+        actor=actor,
+    )
+    result["disable_guard"] = guard
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(f"Disabled supervisor task {task_name}.")
+
+
+@bridge_dispatch_daemon_supervisor_group.command("uninstall")
+@click.option("--task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_supervisor_uninstall_cmd(
+    ctx: click.Context, task_name: str, dry_run: bool, json_output: bool
+) -> None:
+    """Unregister the dispatcher supervisor scheduled task (Windows)."""
+    from groundtruth_kb.dispatcher_supervisor import DispatcherSupervisorError, uninstall_supervisor
+
+    config = _resolve_config(ctx)
+    try:
+        result = uninstall_supervisor(
+            config.project_root,
+            task_name=task_name,
+            dry_run=dry_run,
+        )
+    except DispatcherSupervisorError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(result.get("stdout") or f"Supervisor uninstall complete (dry_run={dry_run}).")
+
+
+@bridge_dispatch_daemon_group.group("watchdog")
+def bridge_dispatch_daemon_watchdog_group() -> None:
+    """Windows GTKB-HarnessStormWatchdog scheduled-task control (WI-5023)."""
+
+
+def _emit_watchdog_status(ctx: click.Context, *, task_name: str, json_output: bool) -> None:
+    from groundtruth_kb.dispatcher_watchdog import collect_watchdog_status
+
+    config = _resolve_config(ctx)
+    payload = collect_watchdog_status(config.project_root, task_name=task_name)
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(f"Watchdog platform: {payload.get('platform')}")
+    click.echo(f"Task: {payload.get('task_name')}")
+    click.echo(f"Registered: {payload.get('registered')}")
+    click.echo(f"State: {payload.get('state')}")
+    click.echo(f"Healthy: {payload.get('healthy')}")
+    findings = payload.get("findings") or []
+    for item in findings:
+        click.echo(f"Finding: {item}")
+
+
+@bridge_dispatch_daemon_watchdog_group.command("status")
+@click.option("--task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_watchdog_status_cmd(ctx: click.Context, task_name: str, json_output: bool) -> None:
+    """Report Windows storm-watchdog scheduled-task health."""
+    _emit_watchdog_status(ctx, task_name=task_name, json_output=json_output)
+
+
+@bridge_dispatch_daemon_watchdog_group.command("install")
+@click.option("--task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--interval-minutes", type=int, default=1, show_default=True)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_watchdog_install_cmd(
+    ctx: click.Context,
+    task_name: str,
+    interval_minutes: int,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Register and enable the headless storm-watchdog task (Windows)."""
+    from groundtruth_kb.dispatcher_watchdog import DispatcherWatchdogError, install_watchdog
+
+    config = _resolve_config(ctx)
+    try:
+        result = install_watchdog(
+            config.project_root,
+            task_name=task_name,
+            interval_minutes=interval_minutes,
+            dry_run=dry_run,
+        )
+    except DispatcherWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(result.get("stdout") or f"Watchdog install complete (dry_run={dry_run}).")
+
+
+@bridge_dispatch_daemon_watchdog_group.command("enable")
+@click.option("--task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_watchdog_enable_cmd(ctx: click.Context, task_name: str, json_output: bool) -> None:
+    """Enable the storm-watchdog scheduled task (Windows)."""
+    from groundtruth_kb.dispatcher_watchdog import DispatcherWatchdogError, enable_watchdog
+
+    try:
+        result = enable_watchdog(task_name=task_name)
+    except DispatcherWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    result["disable_guard_resolution"] = _supersede_dispatch_disable_guard(ctx, task_names=[task_name])
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(f"Enabled watchdog task {task_name}.")
+    _emit_disable_guard_resolution_warning(result)
+
+
+@bridge_dispatch_daemon_watchdog_group.command("disable")
+@click.option("--task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--ttl-seconds", type=int, default=None, help="Bound the disable until this TTL expires.")
+@click.option("--owner-quiesce-record", default=None, help="Explicit owner quiesce evidence, e.g. DELIB/AUQ id.")
+@click.option("--reason", default="", help="Reason for the bounded disable.")
+@click.option("--actor", default="prime-builder/codex", show_default=True, help="Actor recorded in the guard audit.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_watchdog_disable_cmd(
+    ctx: click.Context,
+    task_name: str,
+    ttl_seconds: int | None,
+    owner_quiesce_record: str | None,
+    reason: str,
+    actor: str,
+    json_output: bool,
+) -> None:
+    """Disable the storm-watchdog scheduled task (Windows)."""
+    from groundtruth_kb.dispatcher_watchdog import DispatcherWatchdogError, disable_watchdog
+
+    _validate_dispatch_disable_guard(
+        task_names=[task_name],
+        ttl_seconds=ttl_seconds,
+        owner_quiesce_record=owner_quiesce_record,
+        reason=reason,
+        actor=actor,
+    )
+    try:
+        result = disable_watchdog(task_name=task_name)
+    except DispatcherWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    guard = _record_dispatch_disable_guard(
+        ctx,
+        task_names=[task_name],
+        component="dispatcher-watchdog",
+        ttl_seconds=ttl_seconds,
+        owner_quiesce_record=owner_quiesce_record,
+        reason=reason,
+        actor=actor,
+    )
+    result["disable_guard"] = guard
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(f"Disabled watchdog task {task_name}.")
+
+
+@bridge_dispatch_daemon_watchdog_group.command("uninstall")
+@click.option("--task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_watchdog_uninstall_cmd(
+    ctx: click.Context, task_name: str, dry_run: bool, json_output: bool
+) -> None:
+    """Unregister the storm-watchdog scheduled task (Windows)."""
+    from groundtruth_kb.dispatcher_watchdog import DispatcherWatchdogError, uninstall_watchdog
+
+    _resolve_config(ctx)
+    try:
+        result = uninstall_watchdog(
+            task_name=task_name,
+            dry_run=dry_run,
+        )
+    except DispatcherWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(result.get("stdout") or f"Watchdog uninstall complete (dry_run={dry_run}).")
+
+
+@main.group("watchdog")
+def watchdog_group() -> None:
+    """Platform watchdog commands."""
+
+
+@watchdog_group.group("service-sot")
+def service_sot_watchdog_group() -> None:
+    """Detection-only service and SoT availability watchdog."""
+
+
+def _emit_service_sot_task_status(ctx: click.Context, *, task_name: str, json_output: bool) -> None:
+    from groundtruth_kb.watchdog.service_sot import collect_task_status
+
+    config = _resolve_config(ctx)
+    payload = collect_task_status(config.project_root, task_name=task_name)
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(f"Service/SoT watchdog platform: {payload.get('platform')}")
+    click.echo(f"Task: {payload.get('task_name')}")
+    click.echo(f"Registered: {payload.get('registered')}")
+    click.echo(f"State: {payload.get('state')}")
+    click.echo(f"Healthy: {payload.get('healthy')}")
+    status_output = payload.get("status_output")
+    if isinstance(status_output, dict):
+        click.echo(f"Last run: {status_output.get('overall_status') or '(none)'}")
+    for item in payload.get("findings") or []:
+        click.echo(f"Finding: {item}")
+
+
+@service_sot_watchdog_group.command("run")
+@click.option("--component", "components", multiple=True, help="Limit gt-status probing to one component.")
+@click.option("--no-write", is_flag=True, default=False, help="Print JSON without writing runtime status.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def service_sot_watchdog_run_cmd(
+    ctx: click.Context,
+    components: tuple[str, ...],
+    no_write: bool,
+    json_output: bool,
+) -> None:
+    """Run the service/SoT watchdog once."""
+    from groundtruth_kb.watchdog.service_sot import run_service_sot_watchdog
+
+    config = _resolve_config(ctx)
+    payload = run_service_sot_watchdog(
+        config.project_root,
+        components=components or None,
+        write=not no_write,
+    )
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        click.echo(f"Service/SoT watchdog: {payload.get('overall_status')}")
+        if payload.get("output_path"):
+            click.echo(f"Output: {payload['output_path']}")
+        for item in payload.get("findings") or []:
+            click.echo(f"Finding: {item}")
+    if payload.get("overall_status") == "FAIL":
+        ctx.exit(1)
+
+
+@service_sot_watchdog_group.command("status")
+@click.option("--task-name", default="GTKB-ServiceSoTWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def service_sot_watchdog_status_cmd(ctx: click.Context, task_name: str, json_output: bool) -> None:
+    """Report service/SoT watchdog scheduled-task health."""
+    _emit_service_sot_task_status(ctx, task_name=task_name, json_output=json_output)
+
+
+@service_sot_watchdog_group.command("install")
+@click.option("--task-name", default="GTKB-ServiceSoTWatchdog", show_default=True)
+@click.option("--interval-minutes", type=int, default=5, show_default=True)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def service_sot_watchdog_install_cmd(
+    ctx: click.Context,
+    task_name: str,
+    interval_minutes: int,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Register and enable the service/SoT watchdog task."""
+    from groundtruth_kb.watchdog.service_sot import ServiceSoTWatchdogError, install_task
+
+    config = _resolve_config(ctx)
+    try:
+        result = install_task(
+            config.project_root,
+            task_name=task_name,
+            interval_minutes=interval_minutes,
+            dry_run=dry_run,
+        )
+    except ServiceSoTWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(result.get("stdout") or f"Service/SoT watchdog install complete (dry_run={dry_run}).")
+
+
+@service_sot_watchdog_group.command("enable")
+@click.option("--task-name", default="GTKB-ServiceSoTWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+def service_sot_watchdog_enable_cmd(task_name: str, json_output: bool) -> None:
+    """Enable the service/SoT watchdog scheduled task."""
+    from groundtruth_kb.watchdog.service_sot import ServiceSoTWatchdogError, enable_task
+
+    try:
+        result = enable_task(task_name=task_name)
+    except ServiceSoTWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(f"Enabled service/SoT watchdog task {task_name}.")
+
+
+@service_sot_watchdog_group.command("disable")
+@click.option("--task-name", default="GTKB-ServiceSoTWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+def service_sot_watchdog_disable_cmd(task_name: str, json_output: bool) -> None:
+    """Disable the service/SoT watchdog scheduled task."""
+    from groundtruth_kb.watchdog.service_sot import ServiceSoTWatchdogError, disable_task
+
+    try:
+        result = disable_task(task_name=task_name)
+    except ServiceSoTWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(f"Disabled service/SoT watchdog task {task_name}.")
+
+
+@service_sot_watchdog_group.command("uninstall")
+@click.option("--task-name", default="GTKB-ServiceSoTWatchdog", show_default=True)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+def service_sot_watchdog_uninstall_cmd(task_name: str, dry_run: bool, json_output: bool) -> None:
+    """Unregister the service/SoT watchdog scheduled task."""
+    from groundtruth_kb.watchdog.service_sot import ServiceSoTWatchdogError, uninstall_task
+
+    try:
+        result = uninstall_task(task_name=task_name, dry_run=dry_run)
+    except ServiceSoTWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(result.get("stdout") or f"Service/SoT watchdog uninstall complete (dry_run={dry_run}).")
+
+
 @bridge_dispatch_daemon_group.command("start")
 @click.option("--interval", type=int, default=30, show_default=True, help="Tick interval in seconds.")
 @click.pass_context
 def bridge_dispatch_daemon_start_cmd(ctx: click.Context, interval: int) -> None:
-    """Start the shadow dispatcher daemon in the background."""
+    """Start the dispatcher daemon detached (diagnostic fallback).
+
+    Production hosts should use ``gt bridge dispatch daemon supervisor install``
+    so the headless scheduled-task supervisor keeps the daemon alive across IDE
+    and terminal closure. This command does not install or enable supervision.
+    """
     config = _resolve_config(ctx)
     daemon = _import_dispatcher_daemon_module(config.project_root)
     state_dir = daemon.daemon_state_dir(config.project_root)
@@ -1064,6 +2266,13 @@ def bridge_dispatch_daemon_stop_cmd(ctx: click.Context) -> None:
             if loop_pid > 0 and loop_pid not in candidate_pids:
                 candidate_pids.append(loop_pid)
 
+    reaped_workers = 0
+    if hasattr(daemon, "_reap_dispatched_workers"):
+        try:
+            reaped_workers = int(daemon._reap_dispatched_workers(config.project_root) or 0)
+        except Exception:  # noqa: BLE001 - stop remains best-effort
+            reaped_workers = 0
+
     for candidate_pid in candidate_pids:
         terminate_pid_tree(candidate_pid)
         try:
@@ -1087,13 +2296,14 @@ def bridge_dispatch_daemon_stop_cmd(ctx: click.Context) -> None:
         with contextlib.suppress(OSError):
             pid_path.unlink()
     daemon.release_daemon_lock(state_dir, force=True)
+    reap_note = f"; reaped dispatched workers={reaped_workers}" if reaped_workers else ""
     if candidate_pids:
         joined = ", ".join(str(item) for item in candidate_pids)
-        click.echo(f"Stopped dispatcher daemon (pid(s)={joined} tree terminated, lock released).")
+        click.echo(f"Stopped dispatcher daemon (pid(s)={joined} tree terminated, lock released{reap_note}).")
     elif pid > 0:
-        click.echo("Stopped dispatcher daemon (unverified pid ignored, pid/lock state cleared).")
+        click.echo(f"Stopped dispatcher daemon (unverified pid ignored, pid/lock state cleared{reap_note}).")
     else:
-        click.echo("Stopped dispatcher daemon (no recorded pid; lock released).")
+        click.echo(f"Stopped dispatcher daemon (no recorded pid; lock released{reap_note}).")
 
 
 def _resolve_dispatch_state_dirs(ctx: click.Context, state_dir: str | None):
@@ -1108,6 +2318,8 @@ def _resolve_dispatch_state_dirs(ctx: click.Context, state_dir: str | None):
 @click.option("--soft", is_flag=True, default=False, help="Clear transient dispatcher runtime state.")
 @click.option("--hard", is_flag=True, default=False, help="Owner-gated factory reset (soft + quality wipe).")
 @click.option("--confirm", is_flag=True, default=False, help="Required for --hard reset.")
+@click.option("--recipient", default=None, help="Exact dispatcher recipient key for targeted reoffer.")
+@click.option("--document", default=None, help="Exact bridge document slug for targeted reoffer.")
 @click.option("--dry-run", is_flag=True, default=False, help="Report without mutating state.")
 @click.option("--state-dir", type=click.Path(path_type=Path), default=None, help="Primary dispatcher state directory.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
@@ -1117,15 +2329,59 @@ def bridge_dispatch_reset_cmd(
     soft: bool,
     hard: bool,
     confirm: bool,
+    recipient: str | None,
+    document: str | None,
     dry_run: bool,
     state_dir: Path | None,
     json_output: bool,
 ) -> None:
     """Reset bridge dispatcher transient state (WI-4793)."""
-    from groundtruth_kb.bridge_dispatch_reset import hard_reset, soft_reset
+    from groundtruth_kb.bridge_dispatch_reset import hard_reset, soft_reset, targeted_reoffer
+
+    def _invalid(message: str) -> None:
+        if json_output:
+            click.echo(
+                json.dumps(
+                    {
+                        "status": "invalid",
+                        "recipient": recipient,
+                        "document": document,
+                        "dry_run": dry_run,
+                        "mutated": False,
+                        "changed_fields": [],
+                        "message": message,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            raise click.exceptions.Exit(2)
+        raise click.ClickException(message)
+
+    targeted = recipient is not None or document is not None
+    if targeted:
+        if recipient is None or document is None:
+            _invalid("Targeted reoffer requires both --recipient and --document.")
+        if soft or hard or confirm:
+            _invalid("Targeted reoffer cannot be combined with --soft, --hard, or --confirm.")
+        state_dirs = _resolve_dispatch_state_dirs(ctx, str(state_dir) if state_dir else None)
+        result = targeted_reoffer(state_dirs, recipient, document, dry_run=dry_run)
+        payload = result.to_json_dict()
+        if json_output:
+            click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        else:
+            suffix = " (dry-run)" if dry_run else ""
+            click.echo(f"Bridge dispatch targeted reoffer {payload['status']}{suffix}.")
+            click.echo(f"- recipient: {recipient}")
+            click.echo(f"- document: {document}")
+            if payload.get("audit_path"):
+                click.echo(f"- audit_path: {payload['audit_path']}")
+        if result.status == "invalid":
+            raise click.exceptions.Exit(2)
+        return
 
     if (soft and hard) or (not soft and not hard):
-        raise click.ClickException("Specify exactly one of --soft or --hard.")
+        _invalid("Specify exactly one of --soft or --hard.")
     if hard and not confirm:
         raise click.ClickException(
             "Refusing --hard reset without --confirm. Use --soft for transient-only clear, or pass --confirm."
@@ -2218,6 +3474,345 @@ def hygiene_strays(
         raise SystemExit(2)
 
 
+@hygiene_group.command("auto-resolve")
+@click.option(
+    "--root",
+    type=click.Path(file_okay=False),
+    default=".",
+    show_default=True,
+    help="Repository root to inspect.",
+)
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["json", "markdown"]),
+    default="json",
+    show_default=True,
+    help="Output format.",
+)
+@click.option(
+    "--apply",
+    "apply_changes",
+    is_flag=True,
+    default=False,
+    help="Refuse live apply and emit the missing evidence packet.",
+)
+@click.option(
+    "--evidence",
+    "evidence_refs",
+    multiple=True,
+    help="Item-specific apply evidence reference; repeatable.",
+)
+def hygiene_auto_resolve(root: str, fmt: str, apply_changes: bool, evidence_refs: tuple[str, ...]) -> None:
+    """Build the read-only WI-4979 work-tree auto-resolve action plan."""
+    from groundtruth_kb.hygiene.auto_resolve import (  # noqa: PLC0415
+        AutoResolveError,
+        build_plan,
+        format_markdown,
+        refuse_apply,
+    )
+
+    root_path = Path(root).resolve()
+    try:
+        plan = build_plan(root_path)
+    except AutoResolveError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+
+    if apply_changes:
+        refusal = refuse_apply(plan, evidence_refs=evidence_refs)
+        click.echo(json.dumps(refusal, indent=2, sort_keys=True))
+        raise SystemExit(2)
+
+    if fmt == "markdown":
+        click.echo(format_markdown(plan), nl=False)
+    else:
+        click.echo(json.dumps(plan, indent=2, sort_keys=True))
+
+
+@hygiene_group.group("reclaim")
+def hygiene_reclaim_group() -> None:
+    """Plan and execute exact repository hygiene batches."""
+
+
+def _reclaim_now(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise click.BadParameter("must be an ISO-8601 timestamp", param_hint="--now") from exc
+    if parsed.tzinfo is None:
+        raise click.BadParameter("must include timezone information", param_hint="--now")
+    return parsed
+
+
+def _emit_reclaim_result(action: str, payload: dict[str, Any], *, json_output: bool) -> None:
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else payload
+    fields = []
+    for key in (
+        "run_id",
+        "status",
+        "executable",
+        "candidate_count",
+        "logical_bytes",
+        "physical_bytes_reclaimed",
+        "integrity",
+    ):
+        if key in summary:
+            fields.append(f"{key}={summary[key]}")
+        elif key in payload:
+            fields.append(f"{key}={payload[key]}")
+    click.echo(f"hygiene reclaim {action}: " + (", ".join(fields) if fields else "complete"))
+
+
+@hygiene_reclaim_group.command("plan")
+@click.option("--root", type=click.Path(file_okay=False, path_type=Path), default=Path("."), show_default=True)
+@click.option("--state-root", type=click.Path(file_okay=False, path_type=Path), default=None)
+@click.option("--min-age-hours", type=click.IntRange(min=1), default=168, show_default=True)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit compact machine-readable output.")
+@click.option("--now", default=None, hidden=True, help="Timezone-aware ISO timestamp for deterministic tests.")
+@click.option("--actor", default=None, hidden=True)
+@click.option("--session-id", default=None, hidden=True)
+def hygiene_reclaim_plan(
+    root: Path,
+    state_root: Path | None,
+    min_age_hours: int,
+    json_output: bool,
+    now: str | None,
+    actor: str | None,
+    session_id: str | None,
+) -> None:
+    """Create a read-only, hash-addressed reclaim plan and durable run ledger."""
+    from groundtruth_kb.hygiene.reclaim import ReclaimError, plan_reclaim
+
+    try:
+        payload = plan_reclaim(
+            root.resolve(),
+            state_root=state_root.resolve() if state_root else None,
+            min_age_hours=min_age_hours,
+            now=_reclaim_now(now),
+            actor=actor,
+            session_id=session_id,
+        )
+    except ReclaimError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+    _emit_reclaim_result("plan", payload, json_output=json_output)
+
+
+@hygiene_reclaim_group.command("history")
+@click.option("--root", type=click.Path(file_okay=False, path_type=Path), default=Path("."), show_default=True)
+@click.option("--state-root", type=click.Path(file_okay=False, path_type=Path), default=None)
+@click.option("--run-id", default=None, help="Show one exact run; omit to list runs compactly.")
+@click.option("--item-id", default=None, help="Limit an exact run to one item.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit compact machine-readable output.")
+def hygiene_reclaim_history(
+    root: Path,
+    state_root: Path | None,
+    run_id: str | None,
+    item_id: str | None,
+    json_output: bool,
+) -> None:
+    """List reclaim runs or validate one exact run and its event history."""
+    from groundtruth_kb.hygiene.reclaim import ReclaimError, history_reclaim
+
+    try:
+        payload = history_reclaim(
+            root.resolve(),
+            run_id=run_id,
+            item_id=item_id,
+            state_root=state_root.resolve() if state_root else None,
+        )
+    except ReclaimError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+    _emit_reclaim_result("history", payload, json_output=json_output)
+
+
+@hygiene_reclaim_group.command("trash")
+@click.option("--root", type=click.Path(file_okay=False, path_type=Path), default=Path("."), show_default=True)
+@click.option("--state-root", type=click.Path(file_okay=False, path_type=Path), default=None)
+@click.option("--run-id", required=True, help="Exact planned run identifier.")
+@click.option("--plan-hash", required=True, help="Immutable plan hash from the selected run.")
+@click.option("--item-id", "item_ids", multiple=True, required=True, help="Exact candidate item; repeatable.")
+@click.option(
+    "--owner-evidence",
+    multiple=True,
+    required=True,
+    help="Batch-specific owner/apply evidence reference; repeatable.",
+)
+@click.option(
+    "--quiescence-evidence",
+    multiple=True,
+    required=True,
+    help="Operation-time quiescence evidence reference; repeatable.",
+)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit compact machine-readable output.")
+def hygiene_reclaim_trash(
+    root: Path,
+    state_root: Path | None,
+    run_id: str,
+    plan_hash: str,
+    item_ids: tuple[str, ...],
+    owner_evidence: tuple[str, ...],
+    quiescence_evidence: tuple[str, ...],
+    json_output: bool,
+) -> None:
+    """Move one exact approved batch into same-volume reversible trash."""
+    from groundtruth_kb.hygiene.reclaim import ReclaimError, trash_reclaim
+
+    try:
+        payload = trash_reclaim(
+            root.resolve(),
+            run_id=run_id,
+            plan_hash=plan_hash,
+            item_ids=item_ids,
+            owner_evidence=owner_evidence,
+            quiescence_evidence=quiescence_evidence,
+            state_root=state_root.resolve() if state_root else None,
+        )
+    except ReclaimError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+    _emit_reclaim_result("trash", payload, json_output=json_output)
+
+
+@hygiene_reclaim_group.command("purge")
+@click.option("--root", type=click.Path(file_okay=False, path_type=Path), default=Path("."), show_default=True)
+@click.option("--state-root", type=click.Path(file_okay=False, path_type=Path), default=None)
+@click.option("--run-id", required=True, help="Exact planned run identifier.")
+@click.option("--plan-hash", required=True, help="Immutable plan hash from the selected run.")
+@click.option("--item-id", "item_ids", multiple=True, required=True, help="Exact trashed item; repeatable.")
+@click.option(
+    "--owner-evidence",
+    multiple=True,
+    required=True,
+    help="Batch-specific owner/purge evidence reference; repeatable.",
+)
+@click.option(
+    "--quiescence-evidence",
+    multiple=True,
+    required=True,
+    help="Operation-time quiescence evidence reference; repeatable.",
+)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit compact machine-readable output.")
+def hygiene_reclaim_purge(
+    root: Path,
+    state_root: Path | None,
+    run_id: str,
+    plan_hash: str,
+    item_ids: tuple[str, ...],
+    owner_evidence: tuple[str, ...],
+    quiescence_evidence: tuple[str, ...],
+    json_output: bool,
+) -> None:
+    """Permanently delete exact receipted trash payloads to reclaim disk."""
+    from groundtruth_kb.hygiene.reclaim import ReclaimError, purge_reclaim
+
+    try:
+        payload = purge_reclaim(
+            root.resolve(),
+            run_id=run_id,
+            plan_hash=plan_hash,
+            item_ids=item_ids,
+            owner_evidence=owner_evidence,
+            quiescence_evidence=quiescence_evidence,
+            state_root=state_root.resolve() if state_root else None,
+        )
+    except ReclaimError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+    _emit_reclaim_result("purge", payload, json_output=json_output)
+
+
+@hygiene_reclaim_group.command("deep-clean")
+@click.option("--root", type=click.Path(file_okay=False, path_type=Path), default=Path("."), show_default=True)
+@click.option("--state-root", type=click.Path(file_okay=False, path_type=Path), default=None)
+@click.option("--min-age-hours", type=click.IntRange(min=1), default=168, show_default=True)
+@click.option("--max-cycles", type=click.IntRange(min=1), default=25, show_default=True)
+@click.option("--batch-size", type=click.IntRange(min=1), default=250, show_default=True)
+@click.option(
+    "--owner-evidence",
+    multiple=True,
+    required=True,
+    help="Ops-envelope owner/deep-clean evidence reference; repeatable.",
+)
+@click.option(
+    "--quiescence-evidence",
+    multiple=True,
+    required=True,
+    help="Operation-time quiescence evidence reference; repeatable.",
+)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit compact machine-readable output.")
+@click.option("--actor", default=None, hidden=True)
+@click.option("--session-id", default=None, hidden=True)
+def hygiene_reclaim_deep_clean(
+    root: Path,
+    state_root: Path | None,
+    min_age_hours: int,
+    max_cycles: int,
+    batch_size: int,
+    owner_evidence: tuple[str, ...],
+    quiescence_evidence: tuple[str, ...],
+    json_output: bool,
+    actor: str | None,
+    session_id: str | None,
+) -> None:
+    """Autonomously plan, trash, and purge until the reclaim plan is clean."""
+    from groundtruth_kb.hygiene.reclaim import ReclaimError, deep_clean_reclaim
+
+    try:
+        payload = deep_clean_reclaim(
+            root.resolve(),
+            state_root=state_root.resolve() if state_root else None,
+            min_age_hours=min_age_hours,
+            max_cycles=max_cycles,
+            batch_size=batch_size,
+            owner_evidence=owner_evidence,
+            quiescence_evidence=quiescence_evidence,
+            actor=actor,
+            session_id=session_id,
+        )
+    except ReclaimError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+    _emit_reclaim_result("deep-clean", payload, json_output=json_output)
+
+
+@hygiene_reclaim_group.command("restore")
+@click.option("--root", type=click.Path(file_okay=False, path_type=Path), default=Path("."), show_default=True)
+@click.option("--state-root", type=click.Path(file_okay=False, path_type=Path), default=None)
+@click.option("--run-id", required=True, help="Exact run identifier containing trashed items.")
+@click.option("--item-id", "item_ids", multiple=True, required=True, help="Exact trashed item; repeatable.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit compact machine-readable output.")
+def hygiene_reclaim_restore(
+    root: Path,
+    state_root: Path | None,
+    run_id: str,
+    item_ids: tuple[str, ...],
+    json_output: bool,
+) -> None:
+    """Restore exact items from reversible trash without overwriting paths."""
+    from groundtruth_kb.hygiene.reclaim import ReclaimError, restore_reclaim
+
+    try:
+        payload = restore_reclaim(
+            root.resolve(),
+            run_id=run_id,
+            item_ids=item_ids,
+            state_root=state_root.resolve() if state_root else None,
+        )
+    except ReclaimError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+    _emit_reclaim_result("restore", payload, json_output=json_output)
+
+
 # ---------------------------------------------------------------------------
 # gt validate - deterministic validation services
 # ---------------------------------------------------------------------------
@@ -2313,7 +3908,14 @@ def validate_spec_coherence(
     help="Read back and validate the written packet.",
 )
 @click.option("--artifact-type", default=None, help="Formal artifact type, required for --kind formal.")
-@click.option("--content-file", type=click.Path(), default=None, help="Formal artifact content file.")
+@click.option(
+    "--content-file",
+    type=click.Path(),
+    default=None,
+    help="Content file. Required for --kind formal. Optional for --kind narrative: "
+    "when given, supplies the packet's full_content in place of reading --target, "
+    "while --target still supplies the packet's real path identity.",
+)
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
 @click.pass_context
 def generate_approval_packet(
@@ -2480,7 +4082,7 @@ def assert_cmd(ctx: click.Context, spec_id: str | None, triggered_by: str) -> No
         project_root = config.project_root.resolve()
         summary = run_all_assertions(db, project_root, triggered_by=triggered_by, spec_id=spec_id)
         click.echo(format_summary(summary))
-        if summary.get("failed", 0) > 0:
+        if summary.get("aggregate_result") != "PASS":
             raise SystemExit(1)
     finally:
         db.close()
@@ -2867,6 +4469,12 @@ def backlog_authorize_implementation(
 @click.option("--test-expected-outcome", required=True, help="GOV-03 unambiguous expected outcome for the test.")
 @click.option("--test-spec-id", default=None, help="Spec the test links to (defaults to --source-spec-id).")
 @click.option(
+    "--project",
+    "project_id",
+    default=None,
+    help="Project id to link the new work item to (atomic).",
+)
+@click.option(
     "--test-plan-phase",
     default=None,
     help="GOV-13 test-plan phase id to assign the test to (REQUIRED for non-dry-run creation).",
@@ -2886,6 +4494,7 @@ def backlog_add_work_item(
     description: str | None,
     source_owner_directive: str | None,
     source_spec_id: str | None,
+    project_id: str | None,
     test_title: str,
     test_type: str,
     test_expected_outcome: str,
@@ -2919,6 +4528,7 @@ def backlog_add_work_item(
         description=description,
         source_owner_directive=source_owner_directive,
         source_spec_id=source_spec_id,
+        project_id=project_id,
         change_reason=change_reason,
         test_title=test_title,
         test_type=test_type,
@@ -2936,6 +4546,114 @@ def backlog_add_work_item(
         click.echo(json.dumps(result, indent=2, sort_keys=True, default=str))
         return
     action = "Would create" if result["dry_run"] else "Created"
+    click.echo(f"{action} {result['work_item_id']} + {result['test_id']} -> phase {result['phase_id']}")
+
+
+@backlog.command("add-linked-test")
+@click.option("--work-item", "work_item_id", required=True, help="Exact existing work item id.")
+@click.option("--test-title", required=True, help="GOV-12 linked test title.")
+@click.option(
+    "--test-type",
+    required=True,
+    type=click.Choice(["assertion", "e2e", "integration", "unit", "manual"]),
+    help="GOV-12 linked test type.",
+)
+@click.option("--test-expected-outcome", required=True, help="GOV-03 unambiguous expected outcome.")
+@click.option("--test-spec-id", default=None, help="Test spec id (defaults to the work item's source_spec_id).")
+@click.option("--test-plan-phase", "phase_id", required=True, help="Exact current phase for the new test.")
+@click.option("--change-reason", required=True, help="History reason for the atomic linkage.")
+@click.option("--dry-run", is_flag=True, help="Run the complete preflight without writing.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def backlog_add_linked_test(
+    ctx: click.Context,
+    work_item_id: str,
+    test_title: str,
+    test_type: str,
+    test_expected_outcome: str,
+    test_spec_id: str | None,
+    phase_id: str,
+    change_reason: str,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Create and link one test for one already-existing work item atomically."""
+    from groundtruth_kb.cli_backlog_add_work_item import (
+        AddWorkItemError,
+        ExistingWorkItemLinkedTestRequest,
+        add_linked_test,
+    )
+
+    config = _resolve_config(ctx)
+    request = ExistingWorkItemLinkedTestRequest(
+        work_item_id=work_item_id,
+        test_title=test_title,
+        test_type=test_type,
+        test_expected_outcome=test_expected_outcome,
+        test_spec_id=test_spec_id,
+        phase_id=phase_id,
+        change_reason=change_reason,
+        dry_run=dry_run,
+    )
+    try:
+        result = add_linked_test(config, request)
+    except (AddWorkItemError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True, default=str))
+        return
+    if result["dry_run"]:
+        action = "Already linked" if result["already_linked"] else "Would create and link"
+    else:
+        action = "Already linked" if result["already_linked"] else "Created and linked"
+    click.echo(f"{action} {result['work_item_id']} + {result['test_id']} -> phase {result['phase_id']}")
+
+
+@backlog.command("repair-work-item-test-link")
+@click.option("--work-item", "work_item_id", required=True, help="Exact existing work item id.")
+@click.option("--test", "test_id", required=True, help="Exact existing add-work-item test id.")
+@click.option("--test-plan-phase", "phase_id", required=True, help="Exact phase that must contain the test.")
+@click.option("--change-reason", required=True, help="History reason for the append-only repair.")
+@click.option("--dry-run", is_flag=True, help="Validate and report exact versions without writing.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def backlog_repair_work_item_test_link(
+    ctx: click.Context,
+    work_item_id: str,
+    test_id: str,
+    phase_id: str,
+    change_reason: str,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Repair one exact historical add-work-item linkage atomically."""
+    from groundtruth_kb.cli_backlog_add_work_item import (
+        AddWorkItemError,
+        RepairWorkItemTestLinkRequest,
+        repair_work_item_test_link,
+    )
+
+    config = _resolve_config(ctx)
+    request = RepairWorkItemTestLinkRequest(
+        work_item_id=work_item_id,
+        test_id=test_id,
+        phase_id=phase_id,
+        change_reason=change_reason,
+        dry_run=dry_run,
+    )
+    try:
+        result = repair_work_item_test_link(config, request)
+    except (AddWorkItemError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True, default=str))
+        return
+    if result["dry_run"]:
+        action = "Already repaired" if result["already_repaired"] else "Would repair"
+    else:
+        action = "Already repaired" if result["already_repaired"] else "Repaired"
     click.echo(f"{action} {result['work_item_id']} + {result['test_id']} -> phase {result['phase_id']}")
 
 
@@ -3123,6 +4841,26 @@ def core_specs_next_question_cmd(
     click.echo(question["prompt"])
 
 
+@backlog.command("list-phases")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def backlog_list_phases(ctx: click.Context, json_output: bool) -> None:
+    """List valid test-plan phases (GOV-13)."""
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(config.db_path)
+    rows = db._get_conn().execute("SELECT id, title, last_result FROM test_plan_phases ORDER BY id").fetchall()
+    if json_output:
+        click.echo(
+            json.dumps(
+                [{"phase_id": r[0], "phase_name": r[1], "status": r[2]} for r in rows],
+                indent=2,
+            )
+        )
+        return
+    for row in rows:
+        click.echo(f"{row[0]}  {row[1]}  ({row[2]})")
+
+
 @backlog.command("list")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.option("--all", "include_verified", is_flag=True, help="Include verified/closed work items.")
@@ -3139,7 +4877,44 @@ def core_specs_next_question_cmd(
 @click.option("--stage", "stages", multiple=True, help="Limit to one stage; repeatable.")
 @click.option("--origin", "origins", multiple=True, help="Limit to one origin; repeatable.")
 @click.option("--component", "components", multiple=True, help="Limit to one component; repeatable.")
+@click.option(
+    "--approval-state",
+    "approval_states",
+    multiple=True,
+    help="Limit to one approval_state; repeatable.",
+)
 @click.option("--contains", "contains_terms", multiple=True, help="Case-insensitive text filter; repeatable.")
+@click.option(
+    "--field",
+    "exact_specs",
+    multiple=True,
+    help="Exact field filter as field:value; repeatable for any surfaced work_items field.",
+)
+@click.option(
+    "--match",
+    "match_specs",
+    multiple=True,
+    help="Field-specific glob match as field:pattern; repeatable.",
+)
+@click.option(
+    "--range",
+    "range_specs",
+    multiple=True,
+    help="Inclusive field range as field:min..max; repeatable.",
+)
+@click.option(
+    "--member-of",
+    "member_of_project_ids",
+    multiple=True,
+    help="Limit to work items with active membership in a project id; repeatable.",
+)
+@click.option(
+    "--sort",
+    "sort_fields",
+    multiple=True,
+    help="Sort key field name; repeatable for compound sort.",
+)
+@click.option("--sort-desc", is_flag=True, help="Apply descending order to all --sort keys.")
 @click.option("--limit", type=click.IntRange(min=1), default=None, help="Return at most N rows.")
 @click.pass_context
 def backlog_list(
@@ -3154,7 +4929,14 @@ def backlog_list(
     stages: tuple[str, ...],
     origins: tuple[str, ...],
     components: tuple[str, ...],
+    approval_states: tuple[str, ...],
     contains_terms: tuple[str, ...],
+    exact_specs: tuple[str, ...],
+    match_specs: tuple[str, ...],
+    range_specs: tuple[str, ...],
+    member_of_project_ids: tuple[str, ...],
+    sort_fields: tuple[str, ...],
+    sort_desc: bool,
     limit: int | None,
 ) -> None:
     """List unified backlog items from MemBase work_items."""
@@ -3163,22 +4945,45 @@ def backlog_list(
     try:
         include_terminal = include_verified or bool(work_item_ids) or bool(resolution_statuses)
         items = db.list_work_items() if include_terminal else db.get_open_work_items()
+        membership_ids: dict[str, set[str]] = {}
+        if member_of_project_ids:
+            for project_id in member_of_project_ids:
+                membership_ids[project_id] = {
+                    str(row.get("work_item_id") or "")
+                    for row in db.list_project_work_items(project_id)
+                    if str(row.get("membership_status") or "").strip().lower() == "active"
+                }
     finally:
         db.close()
-    items = [
-        item
-        for item in items
-        if _matches_any_exact(item, "id", work_item_ids)
-        and _matches_exact(item, "project_name", project_name)
-        and _matches_exact(item, "subproject_name", subproject_name)
-        and _matches_any_exact(item, "priority", priorities)
-        and _matches_any_exact(item, "resolution_status", resolution_statuses)
-        and _matches_any_exact(item, "stage", stages)
-        and _matches_any_exact(item, "origin", origins)
-        and _matches_any_exact(item, "component", components)
-        and _matches_contains(item, _WORK_ITEM_CONTAINS_FIELDS, contains_terms)
-    ]
-    items = _apply_limit(items, limit)
+
+    query = BacklogListQuery(
+        include_terminal=include_terminal,
+        work_item_ids=work_item_ids,
+        project_name=project_name,
+        subproject_name=subproject_name,
+        priorities=priorities,
+        resolution_statuses=resolution_statuses,
+        stages=stages,
+        origins=origins,
+        components=components,
+        approval_states=approval_states,
+        contains_terms=contains_terms,
+        exact_specs=exact_specs,
+        match_specs=match_specs,
+        range_specs=range_specs,
+        member_of_project_ids=member_of_project_ids,
+        sort_keys=tuple(SortKey(field=field_name, descending=sort_desc) for field_name in sort_fields),
+        limit=limit,
+    )
+    try:
+        items = filter_work_items(
+            items,
+            query,
+            contains_fields=_WORK_ITEM_CONTAINS_FIELDS,
+            project_membership_ids=membership_ids,
+        )
+    except BacklogQueryError as exc:
+        raise click.ClickException(str(exc)) from exc
 
     if json_output:
         click.echo(json.dumps(items, indent=2, sort_keys=True))
@@ -3371,6 +5176,11 @@ def backlog_status(
 )
 @click.option("--source-spec-id", default=None, help="New source specification id (set, backfill, or correct).")
 @click.option("--owner-approved", is_flag=True, help="Flag proving owner approval.")
+@click.option(
+    "--reopen-terminal",
+    is_flag=True,
+    help="Use the narrowly governed owner-approved terminal-repair path.",
+)
 @click.option("--change-reason", required=True, help="History reason for the update.")
 @click.option("--dry-run", is_flag=True, help="Validate and report would-be changes without writing.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
@@ -3388,6 +5198,7 @@ def backlog_update(
     description_file: Path | None,
     source_spec_id: str | None,
     owner_approved: bool,
+    reopen_terminal: bool,
     change_reason: str,
     dry_run: bool,
     json_output: bool,
@@ -3411,6 +5222,7 @@ def backlog_update(
         title=title,
         description=description,
         source_spec_id=source_spec_id,
+        reopen_terminal=reopen_terminal,
     )
     try:
         result = update_backlog_item(config, request)
@@ -3487,6 +5299,11 @@ def _registry_paths(ctx: click.Context) -> tuple[Path, Path]:
     return default_registry_path(config.project_root), config.db_path
 
 
+def _registry_control_kwargs(ctx: click.Context) -> dict[str, Path]:
+    config = _resolve_config(ctx)
+    return {"project_root": Path(config.project_root), "db_path": Path(config.db_path)}
+
+
 def _record_to_dict(rec: Any) -> dict[str, Any]:
     return {
         "id": rec.id,
@@ -3499,6 +5316,8 @@ def _record_to_dict(rec: Any) -> dict[str, Any]:
         "backup_policy": rec.backup_policy,
         "health_check_function": rec.health_check_function,
         "owner_role": rec.owner_role,
+        "restore_action": rec.restore_action,
+        "coverage_mode": rec.coverage_mode,
         "depends_on": list(rec.depends_on),
         "forbidden_substitutes": list(rec.forbidden_substitutes),
         "notes": rec.notes,
@@ -3511,11 +5330,10 @@ def _record_to_dict(rec: Any) -> dict[str, Any]:
 @click.option("--lifecycle", default=None, help="Filter by lifecycle value.")
 @click.pass_context
 def registry_list(ctx: click.Context, json_output: bool, domain: str | None, lifecycle: str | None) -> None:
-    """List all SoT artifact records from the TOML registry."""
-    toml_path, _db = _registry_paths(ctx)
+    """List all SoT artifact records from one coherent generation."""
     try:
-        records = load_sot_toml(toml_path)
-    except (InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
+        records = list(load_registry_snapshot(**_registry_control_kwargs(ctx)).records)
+    except (RegistryControlPlaneError, InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
         raise click.ClickException(str(exc)) from exc
     if domain:
         records = [r for r in records if r.domain == domain]
@@ -3534,10 +5352,9 @@ def registry_list(ctx: click.Context, json_output: bool, domain: str | None, lif
 @click.pass_context
 def registry_show(ctx: click.Context, entry_id: str, json_output: bool) -> None:
     """Show details of a single SoT artifact record by id."""
-    toml_path, _db = _registry_paths(ctx)
     try:
-        records = load_sot_toml(toml_path)
-    except (InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
+        records = load_registry_snapshot(**_registry_control_kwargs(ctx)).records
+    except (RegistryControlPlaneError, InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
         raise click.ClickException(str(exc)) from exc
     for rec in records:
         if rec.id == entry_id:
@@ -3554,39 +5371,319 @@ def registry_show(ctx: click.Context, entry_id: str, json_output: bool) -> None:
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.pass_context
 def registry_validate(ctx: click.Context, json_output: bool) -> None:
-    """Check parity between TOML registry and MemBase projection."""
-    toml_path, db_path = _registry_paths(ctx)
-    try:
-        toml_records = load_sot_toml(toml_path)
-    except (InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
-        raise click.ClickException(str(exc)) from exc
-    proj_records = load_projection(db_path)
-    report = validate_projection_parity(toml_records, proj_records)
-    result: dict[str, Any] = {
-        "in_sync": report.in_sync,
-        "toml_count": report.toml_count,
-        "projection_count": report.projection_count,
-        "missing_in_projection": list(report.missing_in_projection),
-        "missing_in_toml": list(report.missing_in_toml),
-        "field_divergences": [[pair[0], pair[1]] for pair in report.field_divergences],
-    }
+    """Validate coherent schema, parity, currentness, journal, and reverse coverage."""
+    result = validate_registry_control_plane(**_registry_control_kwargs(ctx))
     if json_output:
-        click.echo(json.dumps(result, indent=2))
-        return
-    status = "IN SYNC" if report.in_sync else "OUT OF SYNC"
-    click.echo(f"Registry parity: {status}")
-    click.echo(f"  TOML records:       {report.toml_count}")
-    click.echo(f"  Projection records: {report.projection_count}")
-    if report.missing_in_projection:
-        click.echo(f"  Missing in projection: {', '.join(report.missing_in_projection)}")
-    if report.missing_in_toml:
-        click.echo(f"  Missing in TOML:       {', '.join(report.missing_in_toml)}")
-    if report.field_divergences:
-        click.echo(f"  Field divergences ({len(report.field_divergences)}):")
-        for rec_id, field in report.field_divergences:
-            click.echo(f"    {rec_id}.{field}")
-    if not report.in_sync:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        status = "VALID" if result["valid"] else "INVALID"
+        click.echo(f"Registry control plane: {status}")
+        for error in result["errors"]:
+            click.echo(f"  {error}")
+    if not result["valid"]:
         raise SystemExit(1)
+
+
+@registry_cmd.command("inspect")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--no-census", is_flag=True, help="Skip the deterministic whole-root census.")
+@click.pass_context
+def registry_inspect(ctx: click.Context, json_output: bool, no_census: bool) -> None:
+    """Inspect coherent declaration, projection, journal, currentness, and coverage state."""
+    result = inspect_registry(include_census=not no_census, **_registry_control_kwargs(ctx))
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        click.echo(f"Registry coherent: {result.get('coherent', False)}")
+        if result.get("record_count") is not None:
+            click.echo(f"Records: {result['record_count']}")
+        if result.get("error"):
+            click.echo(f"Error: {result['error']}")
+
+
+@registry_cmd.command("reconcile")
+@click.option("--json", "json_output", is_flag=True, help="Emit the complete machine-readable report.")
+@click.option("--deep", is_flag=True, help="Inspect disposable descendants instead of emitting pruned envelopes.")
+@click.option("--audit", is_flag=True, help="Perform the periodic deep content-observation audit.")
+@click.option(
+    "--batch-output",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Write the exact additive batch plan inside the project root.",
+)
+@click.pass_context
+def registry_reconcile(
+    ctx: click.Context,
+    json_output: bool,
+    deep: bool,
+    audit: bool,
+    batch_output: Path | None,
+) -> None:
+    """Reconcile registry membership through all five typed observers."""
+
+    from groundtruth_kb.project.artifact_membership_reconciliation import (
+        reconcile_artifact_membership,
+    )
+
+    config = _resolve_config(ctx)
+    root = Path(config.project_root).resolve()
+    try:
+        report = reconcile_artifact_membership(
+            root,
+            db_path=Path(config.db_path),
+            deep=deep,
+            audit=audit,
+        )
+        if batch_output is not None:
+            output = batch_output if batch_output.is_absolute() else root / batch_output
+            output = output.resolve()
+            output.relative_to(root)
+            plan = {
+                "schema_version": 1,
+                "starting_registry_generation_digest": report["registry_generation_digest"],
+                "candidate_manifest_sha256": report["candidate_manifest_sha256"],
+                "observer_input_digests": report["observer_input_digests"],
+                "reconciliation_evidence_digest": report["reconciliation_evidence_digest"],
+                "admission_candidates": report["admission_candidates"],
+                "records": report["batch_records"],
+            }
+            plan_bytes = json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8") + b"\n"
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(plan_bytes)
+            report["batch_output"] = output.relative_to(root).as_posix()
+            report["batch_plan_sha256"] = "sha256:" + hashlib.sha256(plan_bytes).hexdigest()
+    except (OSError, RegistryControlPlaneError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, sort_keys=True))
+        return
+    click.echo(
+        "Registry reconciliation: "
+        f"membership_complete={str(report['membership_complete']).lower()}, "
+        f"load_bearing_gaps={report['counts']['unregistered_load_bearing']}, "
+        f"unknown={report['counts']['invalid_unknown']}, "
+        f"candidates={len(report['admission_candidates'])}, "
+        f"pruned={report['pruned_envelope_count']}"
+    )
+    if batch_output is not None:
+        click.echo(f"Batch plan: {report['batch_output']} ({report['batch_plan_sha256']})")
+
+
+@registry_cmd.command("recover")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def registry_recover(ctx: click.Context, json_output: bool) -> None:
+    """Run locked deterministic recovery for the latest incomplete transaction."""
+    try:
+        receipt = recover_registry(**_registry_control_kwargs(ctx))
+    except RegistryControlPlaneError as exc:
+        raise click.ClickException(str(exc)) from exc
+    result = vars(receipt) if receipt is not None else {"recovered": False, "state": "old_generation_intact"}
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        click.echo(f"Registry recovery: {result}")
+
+
+def _artifact_from_payload(payload: dict[str, Any]) -> SoTArtifact:
+    normalized = dict(payload)
+    normalized["depends_on"] = tuple(normalized.get("depends_on") or ())
+    normalized["forbidden_substitutes"] = tuple(normalized.get("forbidden_substitutes") or ())
+    return SoTArtifact(**normalized)
+
+
+def _registry_authority_options(function: Any) -> Any:
+    options = [
+        click.option("--bridge-id", required=True),
+        click.option("--session-id", required=True),
+        click.option("--start-packet-hash", required=True),
+        click.option("--pauth-id", required=True),
+        click.option("--changed-by", required=True),
+        click.option("--change-reason", required=True),
+    ]
+    for option in reversed(options):
+        function = option(function)
+    return function
+
+
+@registry_cmd.command("register")
+@click.option("--record-json", default=None, help="One explicit declaration as JSON.")
+@click.option(
+    "--batch-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="In-root JSON array of exact declarations.",
+)
+@click.option("--dry-run", is_flag=True, help="Validate and bind the batch without mutating the registry.")
+@click.option("--dry-run-receipt", default=None, help="Exact receipt emitted by the preceding batch dry-run.")
+@_registry_authority_options
+@click.pass_context
+def registry_register(
+    ctx: click.Context,
+    record_json: str | None,
+    bridge_id: str,
+    batch_file: Path | None,
+    dry_run: bool,
+    dry_run_receipt: str | None,
+    session_id: str,
+    start_packet_hash: str,
+    pauth_id: str,
+    changed_by: str,
+    change_reason: str,
+) -> None:
+    """Register one declaration or an exact in-root batch transactionally."""
+    if (record_json is None) == (batch_file is None):
+        raise click.ClickException("provide exactly one of --record-json or --batch-file")
+    config = _resolve_config(ctx)
+    root = Path(config.project_root).resolve()
+    try:
+        batch_metadata: dict[str, Any] = {}
+        if batch_file is not None:
+            resolved = batch_file.resolve()
+            resolved.relative_to(root)
+            loaded = json.loads(resolved.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                from groundtruth_kb.project.artifact_membership_reconciliation import (
+                    REQUIRED_OBSERVER_CLASSES,
+                )
+
+                batch_metadata = loaded
+                raw = loaded.get("records")
+                candidates = loaded.get("admission_candidates")
+                if not isinstance(candidates, list):
+                    raise ValueError("reconciliation plan must contain admission_candidates")
+                candidate_digest = (
+                    "sha256:"
+                    + hashlib.sha256(
+                        json.dumps(
+                            candidates,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ).encode("utf-8")
+                    ).hexdigest()
+                )
+                if candidate_digest != loaded.get("candidate_manifest_sha256"):
+                    raise ValueError("reconciliation candidate manifest digest mismatch")
+                if [item.get("record") for item in candidates if isinstance(item, dict)] != raw:
+                    raise ValueError("reconciliation records do not match the exact candidate manifest")
+                observer_digests = loaded.get("observer_input_digests")
+                if not isinstance(observer_digests, dict) or set(observer_digests) != set(REQUIRED_OBSERVER_CLASSES):
+                    raise ValueError("reconciliation plan must bind all five observer input digests")
+                if not all(
+                    isinstance(value, str) and re.fullmatch(r"sha256:[0-9a-f]{64}", value)
+                    for value in observer_digests.values()
+                ):
+                    raise ValueError("reconciliation observer input digest is malformed")
+                evidence_digest = loaded.get("reconciliation_evidence_digest")
+                if (
+                    not isinstance(evidence_digest, str)
+                    or re.fullmatch(r"sha256:[0-9a-f]{64}", evidence_digest) is None
+                ):
+                    raise ValueError("reconciliation evidence digest is malformed")
+            else:
+                raw = loaded
+            if not isinstance(raw, list):
+                raise ValueError("batch file must contain a JSON array or a reconciliation plan with records")
+        else:
+            raw = [json.loads(record_json or "")]
+        records = [_artifact_from_payload(item) for item in raw]
+        candidate_manifest_sha256 = str(batch_metadata.get("candidate_manifest_sha256") or "") or None
+        expected_generation = str(batch_metadata.get("starting_registry_generation_digest") or "") or None
+        observer_input_digests = batch_metadata.get("observer_input_digests") or None
+        reconciliation_evidence_digest = str(batch_metadata.get("reconciliation_evidence_digest") or "") or None
+        if dry_run:
+            preview = preview_registry_registration(
+                records,
+                actor_session=session_id,
+                start_packet_hash=start_packet_hash,
+                pauth_id=pauth_id,
+                bridge_id=bridge_id,
+                candidate_manifest_sha256=candidate_manifest_sha256,
+                observer_input_digests=observer_input_digests,
+                reconciliation_evidence_digest=reconciliation_evidence_digest,
+                **_registry_control_kwargs(ctx),
+            )
+            if expected_generation is not None and expected_generation != preview.starting_generation_digest:
+                raise ValueError("batch plan was built from a different registry generation")
+            click.echo(json.dumps(vars(preview), indent=2, sort_keys=True))
+            return
+        if batch_file is not None and (expected_generation is None or not dry_run_receipt):
+            raise ValueError("batch apply requires a reconciliation generation and --dry-run-receipt")
+        receipt = register_artifacts(
+            records,
+            actor_session=session_id,
+            changed_by=changed_by,
+            change_reason=change_reason,
+            start_packet_hash=start_packet_hash,
+            pauth_id=pauth_id,
+            bridge_id=bridge_id,
+            expected_generation_digest=expected_generation,
+            candidate_manifest_sha256=candidate_manifest_sha256,
+            observer_input_digests=observer_input_digests,
+            reconciliation_evidence_digest=reconciliation_evidence_digest,
+            dry_run_receipt=dry_run_receipt,
+            **_registry_control_kwargs(ctx),
+        )
+    except (RegistryControlPlaneError, OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps(vars(receipt), indent=2, sort_keys=True))
+
+
+@registry_cmd.command("amend")
+@click.argument("entry_id")
+@click.option("--changes-json", required=True, help="Non-identity field changes as JSON.")
+@_registry_authority_options
+@click.pass_context
+def registry_amend(
+    ctx: click.Context,
+    entry_id: str,
+    bridge_id: str,
+    changes_json: str,
+    session_id: str,
+    start_packet_hash: str,
+    pauth_id: str,
+    changed_by: str,
+    change_reason: str,
+) -> None:
+    """Amend non-identity declaration fields through one journalled generation."""
+    try:
+        changes = json.loads(changes_json)
+        if not isinstance(changes, dict):
+            raise ValueError("--changes-json must be a JSON object")
+        receipt = amend_artifact(
+            entry_id,
+            changes,
+            actor_session=session_id,
+            changed_by=changed_by,
+            change_reason=change_reason,
+            start_packet_hash=start_packet_hash,
+            pauth_id=pauth_id,
+            bridge_id=bridge_id,
+            **_registry_control_kwargs(ctx),
+        )
+    except (RegistryControlPlaneError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps(vars(receipt), indent=2, sort_keys=True))
+
+
+@registry_cmd.command("observe", hidden=True)
+@click.option(
+    "--event-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="Internal capability-bound post-tool event JSON.",
+)
+@click.pass_context
+def registry_observe(ctx: click.Context, event_file: Path) -> None:
+    """Consume one internal observation capability; direct calls without it fail closed."""
+    try:
+        event = json.loads(event_file.read_text(encoding="utf-8"))
+        revisions = consume_observation_capability(**event, **_registry_control_kwargs(ctx))
+    except (RegistryControlPlaneError, OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps({"revision_ids": revisions}, indent=2, sort_keys=True))
 
 
 @registry_cmd.command("sync")
@@ -3595,25 +5692,16 @@ def registry_validate(ctx: click.Context, json_output: bool) -> None:
 @click.option("--change-reason", default="gt registry sync", show_default=True)
 @click.pass_context
 def registry_sync(ctx: click.Context, json_output: bool, changed_by: str, change_reason: str) -> None:
-    """Sync MemBase sot_artifacts projection from the TOML registry."""
-    toml_path, db_path = _registry_paths(ctx)
-    try:
-        toml_records = load_sot_toml(toml_path)
-    except (InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
-        raise click.ClickException(str(exc)) from exc
-    report = sync_projection(toml_records, db_path, changed_by=changed_by, change_reason=change_reason)
-    result: dict[str, Any] = {
-        "inserted": list(report.inserted),
-        "updated": list(report.updated),
-        "unchanged": list(report.unchanged),
-    }
+    """Run read-only diagnostics; projection repair is transaction-only."""
+    _ = changed_by, change_reason
+    result = inspect_registry(include_census=False, **_registry_control_kwargs(ctx))
     if json_output:
-        click.echo(json.dumps(result, indent=2))
-        return
-    click.echo(
-        f"Registry sync: {len(report.inserted)} inserted, "
-        f"{len(report.updated)} updated, {len(report.unchanged)} unchanged."
-    )
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        click.echo("gt registry sync is diagnostic-only; use register/amend/recover for mutations.")
+        click.echo(f"Registry coherent: {result.get('coherent', False)}")
+    if not result.get("coherent"):
+        raise SystemExit(1)
 
 
 @registry_cmd.command("diff")
@@ -3622,6 +5710,44 @@ def registry_sync(ctx: click.Context, json_output: bool, changed_by: str, change
 def registry_diff(ctx: click.Context, json_output: bool) -> None:
     """Show diff between TOML and MemBase projection (non-mutating validate)."""
     ctx.invoke(registry_validate, json_output=json_output)
+
+
+@registry_cmd.command("audit-duplicates")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option(
+    "--output-dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help="Evidence directory for JSON and markdown audit reports.",
+)
+@click.option("--no-write", is_flag=True, help="Run audit without writing evidence files.")
+@click.pass_context
+def registry_audit_duplicates(ctx: click.Context, json_output: bool, output_dir: Path | None, no_write: bool) -> None:
+    """Run the platform duplicate-SoT registry-plus-closure audit."""
+    from groundtruth_kb.project.sot_audit import run_duplicate_sot_audit, write_report_files
+
+    config = _resolve_config(ctx)
+    report = run_duplicate_sot_audit(Path(config.project_root))
+    payload = report.as_dict()
+    if not no_write:
+        evidence_dir = output_dir or Path(config.project_root) / ".gtkb-state" / "sot-singleton-audit"
+        json_path, markdown_path = write_report_files(report, evidence_dir)
+        payload["evidence_files"] = [
+            str(json_path.relative_to(config.project_root).as_posix()),
+            str(markdown_path.relative_to(config.project_root).as_posix()),
+        ]
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(
+        "SoT duplicate audit: "
+        f"{payload['registry_count']} registry records, "
+        f"{payload['persistent_file_count']} persistent files, "
+        f"{payload['violation_count']} violation(s), "
+        f"{payload['uncovered_violation_count']} uncovered."
+    )
+    if report.uncovered_violation_count:
+        raise SystemExit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -3646,6 +5772,25 @@ def _project_service(ctx: click.Context) -> tuple[KnowledgeDB, ProjectLifecycleS
 @click.option("--id", "project_ids", multiple=True, help="Limit to an explicit project id; repeatable.")
 @click.option("--status", default=None, help="Limit to a project status.")
 @click.option("--contains", "contains_terms", multiple=True, help="Case-insensitive text filter; repeatable.")
+@click.option(
+    "--field",
+    "exact_specs",
+    multiple=True,
+    help="Exact field filter as field:value; repeatable for any surfaced project field.",
+)
+@click.option(
+    "--match",
+    "match_specs",
+    multiple=True,
+    help="Field-specific glob match as field:pattern; repeatable.",
+)
+@click.option(
+    "--sort",
+    "sort_fields",
+    multiple=True,
+    help="Sort key field name; repeatable for compound sort.",
+)
+@click.option("--sort-desc", is_flag=True, help="Apply descending order to all --sort keys.")
 @click.option("--limit", type=click.IntRange(min=1), default=None, help="Return at most N rows.")
 @click.pass_context
 def projects_list(
@@ -3655,6 +5800,10 @@ def projects_list(
     project_ids: tuple[str, ...],
     status: str | None,
     contains_terms: tuple[str, ...],
+    exact_specs: tuple[str, ...],
+    match_specs: tuple[str, ...],
+    sort_fields: tuple[str, ...],
+    sort_desc: bool,
     limit: int | None,
 ) -> None:
     """List first-class project records."""
@@ -3664,13 +5813,21 @@ def projects_list(
         projects = service.list_projects(include_terminal=include_terminal, status=status)
     finally:
         db.close()
-    projects = [
-        project
-        for project in projects
-        if _matches_any_exact(project, "id", project_ids)
-        and _matches_contains(project, _PROJECT_CONTAINS_FIELDS, contains_terms)
-    ]
-    projects = _apply_limit(projects, limit)
+
+    query = ProjectListQuery(
+        include_terminal=include_terminal,
+        project_ids=project_ids,
+        status=status,
+        contains_terms=contains_terms,
+        exact_specs=exact_specs,
+        match_specs=match_specs,
+        sort_keys=tuple(SortKey(field=field_name, descending=sort_desc) for field_name in sort_fields),
+        limit=limit,
+    )
+    try:
+        projects = filter_projects(projects, query, contains_fields=_PROJECT_CONTAINS_FIELDS)
+    except BacklogQueryError as exc:
+        raise click.ClickException(str(exc)) from exc
 
     if json_output:
         click.echo(json.dumps(projects, indent=2, sort_keys=True))
@@ -3717,8 +5874,9 @@ def projects_show(ctx: click.Context, project_id: str, json_output: bool) -> Non
         click.echo("Dependencies:")
         for dep in dependencies:
             click.echo(
-                f"  - {dep['from_project_id']} {dep['dependency_type']} {dep['to_project_id']}"
-                f" [{dep['blocking_status']}]"
+                f"  - {dep['dependent_project_id']} {dep['dependency_kind']} "
+                f"{dep['prerequisite_project_id']} "
+                f"[requires {dep['required_prerequisite_state']}; {dep['status']}]"
             )
     if artifact_links:
         click.echo("Artifact links:")
@@ -4043,6 +6201,269 @@ def projects_reorder(
     click.echo(f"Reordered {len(memberships)} work item(s) in {project_id}.")
 
 
+@projects_cmd.group("dependencies")
+def projects_dependencies_group() -> None:
+    """Governed project dependency lifecycle commands."""
+
+
+_PROJECT_DEPENDENCY_KINDS = tuple(sorted(PROJECT_DEPENDENCY_KIND_REGISTRY))
+_PROJECT_DEPENDENCY_STATES = tuple(
+    sorted(
+        {
+            state
+            for definition in PROJECT_DEPENDENCY_KIND_REGISTRY.values()
+            for state in definition["supported_required_states"]
+        }
+    )
+)
+_PROJECT_DEPENDENCY_GATES = tuple(
+    sorted(
+        {
+            gate
+            for definition in PROJECT_DEPENDENCY_KIND_REGISTRY.values()
+            for gate in definition["supported_affected_gates"]
+        }
+    )
+)
+
+
+@projects_dependencies_group.command("add")
+@click.option("--dependent-project", required=True, help="Project whose gate depends on the prerequisite.")
+@click.option("--prerequisite-project", required=True, help="Project that must reach the required state.")
+@click.option(
+    "--kind",
+    "dependency_kind",
+    type=click.Choice(_PROJECT_DEPENDENCY_KINDS),
+    default="requires_project_state",
+    show_default=True,
+)
+@click.option(
+    "--required-state",
+    "required_prerequisite_state",
+    type=click.Choice(_PROJECT_DEPENDENCY_STATES),
+    required=True,
+)
+@click.option("--affected-gate", type=click.Choice(_PROJECT_DEPENDENCY_GATES), required=True)
+@click.option("--rationale", required=True, help="Why this dependency is required.")
+@click.option("--provenance", required=True, help="Governed decision, proposal, or work-item provenance.")
+@click.option("--related-work-item", default=None, help="Optional related work-item id.")
+@click.option("--id", "dependency_id", default=None, help="Optional explicit stable dependency id.")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for the dependency version.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_dependencies_add(
+    ctx: click.Context,
+    dependent_project: str,
+    prerequisite_project: str,
+    dependency_kind: str,
+    required_prerequisite_state: str,
+    affected_gate: str,
+    rationale: str,
+    provenance: str,
+    related_work_item: str | None,
+    dependency_id: str | None,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Add one validated, append-only project dependency."""
+    db, service = _project_service(ctx)
+    try:
+        dependency = service.add_project_dependency(
+            dependent_project,
+            prerequisite_project,
+            dependency_kind=dependency_kind,
+            required_prerequisite_state=required_prerequisite_state,
+            affected_gate=affected_gate,
+            rationale=rationale,
+            provenance=provenance,
+            related_work_item_id=related_work_item,
+            dependency_id=dependency_id,
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+    except (ProjectLifecycleError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+    if json_output:
+        click.echo(json.dumps(dependency, indent=2, sort_keys=True))
+        return
+    click.echo(f"Added project dependency {dependency['id']} (version {dependency['version']}).")
+
+
+@projects_dependencies_group.command("show")
+@click.argument("dependency_id")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_dependencies_show(ctx: click.Context, dependency_id: str, json_output: bool) -> None:
+    """Show one current project dependency and readiness explanation."""
+    db, service = _project_service(ctx)
+    try:
+        dependency = service.show_project_dependency(dependency_id)
+    except ProjectLifecycleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+    if json_output:
+        click.echo(json.dumps(dependency, indent=2, sort_keys=True))
+        return
+    readiness = dependency.get("readiness") or {}
+    click.echo(
+        f"{dependency['id']}: {dependency['dependent_project_id']} depends on "
+        f"{dependency['prerequisite_project_id']} reaching {dependency['required_prerequisite_state']} "
+        f"[{dependency['status']}; satisfied={readiness.get('satisfied')}]"
+    )
+
+
+@projects_dependencies_group.command("list")
+@click.option("--project", "project_id", default=None, help="Limit to either endpoint.")
+@click.option("--dependent-project", default=None, help="Limit to one dependent project.")
+@click.option("--prerequisite-project", default=None, help="Limit to one prerequisite project.")
+@click.option("--all", "include_inactive", is_flag=True, help="Include retired dependency records.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_dependencies_list(
+    ctx: click.Context,
+    project_id: str | None,
+    dependent_project: str | None,
+    prerequisite_project: str | None,
+    include_inactive: bool,
+    json_output: bool,
+) -> None:
+    """List current project dependencies with deterministic readiness."""
+    db, service = _project_service(ctx)
+    try:
+        dependencies = service.list_project_dependencies(
+            project_id,
+            dependent_project_id=dependent_project,
+            prerequisite_project_id=prerequisite_project,
+            include_inactive=include_inactive,
+        )
+    finally:
+        db.close()
+    if json_output:
+        click.echo(json.dumps(dependencies, indent=2, sort_keys=True))
+        return
+    if not dependencies:
+        click.echo("No project dependencies found.")
+        return
+    for dependency in dependencies:
+        readiness = dependency.get("readiness") or {}
+        click.echo(
+            f"{dependency['id']}\t{dependency['dependent_project_id']}\t"
+            f"{dependency['prerequisite_project_id']}\t{dependency['status']}\t"
+            f"satisfied={readiness.get('satisfied')}"
+        )
+
+
+@projects_dependencies_group.command("validate")
+@click.option("--project", "project_id", default=None, help="Limit readiness output to one endpoint.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_dependencies_validate(ctx: click.Context, project_id: str | None, json_output: bool) -> None:
+    """Validate the complete active graph and explain dependency readiness."""
+    db, service = _project_service(ctx)
+    try:
+        result = service.validate_project_dependencies(project_id)
+    finally:
+        db.close()
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        click.echo(
+            f"Project dependency graph valid={result['valid']} "
+            f"active_dependencies={result['active_dependency_count']} "
+            f"registry_version={result['registry']['version']}"
+        )
+        for error in result["errors"]:
+            click.echo(f"- ERROR: {error}")
+    if not result["valid"]:
+        ctx.exit(1)
+
+
+def _projects_dependency_lifecycle_command(
+    ctx: click.Context,
+    dependency_id: str,
+    *,
+    action: Literal["retire", "recover"],
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    db, service = _project_service(ctx)
+    try:
+        if action == "retire":
+            dependency = service.retire_project_dependency(
+                dependency_id,
+                changed_by=changed_by,
+                change_reason=change_reason,
+            )
+        else:
+            dependency = service.recover_project_dependency(
+                dependency_id,
+                changed_by=changed_by,
+                change_reason=change_reason,
+            )
+    except (ProjectLifecycleError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+    if json_output:
+        click.echo(json.dumps(dependency, indent=2, sort_keys=True))
+        return
+    click.echo(f"{action.title()}d project dependency {dependency['id']} (version {dependency['version']}).")
+
+
+@projects_dependencies_group.command("retire")
+@click.argument("dependency_id")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for the retired version.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_dependencies_retire(
+    ctx: click.Context,
+    dependency_id: str,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Retire one active dependency while preserving history."""
+    _projects_dependency_lifecycle_command(
+        ctx,
+        dependency_id,
+        action="retire",
+        changed_by=changed_by,
+        change_reason=change_reason,
+        json_output=json_output,
+    )
+
+
+@projects_dependencies_group.command("recover")
+@click.argument("dependency_id")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for the recovered version.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_dependencies_recover(
+    ctx: click.Context,
+    dependency_id: str,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Recover one retired dependency after full-graph revalidation."""
+    _projects_dependency_lifecycle_command(
+        ctx,
+        dependency_id,
+        action="recover",
+        changed_by=changed_by,
+        change_reason=change_reason,
+        json_output=json_output,
+    )
+
+
 @projects_cmd.command("retire")
 @click.argument("project_id")
 @click.option("--completed-at", default=None, help="Completion timestamp/date. Defaults to current UTC time.")
@@ -4204,6 +6625,11 @@ def projects_link_bridge(
 @click.option("--include-spec", "included_spec_ids", multiple=True, help="Explicitly included spec.")
 @click.option("--exclude-spec", "excluded_spec_ids", multiple=True, help="Explicitly excluded spec.")
 @click.option("--expires-at", default=None, help="Optional ISO-8601 expiration timestamp.")
+@click.option(
+    "--plan-incomplete",
+    is_flag=True,
+    help="Record a keep-open completion guard so this authorization can complete without retiring the project.",
+)
 @click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
 @click.option("--change-reason", required=True, help="History reason for the authorization version.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
@@ -4222,6 +6648,7 @@ def projects_authorize(
     included_spec_ids: tuple[str, ...],
     excluded_spec_ids: tuple[str, ...],
     expires_at: str | None,
+    plan_incomplete: bool,
     changed_by: str,
     change_reason: str,
     json_output: bool,
@@ -4242,6 +6669,7 @@ def projects_authorize(
             included_spec_ids=list(included_spec_ids) or None,
             excluded_spec_ids=list(excluded_spec_ids) or None,
             expires_at=expires_at,
+            plan_incomplete=plan_incomplete,
             changed_by=changed_by,
             change_reason=change_reason,
         )
@@ -4256,15 +6684,27 @@ def projects_authorize(
     if json_output:
         click.echo(json.dumps(authorization, indent=2, sort_keys=True))
         return
-    click.echo(f"Authorized project {authorization['project_id']} with {authorization['id']}.")
+    suffix = " Plan-incomplete keep-open guard recorded." if plan_incomplete else ""
+    click.echo(f"Authorized project {authorization['project_id']} with {authorization['id']}.{suffix}")
 
 
 @projects_cmd.command("authorizations")
 @click.argument("project_id")
 @click.option("--all", "include_terminal", is_flag=True, help="Include revoked/terminal authorizations.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option(
+    "--covers-path",
+    default=None,
+    help="Filter to authorizations covering this target path.",
+)
 @click.pass_context
-def projects_authorizations(ctx: click.Context, project_id: str, include_terminal: bool, json_output: bool) -> None:
+def projects_authorizations(
+    ctx: click.Context,
+    project_id: str,
+    include_terminal: bool,
+    json_output: bool,
+    covers_path: str | None,
+) -> None:
     """List project-scoped implementation authorizations."""
     db, service = _project_service(ctx)
     try:
@@ -4273,6 +6713,20 @@ def projects_authorizations(ctx: click.Context, project_id: str, include_termina
         raise click.ClickException(str(exc)) from exc
     finally:
         db.close()
+
+    if covers_path is not None:
+        from groundtruth_kb.governance.project_authorization_operation_time import classify_target
+
+        path_class = classify_target(covers_path).mutation_class
+        filtered: list[dict[str, Any]] = []
+        for auth in authorizations:
+            allowed = auth.get("allowed_mutation_classes_parsed") or []
+            if path_class in allowed:
+                filtered.append(auth)
+        authorizations = filtered
+        if not authorizations:
+            click.echo(f"No active project authorization covers path: {covers_path}")
+            return
 
     if json_output:
         click.echo(json.dumps(authorizations, indent=2, sort_keys=True))
@@ -4737,6 +7191,89 @@ def policy_check(
         raise SystemExit(2)
     if decision.outcome == "DENY":
         raise SystemExit(3)
+
+
+# ---------------------------------------------------------------------------
+# gt owner-approval
+# ---------------------------------------------------------------------------
+
+
+@main.group("owner-approval")
+def owner_approval_group() -> None:
+    """Render mobile-friendly owner-approval bundles (presentation-only Slice 1)."""
+
+
+@owner_approval_group.command("render")
+@click.option(
+    "--input",
+    "input_file",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Approval packet JSON fixture path.",
+)
+@click.option(
+    "--output-dir",
+    required=True,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Directory for generated index.html and packet.json.",
+)
+@click.option(
+    "--workspace-root",
+    default=None,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Workspace root for evidence-path validation (defaults to cwd).",
+)
+@click.pass_context
+def owner_approval_render(
+    ctx: click.Context,
+    input_file: Path,
+    output_dir: Path,
+    workspace_root: Path | None,
+) -> None:
+    """Render a deterministic owner-approval bundle from a JSON packet fixture."""
+    from groundtruth_kb.owner_approval_surface import (
+        OwnerApprovalSurfaceError,
+        load_approval_packet,
+        render_approval_bundle,
+    )
+
+    root = workspace_root or Path.cwd()
+    try:
+        packet = load_approval_packet(input_file)
+        paths = render_approval_bundle(packet, output_dir, workspace_root=root)
+    except (OwnerApprovalSurfaceError, json.JSONDecodeError, OSError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(f"Rendered owner-approval bundle to {output_dir.resolve()}")
+    click.echo(f"  html: {paths['html']}")
+    click.echo(f"  json: {paths['json']}")
+
+
+@owner_approval_group.command("preview")
+@click.option(
+    "--bundle-dir",
+    required=True,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Directory containing a rendered owner-approval bundle.",
+)
+@click.option(
+    "--host",
+    default="127.0.0.1",
+    show_default=True,
+    help="Host to bind (use explicit non-loopback for LAN).",
+)
+@click.option("--port", default=8767, show_default=True, type=int, help="Port for the preview server.")
+def owner_approval_preview(bundle_dir: Path, host: str, port: int) -> None:
+    """Serve a rendered owner-approval bundle locally (GET-only; no write-back)."""
+    from groundtruth_kb.owner_approval_surface import OwnerApprovalSurfaceError, run_preview_server
+
+    try:
+        click.echo(f"Owner-approval preview at http://{host}:{port}/ (Slice 1 non-authoritative)")
+        run_preview_server(bundle_dir, host=host, port=port)
+    except OwnerApprovalSurfaceError as exc:
+        raise click.ClickException(str(exc)) from exc
+    except KeyboardInterrupt:
+        click.echo("\nPreview server stopped.")
 
 
 # ---------------------------------------------------------------------------
@@ -6858,34 +9395,29 @@ def deliberations_search(
     ChromaDB is used when available, otherwise SQLite LIKE fallback. Use
     ``--semantic-only`` to opt into a stricter contract that refuses fallback.
     """
-    # Per Codex Condition 3: enforce --semantic-only as an explicit
-    # no-fallback mode. We check the module-level HAS_CHROMADB flag because the
-    # DB method's own contract is to *always* fall back; we filter the CLI
-    # layer to match the opt-in promise.
-    if semantic_only:
-        from groundtruth_kb import db as _db_mod
-
-        if not getattr(_db_mod, "HAS_CHROMADB", False):
-            click.echo(
-                "Error: --semantic-only requires ChromaDB. Install it into the gt venv with:\n"
-                '  pip install "groundtruth-kb[search]"'
-            )
-            raise SystemExit(1)
-
     config = _resolve_config(ctx)
     db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
-    rows = db.search_deliberations(query, limit=limit)
+    try:
+        rows = db.search_deliberations(query, limit=limit, require_semantic=semantic_only)
+    except DeliberationSearchDegradedError as exc:
+        reason = exc.status.get("degradation_reason") or "unknown"
+        click.echo(
+            "Error: --semantic-only could not run semantic search; "
+            f"ChromaDB degraded to SQLite LIKE fallback (reason: {reason})."
+        )
+        raise SystemExit(1) from exc
 
     if semantic_only:
+        status = db._deliberation_search_status()
+        rows = [r for r in rows if r.get("search_method") == "semantic"]
+    elif not json_output:
         status = db._deliberation_search_status()
         if status.get("semantic_degraded"):
             reason = status.get("degradation_reason") or "unknown"
             click.echo(
-                "Error: --semantic-only could not run semantic search; "
-                f"ChromaDB degraded to SQLite LIKE fallback (reason: {reason})."
+                f"Warning: semantic deliberation search degraded; SQLite LIKE results are partial (reason: {reason}).",
+                err=True,
             )
-            raise SystemExit(1)
-        rows = [r for r in rows if r.get("search_method") == "semantic"]
 
     if json_output:
         click.echo(json.dumps(rows, indent=2, default=str))
@@ -7692,7 +10224,7 @@ def mode_set_role(ctx: click.Context, harness: str, role: str, reason: str, defe
     "--substrate",
     "substrate",
     required=True,
-    type=click.Choice(["cross_harness_trigger", "single_harness_dispatcher", "none", "dispatcher_daemon"]),
+    type=click.Choice(["dispatcher_daemon", "none"]),
     help="Bridge dispatch substrate to assign",
 )
 @click.option("--reason", "reason", default="manual substrate-switch via gt mode set-bridge-substrate")
@@ -7848,6 +10380,110 @@ def harness_capabilities_cmd(ctx: click.Context) -> None:
         click.echo(json.dumps({"status": "error", "message": str(exc)}, indent=2, sort_keys=True))
         raise SystemExit(1) from exc
     click.echo(json.dumps(data, indent=2, sort_keys=True))
+
+
+@harness_group.command("telemetry")
+@click.option(
+    "--group-by",
+    type=click.Choice(
+        [
+            "harness",
+            "provider_model",
+            "role",
+            "stop_reason",
+            "bridge_version_count",
+            "target_path_count",
+            "linked_spec_count",
+            "verification_command_count",
+        ]
+    ),
+    default="harness",
+    show_default=True,
+    help="Dimension for the successful reconciled-review distribution.",
+)
+@click.option("--harness", help="Filter by harness name.")
+@click.option("--provider-model", help="Filter by provider/model as provider/model.")
+@click.option(
+    "--role", type=click.Choice(["prime-builder", "loyal-opposition"]), help="Filter by document-derived role."
+)
+@click.option("--stop-reason", help="Filter by normalized stop reason.")
+@click.option(
+    "--complexity",
+    type=click.Choice(["bridge_version_count", "target_path_count", "linked_spec_count", "verification_command_count"]),
+    help="Require a known raw thread-complexity count.",
+)
+@click.option(
+    "--complexity-value",
+    type=click.IntRange(0, None),
+    help="Filter the selected raw thread-complexity count to one value.",
+)
+@click.option("--limit", type=click.IntRange(1, 200), default=50, show_default=True, help="Maximum records to inspect.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def harness_telemetry_cmd(
+    ctx: click.Context,
+    group_by: str,
+    harness: str | None,
+    provider_model: str | None,
+    role: str | None,
+    stop_reason: str | None,
+    complexity: str | None,
+    complexity_value: int | None,
+    limit: int,
+    json_output: bool,
+) -> None:
+    """Summarize bounded telemetry from successful reconciled reviews only."""
+
+    from groundtruth_kb.shim_dispatch_telemetry import query_dispatch_telemetry
+
+    config = _resolve_config(ctx)
+    try:
+        payload = query_dispatch_telemetry(
+            Path(config.project_root),
+            group_by=group_by,
+            harness=harness,
+            provider_model=provider_model,
+            role=role,
+            stop_reason=stop_reason,
+            complexity=complexity,
+            complexity_value=complexity_value,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(
+        f"Shim dispatch telemetry: {payload['successful_reconciled_review_count']} successful reconciled review(s)"
+    )
+    click.echo(f"Grouped by: {payload['group_by']}")
+    for row in payload["distribution"]:
+        click.echo(f"- {row['value']}: {row['count']}")
+
+
+@harness_group.command("diagnostic")
+@click.option("--harness-id", required=True, help="Durable harness id to inspect (for example A or B).")
+@click.option("--json", "json_output", is_flag=True, help="Emit the canonical machine-readable diagnostic schema.")
+@click.pass_context
+def harness_diagnostic_cmd(ctx: click.Context, harness_id: str, json_output: bool) -> None:
+    """Show a bounded, local, read-only harness diagnostic projection."""
+
+    from groundtruth_kb.harness_diagnostic import diagnose_harness
+
+    config = _resolve_config(ctx)
+    try:
+        payload = diagnose_harness(Path(config.project_root), harness_id)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    harness = payload.get("harness") or {}
+    click.echo(f"Harness diagnostic: {harness.get('harness_name') or harness_id}")
+    click.echo(f"Status: {payload.get('status')}")
+    click.echo(f"Role: {(payload.get('role') or {}).get('role')}")
+    click.echo(f"Recent runs: {len(payload.get('recent_runs') or [])}")
 
 
 def _harness_emit(record: object) -> None:
@@ -8019,6 +10655,51 @@ def harness_set_precedence(ctx: click.Context, harness_id: str, precedence: int,
             db,
             harness_id,
             precedence,
+            changed_by=_HARNESS_CLI_ACTOR,
+            change_reason=reason,
+        )
+    except harness_ops.HarnessOperationError as exc:
+        raise click.ClickException(str(exc)) from exc
+    generate_harness_projection(db, config.project_root)
+    _harness_emit(record)
+
+
+@harness_group.command("set-invocation-surface")
+@click.option("--harness", "harness_id", required=True, help="Harness id")
+@click.option("--surface", "surface_name", required=True, help="Invocation surface name, for example 'headless'")
+@click.option("--value-json", "value_json", required=True, help="JSON value to store for the named surface")
+@click.option(
+    "--reason",
+    "reason",
+    default="set invocation surface via gt harness set-invocation-surface",
+    help="Change reason",
+)
+@click.pass_context
+def harness_set_invocation_surface(
+    ctx: click.Context,
+    harness_id: str,
+    surface_name: str,
+    value_json: str,
+    reason: str,
+) -> None:
+    """Set one harness invocation surface and refresh the registry projection."""
+    import json as _json
+
+    from groundtruth_kb import harness_ops
+    from groundtruth_kb.harness_projection import generate_harness_projection
+
+    try:
+        surface_value = _json.loads(value_json)
+    except _json.JSONDecodeError as exc:
+        raise click.ClickException(f"--value-json is not valid JSON: {exc}") from exc
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    try:
+        record = harness_ops.set_invocation_surface(
+            db,
+            harness_id,
+            surface_name,
+            surface_value,
             changed_by=_HARNESS_CLI_ACTOR,
             change_reason=reason,
         )

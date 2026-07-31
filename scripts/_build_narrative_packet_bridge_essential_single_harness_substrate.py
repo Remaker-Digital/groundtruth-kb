@@ -33,11 +33,10 @@ NEW_SUBSECTION = """## Dual-Substrate Coexistence (Slice 2 of single-harness-bri
 The bridge protocol has TWO live dispatch substrates as of Slice 2 of
 ``gtkb-single-harness-bridge-dispatcher-slice-2`` (Codex GO at ``-006``):
 
-1. **Cross-harness event-driven trigger** (multi-harness topology) —
-   ``scripts/cross_harness_bridge_trigger.py`` registered as PostToolUse
-   and Stop hooks in ``.claude/settings.json`` and ``.codex/hooks.json``.
-   Fires on tool-use and Stop events. Applicable when the role map records
-   two harness IDs with singleton role-sets.
+1. **Dispatcher daemon** (multi-harness topology) —
+   ``scripts/gtkb_dispatcher_daemon.py`` kept alive by the headless dispatcher
+   supervisor path. Applicable when the role map records two harness IDs with
+   singleton role-sets.
 2. **Single-harness bridge dispatcher** (single-harness topology) —
    ``scripts/single_harness_bridge_dispatcher.py`` invoked by a Windows
    scheduled task ``GTKB-SingleHarnessBridgeDispatcher`` on a fixed
@@ -49,16 +48,16 @@ The bridge protocol has TWO live dispatch substrates as of Slice 2 of
 
 Both substrates honor the same actionable-signature scheme (byte-identical
 ``_signature`` computation), the same active-session-suppression contract
-(per ``bridge/gtkb-cross-harness-trigger-active-session-suppression-001-008.md``
+(per ``bridge/gtkb-dispatcher-daemon-active-session-suppression-001-008.md``
 VERIFIED), and the same fire-and-forget audit-log discipline
 (``.gtkb-state/bridge-poller/dispatch-failures.jsonl``).
 
 They are **mutually exclusive at runtime**:
 
-- In multi-harness topology: the cross-harness trigger is the active
+- In multi-harness topology: the dispatcher daemon is the active
   substrate; the single-harness dispatcher's applicability check returns
   False and the scheduled task no-ops.
-- In single-harness topology: the cross-harness trigger's topology gate
+- In single-harness topology: the dispatcher daemon's topology gate
   (per IP-8 of the slice-2 thread) inerts it with SPEC-required durable
   audit evidence (per-role entries in ``dispatch-failures.jsonl`` plus
   per-recipient ``last_result = "single_harness_topology_not_applicable"``
@@ -114,7 +113,7 @@ def main() -> None:
             ".claude/rules/bridge-essential.md, immediately before the '## Two-Axis Bridge "
             "Automation Model' section. The amendment identifies the single-harness bridge "
             "dispatcher (Slice 2) as the second live dispatch substrate alongside the "
-            "cross-harness event-driven trigger, documents their mutual exclusivity at "
+            "dispatcher daemon, documents their mutual exclusivity at "
             "runtime, and cites the topology gate (IP-8) + doctor check (IP-4) as the "
             "enforcement mechanisms."
         ),

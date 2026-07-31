@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-29T04:44:49Z",
+  "generated_at": "2026-07-24T20:53:48Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -30,9 +30,13 @@
         "present": true
       },
       "hooks_enabled": false,
-      "session_start_configured": false
+      "session_start_configured": true
     },
     "identities": {
+      "alibaba-cloud-studio": {
+        "id": "H",
+        "status": "verified"
+      },
       "antigravity": {
         "id": "C",
         "status": "verified"
@@ -47,6 +51,10 @@
       },
       "cursor": {
         "id": "E",
+        "status": "verified"
+      },
+      "goose": {
+        "id": "G",
         "status": "verified"
       },
       "ollama": {
@@ -81,7 +89,7 @@
       "B": {
         "harness_type": "claude",
         "role": [
-          "prime-builder"
+          "loyal-opposition"
         ],
         "status": "verified"
       },
@@ -102,12 +110,26 @@
       "E": {
         "harness_type": "cursor",
         "role": [
-          "prime-builder"
+          "loyal-opposition"
         ],
         "status": "verified"
       },
       "F": {
         "harness_type": "openrouter",
+        "role": [
+          "loyal-opposition"
+        ],
+        "status": "verified"
+      },
+      "G": {
+        "harness_type": "goose-desktop",
+        "role": [
+          "prime-builder"
+        ],
+        "status": "verified"
+      },
+      "H": {
+        "harness_type": "claude",
         "role": [
           "loyal-opposition"
         ],
@@ -145,7 +167,7 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 3,
+    "sensitive_environment_entry_count": 2,
     "status": "pass"
   },
   "repo_configured_surfaces": {
@@ -190,7 +212,7 @@
     },
     "codex_hooks": {
       "classification": "public_safe",
-      "count": 28,
+      "count": 29,
       "items": [
         ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.py",
         ".codex/gtkb-hooks/bridge-compliance-gate-bash-adapter.py",
@@ -199,6 +221,8 @@
         ".codex/gtkb-hooks/glossary-expansion.py",
         ".codex/gtkb-hooks/lo-file-safety-gate-bash-adapter.py",
         ".codex/gtkb-hooks/project-completion-surface.py",
+        ".codex/gtkb-hooks/run_cmd_no_window.py",
+        ".codex/gtkb-hooks/run_py_no_window.py",
         ".codex/gtkb-hooks/session_start_dispatch.py",
         ".codex/gtkb-hooks/session_stop_dispatch.py",
         ".codex/gtkb-hooks/session_wrapup_trigger_dispatch.py",
@@ -207,7 +231,6 @@
         ".codex/gtkb-hooks/bridge-compliance-audit.cmd",
         ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.cmd",
         ".codex/gtkb-hooks/bridge-compliance-gate.cmd",
-        ".codex/gtkb-hooks/bridge-dispatch-trigger.cmd",
         ".codex/gtkb-hooks/code-quality-baseline-proposal-check.cmd",
         ".codex/gtkb-hooks/codex-mcp-worker-guard.cmd",
         ".codex/gtkb-hooks/credential-scan.cmd",
@@ -264,7 +287,7 @@
       "classification": "local_only",
       "evidence": ".mcp.json",
       "path": ".mcp.json",
-      "present": true
+      "present": false
     },
     "rules": {
       "classification": "public_safe",
@@ -311,52 +334,60 @@
     },
     "skills": {
       "classification": "public_safe",
-      "count": 37,
+      "count": 45,
       "items": [
-        "alternatives-investigation",
-        "arch-audit",
-        "assertion-triage",
-        "bridge",
-        "bridge-config",
-        "bridge-propose",
-        "bridge-reconciliation",
-        "check-deliberations",
-        "code-review-audit",
-        "codex-report",
-        "decision-capture",
-        "dispatcher-control",
-        "grill-me-for-clarification",
+        "gtkb-adr",
+        "gtkb-advisory-disposition",
+        "gtkb-advisory-intake",
+        "gtkb-advisory-proposal",
+        "gtkb-alternatives-investigation",
+        "gtkb-arch-audit",
+        "gtkb-assert",
+        "gtkb-assertion-triage",
+        "gtkb-batch",
         "gtkb-benchmarks",
+        "gtkb-bridge",
+        "gtkb-bridge-config",
+        "gtkb-bridge-propose",
+        "gtkb-bridge-reconciliation",
+        "gtkb-check-deliberations",
+        "gtkb-code-review-audit",
+        "gtkb-decision-capture",
+        "gtkb-dispatcher-control",
+        "gtkb-formal-artifact-packet-helper",
+        "gtkb-grill-me-for-clarification",
+        "gtkb-harness-parity-review",
         "gtkb-hygiene-investigation",
+        "gtkb-hygiene-reclaim",
         "gtkb-hygiene-sweep",
+        "gtkb-lo-hygiene-assessment",
+        "gtkb-lo-opportunity-radar",
+        "gtkb-loyal-opposition-report",
+        "gtkb-managed-skill-adoption-review",
+        "gtkb-projects",
+        "gtkb-promote",
+        "gtkb-proposal-review",
         "gtkb-propose",
+        "gtkb-query",
+        "gtkb-release-candidate-gate",
+        "gtkb-send-review",
+        "gtkb-session-wrap",
+        "gtkb-session-wrap-scan",
+        "gtkb-skill-governance-lifecycle",
+        "gtkb-skill-rollout",
+        "gtkb-spec",
+        "gtkb-spec-intake",
+        "gtkb-structural-hygiene-review",
         "gtkb-sweep-commit",
-        "harness-parity-review",
-        "kb-adr",
-        "kb-assert",
-        "kb-batch",
-        "kb-promote",
-        "kb-query",
-        "kb-session-wrap",
-        "kb-session-wrap-scan",
-        "kb-spec",
-        "kb-work-item",
-        "lo-opportunity-radar",
-        "loyal-opposition-hygiene-assessment",
-        "projects",
-        "proposal-review",
-        "release-candidate-gate",
-        "send-review",
-        "spec-intake",
-        "structural-hygiene-review",
-        "verify"
+        "gtkb-verify",
+        "gtkb-work-item"
       ]
     }
   },
   "role_by_harness_compatibility": [
     {
       "assignment": {
-        "current_role": "['prime-builder']",
+        "current_role": "['loyal-opposition']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "B",
         "matrix_role": "prime-builder",
@@ -397,7 +428,7 @@
         },
         "mcp_support": {
           "evidence": ".mcp.json presence only; contents are local_only",
-          "status": "configured"
+          "status": "unknown"
         },
         "permission_approval_model": {
           "evidence": "AGENTS.md and harness role assignment",
@@ -474,7 +505,7 @@
         },
         "mcp_support": {
           "evidence": ".mcp.json presence only; contents are local_only",
-          "status": "configured"
+          "status": "unknown"
         },
         "permission_approval_model": {
           "evidence": "AGENTS.md and harness role assignment",
@@ -498,7 +529,7 @@
         },
         "startup_support": {
           "evidence": ".codex/hooks.json SessionStart",
-          "status": "unknown"
+          "status": "configured"
         },
         "subagent_team_support": {
           "evidence": "harness runtime; not repo-configured",
@@ -510,7 +541,7 @@
     },
     {
       "assignment": {
-        "current_role": "['prime-builder']",
+        "current_role": "['loyal-opposition']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "B",
         "matrix_role": "loyal-opposition",
@@ -551,7 +582,7 @@
         },
         "mcp_support": {
           "evidence": ".mcp.json presence only; contents are local_only",
-          "status": "configured"
+          "status": "unknown"
         },
         "permission_approval_model": {
           "evidence": "AGENTS.md and harness role assignment",
@@ -628,7 +659,7 @@
         },
         "mcp_support": {
           "evidence": ".mcp.json presence only; contents are local_only",
-          "status": "configured"
+          "status": "unknown"
         },
         "permission_approval_model": {
           "evidence": "AGENTS.md and harness role assignment",
@@ -652,7 +683,7 @@
         },
         "startup_support": {
           "evidence": ".codex/hooks.json SessionStart",
-          "status": "unknown"
+          "status": "configured"
         },
         "subagent_team_support": {
           "evidence": "harness runtime; not repo-configured",
@@ -712,7 +743,7 @@
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
       "status": "verified",
-      "version": "26.1.2"
+      "version": "25.2"
     },
     "playwright": {
       "classification": "unsupported",
@@ -726,7 +757,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.2"
+      "version": "9.1.1"
     },
     "python": {
       "classification": "verified",
@@ -740,7 +771,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.5"
+      "version": "0.15.20"
     }
   },
   "verification": {

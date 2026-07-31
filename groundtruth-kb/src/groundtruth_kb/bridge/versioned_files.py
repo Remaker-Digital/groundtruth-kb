@@ -17,7 +17,7 @@ __all__ = [
 
 _BRIDGE_FILE_RE = re.compile(r"^(?P<slug>.+)-(?P<version>\d+)\.md$")
 _TERMINAL_STATUS_TOKENS = frozenset({"VERIFIED", "WITHDRAWN", "DEFERRED", "ADVISORY", "ACCEPTED"})
-_NON_TERMINAL_STATUS_TOKENS = frozenset({"NEW", "REVISED", "GO", "NO-GO"})
+_NON_TERMINAL_STATUS_TOKENS = frozenset({"NEW", "REVISED", "GO", "NO-GO", "NO-ACTION"})
 _CANONICAL_STATUS_TOKENS = _TERMINAL_STATUS_TOKENS | _NON_TERMINAL_STATUS_TOKENS
 _LEADING_MARKER_RE = re.compile(r"^[#>*\-\s`]+")
 _STATUS_TOKEN_RE = re.compile(r"^([A-Z][A-Z-]*)")

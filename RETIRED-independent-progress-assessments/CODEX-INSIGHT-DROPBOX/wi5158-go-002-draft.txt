@@ -1,0 +1,150 @@
+GO
+
+# Loyal Opposition Verdict — WI-5158 Governed Git Binding Bootstrap (design + target-scope GO only)
+
+bridge_kind: lo_verdict
+Document: gtkb-modernization-wi5158-git-binding-bootstrap
+Version: 002
+Responds to: bridge/gtkb-modernization-wi5158-git-binding-bootstrap-001.md
+
+## Verdict
+
+GO for implementation design and target-scope approval ONLY. Per the proposal's
+own One-Time Bootstrap Review Protocol, this GO establishes design and 35-path
+scope approval; it is NOT bootstrap execution authority and grants NO authority
+to create refs, worktrees, the binding registry/audit, or to mutate Git state.
+Bootstrap execution remains gated behind the separate exact-manifest
+`governance_review` packet, a distinct LO review, and a standalone owner
+hash-approval decision naming `GBM-WI-5158-001` — none of which this verdict
+provides.
+
+Review independence: proposal author session context
+`019f3618-1eea-7252-b02b-a3b9b6401bf7` (prime-builder/codex, harness A) differs
+from this reviewer's session context `7ebdb34c-d12d-4830-b37b-b783ff37fb78`
+(loyal-opposition/claude, harness B). Independent-review boundary satisfied.
+
+## Applicability Preflight
+
+- packet_hash: `sha256:4e19df205636d2df7592ae2018652d1cd7f4fb55e6796b7780fa60baafd0109e`
+- bridge_document_name: `gtkb-modernization-wi5158-git-binding-bootstrap`
+- content_source: `bridge_file_operative`
+- content_file: `bridge/gtkb-modernization-wi5158-git-binding-bootstrap-001.md`
+- operative_file: `bridge/gtkb-modernization-wi5158-git-binding-bootstrap-001.md`
+- preflight_passed: `true`
+- missing_required_specs: []
+- missing_advisory_specs: []
+- Note: `warnings.missing_parent_dirs` lists the not-yet-created `git_lifecycle`
+  package and bootstrap runtime files. These are expected — the proposal creates
+  them and explicitly disclaims that the warnings grant creation authority. Not
+  a blocker.
+
+## Clause Applicability (Slice 2; mandatory gate)
+
+- Bridge id: `gtkb-modernization-wi5158-git-binding-bootstrap`
+- Operative file: `bridge\gtkb-modernization-wi5158-git-binding-bootstrap-001.md`
+- Clauses evaluated: 5
+- must_apply: 3, may_apply: 2, not_applicable: 0
+- Evidence gaps in must_apply clauses: 0
+- Blocking gaps (gate-failing): 0
+- Mode: mandatory (default invocation). Exit 5 = blocking gap; exit 0 = pass. Observed exit 0.
+
+## Prior Deliberations
+
+- `DELIB-20260710-GTKB-MODERNIZATION-GATE-1-5-PILOT-AUTHORIZATION` — owner
+  decision authorizing the bounded pilot entry, PAUTH creation, seed
+  presentation, and THIS proposal filing, while withholding bootstrap execution.
+- `DELIB-20260710-GTKB-MODERNIZATION-GIT-LIFECYCLE-CHARTER` /
+  `-TWO-TIER-BRANCH-MODEL` / `-BRANCH-NAMING-RULE` /
+  `-BRANCH-BINDING-BOOTSTRAP-DCL-V2-APPROVAL` — owner-approved scope, tiers,
+  naming, and the one-time bootstrap amendment (no manifest yet).
+- `DELIB-20260710-GTKB-MODERNIZATION-GATE-1-5-{LEGACY-BASELINE-AUDIT,BASELINE-NONIMPAIRMENT-EVIDENCE,EXECUTION-ENTRY-PACKET}`
+  — frozen import inventory, 242/248 baseline, PAUTH/targets/tests.
+
+## Premise Verification (canonical, read-only)
+
+- Governing carriers exist and are `specified`: `ADR-GOVERNED-TWO-TIER-GIT-LIFECYCLE-001`
+  v1, `DCL-GIT-BRANCH-BINDING-PROMOTION-001` v2 (and `REQ-GTKB-GOVERNED-GIT-LIFECYCLE-001`
+  cited). The circular first-installation concern is addressed by the DCL v2
+  one-time bootstrap amendment, which this proposal invokes but does not
+  self-authorize.
+- Owner authorization is real and correctly bounded: `DELIB-…-PILOT-AUTHORIZATION`
+  (`outcome=owner_decision`, WI-5158) authorizes the design/filing but "retains a
+  separate exact bootstrap-manifest gate."
+- Root boundary: all 35 `target_paths` are inside `E:\GT-KB` (`.gtkb-state/…`,
+  `.gitattributes`, the three `write_verdict.py` helpers, `config/…`, `docs/…`,
+  `groundtruth-kb/…`, `scripts/…`, tests). None out-of-root.
+
+## Findings
+
+### [P2] Design is sound and the dangerous action is separately gated — CONFIRMATION
+
+- Claim: this GO is low-execution-risk because the two-stage protocol confines
+  bootstrap execution to a later, separately-reviewed, owner-hash-approved gate.
+- Evidence: proposal §"One-Time Bootstrap Review Protocol" steps 1–8 and
+  §"Bootstrap Command Semantics" (expected-null `update-ref`, repository lock,
+  append-before-mutation DA reservation, atomic registry replacement,
+  shared-checkout fingerprint, same-manifest-only recovery).
+- Impact: approving the design does not authorize any Git mutation.
+- Recommended action: proceed; the bootstrap packet gets its own LO review.
+
+### [P1] VERIFIED-finalization mechanism change is the highest report-stage risk — VERIFICATION FOCUS
+
+- Claim: moving `write_verdict.py --finalize-verified` onto `gt commit scoped`
+  changes a load-bearing governance mechanism (the exact one that fail-closed on
+  WI-4841's commingled finalization this session).
+- Evidence: proposal §"Scoped Commit And VERIFIED Finalization" — the helpers
+  "After validating verdict structure, review independence, evidence anchors,
+  report claims, and predecessor history … call the scoped-commit service."
+- Impact: a regression here would silently weaken every future VERIFIED
+  finalization. The report MUST prove no behavioral regression, not merely that
+  new tests pass.
+- Recommended action: pinned as binding verification condition #1 below.
+
+## Binding Verification Conditions (for the eventual post-implementation report)
+
+VERIFIED requires executed, primary-evidence coverage for ALL of:
+
+1. **Finalization non-regression**: the existing verify-helper validations
+   (verdict structure, review independence, WI-4520 evidence anchors,
+   report-claim coverage, predecessor-chain history, by-reference finalization
+   waiver handling) are demonstrably preserved after the swap to `gt commit
+   scoped`. Show the existing finalization/atomicity regression suites
+   (`test_lo_verified_commit_atomicity.py`,
+   `test_verified_finalization_validation_hardening.py`) still pass, plus new
+   scoped-commit tests covering mixed hunks, foreign staged content,
+   untracked/ignored preservation, hook/credential failure, changed head, and
+   rollback.
+2. **Non-impairment**: the archived baseline improves from 242/248 to 248/248
+   with no new failure (the two named repairs: Cursor LF export policy;
+   dashboard system-map authoritative_source pointer).
+3. **Cross-harness byte-parity**: `.claude`/`.codex`/`.cursor`
+   `write_verdict.py` are byte-identical and LF-only;
+   `check_harness_parity.py --all` and `harness_parity_phase2.py` run (catalog
+   PASS alone is NOT an operational-readiness claim, per the proposal).
+4. **Scope hygiene**: the implementation lands as one scoped WI commit; no
+   bootstrap/ref/worktree/registry/audit mutation, no `groundtruth.db`, no push,
+   no dispatcher change.
+5. **ruff check AND ruff format --check** on every changed `.py` (separate gates).
+6. **Bootstrap remains separately gated**: the report must NOT claim or perform
+   bootstrap execution; that awaits the `governance_review` packet + owner hash
+   approval.
+
+## Gate Summary
+
+- Root boundary: all 35 `target_paths` inside `E:\GT-KB`. PASS.
+- Specification linkage: 19 formal IDs cited; carriers verified specified. PASS.
+- Applicability preflight: `missing_required_specs: []`. PASS.
+- Clause preflight: exit 0; zero blocking gaps. PASS.
+- Cross-Harness Disposition: present, per-harness, no waiver requested. PASS.
+- Owner-decision scope: PILOT-AUTHORIZATION authorizes design/filing; bootstrap
+  withheld and separately gated. PASS.
+- Review independence: distinct session contexts. PASS.
+
+## Recommended Commit Type
+
+`feat` (concurs) — `feat(git-lifecycle): add governed branch binding bootstrap`;
+adds a new governed lifecycle capability.
+
+---
+
+*(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

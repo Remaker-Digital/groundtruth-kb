@@ -77,6 +77,13 @@ gt dashboard start
 # Visit http://127.0.0.1:3000/d/groundtruth-kb/groundtruth-kb-dashboard
 ```
 
+The source repository also carries a release-health dashboard refresh used by
+the GT-KB release process:
+
+```powershell
+groundtruth-kb/.venv/Scripts/python.exe scripts/gtkb_dashboard/refresh_dashboard_db.py --db-path .tmp/gtkb-dashboard-health.sqlite --project-root E:\GT-KB
+```
+
 **Same-day prototype** (includes example data):
 
 ```powershell
@@ -94,12 +101,12 @@ flowchart TB
     Bridge["Optional<br/>File Bridge Setup<br/>Prime Builder + Loyal Opposition"]
     L2["Layer 2<br/>Project Scaffold<br/>gt project init / upgrade"]
     L3["Layer 3<br/>Workstation Doctor<br/>gt project doctor"]
-    Azure["Opt-in<br/>Azure readiness envelope<br/>specs, ADRs, checks, evidence"]
+    Deploy["Opt-in<br/>deployment readiness envelopes<br/>specs, ADRs, checks, evidence"]
 
     L1 --> L2 --> L3
     Bridge --> L2
-    L2 --> Azure
-    L3 --> Azure
+    L2 --> Deploy
+    L3 --> Deploy
 ```
 
 See [docs/architecture/product-split.md](docs/architecture/product-split.md)
@@ -114,7 +121,7 @@ discipline layer.
 
 ## Status
 
-This project is in early development (v0.6.1, developer-preview). The
+This project is in early development (`0.7.0rc1`, release candidate). The
 toolkit is extracted from a production system managing 2,000+
 specifications and 11,000+ tests. See
 [docs/known-limitations.md](docs/known-limitations.md) for current gaps.
@@ -153,11 +160,12 @@ discipline behind GroundTruth:
 [Desktop Setup](docs/desktop-setup.md) |
 [Example Project](examples/task-tracker/WALKTHROUGH.md)
 
-## Azure Readiness
+## Optional Deployment Readiness
 
-GroundTruth-KB keeps the default scaffold lightweight, then adds an opt-in
-Azure enterprise readiness path for SaaS teams that need buyer-grade cloud
-evidence.
+GroundTruth-KB keeps the default scaffold lightweight and deployment-provider
+agnostic. Applications can add environment-specific readiness envelopes when
+they need buyer-grade cloud evidence; Azure is one optional example, not a
+GT-KB runtime dependency.
 
 ```mermaid
 flowchart LR
@@ -169,11 +177,14 @@ flowchart LR
     Starter --> Candidate --> Enterprise --> Regulated
 ```
 
-The full taxonomy is in
+The optional Azure taxonomy is in
 [docs/reference/azure-readiness-taxonomy.md](docs/reference/azure-readiness-taxonomy.md).
-The wiki-ready summary lives at
-[docs/wiki/azure-enterprise-readiness.md](docs/wiki/azure-enterprise-readiness.md)
-and is mirrored to the GitHub Wiki.
+
+The release-health wiki source lives at
+[docs/wiki/release-health.md](docs/wiki/release-health.md). Source-to-wiki
+comparison is handled by `scripts/update_wiki_pages.py compare` from the
+repository root; wiki clones are publishing targets, not source-of-truth
+artifacts.
 
 ## Process Templates
 

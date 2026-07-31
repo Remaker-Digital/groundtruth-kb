@@ -139,7 +139,7 @@ def _validate_json_string_array(value: str | None, option_name: str) -> None:
         raise BacklogAddError(f"{option_name} is invalid: expected a JSON array of strings")
 
 
-def _resolve_changed_by() -> str:
+def _resolve_changed_by(project_root: Path) -> str:
     """Resolve ``changed_by`` via the MUTATING fail-closed resolver.
 
     Raises:
@@ -154,7 +154,7 @@ def _resolve_changed_by() -> str:
     # surface explicit.
     from scripts._kb_attribution import resolve_changed_by  # type: ignore[import-untyped]
 
-    return cast(str, resolve_changed_by())
+    return cast(str, resolve_changed_by(project_root=project_root))
 
 
 def _allocate_next_work_item_id(db: KnowledgeDB) -> str:
@@ -179,27 +179,27 @@ def _allocate_next_work_item_id(db: KnowledgeDB) -> str:
     return f"WI-{max_n + 1:04d}"
 
 
-def add_backlog_item(config: GTConfig, request: BacklogAddRequest) -> dict[str, Any]:
-    """Validate, allocate an id, and insert one ``work_items`` candidate row.
+def _add_backlog_item(
+    config: GTConfig,
+    request: BacklogAddRequest,
+    *,
+    changed_by: str,
+    db: KnowledgeDB | None = None,
+    allocated_id: str | None = None,
+    source_test_id: str | None = None,
+    commit: bool = True,
+) -> dict[str, Any]:
+    """Persist one validated backlog item with a pre-resolved document actor.
 
-    On ``request.dry_run`` the allocated id and insert kwargs are returned
-    without writing. Otherwise a single ``insert_work_item`` call persists the
-    row with ``resolution_status='open'`` and ``stage='backlogged'``.
-
-    Raises:
-        BacklogAddError: on field validation failure or duplicate-id collision.
-        RuntimeError: when harness attribution cannot be resolved (surfaced
-            unchanged from the resolver, before any DB write).
+    This is intentionally private so public CLI callers cannot pass an arbitrary
+    ``changed_by`` label. Compound writer flows reuse the single actor they
+    resolved before beginning any mutation.
     """
     priority = _validate_request(request)
 
-    # Attribution is resolved BEFORE opening any write path. A RuntimeError
-    # here propagates to the caller, which exits non-zero with no DB mutation.
-    changed_by = _resolve_changed_by()
+    db = db or KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
 
-    db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
-
-    allocated_id = _allocate_next_work_item_id(db)
+    allocated_id = allocated_id or _allocate_next_work_item_id(db)
     if db.get_work_item(allocated_id) is not None:
         raise BacklogAddError(
             f"allocated id {allocated_id} already exists; refusing to overwrite (allocation race — retry the command)"
@@ -215,6 +215,7 @@ def add_backlog_item(config: GTConfig, request: BacklogAddRequest) -> dict[str, 
         "change_reason": request.change_reason,
         "description": request.description,
         "source_spec_id": request.source_spec_id,
+        "source_test_id": source_test_id,
         "priority": priority,
         "stage": "backlogged",
         "project_name": request.project_name,
@@ -237,7 +238,7 @@ def add_backlog_item(config: GTConfig, request: BacklogAddRequest) -> dict[str, 
             "kwargs": insert_kwargs,
         }
 
-    row = db.insert_work_item(**insert_kwargs)
+    row = db.insert_work_item(**insert_kwargs, commit=commit)
     if row is None:
         raise BacklogAddError(f"Unexpected error: inserted work item {allocated_id} not found on readback.")
 
@@ -247,3 +248,13 @@ def add_backlog_item(config: GTConfig, request: BacklogAddRequest) -> dict[str, 
         "id": row["id"],
         "row": row,
     }
+
+
+def add_backlog_item(config: GTConfig, request: BacklogAddRequest) -> dict[str, Any]:
+    """Validate, allocate an id, and insert one ``work_items`` candidate row.
+
+    The explicit worker session document is resolved before any database handle
+    or write path is opened. Callers cannot provide an attribution override.
+    """
+    changed_by = _resolve_changed_by(Path(config.project_root))
+    return _add_backlog_item(config, request, changed_by=changed_by)

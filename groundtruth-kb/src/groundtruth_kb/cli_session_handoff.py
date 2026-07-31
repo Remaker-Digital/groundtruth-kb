@@ -15,6 +15,7 @@ Licensed under AGPL-3.0-or-later.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import click
@@ -22,10 +23,35 @@ import click
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.session.envelope import TOPIC_TYPES
 
+_PLACEHOLDER_TURN_METADATA = {
+    "",
+    "-",
+    "n/a",
+    "na",
+    "none",
+    "null",
+    "tbd",
+    "todo",
+    "unknown",
+    "unspecified",
+}
+
 
 def _resolve_config(ctx: click.Context) -> GTConfig:
     config_path = ctx.obj.get("config") if ctx.obj else None
     return GTConfig.load(config_path=config_path)
+
+
+def _required_turn_metadata(value: str, option_name: str) -> str:
+    normalized = value.strip()
+    if (
+        normalized.lower() in _PLACEHOLDER_TURN_METADATA
+        or "\n" in normalized
+        or "\r" in normalized
+        or len(normalized) > 256
+    ):
+        raise click.ClickException(f"{option_name} must be non-placeholder single-line Codex turn metadata.")
+    return normalized
 
 
 @click.group("session")
@@ -63,18 +89,81 @@ def envelope_open_cmd(
     json_output: bool,
 ) -> None:
     """Open a current per-harness session-envelope file."""
-    from groundtruth_kb.session.envelope import open_session
+    from groundtruth_kb.session.envelope import (
+        EnvelopeError,
+        load_worker_session,
+        open_session,
+        parse_canonical_init_keyword,
+        resolve_harness_identity,
+        resolve_worker_role_provenance,
+    )
+
+    parsed_keyword = parse_canonical_init_keyword(init_keyword) if init_keyword is not None else None
+    if init_keyword is not None and parsed_keyword is None:
+        raise click.ClickException("--init-keyword must use the exact canonical session-init grammar.")
+
+    parsed_role = parsed_keyword["role"] if parsed_keyword is not None else None
+    parsed_subject = parsed_keyword["subject"] if parsed_keyword is not None else None
+    if role is not None:
+        if parsed_role is None:
+            raise click.ClickException("--role requires a canonical role-bearing --init-keyword.")
+        if role != parsed_role:
+            raise click.ClickException("--role conflicts with the role asserted by --init-keyword.")
+    elif parsed_role is not None:
+        role = parsed_role
+
+    if subject is not None and parsed_subject is not None and subject != parsed_subject:
+        raise click.ClickException("--subject conflicts with the subject asserted by --init-keyword.")
+    if subject is None and parsed_subject is not None:
+        subject = parsed_subject
 
     config = _resolve_config(ctx)
-    envelope = open_session(
-        Path(config.project_root),
-        harness_name=harness_name,
-        harness_id=harness_id,
-        init_keyword=init_keyword,
-        subject=subject,
-        role=role,
-        active_work_item_id=active_work_item_id,
-    )
+    project_root = Path(config.project_root)
+    envelope = None
+    host_session_id = None
+    normalized_harness = harness_name.strip().lower()
+    codex_thread_id = os.environ.get("CODEX_THREAD_ID") if normalized_harness == "codex" else None
+    try:
+        if codex_thread_id is not None:
+            host_session_id = _required_turn_metadata(codex_thread_id, "CODEX_THREAD_ID")
+            resolved_name, resolved_id = resolve_harness_identity(
+                project_root,
+                harness_name=normalized_harness,
+                harness_id=harness_id,
+            )
+            existing = load_worker_session(project_root, resolved_name, host_session_id)
+            if existing is not None:
+                if existing.get("session_id") != host_session_id:
+                    raise EnvelopeError("Exact session envelope has a mismatched session id.")
+                if existing.get("status") != "open":
+                    raise EnvelopeError("Exact session envelope is not open.")
+                if existing.get("harness_name") != resolved_name or existing.get("harness_id") != resolved_id:
+                    raise EnvelopeError("Exact session envelope has mismatched harness identity.")
+                provenance = resolve_worker_role_provenance(
+                    project_root,
+                    current_session_id=host_session_id,
+                    harness_name=resolved_name,
+                )
+                if role is not None and provenance["role"] != role:
+                    raise EnvelopeError("Requested role conflicts with the exact host-bound session envelope.")
+                if subject is not None and existing.get("subject") != subject:
+                    raise EnvelopeError("Requested subject conflicts with the exact host-bound session envelope.")
+                envelope = existing
+
+        if envelope is None:
+            envelope = open_session(
+                project_root,
+                harness_name=harness_name,
+                harness_id=harness_id,
+                init_keyword=init_keyword,
+                subject=subject,
+                role=role,
+                active_work_item_id=active_work_item_id,
+                session_id=host_session_id if parsed_role is not None else None,
+                worker_role_source="transcript_init_keyword" if parsed_role is not None else None,
+            )
+    except EnvelopeError as exc:
+        raise click.ClickException(str(exc)) from exc
     if json_output:
         click.echo(json.dumps(envelope, indent=2, sort_keys=True))
     else:
@@ -93,6 +182,165 @@ def envelope_show_cmd(ctx: click.Context, harness_name: str) -> None:
     if envelope is None:
         raise click.ClickException(f"No current session envelope for harness {harness_name!r}.")
     click.echo(json.dumps(envelope, indent=2, sort_keys=True))
+
+
+@envelope_group.command("attest-author-metadata")
+@click.option("--harness-name", default="codex", show_default=True)
+@click.option("--harness-id", default=None)
+@click.option("--session-id", required=True)
+@click.option("--model", required=True)
+@click.option("--reasoning-effort", required=True)
+@click.option("--thread-source", required=True)
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def envelope_attest_author_metadata_cmd(
+    ctx: click.Context,
+    harness_name: str,
+    harness_id: str | None,
+    session_id: str,
+    model: str,
+    reasoning_effort: str,
+    thread_source: str,
+    json_output: bool,
+) -> None:
+    """Attest host-provided Codex turn metadata for one exact open session."""
+    from groundtruth_kb.session.envelope import (
+        EnvelopeError,
+        load_current,
+        load_worker_session,
+        resolve_harness_identity,
+        resolve_worker_role_provenance,
+        utc_now_iso,
+        write_current,
+    )
+
+    normalized_harness = harness_name.strip().lower()
+    if normalized_harness != "codex":
+        raise click.ClickException("Author metadata attestation currently accepts only the Codex harness.")
+    normalized_session_id = _required_turn_metadata(session_id, "--session-id")
+    normalized_model = _required_turn_metadata(model, "--model")
+    normalized_reasoning = _required_turn_metadata(reasoning_effort, "--reasoning-effort")
+    normalized_thread_source = _required_turn_metadata(thread_source, "--thread-source")
+
+    config = _resolve_config(ctx)
+    project_root = Path(config.project_root)
+    try:
+        resolved_name, resolved_id = resolve_harness_identity(
+            project_root,
+            harness_name=normalized_harness,
+            harness_id=harness_id,
+        )
+        envelope = load_worker_session(project_root, resolved_name, normalized_session_id)
+        current = load_current(project_root, resolved_name)
+        provenance_validated = False
+        if current is None:
+            raise EnvelopeError("Current harness session envelope is missing.")
+        current_session_id = current.get("session_id")
+        if current_session_id != normalized_session_id:
+            host_thread_id = str(os.environ.get("CODEX_THREAD_ID") or "").strip()
+            if host_thread_id != normalized_session_id:
+                raise EnvelopeError("Exact session envelope is not the current harness session.")
+            if envelope is None:
+                if current.get("harness_name") != resolved_name or current.get("harness_id") != resolved_id:
+                    raise EnvelopeError("Current session envelope has mismatched harness identity.")
+                if current.get("status") != "open":
+                    raise EnvelopeError("Current session envelope is not open.")
+                resolve_worker_role_provenance(
+                    project_root,
+                    current_session_id=str(current_session_id),
+                    harness_name=resolved_name,
+                )
+                provenance_validated = True
+                envelope = dict(current)
+                envelope["session_id"] = normalized_session_id
+                provenance = dict(envelope["worker_role_provenance"])
+                provenance["session_id"] = normalized_session_id
+                envelope["worker_role_provenance"] = provenance
+        elif envelope is None:
+            raise EnvelopeError("Exact session envelope is missing.")
+        if envelope.get("session_id") != normalized_session_id:
+            raise EnvelopeError("Exact session envelope has a mismatched session id.")
+        if envelope.get("harness_name") != resolved_name or envelope.get("harness_id") != resolved_id:
+            raise EnvelopeError("Exact session envelope has mismatched harness identity.")
+        if envelope.get("status") != "open":
+            raise EnvelopeError("Exact session envelope is not open.")
+        if not provenance_validated:
+            resolve_worker_role_provenance(
+                project_root,
+                current_session_id=normalized_session_id,
+                harness_name=resolved_name,
+            )
+    except EnvelopeError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    envelope["model_id"] = normalized_model
+    # Codex request metadata exposes one opaque model identifier, not a
+    # separately versioned semantic model. Preserve that value without parsing.
+    envelope["model_version"] = normalized_model
+    envelope["model_configuration"] = (
+        f"reasoning_effort={normalized_reasoning}; thread_source={normalized_thread_source}"
+    )
+    envelope["model_metadata_source"] = "x-codex-turn-metadata"
+    envelope["model_metadata_attested_at"] = utc_now_iso()
+    write_current(project_root, resolved_name, envelope)
+
+    result = {
+        "session_id": normalized_session_id,
+        "harness_id": resolved_id,
+        "harness_name": resolved_name,
+        "model_id": envelope["model_id"],
+        "model_version": envelope["model_version"],
+        "model_configuration": envelope["model_configuration"],
+        "model_metadata_source": envelope["model_metadata_source"],
+        "model_metadata_attested_at": envelope["model_metadata_attested_at"],
+    }
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        click.echo(normalized_session_id)
+
+
+@envelope_group.command("packet")
+@click.option(
+    "--kind",
+    "packet_kind",
+    type=click.Choice(["session-envelope", "activity-packet", "session", "activity"]),
+    default="session-envelope",
+    show_default=True,
+    help="Packet kind to compose.",
+)
+@click.option("--activity", type=click.Choice(list(TOPIC_TYPES)), default=None, help="Required for activity-packet.")
+@click.option("--role", default="prime-builder", show_default=True, help="Role bootstrap to include.")
+@click.option("--ttl-seconds", default=300, show_default=True, type=click.IntRange(1, None))
+@click.option("--cache-dir", type=click.Path(path_type=Path), default=None)
+@click.option("--refresh", is_flag=True, default=False, help="Bypass any valid cached packet.")
+@click.pass_context
+def envelope_packet_cmd(
+    ctx: click.Context,
+    packet_kind: str,
+    activity: str | None,
+    role: str,
+    ttl_seconds: int,
+    cache_dir: Path | None,
+    refresh: bool,
+) -> None:
+    """Compose a budgeted session-envelope or activity packet as JSON."""
+    from groundtruth_kb.session.packet import PacketError, compose_packet
+
+    config = _resolve_config(ctx)
+    try:
+        packet = compose_packet(
+            project_root=Path(config.project_root),
+            packet_kind=packet_kind,
+            activity=activity,
+            role=role,
+            ttl_seconds=ttl_seconds,
+            cache_dir=cache_dir,
+            refresh=refresh,
+        )
+    except PacketError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps(packet, indent=2, sort_keys=True))
 
 
 @session_group.group("topic")

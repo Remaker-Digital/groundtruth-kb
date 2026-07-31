@@ -71,7 +71,7 @@ def _version_entry(path: Path, project_root: Path) -> dict[str, Any] | None:
     }
 
 
-def show_thread(project_root: Path, slug: str) -> dict[str, Any] | None:
+def show_thread(project_root: Path, slug: str, *, compact: bool = False) -> dict[str, Any] | None:
     """Return one bridge thread's version chain, latest first."""
 
     bridge_dir = _bridge_dir(project_root)
@@ -91,6 +91,14 @@ def show_thread(project_root: Path, slug: str) -> dict[str, Any] | None:
 
     versions.sort(key=lambda row: int(row["version"]), reverse=True)
     latest = versions[0]
+    if compact:
+        return {
+            "slug": slug,
+            "latest_status": latest["status"],
+            "latest_path": latest["path"],
+            "version_count": len(versions),
+            "compact": True,
+        }
     return {
         "slug": slug,
         "latest_status": latest["status"],
@@ -107,7 +115,7 @@ def _validate_work_item_id(wi_id: str) -> str:
     return normalized
 
 
-def threads_for_work_item(project_root: Path, wi_id: str) -> dict[str, Any]:
+def threads_for_work_item(project_root: Path, wi_id: str, *, compact: bool = False) -> dict[str, Any]:
     """Return bridge threads that cite ``wi_id`` in any version."""
 
     normalized_wi = _validate_work_item_id(wi_id)
@@ -158,22 +166,36 @@ def threads_for_work_item(project_root: Path, wi_id: str) -> dict[str, Any]:
         if not citing_paths:
             continue
         latest = versions[0]
-        threads.append(
-            {
-                "slug": slug,
-                "latest_status": latest["status"],
-                "latest_path": latest["path"],
-                "citing_paths": citing_paths,
-            }
-        )
+        thread_row = {
+            "slug": slug,
+            "latest_status": latest["status"],
+            "latest_path": latest["path"],
+        }
+        if not compact:
+            thread_row["citing_paths"] = citing_paths
+        threads.append(thread_row)
     threads.sort(key=lambda item: item["slug"])
 
     total_threads = len(grouped)
     threads_with_metadata = sum(1 for row in grouped.values() if row["work_items"])
-    return {
+    payload: dict[str, Any] = {
         "work_item": normalized_wi,
         "match_count": len(threads),
         "threads": threads,
+    }
+    if compact:
+        payload["compact"] = True
+        payload["coverage_caveat"] = {
+            "total_threads": total_threads,
+            "threads_with_work_item_metadata": threads_with_metadata,
+            "note": (
+                "Compact mode omits per-version citing paths and full version chains; "
+                "rerun without --compact for archival detail."
+            ),
+        }
+        return payload
+    return {
+        **payload,
         "coverage_caveat": {
             "total_threads": total_threads,
             "threads_with_work_item_metadata": threads_with_metadata,

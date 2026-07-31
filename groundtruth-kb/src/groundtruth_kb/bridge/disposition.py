@@ -19,18 +19,21 @@ STATUS_NEW: Final[str] = "NEW"
 STATUS_REVISED: Final[str] = "REVISED"
 STATUS_GO: Final[str] = "GO"
 STATUS_NO_GO: Final[str] = "NO-GO"
+STATUS_NO_ACTION: Final[str] = "NO-ACTION"
 STATUS_VERIFIED: Final[str] = "VERIFIED"
 STATUS_ADVISORY: Final[str] = "ADVISORY"
 STATUS_DEFERRED: Final[str] = "DEFERRED"
 STATUS_WITHDRAWN: Final[str] = "WITHDRAWN"
 
 PRIME_ACTIONABLE_STATUSES: Final[frozenset[str]] = frozenset({STATUS_GO, STATUS_NO_GO, STATUS_ADVISORY})
-LOYAL_OPPOSITION_ACTIONABLE_STATUSES: Final[frozenset[str]] = frozenset({STATUS_NEW, STATUS_REVISED})
+LOYAL_OPPOSITION_ACTIONABLE_STATUSES: Final[frozenset[str]] = frozenset({STATUS_NEW, STATUS_REVISED, STATUS_NO_ACTION})
 OWNER_VISIBLE_STATUSES: Final[frozenset[str]] = frozenset({STATUS_ADVISORY})
 TERMINAL_OR_CLOSED_STATUSES: Final[frozenset[str]] = frozenset({STATUS_VERIFIED, STATUS_DEFERRED, STATUS_WITHDRAWN})
 VERIFIED_CONTEXT_STATUSES: Final[frozenset[str]] = frozenset({STATUS_VERIFIED})
 
 CLASSIFICATION_TERMINAL: Final[str] = "terminal"
+CLASSIFICATION_OWNER_HOLD: Final[str] = "owner_hold"
+CLASSIFICATION_HEADLESS_INELIGIBLE: Final[str] = "headless_ineligible"
 
 # Bridge-kind substring tokens. Matched against the lowercased + kebab-to-snake
 # normalized bridge_kind value. Order matters: terminal is checked first so the
@@ -97,6 +100,11 @@ def dispatchable_for_status(status: str, classification: str = "ambiguous") -> b
     status_key = normalize_status(status)
     if status_key in LOYAL_OPPOSITION_ACTIONABLE_STATUSES:
         return True
+    if status_key in {STATUS_GO, STATUS_NO_GO} and classification in {
+        CLASSIFICATION_OWNER_HOLD,
+        CLASSIFICATION_HEADLESS_INELIGIBLE,
+    }:
+        return False
     if status_key == STATUS_NO_GO:
         return True
     if status_key == STATUS_GO:
@@ -115,6 +123,8 @@ def _action_role_for_status(status: str) -> str | None:
 def _reason_for_actionable(status: str) -> tuple[str, str]:
     if status in {STATUS_NEW, STATUS_REVISED}:
         return "lo_review_required", "review"
+    if status == STATUS_NO_ACTION:
+        return "lo_no_action_review_required", "review_no_action"
     if status == STATUS_GO:
         return "prime_go_continuation", "implement_or_continue"
     if status == STATUS_NO_GO:
@@ -125,7 +135,7 @@ def _reason_for_actionable(status: str) -> tuple[str, str]:
 
 
 def _reason_for_non_actionable(status: str, expected_role: str | None) -> tuple[str, str]:
-    if status in {STATUS_NEW, STATUS_REVISED} and expected_role == LOYAL_OPPOSITION_ROLE:
+    if status in {STATUS_NEW, STATUS_REVISED, STATUS_NO_ACTION} and expected_role == LOYAL_OPPOSITION_ROLE:
         return "wrong_role_lo_review", "loyal_opposition_review"
     if status in {STATUS_GO, STATUS_NO_GO} and expected_role == PRIME_BUILDER_ROLE:
         return "wrong_role_prime_continuation", "prime_builder_continuation"

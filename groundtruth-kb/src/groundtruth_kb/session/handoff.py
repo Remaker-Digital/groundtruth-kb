@@ -12,7 +12,7 @@ Inputs (per spec § Inputs):
 1. The latest archived session-envelope JSON at
    ``harness-state/<harness_name>/session-envelope-archive/<closed_at-ISO>-session-envelope.json``.
 2. Open bridge state filtered for the active role: the latest NEW / REVISED /
-   GO / NO-GO line per versioned bridge Document chain.
+   NO-ACTION / GO / NO-GO line per versioned bridge Document chain.
 
 Outputs (per spec § Output Surfaces):
 
@@ -38,12 +38,12 @@ from groundtruth_kb.harness_projection import HarnessStateError, read_identity
 
 # Canonical status tokens we surface in the handoff prompt. Latest-only per
 # Document; matches the bridge file-bridge protocol § Statuses.
-_BRIDGE_STATUSES_OF_INTEREST = ("NEW", "REVISED", "GO", "NO-GO")
+_BRIDGE_STATUSES_OF_INTEREST = ("NEW", "REVISED", "NO-ACTION", "GO", "NO-GO")
 
 # Roles for which a bridge entry is considered "open" / actionable.
 _ROLE_ACTIONABLE_STATUSES = {
     "prime-builder": ("GO", "NO-GO"),
-    "loyal-opposition": ("NEW", "REVISED"),
+    "loyal-opposition": ("NEW", "REVISED", "NO-ACTION"),
 }
 
 
@@ -418,11 +418,23 @@ def _role_from_envelope(envelope: dict[str, Any]) -> str:
     return "prime-builder"
 
 
+def _init_keyword_for_role(role: str) -> str:
+    if role == "loyal-opposition":
+        return "::init gtkb lo"
+    return "::init gtkb pb"
+
+
+def _activity_keyword_for_role(role: str) -> str:
+    if role == "loyal-opposition":
+        return "::open test"
+    return "::open build"
+
+
 _DOCUMENT_LINE = re.compile(r"^Document:\s*(?P<name>\S+)\s*$")
 _STATUS_LINE = re.compile(r"^(?P<status>[A-Z-]+):\s*(?P<path>\S+)\s*$")
 _VERSIONED_BRIDGE_FILE = re.compile(r"^(?P<slug>.+)-(?P<version>\d+)\.md$")
 _BRIDGE_FILE_STATUS = re.compile(
-    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b",
+    r"^[#>*\-\s`]*(NEW|REVISED|NO-ACTION|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b",
     re.IGNORECASE,
 )
 
@@ -594,11 +606,29 @@ def _assemble_prompt(
     lines.append("")
     lines.append("## Next-Session Direction")
     lines.append("")
+    lines.append("Send startup keywords and task content as separate messages:")
+    lines.append("")
+    lines.append("1. Session role:")
+    lines.append("")
+    lines.append("```text")
+    lines.append(_init_keyword_for_role(role))
+    lines.append("```")
+    lines.append("")
+    lines.append("2. Activity envelope:")
+    lines.append("")
+    lines.append("```text")
+    lines.append(_activity_keyword_for_role(role))
+    lines.append("```")
+    lines.append("")
+    lines.append("3. Handoff body:")
+    lines.append("")
+    lines.append("```text")
     lines.append(
         "Read this handoff prompt, then read live dispatcher/TAFE state and "
         "the versioned bridge file chain. Act on the role-actionable entries "
         "above in oldest-first order.",
     )
+    lines.append("```")
     lines.append("")
     return "\n".join(lines)
 

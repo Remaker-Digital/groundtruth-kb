@@ -25,6 +25,17 @@ def _git(repo: Path, *args: str) -> None:
     )
 
 
+def _status(repo: Path) -> str:
+    result = subprocess.run(
+        ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout
+
+
 def _init_repo(repo: Path) -> Path:
     _git(repo, "init")
     _git(repo, "config", "user.email", "gtkb-tests@example.invalid")
@@ -38,6 +49,29 @@ def _init_repo(repo: Path) -> Path:
 def _old_mtime(path: Path, *, hours: int = 13) -> None:
     old = (NOW - timedelta(hours=hours)).timestamp()
     os.utime(path, (old, old))
+
+
+def _write_sot_registry(repo: Path) -> None:
+    registry_dir = repo / "config" / "registry"
+    registry_dir.mkdir(parents=True)
+    (registry_dir / "sot-artifacts.toml").write_text(
+        """
+[[artifacts]]
+id = "owner-local-env"
+domain = "runtime_state"
+lifecycle = "active"
+storage_path = ".env.local"
+coverage_mode = "exact"
+authority_spec_id = "GOV-ENV-LOCAL-AUTHORITY-001"
+mutation_api = "owner-managed local file; GT-KB records path authority only"
+versioning_policy = "overwrite_single_writer"
+backup_policy = "gitignored_runtime"
+health_check_function = ""
+owner_role = "owner_only"
+notes = ".env.local is preserved by cleanup scans without reading or serializing credential values."
+""".lstrip(),
+        encoding="utf-8",
+    )
 
 
 def _run_strays(repo: Path, *extra: str) -> dict[str, object]:
@@ -88,6 +122,8 @@ def test_hygiene_strays_reports_stale_tracked_and_untracked_paths(tmp_path: Path
     assert by_path["tracked.txt"]["tracked"] is True
     assert by_path["stray.txt"]["classification"] == "stale"
     assert by_path["stray.txt"]["tracked"] is False
+    assert report["auto_resolve_plan"]["counts"]["dirty_paths"] == 2
+    assert report["auto_resolve_summary"]["actuator_actions"]["manual_owner_review"] == 2
 
 
 def test_hygiene_strays_active_workspace_path_is_not_stale(tmp_path: Path) -> None:
@@ -103,6 +139,27 @@ def test_hygiene_strays_active_workspace_path_is_not_stale(tmp_path: Path) -> No
     assert report["counts"]["workspace_active_session"] == 1
     assert finding["classification"] == "active_session"
     assert finding["candidate_action"] == "skip"
+
+
+def test_hygiene_strays_preserves_gitignored_registered_local_artifact(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    _write_sot_registry(repo)
+    (repo / ".gitignore").write_text(".env.local\n", encoding="utf-8")
+    _git(repo, "add", ".gitignore", "config/registry/sot-artifacts.toml")
+    _git(repo, "commit", "-m", "registry")
+    env_local = repo / ".env.local"
+    env_local.write_text("REGISTERED_LOCAL_SENTINEL\n", encoding="utf-8")
+    _old_mtime(env_local)
+
+    report = _run_strays(repo)
+
+    by_path = {finding["path"]: finding for finding in report["workspace_findings"]}
+    assert report["counts"]["workspace_stale"] == 0
+    assert report["counts"]["workspace_registered_artifact"] == 1
+    assert by_path[".env.local"]["classification"] == "registered_artifact"
+    assert by_path[".env.local"]["candidate_action"] == "preserve_registered_artifact"
+    assert by_path[".env.local"]["registered_artifact_ids"] == ["owner-local-env"]
+    assert by_path[".env.local"]["unique_content"] is None
 
 
 def test_hygiene_strays_reports_orphaned_worktree_directory(tmp_path: Path) -> None:
@@ -127,3 +184,47 @@ def test_parse_stash_entries_uses_epoch_timestamp() -> None:
     assert report[0].stash_ref == "stash@{0}"
     assert report[0].created_at == datetime.fromtimestamp(1782684000, UTC)
     assert report[0].subject == "WIP on branch"
+
+
+def test_hygiene_auto_resolve_cli_reports_plan_and_refuses_apply_without_mutation(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    cursor_hooks = repo / ".cursor" / "gtkb-hooks"
+    cursor_hooks.mkdir(parents=True)
+    for name in (
+        "last-session-start.json",
+        "last-session-start.err",
+        "last-user-visible-startup-pb.md",
+        "last-user-visible-startup-pb.meta.json",
+    ):
+        (cursor_hooks / name).write_text("{}\n", encoding="utf-8")
+    before = _status(repo)
+
+    result = CliRunner().invoke(
+        main,
+        ["hygiene", "auto-resolve", "--root", str(repo), "--format", "json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["read_only"] is True
+    assert payload["candidate_actions_only"] is True
+    assert payload["counts"]["actuator_actions"]["auto_ignore"] == 4
+    assert {item["path"] for item in payload["items"]} == {
+        ".cursor/gtkb-hooks/last-session-start.err",
+        ".cursor/gtkb-hooks/last-session-start.json",
+        ".cursor/gtkb-hooks/last-user-visible-startup-pb.md",
+        ".cursor/gtkb-hooks/last-user-visible-startup-pb.meta.json",
+    }
+    assert {item["actuator_action"] for item in payload["items"]} == {"auto_ignore"}
+
+    refused = CliRunner().invoke(
+        main,
+        ["hygiene", "auto-resolve", "--root", str(repo), "--apply", "--evidence", "packet-1"],
+    )
+
+    assert refused.exit_code == 2
+    refusal = json.loads(refused.output)
+    assert refusal["status"] == "refused"
+    assert refusal["applied"] is False
+    assert "untracked_file_deletion" in refusal["forbidden_operations"]
+    assert _status(repo) == before

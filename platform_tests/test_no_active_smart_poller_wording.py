@@ -9,7 +9,7 @@ current-use match remains.
 
 The forbidden patterns describe the smart poller as if it were the active
 mechanism; post-Slice-4, that wording is misleading because the smart poller
-was retired in favor of the cross-harness event-driven trigger.
+was retired in favor of the dispatcher daemon.
 
 REVISED-7 allowlist:
 - ``groundtruth-kb/release-notes-*.md`` — frozen release evidence.
@@ -28,7 +28,7 @@ REVISED-7 allowlist:
 - ``docs/``, ``MEMORY.md``, ``memory/**`` — historical documentation.
 - ``archive/smart-poller-2026-05-09/**`` — explicit archive directory.
 - ``tests/test_no_active_smart_poller_wording.py`` — this test file itself.
-- ``tests/scripts/test_cross_harness_bridge_trigger.py`` — references the
+- ``tests/scripts/test_dispatcher_runtime.py`` — references the
   retired smart-poller's signature scheme as historical comparison.
 
 REMOVED from allowlist (these files MUST be grep-clean post-Slice-4):
@@ -130,7 +130,7 @@ _ALLOWLIST_PATH_FRAGMENTS = (
     # Historical test surfaces.
     "groundtruth-kb/tests/test_bridge_notify.py",
     "groundtruth-kb/tests/test_doctor_bridge_dispatch_liveness.py",
-    "groundtruth-kb/tests/test_doctor_cross_harness_trigger.py",
+    "groundtruth-kb/tests/test_doctor_dispatcher_runtime.py",
     "groundtruth-kb/tests/test_doctor_cli_no_smart_poller_guidance.py",
     "groundtruth-kb/tests/test_slice_4_doctor_test_layout.py",
     # Bridge proposal narratives (frozen).
@@ -141,9 +141,9 @@ _ALLOWLIST_PATH_FRAGMENTS = (
     "memory/",
     # Explicit archive directory.
     "archive/smart-poller-2026-05-09/",
-    # Self-references (this test + the cross-harness trigger test).
+    # Self-references (this test + the dispatcher daemon test).
     "tests/test_no_active_smart_poller_wording.py",
-    "tests/scripts/test_cross_harness_bridge_trigger.py",
+    "tests/scripts/test_dispatcher_runtime.py",
     # Worktree root (out-of-scope tree).
     ".claude/worktrees/",
     ".tmp/",
@@ -216,13 +216,11 @@ def test_no_current_use_smart_poller_wording_in_repo() -> None:
             d
             for d in dirnames
             if d not in _PRUNE_DIRNAMES
-            and not d.startswith(".pytest")
-            and not d.startswith(".tmp")
+            and not (d.startswith(".") and d not in (".github", ".githooks"))
             and not d.startswith("tmp")
-            and not d.startswith(".uv")
-            and not d.startswith(".hypothesis")
             and "agentred" not in d.lower()
             and not d.startswith("C\uf03a")
+            and "pytest" not in d.lower()
         ]
         for fname in filenames:
             path = Path(dirpath) / fname
@@ -250,7 +248,7 @@ def test_no_current_use_smart_poller_wording_in_repo() -> None:
     assert not offenses, (
         "Live-instruction smart-poller wording found outside the Slice 4 "
         "allowlist. Either: (a) update the offending line to reference the "
-        "cross-harness event-driven trigger; (b) add an explicit "
+        "dispatcher daemon; (b) add an explicit "
         "'# HISTORICAL: ...' comment prefix when the historical reference is "
         "deliberate; or (c) widen the allowlist if the file is a frozen "
         "historical artifact.\n\nOffenses:\n" + "\n".join(offenses)

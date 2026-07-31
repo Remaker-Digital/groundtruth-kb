@@ -5,23 +5,45 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import re
+import sys
 import tomllib
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "harness-capability-registry.toml"
+SCRIPT_DIR = Path(__file__).resolve().parent
+REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "gtkb-harness-capability-registry.toml"
 PROJECT_SKILLS_RELATIVE_PATH = Path(".claude") / "skills"
 
-# Guarded import — direct script execution may not have repo root on sys.path.
-# Pattern mirrored from scripts/harness_identity.py:14-16 + scripts/harness_roles.py:47-49.
-try:
-    from scripts.harness_projection_reader import load_harness_projection
-except ModuleNotFoundError:
-    from harness_projection_reader import load_harness_projection  # type: ignore[no-redef]
+
+def _load_sibling_script_module(module_name: str) -> Any:
+    module_path = SCRIPT_DIR / f"{module_name}.py"
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    if spec is None or spec.loader is None:
+        raise ModuleNotFoundError(f"cannot load local script module {module_name!r} from {module_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    previous = sys.modules.get(module_name)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        if previous is None:
+            sys.modules.pop(module_name, None)
+        else:
+            sys.modules[module_name] = previous
+        raise
+    return module
+
+
+load_harness_projection = _load_sibling_script_module("harness_projection_reader").load_harness_projection
+codex_adapter_generator = _load_sibling_script_module("generate_codex_skill_adapters")
+antigravity_adapter_generator = _load_sibling_script_module("generate_antigravity_skill_adapters")
+api_adapter_generator = _load_sibling_script_module("generate_api_skill_adapters")
 
 _FALLBACK_KNOWN_HARNESSES = ("claude", "codex")
 
@@ -37,8 +59,25 @@ CAPABILITY_FLOOR_REQUIRED_FIELDS = (
     "tool_guard_adapter_fail_closed",
 )
 CANONICAL_TOOL_SUBSET = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
+ENVELOPE_MODE_FIELDS = {
+    "activity_envelope_projection_mode": "Activity envelope projection mode",
+    "compact_result_envelope_mode": "Compact result-envelope mode",
+    "compact_session_envelope_mode": "Compact session-envelope mode",
+}
+VALID_ENVELOPE_MODES = frozenset(
+    {
+        "native",
+        "fallback",
+        "adapter",
+        "generated-adapter",
+        "compact-provider",
+        "optimized-startup",
+        "typed-waiver",
+        "documented-limitation",
+    }
+)
 
-# ── Cross-harness parity schema (Slice 2 of PROJECT-GTKB-CROSS-HARNESS-PARITY) ──
+# â”€â”€ Cross-harness parity schema (Slice 2 of PROJECT-GTKB-CROSS-HARNESS-PARITY) â”€â”€
 # Additive surface derived from ADR-CROSS-HARNESS-PARITY-001 +
 # DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001 (assertions PARITY-WAIVER-SCHEMA and
 # PARITY-APPLICABILITY-RULE). These accessors/validators are consumed by the
@@ -55,6 +94,7 @@ WAIVER_REQUIRED_FIELDS = (
     "rationale",
     "owner_approval_ref",
 )
+OPERATING_ROLES = ("prime-builder", "loyal-opposition")
 
 
 def _load_known_harnesses_from_projection(project_root: Path | None = None) -> tuple[str, ...]:
@@ -87,6 +127,7 @@ VALID_STATES = {
     "EXTRA",
     "UNSUPPORTED",
     "OWNER_ACTION_REQUIRED",
+    "DEFERRED",
 }
 WARNING_STATES = {
     "DEGRADED",
@@ -101,6 +142,11 @@ ROLE_ALIASES = {
 }
 GENERATED_MARKER = "<!-- GTKB-CODEX-SKILL-ADAPTER"
 GENERATED_END_MARKER = "GTKB-CODEX-SKILL-ADAPTER -->"
+ADAPTER_GENERATOR_BY_MARKER = {
+    "GTKB-CODEX-SKILL-ADAPTER": "scripts/generate_codex_skill_adapters.py",
+    "GTKB-ANTIGRAVITY-SKILL-ADAPTER": "scripts/generate_antigravity_skill_adapters.py",
+    "GTKB-API-SKILL-ADAPTER": "scripts/generate_api_skill_adapters.py",
+}
 FRONTMATTER_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 
 
@@ -214,6 +260,43 @@ def _adapter_metadata(text: str, expected_marker: str | None = None) -> dict[str
     return metadata
 
 
+def _normalized_adapter_semantics(text: str, expected_marker: str) -> str:
+    return _strip_generated_block(text, expected_marker).lstrip("\ufeff").rstrip() + "\n"
+
+
+def _render_expected_adapter(
+    *,
+    capability: dict[str, Any],
+    adapter_source: str,
+    surface: str,
+    source_text: str,
+    source_hash: str,
+    expected_marker: str,
+) -> str | None:
+    """Render the canonical adapter shape without trusting declared hashes alone."""
+
+    generated_at = "1970-01-01T00:00:00Z"
+    common = {
+        "capability_id": str(capability.get("id") or ""),
+        "canonical_name": str(capability.get("canonical_name") or ""),
+        "source_relative_path": adapter_source,
+        "adapter_relative_path": surface,
+        "source_sha256": source_hash,
+    }
+    if expected_marker == "GTKB-CODEX-SKILL-ADAPTER":
+        adapter = codex_adapter_generator.SkillAdapter(**common)
+        return codex_adapter_generator.render_adapter(source_text, adapter, generated_at=generated_at)
+    if expected_marker == "GTKB-ANTIGRAVITY-SKILL-ADAPTER":
+        adapter = antigravity_adapter_generator.SkillAdapter(**common)
+        return antigravity_adapter_generator.render_adapter(source_text, adapter, generated_at=generated_at)
+    if expected_marker == "GTKB-API-SKILL-ADAPTER":
+        canonical_text = api_adapter_generator._strip_generated_block(source_text).lstrip("\ufeff")
+        frontmatter = api_adapter_generator.validate_skill_frontmatter(canonical_text, adapter_source)
+        adapter = api_adapter_generator.ApiSkillAdapter(description=frontmatter["description"], **common)
+        return api_adapter_generator.render_adapter(adapter, generated_at=generated_at)
+    return None
+
+
 def _normalize_role(role: str | None) -> str | None:
     normalized = str(role or "").strip().lower()
     if not normalized:
@@ -304,6 +387,101 @@ def load_registry(project_root: Path) -> tuple[dict[str, Any], Path]:
     return _load_toml(registry_path), registry_path
 
 
+def capability_artifact_observations(project_root: Path) -> list[dict[str, str]]:
+    """Return deterministic path observations from the canonical capability registry.
+
+    This is the public inventory surface used by registry reconciliation.  A
+    capability row proves that a declared source or operative native/adapter
+    surface is load-bearing; it does not grant registry membership.
+    """
+
+    registry, registry_path = load_registry(project_root)
+    rows: list[dict[str, str]] = [
+        {
+            "path": _relative_path(project_root, registry_path),
+            "source": "capability_registry",
+            "reason": "canonical capability inventory declaration",
+        }
+    ]
+    capabilities = registry.get("capabilities")
+    for capability in capabilities if isinstance(capabilities, list) else []:
+        if not isinstance(capability, dict):
+            continue
+        capability_id = str(capability.get("id") or "unknown")
+        canonical_source = capability.get("canonical_source")
+        if isinstance(canonical_source, str) and canonical_source.strip():
+            rows.append(
+                {
+                    "path": canonical_source.strip(),
+                    "source": f"capability:{capability_id}:canonical_source",
+                    "reason": "canonical capability source",
+                }
+            )
+        for harness, configuration in sorted(capability.items()):
+            if not isinstance(configuration, dict):
+                continue
+            status = str(configuration.get("status") or "").strip().casefold()
+            if status not in {"native", "adapter", "generated-adapter"}:
+                continue
+            for field in ("surface", "adapter_source"):
+                value = configuration.get(field)
+                if isinstance(value, str) and value.strip():
+                    rows.append(
+                        {
+                            "path": value.strip(),
+                            "source": f"capability:{capability_id}:{harness}:{field}",
+                            "reason": f"operative {status} capability surface",
+                        }
+                    )
+
+    harnesses = registry.get("harnesses")
+    for harness, configuration in sorted(harnesses.items()) if isinstance(harnesses, dict) else []:
+        if not isinstance(configuration, dict):
+            continue
+        for field in (
+            "activity_envelope_manifest_source",
+            "skill_adapter_generator",
+            "skill_adapter_manifest",
+        ):
+            value = configuration.get(field)
+            if isinstance(value, str) and value.strip():
+                rows.append(
+                    {
+                        "path": value.strip(),
+                        "source": f"harness:{harness}:{field}",
+                        "reason": "declared harness capability support artifact",
+                    }
+                )
+        manifest_value = configuration.get("skill_adapter_manifest")
+        if not isinstance(manifest_value, str) or not manifest_value.strip():
+            continue
+        manifest_path = project_root / manifest_value
+        if not manifest_path.is_file():
+            continue
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        adapters = manifest.get("adapters") if isinstance(manifest, dict) else None
+        for adapter in adapters if isinstance(adapters, list) else []:
+            if not isinstance(adapter, dict):
+                continue
+            capability_id = str(adapter.get("capability_id") or "unknown")
+            for field in ("source_relative_path", "adapter_relative_path"):
+                value = adapter.get(field)
+                if isinstance(value, str) and value.strip():
+                    rows.append(
+                        {
+                            "path": value.strip(),
+                            "source": f"manifest:{harness}:{capability_id}:{field}",
+                            "reason": "generated adapter manifest member",
+                        }
+                    )
+
+    unique = {(row["path"].casefold(), row["source"], row["reason"]): row for row in rows}
+    return sorted(unique.values(), key=lambda row: (row["path"].casefold(), row["source"], row["reason"]))
+
+
 def _selected_harnesses(harness: str, known_harnesses: tuple[str, ...]) -> list[str]:
     normalized = _normalize_harness(harness, known_harnesses)
     if normalized == "all":
@@ -311,10 +489,78 @@ def _selected_harnesses(harness: str, known_harnesses: tuple[str, ...]) -> list[
     return [normalized]
 
 
+def _assigned_roles_by_harness(project_root: Path) -> dict[str, list[str]]:
+    projection = load_harness_projection(project_root)
+    assigned: dict[str, list[str]] = {}
+    for record in projection.get("harnesses", []):
+        if not isinstance(record, dict):
+            continue
+        if record.get("status") != "active":
+            continue
+        harness_name = str(record.get("harness_name") or "").strip().lower()
+        if not harness_name:
+            continue
+        roles = [_normalize_role(role) for role in _as_string_list(record.get("role"))]
+        assigned[harness_name] = [role for role in roles if role]
+    return assigned
+
+
+def _scope_harnesses_for_role(
+    selected_harnesses: list[str],
+    *,
+    selected_role: str | None,
+    explicit_harness: bool,
+    include_all: bool,
+    project_root: Path,
+) -> list[str]:
+    if not selected_role or explicit_harness or include_all:
+        return selected_harnesses
+    assigned_roles = _assigned_roles_by_harness(project_root)
+    return [harness for harness in selected_harnesses if selected_role in assigned_roles.get(harness, [])]
+
+
 def _role_applies(capability: dict[str, Any], role: str | None, include_all: bool) -> bool:
     if include_all or role is None:
         return True
+    if resolve_applicability(capability) == "universal":
+        return True
     return role in _as_string_list(capability.get("required_for_roles"))
+
+
+def _active_harnesses_from_selection(selected_harnesses: list[str], project_root: Path) -> list[str]:
+    active: list[str] = []
+    for selected_harness in selected_harnesses:
+        lifecycle = _harness_lifecycle_class(selected_harness, project_root)
+        if lifecycle in {"suspended", "registered_no_role", "retired", "other"}:
+            continue
+        active.append(selected_harness)
+    return active
+
+
+def _coverage_blocking_states() -> set[str]:
+    return {"MISSING", "OWNER_ACTION_REQUIRED"}
+
+
+def _base_result(
+    capability: dict[str, Any],
+    harness: str,
+    *,
+    configured_status: str,
+    evidence: str,
+    state: str,
+    note: str,
+) -> CapabilityResult:
+    return CapabilityResult(
+        harness=harness,
+        capability_id=str(capability.get("id") or ""),
+        capability_name=str(capability.get("canonical_name") or ""),
+        parity_class=str(capability.get("parity_class") or "baseline"),
+        required_for_roles=_as_string_list(capability.get("required_for_roles")),
+        configured_status=configured_status,
+        state=state,
+        evidence=evidence,
+        note=note,
+    )
 
 
 def _status_for_surface(
@@ -328,24 +574,28 @@ def _status_for_surface(
         if manifest_adapters and harness in manifest_adapters:
             kind = capability.get("kind")
             if kind == "hook":
-                harness_config = {
-                    "surface": capability.get("canonical_source"),
-                    "status": "native",
-                }
+                return _base_result(
+                    capability,
+                    harness,
+                    configured_status="unsupported",
+                    evidence="no hook surface declared",
+                    state="UNSUPPORTED",
+                    note=(
+                        "Skill adapter manifests do not prove hook registration or invocation; "
+                        "add an explicit harness hook surface if this capability is supported."
+                    ),
+                )
             elif kind == "skill":
                 cap_id = capability.get("id")
                 harness_config = manifest_adapters[harness].get(cap_id)
 
     if not isinstance(harness_config, dict):
-        return CapabilityResult(
-            harness=harness,
-            capability_id=str(capability.get("id") or ""),
-            capability_name=str(capability.get("canonical_name") or ""),
-            parity_class=str(capability.get("parity_class") or "baseline"),
-            required_for_roles=_as_string_list(capability.get("required_for_roles")),
+        return _base_result(
+            capability,
+            harness,
             configured_status="missing-config",
-            state="MISSING",
             evidence="registry lacks harness-specific capability surface",
+            state="MISSING",
             note="Add a harness-specific registry entry.",
         )
 
@@ -377,7 +627,11 @@ def _status_for_surface(
                 state="DEGRADED",
                 note=str(harness_config.get("fallback") or "Fallback surface exists."),
             )
-        return CapabilityResult(**common, state="MISSING", note="Fallback surface is declared but absent.")
+        return CapabilityResult(
+            **common,
+            state="DEFERRED",
+            note="Fallback surface is declared but absent (deferred; dedicated generator tracked separately).",
+        )
 
     if configured_status == "adapter":
         if not surface_exists:
@@ -405,6 +659,19 @@ def _status_for_surface(
         source_hash = _canonical_hash(source_path.read_text(encoding="utf-8"), source_expected_marker)
         declared_source_hash = str(harness_config.get("source_sha256") or "").strip()
         metadata = _adapter_metadata(adapter_text, expected_marker)
+        expected_generator = ADAPTER_GENERATOR_BY_MARKER.get(expected_marker)
+        if metadata.get("Generated by") != expected_generator:
+            return CapabilityResult(
+                **common,
+                state="STALE",
+                note=f"Generated adapter has an unsupported or missing generator identity for {expected_marker}.",
+            )
+        if not metadata.get("Generated at"):
+            return CapabilityResult(
+                **common,
+                state="STALE",
+                note="Generated adapter lacks a generation timestamp.",
+            )
         adapter_source_hash = metadata.get("Canonical source sha256", "")
         adapter_source_path = metadata.get("Canonical source", "")
         if declared_source_hash and declared_source_hash != source_hash:
@@ -424,6 +691,35 @@ def _status_for_surface(
                 **common,
                 state="STALE",
                 note="Generated adapter hash does not match the canonical source.",
+            )
+        try:
+            expected_adapter = _render_expected_adapter(
+                capability=capability,
+                adapter_source=adapter_source,
+                surface=surface,
+                source_text=source_path.read_text(encoding="utf-8"),
+                source_hash=source_hash,
+                expected_marker=expected_marker,
+            )
+        except (TypeError, ValueError) as exc:
+            return CapabilityResult(
+                **common,
+                state="STALE",
+                note=f"Canonical adapter semantics could not be rendered: {exc}",
+            )
+        if expected_adapter is None:
+            return CapabilityResult(
+                **common,
+                state="STALE",
+                note=f"No semantic adapter renderer is registered for {expected_marker}.",
+            )
+        if _normalized_adapter_semantics(adapter_text, expected_marker) != _normalized_adapter_semantics(
+            expected_adapter, expected_marker
+        ):
+            return CapabilityResult(
+                **common,
+                state="STALE",
+                note="Generated adapter semantics do not match the canonical generator output.",
             )
         return CapabilityResult(**common, state="PASS", note="Generated adapter matches the canonical source.")
 
@@ -506,7 +802,7 @@ def _overall_status(results: list[CapabilityResult], extras: list[ExtraResult], 
 
 
 def _harness_lifecycle_class(harness_name: str, project_root: Path = PROJECT_ROOT) -> str | None:
-    """Return 'active' | 'registered_no_role' | 'suspended' | 'other' | None from the registry projection.
+    """Return the harness lifecycle class from the registry projection.
 
     Used by check_harness_parity() to route registered/no-active-role harnesses (status=registered
     AND role=[]) through the capability-floor evaluation path instead of per-capability checks.
@@ -519,6 +815,8 @@ def _harness_lifecycle_class(harness_name: str, project_root: Path = PROJECT_ROO
         role = record.get("role") or []
         if status == "suspended":
             return "suspended"
+        if status == "retired":
+            return "retired"
         if status == "registered" and role == []:
             return "registered_no_role"
         if status == "active":
@@ -548,7 +846,7 @@ def _evaluate_capability_floor(harness_name: str, registry_data: dict[str, Any])
                 required_for_roles=["registered_no_role"],
                 configured_status="declared" if present else "missing",
                 state="PASS" if present else "MISSING",
-                evidence=f"config/agent-control/harness-capability-registry.toml::[harnesses.{harness_name}].{field}",
+                evidence=f"config/agent-control/gtkb-harness-capability-registry.toml::[harnesses.{harness_name}].{field}",
                 note=("" if present else f"Required capability-floor field '{field}' not declared"),
             )
         )
@@ -574,6 +872,61 @@ def _evaluate_capability_floor(harness_name: str, registry_data: dict[str, Any])
                         note=f"Non-canonical tools in advertised_tool_subset: {sorted(extras)}",
                     )
                 )
+    return results
+
+
+def _activity_envelope_projection_results(
+    selected_harnesses: list[str],
+    registry_data: dict[str, Any],
+) -> list[CapabilityResult]:
+    """Verify each selected harness declares activity/result/session envelope posture."""
+    harnesses_config = registry_data.get("harnesses", {}) if isinstance(registry_data, dict) else {}
+    results: list[CapabilityResult] = []
+    for harness_name in selected_harnesses:
+        floor = harnesses_config.get(harness_name, {}) if isinstance(harnesses_config, dict) else {}
+        floor = floor if isinstance(floor, dict) else {}
+        if not (any(field in floor for field in ENVELOPE_MODE_FIELDS) or "full_transcript_archive_required" in floor):
+            continue
+        for field, label in ENVELOPE_MODE_FIELDS.items():
+            value = str(floor.get(field) or "").strip()
+            valid = value in VALID_ENVELOPE_MODES
+            results.append(
+                CapabilityResult(
+                    harness=harness_name,
+                    capability_id=f"activity_envelope.{field}",
+                    capability_name=label,
+                    parity_class="required",
+                    required_for_roles=["prime-builder", "loyal-opposition"],
+                    configured_status=value or "missing",
+                    state="PASS" if valid else "MISSING",
+                    evidence=f"config/agent-control/gtkb-harness-capability-registry.toml::[harnesses.{harness_name}].{field}",
+                    note=("" if valid else f"Required activity-envelope field '{field}' is missing or invalid."),
+                )
+            )
+        transcript_required = floor.get("full_transcript_archive_required")
+        transcript_independent = transcript_required is False
+        results.append(
+            CapabilityResult(
+                harness=harness_name,
+                capability_id="activity_envelope.full_transcript_archive_independence",
+                capability_name="Full transcript archive independence",
+                parity_class="required",
+                required_for_roles=["prime-builder", "loyal-opposition"],
+                configured_status=str(transcript_required).lower()
+                if isinstance(transcript_required, bool)
+                else "missing",
+                state="PASS" if transcript_independent else "MISSING",
+                evidence=(
+                    "config/agent-control/gtkb-harness-capability-registry.toml::"
+                    f"[harnesses.{harness_name}].full_transcript_archive_required"
+                ),
+                note=(
+                    ""
+                    if transcript_independent
+                    else "Harness must be assessable through compact result/session envelopes without full transcript archives."
+                ),
+            )
+        )
     return results
 
 
@@ -620,6 +973,113 @@ def load_parity_waivers(registry: dict[str, Any]) -> list[dict[str, Any]]:
     """Return the typed ``[[parity_waivers]]`` records (empty list when absent)."""
     raw = registry.get("parity_waivers")
     return [item for item in raw if isinstance(item, dict)] if isinstance(raw, list) else []
+
+
+def _waiver_lookup(registry: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
+    lookup: dict[tuple[str, str], dict[str, Any]] = {}
+    for waiver in load_parity_waivers(registry):
+        cap_id = str(waiver.get("capability_id") or "").strip()
+        harness = str(waiver.get("harness") or "").strip().lower()
+        if cap_id and harness:
+            lookup[(cap_id, harness)] = waiver
+    return lookup
+
+
+def _apply_waiver(result: CapabilityResult, waiver: dict[str, Any] | None) -> CapabilityResult:
+    if result.state != "MISSING" or waiver is None:
+        return result
+    reason_class = str(waiver.get("reason_class") or "").strip()
+    owner_ref = str(waiver.get("owner_approval_ref") or "").strip()
+    rationale = str(waiver.get("rationale") or "").strip()
+    state = "OWNER_ACTION_REQUIRED" if reason_class == "deliberate-deferral" else "UNSUPPORTED"
+    note_parts = ["Approved parity waiver"]
+    if owner_ref:
+        note_parts.append(owner_ref)
+    if reason_class:
+        note_parts.append(f"({reason_class})")
+    if rationale:
+        note_parts.append(f": {rationale}")
+    return replace(
+        result,
+        configured_status=f"waived:{reason_class or 'unspecified'}",
+        state=state,
+        note=" ".join(note_parts),
+    )
+
+
+def _fleet_role_coverage_results(
+    project_root: Path,
+    *,
+    selected_harnesses: list[str],
+    capabilities: list[dict[str, Any]],
+    waivers: dict[tuple[str, str], dict[str, Any]],
+    manifest_adapters: dict[str, dict[str, dict[str, Any]]],
+    selected_role: str | None,
+    explicit_harness: bool,
+) -> list[CapabilityResult]:
+    """Return fleet-level proof rows for role readiness.
+
+    The row is PASS when at least one active harness assigned the role has no
+    unwaived required role-relative capability blocker. Explicit single-harness
+    diagnostics stay harness-local and do not emit fleet rows.
+    """
+    if explicit_harness:
+        return []
+
+    roles = [selected_role] if selected_role else list(OPERATING_ROLES)
+    assigned_roles = _assigned_roles_by_harness(project_root)
+    active_selected = _active_harnesses_from_selection(selected_harnesses, project_root)
+    results: list[CapabilityResult] = []
+
+    for role in roles:
+        if role not in OPERATING_ROLES:
+            continue
+        candidates = [harness for harness in active_selected if role in assigned_roles.get(harness, [])]
+        ready: list[str] = []
+        blocked_notes: list[str] = []
+        for harness in candidates:
+            blockers: list[str] = []
+            for capability in capabilities:
+                if resolve_applicability(capability) != "role-relative":
+                    continue
+                if role not in _as_string_list(capability.get("required_for_roles")):
+                    continue
+                result = _status_for_surface(project_root, capability, harness, manifest_adapters)
+                result = _apply_waiver(result, waivers.get((result.capability_id, harness)))
+                if result.parity_class in REQUIRED_PARITY_CLASSES and result.state in _coverage_blocking_states():
+                    blockers.append(f"{result.capability_id}:{result.state}")
+            if blockers:
+                blocked_notes.append(f"{harness} blocked by {', '.join(sorted(blockers))}")
+            else:
+                ready.append(harness)
+
+        if ready:
+            state = "PASS"
+            note = f"At least one active harness assigned `{role}` covers required role-relative capabilities: {', '.join(ready)}."
+        elif candidates:
+            state = "MISSING"
+            note = "No active assigned harness covers required role-relative capabilities after waivers."
+            if blocked_notes:
+                note += " " + "; ".join(blocked_notes)
+        else:
+            state = "MISSING"
+            note = f"No active harness is assigned `{role}`."
+
+        results.append(
+            CapabilityResult(
+                harness="fleet",
+                capability_id=f"fleet.role-coverage.{role}",
+                capability_name=f"Fleet role coverage: {role}",
+                parity_class="required",
+                required_for_roles=[role],
+                configured_status="computed",
+                state=state,
+                evidence="harness-state/harness-registry.json + config/agent-control/gtkb-harness-capability-registry.toml",
+                note=note,
+            )
+        )
+
+    return results
 
 
 def validate_parity_waiver(waiver: dict[str, Any]) -> list[str]:
@@ -690,6 +1150,60 @@ def validate_parity_schema(
     return errors
 
 
+def _check_rename_map_consistency(project_root: Path) -> list[dict[str, str]]:
+    """Compare on-disk skill dirs against skill-rename-map.toml (GFR Slice D Finding 4.5)."""
+    import tomllib
+
+    rename_map_path = project_root / "config" / "agent-control" / "skill-rename-map.toml"
+    if not rename_map_path.is_file():
+        return []
+    with rename_map_path.open("rb") as f:
+        payload = tomllib.load(f)
+    skills_dir = project_root / ".claude" / "skills"
+    findings: list[dict[str, str]] = []
+    for entry in payload.get("skills", []):
+        expected_dir = entry.get("dir", "")
+        canonical_name = entry.get("canonical_name", "")
+        if not expected_dir:
+            continue
+        expected_path = skills_dir / expected_dir
+        if not expected_path.is_dir():
+            # Check if a dir with a different name exists
+            actual_dirs = [d.name for d in skills_dir.iterdir() if d.is_dir()] if skills_dir.is_dir() else []
+            for actual in actual_dirs:
+                skill_md = skills_dir / actual / "SKILL.md"
+                if skill_md.is_file():
+                    content = skill_md.read_text(encoding="utf-8")
+                    name_match = re.search(r"^name:\s*(.+)$", content, re.MULTILINE)
+                    if name_match and name_match.group(1).strip() == canonical_name:
+                        findings.append(
+                            {
+                                "type": "STALE_NAME",
+                                "expected_dir": expected_dir,
+                                "actual_dir": actual,
+                                "canonical_name": canonical_name,
+                            }
+                        )
+                        break
+        # Check frontmatter name matches canonical_name
+        skill_md = expected_path / "SKILL.md"
+        if skill_md.is_file():
+            content = skill_md.read_text(encoding="utf-8")
+            name_match = re.search(r"^name:\s*(.+)$", content, re.MULTILINE)
+            if name_match:
+                actual_name = name_match.group(1).strip()
+                if actual_name != canonical_name:
+                    findings.append(
+                        {
+                            "type": "NAME_MISMATCH",
+                            "dir": expected_dir,
+                            "canonical_name": canonical_name,
+                            "actual_name": actual_name,
+                        }
+                    )
+    return findings
+
+
 def check_harness_parity(
     project_root: Path = PROJECT_ROOT,
     *,
@@ -700,7 +1214,17 @@ def check_harness_parity(
     project_root = project_root.resolve()
     known_harnesses = _load_known_harnesses_from_projection(project_root)
     selected_role = _normalize_role(role)
-    selected_harnesses = _selected_harnesses(harness, known_harnesses)
+    normalized_harness = _normalize_harness(harness, known_harnesses)
+    explicit_harness = normalized_harness != "all"
+    base_selected_harnesses = _selected_harnesses(normalized_harness, known_harnesses)
+    selected_harnesses = list(base_selected_harnesses)
+    selected_harnesses = _scope_harnesses_for_role(
+        selected_harnesses,
+        selected_role=selected_role,
+        explicit_harness=explicit_harness,
+        include_all=include_all,
+        project_root=project_root,
+    )
     errors: list[str] = []
 
     try:
@@ -720,6 +1244,7 @@ def check_harness_parity(
     )
     if registry and not capabilities:
         errors.append("registry has no capability entries")
+    waivers = _waiver_lookup(registry)
 
     # Split selected harnesses by lifecycle class so registered/no-active-role harnesses
     # are evaluated against the top-level [harnesses.<name>] capability floor rather than
@@ -733,12 +1258,19 @@ def check_harness_parity(
             continue
         if lifecycle == "registered_no_role":
             registered_floor_harnesses.append(selected_harness)
+        elif lifecycle in {"retired", "other"} and not explicit_harness:
+            continue
         else:
             active_harnesses.append(selected_harness)
+    operative_harnesses = set(active_harnesses) | set(registered_floor_harnesses)
+    report_selected_harnesses = [
+        selected_harness for selected_harness in selected_harnesses if selected_harness in operative_harnesses
+    ]
+    universal_active_harnesses = _active_harnesses_from_selection(base_selected_harnesses, project_root)
 
     harness_manifest_adapters: dict[str, dict[str, dict[str, Any]]] = {}
     harnesses_config = registry.get("harnesses", {})
-    for selected_harness in active_harnesses:
+    for selected_harness in sorted(set(active_harnesses) | set(universal_active_harnesses)):
         floor = harnesses_config.get(selected_harness, {})
         manifest_path_str = floor.get("skill_adapter_manifest") if isinstance(floor, dict) else None
         if manifest_path_str:
@@ -765,10 +1297,32 @@ def check_harness_parity(
     for capability in capabilities:
         if not _role_applies(capability, selected_role, include_all):
             continue
-        for selected_harness in active_harnesses:
-            results.append(_status_for_surface(project_root, capability, selected_harness, harness_manifest_adapters))
+        applicability = resolve_applicability(capability)
+        capability_harnesses = (
+            universal_active_harnesses
+            if applicability == "universal" and selected_role and not explicit_harness and not include_all
+            else active_harnesses
+        )
+        for selected_harness in capability_harnesses:
+            result = _status_for_surface(project_root, capability, selected_harness, harness_manifest_adapters)
+            results.append(_apply_waiver(result, waivers.get((result.capability_id, selected_harness))))
     for floor_harness in registered_floor_harnesses:
         results.extend(_evaluate_capability_floor(floor_harness, registry))
+    envelope_harnesses = (
+        universal_active_harnesses if selected_role and not explicit_harness and not include_all else active_harnesses
+    )
+    results.extend(_activity_envelope_projection_results(envelope_harnesses, registry))
+    results.extend(
+        _fleet_role_coverage_results(
+            project_root,
+            selected_harnesses=base_selected_harnesses,
+            capabilities=capabilities,
+            waivers=waivers,
+            manifest_adapters=harness_manifest_adapters,
+            selected_role=selected_role,
+            explicit_harness=explicit_harness,
+        )
+    )
 
     extras = _extra_project_skills(project_root, capabilities) if not errors else []
     counts = _count_states(results, extras, errors)
@@ -776,7 +1330,7 @@ def check_harness_parity(
         overall_status=_overall_status(results, extras, errors),
         project_root=str(project_root),
         registry_path=_relative_path(project_root, registry_path),
-        selected_harnesses=selected_harnesses,
+        selected_harnesses=report_selected_harnesses,
         selected_role=selected_role,
         counts=counts,
         results=results,
@@ -869,6 +1423,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Validate the cross-harness parity schema (applicability + waiver records) and exit.",
     )
+    parser.add_argument(
+        "--strict-on-rename",
+        action="store_true",
+        help="Compare on-disk skill dirs against skill-rename-map.toml and flag stale names.",
+    )
     args = parser.parse_args(argv)
 
     if args.validate_schema:
@@ -887,6 +1446,16 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  - {err}")
             return 1
         print("parity schema OK")
+        return 0
+
+    if args.strict_on_rename:
+        findings = _check_rename_map_consistency(args.project_root.resolve())
+        if findings:
+            print("STALE NAME / NAME_MISMATCH findings:")
+            for f in findings:
+                print(f"  - {f['type']}: {f}")
+            return 1
+        print("strict-on-rename: all skill dirs consistent with skill-rename-map.toml")
         return 0
 
     report = check_harness_parity(

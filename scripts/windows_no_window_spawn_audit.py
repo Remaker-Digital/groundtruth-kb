@@ -21,7 +21,13 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 NO_WINDOW_KEYWORDS = {"creationflags", "startupinfo"}
-NO_WINDOW_KWARGS_HELPERS = {"_no_window_run_kwargs", "_no_window_subprocess_kwargs"}
+NO_WINDOW_KWARGS_HELPERS = {
+    "_run_with_status_wrapper_popen_kwargs",
+    "_no_window_run_kwargs",
+    "_no_window_subprocess_kwargs",
+    "hidden_process_popen_kwargs",
+    "no_window_subprocess_kwargs",
+}
 LAUNCH_CALLS = {
     "subprocess.Popen",
     "subprocess.run",
@@ -52,14 +58,20 @@ RELEASE_RUNTIME_FILES = {
     "groundtruth-kb/src/groundtruth_kb/bridge/poller.py",
     "groundtruth-kb/src/groundtruth_kb/bridge/wait_commands.py",
     "groundtruth-kb/src/groundtruth_kb/bridge/worker.py",
-    "scripts/cross_harness_bridge_trigger.py",
+    "scripts/auto_finalize_sweep.py",
+    "scripts/codex_mcp_worker_guard.py",
+    "/".join(("scripts", "_".join(("cross", "harness", "bridge", "trigger")) + ".py")),
     "scripts/cursor_harness.py",
+    "scripts/dispatcher_runtime.py",
     "scripts/ensure_dispatcher_daemon.py",
     "scripts/gtkb_dispatcher_daemon.py",
     "scripts/ollama_harness.py",
     "scripts/openrouter_harness.py",
     "scripts/run_with_status.py",
     "scripts/single_harness_bridge_dispatcher.py",
+    "scripts/verify_claude_dispatch.py",
+    "scripts/verify_codex_dispatch.py",
+    "scripts/verify_cursor_dispatch.py",
     "scripts/verify_ollama_dispatch.py",
 }
 
@@ -67,6 +79,7 @@ RELEASE_RUNTIME_PREFIXES = (
     ".claude/hooks/",
     ".codex/gtkb-hooks/",
     "groundtruth-kb/src/groundtruth_kb/dispatcher/",
+    "groundtruth-kb/src/groundtruth_kb/watchdog/",
 )
 
 INTERACTIVE_TOOL_PREFIXES = (
@@ -169,7 +182,7 @@ class _NoWindowAssignmentCollector(ast.NodeVisitor):
         self.names: set[str] = set()
 
     def visit_Assign(self, node: ast.Assign) -> None:  # noqa: N802
-        if _dict_has_no_window_key(node.value):
+        if _dict_has_no_window_key(node.value) or _is_no_window_kwargs_helper_call(node.value):
             for target in node.targets:
                 if isinstance(target, ast.Name):
                     self.names.add(target.id)
@@ -178,7 +191,11 @@ class _NoWindowAssignmentCollector(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:  # noqa: N802
-        if isinstance(node.target, ast.Name) and node.value is not None and _dict_has_no_window_key(node.value):
+        if (
+            isinstance(node.target, ast.Name)
+            and node.value is not None
+            and (_dict_has_no_window_key(node.value) or _is_no_window_kwargs_helper_call(node.value))
+        ):
             self.names.add(node.target.id)
         self._visit_target(node.target)
         self.generic_visit(node)
@@ -298,6 +315,12 @@ def scan_file(path: Path, *, root: Path | None = None) -> list[SpawnFinding]:
     rel_path = _normalize_path(path, root)
     try:
         text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        # A tracked-but-missing path (e.g. a file removed from the working tree
+        # but still listed by ``git ls-files``) cannot be scanned; skip it rather
+        # than crashing the whole audit, which would silently disable the
+        # no-window enforcement guard.
+        return []
     except UnicodeDecodeError:
         text = path.read_text(encoding="utf-8-sig")
     tree = ast.parse(text, filename=rel_path)

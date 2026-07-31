@@ -5,8 +5,11 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 from types import ModuleType
+from unittest.mock import patch
 
 import pytest
+
+from scripts.gtkb_bridge_writer import normalize_bridge_envelope_head
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
@@ -34,8 +37,8 @@ def gate(request: pytest.FixtureRequest) -> ModuleType:
 
 
 def _bridge_proposal_missing_numbered_file_evidence() -> str:
-    return """
-NEW
+    return normalize_bridge_envelope_head(
+        """NEW
 author_identity: prime-builder/test
 author_harness_id: A
 author_session_context_id: test-magic-content-guidance
@@ -83,15 +86,17 @@ All active files remain in `E:/GT-KB`.
 
 python -m pytest platform_tests/hooks/test_bridge_compliance_gate_magic_content_guidance.py -q --tb=short
 """
+    )
 
 
 def test_pending_bridge_write_denial_surfaces_clause_evidence_pattern(gate: ModuleType) -> None:
-    reason = gate._deny_reason_for_content(
-        cwd_path=REPO_ROOT,
-        file_path="bridge/test-magic-content-guidance-001.md",
-        content=_bridge_proposal_missing_numbered_file_evidence(),
-        run_pending_preflight=True,
-    )
+    with patch.object(gate, "_wi_project_membership_gap", return_value=None):
+        reason = gate._deny_reason_for_content(
+            cwd_path=REPO_ROOT,
+            file_path="bridge/test-magic-content-guidance-001.md",
+            content=_bridge_proposal_missing_numbered_file_evidence(),
+            run_pending_preflight=True,
+        )
 
     assert reason is not None
     assert "ADR/DCL clause preflight failed" in reason

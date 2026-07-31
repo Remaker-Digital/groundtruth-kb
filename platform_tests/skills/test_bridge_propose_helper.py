@@ -22,23 +22,23 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-HELPER_PATH = REPO_ROOT / ".claude/skills/bridge-propose/helpers/write_bridge.py"
-TEMPLATE_HELPER_PATH = REPO_ROOT / "groundtruth-kb/templates/skills/bridge-propose/helpers/write_bridge.py"
-TEMPLATE_SKILL_PATH = REPO_ROOT / "groundtruth-kb/templates/skills/bridge-propose/SKILL.md"
+HELPER_PATH = REPO_ROOT / ".claude/skills/gtkb-bridge-propose/helpers/write_bridge.py"
+CODEX_HELPER_PATH = REPO_ROOT / ".codex/skills/gtkb-bridge-propose/helpers/write_bridge.py"
+TEMPLATE_HELPER_PATH = REPO_ROOT / "groundtruth-kb/templates/skills/gtkb-bridge-propose/helpers/write_bridge.py"
+TEMPLATE_SKILL_PATH = REPO_ROOT / "groundtruth-kb/templates/skills/gtkb-bridge-propose/SKILL.md"
 GLOSSARY_PATH = REPO_ROOT / ".claude/rules/canonical-terminology.md"
 
 
 def _load_helper_module():
     """Load the canonical helper module by file path.
 
-    The helper lives at ``.claude/skills/bridge-propose/helpers/write_bridge.py``
+    The helper lives at ``.claude/skills/gtkb-bridge-propose/helpers/write_bridge.py``
     and is not on ``sys.path``. Loading by file path keeps the test independent
     of import-system configuration.
     """
@@ -53,6 +53,50 @@ def _load_helper_module():
 @pytest.fixture(scope="module")
 def helper_module():
     return _load_helper_module()
+
+
+@pytest.fixture(autouse=True)
+def _central_writer_unit_boundary(helper_module, monkeypatch):
+    monkeypatch.setenv("GTKB_AUTHOR_IDENTITY", "prime-builder/test")
+    monkeypatch.setenv("GTKB_AUTHOR_HARNESS_ID", "test-harness")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL", "fixture-model")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL_VERSION", "fixture-version")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL_CONFIGURATION", "unit-test")
+    monkeypatch.setattr(
+        helper_module._bridge_writer,
+        "run_bridge_compliance_audit",
+        lambda **_kwargs: {"decision": "pass"},
+    )
+    monkeypatch.setattr(
+        helper_module,
+        "_run_bridge_compliance_audit",
+        lambda **_kwargs: {"decision": "pass"},
+    )
+
+
+def _valid_proposal_body() -> str:
+    return "\n".join(
+        [
+            "NEW",
+            "Document: passing-topic",
+            "Project Authorization: PAUTH-TEST",
+            "Project: PROJECT-TEST",
+            "Work Item: WI-5409",
+            "",
+            "## Summary",
+            "",
+            "Clean bridge body.",
+            "",
+            "## Specification Links",
+            "",
+            "- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`",
+            "",
+            "## Prior Deliberations",
+            "",
+            "_No prior deliberations: unit test._",
+            "",
+        ]
+    )
 
 
 # --------------------------------------------------------------------------
@@ -167,12 +211,13 @@ def test_propose_bridge_pre_populate_opt_out_preserves_body(helper_module, tmp_p
     content matches the input body modulo the credential scan.
     """
     monkeypatch.setenv("GTKB_SESSION_ID", "test-session-id")
+    monkeypatch.setattr(helper_module, "_run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     (bridge_dir / "INDEX.md").write_text("# Bridge Index\n\n<!-- comment -->\n\n", encoding="utf-8")
 
     body = (
-        "# Test Proposal\n\n"
+        "NEW\n\n# Test Proposal\n\n"
         "## Summary\n\nNo pre-population.\n\n"
         "## Specification Links\n\n- `GOV-FOO-001`\n\n"
         "## Prior Deliberations\n\n_No prior deliberations: opt-out test._\n"
@@ -193,6 +238,83 @@ def test_propose_bridge_pre_populate_opt_out_preserves_body(helper_module, tmp_p
         )
     # The opt-out justification line should still be present.
     assert "_No prior deliberations: opt-out test._" in written
+
+
+def test_propose_bridge_compliance_denial_precedes_claim_and_write(helper_module, tmp_path, monkeypatch):
+    """Compliance denial must create no file and acquire no work intent."""
+    bridge_dir = tmp_path / "bridge"
+    bridge_file = bridge_dir / "denied-topic-001.md"
+    events: list[str] = []
+
+    def deny(**_kwargs):
+        events.append("audit")
+        assert _kwargs["content"].startswith("NEW\n::init gtkb pb\n::open build\n")
+        raise helper_module.BridgeComplianceError("project/work-item mismatch")
+
+    def fail_acquire(*_args, **_kwargs):  # pragma: no cover - assertion helper
+        raise AssertionError("work-intent acquisition must not run after compliance denial")
+
+    monkeypatch.setenv("GTKB_SESSION_ID", "session-denied")
+    monkeypatch.setattr(helper_module, "_run_bridge_compliance_audit", deny)
+    monkeypatch.setattr(helper_module, "_acquire_bridge_work_intent", fail_acquire)
+
+    with pytest.raises(helper_module.BridgeComplianceError, match="project/work-item mismatch"):
+        helper_module.propose_bridge(
+            "denied-topic",
+            _valid_proposal_body(),
+            bridge_dir=bridge_dir,
+            pre_populate_prior_deliberations=False,
+        )
+
+    assert events == ["audit"]
+    assert not bridge_file.exists()
+    assert not bridge_dir.exists()
+
+
+def test_propose_bridge_compliance_pass_keeps_single_claim_write_release(helper_module, tmp_path, monkeypatch):
+    """A passing proposal still writes once after one claim lifecycle."""
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    events: list[str] = []
+    registry = object()
+
+    def pass_audit(**_kwargs):
+        events.append("audit")
+        assert _kwargs["content"].startswith("NEW\n::init gtkb pb\n::open build\n")
+        return {"decision": "pass"}
+
+    def acquire(thread_slug, session_id, *, project_root):
+        assert events == ["audit"]
+        assert thread_slug == "passing-topic"
+        assert session_id == "session-pass"
+        assert project_root == tmp_path.resolve()
+        events.append("acquire")
+        return registry
+
+    def release(project_root, thread_slug, session_id, *, claim_registry=None):
+        assert claim_registry is registry
+        assert thread_slug == "passing-topic"
+        assert session_id == "session-pass"
+        assert project_root == tmp_path.resolve()
+        events.append("release")
+
+    monkeypatch.setenv("GTKB_SESSION_ID", "session-pass")
+    monkeypatch.setenv("GTKB_AUTHOR_SESSION_CONTEXT_ID", "session-pass")
+    monkeypatch.setattr(helper_module, "_run_bridge_compliance_audit", pass_audit)
+    monkeypatch.setattr(helper_module, "resolve_work_intent_session_id", lambda: "session-pass")
+    monkeypatch.setattr(helper_module, "_acquire_bridge_work_intent", acquire)
+    monkeypatch.setattr(helper_module._bridge_writer, "_release_claim", release)
+
+    out = helper_module.propose_bridge(
+        "passing-topic",
+        _valid_proposal_body(),
+        bridge_dir=bridge_dir,
+        pre_populate_prior_deliberations=False,
+    )
+
+    assert events == ["audit", "acquire", "release"]
+    assert out == bridge_dir / "passing-topic-001.md"
+    assert out.read_text(encoding="utf-8").startswith("NEW\n::init gtkb pb\n::open build\n")
 
 
 # --------------------------------------------------------------------------
@@ -354,22 +476,8 @@ def test_seeds_and_search_combined_and_deduplicated(helper_module, tmp_path):
 
 
 def test_codex_skill_adapter_parity_check():
-    """``generate_codex_skill_adapters.py --update-registry --check`` must
-    return exit 0 (PASS) — the canonical Claude SKILL hash matches the
-    registered hash in the harness-capability-registry."""
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(REPO_ROOT / "scripts/generate_codex_skill_adapters.py"),
-            "--update-registry",
-            "--check",
-        ],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, f"Adapter parity check failed: stdout={result.stdout!r} stderr={result.stderr!r}"
-    assert "PASS" in result.stdout, f"Expected PASS in stdout, got: {result.stdout!r}"
+    """The Codex bridge-propose helper projection must match the canonical helper."""
+    assert CODEX_HELPER_PATH.read_bytes() == HELPER_PATH.read_bytes()
 
 
 # --------------------------------------------------------------------------

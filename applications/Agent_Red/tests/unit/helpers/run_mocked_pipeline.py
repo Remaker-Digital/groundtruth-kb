@@ -16,6 +16,7 @@ All argv after the mode token are forwarded verbatim to deploy_pipeline's argpar
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -28,8 +29,7 @@ from unittest.mock import MagicMock, patch
 # Bootstrap path so scripts.* and tools.knowledge-db imports resolve
 # ---------------------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-for _p in [str(PROJECT_ROOT), str(PROJECT_ROOT / "scripts"),
-           str(PROJECT_ROOT / "tools" / "knowledge-db")]:
+for _p in [str(PROJECT_ROOT), str(PROJECT_ROOT / "scripts"), str(PROJECT_ROOT / "tools" / "knowledge-db")]:
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
@@ -37,8 +37,7 @@ for _p in [str(PROJECT_ROOT), str(PROJECT_ROOT / "scripts"),
 # Consume mode from argv before argparse inside main() reads sys.argv
 # ---------------------------------------------------------------------------
 if len(sys.argv) < 2:
-    print("Usage: run_mocked_pipeline.py <success|smoke_failure> [pipeline-args...]",
-          file=sys.stderr)
+    print("Usage: run_mocked_pipeline.py <success|smoke_failure> [pipeline-args...]", file=sys.stderr)
     sys.exit(2)
 
 MODE = sys.argv[1]
@@ -79,44 +78,45 @@ def _api_call_503(fqdn, path, api_key=None, timeout=10):
 # ---------------------------------------------------------------------------
 if MODE == "success":
     with ExitStack() as stack:
-        stack.enter_context(patch.object(dp, "phase_0_validate_environment",
-                                         return_value=_pass(0, "Validate Environment")))
-        stack.enter_context(patch.object(dp, "phase_1_protected_behaviors",
-                                         return_value=_pass(1, "Protected Behaviors")))
-        stack.enter_context(patch.object(dp, "phase_2_clear_vite_api_url",
-                                         return_value=_pass(2, "Clear Vite API URL")))
-        stack.enter_context(patch.object(dp, "phase_3_build_artifacts",
-                                         return_value=_pass(3, "Build Artifacts")))
-        stack.enter_context(patch.object(dp, "phase_4_freshness_gate",
-                                         return_value=_pass(4, "Build Freshness Gate")))
-        stack.enter_context(patch.object(dp, "phase_5_restore_env_local",
-                                         return_value=_pass(5, "Restore .env.local")))
-        stack.enter_context(patch.object(dp, "phase_6_create_build_context",
-                                         return_value=(_pass(6, "Create Build Context"), "/tmp/ctx")))
-        stack.enter_context(patch.object(dp, "phase_7_acr_build",
-                                         return_value=_pass(7, "ACR Build")))
-        stack.enter_context(patch.object(dp, "phase_10a_pre_deploy_snapshot",
-                                         side_effect=_mock_snapshot_phase))
-        stack.enter_context(patch.object(dp, "phase_8_deploy",
-                                         return_value=_pass(9, "Deploy")))
-        stack.enter_context(patch.object(dp, "phase_10_startup_and_version",
-                                         return_value=_pass(10, "Startup & Version")))
+        stack.enter_context(
+            patch.object(dp, "phase_0_validate_environment", return_value=_pass(0, "Validate Environment"))
+        )
+        stack.enter_context(
+            patch.object(dp, "phase_1_protected_behaviors", return_value=_pass(1, "Protected Behaviors"))
+        )
+        stack.enter_context(patch.object(dp, "phase_2_clear_vite_api_url", return_value=_pass(2, "Clear Vite API URL")))
+        stack.enter_context(patch.object(dp, "phase_3_build_artifacts", return_value=_pass(3, "Build Artifacts")))
+        stack.enter_context(patch.object(dp, "phase_4_freshness_gate", return_value=_pass(4, "Build Freshness Gate")))
+        stack.enter_context(patch.object(dp, "phase_5_restore_env_local", return_value=_pass(5, "Restore .env.local")))
+        stack.enter_context(
+            patch.object(
+                dp, "phase_6_create_build_context", return_value=(_pass(6, "Create Build Context"), "/tmp/ctx")
+            )
+        )
+        stack.enter_context(patch.object(dp, "phase_7_acr_build", return_value=_pass(7, "ACR Build")))
+        stack.enter_context(patch.object(dp, "phase_10a_pre_deploy_snapshot", side_effect=_mock_snapshot_phase))
+        stack.enter_context(patch.object(dp, "phase_8_deploy", return_value=_pass(9, "Deploy")))
+        stack.enter_context(
+            patch.object(dp, "phase_10_startup_and_version", return_value=_pass(10, "Startup & Version"))
+        )
+        stack.enter_context(
+            patch.object(dp, "phase_15_enforce_scaling", return_value=_pass(15, "Enforce Scaling Baseline"))
+        )
         # Staging-track post-deploy phases
-        stack.enter_context(patch.object(dp, "phase_13_upgrade_verification",
-                                         return_value=_pass(11, "Upgrade Verification")))
-        stack.enter_context(patch.object(dp, "phase_14_config_pipeline",
-                                         return_value=_pass(12, "Config Pipeline")))
-        stack.enter_context(patch.object(dp, "phase_13_seed_test_tenant",
-                                         return_value=_pass(13, "Seed Test Tenant")))
-        stack.enter_context(patch.object(dp, "phase_14_verify_initialized_state",
-                                         return_value=_pass(14, "Verify Initialized State")))
+        stack.enter_context(
+            patch.object(dp, "phase_13_upgrade_verification", return_value=_pass(11, "Upgrade Verification"))
+        )
+        stack.enter_context(patch.object(dp, "phase_14_config_pipeline", return_value=_pass(12, "Config Pipeline")))
+        stack.enter_context(patch.object(dp, "phase_13_seed_test_tenant", return_value=_pass(13, "Seed Test Tenant")))
+        stack.enter_context(
+            patch.object(dp, "phase_14_verify_initialized_state", return_value=_pass(14, "Verify Initialized State"))
+        )
         # Skip real sleeps (65-second rate-limit cooldowns in main())
         mock_time = stack.enter_context(patch.object(dp, "time"))
         mock_time.time.side_effect = __import__("time").time
         mock_time.sleep.return_value = None
         # Suppress KB write on failure (should not trigger, but guard anyway)
-        stack.enter_context(patch.object(dp, "_create_defect_work_item",
-                                         return_value=None))
+        stack.enter_context(patch.object(dp, "_create_defect_work_item", return_value=None))
         sys.exit(dp.main())
 
 # ---------------------------------------------------------------------------
@@ -124,52 +124,60 @@ if MODE == "success":
 # ---------------------------------------------------------------------------
 elif MODE == "smoke_failure":
     with ExitStack() as stack:
-        stack.enter_context(patch.object(dp, "phase_0_validate_environment",
-                                         return_value=_pass(0, "Validate Environment")))
-        stack.enter_context(patch.object(dp, "phase_1_protected_behaviors",
-                                         return_value=_pass(1, "Protected Behaviors")))
-        stack.enter_context(patch.object(dp, "phase_2_clear_vite_api_url",
-                                         return_value=_pass(2, "Clear Vite API URL")))
-        stack.enter_context(patch.object(dp, "phase_3_build_artifacts",
-                                         return_value=_pass(3, "Build Artifacts")))
-        stack.enter_context(patch.object(dp, "phase_4_freshness_gate",
-                                         return_value=_pass(4, "Build Freshness Gate")))
-        stack.enter_context(patch.object(dp, "phase_5_restore_env_local",
-                                         return_value=_pass(5, "Restore .env.local")))
-        stack.enter_context(patch.object(dp, "phase_6_create_build_context",
-                                         return_value=(_pass(6, "Create Build Context"), "/tmp/ctx")))
-        stack.enter_context(patch.object(dp, "phase_7_acr_build",
-                                         return_value=_pass(7, "ACR Build")))
-        stack.enter_context(patch.object(dp, "phase_10a_pre_deploy_snapshot",
-                                         side_effect=_mock_snapshot_phase))
-        stack.enter_context(patch.object(dp, "phase_8_deploy",
-                                         return_value=_pass(9, "Deploy")))
-        stack.enter_context(patch.object(dp, "phase_10_startup_and_version",
-                                         return_value=_pass(10, "Startup & Version")))
+        stack.enter_context(
+            patch.object(dp, "phase_0_validate_environment", return_value=_pass(0, "Validate Environment"))
+        )
+        stack.enter_context(
+            patch.object(dp, "phase_1_protected_behaviors", return_value=_pass(1, "Protected Behaviors"))
+        )
+        stack.enter_context(patch.object(dp, "phase_2_clear_vite_api_url", return_value=_pass(2, "Clear Vite API URL")))
+        stack.enter_context(patch.object(dp, "phase_3_build_artifacts", return_value=_pass(3, "Build Artifacts")))
+        stack.enter_context(patch.object(dp, "phase_4_freshness_gate", return_value=_pass(4, "Build Freshness Gate")))
+        stack.enter_context(patch.object(dp, "phase_5_restore_env_local", return_value=_pass(5, "Restore .env.local")))
+        stack.enter_context(
+            patch.object(
+                dp, "phase_6_create_build_context", return_value=(_pass(6, "Create Build Context"), "/tmp/ctx")
+            )
+        )
+        stack.enter_context(patch.object(dp, "phase_7_acr_build", return_value=_pass(7, "ACR Build")))
+        stack.enter_context(patch.object(dp, "phase_10a_pre_deploy_snapshot", side_effect=_mock_snapshot_phase))
+        stack.enter_context(patch.object(dp, "phase_8_deploy", return_value=_pass(9, "Deploy")))
+        stack.enter_context(
+            patch.object(dp, "phase_10_startup_and_version", return_value=_pass(10, "Startup & Version"))
+        )
+        stack.enter_context(
+            patch.object(dp, "phase_15_enforce_scaling", return_value=_pass(15, "Enforce Scaling Baseline"))
+        )
         # phase_11_production_verification is NOT mocked — it runs with mocked api_call
         stack.enter_context(patch.object(dp, "api_call", side_effect=_api_call_503))
         # _stream backs the upgrade_verification subprocess call inside phase_11
-        stack.enter_context(patch.object(
-            dp, "_stream",
-            return_value=MagicMock(returncode=0, stdout="(41 pass, 0 fail)"),
-        ))
+        stack.enter_context(
+            patch.object(
+                dp,
+                "_stream",
+                return_value=MagicMock(returncode=0, stdout="(41 pass, 0 fail)"),
+            )
+        )
         # get_current_image is imported inside main() — patch at source module level.
         # Use a synthetic previous-version tag (the "current" image being replaced).
-        stack.enter_context(patch(
-            "scripts.deploy_config.get_current_image",
-            return_value="acragentredeastus.azurecr.io/api-gateway:v1.98.0-mock-prev",
-        ))
-        stack.enter_context(patch(
-            "scripts.deploy_config.rollback_to_image",
-            return_value=True,
-        ))
+        stack.enter_context(
+            patch(
+                "scripts.deploy_config.get_current_image",
+                return_value="acragentredeastus.azurecr.io/api-gateway:v1.98.0-mock-prev",
+            )
+        )
+        stack.enter_context(
+            patch(
+                "scripts.deploy_config.rollback_to_image",
+                return_value=True,
+            )
+        )
         # Skip sleeps (65s cooldown in phase_11, 15s post-rollback wait)
         mock_time = stack.enter_context(patch.object(dp, "time"))
         mock_time.time.side_effect = __import__("time").time
         mock_time.sleep.return_value = None
         # Suppress KB write for the expected failure
-        stack.enter_context(patch.object(dp, "_create_defect_work_item",
-                                         return_value=None))
+        stack.enter_context(patch.object(dp, "_create_defect_work_item", return_value=None))
         sys.exit(dp.main())
 
 else:

@@ -229,6 +229,37 @@ def _validate_packet(
     return None
 
 
+def _reconstruct_edit_content(file_path: str, tool_input: dict[str, Any]) -> str | None:
+    """Reconstruct the full post-edit content an Edit tool call would produce.
+
+    Reads the current on-disk content at ``file_path`` and applies the same
+    old_string -> new_string substitution the Edit tool itself performs, so
+    Edit calls can be matched against on-disk approval packets exactly like
+    Write calls (autodiscovery, HYG-047/FAB-14). Returns None (fail closed to
+    the existing env-var / tool_input-hint path) whenever reconstruction would
+    be ambiguous: missing/non-string old_string or new_string, old_string
+    absent from the current file, or old_string appearing more than once
+    without replace_all.
+    """
+    old_string = tool_input.get("old_string")
+    new_string = tool_input.get("new_string")
+    if not isinstance(old_string, str) or not old_string or not isinstance(new_string, str):
+        return None
+    try:
+        current = Path(file_path).read_text(encoding="utf-8")
+    except OSError:
+        return None
+    occurrences = current.count(old_string)
+    if occurrences == 0:
+        return None
+    replace_all = bool(tool_input.get("replace_all"))
+    if occurrences > 1 and not replace_all:
+        return None
+    if replace_all:
+        return current.replace(old_string, new_string)
+    return current.replace(old_string, new_string, 1)
+
+
 def _autodiscover_packet(root: Path, rel_path: str, new_content: str | None) -> str | None:
     """HYG-047 (FAB-14): find an owner-approved packet on disk matching THIS write.
 
@@ -319,9 +350,12 @@ def main() -> None:
         _emit_pass()
         return
 
-    new_content = tool_input.get("content") if tool_name == "Write" else None
-    if new_content is not None and not isinstance(new_content, str):
-        new_content = None
+    if tool_name == "Write":
+        new_content = tool_input.get("content")
+        if not isinstance(new_content, str):
+            new_content = None
+    else:
+        new_content = _reconstruct_edit_content(file_path, tool_input)
 
     packet_ref = _resolve_packet_path(tool_input, config, root)
     if not packet_ref:

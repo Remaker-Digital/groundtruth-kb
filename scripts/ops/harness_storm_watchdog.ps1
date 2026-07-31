@@ -58,65 +58,114 @@ $NONCODEX_THRESHOLD = 15
 $NONCODEX_HARNESS_SCRIPTS = @('ollama_harness.py', 'openrouter_harness.py', 'cursor_harness.py')
 $NONCODEX_HARNESS_SCRIPT_PATTERN =
     'scripts\\(' + (($NONCODEX_HARNESS_SCRIPTS | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')'
-$GTKB_VENV_PYTHON_PATTERN = 'groundtruth-kb\\\.venv\\Scripts\\python\.exe'
+$RUN_WITH_STATUS_SCRIPT_PATTERN = 'scripts\\run_with_status\.py'
+$GTKB_VENV_PYTHON_PATTERN = 'groundtruth-kb\\\.venv\\Scripts\\python(?:w)?\.exe'
+$PYTHON_PROCESS_NAMES = @('python.exe', 'pythonw.exe', 'python', 'py.exe', 'pyw.exe')
+$CURSOR_AGENT_PROCESS_NAMES = @('agent.exe', 'agent', 'cursor-agent.exe', 'cursor-agent')
+$RUN_WITH_STATUS_DEFAULT_LIFETIME_SECONDS = 600
+$CODEX_EXEC_PATTERN = '\bcodex(?:\.exe)?\b.*\bexec\b'
 
 function Get-CreateEpoch($cimProc) {
     try { return [int][double]::Parse(([DateTimeOffset]$cimProc.CreationDate).ToUnixTimeSeconds()) }
     catch { return 0 }
 }
 
+function Get-NormalizedCommand($cimProc) {
+    if (-not $cimProc.CommandLine) { return '' }
+    return ($cimProc.CommandLine -replace '/', '\')
+}
+
+function Get-RunWithStatusLifetimeSeconds($commandLine) {
+    $match = [regex]::Match($commandLine, '--lifetime\s+([0-9]+(?:\.[0-9]+)?)')
+    if ($match.Success) {
+        try { return [double]::Parse($match.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture) }
+        catch { return $RUN_WITH_STATUS_DEFAULT_LIFETIME_SECONDS }
+    }
+    return $RUN_WITH_STATUS_DEFAULT_LIFETIME_SECONDS
+}
+
 $allCim = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
 
 # --- Population detection (observability only; never kills) ----------------- #
 $codex = @($allCim | Where-Object { $_.Name -eq 'codex.exe' })
-$family = @($allCim | Where-Object {
+$baseFamily = @($allCim | Where-Object {
         $_.Name -eq 'codex.exe' -or $_.Name -like 'codex-command-runner*' -or
         $_.Name -like 'codex-windows-sandbox*' -or
         (($_.Name -eq 'node_repl.exe' -or $_.Name -eq 'node_repl') -and $_.ExecutablePath -and ($_.ExecutablePath -match 'OpenAI\\Codex'))
     })
-$noncodex = @($allCim | Where-Object {
-        $cmd = $_.CommandLine
-        if (-not $cmd) { return $false }
+$wrappedCodex = @($allCim | Where-Object {
+        $normalizedCmd = Get-NormalizedCommand $_
+        if (-not $normalizedCmd) { return $false }
         $name = $_.Name
-        $normalizedCmd = $cmd -replace '/', '\'
-        $isPython = $name -in @('python.exe', 'python', 'py.exe')
+        $isPython = $PYTHON_PROCESS_NAMES -contains $name
+        $isRunWithStatus = $normalizedCmd -match $RUN_WITH_STATUS_SCRIPT_PATTERN
+        $isProjectHarness =
+            ($normalizedCmd -match [regex]::Escape($root)) -or
+            ($normalizedCmd -match $GTKB_VENV_PYTHON_PATTERN)
+        $isPython -and $isRunWithStatus -and $isProjectHarness -and ($normalizedCmd -match $CODEX_EXEC_PATTERN)
+    })
+$family = @($baseFamily + $wrappedCodex)
+$noncodex = @($allCim | Where-Object {
+        $normalizedCmd = Get-NormalizedCommand $_
+        if (-not $normalizedCmd) { return $false }
+        $name = $_.Name
+        $isPython = $PYTHON_PROCESS_NAMES -contains $name
         $invokesWatchedHarness = $normalizedCmd -match $NONCODEX_HARNESS_SCRIPT_PATTERN
         $isProjectHarness =
             ($normalizedCmd -match [regex]::Escape($root)) -or
             ($normalizedCmd -match $GTKB_VENV_PYTHON_PATTERN)
         $isPython -and $invokesWatchedHarness -and $isProjectHarness
     })
+$cursorAgents = @($allCim | Where-Object {
+        $normalizedCmd = Get-NormalizedCommand $_
+        if (-not $normalizedCmd) { return $false }
+        $name = $_.Name
+        $isCursorAgent = $CURSOR_AGENT_PROCESS_NAMES -contains $name
+        $isProjectWorkspace = $normalizedCmd -match [regex]::Escape($root)
+        $isCursorAgent -and $isProjectWorkspace
+    })
 
 $codexCount    = $codex.Count
 $familyCount   = $family.Count
 $noncodexCount = $noncodex.Count
+$cursorAgentCount = $cursorAgents.Count
+$dispatchWrapperCount = @(($family + $noncodex) | Where-Object { (Get-NormalizedCommand $_) -match $RUN_WITH_STATUS_SCRIPT_PATTERN }).Count
 
-Set-Content $beat "$now codex=$codexCount family=$familyCount noncodex=$noncodexCount threshold=$CODEX_THRESHOLD noncodexThreshold=$NONCODEX_THRESHOLD mode=liveness-aware(WI-4828)"
+Set-Content $beat "$now codex=$codexCount family=$familyCount noncodex=$noncodexCount cursorAgents=$cursorAgentCount wrapped=$dispatchWrapperCount threshold=$CODEX_THRESHOLD noncodexThreshold=$NONCODEX_THRESHOLD mode=liveness-aware(WI-4828)"
 
-if (($codexCount -gt $CODEX_THRESHOLD) -or ($noncodexCount -gt $NONCODEX_THRESHOLD)) {
+if (($codexCount -gt $CODEX_THRESHOLD) -or ($noncodexCount -gt $NONCODEX_THRESHOLD) -or ($cursorAgentCount -gt $NONCODEX_THRESHOLD) -or ($dispatchWrapperCount -gt $NONCODEX_THRESHOLD)) {
     # WI-4828: the threshold is now a DETECTION signal only. Reaping is decided
     # by liveness (below), not by this count. Logged for observability.
-    Add-Content $log "$now POPULATION codex=$codexCount family=$familyCount noncodex=$noncodexCount over-threshold (reap is liveness-based, not count-based)"
+    Add-Content $log "$now POPULATION codex=$codexCount family=$familyCount noncodex=$noncodexCount cursorAgents=$cursorAgentCount wrapped=$dispatchWrapperCount over-threshold (reap is liveness-based, not count-based)"
 }
 
 # --- Candidate set for the liveness decider (with dispatched flag) ---------- #
 $candidates = @()
-foreach ($p in ($family + $noncodex)) {
+$seenCandidatePids = @{}
+foreach ($p in ($family + $noncodex + $cursorAgents)) {
+    $pid = [int]$p.ProcessId
+    if ($seenCandidatePids.ContainsKey($pid)) { continue }
+    $seenCandidatePids[$pid] = $true
     $name = $p.Name
+    $normalizedCmd = Get-NormalizedCommand $p
+    $isPython = $PYTHON_PROCESS_NAMES -contains $name
+    $isRunWithStatus = $isPython -and ($normalizedCmd -match $RUN_WITH_STATUS_SCRIPT_PATTERN)
     $dispatched = $false
     if ($name -eq 'codex.exe') {
         # Dispatched workers run `codex exec ...`; interactive `codex` TUI does not.
         if ($p.CommandLine -and ($p.CommandLine -match '\bexec\b')) { $dispatched = $true }
     }
-    elseif (($name -eq 'python.exe' -or $name -eq 'python' -or $name -eq 'py.exe')) {
-        $dispatched = $true  # non-codex harness python is a dispatched root
+    elseif ($isPython) {
+        $invokesWatchedHarness = $normalizedCmd -match $NONCODEX_HARNESS_SCRIPT_PATTERN
+        if ($invokesWatchedHarness -or $isRunWithStatus) { $dispatched = $true }
     }
     $candidates += [pscustomobject]@{
-        pid               = [int]$p.ProcessId
+        pid               = $pid
         ppid              = [int]$p.ParentProcessId
         name              = [string]$name
         create_time_epoch = (Get-CreateEpoch $p)
         dispatched        = $dispatched
+        max_lifetime_seconds = $(if ($isRunWithStatus) { Get-RunWithStatusLifetimeSeconds $normalizedCmd } else { $null })
     }
 }
 
@@ -148,9 +197,29 @@ if ($candidates.Count -gt 0) {
             # all PowerShell versions; the decider also reads utf-8-sig as a
             # belt-and-suspenders.
             [System.IO.File]::WriteAllText($procFile, $procJson)
-            $decisionRaw = (& $pythonExe $reapScript --now $nowEpoch --project-root $root --provenance-dir '.gtkb-state/ops/dispatch-provenance' --processes-file $procFile 2>$null)
-            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($decisionRaw)) {
-                $failSafe = $true; $failReason = "decider exit=$LASTEXITCODE output-empty=$([string]::IsNullOrWhiteSpace($decisionRaw))"
+            $decisionFile = Join-Path $opsDir ('storm-watchdog-decision-' + [guid]::NewGuid().ToString('N') + '.json')
+            if (Test-Path $decisionFile) { Remove-Item $decisionFile -Force -ErrorAction SilentlyContinue }
+            $decider = Start-Process -FilePath $pythonExe -ArgumentList @(
+                $reapScript,
+                '--now',
+                $nowEpoch,
+                '--project-root',
+                $root,
+                '--provenance-dir',
+                '.gtkb-state/ops/dispatch-provenance',
+                '--processes-file',
+                $procFile,
+                '--output-file',
+                $decisionFile
+            ) -Wait -PassThru -WindowStyle Hidden
+            $deciderExitCode = $decider.ExitCode
+            $decisionRaw = ''
+            if (Test-Path $decisionFile) {
+                $decisionRaw = [System.IO.File]::ReadAllText($decisionFile)
+                Remove-Item $decisionFile -Force -ErrorAction SilentlyContinue
+            }
+            if ($deciderExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($decisionRaw)) {
+                $failSafe = $true; $failReason = "decider exit=$deciderExitCode output-file-empty=$([string]::IsNullOrWhiteSpace($decisionRaw))"
             }
             else {
                 $decision = $decisionRaw | ConvertFrom-Json

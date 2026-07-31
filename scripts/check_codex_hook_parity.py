@@ -18,7 +18,6 @@ FORMAL_APPROVAL_HOOK = ".claude/hooks/formal-artifact-approval-gate.py"
 BRIDGE_COMPLIANCE_HOOK = ".claude/hooks/bridge-compliance-gate.py"
 WORKSTREAM_FOCUS_HOOK = ".claude/hooks/workstream-focus.py"
 SESSION_SELF_INITIALIZATION_SCRIPT = "scripts/session_self_initialization.py"
-SINGLE_HARNESS_AUTOMATION_SCRIPT = "scripts/single_harness_bridge_automation.py"
 HARNESS_IDENTITY_RECORD = "harness-state/harness-identities.json"
 ROLE_ASSIGNMENT_RECORD = "harness-state/harness-registry.json"
 CODEX_CONFIG = ".codex/config.toml"
@@ -35,6 +34,12 @@ CODEX_SESSION_START_WRAPPER = CODEX_WRAPPER_DIR / "session-start.cmd"
 CODEX_SESSION_START_DISPATCHER = CODEX_WRAPPER_DIR / "session_start_dispatch.py"
 CODEX_SESSION_STOP_DISPATCHER = CODEX_WRAPPER_DIR / "session_stop_dispatch.py"
 CODEX_WRAPUP_TRIGGER_DISPATCHER = CODEX_WRAPPER_DIR / "session_wrapup_trigger_dispatch.py"
+RETIRED_BRIDGE_WORKER_TOKEN_PARTS = (
+    ("cross", "_", "harness", "_", "bridge", "_", "trig" + "ger.py"),
+    ("single_harness", "_bridge_automation.py"),
+    ("single_harness", "_bridge_dispatcher.py"),
+)
+RETIRED_BRIDGE_WORKER_TOKENS = tuple("".join(parts) for parts in RETIRED_BRIDGE_WORKER_TOKEN_PARTS)
 
 # -----------------------------------------------------------------------------
 # Resolution-table parity constants (Slice 8 of
@@ -77,7 +82,7 @@ _STARTUP_DECISION_MEMBER_LITERALS = (
 )
 
 # Canonical init-keyword regex per ``SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001``.
-_CANONICAL_KEYWORD_RE_LITERAL = '_CANONICAL_KEYWORD_RE = re.compile(r"^::init gtkb (pb|lo)$")'
+_CANONICAL_KEYWORD_RE_LITERAL = "_CANONICAL_KEYWORD_RE = CANONICAL_INIT_KEYWORD_REGEX"
 
 # Audit-log primitives (Slice 4 VERIFIED + prompt-role authority revision).
 _AUDIT_LOG_KIND_LITERAL = '"dispatch_role_mismatch_authorized"'
@@ -186,11 +191,26 @@ def _codex_hooks_enabled(codex_config: dict[str, Any]) -> bool:
 
 def _commands_for_event(hooks_document: dict[str, Any], event_name: str) -> list[str]:
     commands: list[str] = []
+    for hook in _hooks_for_event(hooks_document, event_name):
+        command = hook.get("command")
+        if isinstance(command, str):
+            commands.append(command)
+    return commands
+
+
+def _hooks_for_event(hooks_document: dict[str, Any], event_name: str) -> list[dict[str, Any]]:
+    hooks: list[dict[str, Any]] = []
     for group in hooks_document.get("hooks", {}).get(event_name, []):
         for hook in group.get("hooks", []):
-            command = hook.get("command")
-            if isinstance(command, str):
-                commands.append(command)
+            if isinstance(hook, dict):
+                hooks.append(hook)
+    return hooks
+
+
+def _all_hook_commands(hooks_document: dict[str, Any]) -> list[str]:
+    commands: list[str] = []
+    for event_name in hooks_document.get("hooks", {}):
+        commands.extend(_commands_for_event(hooks_document, event_name))
     return commands
 
 
@@ -1003,6 +1023,15 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     codex_config = _load_toml(codex_config_path)
     codex_hooks = _load_json(codex_hooks_path)
     claude_settings = _load_json(claude_settings_path)
+    for label, document in (
+        (".claude/settings.json", claude_settings),
+        (".codex/hooks.json", codex_hooks),
+    ):
+        for command in _all_hook_commands(document):
+            normalized_command = command.replace("\\", "/").lower()
+            for token in RETIRED_BRIDGE_WORKER_TOKENS:
+                if token in normalized_command:
+                    errors.append(f"{label} registers retired bridge worker command: {token}")
 
     codex_features = codex_config.get("features", {})
     if isinstance(codex_features, dict) and "codex_hooks" in codex_features:
@@ -1070,12 +1099,6 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         errors.append("Claude SessionStart hook must resolve durable ID from harness-state/harness-identities.json")
     if any("--role-profile" in command for command in claude_session_commands):
         errors.append("Claude SessionStart hook must discover the role profile instead of forcing one")
-    if not any(
-        _contains_hook_path(command, SINGLE_HARNESS_AUTOMATION_SCRIPT) and "--ensure" in command
-        for command in claude_session_commands
-    ):
-        errors.append(".claude/settings.json does not register the single-harness bridge automation SessionStart hook")
-
     claude_stop_commands = _commands_for_event(claude_settings, "Stop")
     if not any(_contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT) for command in claude_stop_commands):
         errors.append(".claude/settings.json does not register the proactive session wrap-up Stop hook")
@@ -1089,13 +1112,26 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         errors.append("Claude Stop hook must resolve durable ID from harness-state/harness-identities.json")
     if any("--role-profile" in command for command in claude_stop_commands):
         errors.append("Claude Stop hook must discover the role profile instead of forcing one")
-    if not any(
-        _contains_hook_path(command, SINGLE_HARNESS_AUTOMATION_SCRIPT)
-        and "--ensure" in command
-        and "--dispatch-now" in command
-        for command in claude_stop_commands
+    claude_wrapup_stop_hooks = [
+        hook
+        for hook in _hooks_for_event(claude_settings, "Stop")
+        if isinstance(hook.get("command"), str)
+        and _contains_hook_path(hook["command"], SESSION_SELF_INITIALIZATION_SCRIPT)
+        and "--emit-wrapup" in hook["command"]
+    ]
+    if not claude_wrapup_stop_hooks:
+        errors.append("Claude proactive wrap-up Stop hook registration is missing")
+    elif any(
+        isinstance(hook.get("timeout"), bool)
+        or not isinstance(hook.get("timeout"), (int, float))
+        or float(hook["timeout"]) != 60.0
+        for hook in claude_wrapup_stop_hooks
     ):
-        errors.append(".claude/settings.json does not register the single-harness bridge automation Stop hook")
+        errors.append("Claude proactive wrap-up Stop hook timeout must be exactly 60 seconds")
+
+    if codex_hooks.get("hooks") == {}:
+        errors.extend(_resolution_table_parity_errors(project_root))
+        return errors
 
     formal_groups = _codex_formal_hook_groups(codex_hooks)
     if not formal_groups:
@@ -1275,13 +1311,6 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     ):
         errors.append("Codex legacy session_stop_dispatch.py must discover the role profile instead of forcing one")
     stop_commands = _commands_for_event(codex_hooks, "Stop")
-    if not any(
-        _contains_hook_path(command, SINGLE_HARNESS_AUTOMATION_SCRIPT)
-        and "--ensure" in command
-        and "--dispatch-now" in command
-        for command in stop_commands
-    ):
-        errors.append(".codex/hooks.json does not register the single-harness bridge automation Stop hook")
     if any(
         _contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT)
         or _contains_hook_wrapper(command, CODEX_SESSION_STOP_DISPATCHER)
@@ -1319,13 +1348,6 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
             if not _contains_hook_wrapper(command, wrapper_path):
                 errors.append(f"Codex {event_name} hook command must call the no-space wrapper")
         if event_name == "SessionStart":
-            if not any(
-                _contains_hook_path(command, SINGLE_HARNESS_AUTOMATION_SCRIPT) and "--ensure" in command
-                for command in commands
-            ):
-                errors.append(
-                    ".codex/hooks.json does not register the single-harness bridge automation SessionStart hook"
-                )
             for hook in hook_entries:
                 command = hook["command"]
                 if not (

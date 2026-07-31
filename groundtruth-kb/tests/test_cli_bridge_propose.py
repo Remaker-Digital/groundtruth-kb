@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +16,7 @@ from groundtruth_kb.bridge.proposal_autoload import (
     auto_project_metadata,
     auto_spec_links,
 )
+from groundtruth_kb.bridge.proposal_filing import NONIMPAIRMENT_REQUIRED_FIELDS
 from groundtruth_kb.bridge.taxonomy import BridgeKind
 from groundtruth_kb.cli import main
 from groundtruth_kb.cli_bridge_propose import build_propose_context, render_proposal_draft
@@ -204,6 +206,12 @@ def test_implementation_template_renders(project_dir: Path) -> None:
     assert "# Implementation Proposal - gt bridge propose CLI" in rendered
     assert f"Project Authorization: {AUTH_ID}" in rendered
     assert "## Specification Links" in rendered
+    assert "## Intuitiveness / Non-Impairment Disposition" in rendered
+    section = rendered.split("## Intuitiveness / Non-Impairment Disposition", 1)[1]
+    disposition = json.loads(section.split("```json", 1)[1].split("```", 1)[0])
+    assert set(disposition) == {"schema_version", *NONIMPAIRMENT_REQUIRED_FIELDS}
+    assert disposition["schema_version"] == 1
+    assert all(disposition[field] == "TODO" for field in NONIMPAIRMENT_REQUIRED_FIELDS)
     assert "${claim}" in rendered
 
 
@@ -255,6 +263,9 @@ def test_template_emits_spec_to_test_skeleton(project_dir: Path) -> None:
     _seed_project(project_dir)
     rendered = render_proposal_draft("implementation", _context(project_dir))
     assert "## Specification-Derived Verification Plan" in rendered
+    assert rendered.index("## Intuitiveness / Non-Impairment Disposition") < rendered.index(
+        "## Specification-Derived Verification Plan"
+    )
     assert "${verification_plan_table}" in rendered
 
 

@@ -16,6 +16,8 @@ from types import ModuleType
 
 import pytest
 
+from scripts.gtkb_bridge_writer import normalize_bridge_envelope_head
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
 TEMPLATE_HOOK = REPO_ROOT / "groundtruth-kb" / "templates" / "hooks" / "bridge-compliance-gate.py"
@@ -50,7 +52,7 @@ def _write_bridge_file(tmp_path: Path, filename: str, status: str, target_paths:
     if target_paths is not None:
         body += f"\ntarget_paths: {json.dumps(target_paths)}\n"
     path = bridge_dir / filename
-    path.write_text(body, encoding="utf-8")
+    path.write_text(normalize_bridge_envelope_head(body), encoding="utf-8")
     return path
 
 
@@ -87,7 +89,7 @@ def test_versioned_bridge_file_gets_normal_proposal_governance_denial(gate: Modu
     reason = gate._deny_reason_for_content(
         cwd_path=tmp_path,
         file_path="bridge/example-thread-001.md",
-        content="NEW\n\n# Example proposal\n",
+        content=normalize_bridge_envelope_head("NEW\n\n# Example proposal\n"),
     )
     assert reason is not None
     assert "Specification Links" in reason

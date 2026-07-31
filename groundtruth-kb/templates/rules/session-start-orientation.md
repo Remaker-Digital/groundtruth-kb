@@ -9,7 +9,7 @@ Produce a **7-item ORIENT block** once per session after memory read and bridge 
 ## Output format (verbatim)
 
 ```
-ORIENT S{N} @ HH:MMZ
+ORIENT <session_id-short> @ HH:MMZ
   1 bridge:     <status>                                  # TAFE/dispatcher + versioned bridge scan
   2 branch:     <repo>@<sha-short>  (<ahead/behind N>)    # git rev-parse + git status -sb
   3 worktree:   <N modified, M untracked>  [relevant: <scoped subset>]

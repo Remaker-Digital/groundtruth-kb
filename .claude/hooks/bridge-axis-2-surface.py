@@ -2,14 +2,11 @@
 """
 Claude Code UserPromptSubmit hook — Bridge AXIS 2 in-session surface.
 
-Closes the AXIS 2 (non-dispatchable, interactive notification) cross-harness
-gap called out in .claude/rules/bridge-essential.md § Two-Axis Bridge
-Automation Model. When an interactive Claude session is active, the
-cross-harness event-driven trigger from Codex correctly suppresses headless
-spawn (per gtkb-cross-harness-trigger-active-session-suppression-001 VERIFIED)
-but offers no notification path into the running session. This hook closes
-that gap by surfacing newly-actionable Prime bridge work into the session's
-next prompt as additionalContext.
+Closes the AXIS 2 (non-dispatchable, interactive notification) in-session
+surface gap called out in .claude/rules/bridge-essential.md. Dispatchable bridge
+work is owned by the dispatcher daemon; this hook never launches workers. It
+only surfaces newly-actionable bridge work into the running interactive session
+as additionalContext.
 
 Authority:
 - bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-005.md REVISED-2
@@ -119,7 +116,12 @@ def _log_error(payload: dict[str, Any]) -> None:
 
 
 def _load_scan_bridge_helper() -> Any:
-    helper_path = PROJECT_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
+    helper_path = PROJECT_ROOT / ".claude" / "skills" / "gtkb-bridge" / "helpers" / "scan_bridge.py"
+    if not helper_path.is_file():
+        # WI-5661: fall back to the pre-rename skill dir (WI-5651 renamed bridge -> gtkb-bridge).
+        _legacy = PROJECT_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
+        if _legacy.is_file():
+            helper_path = _legacy
     spec = importlib.util.spec_from_file_location("_gtkb_axis2_scan_bridge", helper_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"scan helper could not be loaded from {helper_path}")
@@ -137,9 +139,9 @@ def _compute_actionable_for_role(role_profile: str) -> tuple[str, list[Any]]:
     the selected role-actionable items, so suppression/dismissal keys off the
     correct role's signature.
 
-    Signature scheme mirrors scripts/cross_harness_bridge_trigger.py:_signature
-    for the selected list. Falls back to ("", []) if the scanner is unavailable
-    or returns no selected items.
+    Signature scheme is local to this AXIS 2 surface and covers the selected
+    actionable list. Falls back to ("", []) if the scanner is unavailable or
+    returns no selected items.
     """
     try:
         scanner = _load_scan_bridge_helper()

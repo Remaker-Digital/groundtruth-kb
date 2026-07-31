@@ -4,24 +4,21 @@
 
 The dispatcher cutover (WI-4848) requires the flip to live spawn to be gated on
 *shadow-decision parity evidence*: proof that the daemon's shadow dispatch
-decision matches what the live ``cross_harness_bridge_trigger`` would actually
+decision matches what the live ``dispatcher_runtime`` would actually
 dispatch for the same bridge state. This module produces that evidence.
 
-It is strictly read-only: it loads the trigger and daemon modules, computes both
-decisions for a given bridge state, and reports per-role whether they match
-field-for-field (recipient harness, selected documents, signature). It never
-calls the trigger's spawn path, never writes dispatch state, and never re-enables
+It is strictly read-only: it loads the dispatcher runtime and daemon modules,
+computes both decisions for a given bridge state, and reports per-role whether
+they match field-for-field (recipient harness, selected documents, signature).
+It never calls a spawn path, never writes dispatch state, and never re-enables
 dispatchability -- running it leaves the quiesced posture unchanged.
 
 Scope (slice 1): isolate the *selection* divergence. The daemon's
 ``compute_shadow_decisions`` feeds the full ``items`` list to
-``_target_selected_signature`` per target, while the trigger's ``run_trigger``
-loop shrinks ``remaining_items`` after each target (cross_harness_bridge_trigger
-~L4252-L4292). Identical for single-target roles; a real divergence class for
-multi-target roles. Both sides are resolved against the same state dir here so
-the comparison isolates that one variable; the live trigger's distinct
-``--state-dir`` and its readiness/provider-backoff runtime gates are documented
-known differences addressed by the cutover slice, not by this harness.
+``_target_selected_signature`` per target, while ``dispatcher_runtime`` shrinks
+``remaining_items`` after each target. Identical for single-target roles; a real
+divergence class for multi-target roles. Both sides are resolved against the
+same live state dir here so the comparison isolates that one variable.
 """
 
 from __future__ import annotations
@@ -43,7 +40,7 @@ for _p in (_SCRIPTS_DIR, _REPO_ROOT / "groundtruth-kb" / "src"):
         sys.path.insert(0, str(_p))
 
 DEFAULT_MAX_ITEMS = 2
-_TRIGGER_STATE_SUBDIR = (".gtkb-state", "cross-harness-trigger")
+_RUNTIME_STATE_SUBDIR = (".gtkb-state", "bridge-poller")
 
 
 def _load_module(mod_name: str, path: Path):
@@ -59,7 +56,7 @@ def _load_module(mod_name: str, path: Path):
 
 
 def _load_trigger():
-    return _load_module("_cross_harness_trigger_for_parity", _SCRIPTS_DIR / "cross_harness_bridge_trigger.py")
+    return _load_module("_dispatcher_runtime_for_parity", _SCRIPTS_DIR / "dispatcher_runtime.py")
 
 
 def _load_daemon():
@@ -85,7 +82,7 @@ def trigger_canonical_decisions(project_root: Path, *, max_items: int = DEFAULT_
     trigger = _load_trigger()
     index_text = trigger._read_bridge_state_live(project_root)
     actionable_prime, actionable_codex = trigger._compute_actionable(index_text, project_root)
-    state_dir = project_root.joinpath(*_TRIGGER_STATE_SUBDIR)
+    state_dir = project_root.joinpath(*_RUNTIME_STATE_SUBDIR)
     decisions: list[dict[str, Any]] = []
     for role_label, items in (
         ("prime-builder", actionable_prime),

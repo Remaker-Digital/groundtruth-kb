@@ -27,11 +27,11 @@ from types import ModuleType
 
 import pytest
 
-_SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "cross_harness_bridge_trigger.py"
+_SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "dispatcher_runtime.py"
 
 
 def _load_trigger() -> ModuleType:
-    module_name = "cross_harness_bridge_trigger"
+    module_name = "dispatcher_runtime"
     if module_name in sys.modules:
         return sys.modules[module_name]
     spec = importlib.util.spec_from_file_location(module_name, _SCRIPT_PATH)
@@ -125,6 +125,49 @@ def test_backoff_skip_throttles_relog_and_keeps_annotation(tmp_path: Path, monke
     assert len(_previous_launch_failed_rows(failures)) == 2
 
 
+def test_backoff_skip_honors_active_circuit_breaker_for_changed_signature(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A tripped provider must not consume new work before its half-open window.
+
+    Release-health regression: D/F could fail on one selected batch, trip the
+    circuit breaker, then immediately take a different NEW batch because
+    provider backoff was gated by same-signature equality.
+    """
+    trigger = _load_trigger()
+    monkeypatch.setenv("GTKB_DISPATCH_RETRY_DELAY_SECONDS", "86400")
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+
+    prior: dict = {
+        "last_launch": {
+            "launched": True,
+            "exit_code": 4294967295,
+            "dispatch_id": "d1",
+            "signature": "old-signature",
+        },
+        "failure_count": 4,
+        "circuit_breaker_tripped": True,
+        "circuit_breaker_tripped_at": _iso(datetime.now(UTC)),
+        "last_failure_reason": "subprocess_execution_failed",
+        "failure_class": "subprocess_execution_failed",
+    }
+
+    skip = trigger._provider_failure_backoff_skip(
+        prior=prior,
+        recipient="loyal-opposition:F",
+        signature="new-signature",
+        state_dir=state_dir,
+    )
+
+    assert skip is not None
+    assert skip["reason"] == "provider_failure_backoff_active"
+    assert skip["backoff_source"] == "circuit_breaker_active"
+    assert skip["failure_class"] == "process_terminated_abruptly"
+    assert skip["previous_launch_failed"]["signature"] == "new-signature"
+    assert len(_previous_launch_failed_rows(state_dir / trigger.DISPATCH_FAILURES_FILENAME)) == 1
+
+
 # --- recovery clears the cooldown stamp --------------------------------------
 
 
@@ -203,7 +246,7 @@ def test_lo_provider_backoff_hold_reason_preserves_retry_delay() -> None:
     )
 
 
-# --- end-to-end run_trigger integration ---------------------------------------
+# --- end-to-end run_dispatch_cycle integration --------------------------------
 
 _CODEX_INVOCATION_SURFACES = {"headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}}
 _CLAUDE_INVOCATION_SURFACES = {
@@ -270,7 +313,7 @@ def _make_failover_project(root: Path) -> Path:
 def test_sole_active_lo_in_backoff_produces_lo_failover_exhausted_end_to_end(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """run_trigger with sole active LO in non_retryable backoff must emit lo_failover_exhausted.
+    """run_dispatch_cycle with sole active LO in non_retryable backoff must emit lo_failover_exhausted.
 
     Regression for WI-4662: the `if target_index < len(targets) - 1` guard prevented
     _provider_failure_backoff_skip from running on the sole/last target, so the
@@ -315,9 +358,9 @@ def test_sole_active_lo_in_backoff_produces_lo_failover_exhausted_end_to_end(
         encoding="utf-8",
     )
 
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
-    assert not summary.get("skipped"), f"run_trigger skipped unexpectedly: {summary.get('reason')}"
+    assert not summary.get("skipped"), f"run_dispatch_cycle skipped unexpectedly: {summary.get('reason')}"
 
     recipients = summary.get("dispatch_state", {}).get("recipients", {})
     lo_state = recipients.get("loyal-opposition", {})

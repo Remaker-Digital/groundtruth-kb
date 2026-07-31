@@ -54,9 +54,12 @@ if str(PROJECT_ROOT) not in sys.path:
 
 _credential_patterns = importlib.import_module("groundtruth_kb.governance.credential_patterns")
 _prior_deliberations = importlib.import_module("groundtruth_kb.bridge.prior_deliberations")
+_bridge_writer = importlib.import_module("scripts.gtkb_bridge_writer")
 BASH_EXTRAS = _credential_patterns.BASH_EXTRAS
 CREDENTIAL_PATTERNS = _credential_patterns.CREDENTIAL_PATTERNS
+BridgeEnvelopeError = _bridge_writer.BridgeEnvelopeError
 ensure_author_metadata = importlib.import_module("scripts.bridge_author_metadata").ensure_author_metadata
+normalize_bridge_envelope_head = _bridge_writer.normalize_bridge_envelope_head
 DEFAULT_DB_PATH = _prior_deliberations.DEFAULT_DB_PATH
 DEFAULT_GLOSSARY_PATH = _prior_deliberations.DEFAULT_GLOSSARY_PATH
 DEFAULT_PREPOPULATION_LOG = _prior_deliberations.DEFAULT_PREPOPULATION_LOG
@@ -106,12 +109,10 @@ class CredentialHitsFoundError(RuntimeError):
 
 
 class BridgeComplianceError(RuntimeError):
-    """Raised when the Codex helper path fails bridge-compliance validation.
+    """Raised when a helper path fails bridge-compliance validation.
 
-    Codex does not currently have a Write/Edit tool hook route equivalent to
-    Claude's bridge-compliance PreToolUse path. The Codex path therefore runs
-    the bridge-compliance gate in audit mode before any proposal file write and
-    raises this error on a deny decision.
+    Helper paths run the bridge-compliance gate in audit mode before any
+    proposal file write and raise this error on a deny decision.
     """
 
 
@@ -126,6 +127,9 @@ class BridgeWorkIntentError(RuntimeError):
 _SCAN_CATALOG: list[tuple[re.Pattern[str], str, str]] = [
     (spec.pattern, spec.name, spec.description) for spec in list(CREDENTIAL_PATTERNS) + list(BASH_EXTRAS)
 ]
+_STATUS_TOKENS = frozenset(
+    {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "NO-ACTION", "ADVISORY", "DEFERRED", "WITHDRAWN"}
+)
 
 WORK_INTENT_TTL_SECONDS = 300
 # Session-id env-var membership is owned by scripts/gtkb_session_id.py
@@ -363,6 +367,15 @@ def compose_proposal(
     return bridge_root / f"{slug}-{version:03d}.md", content
 
 
+def _is_status_bearing_content(content: str) -> bool:
+    for line in content.splitlines():
+        token = line.strip()
+        if not token:
+            continue
+        return token in _STATUS_TOKENS
+    return False
+
+
 def compose_index_update(*args: Any, **kwargs: Any) -> str:
     """Historical API stub retained only to fail closed for stale callers."""
     return _disabled_legacy_state_update(*args, **kwargs)
@@ -392,6 +405,8 @@ def _run_bridge_compliance_audit(
     }
     with tempfile.TemporaryDirectory(prefix="gtkb-bridge-compliance-") as tmp:
         audit_output = Path(tmp) / "audit.json"
+        from scripts.windows_subprocess import no_window_subprocess_kwargs
+
         result = subprocess.run(
             [
                 sys.executable,
@@ -405,6 +420,7 @@ def _run_bridge_compliance_audit(
             text=True,
             capture_output=True,
             check=False,
+            **no_window_subprocess_kwargs(),
         )
         if result.returncode != 0:
             raise BridgeComplianceError(
@@ -444,8 +460,8 @@ def propose_bridge(
 ) -> Path:
     """Create ``bridge/<topic_slug>-001.md`` through the no-index bridge path.
 
-    Phase 0 — Prior Deliberations pre-population (default-on; Phase 2 of
-    GTKB-DA-READ-SURFACE-CORRECTION): when
+    Phase 0 — Prior Deliberations pre-population (glossary seeding plus
+    semantic-search opt-in; Phase 2 of GTKB-DA-READ-SURFACE-CORRECTION): when
     ``pre_populate_prior_deliberations=True`` (default), call
     :func:`pre_populate_prior_deliberations` on ``body`` before scanning.
     Glossary-source seeding from ``.claude/rules/canonical-terminology.md``
@@ -498,7 +514,7 @@ def propose_bridge(
     project_root = bridge_root.parent.resolve()
     bridge_file = bridge_root / f"{topic_slug}-001.md"
 
-    # Phase 0: Prior Deliberations pre-population (default-on).
+    # Phase 0: Prior Deliberations pre-population with semantic search opt-in.
     if pre_populate_prior_deliberations:
         body = globals()["pre_populate_prior_deliberations"](
             topic_slug,
@@ -512,6 +528,13 @@ def propose_bridge(
     hits = scan_credential_hits(body)
     body_to_write = handle_hits_abort_or_redact(body, hits, mode=mode)
     body_to_write = ensure_author_metadata(body_to_write, project_root=bridge_root.parent)
+    body_to_write = normalize_bridge_envelope_head(body_to_write)
+    if _is_status_bearing_content(body_to_write):
+        _run_bridge_compliance_audit(
+            file_path=bridge_file,
+            content=body_to_write,
+            project_root=project_root,
+        )
 
     # Phase 2: File-first write (fail-fast on existing file; no silent overwrite).
     if bridge_file.exists():
@@ -568,6 +591,7 @@ def propose_bridge_codex_non_bypass(
         project_root=project_root,
         explicit=author_metadata,
     )
+    body_to_write = normalize_bridge_envelope_head(body_to_write)
     bridge_file, body_to_write = compose_proposal(
         topic_slug,
         version,

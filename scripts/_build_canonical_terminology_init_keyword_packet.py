@@ -42,7 +42,7 @@ NEW_SECTION = (
     "`bridge/gtkb-canonical-init-keyword-syntax-001-007.md` (Codex GO at -008); "
     "`DCL-CONCEPT-ON-CONTACT-001` (load-bearing concept added on first contact).\n"
     "\n"
-    "**Implementation pointer:** Emitted by `scripts/cross_harness_bridge_trigger.py` in `_dispatch_prompt` "
+    "**Implementation pointer:** Emitted by `scripts/gtkb_dispatcher_daemon.py` in `_dispatch_prompt` "
     "(canonical keyword derived from durable role per `DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001`). "
     "Recognized by `.claude/hooks/session_start_dispatch.py` and `.codex/gtkb-hooks/session_start_dispatch.py` "
     "SessionStart hooks. Receiver performs set-membership check against own durable role; mismatch "

@@ -150,7 +150,7 @@ def _role_set_to_json(role_set: Iterable[str]) -> list[str]:
 
 
 def is_prime_builder(record: dict[str, Any]) -> bool:
-    """True iff this record's durable role set carries Prime-Builder authority.
+    """True iff this record's dispatcher role set carries Prime-Builder authority.
 
     Per the Acting-Prime Compatibility Contract, ``acting-prime-builder`` in
     the role set ALSO counts as Prime-equivalent for attribution purposes
@@ -161,7 +161,7 @@ def is_prime_builder(record: dict[str, Any]) -> bool:
 
 
 def is_loyal_opposition(record: dict[str, Any]) -> bool:
-    """True iff this record's durable role set carries Loyal-Opposition authority."""
+    """True iff this record's dispatcher role set carries Loyal-Opposition authority."""
     return ROLE_LOYAL_OPPOSITION in _normalize_role_field(record.get("role"))
 
 
@@ -461,7 +461,7 @@ def evaluate_ollama_role_promotion(
     require_daemon: bool = True,
     readiness_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Evaluate whether harness D is eligible for durable role promotion.
+    """Evaluate whether harness D is eligible for dispatcher/default role promotion.
 
     The gate is intentionally stricter than bridge evidence alone: VERIFIED
     child threads prove the implementation slices landed, while dispatch
@@ -586,7 +586,7 @@ def apply_ollama_role_promotion(
 
     ``dry_run=True`` is report-friendly and mutation-free. ``dry_run=False``
     activates harness D when needed, then delegates the role assignment to the
-    canonical mode-switch transaction so durable role authority remains the
+    canonical mode-switch transaction so dispatcher/default role authority remains the
     DB-backed harness registry and generated projection.
     """
 

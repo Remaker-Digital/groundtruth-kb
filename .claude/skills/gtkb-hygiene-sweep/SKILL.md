@@ -1,7 +1,17 @@
 ---
 name: gtkb-hygiene-sweep
 description: Orchestrate the deterministic `gt hygiene sweep` CLI and route deterministic inventory-backed string scans to `gt admin inventory refresh` plus `gt admin inventory scan-strings` instead of ad hoc grep loops. Use when investigating config-drift class observations, inventory-wide string checks, repeated config defects, or session-start hygiene thresholds; classify findings by artifact lifecycle trigger category per DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001 and guide owner-gated remediation child-bridge filing.
+license: "Proprietary - (c) 2026 Remaker Digital"
+metadata:
+  project: groundtruth-kb
+  category: operations and hygiene
+  activity-envelope: build, ops
 ---
+
+# Activity Envelope Requirement
+
+This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
+
 
 # /gtkb-hygiene-sweep
 

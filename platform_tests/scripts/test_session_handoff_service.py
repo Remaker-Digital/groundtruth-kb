@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -368,6 +369,25 @@ def test_handoff_prompt_uses_handoff_terminology_not_continuation(tmp_path: Path
     assert "continuation prompt" not in body
 
 
+def test_handoff_prompt_separates_init_open_and_body_messages(tmp_path: Path) -> None:
+    root = _make_project_root(tmp_path, session_id="S-KICKOFF")
+    db = _make_db(tmp_path)
+    result = generate(session_id="S-KICKOFF", project_root=root, db=db)
+
+    fences = re.findall(r"```text\r?\n(.*?)\r?\n```", result["prompt_markdown"], flags=re.DOTALL)
+
+    assert fences[:3] == [
+        "::init gtkb pb",
+        "::open build",
+        (
+            "Read this handoff prompt, then read live dispatcher/TAFE state and "
+            "the versioned bridge file chain. Act on the role-actionable entries "
+            "above in oldest-first order."
+        ),
+    ]
+    assert all("Read this handoff prompt" not in fence for fence in fences[:2])
+
+
 def test_handoff_reads_versioned_bridge_files_when_index_is_absent(tmp_path: Path) -> None:
     root = _make_project_root(tmp_path, session_id="S-NOINDEX")
     index_path = root / "bridge" / "INDEX.md"
@@ -381,6 +401,25 @@ def test_handoff_reads_versioned_bridge_files_when_index_is_absent(tmp_path: Pat
     body = result["prompt_markdown"]
     assert "GO: gtkb-test-thread-001 -> bridge/gtkb-test-thread-001-002.md" in body
     assert "versioned bridge file chain" in body
+
+
+def test_handoff_surfaces_latest_no_action_for_loyal_opposition(tmp_path: Path) -> None:
+    root = _make_project_root(tmp_path, session_id="S-NO-ACTION")
+    archive_file = next((root / "harness-state" / "claude" / "session-envelope-archive").glob("*.json"))
+    envelope = json.loads(archive_file.read_text(encoding="utf-8"))
+    envelope["role_resolved"] = "loyal-opposition"
+    archive_file.write_text(json.dumps(envelope, indent=2, sort_keys=True), encoding="utf-8")
+
+    (root / "bridge" / "INDEX.md").unlink()
+    slug = "gtkb-verdict-correction"
+    (root / "bridge" / f"{slug}-001.md").write_text("NEW\n\n# Proposal\n", encoding="utf-8")
+    (root / "bridge" / f"{slug}-002.md").write_text("GO\n\n# Initial verdict\n", encoding="utf-8")
+    (root / "bridge" / f"{slug}-003.md").write_text("NO-ACTION\n\n# Correct the verdict\n", encoding="utf-8")
+    db = _make_db(tmp_path)
+
+    result = generate(session_id="S-NO-ACTION", project_root=root, db=db)
+
+    assert f"NO-ACTION: {slug} -> bridge/{slug}-003.md" in result["prompt_markdown"]
 
 
 # ---------------------------------------------------------------------------

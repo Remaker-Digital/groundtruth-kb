@@ -109,7 +109,6 @@ exclusion_globs = [
     "archive/**",
     "applications/**",
     "bridge/**",
-    "independent-progress-assessments/**",
 ]
 classification = "runtime_residue"
 remediation_hint = "Runtime/sandbox residue committed in-tree; scrub the PASS/ subtree. Sandbox output belongs outside E:/GT-KB or under .gtkb-state per .claude/rules/project-root-boundary.md. Scanner-owned-artifact severity handling is tracked by WI-4259."
@@ -192,7 +191,7 @@ exclusion_globs = [
     "config/governance/hygiene-sweep-patterns.toml",
 ]
 classification = "retired_mechanism"
-remediation_hint = "Retired poller reference found; replace with cross-harness event-driven trigger. References should be archived or deleted."
+remediation_hint = "Retired poller reference found; replace with dispatcher daemon wording or delete the obsolete reference."
 
 [[patterns]]
 id = "claude-playground"
@@ -389,7 +388,6 @@ exclusion_globs = [
     "archive/**",
     "applications/**",
     "bridge/**",
-    "independent-progress-assessments/**",
     ".claude/**",
     ".codex/**",
 ]

@@ -1,0 +1,40 @@
+schema_version = 1
+enabled = false
+mode = "planning_only"
+runtime_launch_allowed = false
+credential_access_allowed = false
+dispatcher_replacement_allowed = false
+
+[defaults]
+artifact_retention_days = 30
+required_review_status = "VERIFIED"
+root_boundary = "E:/GT-KB"
+
+[[providers]]
+name = "modal"
+enabled = false
+credential_source = "future_owner_approval"
+required_artifacts = ["stdout", "stderr", "exit_code", "bridge_report"]
+capabilities = ["ephemeral_compute", "artifact_collection", "timeout_enforcement"]
+
+[[providers]]
+name = "daytona"
+enabled = false
+credential_source = "future_owner_approval"
+required_artifacts = ["stdout", "stderr", "exit_code", "workspace_snapshot"]
+capabilities = ["disposable_workspace", "git_checkout", "artifact_collection"]
+
+[[approval_gates]]
+name = "provider_selection"
+required_before = "runtime_integration"
+owner_decision_required = true
+
+[[approval_gates]]
+name = "credential_use"
+required_before = "credential_access"
+owner_decision_required = true
+
+[[approval_gates]]
+name = "dispatcher_activation"
+required_before = "dispatch_route_enablement"
+owner_decision_required = true

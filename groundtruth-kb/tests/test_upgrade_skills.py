@@ -14,8 +14,8 @@ from pathlib import Path
 from groundtruth_kb import __version__
 from groundtruth_kb.project.upgrade import execute_upgrade, plan_upgrade
 
-_SKILL_MD = ".claude/skills/decision-capture/SKILL.md"
-_SKILL_HELPER = ".claude/skills/decision-capture/helpers/record_decision.py"
+_SKILL_MD = ".claude/skills/gtkb-decision-capture/SKILL.md"
+_SKILL_HELPER = ".claude/skills/gtkb-decision-capture/helpers/record_decision.py"
 
 
 def _write_minimal_toml(target: Path, profile: str, version: str) -> None:
@@ -116,8 +116,8 @@ def _write_skill_files(target: Path, *, customized: bool) -> None:
     from groundtruth_kb import get_templates_dir
 
     templates = get_templates_dir()
-    skill_src = templates / "skills" / "decision-capture" / "SKILL.md"
-    helper_src = templates / "skills" / "decision-capture" / "helpers" / "record_decision.py"
+    skill_src = templates / "skills" / "gtkb-decision-capture" / "SKILL.md"
+    helper_src = templates / "skills" / "gtkb-decision-capture" / "helpers" / "record_decision.py"
 
     skill_dst = target / _SKILL_MD
     helper_dst = target / _SKILL_HELPER
@@ -165,7 +165,7 @@ def test_execute_upgrade_applies_customized_skill_with_force(tmp_path: Path) -> 
     # Hash comparison avoids newline-translation false negatives on
     # Windows. execute_upgrade uses shutil.copy2 which preserves bytes.
     templates = get_templates_dir()
-    template_bytes = (templates / "skills" / "decision-capture" / "SKILL.md").read_bytes()
+    template_bytes = (templates / "skills" / "gtkb-decision-capture" / "SKILL.md").read_bytes()
     assert hashlib.sha256(skill_path.read_bytes()).hexdigest() == hashlib.sha256(template_bytes).hexdigest()
 
 
@@ -197,8 +197,8 @@ def test_base_profile_no_skill_actions(tmp_path: Path) -> None:
 # Bridge-propose skill — unconditional missing-file repair at current version.
 # ---------------------------------------------------------------------------
 
-_BRIDGE_PROPOSE_SKILL_MD = ".claude/skills/bridge-propose/SKILL.md"
-_BRIDGE_PROPOSE_HELPER = ".claude/skills/bridge-propose/helpers/write_bridge.py"
+_BRIDGE_PROPOSE_SKILL_MD = ".claude/skills/gtkb-bridge-propose/SKILL.md"
+_BRIDGE_PROPOSE_HELPER = ".claude/skills/gtkb-bridge-propose/helpers/write_bridge.py"
 
 
 def test_plan_upgrade_adds_missing_bridge_propose_skill_at_same_version(tmp_path: Path) -> None:
@@ -219,8 +219,8 @@ def test_plan_upgrade_adds_missing_bridge_propose_skill_at_same_version(tmp_path
 # Spec-intake skill — unconditional missing-file repair at current version.
 # ---------------------------------------------------------------------------
 
-_SPEC_INTAKE_SKILL_MD = ".claude/skills/spec-intake/SKILL.md"
-_SPEC_INTAKE_HELPER = ".claude/skills/spec-intake/helpers/spec_intake.py"
+_SPEC_INTAKE_SKILL_MD = ".claude/skills/gtkb-spec-intake/SKILL.md"
+_SPEC_INTAKE_HELPER = ".claude/skills/gtkb-spec-intake/helpers/spec_intake.py"
 
 
 def test_plan_upgrade_adds_missing_spec_intake_skill_at_same_version(tmp_path: Path) -> None:
@@ -267,11 +267,11 @@ def test_execute_creates_missing_spec_intake_files_at_same_version(tmp_path: Pat
 # ---------------------------------------------------------------------------
 
 _BRIDGE_SKILL_FILES = {
-    ".claude/skills/bridge/SKILL.md",
-    ".claude/skills/bridge/helpers/scan_bridge.py",
-    ".claude/skills/bridge/helpers/revise_bridge.py",
-    ".claude/skills/bridge/helpers/impl_report_bridge.py",
-    ".claude/skills/bridge/helpers/show_thread_bridge.py",
+    ".claude/skills/gtkb-bridge/SKILL.md",
+    ".claude/skills/gtkb-bridge/helpers/scan_bridge.py",
+    ".claude/skills/gtkb-bridge/helpers/revise_bridge.py",
+    ".claude/skills/gtkb-bridge/helpers/impl_report_bridge.py",
+    ".claude/skills/gtkb-bridge/helpers/show_thread_bridge.py",
 }
 
 
@@ -295,11 +295,13 @@ def test_execute_creates_missing_bridge_skill_files_at_same_version(tmp_path: Pa
         path = tmp_path / rel_path
         assert path.exists(), f"{rel_path} should be copied by execute_upgrade"
         assert path.read_text(encoding="utf-8").strip(), f"{rel_path} is empty"
-    assert "def scan" in (tmp_path / ".claude/skills/bridge/helpers/scan_bridge.py").read_text(encoding="utf-8")
-    assert "def file_revision" in (tmp_path / ".claude/skills/bridge/helpers/revise_bridge.py").read_text(
+    assert "def scan" in (tmp_path / ".claude/skills/gtkb-bridge/helpers/scan_bridge.py").read_text(encoding="utf-8")
+    assert "def file_revision" in (tmp_path / ".claude/skills/gtkb-bridge/helpers/revise_bridge.py").read_text(
         encoding="utf-8"
     )
-    assert "def file_report" in (tmp_path / ".claude/skills/bridge/helpers/impl_report_bridge.py").read_text(
+    assert "def file_report" in (tmp_path / ".claude/skills/gtkb-bridge/helpers/impl_report_bridge.py").read_text(
         encoding="utf-8"
     )
-    assert "def show" in (tmp_path / ".claude/skills/bridge/helpers/show_thread_bridge.py").read_text(encoding="utf-8")
+    assert "def show" in (tmp_path / ".claude/skills/gtkb-bridge/helpers/show_thread_bridge.py").read_text(
+        encoding="utf-8"
+    )

@@ -1,0 +1,151 @@
+schema_version = 1
+roadmap_id = "GTKB-COMMAND-SURFACE"
+source_bridge = "bridge/gtkb-command-surface-003.md"
+verified_architecture_bridge = "bridge/gtkb-command-surface-006.md"
+project = "PROJECT-HARNESS-PARITY-PHASE-2"
+work_item = "WI-4754"
+project_authorization = "PAUTH-PROJECT-HARNESS-PARITY-PHASE-2-IMPLEMENTATION-2026-06-29"
+
+[[slices]]
+id = "CS-2"
+title = ":: dispatcher hook, registry, suppression contract"
+disposition = "defer"
+child_slice = "GTKB-COMMAND-SURFACE-CS-2-DISPATCHER-HOOK"
+rationale = "The corrected architecture is implementable, but a broad UserPromptSubmit command dispatcher would now overlap the shipped init-keyword and activity-envelope routing surfaces. Keep it as a future child slice only after a fresh owner decision confirms the generic dispatcher is still desirable."
+harness_parity_disposition = "Future work must prove Claude hook ordering, Codex fallback semantics, and Cursor/other harness non-hook behavior explicitly instead of assuming a shared native hook model."
+required_target_paths = [
+  ".claude/commands/registry.json",
+  ".claude/hooks/command-dispatcher.py",
+  ".claude/hooks/spec-classifier.py",
+  ".claude/hooks/owner-decision-tracker.py",
+  ".claude/settings.json",
+  ".groundtruth/session/command-audit/",
+  "platform_tests/hooks/test_command_surface_dispatcher.py",
+]
+required_specs = [
+  "GOV-FILE-BRIDGE-AUTHORITY-001",
+  "DCL-CROSS-HARNESS-ENFORCEMENT-001",
+  "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001",
+]
+pauth_needed = true
+bridge_proposal_needed = true
+
+[[slices]]
+id = "CS-2.5"
+title = "Session wrap clears command-audit state"
+disposition = "supersede"
+child_slice = ""
+rationale = "The original cleanup concern is covered by the later wrap scanner/session artifact work and by treating command-audit as session-local runtime evidence. No standalone CS-2.5 implementation should proceed unless CS-2 itself is re-approved."
+harness_parity_disposition = "No harness-specific command runtime remains to equalize until CS-2 is revived."
+required_target_paths = []
+required_specs = [
+  "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001",
+  "DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001",
+]
+pauth_needed = false
+bridge_proposal_needed = false
+covered_by = [
+  "bridge/gtkb-wrapup-enhancements-slice1-007.md",
+]
+
+[[slices]]
+id = "CS-3"
+title = "First command set"
+disposition = "needs_owner_decision"
+child_slice = "GTKB-COMMAND-SURFACE-CS-3-FIRST-COMMAND-SET"
+rationale = "The first command set mixes commands that are already covered (`::init`, `::wrap`) with optional future intent macros (`::spec`, `::decide`, `::question`, `::bridge`). A future child slice must split covered commands from new macros and get owner confirmation before adding runtime dispatch."
+harness_parity_disposition = "Any new macro must state whether it is a Claude hook command, a Codex prompt convention, a CLI affordance, or a cross-harness rule-only surface."
+required_target_paths = [
+  ".claude/commands/registry.json",
+  ".claude/skills/spec-intake/SKILL.md",
+  ".claude/skills/decision-capture/SKILL.md",
+  ".claude/skills/kb-session-wrap/SKILL.md",
+  ".claude/skills/bridge-propose/SKILL.md",
+  ".claude/skills/proposal-review/SKILL.md",
+  "platform_tests/hooks/test_command_surface_dispatcher.py",
+]
+required_specs = [
+  "SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001",
+  "GOV-FILE-BRIDGE-AUTHORITY-001",
+  "DCL-CROSS-HARNESS-ENFORCEMENT-001",
+]
+pauth_needed = true
+bridge_proposal_needed = true
+covered_behaviors = [
+  "::init - covered by the current init-keyword startup contract; do not re-implement through a generic dispatcher.",
+  "::wrap - covered by kb-session-wrap and wrap-scan surfaces; keep a macro as optional future syntax only.",
+]
+owner_decision_needed = "Confirm whether ::spec, ::decide, ::question, and ::bridge remain desirable as runtime macros after current skill, AUQ, and bridge helper workflows."
+
+[[slices]]
+id = "CS-4"
+title = "Dashboard cross-surface affordance"
+disposition = "defer"
+child_slice = "GTKB-COMMAND-SURFACE-CS-4-DASHBOARD-AFFORDANCE"
+rationale = "Dashboard affordances remain potentially useful, but they should follow a fresh dashboard/product proposal after the command registry and runtime command model are confirmed."
+harness_parity_disposition = "Dashboard UX is harness-neutral and should not create harness-specific command behavior."
+required_target_paths = [
+  "docs/gtkb-dashboard/",
+  "config/agent-control/command-surface.toml",
+  "platform_tests/scripts/test_command_surface_disposition.py",
+]
+required_specs = [
+  "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001",
+  "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001",
+]
+pauth_needed = true
+bridge_proposal_needed = true
+
+[[slices]]
+id = "CS-5+"
+title = "Macros and workflow scaffolds"
+disposition = "defer"
+child_slice = "GTKB-COMMAND-SURFACE-CS-5-WORKFLOW-MACROS"
+rationale = "Macro/workflow scaffolds should be driven by observed owner workflows, not by the historical roadmap alone. Keep the category as an owner-discovered future slice."
+harness_parity_disposition = "Every macro must declare whether it is model-instruction-only, hook-routed, CLI-routed, or dashboard-routed before parity claims are made."
+required_target_paths = [
+  ".claude/commands/registry.json",
+  "config/agent-control/command-surface.toml",
+  "platform_tests/hooks/test_command_surface_dispatcher.py",
+]
+required_specs = [
+  "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001",
+  "DCL-CROSS-HARNESS-ENFORCEMENT-001",
+]
+pauth_needed = true
+bridge_proposal_needed = true
+
+[[slices]]
+id = "CS-6"
+title = "Codex parity"
+disposition = "supersede"
+child_slice = ""
+rationale = "Codex command parity is now governed by the broader Harness Parity Phase 2 surfaces. Do not revive a standalone CS-6 unless a future command dispatcher lands and creates a new Codex-specific gap."
+harness_parity_disposition = "Covered by Harness Parity Phase 2 typed parity checks and waiver mechanics; no separate command-surface parity slice is currently needed."
+required_target_paths = []
+required_specs = [
+  "ADR-CROSS-HARNESS-PARITY-001",
+  "DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001",
+]
+pauth_needed = false
+bridge_proposal_needed = false
+covered_by = [
+  "PROJECT-HARNESS-PARITY-PHASE-2",
+  "scripts/harness_parity_phase2.py",
+]
+
+[[slices]]
+id = "CS-7"
+title = "Local-command audit and disposition"
+disposition = "retire"
+child_slice = ""
+rationale = "The six local `.claude/commands/*.md` files are developer-local conveniences, not a GT-KB product surface. Retire this roadmap slice as live implementation work unless the owner later chooses to productize a specific local command."
+harness_parity_disposition = "Local slash commands are intentionally outside the tracked cross-harness product surface; they should not create release parity obligations."
+required_target_paths = []
+required_specs = [
+  "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001",
+  "DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001",
+]
+pauth_needed = false
+bridge_proposal_needed = false
+

@@ -85,6 +85,34 @@ def test_auto_mode_requires_owner_activated_scope() -> None:
     assert validate_packet(packet).is_valid is True
 
 
+def test_gap_state_capture_requires_context_and_intended_operation() -> None:
+    packet = construct_approval_packet(
+        artifact_type="deliberation",
+        artifact_id="DELIB-9002",
+        action="create",
+        source_ref="bridge:gap-state",
+        full_content="Owner-approved gap-state deliberation content.",
+        approval_mode="approve",
+        presented_to_user=True,
+        transcript_captured=True,
+        explicit_change_request="AUQ S999: approve gap-state capture.",
+        approved_by="owner",
+        changed_by="test",
+        change_reason="gap-state formal artifact capture",
+        capture_context="gap_state",
+        gap_state_bridge_id="gtkb-gap-state-example",
+        gap_state_reason="requirement sufficiency gap-state proposal needs formal artifact capture",
+        intended_db_operation={"method": "insert_deliberation", "source_ref": "bridge:gap-state"},
+    )
+
+    assert validate_packet(packet).is_valid is True
+
+    packet.pop("intended_db_operation")
+    result = validate_packet(packet)
+    assert result.is_valid is False
+    assert "intended_db_operation" in result.errors[0]
+
+
 def test_expired_packet_fails() -> None:
     packet = _packet()
     packet["expires_at"] = (datetime.now(UTC) - timedelta(days=1)).isoformat()

@@ -12,14 +12,39 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ID = "PROJECT-HARNESS-PARITY-PHASE-2"
-WORK_ITEM_ID = "WI-4900"
+WORK_ITEM_ID = "WI-4899"
+EVALUATOR_WORK_ITEM_ID = "WI-4900"
+WAIVER_REGISTRY_WORK_ITEM_ID = "WI-4901"
 PROJECT_AUTHORIZATION = "PAUTH-PROJECT-HARNESS-PARITY-PHASE-2-IMPLEMENTATION-2026-06-29"
-BRIDGE_ID = "gtkb-harness-parity-phase-2-baseline-evaluator"
+BRIDGE_ID = "gtkb-harness-parity-phase-2-codex-baseline-matrix"
+WAIVER_REGISTRY_BRIDGE_ID = "gtkb-wi4901-phase2-waiver-registry"
 
 DEFAULT_WAIVER_PATH = Path("config") / "harness-parity" / "phase2-waivers.toml"
 HARNESS_REGISTRY_PATH = Path("harness-state") / "harness-registry.json"
 CAPABILITY_REGISTRY_PATH = Path("config") / "agent-control" / "harness-capability-registry.toml"
 DISPATCHER_RULES_PATH = Path("config") / "dispatcher" / "rules.toml"
+
+NO_WINDOW_EVIDENCE_PATHS_BY_HARNESS = {
+    "antigravity": ("scripts/dispatcher_runtime.py",),
+    "claude": ("scripts/dispatcher_runtime.py",),
+    "codex": (
+        "scripts/dispatcher_runtime.py",
+        ".codex/hooks.json",
+        ".codex/gtkb-hooks/run_cmd_no_window.py",
+    ),
+    "cursor": ("scripts/cursor_harness.py",),
+    "ollama": ("scripts/ollama_harness.py",),
+    "openrouter": ("scripts/openrouter_harness.py", "scripts/dispatcher_runtime.py"),
+    "alibaba-cloud-studio": ("scripts/alibaba_cloud_studio_harness.py", "scripts/dispatcher_runtime.py"),
+}
+NO_WINDOW_EVIDENCE_TOKENS = (
+    "create_no_window",
+    "run_cmd_no_window",
+    "windowstyle hidden",
+    "windowstyle",
+    "no-window",
+    "no_window",
+)
 
 GAP_STATES = {"needs_adapter", "blocked", "impossible"}
 FAILURE_STATES = GAP_STATES | {"invalid_waiver"}
@@ -29,6 +54,8 @@ WAIVER_REASON_CLASSES = {
     "deliberate_deferral",
     "owner_accepted_risk",
 }
+WAIVER_STATUSES = {"active", "retired"}
+WAIVER_EVALUATOR_BEHAVIORS = {"waive"}
 
 
 @dataclass(frozen=True)
@@ -215,9 +242,41 @@ def _load_waivers(root: Path, waiver_path: Path) -> tuple[list[dict[str, Any]], 
         ]
 
     raw_waivers = data.get("waivers", [])
-    waivers = [item for item in raw_waivers if isinstance(item, dict)] if isinstance(raw_waivers, list) else []
+    if raw_waivers is None:
+        raw_waivers = []
+    if not isinstance(raw_waivers, list):
+        return [], [
+            Cell(
+                harness="*",
+                harness_id="*",
+                dimension="waiver_registry",
+                title="Typed waiver registry",
+                status="invalid_waiver",
+                release_blocking=True,
+                evidence=[_rel(root, full_path)],
+                details="Typed waiver registry field 'waivers' must be an array of tables.",
+            )
+        ]
+
+    waivers = [item for item in raw_waivers if isinstance(item, dict)]
     validation_cells: list[Cell] = []
-    for index, waiver in enumerate(waivers):
+    for index, raw_waiver in enumerate(raw_waivers):
+        if not isinstance(raw_waiver, dict):
+            validation_cells.append(
+                Cell(
+                    harness="*",
+                    harness_id="*",
+                    dimension="waiver_registry",
+                    title="Typed waiver registry",
+                    status="invalid_waiver",
+                    release_blocking=True,
+                    evidence=[f"{_rel(root, full_path)}::waivers[{index}]"],
+                    details="Waiver record must be a TOML table.",
+                    waiver_id=f"waiver[{index}]",
+                )
+            )
+            continue
+        waiver = raw_waiver
         errors = validate_waiver(waiver)
         if errors:
             validation_cells.append(
@@ -238,23 +297,47 @@ def _load_waivers(root: Path, waiver_path: Path) -> tuple[list[dict[str, Any]], 
 
 def validate_waiver(waiver: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    required = ("id", "harness", "dimension", "reason_class", "rationale", "owner_decision", "evidence")
+    required = (
+        "id",
+        "harness",
+        "dimension",
+        "reason_class",
+        "rationale",
+        "owner_decision",
+        "evidence",
+        "evaluator_behavior",
+        "status",
+    )
     for field in required:
         if not str(waiver.get(field) or "").strip():
             errors.append(f"missing required field {field!r}")
+    dimension = str(waiver.get("dimension") or "").strip()
+    valid_dimensions = {dimension.id for dimension in DIMENSIONS} | {"*"}
+    if dimension and dimension not in valid_dimensions:
+        errors.append(f"invalid dimension {dimension!r}")
     reason_class = str(waiver.get("reason_class") or "").strip()
     if reason_class and reason_class not in WAIVER_REASON_CLASSES:
         errors.append(f"invalid reason_class {reason_class!r}")
+    behavior = str(waiver.get("evaluator_behavior") or "").strip()
+    if behavior and behavior not in WAIVER_EVALUATOR_BEHAVIORS:
+        errors.append(f"invalid evaluator_behavior {behavior!r}")
     if not (str(waiver.get("review_trigger") or "").strip() or str(waiver.get("expires") or "").strip()):
         errors.append("missing review_trigger or expires")
-    if str(waiver.get("status") or "active").strip() not in {"active", "retired"}:
+    owner_decision = str(waiver.get("owner_decision") or "").strip()
+    if owner_decision and not owner_decision.startswith(
+        ("DELIB-", "bridge/", ".groundtruth/formal-artifact-approvals/")
+    ):
+        errors.append("owner_decision must cite a governed decision, bridge artifact, or approval packet")
+    if str(waiver.get("status") or "").strip() not in WAIVER_STATUSES:
         errors.append("status must be active or retired")
     return errors
 
 
 def _find_waiver(waivers: list[dict[str, Any]], harness: str, dimension: str) -> dict[str, Any] | None:
     for waiver in waivers:
-        if str(waiver.get("status") or "active").strip() != "active":
+        if validate_waiver(waiver):
+            continue
+        if str(waiver.get("status") or "").strip() != "active":
             continue
         waiver_harness = str(waiver.get("harness") or "").strip()
         waiver_dimension = str(waiver.get("dimension") or "").strip()
@@ -351,6 +434,7 @@ def _hook_projection_status(root: Path, harness: dict[str, Any]) -> tuple[str, l
         "antigravity": [".agent"],
         "ollama": ["scripts/ollama_harness.py"],
         "openrouter": ["scripts/openrouter_harness.py"],
+        "alibaba-cloud-studio": ["scripts/alibaba_cloud_studio_harness.py"],
     }.get(name, [])
     existing = [path for path in surfaces if _exists(root, path)]
     if existing:
@@ -361,12 +445,13 @@ def _hook_projection_status(root: Path, harness: dict[str, Any]) -> tuple[str, l
 def _bridge_write_path_status(root: Path, harness: dict[str, Any]) -> tuple[str, list[str], str]:
     name = str(harness.get("harness_name") or "")
     surfaces = {
-        "claude": [".claude/skills/bridge/helpers", ".claude/skills/verify/helpers"],
-        "codex": [".codex/skills/bridge/helpers", ".codex/skills/verify/helpers"],
-        "cursor": [".cursor/skills/bridge/helpers"],
-        "antigravity": [".agent/skills/bridge"],
-        "ollama": ["scripts/ollama_harness.py", ".api-harness/skills/bridge"],
-        "openrouter": ["scripts/openrouter_harness.py", ".api-harness/skills/bridge"],
+        "claude": [".claude/skills/gtkb-bridge/helpers", ".claude/skills/gtkb-verify/helpers"],
+        "codex": [".codex/skills/gtkb-bridge/helpers", ".codex/skills/gtkb-verify/helpers"],
+        "cursor": [".cursor/skills/gtkb-bridge/helpers"],
+        "antigravity": [".agent/skills/gtkb-bridge"],
+        "ollama": ["scripts/ollama_harness.py", ".api-harness/skills/gtkb-bridge"],
+        "openrouter": ["scripts/openrouter_harness.py", ".api-harness/skills/gtkb-bridge"],
+        "alibaba-cloud-studio": ["scripts/alibaba_cloud_studio_harness.py", ".api-harness/skills/gtkb-bridge"],
     }.get(name, [])
     existing = [path for path in surfaces if _exists(root, path)]
     if existing:
@@ -376,9 +461,10 @@ def _bridge_write_path_status(root: Path, harness: dict[str, Any]) -> tuple[str,
 
 def _readiness_probe_status(root: Path, harness: dict[str, Any]) -> tuple[str, list[str], str]:
     name = str(harness.get("harness_name") or "")
+    script_name = name.replace("-", "_")
     candidates = [
         f"scripts/verify_{name}_dispatch.py",
-        f"scripts/{name}_harness.py",
+        f"scripts/{script_name}_harness.py",
         f"scripts/check_{name}_harness.py",
     ]
     existing = [path for path in candidates if _exists(root, path)]
@@ -390,7 +476,7 @@ def _readiness_probe_status(root: Path, harness: dict[str, Any]) -> tuple[str, l
 def _provider_settings_status(harness: dict[str, Any], cap_registry: dict[str, Any]) -> tuple[str, list[str], str]:
     name = str(harness.get("harness_name") or "")
     floor = _harness_config(cap_registry, name)
-    provider_backed = name in {"ollama", "openrouter", "cursor"}
+    provider_backed = name in {"ollama", "openrouter", "alibaba-cloud-studio", "cursor"}
     if not provider_backed:
         return "supported", ["harness-state/harness-registry.json"], "Harness is not provider-shim scoped."
     fields = ("routing_schema_version", "skill_adapter_manifest", "skill_adapter_generation_supported")
@@ -408,7 +494,19 @@ def _provider_settings_status(harness: dict[str, Any], cap_registry: dict[str, A
     )
 
 
-def _no_window_status(harness: dict[str, Any]) -> tuple[str, list[str], str]:
+def _has_no_window_evidence(root: Path, rel_path: str) -> bool:
+    path = root / rel_path
+    if not path.is_file():
+        return False
+    try:
+        text = path.read_text(encoding="utf-8", errors="ignore").lower()
+    except OSError:
+        return False
+    return any(token in text for token in NO_WINDOW_EVIDENCE_TOKENS)
+
+
+def _no_window_status(root: Path, harness: dict[str, Any]) -> tuple[str, list[str], str]:
+    name = str(harness.get("harness_name") or "")
     invocation = harness.get("invocation_surfaces", {})
     headless = invocation.get("headless", {}) if isinstance(invocation, dict) else {}
     argv = headless.get("argv", []) if isinstance(headless, dict) else []
@@ -418,6 +516,17 @@ def _no_window_status(harness: dict[str, Any]) -> tuple[str, list[str], str]:
     joined = " ".join(str(part).lower() for part in argv)
     if any(token in joined for token in ("hidden", "nowindow", "no-window", "windowstyle")):
         return "supported", evidence, "Invocation explicitly carries no-window evidence."
+    wrapper_evidence = [
+        rel_path
+        for rel_path in NO_WINDOW_EVIDENCE_PATHS_BY_HARNESS.get(name, ())
+        if _has_no_window_evidence(root, rel_path)
+    ]
+    if wrapper_evidence:
+        return (
+            "supported",
+            [*evidence, *wrapper_evidence],
+            "Harness dispatch wrapper carries explicit Windows no-window evidence.",
+        )
     if str(harness.get("harness_type") or "") in {"codex", "claude"}:
         return "needs_adapter", evidence, "Native CLI invocation lacks explicit no-window evidence."
     return "needs_adapter", evidence, "Provider/adapter invocation lacks explicit no-window evidence."
@@ -432,7 +541,9 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
     required_roles = _role_tags(dispatcher_rules)
 
     cells: list[Cell] = [*waiver_validation]
-    harnesses = [h for h in harness_doc.get("harnesses", []) if isinstance(h, dict)]
+    registry_harnesses = [h for h in harness_doc.get("harnesses", []) if isinstance(h, dict)]
+    harnesses = [h for h in registry_harnesses if h.get("status") == "active"]
+    excluded_harnesses = [h for h in registry_harnesses if h.get("status") != "active"]
     for harness in harnesses:
         name = str(harness.get("harness_name") or "")
         status = str(harness.get("status") or "")
@@ -458,15 +569,19 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
                 "Headless argv is declared." if headless_argv else "No headless argv is declared.",
             )
         )
-        can_receive = bool(harness.get("can_receive_dispatch"))
-        receive_status = "supported" if can_receive else ("needs_adapter" if status == "active" else "blocked")
+        currently_eligible = bool(harness.get("can_receive_dispatch"))
+        receive_capable = bool(headless_argv and set(roles).intersection(required_roles))
+        receive_status = "supported" if receive_capable else "needs_adapter"
         cells.append(
             _cell(
                 harness,
                 "dispatcher_receive",
                 receive_status,
                 [_rel(root, root / DISPATCHER_RULES_PATH), _rel(root, root / HARNESS_REGISTRY_PATH)],
-                f"can_receive_dispatch={can_receive}; dispatcher required roles={sorted(required_roles)}",
+                (
+                    f"receive_capable={receive_capable}; current_eligibility={currently_eligible}; "
+                    f"dispatcher required roles={sorted(required_roles)}"
+                ),
             )
         )
         can_fire = bool(harness.get("can_fire_events"))
@@ -474,7 +589,7 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
             _cell(
                 harness,
                 "event_source",
-                "supported" if can_fire else ("needs_adapter" if status == "active" else "blocked"),
+                "supported" if can_fire else "needs_adapter",
                 [_rel(root, root / HARNESS_REGISTRY_PATH)],
                 f"can_fire_events={can_fire}",
             )
@@ -486,7 +601,7 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
             ("bridge_write_path", *_bridge_write_path_status(root, harness)),
             ("readiness_probe", *_readiness_probe_status(root, harness)),
             ("provider_settings", *_provider_settings_status(harness, capability_registry)),
-            ("no_window_launch", *_no_window_status(harness)),
+            ("no_window_launch", *_no_window_status(root, harness)),
         ):
             cells.append(_cell(harness, dim_id, status_value, evidence, details))
 
@@ -501,8 +616,11 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
         "metadata": {
             "project_id": PROJECT_ID,
             "work_item_id": WORK_ITEM_ID,
+            "evaluator_work_item_id": EVALUATOR_WORK_ITEM_ID,
+            "waiver_registry_work_item_id": WAIVER_REGISTRY_WORK_ITEM_ID,
             "project_authorization": PROJECT_AUTHORIZATION,
             "bridge_id": BRIDGE_ID,
+            "waiver_registry_bridge_id": WAIVER_REGISTRY_BRIDGE_ID,
             "project_root": str(root),
             "waiver_path": _rel(root, waiver_path if waiver_path.is_absolute() else root / waiver_path),
             "read_only": True,
@@ -511,10 +629,24 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
         "counts": dict(sorted(counts.items())),
         "summary": {
             "harness_count": len(harnesses),
+            "registry_harness_count": len(registry_harnesses),
+            "evaluated_harness_count": len(harnesses),
+            "excluded_harness_count": len(excluded_harnesses),
             "cell_count": len(cells),
             "unwaived_gap_count": len(unwaived_gaps),
             "unwaived_release_blocking_gap_count": len(unwaived_release_gaps),
             "waiver_count": len(waivers),
+            "active_waiver_count": sum(
+                1
+                for waiver in waivers
+                if not validate_waiver(waiver) and str(waiver.get("status") or "").strip() == "active"
+            ),
+            "retired_waiver_count": sum(
+                1
+                for waiver in waivers
+                if not validate_waiver(waiver) and str(waiver.get("status") or "").strip() == "retired"
+            ),
+            "invalid_waiver_count": len(waiver_validation),
         },
         "harnesses": [
             {
@@ -525,6 +657,16 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
                 "role": harness.get("role") or [],
             }
             for harness in harnesses
+        ],
+        "excluded_harnesses": [
+            {
+                "id": harness.get("id"),
+                "name": harness.get("harness_name"),
+                "type": harness.get("harness_type"),
+                "status": harness.get("status"),
+                "role": harness.get("role") or [],
+            }
+            for harness in excluded_harnesses
         ],
         "cells": [asdict(cell) for cell in sorted(cells, key=lambda c: (c.harness, c.dimension))],
         "candidate_work_items": [asdict(candidate) for candidate in build_candidate_work_items(cells)],
@@ -566,32 +708,82 @@ def build_candidate_work_items(cells: list[Cell]) -> list[CandidateWorkItem]:
 
 def format_markdown(report: dict[str, Any], *, include_supported: bool = False) -> str:
     metadata = report["metadata"]
+    candidate_by_cell = {
+        (candidate["harness"], candidate["dimension"]): candidate
+        for candidate in report.get("candidate_work_items", [])
+    }
     lines = [
-        "# Harness Parity Phase 2 Baseline",
+        "# Harness Parity Phase 2 Codex Baseline Matrix",
         "",
         f"- Overall status: {report['overall_status']}",
         f"- Project: {metadata['project_id']}",
         f"- Work item: {metadata['work_item_id']}",
+        f"- Evaluator source work item: {metadata['evaluator_work_item_id']}",
+        f"- Waiver registry work item: {metadata['waiver_registry_work_item_id']}",
         f"- Project authorization: {metadata['project_authorization']}",
         f"- Bridge: {metadata['bridge_id']}",
+        f"- Waiver registry bridge: {metadata['waiver_registry_bridge_id']}",
         f"- Counts: {', '.join(f'{key}: {value}' for key, value in report['counts'].items()) or 'none'}",
+        (
+            "- Harness population: "
+            f"registry={report['summary']['registry_harness_count']}, "
+            f"evaluated={report['summary']['evaluated_harness_count']}, "
+            f"excluded={report['summary']['excluded_harness_count']}"
+        ),
+        (
+            "- Waivers: "
+            f"active={report['summary']['active_waiver_count']}, "
+            f"retired={report['summary']['retired_waiver_count']}, "
+            f"invalid={report['summary']['invalid_waiver_count']}"
+        ),
         "",
-        "## Findings",
+        "## Excluded Harnesses",
         "",
-        "| Harness | Dimension | State | Release Blocking | Evidence | Details |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| ID | Name | Lifecycle Status | Roles |",
+        "| --- | --- | --- | --- |",
     ]
+    excluded_harnesses = report.get("excluded_harnesses", [])
+    if excluded_harnesses:
+        for harness in excluded_harnesses:
+            lifecycle_status = harness.get("status")
+            status_display = "<missing>" if lifecycle_status is None else str(lifecycle_status)
+            roles = ", ".join(str(role) for role in harness.get("role", [])) or "none"
+            status_display = status_display.replace("|", "\\|")
+            roles = roles.replace("|", "\\|")
+            lines.append(
+                f"| {harness.get('id') or '<missing>'} | {harness.get('name') or '<missing>'} | "
+                f"{status_display} | {roles} |"
+            )
+    else:
+        lines.append("| none | none | none | none |")
+
+    lines.extend(
+        [
+            "",
+            "## Findings",
+            "",
+            "| Harness | Dimension | State | Release Blocking | Evidence | Disposition | Details |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
+        ]
+    )
     rows = report["cells"] if include_supported else [cell for cell in report["cells"] if cell["status"] != "supported"]
     if rows:
         for cell in rows:
             evidence = "<br>".join(cell["evidence"])
             details = str(cell["details"]).replace("|", "\\|")
+            if cell.get("waiver_id"):
+                disposition = f"Waiver: {cell['waiver_id']}"
+            elif cell["status"] in FAILURE_STATES:
+                candidate = candidate_by_cell.get((cell["harness"], cell["dimension"]))
+                disposition = f"Candidate: {candidate['title']}" if candidate else "Registry correction required"
+            else:
+                disposition = "Supported"
             lines.append(
                 f"| {cell['harness']} | {cell['title']} | {cell['status']} | "
-                f"{cell['release_blocking']} | {evidence} | {details} |"
+                f"{cell['release_blocking']} | {evidence} | {disposition} | {details} |"
             )
     else:
-        lines.append("| all | all | supported | False | n/a | No unwaived gaps found. |")
+        lines.append("| all | all | supported | False | n/a | Supported | No unwaived gaps found. |")
 
     candidates = report.get("candidate_work_items", [])
     if candidates:

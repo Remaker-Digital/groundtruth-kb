@@ -6,7 +6,7 @@ validate first, then an atomic append-only write whose
 ``changed_by`` / ``changed_at`` / ``change_reason`` columns are the audit
 trail. This module is that discipline for the ``harnesses``-table verbs
 (``register`` / ``activate`` / ``suspend`` / ``resume`` / ``retire`` /
-``set-precedence``).
+``set-precedence`` / ``set-invocation-surface``).
 
 It is pure DB logic: it imports only the standard library and
 ``groundtruth_kb.harness_lifecycle`` (the WI-3339 FSM), opens no file, and
@@ -54,7 +54,7 @@ _STATUS_VERB_HINT: dict[str, str] = {
     harness_lifecycle.STATUS_REGISTERED: ("use 'gt harness activate' to bring a registered harness into service"),
     harness_lifecycle.STATUS_ACTIVE: ("use 'gt harness suspend' to suspend an active harness"),
     harness_lifecycle.STATUS_SUSPENDED: ("use 'gt harness resume' to return a suspended harness to service"),
-    harness_lifecycle.STATUS_RETIRED: ("'retired' is terminal; the harness has no further transitions"),
+    harness_lifecycle.STATUS_RETIRED: ("use 'gt harness unretire' to return a retired harness to registered status"),
 }
 
 # FR1 content fields carried forward verbatim when appending a new harness
@@ -496,3 +496,168 @@ def set_harness_precedence(
         change_reason=change_reason,
         reviewer_precedence=reviewer_precedence,
     )
+
+
+def set_invocation_surface(
+    db: Any,
+    harness_id: str,
+    surface_name: str,
+    surface_value: Any,
+    *,
+    changed_by: str,
+    change_reason: str,
+) -> dict[str, Any]:
+    """Replace one named invocation surface on an existing harness.
+
+    The operation appends a new harness version, preserving lifecycle status,
+    role metadata, precedence, type/name, and capabilities reference. It is the
+    narrow mutation path for headless argv changes: callers update only the
+    requested ``invocation_surfaces`` entry instead of rewriting the whole
+    harness record ad hoc.
+    """
+    surface_key = surface_name.strip()
+    if not surface_key:
+        raise HarnessOperationError("invocation surface name must be non-empty")
+    current = db.get_harness(harness_id)
+    if current is None:
+        raise HarnessOperationError(f"unknown harness {harness_id!r}; no such harness in the registry")
+    surfaces = _decode_json_field(current.get("invocation_surfaces"))
+    if surfaces is None:
+        surfaces = {}
+    if not isinstance(surfaces, dict):
+        raise HarnessOperationError(
+            f"harness {harness_id!r} invocation_surfaces must be a JSON object before updating {surface_key!r}"
+        )
+    updated = dict(surfaces)
+    updated[surface_key] = surface_value
+    return _append_version(
+        db,
+        current,
+        changed_by=changed_by,
+        change_reason=change_reason,
+        invocation_surfaces=updated,
+    )
+
+
+def set_dispatch_metadata(
+    db: Any,
+    harness_id: str,
+    *,
+    can_receive_dispatch: bool | None = None,
+    can_fire_events: bool | None = None,
+    dispatch_quality: float | None = None,
+    dispatch_cost: float | None = None,
+    dispatch_availability: float | None = None,
+    reviewer_precedence: int | None = None,
+    dispatch_max_items: int | None = None,
+    dispatch_tags: list[str] | tuple[str, ...] | None = None,
+    changed_by: str,
+    change_reason: str,
+) -> dict[str, Any]:
+    """Append a harness version with updated canonical dispatch metadata.
+
+    WI-5012 makes the harness registry/MemBase the authoritative home for
+    dispatchability and ranking fields. The fields are stored under the existing
+    ``invocation_surfaces.dispatch`` object to avoid a schema migration while
+    preserving the append-only harness version discipline.
+    """
+    current = db.get_harness(harness_id)
+    if current is None:
+        raise HarnessOperationError(f"unknown harness {harness_id!r}; no such harness in the registry")
+    surfaces = _decode_json_field(current.get("invocation_surfaces"))
+    if surfaces is None:
+        surfaces = {}
+    if not isinstance(surfaces, dict):
+        raise HarnessOperationError(f"harness {harness_id!r} invocation_surfaces must be a JSON object")
+    updated_surfaces = dict(surfaces)
+    dispatch = updated_surfaces.get("dispatch")
+    if dispatch is None:
+        dispatch = {}
+    if not isinstance(dispatch, dict):
+        raise HarnessOperationError(f"harness {harness_id!r} invocation_surfaces.dispatch must be a JSON object")
+    updated_dispatch = dict(dispatch)
+
+    changed = False
+    if can_receive_dispatch is not None:
+        updated_dispatch["can_receive_dispatch"] = bool(can_receive_dispatch)
+        changed = True
+    if can_fire_events is not None:
+        updated_dispatch["can_fire_events"] = bool(can_fire_events)
+        updated_dispatch["event_driven_hooks"] = bool(can_fire_events)
+        changed = True
+    for field, value in (
+        ("dispatch_quality", dispatch_quality),
+        ("dispatch_cost", dispatch_cost),
+        ("dispatch_availability", dispatch_availability),
+    ):
+        if value is not None:
+            updated_dispatch[field] = _validate_dispatch_score(field, value)
+            changed = True
+    dispatch_changed = False
+    if dispatch_max_items is not None:
+        updated_dispatch["dispatch_max_items"] = _validate_dispatch_max_items(dispatch_max_items)
+        changed = True
+        dispatch_changed = True
+    if dispatch_tags is not None:
+        updated_dispatch["dispatch_tags"] = _validate_dispatch_tags(dispatch_tags)
+        changed = True
+        dispatch_changed = True
+    if reviewer_precedence is not None:
+        reviewer_precedence = _validate_reviewer_precedence(reviewer_precedence)
+        changed = True
+    if not changed:
+        raise HarnessOperationError("at least one dispatch metadata field must be provided")
+
+    overrides: dict[str, Any] = {}
+    if dispatch_changed or any(
+        value is not None
+        for value in (
+            can_receive_dispatch,
+            can_fire_events,
+            dispatch_quality,
+            dispatch_cost,
+            dispatch_availability,
+        )
+    ):
+        updated_surfaces["dispatch"] = updated_dispatch
+        overrides["invocation_surfaces"] = updated_surfaces
+    if reviewer_precedence is not None:
+        overrides["reviewer_precedence"] = reviewer_precedence
+    return _append_version(db, current, changed_by=changed_by, change_reason=change_reason, **overrides)
+
+
+def _validate_dispatch_score(name: str, value: float) -> float | int:
+    try:
+        score = float(value)
+    except (TypeError, ValueError) as exc:
+        raise HarnessOperationError(f"{name} must be numeric") from exc
+    if score < 0 or score > 100:
+        raise HarnessOperationError(f"{name} must be between 0 and 100")
+    return int(score) if score.is_integer() else score
+
+
+def _validate_dispatch_max_items(value: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise HarnessOperationError("dispatch_max_items must be an integer") from exc
+    if parsed < 1:
+        raise HarnessOperationError("dispatch_max_items must be at least 1")
+    return parsed
+
+
+def _validate_reviewer_precedence(value: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise HarnessOperationError("reviewer_precedence must be an integer") from exc
+    if parsed < 0:
+        raise HarnessOperationError("reviewer_precedence must be non-negative")
+    return parsed
+
+
+def _validate_dispatch_tags(values: list[str] | tuple[str, ...]) -> list[str]:
+    cleaned = sorted({str(value).strip() for value in values if str(value).strip()})
+    if not cleaned:
+        raise HarnessOperationError("dispatch_tags must include at least one value")
+    return cleaned

@@ -1418,7 +1418,7 @@
     {
       "id": 17,
       "type": "row",
-      "title": "GT-KB Install and Setup",
+      "title": "Application Deployment",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -1431,10 +1431,203 @@
     {
       "id": 18,
       "type": "bargauge",
-      "title": "Setup Coverage",
+      "title": "Application Deployment Health",
       "gridPos": {
         "x": 0,
         "y": 30,
+        "w": 8,
+        "h": 6
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT surface AS metric,\n                       CASE lower(status)\n                           WHEN 'red' THEN 2\n                           WHEN 'yellow' THEN 1\n                           ELSE 0\n                       END AS value\n                FROM application_deployment_signals\n                ORDER BY sort_order;",
+          "queryType": "table",
+          "rawQueryText": "SELECT surface AS metric,\n                       CASE lower(status)\n                           WHEN 'red' THEN 2\n                           WHEN 'yellow' THEN 1\n                           ELSE 0\n                       END AS value\n                FROM application_deployment_signals\n                ORDER BY sort_order;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 34,
+        "minVizHeight": 18,
+        "minVizWidth": 8,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short",
+          "max": 2,
+          "min": 0,
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "1": {
+                  "text": "Watch",
+                  "color": "yellow"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "2": {
+                  "text": "Act",
+                  "color": "red"
+                }
+              },
+              "type": "value"
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 19,
+      "type": "table",
+      "title": "Application Deployment Signals",
+      "gridPos": {
+        "x": 8,
+        "y": 30,
+        "w": 16,
+        "h": 6
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT sort_order, surface, signal, mock_value, upper(status) AS status, source_contract\n                FROM application_deployment_signals\n                ORDER BY sort_order;",
+          "queryType": "table",
+          "rawQueryText": "SELECT sort_order, surface, signal, mock_value, upper(status) AS status, source_contract\n                FROM application_deployment_signals\n                ORDER BY sort_order;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "sort_order",
+            "desc": false
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sort_order"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "GT-KB Install and Setup",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 21,
+      "type": "bargauge",
+      "title": "Setup Coverage",
+      "gridPos": {
+        "x": 0,
+        "y": 37,
         "w": 8,
         "h": 6
       },
@@ -1506,12 +1699,12 @@
       }
     },
     {
-      "id": 19,
+      "id": 22,
       "type": "bargauge",
       "title": "Required Tool Categories",
       "gridPos": {
         "x": 8,
-        "y": 30,
+        "y": 37,
         "w": 8,
         "h": 6
       },
@@ -1583,12 +1776,12 @@
       }
     },
     {
-      "id": 20,
+      "id": 23,
       "type": "bargauge",
       "title": "Third-Party Service Categories",
       "gridPos": {
         "x": 16,
-        "y": 30,
+        "y": 37,
         "w": 8,
         "h": 6
       },
@@ -1660,25 +1853,25 @@
       }
     },
     {
-      "id": 21,
+      "id": 24,
       "type": "row",
       "title": "Delivery Timeline",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 36,
+        "y": 43,
         "w": 24,
         "h": 1
       },
       "panels": []
     },
     {
-      "id": 22,
+      "id": 25,
       "type": "bargauge",
       "title": "Delivery Timeline Summary",
       "gridPos": {
         "x": 0,
-        "y": 37,
+        "y": 44,
         "w": 24,
         "h": 7
       },
@@ -1750,25 +1943,615 @@
       }
     },
     {
-      "id": 23,
+      "id": 26,
       "type": "row",
       "title": "Release Readiness",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 44,
+        "y": 51,
         "w": 24,
         "h": 1
       },
       "panels": []
     },
     {
-      "id": 24,
+      "id": 27,
+      "type": "stat",
+      "title": "Release Health Findings",
+      "gridPos": {
+        "x": 0,
+        "y": 52,
+        "w": 8,
+        "h": 4
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT value FROM current_metrics WHERE metric_key = 'release_health_findings';",
+          "queryType": "table",
+          "rawQueryText": "SELECT value FROM current_metrics WHERE metric_key = 'release_health_findings';",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        },
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+          "refId": "F",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "F"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "m"
+              },
+              {
+                "id": "custom.hidden",
+                "value": false
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "description": "Freshness: minutes since the most recent `refresh_runs.completed_at` (falls back to `started_at`). Secondary value `Refreshed (m ago)` comes from target `F`."
+    },
+    {
+      "id": 28,
+      "type": "stat",
+      "title": "Dirty Worktree Paths",
+      "gridPos": {
+        "x": 8,
+        "y": 52,
+        "w": 8,
+        "h": 4
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT value FROM current_metrics WHERE metric_key = 'dirty_worktree_paths';",
+          "queryType": "table",
+          "rawQueryText": "SELECT value FROM current_metrics WHERE metric_key = 'dirty_worktree_paths';",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        },
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+          "refId": "F",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "F"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "m"
+              },
+              {
+                "id": "custom.hidden",
+                "value": false
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "description": "Freshness: minutes since the most recent `refresh_runs.completed_at` (falls back to `started_at`). Secondary value `Refreshed (m ago)` comes from target `F`."
+    },
+    {
+      "id": 29,
+      "type": "stat",
+      "title": "Dispatcher Health Findings",
+      "gridPos": {
+        "x": 16,
+        "y": 52,
+        "w": 8,
+        "h": 4
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT value FROM current_metrics WHERE metric_key = 'dispatcher_health_findings';",
+          "queryType": "table",
+          "rawQueryText": "SELECT value FROM current_metrics WHERE metric_key = 'dispatcher_health_findings';",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        },
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+          "refId": "F",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "F"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "m"
+              },
+              {
+                "id": "custom.hidden",
+                "value": false
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "description": "Freshness: minutes since the most recent `refresh_runs.completed_at` (falls back to `started_at`). Secondary value `Refreshed (m ago)` comes from target `F`."
+    },
+    {
+      "id": 30,
+      "type": "stat",
+      "title": "Bridge Actionability Findings",
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 8,
+        "h": 4
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT value FROM current_metrics WHERE metric_key = 'bridge_actionability_findings';",
+          "queryType": "table",
+          "rawQueryText": "SELECT value FROM current_metrics WHERE metric_key = 'bridge_actionability_findings';",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        },
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+          "refId": "F",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "F"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "m"
+              },
+              {
+                "id": "custom.hidden",
+                "value": false
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "description": "Freshness: minutes since the most recent `refresh_runs.completed_at` (falls back to `started_at`). Secondary value `Refreshed (m ago)` comes from target `F`."
+    },
+    {
+      "id": 31,
+      "type": "stat",
+      "title": "README / Wiki Drift",
+      "gridPos": {
+        "x": 8,
+        "y": 56,
+        "w": 8,
+        "h": 4
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT value FROM current_metrics WHERE metric_key = 'readme_wiki_drift';",
+          "queryType": "table",
+          "rawQueryText": "SELECT value FROM current_metrics WHERE metric_key = 'readme_wiki_drift';",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        },
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+          "refId": "F",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "F"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "m"
+              },
+              {
+                "id": "custom.hidden",
+                "value": false
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "description": "Freshness: minutes since the most recent `refresh_runs.completed_at` (falls back to `started_at`). Secondary value `Refreshed (m ago)` comes from target `F`."
+    },
+    {
+      "id": 32,
       "type": "table",
       "title": "Release Blockers",
       "gridPos": {
         "x": 0,
-        "y": 45,
+        "y": 60,
         "w": 12,
         "h": 6
       },
@@ -1835,12 +2618,12 @@
       }
     },
     {
-      "id": 25,
+      "id": 33,
       "type": "piechart",
       "title": "Risk Severity Mix",
       "gridPos": {
         "x": 12,
-        "y": 45,
+        "y": 60,
         "w": 6,
         "h": 6
       },
@@ -1907,12 +2690,12 @@
       }
     },
     {
-      "id": 26,
+      "id": 34,
       "type": "piechart",
       "title": "Integration Status Mix",
       "gridPos": {
         "x": 18,
-        "y": 45,
+        "y": 60,
         "w": 6,
         "h": 6
       },
@@ -1979,19 +2762,19 @@
       }
     },
     {
-      "id": 30,
+      "id": 38,
       "type": "row",
       "title": "Setup Details",
       "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 51,
+        "y": 67,
         "w": 24,
         "h": 1
       },
       "panels": [
         {
-          "id": 27,
+          "id": 35,
           "type": "table",
           "title": "Step-by-Step Setup",
           "gridPos": {
@@ -2081,7 +2864,7 @@
           }
         },
         {
-          "id": 28,
+          "id": 36,
           "type": "table",
           "title": "Required Tools, CLIs, and SDKs",
           "gridPos": {
@@ -2171,7 +2954,7 @@
           }
         },
         {
-          "id": 29,
+          "id": 37,
           "type": "table",
           "title": "Third-Party Test Services",
           "gridPos": {
@@ -2263,19 +3046,19 @@
       ]
     },
     {
-      "id": 32,
+      "id": 40,
       "type": "row",
       "title": "Action Center Details",
       "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 52,
+        "y": 68,
         "w": 24,
         "h": 1
       },
       "panels": [
         {
-          "id": 31,
+          "id": 39,
           "type": "table",
           "title": "All Actions",
           "gridPos": {
@@ -2367,19 +3150,19 @@
       ]
     },
     {
-      "id": 34,
+      "id": 42,
       "type": "row",
       "title": "Delivery Timeline Details",
       "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 53,
+        "y": 69,
         "w": 24,
         "h": 1
       },
       "panels": [
         {
-          "id": 33,
+          "id": 41,
           "type": "table",
           "title": "Delivery Timeline Details",
           "gridPos": {
@@ -2471,19 +3254,19 @@
       ]
     },
     {
-      "id": 37,
+      "id": 45,
       "type": "row",
       "title": "KPI History Details",
       "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 54,
+        "y": 70,
         "w": 24,
         "h": 1
       },
       "panels": [
         {
-          "id": 35,
+          "id": 43,
           "type": "table",
           "title": "Current Metrics",
           "gridPos": {
@@ -2542,7 +3325,7 @@
           }
         },
         {
-          "id": 36,
+          "id": 44,
           "type": "timeseries",
           "title": "KPI Snapshots",
           "gridPos": {
@@ -2607,19 +3390,19 @@
       ]
     },
     {
-      "id": 39,
+      "id": 47,
       "type": "row",
       "title": "Integration Status Details",
       "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 55,
+        "y": 71,
         "w": 24,
         "h": 1
       },
       "panels": [
         {
-          "id": 38,
+          "id": 46,
           "type": "table",
           "title": "Testing Service Integrations",
           "gridPos": {
@@ -2693,19 +3476,19 @@
       ]
     },
     {
-      "id": 42,
+      "id": 50,
       "type": "row",
       "title": "Data Freshness Details",
       "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 56,
+        "y": 72,
         "w": 24,
         "h": 1
       },
       "panels": [
         {
-          "id": 40,
+          "id": 48,
           "type": "table",
           "title": "Data Freshness",
           "gridPos": {
@@ -2764,7 +3547,7 @@
           }
         },
         {
-          "id": 41,
+          "id": 49,
           "type": "table",
           "title": "Refresh Runs",
           "gridPos": {
@@ -2825,19 +3608,19 @@
       ]
     },
     {
-      "id": 48,
+      "id": 56,
       "type": "row",
       "title": "TAFE Observability",
       "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 57,
+        "y": 73,
         "w": 24,
         "h": 1
       },
       "panels": [
         {
-          "id": 43,
+          "id": 51,
           "type": "piechart",
           "title": "Stage Attempt Outcomes (TAFE)",
           "gridPos": {
@@ -2909,7 +3692,7 @@
           }
         },
         {
-          "id": 44,
+          "id": 52,
           "type": "piechart",
           "title": "Failure Class Distribution (TAFE)",
           "gridPos": {
@@ -2981,7 +3764,7 @@
           }
         },
         {
-          "id": 45,
+          "id": 53,
           "type": "table",
           "title": "Active Flow Instances (TAFE)",
           "gridPos": {
@@ -3040,7 +3823,7 @@
           }
         },
         {
-          "id": 46,
+          "id": 54,
           "type": "table",
           "title": "Active Stage Leases (TAFE)",
           "gridPos": {
@@ -3099,7 +3882,7 @@
           }
         },
         {
-          "id": 47,
+          "id": 55,
           "type": "bargauge",
           "title": "Capability Snapshot Readiness by Role (TAFE)",
           "gridPos": {
@@ -3176,13 +3959,467 @@
           }
         }
       ]
+    },
+    {
+      "id": 61,
+      "type": "row",
+      "title": "DORA Four Keys (Delivery Performance)",
+      "collapsed": true,
+      "gridPos": {
+        "x": 0,
+        "y": 74,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [
+        {
+          "id": 57,
+          "type": "stat",
+          "title": "Deployment Frequency",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 6,
+            "h": 6
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT value FROM current_metrics WHERE metric_key = 'dora_deployment_frequency';",
+              "queryType": "table",
+              "rawQueryText": "SELECT value FROM current_metrics WHERE metric_key = 'dora_deployment_frequency';",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            },
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+              "queryType": "table",
+              "rawQueryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+              "refId": "F",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "F"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "m"
+                  },
+                  {
+                    "id": "custom.hidden",
+                    "value": false
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "text"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "description": "Freshness: minutes since the most recent `refresh_runs.completed_at` (falls back to `started_at`). Secondary value `Refreshed (m ago)` comes from target `F`."
+        },
+        {
+          "id": 58,
+          "type": "stat",
+          "title": "Lead Time for Changes",
+          "gridPos": {
+            "x": 6,
+            "y": 0,
+            "w": 6,
+            "h": 6
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT value FROM current_metrics WHERE metric_key = 'dora_lead_time_hours';",
+              "queryType": "table",
+              "rawQueryText": "SELECT value FROM current_metrics WHERE metric_key = 'dora_lead_time_hours';",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            },
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+              "queryType": "table",
+              "rawQueryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+              "refId": "F",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "h"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "F"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "m"
+                  },
+                  {
+                    "id": "custom.hidden",
+                    "value": false
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "text"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "description": "Freshness: minutes since the most recent `refresh_runs.completed_at` (falls back to `started_at`). Secondary value `Refreshed (m ago)` comes from target `F`."
+        },
+        {
+          "id": 59,
+          "type": "stat",
+          "title": "Change Failure Rate",
+          "gridPos": {
+            "x": 12,
+            "y": 0,
+            "w": 6,
+            "h": 6
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT value FROM current_metrics WHERE metric_key = 'dora_change_failure_rate';",
+              "queryType": "table",
+              "rawQueryText": "SELECT value FROM current_metrics WHERE metric_key = 'dora_change_failure_rate';",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            },
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+              "queryType": "table",
+              "rawQueryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+              "refId": "F",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "percent"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "F"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "m"
+                  },
+                  {
+                    "id": "custom.hidden",
+                    "value": false
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "text"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "description": "Freshness: minutes since the most recent `refresh_runs.completed_at` (falls back to `started_at`). Secondary value `Refreshed (m ago)` comes from target `F`."
+        },
+        {
+          "id": 60,
+          "type": "stat",
+          "title": "MTTR",
+          "gridPos": {
+            "x": 18,
+            "y": 0,
+            "w": 6,
+            "h": 6
+          },
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT value FROM current_metrics WHERE metric_key = 'dora_mttr_hours';",
+              "queryType": "table",
+              "rawQueryText": "SELECT value FROM current_metrics WHERE metric_key = 'dora_mttr_hours';",
+              "refId": "A",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            },
+            {
+              "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "gtkb-dashboard-sqlite"
+              },
+              "format": "table",
+              "queryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+              "queryType": "table",
+              "rawQueryText": "SELECT CAST((julianday('now') - julianday(MAX(COALESCE(completed_at, started_at)))) * 24 * 60 AS INTEGER) AS \"Refreshed (m ago)\" FROM refresh_runs;",
+              "refId": "F",
+              "timeColumns": [
+                "time",
+                "generated_at",
+                "started_at",
+                "completed_at"
+              ]
+            }
+          ],
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "h"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "F"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "m"
+                  },
+                  {
+                    "id": "custom.hidden",
+                    "value": false
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "text"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "description": "Freshness: minutes since the most recent `refresh_runs.completed_at` (falls back to `started_at`). Secondary value `Refreshed (m ago)` comes from target `F`."
+        }
+      ]
     }
   ],
   "refresh": "5m",
   "schemaVersion": 41,
   "tags": [
     "gt-kb",
-    "agent-red",
+    "operations",
     "sqlite"
   ],
   "templating": {
@@ -3194,8 +4431,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Agent Red GT-KB Dashboard",
-  "uid": "agent-red-gtkb",
-  "version": 4,
+  "title": "GT-KB Operations Dashboard",
+  "uid": "groundtruth-kb-dashboard",
+  "version": 5,
   "weekStart": ""
 }

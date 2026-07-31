@@ -29,7 +29,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 KB_PATH = REPO_ROOT / "groundtruth.db"
-INSIGHT_DIR = REPO_ROOT / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
 BRIDGE_DIR = REPO_ROOT / "bridge"
 
 _AR_KEY_RE = re.compile(r"(ar_live|ar_user|ar_spa_plat|pk_live|arsk)_[A-Za-z0-9_-]{10,}")
@@ -68,10 +67,15 @@ def _zero_status(count: int) -> str:
 
 
 def count_candidate_sources() -> dict[str, int]:
-    """Count files eligible for deliberation archival."""
+    """Count canonical sources eligible for deliberation archival.
+
+    WI-5589: the LO insight-dropbox filesystem scan is retired. Loyal
+    Opposition findings are canonically filed as ``ADVISORY`` numbered bridge
+    entries and are therefore already counted by the bridge scan below, so
+    ``lo_reports`` is reported as ``0`` rather than re-deriving a count from a
+    non-canonical carrier (``DCL-CANONICAL-CARRIER-NONAUTHORITY-001``).
+    """
     lo_count = 0
-    if INSIGHT_DIR.exists():
-        lo_count = len([f for f in INSIGHT_DIR.glob("INSIGHTS-*.md") if f.stat().st_size >= 100])
 
     gt_src = REPO_ROOT / "groundtruth-kb" / "src"
     if str(gt_src) not in sys.path:

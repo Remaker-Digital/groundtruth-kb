@@ -10,7 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import cross_harness_bridge_trigger as cht  # noqa: E402
+import dispatcher_runtime as cht  # noqa: E402
 
 
 def _write_project(root: Path) -> Path:
@@ -110,12 +110,11 @@ def test_dispatch_emits_author_meets_reviewer_refused_diagnostic_record_on_refus
         f"Document: {bridge_id}\nNEW: bridge/gtkb-{bridge_id}-001.md\n", encoding="utf-8"
     )
 
-    monkeypatch.setattr(cht, "_is_cross_harness_trigger_active_substrate", lambda root: True)
-    monkeypatch.setattr(cht, "_is_single_harness_topology", lambda root: False)
-    monkeypatch.setattr(cht, "_evaluate_ollama_dispatch_readiness", lambda root: {"ready": True})
+    monkeypatch.setattr(cht, "_is_dispatcher_daemon_active_substrate", lambda root: True)
+    monkeypatch.setattr(cht, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
     monkeypatch.setattr(cht, "_new_dispatch_id", lambda recipient_key: "dispatch-session-1")
 
-    summary = cht.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    summary = cht.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     assert summary["results"]["loyal-opposition"]["reason"] == "author_meets_reviewer_refused"
 
@@ -153,11 +152,10 @@ def test_dispatch_fails_closed_when_author_session_metadata_missing(
         f"Document: {bridge_id}\nNEW: bridge/gtkb-{bridge_id}-001.md\n", encoding="utf-8"
     )
 
-    monkeypatch.setattr(cht, "_is_cross_harness_trigger_active_substrate", lambda root: True)
-    monkeypatch.setattr(cht, "_is_single_harness_topology", lambda root: False)
-    monkeypatch.setattr(cht, "_evaluate_ollama_dispatch_readiness", lambda root: {"ready": True})
+    monkeypatch.setattr(cht, "_is_dispatcher_daemon_active_substrate", lambda root: True)
+    monkeypatch.setattr(cht, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 
-    summary = cht.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    summary = cht.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     assert summary["results"]["loyal-opposition"]["reason"] == "author_session_context_missing"
 

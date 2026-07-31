@@ -26,7 +26,19 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
 DEFAULT_DRAFT_DIR = PROJECT_ROOT / ".gtkb-state" / "bridge-impl-reports" / "drafts"
-BRIDGE_PROPOSE_HELPER = PROJECT_ROOT / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py"
+
+
+def _resolve_bridge_propose_helper(root: Path) -> Path:
+    """Prefer the canonical gtkb- prefixed helper, falling back to the pre-rename
+    name for backward compatibility (WI-5651 skill-rename path canonicalization)."""
+    for name in ("gtkb-bridge-propose", "bridge-propose"):
+        candidate = root / ".claude" / "skills" / name / "helpers" / "write_bridge.py"
+        if candidate.is_file():
+            return candidate
+    return root / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py"
+
+
+BRIDGE_PROPOSE_HELPER = _resolve_bridge_propose_helper(PROJECT_ROOT)
 
 if str(PROJECT_ROOT / "groundtruth-kb" / "src") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "groundtruth-kb" / "src"))
@@ -38,6 +50,7 @@ _bridge_writer = importlib.import_module("scripts.gtkb_bridge_writer")
 WriterBridgeConflictError = _bridge_writer.BridgeConflictError
 WriterBridgeTransitionError = _bridge_writer.BridgeTransitionError
 write_bridge_file = _bridge_writer.write_bridge_file
+no_window_subprocess_kwargs = importlib.import_module("scripts.windows_subprocess").no_window_subprocess_kwargs
 
 
 class BridgeImplReportError(RuntimeError):
@@ -85,15 +98,45 @@ class ImplReportPlan:
     go_path: str
     linked_specs: tuple[str, ...]
     files_changed: tuple[str, ...]
+    excluded_dirty_count: int
     version_chain: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        return payload
+
+    def to_compact_dict(self) -> dict[str, Any]:
+        return {
+            "slug": self.slug,
+            "latest_status": self.latest_status,
+            "latest_path": self.latest_path,
+            "next_version": self.next_version,
+            "report_path": self.report_path,
+            "proposal_path": self.proposal_path,
+            "go_path": self.go_path,
+            "linked_specs": list(self.linked_specs),
+            "files_changed_count": len(self.files_changed),
+            "excluded_dirty_count": self.excluded_dirty_count,
+            "version_count": len(self.version_chain),
+            "compact": True,
+        }
 
 
 _SECTION_RE_TEMPLATE = r"^##\s+{heading}\s*$"
 _BRIDGE_KIND_RE = re.compile(r"^\s*bridge_kind:\s*(?P<kind>[A-Za-z0-9_-]+)\s*$", re.MULTILINE)
 _RECOMMENDED_COMMIT_TYPE_RE = re.compile(r"Recommended commit type\s*:", re.IGNORECASE)
+_TARGET_PATHS_RE = re.compile(r"^\s*target_paths:\s*(?P<payload>\[[^\n]*\])\s*$", re.MULTILINE)
+_PROJECT_METADATA_LINE_RE = re.compile(
+    r"^(Project Authorization:\s*PAUTH-[A-Z0-9-]+|Project:\s*[A-Z0-9-]+|"
+    r"Work Item:\s*(?:WI-\d+|WI-AUTO-[A-Z0-9-]+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+))$",
+    re.MULTILINE,
+)
+
+
+@dataclass(frozen=True)
+class ApprovedPathScope:
+    path: str
+    is_directory: bool
 
 
 def _load_bridge_propose_helper():
@@ -202,16 +245,66 @@ def _extract_linked_specs(proposal_text: str) -> tuple[str, ...]:
         if not line.startswith("-"):
             continue
         item = line.lstrip("-").strip()
-        item = item.strip("`").strip()
+        if item.startswith("`") and "`" in item[1:]:
+            item = item.split("`", 2)[1].strip()
+        else:
+            item = item.split(maxsplit=1)[0].strip("`").strip()
         if item and item not in specs:
             specs.append(item)
     return tuple(specs)
+
+
+def _normalize_repo_path(raw: str) -> str:
+    value = raw.strip().replace("\\", "/")
+    if not value:
+        raise BridgeImplReportError("target_paths entries must not be empty")
+    if "\0" in value or value.startswith("/") or re.match(r"^[A-Za-z]:", value):
+        raise BridgeImplReportError(f"target_paths entry escapes the repository root: {raw!r}")
+    parts = [part for part in value.split("/") if part and part != "."]
+    if not parts or any(part == ".." for part in parts):
+        raise BridgeImplReportError(f"target_paths entry escapes the repository root: {raw!r}")
+    return "/".join(parts)
+
+
+def _extract_target_path_scopes(proposal_text: str, *, project_root: Path) -> tuple[ApprovedPathScope, ...]:
+    match = _TARGET_PATHS_RE.search(proposal_text)
+    if not match:
+        raise BridgeImplReportError("Approved proposal must include target_paths as inline JSON")
+    try:
+        payload = json.loads(match.group("payload"))
+    except json.JSONDecodeError as exc:
+        raise BridgeImplReportError("Approved proposal target_paths must be valid inline JSON") from exc
+    if not isinstance(payload, list) or any(not isinstance(item, str) for item in payload):
+        raise BridgeImplReportError("Approved proposal target_paths must be a JSON list of strings")
+
+    scopes: list[ApprovedPathScope] = []
+    seen: set[tuple[str, bool]] = set()
+    for raw in payload:
+        normalized = _normalize_repo_path(raw)
+        is_directory = raw.strip().replace("\\", "/").endswith("/") or (project_root / normalized).is_dir()
+        key = (normalized, is_directory)
+        if key in seen:
+            continue
+        seen.add(key)
+        scopes.append(ApprovedPathScope(path=normalized, is_directory=is_directory))
+    if not scopes:
+        raise BridgeImplReportError("Approved proposal target_paths must not be empty")
+    return tuple(scopes)
 
 
 def _format_spec_links(specs: tuple[str, ...]) -> str:
     if not specs:
         return "- _No linked specifications found in approved proposal._"
     return "\n".join(f"- `{spec}`" for spec in specs)
+
+
+def _extract_project_metadata_lines(proposal_text: str) -> tuple[str, ...]:
+    lines: list[str] = []
+    for match in _PROJECT_METADATA_LINE_RE.finditer(proposal_text):
+        line = match.group(0).strip()
+        if line not in lines:
+            lines.append(line)
+    return tuple(lines)
 
 
 def _table_escape(value: str) -> str:
@@ -238,18 +331,72 @@ def _git_lines(args: list[str], *, cwd: Path) -> tuple[str, ...]:
         errors="replace",
         timeout=30,
         check=False,
+        **no_window_subprocess_kwargs(),
     )
     if result.returncode != 0:
         return ()
     return tuple(line for line in result.stdout.splitlines() if line.strip())
 
 
-def _files_changed(project_root: Path) -> tuple[str, ...]:
-    return _git_lines(["diff", "--name-only", "HEAD", "--"], cwd=project_root)
+def _git_status_paths(project_root: Path) -> tuple[str, ...]:
+    result = subprocess.run(
+        ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all", "--"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30,
+        check=False,
+        **no_window_subprocess_kwargs(),
+    )
+    if result.returncode != 0:
+        return ()
+    records = [record for record in result.stdout.split("\0") if record]
+    paths: list[str] = []
+    index = 0
+    while index < len(records):
+        record = records[index]
+        status = record[:2]
+        path = record[3:] if len(record) > 3 else record[2:].strip()
+        if path:
+            paths.append(path)
+        if ("R" in status or "C" in status) and index + 1 < len(records):
+            index += 1
+            if records[index]:
+                paths.append(records[index])
+        index += 1
+
+    normalized: list[str] = []
+    for path in paths:
+        repo_path = _normalize_repo_path(path)
+        if repo_path not in normalized:
+            normalized.append(repo_path)
+    return tuple(normalized)
 
 
-def _diff_stat(project_root: Path) -> tuple[str, ...]:
-    return _git_lines(["diff", "--stat", "HEAD", "--"], cwd=project_root)
+def _is_in_approved_scope(path: str, scopes: tuple[ApprovedPathScope, ...]) -> bool:
+    for scope in scopes:
+        if path == scope.path:
+            return True
+        if scope.is_directory and path.startswith(f"{scope.path}/"):
+            return True
+    return False
+
+
+def _scoped_files_changed(
+    project_root: Path,
+    approved_scopes: tuple[ApprovedPathScope, ...],
+) -> tuple[tuple[str, ...], int]:
+    all_dirty = _git_status_paths(project_root)
+    included = tuple(path for path in all_dirty if _is_in_approved_scope(path, approved_scopes))
+    return included, len(all_dirty) - len(included)
+
+
+def _diff_stat(project_root: Path, files_changed: tuple[str, ...]) -> tuple[str, ...]:
+    if not files_changed:
+        return ()
+    return _git_lines(["diff", "--stat", "HEAD", "--", *files_changed], cwd=project_root)
 
 
 def _recommend_commit_type(files_changed: tuple[str, ...]) -> tuple[str, str]:
@@ -294,6 +441,8 @@ def plan_report(
     proposal_text = (
         approved_proposal.abs_path.read_text(encoding="utf-8") if approved_proposal.abs_path.is_file() else ""
     )
+    approved_scopes = _extract_target_path_scopes(proposal_text, project_root=bridge_root.parent)
+    files_changed, excluded_dirty_count = _scoped_files_changed(bridge_root.parent, approved_scopes)
     next_version = _highest_version(versions) + 1
     report_rel = f"bridge/{slug}-{next_version:03d}.md"
     return ImplReportPlan(
@@ -309,7 +458,8 @@ def plan_report(
         proposal_path=approved_proposal.rel_path,
         go_path=latest.rel_path,
         linked_specs=_extract_linked_specs(proposal_text),
-        files_changed=_files_changed(bridge_root.parent),
+        files_changed=files_changed,
+        excluded_dirty_count=excluded_dirty_count,
         version_chain=tuple(version.rel_path for version in versions),
     )
 
@@ -321,7 +471,7 @@ def build_report_skeleton(slug: str, *, bridge_dir: Path | None = None) -> str:
     proposal_text = proposal_path.read_text(encoding="utf-8") if proposal_path.is_file() else ""
     acceptance_criteria = _extract_acceptance_criteria(proposal_text)
     commit_type, commit_reason = _recommend_commit_type(plan.files_changed)
-    diff_stat = _diff_stat(bridge_root.parent)
+    diff_stat = _diff_stat(bridge_root.parent, plan.files_changed)
 
     spec_rows = "\n".join(
         f"| `{_table_escape(spec)}` | Record command(s) and observed result covering this linked specification. |"
@@ -334,11 +484,14 @@ def build_report_skeleton(slug: str, *, bridge_dir: Path | None = None) -> str:
         if acceptance_criteria
         else "- [ ] Reconcile approved proposal acceptance criteria."
     )
+    metadata_lines = "\n".join(_extract_project_metadata_lines(proposal_text))
+    metadata_block = f"{metadata_lines}\n" if metadata_lines else ""
     files_lines = (
         "\n".join(f"- `{path}`" for path in plan.files_changed)
         if plan.files_changed
-        else "- _No dirty files detected by git diff._"
+        else "- _No approved-scope dirty files detected by git status._"
     )
+    excluded_line = f"Excluded out-of-scope dirty paths: {plan.excluded_dirty_count}."
     stat_lines = "\n".join(f"    {line}" for line in diff_stat) if diff_stat else "    _No git diff stat available._"
 
     return (
@@ -349,13 +502,15 @@ def build_report_skeleton(slug: str, *, bridge_dir: Path | None = None) -> str:
         f"Version: {plan.next_version:03d} (NEW; post-implementation report)\n"
         f"Responds to GO: {plan.go_path}\n"
         f"Approved proposal: {plan.proposal_path}\n"
+        f"{metadata_block}"
         f"Recommended commit type: {commit_type}\n\n"
         "## Implementation Claim\n\n"
         "Describe the completed implementation and the user-visible or governance-visible behavior it changes.\n\n"
         "## Specification Links\n\n"
         f"{_format_spec_links(plan.linked_specs)}\n\n"
         "## Owner Decisions / Input\n\n"
-        "No new owner decision is required by this implementation report. Carry forward any proposal-specific owner evidence here if applicable.\n\n"
+        "No new owner decision is required by this implementation report. Carry forward any "
+        "proposal-specific owner evidence here if applicable.\n\n"
         "## Prior Deliberations\n\n"
         f"- `{plan.proposal_path}` - approved implementation proposal carried forward.\n"
         f"- `{plan.go_path}` - Loyal Opposition GO verdict authorizing implementation.\n\n"
@@ -369,6 +524,7 @@ def build_report_skeleton(slug: str, *, bridge_dir: Path | None = None) -> str:
         "- Replace with exact observed pass/fail output summaries.\n\n"
         "## Files Changed\n\n"
         f"{files_lines}\n\n"
+        f"{excluded_line}\n\n"
         "## Recommended Commit Type\n\n"
         f"- Recommended commit type: `{commit_type}`\n"
         f"- Diff-stat justification: {commit_reason}\n\n"
@@ -381,7 +537,8 @@ def build_report_skeleton(slug: str, *, bridge_dir: Path | None = None) -> str:
         "Document residual risk and the rollback path for the changed files. Bridge audit files remain append-only.\n\n"
         "## Loyal Opposition Asks\n\n"
         "1. Verify the implementation against the linked specifications and executed command evidence.\n"
-        "2. Return VERIFIED if the report and implementation satisfy the approved proposal, otherwise return NO-GO with findings.\n"
+        "2. Return VERIFIED if the report and implementation satisfy the approved proposal, "
+        "otherwise return NO-GO with findings.\n"
     )
 
 
@@ -454,12 +611,18 @@ def _main(argv: list[str] | None = None) -> int:
     parser.add_argument("--bridge-dir", type=Path, default=DEFAULT_BRIDGE_DIR)
     parser.add_argument("--draft-dir", type=Path, default=DEFAULT_DRAFT_DIR)
     parser.add_argument("--content-file", type=Path)
+    parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="For plan mode, omit changed-file and version-chain payloads; emit current/actionable summary only.",
+    )
     args = parser.parse_args(argv)
 
     if args.mode == "plan":
+        plan = plan_report(args.slug, bridge_dir=args.bridge_dir, draft_dir=args.draft_dir)
         print(
             json.dumps(
-                plan_report(args.slug, bridge_dir=args.bridge_dir, draft_dir=args.draft_dir).to_dict(),
+                plan.to_compact_dict() if args.compact else plan.to_dict(),
                 indent=2,
                 sort_keys=True,
             )

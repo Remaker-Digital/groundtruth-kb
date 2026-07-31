@@ -14,7 +14,7 @@ reclaimable. Every delete path -- ``release_lease`` and stale reclamation --
 is guarded by the lease token, so a worker can never delete a lease that went
 stale, was reclaimed, and is now held by a different worker.
 
-Slice 2 is the standalone primitive only. The cross-harness trigger and the
+Slice 2 is the standalone primitive only. The dispatcher daemon and the
 single-harness dispatcher consume this registry in a later scheduler slice;
 this module imports nothing from the dispatch path and runs no polling loop.
 """

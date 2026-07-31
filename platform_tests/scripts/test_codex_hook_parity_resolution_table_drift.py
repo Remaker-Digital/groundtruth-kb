@@ -206,7 +206,7 @@ def test_init_keyword_regex_drift_caught_as_parity_error(tmp_path: Path) -> None
     staged_root = _stage_canonical_tree(tmp_path)
     _mutate(
         staged_root / _CORE,
-        '_CANONICAL_KEYWORD_RE = re.compile(r"^::init gtkb (pb|lo)$")',
+        "_CANONICAL_KEYWORD_RE = CANONICAL_INIT_KEYWORD_REGEX",
         '_CANONICAL_KEYWORD_RE = re.compile(r"^::init gtkb (pb|lo|admin)$")',
     )
     errors = parity._resolution_table_parity_errors(staged_root)

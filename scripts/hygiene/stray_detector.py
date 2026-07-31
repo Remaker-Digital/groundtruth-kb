@@ -39,12 +39,15 @@ class WorkspaceEntry:
     `path` is repo-relative; `last_modified` is a timezone-aware UTC datetime;
     `tracked` distinguishes tracked edits from untracked strays;
     `content_hash` is optional and enables uniqueness flagging.
+    `registered_artifact_ids` records SoT registry matches that must be
+    preserved before stale tracked/untracked heuristics apply.
     """
 
     path: str
     last_modified: datetime
     tracked: bool
     content_hash: str | None = None
+    registered_artifact_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -104,6 +107,7 @@ class WorkspaceFinding:
     triage_reason: str
     candidate_action: str
     unique_content: bool | None = None
+    registered_artifact_ids: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -114,6 +118,7 @@ class WorkspaceFinding:
             "triage_reason": self.triage_reason,
             "candidate_action": self.candidate_action,
             "unique_content": self.unique_content,
+            "registered_artifact_ids": list(self.registered_artifact_ids),
         }
 
 
@@ -219,6 +224,19 @@ def classify_workspace_entry(
             triage_reason="active_session_holds_path",
             candidate_action="skip",
             unique_content=unique_content,
+            registered_artifact_ids=entry.registered_artifact_ids,
+        )
+
+    if entry.registered_artifact_ids:
+        return WorkspaceFinding(
+            path=entry.path,
+            age_hours=age_hours,
+            classification="registered_artifact",
+            tracked=entry.tracked,
+            triage_reason="registered_sot_artifact_preserved",
+            candidate_action="preserve_registered_artifact",
+            unique_content=unique_content,
+            registered_artifact_ids=entry.registered_artifact_ids,
         )
 
     if _is_stale_age(age_hours, threshold_hours):
@@ -236,6 +254,7 @@ def classify_workspace_entry(
             triage_reason=triage_reason,
             candidate_action=candidate_action,
             unique_content=unique_content,
+            registered_artifact_ids=entry.registered_artifact_ids,
         )
 
     return WorkspaceFinding(
@@ -246,6 +265,7 @@ def classify_workspace_entry(
         triage_reason="below_stale_threshold",
         candidate_action="skip",
         unique_content=unique_content,
+        registered_artifact_ids=entry.registered_artifact_ids,
     )
 
 
@@ -476,6 +496,9 @@ def detect_strays(
             "workspace_stale": sum(1 for f in workspace_findings if f.classification == "stale"),
             "workspace_recent": sum(1 for f in workspace_findings if f.classification == "recent"),
             "workspace_active_session": sum(1 for f in workspace_findings if f.classification == "active_session"),
+            "workspace_registered_artifact": sum(
+                1 for f in workspace_findings if f.classification == "registered_artifact"
+            ),
             "stash_total": len(stash_findings),
             "stash_stale": sum(1 for f in stash_findings if f.classification == "stale"),
             "stash_recent": sum(1 for f in stash_findings if f.classification == "recent"),

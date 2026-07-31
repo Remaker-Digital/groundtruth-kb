@@ -827,7 +827,7 @@ def test_worker_stop_writes_owner_decision_artifact_instead_of_blocking(tmp_path
     assert result.returncode == 0, f"stderr: {result.stderr}"
     assert result.stdout == "", "worker Stop hook must not emit an interactive block"
     artifact_path = (
-        project / ".gtkb-state" / "cross-harness-trigger" / "dispatch-runs" / f"{run_id}.owner-decision-requested.json"
+        project / ".gtkb-state" / "bridge-poller" / "dispatch-runs" / f"{run_id}.owner-decision-requested.json"
     )
     assert artifact_path.is_file()
     payload = json.loads(artifact_path.read_text(encoding="utf-8"))
@@ -1214,6 +1214,127 @@ def test_decision_entry_resolved_via_round_trips(tmp_path: Path) -> None:
     assert resolved_out[0].resolved_via == "same_turn_auq_formalization", (
         "resolved_via field must survive write -> read round-trip via the durable-file parser path"
     )
+
+
+def test_cross_session_bridge_resolution_runs_before_nudge(tmp_path: Path) -> None:
+    """A live GO bridge thread clears a stale pending decision before UPS nudges."""
+    project = _setup_project(tmp_path)
+    bridge_dir = project / "bridge"
+    bridge_dir.mkdir()
+    bridge_file = bridge_dir / "gtkb-cross-session-owner-decision-001.md"
+    bridge_file.write_text("GO\n\n# Approved bridge work\n", encoding="utf-8")
+    pending_body = """\
+# Pending Owner Decisions
+---
+## Pending
+
+- id: DECISION-1219
+  asked_at: 2026-07-05T00:00:00Z
+  thread_ref: bridge/gtkb-cross-session-owner-decision-001.md
+  question: "Should the duplicate Slice C decision remain pending?"
+  detected_via: ask_user_question
+  status: pending
+  question_hash: cross-session
+  notes: ""
+
+## Resolved
+
+(none)
+
+## History
+
+(none)
+"""
+    pending_path = project / "memory" / "pending-owner-decisions.md"
+    pending_path.write_text(pending_body, encoding="utf-8")
+    before_files = sorted(path.relative_to(project).as_posix() for path in project.rglob("*") if path.is_file())
+
+    result = _run_hook("user-prompt-submit", project, json.dumps({"prompt": "continue ordinary work"}))
+
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert "### Pending Owner Decisions" not in result.stdout
+    assert "live pending owner-decision set is empty" in result.stdout
+    body = _read_pending_file(project)
+    pending = body.split("## Pending", 1)[1].split("##", 1)[0]
+    resolved = body.split("## Resolved", 1)[1].split("##", 1)[0]
+    assert "DECISION-1219" not in pending
+    assert "DECISION-1219" in resolved
+    assert "resolved_via: cross_session_bridge_resolution" in resolved
+    assert "gtkb-cross-session-owner-decision" in resolved
+    after_files = sorted(path.relative_to(project).as_posix() for path in project.rglob("*") if path.is_file())
+    assert after_files == before_files
+    assert bridge_file.read_text(encoding="utf-8") == "GO\n\n# Approved bridge work\n"
+
+
+def test_cross_session_bridge_resolution_only_moves_exact_match(tmp_path: Path) -> None:
+    """Multiple pending entries keep unrelated decisions pending."""
+    project = _setup_project(tmp_path)
+    bridge_dir = project / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "gtkb-resolved-owner-decision-001.md").write_text("VERIFIED\n", encoding="utf-8")
+    pending_body = """\
+# Pending Owner Decisions
+---
+## Pending
+
+- id: DECISION-1219
+  asked_at: 2026-07-05T00:00:00Z
+  thread_ref: bridge/gtkb-resolved-owner-decision-001.md
+  question: "Should the stale entry clear?"
+  detected_via: ask_user_question
+  status: pending
+  question_hash: stale
+  notes: ""
+
+- id: DECISION-1220
+  asked_at: 2026-07-05T00:01:00Z
+  question: "Should the unrelated entry stay pending?"
+  detected_via: ask_user_question
+  status: pending
+  question_hash: unrelated
+  notes: ""
+
+## Resolved
+
+(none)
+
+## History
+
+(none)
+"""
+    (project / "memory" / "pending-owner-decisions.md").write_text(pending_body, encoding="utf-8")
+
+    transcript = tmp_path / "turn_without_decision.jsonl"
+    _write_jsonl(
+        transcript,
+        [
+            {
+                "type": "user",
+                "uuid": "u-1",
+                "parentUuid": None,
+                "timestamp": "2026-07-05T00:00:00Z",
+                "message": {"role": "user", "content": "continue"},
+            },
+            {
+                "type": "assistant",
+                "uuid": "a-1",
+                "parentUuid": "u-1",
+                "timestamp": "2026-07-05T00:00:01Z",
+                "message": {"role": "assistant", "content": [{"type": "text", "text": "Done."}]},
+            },
+        ],
+    )
+
+    result = _run_hook("stop", project, _stop_payload_for_path(transcript))
+
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    body = _read_pending_file(project)
+    pending = body.split("## Pending", 1)[1].split("##", 1)[0]
+    resolved = body.split("## Resolved", 1)[1].split("##", 1)[0]
+    assert "DECISION-1219" not in pending
+    assert "DECISION-1219" in resolved
+    assert "DECISION-1220" in pending
+    assert "DECISION-1220" not in resolved
 
 
 def test_correlation_signal_a_only_keeps_prose_pending() -> None:
