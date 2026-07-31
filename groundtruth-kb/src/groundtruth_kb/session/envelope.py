@@ -695,6 +695,105 @@ def open_session(
     return envelope
 
 
+# DCL-INTERACTIVE-SESSION-ROLE-PERSISTENCE-001 (CLAUSE-PERSISTENCE-ACROSS-BOUNDARIES).
+# Deliberately self-contained: these sets are read only by the persistence resolver
+# below so the clause stays satisfied independently of neighbouring role-source work.
+PERSISTED_TRANSCRIPT_ROLE_SOURCE = "transcript_init_keyword"
+# Worker-document provenance values that already carry owner-declared interactive authority.
+TRANSCRIPT_ROLE_SOURCES = frozenset(
+    {
+        "interactive_transcript_explicit",
+        "owner_init_keyword",
+        "transcript_init_keyword",
+    }
+)
+# Per-session role-marker ``source`` labels written by the init-keyword surfaces.
+TRANSCRIPT_MARKER_SOURCES = frozenset(
+    {
+        "init_keyword",
+        "owner_init_keyword",
+        "session_self_initialization",
+        "transcript_init_keyword",
+    }
+)
+# Role sources that carry no owner direction; only these defer to a prior transcript role.
+REGISTRY_FALLBACK_ROLE_SOURCES = frozenset({"session_resolver_fallback"})
+_UNSAFE_MARKER_SESSION_ID_CHARS = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _per_session_role_marker_path(project_root: Path, session_id: str) -> Path:
+    """Return the per-session role-marker path, mirroring the canonical builder."""
+    try:  # pragma: no cover - import shape varies by entrypoint
+        from scripts.gtkb_session_id import per_session_role_marker_path  # noqa: PLC0415
+    except ImportError:  # pragma: no cover - direct-script sys.path shape
+        try:
+            from gtkb_session_id import (  # type: ignore[no-redef]  # noqa: PLC0415
+                per_session_role_marker_path,
+            )
+        except ImportError:
+            sanitized = _UNSAFE_MARKER_SESSION_ID_CHARS.sub("-", str(session_id)).strip("-.") or "unknown"
+            return Path(project_root) / ".claude" / "session" / f"role-{sanitized[:128]}.json"
+    return per_session_role_marker_path(project_root, session_id)
+
+
+def transcript_declared_role(
+    project_root: Path,
+    session_id: str,
+    *,
+    envelope: dict[str, Any] | None = None,
+) -> tuple[str, str] | None:
+    """Return ``(role, role_source)`` when this session context already carries an
+    owner-declared interactive role, else ``None``.
+
+    Implements ``DCL-INTERACTIVE-SESSION-ROLE-PERSISTENCE-001``
+    ``CLAUSE-PERSISTENCE-ACROSS-BOUNDARIES``: an explicit-direction role established
+    in an interactive transcript must survive compaction, resume, and contiguous
+    SessionStart-like boundaries, changing only when the owner explicitly changes it.
+    Two evidence surfaces are consulted, in order: a prior worker session document
+    whose ``role_resolution_source`` is interactive, then the per-session role marker
+    written by the init-keyword surfaces. The marker is what makes the role survive a
+    boundary that re-creates (or has already overwritten) the worker document.
+
+    The durable registry is never read or written here: it stays the caller's fallback
+    and is never mutated (``CLAUSE-NO-DURABLE-REGISTRY-MUTATION``).
+
+    Fail-safe: any unexpected read or parse error yields ``None`` so callers fall back
+    to registry-derived behavior. A role-resolution repair must never make a session
+    unstartable.
+    """
+    try:
+        if isinstance(envelope, dict):
+            provenance = envelope.get("worker_role_provenance")
+            if isinstance(provenance, dict):
+                prior_source = provenance.get("role_resolution_source")
+                prior_role = provenance.get("role")
+                if (
+                    isinstance(prior_source, str)
+                    and prior_source in TRANSCRIPT_ROLE_SOURCES
+                    and isinstance(prior_role, str)
+                    and prior_role in WORKER_ROLES
+                ):
+                    return prior_role, prior_source
+
+        marker = _read_json(_per_session_role_marker_path(project_root, session_id), None)
+        if isinstance(marker, dict):
+            marker_session_id = marker.get("session_id")
+            if isinstance(marker_session_id, str) and marker_session_id and marker_session_id != session_id:
+                return None
+            marker_source = marker.get("source")
+            marker_role = marker.get("role")
+            if (
+                isinstance(marker_source, str)
+                and marker_source in TRANSCRIPT_MARKER_SOURCES
+                and isinstance(marker_role, str)
+                and marker_role in WORKER_ROLES
+            ):
+                return marker_role, PERSISTED_TRANSCRIPT_ROLE_SOURCE
+    except Exception:  # noqa: BLE001 - role resolution must never make a session unstartable
+        return None
+    return None
+
+
 def ensure_worker_session(
     project_root: Path,
     *,
@@ -713,6 +812,19 @@ def ensure_worker_session(
         harness_id=harness_id,
     )
     current = load_worker_session(project_root, resolved_name, session_id)
+
+    # DCL-INTERACTIVE-SESSION-ROLE-PERSISTENCE-001 (CLAUSE-PERSISTENCE-ACROSS-BOUNDARIES,
+    # CLAUSE-AGENT-HINT-NOT-LOCK): a registry-derived fallback is a hint, not authority.
+    # When this session context already carries an owner-declared interactive role, the
+    # fallback defers to it -- including when the document is being re-created at a
+    # SessionStart-like boundary, which is the case a document-only guard cannot see.
+    # Explicit new owner direction and dispatcher composition
+    # (CLAUSE-DISPATCHER-SOT-FOR-DISPATCH) are untouched; only the fallback defers.
+    if role_source in REGISTRY_FALLBACK_ROLE_SOURCES:
+        persisted = transcript_declared_role(project_root, session_id, envelope=current)
+        if persisted is not None:
+            role, role_source = persisted
+
     if current is None or current.get("status") != "open" or current.get("session_id") != session_id:
         return open_session(
             project_root,
