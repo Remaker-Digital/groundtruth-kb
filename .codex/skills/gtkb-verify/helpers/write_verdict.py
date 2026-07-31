@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -1100,6 +1101,128 @@ def _assert_verdict_author_session_context_is_real(body: str) -> None:
         )
 
 
+_BRIDGE_COMPLIANCE_GATE_MODULES: dict[str, Any] = {}
+
+
+def _load_bridge_compliance_gate(project_root: Path) -> Any:
+    """Load the bridge-compliance gate module that will audit this write.
+
+    The gate owns the single definition of the self-referential
+    ``candidate_evidence_hash`` algorithm, so the helper never re-implements it
+    and the stamped value cannot drift from the audited value. Resolution reuses
+    the writer's own gate lookup, which guarantees the module loaded here is the
+    same file ``run_bridge_compliance_audit`` executes for this ``project_root``.
+
+    Loading is fail-closed, matching the review-independence comparator: no
+    terminal VERIFIED verdict may be finalized when the enforcement definition
+    is unavailable.
+    """
+    try:
+        from scripts.gtkb_bridge_writer import _bridge_compliance_gate_path
+
+        gate_path = _bridge_compliance_gate_path(project_root)
+        key = str(gate_path.resolve())
+        cached = _BRIDGE_COMPLIANCE_GATE_MODULES.get(key)
+        if cached is not None:
+            return cached
+        suffix = hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
+        spec = importlib.util.spec_from_file_location(f"gtkb_bridge_compliance_gate_{suffix}", gate_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"could not build a module spec for {gate_path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    except Exception as exc:  # noqa: BLE001 - any gate-load failure must deny finalization.
+        raise VerifiedFinalizationError(
+            "Bridge-compliance gate could not be loaded; VERIFIED finalization is denied. The gate "
+            "owns the candidate_evidence_hash definition and the verdict cannot be stamped without "
+            f"it ({exc})."
+        ) from exc
+    _BRIDGE_COMPLIANCE_GATE_MODULES[key] = module
+    return module
+
+
+def _restamp_candidate_evidence_hash(
+    body: str,
+    *,
+    verdict_rel_path: str,
+    project_root: Path,
+) -> str:
+    """Return the verdict body with ``candidate_evidence_hash`` stamped over final bytes.
+
+    ``candidate_evidence_hash`` is self-referential: the gate recomputes it over
+    the fully normalized candidate bytes it is about to audit. Every body
+    mutation performed after the reviewer stamped the field therefore
+    invalidates it. This step runs last, after the finalizer's own mutations and
+    after pre-applying the writer's pre-audit normalization, so the bytes stamped
+    here are the bytes the audit hashes.
+
+    Deterministic: no clock, no network, no retry. Fail-closed on every branch
+    where the gate could not validate the result.
+    """
+    from scripts.gtkb_bridge_writer import ensure_author_metadata, normalize_bridge_envelope_head
+
+    gate = _load_bridge_compliance_gate(project_root)
+
+    # Pre-apply the writer's pre-audit normalization so the stamped bytes and the
+    # audited bytes are identical. Both are idempotent for a finalizer-shaped body.
+    normalized = ensure_author_metadata(body, project_root=project_root, explicit=None)
+    normalized = normalize_bridge_envelope_head(normalized)
+
+    occurrences = list(gate.CANDIDATE_EVIDENCE_HASH_LINE_RE.finditer(normalized))
+    if len(occurrences) > 1:
+        raise VerifiedFinalizationError(
+            f"VERIFIED verdict body declares {len(occurrences)} `candidate_evidence_hash` fields; the "
+            "bridge-compliance gate requires exactly one and denies the write otherwise. Remove the "
+            "duplicate field(s) from the Applicability Preflight section."
+        )
+    if not occurrences:
+        # Mirror the gate's own activation condition: it only checks the hash when
+        # an Applicability Preflight section is present. Absent that section the
+        # field is not required, so there is nothing to stamp.
+        if gate._applicability_preflight_section(normalized) is not None:
+            raise VerifiedFinalizationError(
+                "VERIFIED verdict body has an `## Applicability Preflight` section but no "
+                "`candidate_evidence_hash` field, so the bridge-compliance gate will deny the write. "
+                f"Add `- candidate_evidence_hash: `{gate.CANDIDATE_EVIDENCE_HASH_SENTINEL}`` to that "
+                "section; the finalizer stamps the real value."
+            )
+        return normalized
+
+    expected = gate._candidate_evidence_hash(verdict_rel_path, normalized, project_root)
+    if expected is None:
+        raise VerifiedFinalizationError(
+            "VERIFIED finalization could not compute `candidate_evidence_hash` for "
+            f"{verdict_rel_path!r}; the verdict path must be root-contained and the field must carry "
+            "either the sentinel placeholder or a well-formed sha256 value."
+        )
+
+    stamped = gate.CANDIDATE_EVIDENCE_HASH_LINE_RE.sub(
+        lambda match: match.group("prefix") + expected + match.group("suffix"),
+        normalized,
+        count=1,
+    )
+
+    # The writer re-applies its normalization before auditing. Assert that
+    # re-application is a no-op here, so a future non-idempotent normalization
+    # change fails closed instead of silently reintroducing a stale stamp.
+    reapplied = normalize_bridge_envelope_head(
+        ensure_author_metadata(stamped, project_root=project_root, explicit=None)
+    )
+    if reapplied != stamped:
+        raise VerifiedFinalizationError(
+            "VERIFIED finalization detected non-idempotent bridge-writer normalization; the stamped "
+            "bytes would differ from the audited bytes. Refusing to write a verdict whose "
+            "`candidate_evidence_hash` cannot be guaranteed fresh."
+        )
+    recomputed = gate._candidate_evidence_hash(verdict_rel_path, stamped, project_root)
+    if recomputed != expected:
+        raise VerifiedFinalizationError(
+            "VERIFIED finalization could not reach a stable `candidate_evidence_hash` fixpoint for "
+            f"{verdict_rel_path!r} (expected {expected!r}, recomputed {recomputed!r})."
+        )
+    return stamped
+
+
 def finalize_verified_commit(
     slug: str,
     body: str,
@@ -1174,6 +1297,15 @@ def finalize_verified_commit(
         latest_report_rel_path=latest_report,
     )
     _assert_verdict_author_session_context_is_real(body_to_write)
+
+    # Must run last: every preceding step may mutate the body, and the gate hashes
+    # the final normalized bytes. Fail-closed, so no partial terminal artifact and
+    # no commit can result from a stale stamp.
+    body_to_write = _restamp_candidate_evidence_hash(
+        body_to_write,
+        verdict_rel_path=verdict_rel_path,
+        project_root=root,
+    )
 
     from scripts.gtkb_bridge_writer import (
         finalize_pending_bridge_publication,

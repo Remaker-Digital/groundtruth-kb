@@ -156,7 +156,13 @@ zero-padded version number for the thread. Structure:
   deficiency rationale, proposed solution, option rationale, Prime Builder
   implementation context).
 - `## Required Revisions` — for a `NO-GO` verdict only; the finding-by-finding
-  required changes Prime Builder must address before resubmitting.
+  required changes Prime Builder must address before resubmitting. The section
+  MUST instruct Prime Builder to refile the corrected proposal or report as
+  `REVISED`, per the authoritative post-verdict transition table
+  (`ORDINARY_TRANSITIONS` in `scripts/bridge_lifecycle_resolver.py`: after a
+  `NO-GO`, the lawful Prime statuses are `REVISED` and `NO-ACTION` per
+  `DCL-NO-ACTION-STATUS-SEMANTICS-001`), and MUST NOT instruct a refile as
+  `NEW` — `NEW` is never a lawful successor to `NO-GO`.
 - `## Commands Executed` — the exact shell commands run during the review with
   observed output excerpts.
 - `## Commit Finalization Evidence` — for a `VERIFIED` verdict only; the

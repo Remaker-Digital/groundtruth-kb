@@ -107,7 +107,7 @@ class Advisory:
     """One advisory item the router considers for backlog routing."""
 
     source: str  # "dropbox" or "bridge"
-    source_key: str  # idempotency key (filename or bridge slug)
+    source_key: str  # idempotency key (filename or versioned bridge slug)
     relative_path: str  # path under project root, forward-slash form
     title: str
     description: str
@@ -138,12 +138,18 @@ class RouterResult:
     scan_finished_at: str = ""
     dry_run: bool = False
 
+    @property
+    def starvation_signal(self) -> bool:
+        """True when every scanned advisory was silently skipped as existing."""
+        return self.scanned > 0 and not self.staged and len(self.skipped_existing) == self.scanned
+
     def as_json(self, *, compact: bool = False) -> str:
         if compact:
             payload = {
                 "staged_count": len(self.staged),
                 "skipped_existing_count": len(self.skipped_existing),
                 "skipped_expired_count": len(self.skipped_expired),
+                "starvation_signal": self.starvation_signal,
                 "errors": self.errors,
                 "scanned": self.scanned,
                 "scan_started_at": self.scan_started_at,
@@ -155,6 +161,7 @@ class RouterResult:
                 "staged": self.staged,
                 "skipped_existing": self.skipped_existing,
                 "skipped_expired": self.skipped_expired,
+                "starvation_signal": self.starvation_signal,
                 "errors": self.errors,
                 "scanned": self.scanned,
                 "scan_started_at": self.scan_started_at,
@@ -373,7 +380,7 @@ def _latest_bridge_threads(project_root: Path) -> dict[str, tuple[int, str, str]
 def collect_bridge_advisories(project_root: Path, *, since: date | None) -> list[Advisory]:
     """Scan numbered bridge files for threads whose latest status is ADVISORY."""
     advisories: list[Advisory] = []
-    for doc_id, (_version, latest_status, latest_path) in sorted(_latest_bridge_threads(project_root).items()):
+    for doc_id, (version, latest_status, latest_path) in sorted(_latest_bridge_threads(project_root).items()):
         if latest_status != "ADVISORY":
             continue
         file_path = project_root / latest_path
@@ -399,7 +406,7 @@ def collect_bridge_advisories(project_root: Path, *, since: date | None) -> list
         advisories.append(
             Advisory(
                 source="bridge",
-                source_key=doc_id,
+                source_key=f"{doc_id}-{version:03d}",
                 relative_path=latest_path.replace("\\", "/"),
                 title=title,
                 description=description or f"Bridge advisory document {doc_id} at {latest_path}.",
@@ -438,6 +445,69 @@ def _existing_wi_for(db, source_key: str) -> str | None:
         (f"%{source_key}%",),
     ).fetchone()
     return None if row is None else row[0]
+
+
+def _legacy_bridge_source_key(advisory: Advisory) -> str | None:
+    """Return the pre-WI-5757 bare-slug key for a bridge advisory."""
+    if advisory.source != "bridge":
+        return None
+    value = str(advisory.provenance_bridge_thread or "").strip()
+    return value or None
+
+
+def _legacy_recorded_versioned_key(
+    legacy_source_key: str,
+    legacy_record: dict[str, Any] | None,
+) -> str:
+    """Resolve the exact version represented by a legacy bare-slug record.
+
+    Records created before WI-5757 normally retain ``relative_path``. When a
+    historical record does not, version 001 is the conservative compatibility
+    default selected by the reviewed proposal.
+    """
+    relative_path = str((legacy_record or {}).get("relative_path") or "")
+    match = VERSIONED_BRIDGE_FILE_RE.match(Path(relative_path).name)
+    if match is not None and match.group("slug") == legacy_source_key:
+        return f"{legacy_source_key}-{int(match.group('version')):03d}"
+    return f"{legacy_source_key}-001"
+
+
+def _candidate_store_match(
+    status_map: dict[str, dict[str, Any]],
+    advisory: Advisory,
+) -> tuple[str, dict[str, Any]] | None:
+    """Return an exact or byte-location-compatible legacy candidate match."""
+    exact = status_map.get(advisory.source_key)
+    if exact is not None:
+        return advisory.source_key, exact
+    legacy_source_key = _legacy_bridge_source_key(advisory)
+    if legacy_source_key is None:
+        return None
+    legacy = status_map.get(legacy_source_key)
+    if legacy is None:
+        return None
+    if str(legacy.get("relative_path") or "").replace("\\", "/") != advisory.relative_path.replace("\\", "/"):
+        return None
+    return legacy_source_key, legacy
+
+
+def _existing_wi_for_advisory(
+    db,
+    advisory: Advisory,
+    status_map: dict[str, dict[str, Any]],
+) -> str | None:
+    """Apply versioned WI dedup plus the bounded legacy bare-slug rule."""
+    existing = _existing_wi_for(db, advisory.source_key)
+    if existing is not None:
+        return existing
+    legacy_source_key = _legacy_bridge_source_key(advisory)
+    if legacy_source_key is None:
+        return None
+    legacy_record = status_map.get(legacy_source_key)
+    represented_key = _legacy_recorded_versioned_key(legacy_source_key, legacy_record)
+    if advisory.source_key != represented_key:
+        return None
+    return _existing_wi_for(db, legacy_source_key)
 
 
 def is_live_advisory(db, status_map: dict[str, dict[str, Any]], source_key: str) -> bool:
@@ -542,6 +612,7 @@ def _write_last_scan(project_root: Path, result: RouterResult, source: str, sinc
         "staged_count": len(result.staged),
         "skipped_existing_count": len(result.skipped_existing),
         "skipped_expired_count": len(result.skipped_expired),
+        "starvation_signal": result.starvation_signal,
         "errors_count": len(result.errors),
     }
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -600,19 +671,22 @@ def run(
     for advisory in advisories:
         try:
             # Idempotency #1: already on the candidate surface (any status).
-            if advisory.source_key in status_map:
+            candidate_match = _candidate_store_match(status_map, advisory)
+            if candidate_match is not None:
+                matched_source_key, matched_record = candidate_match
                 result.skipped_existing.append(
                     {
                         "source_key": advisory.source_key,
                         "source": advisory.source,
                         "matched_in": "candidate_store",
-                        "matched_status": status_map[advisory.source_key].get("status"),
+                        "matched_source_key": matched_source_key,
+                        "matched_status": matched_record.get("status"),
                     }
                 )
                 continue
             # Idempotency #2: already promoted to a work_items row (or a legacy
             # auto-created row from the pre-Stage-3 router).
-            existing = _existing_wi_for(db, advisory.source_key)
+            existing = _existing_wi_for_advisory(db, advisory, status_map)
             if existing is not None:
                 result.skipped_existing.append(
                     {
@@ -689,6 +763,8 @@ def main(argv: list[str] | None = None) -> int:
         dry_run=args.dry_run,
         retention_policy=retention_policy,
     )
+    if result.starvation_signal:
+        print("WARNING: advisory router starvation signal: all scanned advisories were skipped as already existing")
     print(result.as_json(compact=args.compact))
     return 0 if not result.errors else 1
 

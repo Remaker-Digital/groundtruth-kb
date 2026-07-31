@@ -393,6 +393,47 @@ def _post_go_chain_state(statuses_after_go: list[str]) -> str:
     return "awaiting_review"
 
 
+def _packet_go_integrity(project_root: Path, packet: dict[str, Any]) -> tuple[Any, list[str], str | None]:
+    """Shared integrity clauses: hash check; pinned GO present/status/newer check.
+    Returns (bridge_entry, statuses_after_go, error_message|None).
+    The expiry hard-reject, chain-state rejections, and PAUTH checks are left to
+    the active-authority caller (_validate_packet); the evidence caller
+    (assess_packet_terminal_evidence) runs its own evidence-specific chain-state
+    and contest checks after this helper passes.
+    """
+    if packet_hash(packet) != packet.get("packet_hash"):
+        return None, [], "Implementation authorization packet hash mismatch"
+
+    entry = bridge_entry(project_root, str(packet["bridge_id"]))
+    go_file = packet.get("go_file")
+
+    found_go = False
+    statuses_after_go: list[str] = []
+
+    for status, path in entry.versions:
+        if path == go_file:
+            if status == "GO":
+                found_go = True
+                break
+            return None, [], f"Bridge GO file status changed: {go_file} is now {status}"
+        statuses_after_go.append(status)
+
+    if not found_go:
+        return None, [], f"Bridge GO file not found in chain: {go_file}"
+
+    if any(status == "GO" for status in statuses_after_go):
+        return (
+            None,
+            [],
+            (
+                f"Newer GO exists in bridge chain after {go_file}; "
+                f"re-issue the implementation-authorization packet from the new GO."
+            ),
+        )
+
+    return entry, statuses_after_go, None
+
+
 def _report_no_go_resumption_authority(
     project_root: Path,
     packet: dict[str, Any],
@@ -600,6 +641,19 @@ def _iter_section_spans(markdown: str):
         yield level, match.group(2).strip(), markdown[start:end].strip()
 
 
+def _section_body_including_subsections(markdown: str, heading: str) -> str:
+    """Return the body of a section including nested ###-level subsections.
+
+    Uses _iter_section_spans so that ### Required (blocking) / ### Advisory
+    subheadings under ## Specification Links are retained in the returned body
+    (WI-5823 Slice A). Other callers still use section_body() unchanged.
+    """
+    for _level, found_heading, body in _iter_section_spans(markdown):
+        if found_heading.lower() == heading.lower():
+            return body
+    return ""
+
+
 def section_body(markdown: str, heading: str) -> str:
     for found_heading, body in _iter_sections(markdown):
         if found_heading.lower() == heading.lower():
@@ -776,8 +830,30 @@ def _extract_spec_links_from_table(body: str) -> list[str]:
     return [link for link in links if link]
 
 
+def _preflight_parity_harvest(body: str) -> list[str]:
+    """Harvest concrete spec-ID tokens from any prose format (WI-5823 Slice B).
+
+    Runs as third additive branch when bullet and table branches both yield
+    zero links. Accepts the same token classes the applicability preflight
+    already harvests at GO time: backtick spans, SPEC_ID_RE uppercase artifact
+    IDs, and .claude/rules/ paths. Returns only concrete citation tokens.
+    """
+    links: list[str] = []
+    # Backtick-quoted tokens (same as bullet branch but from any context)
+    ticks = re.findall(r"`([^`]+)`", body)
+    links.extend(ticks)
+    # Uppercase artifact IDs (SPEC-..., GOV-..., ADR-..., DCL-..., etc.)
+    for m in _SPEC_ID_RE.finditer(body):
+        links.append(m.group(0))
+    # .claude/rules/ paths (mirroring preflight's RULE_PATH_RE)
+    rule_paths = re.findall(r"\.claude/rules/[\w./-]+", body, re.IGNORECASE)
+    links.extend(p.strip() for p in rule_paths)
+    return list(dict.fromkeys(link for link in links if link and "/" not in link[:3]))
+
+
 def extract_spec_links(markdown: str) -> list[str]:
-    body = section_body(markdown, "Specification Links")
+    # WI-5823 Slice A: use level-aware body so ### subheadings are retained
+    body = _section_body_including_subsections(markdown, "Specification Links")
     if not body:
         raise AuthorizationError("Approved proposal is missing ## Specification Links")
     links: list[str] = []
@@ -799,6 +875,11 @@ def extract_spec_links(markdown: str) -> list[str]:
     # Bullet branch has precedence; table fallback dormant whenever bullets exist.
     if not links:
         links = _extract_spec_links_from_table(body)
+    # WI-5823 Slice B: preflight-parity harvest as third additive branch.
+    # Fires only when both bullet and table branches yield zero links.
+    # Harvests concrete citation tokens from prose/compact-citation format.
+    if not links:
+        links = _preflight_parity_harvest(body)
     if not links:
         raise AuthorizationError("Approved proposal has no concrete specification links")
     return links
@@ -2099,10 +2180,31 @@ def write_named_packet(project_root: Path, packet: dict[str, Any], bridge_id: st
     `.gtkb-state/implementation-authorizations/by-bridge/<bridge_id>.json`
     survives subsequent `begin --bridge-id Y` operations so an earlier
     bridge's packet can be recovered via `activate --bridge-id X`.
+
+    When the target named packet already exists and its bytes differ from
+    `packet`, the existing bytes are preserved to an append-only history
+    location before the new packet is written. A byte-identical rewrite
+    creates no history entry. If history preservation fails, the write
+    fails closed and the existing packet is left untouched.
     """
     path = packet_path_for_bridge(project_root, bridge_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    new_bytes = json.dumps(packet, indent=2, sort_keys=True) + "\n"
+    if path.exists():
+        existing_bytes = path.read_bytes()
+        if existing_bytes != new_bytes.encode("utf-8"):
+            history_dir = path.parent / f"{bridge_id}.history"
+            history_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+            short_hash = hashlib.sha256(existing_bytes).hexdigest()[:8]
+            history_path = history_dir / f"{ts}-{short_hash}.json"
+            try:
+                history_path.write_bytes(existing_bytes)
+            except OSError:
+                raise AuthorizationError(
+                    f"Cannot preserve existing named-packet bytes for {bridge_id!r} to history; aborting overwrite"
+                )
+    path.write_text(new_bytes, encoding="utf-8")
     return path
 
 
@@ -2115,7 +2217,7 @@ def _worker_harness_selector() -> str | None:
         return None
     if os.environ.get("CLAUDE_CODE_SESSION_ID") or os.environ.get("CLAUDECODE"):
         return "claude"
-    if os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_HOME"):
+    if os.environ.get("CODEX_THREAD_ID"):
         return "codex"
     return None
 
@@ -2239,18 +2341,24 @@ def finalize_implementation_start_packet(
     return finalized
 
 
-def write_started_packets(project_root: Path, packets: list[dict[str, Any]]) -> None:
-    """Write an already-finalized packet set named-first and current-last."""
+def write_started_packets(project_root: Path, packets: list[dict[str, Any]]) -> list[tuple[Path, Path]]:
+    """Write an already-finalized packet set named-first and current-last.
+
+    Returns a list of (named_path, active_pointer_path) tuples, one per packet.
+    """
+    written: list[tuple[Path, Path]] = []
     if not packets:
-        return
+        return written
     for packet in packets:
         if packet.get("schema_version") != 3 or not isinstance(packet.get("implementation_start"), dict):
             raise AuthorizationError("Durable implementation-start writes require a finalized schema-v3 packet")
         if packet_hash(packet) != packet.get("packet_hash"):
             raise AuthorizationError("Durable implementation-start packet hash mismatch")
     for packet in packets:
-        write_named_packet(project_root, packet, str(packet["bridge_id"]))
-    write_packet(project_root, packets[0])
+        named_path = write_named_packet(project_root, packet, str(packet["bridge_id"]))
+    active_path = write_packet(project_root, packets[0])
+    written.append((named_path, active_path))
+    return written
 
 
 def issue_dispatch_authorization_packets(
@@ -2501,34 +2609,28 @@ def _validate_packet(project_root: Path, packet: dict[str, Any]) -> None:
     optional project-authorization drift. Raises AuthorizationError on any
     failure. Shared by `load_packet()` (active pointer) and `load_named_packet()`
     (by-bridge named cache).
+
+    Integrity clauses delegated to `_packet_go_integrity`; the active-authority
+    path retains its own expiry, chain-state, and PAUTH checks unchanged.
     """
-    if packet_hash(packet) != packet.get("packet_hash"):
-        raise AuthorizationError("Implementation authorization packet hash mismatch")
+    _entry, _statuses, integrity_error = _packet_go_integrity(project_root, packet)
+    if integrity_error:
+        raise AuthorizationError(integrity_error)
+
     if parse_iso(str(packet["expires_at"])) < now_utc():
         raise AuthorizationError("Implementation authorization packet has expired")
 
+    # entry and statuses_after_go are retrieved again to keep the active path
+    # self-contained and byte-identical in its rejection messages
     entry = bridge_entry(project_root, str(packet["bridge_id"]))
     go_file = packet.get("go_file")
-
-    found_go = False
     statuses_after_go: list[str] = []
-
     for status, path in entry.versions:
         if path == go_file:
-            if status == "GO":
-                found_go = True
-                break
-            raise AuthorizationError(f"Bridge GO file status changed: {go_file} is now {status}")
+            # GO was already verified by _packet_go_integrity; just skip
+            break
         statuses_after_go.append(status)
 
-    if not found_go:
-        raise AuthorizationError(f"Bridge GO file not found in chain: {go_file}")
-
-    if any(status == "GO" for status in statuses_after_go):
-        raise AuthorizationError(
-            f"Newer GO exists in bridge chain after {go_file}; "
-            f"re-issue the implementation-authorization packet from the new GO."
-        )
     # A post-GO NEW/REVISED is a post-implementation report (not a superseding
     # proposal); a post-GO NO-GO is a NO-GO'd report and the pinned GO still
     # authorizes the revision. The latest status determines resume validity -
@@ -2565,6 +2667,121 @@ def _validate_packet(project_root: Path, packet: dict[str, Any]) -> None:
         requested_operations=["implementation_packet_load"],
         target_paths=[str(path) for path in packet.get("target_path_globs", [])],
     )
+
+
+def assess_packet_terminal_evidence(project_root: Path, bridge_id: str) -> dict[str, Any]:
+    """Assess whether an implementation-start packet is valid as historical
+    terminal evidence per DELIB-202667723. Read-only; confers no mutation
+    authority, mints no packet, performs no MemBase mutation.
+
+    Returns: bridge_id, evidence_valid, expired, live_at_implementation,
+    contested, chain_state, active_valid, reasons.
+    """
+    reasons: list[str] = []
+
+    path = packet_path_for_bridge(project_root, bridge_id)
+    if not path.is_file():
+        return _terminal_result(
+            bridge_id, False, False, False, False, None, False, [f"Named packet for bridge {bridge_id!r} not found"]
+        )
+
+    try:
+        packet = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return _terminal_result(bridge_id, False, False, False, False, None, False, [f"Packet unreadable: {exc}"])
+
+    # E1+E3: shared integrity clauses (hash + GO chain)
+    entry, statuses_after_go, integrity_error = _packet_go_integrity(project_root, packet)
+    if integrity_error:
+        return _terminal_result(bridge_id, False, False, False, False, None, False, [integrity_error])
+
+    # Determine expiry
+    packet_expires_str = str(packet.get("expires_at", ""))
+    expired = False
+    packet_expires = None
+    try:
+        packet_expires = parse_iso(packet_expires_str)
+        expired = packet_expires < now_utc()
+    except (ValueError, TypeError):
+        return _terminal_result(bridge_id, False, True, False, False, None, False, ["Packet expires_at unparseable"])
+
+    # E2: live-at-implementation
+    impl_start = packet.get("implementation_start")
+    live_at_implementation = False
+    if isinstance(impl_start, dict):
+        finalized_str = str(impl_start.get("finalized_at", ""))
+        try:
+            finalized = parse_iso(finalized_str)
+            live_at_implementation = finalized <= packet_expires
+        except (ValueError, TypeError):
+            reasons.append("implementation_start.finalized_at unparseable")
+    else:
+        reasons.append("No implementation_start block (never durably started)")
+
+    if not live_at_implementation:
+        reasons.append("Packet not live at implementation")
+
+    # E4: chain-state handling
+    state = _post_go_chain_state(statuses_after_go)
+    chain_state = state
+    if state in ("deferred", "no_action"):
+        reasons.append(f"Bridge thread is {state.upper()}; owner/resolution required")
+        return _terminal_result(bridge_id, False, expired, live_at_implementation, False, chain_state, False, reasons)
+    # awaiting_review and terminal are expected evidence habitat - no rejection
+
+    # E5: uncontested
+    contested = False
+    try:
+        holder = bridge_work_intent_registry.current_holder(bridge_id, project_root=project_root)
+        if holder is not None:
+            holder_session = holder.get("session_id")
+            if isinstance(impl_start, dict):
+                pkt_session = impl_start.get("session_id")
+                if holder_session and pkt_session and holder_session != pkt_session:
+                    contested = True
+                    reasons.append(f"Thread contested: holder {holder_session!r} != packet {pkt_session!r}")
+                    return _terminal_result(
+                        bridge_id, False, expired, live_at_implementation, True, chain_state, False, reasons
+                    )
+    except Exception as exc:
+        reasons.append(f"Work-intent registry unreadable: {exc}")
+        return _terminal_result(bridge_id, False, expired, live_at_implementation, False, chain_state, False, reasons)
+
+    # Active validity: unchanged _validate_packet outcome
+    active_valid = False
+    try:
+        _validate_packet(project_root, packet)
+        active_valid = True
+    except AuthorizationError:
+        active_valid = False
+
+    evidence_valid = len(reasons) == 0
+    return _terminal_result(
+        bridge_id, evidence_valid, expired, live_at_implementation, contested, chain_state, active_valid, reasons
+    )
+
+
+def _terminal_result(
+    bridge_id: str,
+    evidence_valid: bool,
+    expired: bool,
+    live_at_implementation: bool,
+    contested: bool,
+    chain_state: str | None,
+    active_valid: bool,
+    reasons: list[str],
+) -> dict[str, Any]:
+    """Build the standard terminal-evidence assessment payload."""
+    return {
+        "bridge_id": bridge_id,
+        "evidence_valid": evidence_valid,
+        "expired": expired,
+        "live_at_implementation": live_at_implementation,
+        "contested": contested,
+        "chain_state": chain_state,
+        "active_valid": active_valid,
+        "reasons": reasons,
+    }
 
 
 def load_packet(project_root: Path) -> dict[str, Any]:
@@ -2619,6 +2836,9 @@ def list_named_packets(project_root: Path) -> list[dict[str, Any]]:
     `(bridge_id, expires_at, target_path_globs, valid, error)`. A row is
     `valid=True` iff the packet would pass `_validate_packet()` against the
     live versioned bridge-file chain right now.
+
+    Per WI-5694 (DELIB-202667723), rows also carry additive terminal-evidence
+    fields: `evidence_valid`, `evidence_error`, `expired`.
     """
     by_bridge_dir = project_root / BY_BRIDGE_DIRECTORY_RELATIVE_PATH
     if not by_bridge_dir.is_dir():
@@ -2637,6 +2857,9 @@ def list_named_packets(project_root: Path) -> list[dict[str, Any]]:
                     "target_path_globs": [],
                     "valid": False,
                     "error": f"corrupt or unreadable: {exc}",
+                    "evidence_valid": False,
+                    "evidence_error": f"corrupt or unreadable: {exc}",
+                    "expired": False,
                 }
             )
             continue
@@ -2648,6 +2871,21 @@ def list_named_packets(project_root: Path) -> list[dict[str, Any]]:
         except AuthorizationError as exc:
             valid = False
             error = str(exc)
+
+        # Terminal-evidence assessment (WI-5694 additive fields)
+        evidence_valid = False
+        evidence_error: str | None = None
+        expired_flag = False
+        if bridge_id:
+            try:
+                evidence = assess_packet_terminal_evidence(project_root, str(bridge_id))
+                evidence_valid = bool(evidence.get("evidence_valid"))
+                if not evidence_valid:
+                    evidence_error = "; ".join(evidence.get("reasons", [])) or None
+                expired_flag = bool(evidence.get("expired"))
+            except Exception as exc:
+                evidence_error = f"evidence assessment failed: {exc}"
+
         rows.append(
             {
                 "path": rel,
@@ -2656,21 +2894,31 @@ def list_named_packets(project_root: Path) -> list[dict[str, Any]]:
                 "target_path_globs": packet.get("target_path_globs", []),
                 "valid": valid,
                 "error": error,
+                "evidence_valid": evidence_valid,
+                "evidence_error": evidence_error,
+                "expired": expired_flag,
             }
         )
     return rows
 
 
 def list_named_packets_compact(project_root: Path) -> dict[str, Any]:
-    """Return compact current/actionable authorization summaries without full packet bodies."""
+    """Return compact current/actionable authorization summaries without full packet bodies.
+
+    Per WI-5694 (DELIB-202667723): includes evidence_valid_count and evidence-only
+    rows for packets that are evidence-valid but not active-valid.
+    """
     rows = list_named_packets(project_root)
     valid_rows = [row for row in rows if row.get("valid")]
+    evidence_only_rows = [row for row in rows if not row.get("valid") and row.get("evidence_valid")]
+    evidence_valid_count = sum(1 for row in rows if row.get("evidence_valid"))
     return {
         "compact": True,
         "packet_count": len(rows),
         "valid_count": len(valid_rows),
         "invalid_count": len(rows) - len(valid_rows),
         "invalid_packets_omitted": len(rows) - len(valid_rows),
+        "evidence_valid_count": evidence_valid_count,
         "packets": [
             {
                 "bridge_id": row.get("bridge_id"),
@@ -2678,8 +2926,25 @@ def list_named_packets_compact(project_root: Path) -> dict[str, Any]:
                 "expires_at": row.get("expires_at"),
                 "path": row.get("path"),
                 "error": row.get("error"),
+                "evidence_valid": row.get("evidence_valid"),
+                "evidence_error": row.get("evidence_error"),
+                "expired": row.get("expired"),
             }
             for row in valid_rows
+        ]
+        + [
+            {
+                "bridge_id": row.get("bridge_id"),
+                "valid": row.get("valid"),
+                "expires_at": row.get("expires_at"),
+                "path": row.get("path"),
+                "error": row.get("error"),
+                "evidence_valid": row.get("evidence_valid"),
+                "evidence_error": row.get("evidence_error"),
+                "expired": row.get("expired"),
+                "evidence_only": True,
+            }
+            for row in evidence_only_rows
         ],
     }
 
@@ -3009,10 +3274,18 @@ def main(argv: list[str] | None = None) -> int:
                 owner_sufficiency_deliberation_id=args.owner_sufficiency_deliberation_id,
                 session_id=session_id,
             )
+            written = None
             if not args.no_write:
                 packet = finalize_implementation_start_packet(root, packet, session_id=session_id)
-                write_started_packets(root, [packet])
-            print(json.dumps(packet, indent=2, sort_keys=True))
+                written = write_started_packets(root, [packet])
+            packet_paths: dict[str, str | None] = {}
+            if written:
+                named_path, active_path = written[0]
+                packet_paths["named"] = str(named_path)
+                packet_paths["active_pointer"] = str(active_path)
+            packet_paths["superseded_preserved"] = None
+            output = {"packet": packet, "packet_paths": packet_paths}
+            print(json.dumps(output, indent=2, sort_keys=True))
             return 0
         if args.command == "validate":
             result = validate_targets(root, args.target)

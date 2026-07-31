@@ -19,13 +19,22 @@ import sqlite3
 import sys
 import tomllib
 from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 
 try:
-    from scripts.implementation_authorization import PATH_TOKEN_RE
+    from scripts.implementation_authorization import (
+        PATH_TOKEN_RE,
+        AuthorizationError,
+        extract_and_validate_project_authorization,
+    )
 except ImportError:  # pragma: no cover - direct script execution path
-    from implementation_authorization import PATH_TOKEN_RE
+    from implementation_authorization import (  # type: ignore[no-redef]
+        PATH_TOKEN_RE,
+        AuthorizationError,
+        extract_and_validate_project_authorization,
+    )
 
 try:
     from scripts.bridge_author_metadata import REQUIRED_AUTHOR_METADATA_FIELDS
@@ -33,15 +42,25 @@ except ImportError:  # pragma: no cover - direct script execution path
     from bridge_author_metadata import REQUIRED_AUTHOR_METADATA_FIELDS
 
 try:
-    from groundtruth_kb.governance.project_authorization_operation_time import classify_target as _classify_target
+    from groundtruth_kb.governance.project_authorization_operation_time import (
+        classify_target as _classify_target,
+    )
+    from groundtruth_kb.governance.project_authorization_operation_time import (
+        evaluate_envelope as _evaluate_envelope,
+    )
+    from groundtruth_kb.governance.project_authorization_operation_time import (
+        load_operation_taxonomy as _load_operation_taxonomy,
+    )
 except ImportError:  # pragma: no cover
     _classify_target = None  # type: ignore[assignment]
+    _evaluate_envelope = None  # type: ignore[assignment]
+    _load_operation_taxonomy = None  # type: ignore[assignment]
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 DEFAULT_BRIDGE_DIR: Final[Path] = PROJECT_ROOT / "bridge"
 DEFAULT_CONFIG_PATH: Final[Path] = PROJECT_ROOT / "config" / "governance" / "spec-applicability.toml"
 DEFAULT_DB_PATH: Final[Path] = PROJECT_ROOT / "groundtruth.db"
-PACKET_HASH_SCHEMA_VERSION: Final[int] = 2
+PACKET_HASH_SCHEMA_VERSION: Final[int] = 3
 PACKET_HASH_MATERIAL_KEYS: Final[frozenset[str]] = frozenset(
     {
         "packet_hash_schema_version",
@@ -57,6 +76,7 @@ PACKET_HASH_MATERIAL_KEYS: Final[frozenset[str]] = frozenset(
         "applicable_specs",
         "missing_required_specs",
         "missing_advisory_specs",
+        "project_authorization_operation_time",
     }
 )
 
@@ -101,6 +121,20 @@ OPERATIVE_REFERENCE_RE: Final[re.Pattern[str]] = re.compile(
 PAUTH_AMENDMENT_SPEC_ID: Final[str] = "DCL-PROJECT-SPECIFICATION-AMENDMENT-APPROVAL-REQUIRED-001"
 OWNER_EVIDENCE_RE: Final[re.Pattern[str]] = re.compile(r"Owner evidence:\s*([^\s`)]+)", re.IGNORECASE)
 JSON_FENCE_RE: Final[re.Pattern[str]] = re.compile(r"```json\s*(.*?)```", re.IGNORECASE | re.DOTALL)
+BRIDGE_KIND_RE: Final[re.Pattern[str]] = re.compile(r"(?im)^\s*bridge_kind:\s*([a-z0-9_-]+)\s*$")
+VERSION_DECLARATION_RE: Final[re.Pattern[str]] = re.compile(r"(?im)^\s*Version:\s*(\d+)\s*$")
+PAUTH_METADATA_RE: Final[re.Pattern[str]] = re.compile(r"(?im)^\s*Project Authorization(?: ID)?:\s*\S+")
+APPROVED_PROPOSAL_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?im)^\s*Approved proposal:\s*`?(?:bridge/)?([A-Za-z0-9_.-]+)-(\d{3})\.md`?\s*$"
+)
+PROPOSAL_BRIDGE_KINDS: Final[frozenset[str]] = frozenset({"prime_proposal", "implementation_proposal"})
+FINALIZATION_BRIDGE_KINDS: Final[frozenset[str]] = frozenset(
+    {"implementation_report", "implementation_report_revision"}
+)
+PAUTH_PHASE_OPERATIONS: Final[dict[str, tuple[str, ...]]] = {
+    "proposal": ("implementation_packet_create", "implementation_start"),
+    "finalization": ("git_commit", "protected_mutation"),
+}
 
 
 @dataclass(frozen=True)
@@ -687,6 +721,41 @@ def _stable_applicable_specs(applicable: dict[str, ApplicableSpec]) -> dict[str,
 
 
 def _packet_hash_material(packet: dict[str, Any], applicable: dict[str, ApplicableSpec]) -> dict[str, Any]:
+    pauth = packet.get("project_authorization_operation_time") or {}
+    stable_pauth = {
+        "applicable": pauth.get("applicable"),
+        "phase": pauth.get("phase"),
+        "status": pauth.get("status"),
+        "allowed": pauth.get("allowed"),
+        "reason_code": pauth.get("reason_code"),
+        "authorization_id": pauth.get("authorization_id"),
+        "authorization_version": pauth.get("authorization_version"),
+        "project_id": pauth.get("project_id"),
+        "authorization_source": pauth.get("authorization_source"),
+        "requested_operations": pauth.get("requested_operations", []),
+        "cohort": pauth.get("cohort", []),
+        "target_classifications": pauth.get("target_classifications", []),
+        "decisions": [
+            {
+                key: decision.get(key)
+                for key in (
+                    "allowed",
+                    "reason_code",
+                    "authorization_id",
+                    "authorization_version",
+                    "normalized_envelope_hash",
+                    "normalized_operation",
+                    "classified_targets",
+                    "evaluator_id",
+                    "evaluator_version",
+                    "evaluator_sha256",
+                    "taxonomy_version",
+                    "taxonomy_sha256",
+                )
+            }
+            for decision in pauth.get("decisions", [])
+        ],
+    }
     material = {
         "packet_hash_schema_version": PACKET_HASH_SCHEMA_VERSION,
         "bridge_document_name": packet["bridge_document_name"],
@@ -701,10 +770,221 @@ def _packet_hash_material(packet: dict[str, Any], applicable: dict[str, Applicab
         "applicable_specs": _stable_applicable_specs(applicable),
         "missing_required_specs": packet["missing_required_specs"],
         "missing_advisory_specs": packet["missing_advisory_specs"],
+        "project_authorization_operation_time": stable_pauth,
     }
     if set(material) != PACKET_HASH_MATERIAL_KEYS:  # pragma: no cover - construction invariant
         raise RuntimeError("packet hash material key set drifted")
     return material
+
+
+def _bridge_kind(content: str) -> str | None:
+    match = BRIDGE_KIND_RE.search(content)
+    return match.group(1).lower() if match else None
+
+
+def _pauth_phase(content: str, versions: list[BridgeVersion]) -> str | None:
+    kind = _bridge_kind(content)
+    if kind in PROPOSAL_BRIDGE_KINDS:
+        return "proposal"
+    if kind in FINALIZATION_BRIDGE_KINDS:
+        return "finalization"
+    if PAUTH_METADATA_RE.search(content) and extract_declared_target_paths(content):
+        status = _status_from_content(content)
+        if status in {"NEW", "REVISED"} and any(version.status == "GO" for version in versions):
+            return "finalization"
+        return "proposal"
+    return None
+
+
+def _declared_version(content: str) -> int | None:
+    match = VERSION_DECLARATION_RE.search(content)
+    return int(match.group(1)) if match else None
+
+
+def _approved_proposal_for_report(
+    *,
+    bridge_id: str,
+    report_content: str,
+    versions: list[BridgeVersion],
+) -> tuple[str | None, str | None, str | None]:
+    report_version = _declared_version(report_content)
+
+    def approved_by_go(proposal: BridgeVersion) -> bool:
+        for verdict in versions:
+            if verdict.status != "GO" or verdict.version_number <= proposal.version_number:
+                continue
+            if report_version is not None and verdict.version_number >= report_version:
+                continue
+            try:
+                verdict_content = verdict.abs_path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            for reference_slug, reference_version in OPERATIVE_REFERENCE_RE.findall(verdict_content):
+                if reference_slug == bridge_id and int(reference_version) == proposal.version_number:
+                    return True
+        return False
+
+    explicit = APPROVED_PROPOSAL_RE.search(report_content)
+    if explicit:
+        explicit_slug, explicit_version_text = explicit.groups()
+        if explicit_slug != bridge_id:
+            return None, None, f"Approved proposal references a different bridge thread: {explicit_slug}"
+        explicit_version = int(explicit_version_text)
+        match = next((version for version in versions if version.version_number == explicit_version), None)
+        if match is None:
+            return None, None, f"Approved proposal version is absent: bridge/{bridge_id}-{explicit_version:03d}.md"
+        if report_version is not None and explicit_version >= report_version:
+            return None, None, "Approved proposal must precede the implementation report"
+        try:
+            proposal_content = match.abs_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            return None, None, f"Approved proposal is unreadable: {exc}"
+        if _bridge_kind(proposal_content) not in PROPOSAL_BRIDGE_KINDS:
+            return (
+                None,
+                None,
+                f"Approved proposal metadata does not identify a proposal-kind artifact: {match.rel_path}",
+            )
+        if not approved_by_go(match):
+            return None, None, f"Approved proposal has no matching earlier GO verdict: {match.rel_path}"
+        return proposal_content, match.rel_path, None
+
+    candidates: list[tuple[BridgeVersion, str]] = []
+    for version in versions:
+        if report_version is not None and version.version_number >= report_version:
+            continue
+        try:
+            candidate_content = version.abs_path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if _bridge_kind(candidate_content) in PROPOSAL_BRIDGE_KINDS and approved_by_go(version):
+            candidates.append((version, candidate_content))
+    if not candidates:
+        return (
+            None,
+            None,
+            "Implementation report has no readable earlier proposal-kind artifact with a matching GO verdict",
+        )
+    proposal, proposal_content = max(candidates, key=lambda item: item[0].version_number)
+    return proposal_content, proposal.rel_path, None
+
+
+def _pauth_phase_cohort(
+    *,
+    phase: str,
+    bridge_id: str,
+    content: str,
+    declared_target_paths: set[str],
+    versions: list[BridgeVersion],
+    approved_proposal_content: str | None = None,
+) -> list[str]:
+    cohort = set(declared_target_paths)
+    if phase != "finalization":
+        return sorted(cohort)
+
+    if approved_proposal_content is not None:
+        cohort.update(extract_declared_target_paths(approved_proposal_content))
+
+    declared_version = _declared_version(content)
+    observed_versions = [version.version_number for version in versions]
+    if declared_version is not None:
+        observed_versions.append(declared_version)
+    next_version = max(observed_versions, default=0) + 1
+    cohort.update(f"bridge/{bridge_id}-{version:03d}.md" for version in range(1, next_version + 1))
+    return sorted(cohort)
+
+
+def _evaluate_pauth_phase(
+    *,
+    content: str,
+    project_root: Path,
+    phase: str | None,
+    cohort: list[str],
+    cited_specs: set[str],
+    authorization_source: str | None = None,
+    decision_time: datetime | None = None,
+) -> tuple[dict[str, Any], list[str]]:
+    if phase is None:
+        return {
+            "applicable": False,
+            "phase": None,
+            "status": "not_applicable",
+            "requested_operations": [],
+            "cohort": [],
+            "allowed": None,
+            "reason_code": "not_applicable",
+            "decisions": [],
+        }, []
+
+    requested_operations = list(PAUTH_PHASE_OPERATIONS[phase])
+    base: dict[str, Any] = {
+        "applicable": True,
+        "phase": phase,
+        "status": "error",
+        "requested_operations": requested_operations,
+        "cohort": cohort,
+        "allowed": False,
+        "reason_code": "evaluation_error",
+        "authorization_source": authorization_source,
+        "decisions": [],
+    }
+    try:
+        envelope = extract_and_validate_project_authorization(
+            project_root,
+            content,
+            sorted(cited_specs),
+        )
+        if envelope is None:
+            raise AuthorizationError(
+                "implementation-bearing bridge content does not cite Project Authorization metadata"
+            )
+        if _evaluate_envelope is None or _load_operation_taxonomy is None:
+            raise AuthorizationError("canonical project-authorization operation evaluator is unavailable")
+        taxonomy = _load_operation_taxonomy(project_root)
+        effective_decision_time = (decision_time or datetime.now(UTC)).replace(microsecond=0)
+        decisions = [
+            _evaluate_envelope(
+                envelope,
+                requested_operation=operation,
+                target_paths=cohort,
+                decision_time=effective_decision_time,
+                taxonomy=taxonomy,
+            )
+            for operation in requested_operations
+        ]
+        decision_payloads = [decision.as_dict() for decision in decisions]
+        allowed = all(decision.allowed for decision in decisions)
+        base.update(
+            {
+                "authorization_id": envelope.get("id"),
+                "authorization_version": envelope.get("version"),
+                "project_id": envelope.get("project_id"),
+                "allowed": allowed,
+                "status": "allowed" if allowed else "denied",
+                "reason_code": "allowed"
+                if allowed
+                else next(decision.reason_code for decision in decisions if not decision.allowed),
+                "decisions": decision_payloads,
+                "target_classifications": (
+                    decision_payloads[0].get("classified_targets", []) if decision_payloads else []
+                ),
+                "evaluator_id": decision_payloads[0].get("evaluator_id") if decision_payloads else None,
+                "evaluator_version": decision_payloads[0].get("evaluator_version") if decision_payloads else None,
+                "evaluator_sha256": decision_payloads[0].get("evaluator_sha256") if decision_payloads else None,
+                "taxonomy_version": decision_payloads[0].get("taxonomy_version") if decision_payloads else None,
+                "taxonomy_sha256": decision_payloads[0].get("taxonomy_sha256") if decision_payloads else None,
+            }
+        )
+        errors = [
+            "PAUTH operation-time denial "
+            f"({decision.normalized_operation or operation}): {decision.reason_code}: {decision.reason}"
+            for operation, decision in zip(requested_operations, decisions, strict=True)
+            if not decision.allowed
+        ]
+        return base, errors
+    except (AuthorizationError, OSError, RuntimeError, ValueError) as exc:
+        base["error"] = str(exc)
+        return base, [f"PAUTH operation-time evaluation failed closed: {exc}"]
 
 
 def build_packet(
@@ -767,6 +1047,54 @@ def build_packet(
         sid for sid, item in applicable.items() if item.severity != "blocking" and sid not in cited_specs
     )
     blocking_errors = _pauth_amendment_blocking_errors(content, project_root, db_path)
+    pauth_phase = _pauth_phase(content, versions)
+    authorization_content = content
+    authorization_source = content_source.get("path")
+    authorization_specs = set(cited_specs)
+    proposal_error: str | None = None
+    approved_content: str | None = None
+    if pauth_phase == "finalization":
+        approved_content, approved_path, proposal_error = _approved_proposal_for_report(
+            bridge_id=bridge_id,
+            report_content=content,
+            versions=versions,
+        )
+        if approved_content is not None:
+            authorization_content = approved_content
+            authorization_source = approved_path
+            authorization_specs.update(extract_spec_links(approved_content))
+    pauth_cohort = _pauth_phase_cohort(
+        phase=pauth_phase or "proposal",
+        bridge_id=bridge_id,
+        content=content,
+        declared_target_paths=declared_target_paths,
+        versions=versions,
+        approved_proposal_content=approved_content,
+    )
+    if proposal_error is not None:
+        pauth_operation_time = {
+            "applicable": True,
+            "phase": pauth_phase,
+            "status": "error",
+            "requested_operations": list(PAUTH_PHASE_OPERATIONS[pauth_phase]),
+            "cohort": pauth_cohort,
+            "allowed": False,
+            "reason_code": "approved_proposal_resolution_failed",
+            "authorization_source": None,
+            "decisions": [],
+            "error": proposal_error,
+        }
+        pauth_errors = [f"PAUTH operation-time evaluation failed closed: {proposal_error}"]
+    else:
+        pauth_operation_time, pauth_errors = _evaluate_pauth_phase(
+            content=authorization_content,
+            project_root=project_root,
+            phase=pauth_phase,
+            cohort=pauth_cohort,
+            cited_specs=authorization_specs,
+            authorization_source=authorization_source,
+        )
+    blocking_errors.extend(pauth_errors)
     packet: dict[str, Any] = {
         "packet_hash_schema_version": PACKET_HASH_SCHEMA_VERSION,
         "bridge_document_name": bridge_id,
@@ -797,6 +1125,7 @@ def build_packet(
         "applicable_specs": {sid: asdict(item) for sid, item in sorted(applicable.items())},
         "missing_required_specs": missing_required,
         "missing_advisory_specs": advisory_missing,
+        "project_authorization_operation_time": pauth_operation_time,
         "blocking_errors": blocking_errors,
         "preflight_passed": not missing_required and not blocking_errors,
     }
@@ -846,6 +1175,40 @@ def format_markdown(packet: dict[str, Any]) -> str:
         f"- missing_advisory_specs: {json.dumps(packet['missing_advisory_specs'])}",
         f"- blocking_errors: {json.dumps(packet.get('blocking_errors', []))}",
     ]
+    pauth = packet.get("project_authorization_operation_time") or {}
+    if pauth.get("applicable"):
+        lines += [
+            "",
+            "### Project Authorization Operation-Time Evaluation",
+            "",
+            f"- phase: `{pauth.get('phase')}`",
+            f"- status: `{pauth.get('status')}`",
+            f"- reason_code: `{pauth.get('reason_code')}`",
+            f"- authorization_id: `{pauth.get('authorization_id')}`",
+            f"- authorization_version: `{pauth.get('authorization_version')}`",
+            f"- project_id: `{pauth.get('project_id')}`",
+            f"- authorization_source: `{pauth.get('authorization_source')}`",
+            f"- requested_operations: {json.dumps(pauth.get('requested_operations', []))}",
+            f"- cohort: {json.dumps(pauth.get('cohort', []))}",
+            f"- allowed: `{str(pauth.get('allowed')).lower()}`",
+            f"- evaluator: `{pauth.get('evaluator_id')}` v`{pauth.get('evaluator_version')}`",
+            f"- evaluator_sha256: `{pauth.get('evaluator_sha256')}`",
+            f"- taxonomy: v`{pauth.get('taxonomy_version')}` `{pauth.get('taxonomy_sha256')}`",
+        ]
+        if pauth.get("error"):
+            lines.append(f"- error: `{pauth['error']}`")
+        lines += [
+            "",
+            "| Operation | Allowed | Reason Code | Reason |",
+            "| --- | --- | --- | --- |",
+        ]
+        for decision in pauth.get("decisions", []):
+            reason = str(decision.get("reason") or "").replace("|", "\\|")
+            lines.append(
+                f"| `{decision.get('normalized_operation')}` | "
+                f"`{str(decision.get('allowed')).lower()}` | "
+                f"`{decision.get('reason_code')}` | {reason} |"
+            )
     if packet.get("missing_required_specs") and spec_links_diag.get("status") == "heading_unrecognized":
         lines.append(
             "- NOTE: a Specification-Links-like heading "
@@ -907,6 +1270,9 @@ def main(argv: list[str] | None = None) -> int:
             + ", ".join(str(path) for path in missing_parent_dirs)
             + "\n"
         )
+    pauth_status = (packet.get("project_authorization_operation_time") or {}).get("status")
+    if pauth_status == "error":
+        return 6
     return 0 if packet["preflight_passed"] else 5
 
 

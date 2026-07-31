@@ -101,6 +101,7 @@ from groundtruth_kb.project.lifecycle import (
 from groundtruth_kb.project.registry_control_plane import (
     RegistryControlPlaneError,
     amend_artifact,
+    append_passive_observation,
     consume_observation_capability,
     inspect_registry,
     load_registry_snapshot,
@@ -5668,22 +5669,89 @@ def registry_amend(
     click.echo(json.dumps(vars(receipt), indent=2, sort_keys=True))
 
 
-@registry_cmd.command("observe", hidden=True)
+@registry_cmd.command("observe")
 @click.option(
     "--event-file",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    required=True,
     help="Internal capability-bound post-tool event JSON.",
 )
+@click.option(
+    "--artifact",
+    "record_ids",
+    multiple=True,
+    help="Observe the present content of an existing registry artifact id.",
+)
+@click.option(
+    "--path",
+    "target_paths",
+    multiple=True,
+    help="Observe an existing registered project-relative path.",
+)
+@click.option("--change-reason", help="Required reason for an operator observation.")
+@click.option("--changed-by", default="registry-observer/cli", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.pass_context
-def registry_observe(ctx: click.Context, event_file: Path) -> None:
-    """Consume one internal observation capability; direct calls without it fail closed."""
+def registry_observe(
+    ctx: click.Context,
+    event_file: Path | None,
+    record_ids: tuple[str, ...],
+    target_paths: tuple[str, ...],
+    change_reason: str | None,
+    changed_by: str,
+    json_output: bool,
+) -> None:
+    """Record truthful present-content evidence for an existing registry identity."""
+
     try:
-        event = json.loads(event_file.read_text(encoding="utf-8"))
-        revisions = consume_observation_capability(**event, **_registry_control_kwargs(ctx))
+        if event_file is not None:
+            if record_ids or target_paths or change_reason:
+                raise click.UsageError("--event-file cannot be combined with operator observation options")
+            event = json.loads(event_file.read_text(encoding="utf-8"))
+            revisions = consume_observation_capability(**event, **_registry_control_kwargs(ctx))
+            payload = {"mode": "capability", "revision_ids": revisions}
+        else:
+            if not record_ids and not target_paths:
+                raise click.UsageError("provide at least one --artifact or --path")
+            if not str(change_reason or "").strip():
+                raise click.UsageError("--change-reason is required for an operator observation")
+            actor_session = next(
+                (
+                    str(os.environ.get(name) or "").strip()
+                    for name in (
+                        "GTKB_WORK_INTENT_SESSION_ID",
+                        "CODEX_SESSION_ID",
+                        "CODEX_THREAD_ID",
+                        "CLAUDE_CODE_SESSION_ID",
+                        "CLAUDE_SESSION_ID",
+                        "GTKB_INHERITED_SESSION_ID",
+                        "ANTIGRAVITY_SESSION_ID",
+                        "GTKB_SESSION_ID",
+                    )
+                    if str(os.environ.get(name) or "").strip()
+                ),
+                "unattributed_external",
+            )
+            revisions = append_passive_observation(
+                target_paths=target_paths,
+                record_ids=set(record_ids),
+                actor_session=actor_session,
+                changed_by=changed_by,
+                change_reason=str(change_reason).strip(),
+                **_registry_control_kwargs(ctx),
+            )
+            payload = {
+                "actor_session": actor_session,
+                "artifact_ids": sorted(set(record_ids)),
+                "mode": "operator",
+                "paths": list(target_paths),
+                "revision_ids": revisions,
+            }
     except (RegistryControlPlaneError, OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
         raise click.ClickException(str(exc)) from exc
-    click.echo(json.dumps({"revision_ids": revisions}, indent=2, sort_keys=True))
+    if json_output or event_file is not None:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        click.echo(f"Recorded {len(revisions)} registry observation revision(s).")
 
 
 @registry_cmd.command("sync")

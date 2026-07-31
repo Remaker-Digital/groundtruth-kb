@@ -13,6 +13,11 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+try:
+    from scripts.parity_discovery_diff import enumerate_hook_surfaces
+except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
+    from parity_discovery_diff import enumerate_hook_surfaces  # type: ignore[no-redef]
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FORMAL_APPROVAL_HOOK = ".claude/hooks/formal-artifact-approval-gate.py"
 BRIDGE_COMPLIANCE_HOOK = ".claude/hooks/bridge-compliance-gate.py"
@@ -371,45 +376,116 @@ def _start_wrapper_errors(wrapper_path: Path) -> list[str]:
     return errors
 
 
-def _codex_formal_hook_groups(codex_hooks: dict[str, Any]) -> list[dict[str, Any]]:
-    groups: list[dict[str, Any]] = []
-    for group in codex_hooks.get("hooks", {}).get("PreToolUse", []):
-        commands = [hook.get("command", "") for hook in group.get("hooks", []) if isinstance(hook.get("command"), str)]
-        if any(
-            _contains_hook_path(command, FORMAL_APPROVAL_HOOK)
-            or _contains_hook_wrapper(command, CODEX_FORMAL_APPROVAL_WRAPPER)
-            for command in commands
-        ):
-            groups.append(group)
-    return groups
+def _surface_stem(value: str | Path) -> str:
+    return Path(str(value).replace("\\", "/")).stem.lower()
 
 
-def _codex_bridge_compliance_hook_groups(codex_hooks: dict[str, Any], event_name: str) -> list[dict[str, Any]]:
-    """Return Codex hook groups whose commands reference the bridge-compliance family."""
-    groups: list[dict[str, Any]] = []
+def _codex_surface_routes(
+    codex_hooks: dict[str, Any],
+    event_name: str,
+    *required_surfaces: str | Path,
+    project_root: Path = PROJECT_ROOT,
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    """Return exact hook routes exposing any required direct or batch surface.
+
+    The public parity enumerator is the single parser for ``run_py_no_window``
+    batches. Missing, unreadable, malformed, or incomplete batch evidence
+    yields no child surface, so required routes fail closed without a second
+    batch parser here.
+    """
+
+    required = {_surface_stem(surface) for surface in required_surfaces}
+    routes: list[tuple[dict[str, Any], dict[str, Any]]] = []
     for group in codex_hooks.get("hooks", {}).get(event_name, []):
-        commands = [hook.get("command", "") for hook in group.get("hooks", []) if isinstance(hook.get("command"), str)]
-        if any(
-            _contains_hook_path(command, BRIDGE_COMPLIANCE_HOOK)
-            or _contains_hook_wrapper(command, CODEX_BRIDGE_COMPLIANCE_WRAPPER)
-            or _contains_hook_wrapper(command, CODEX_BRIDGE_COMPLIANCE_AUDIT_DISPATCHER)
-            for command in commands
-        ):
-            groups.append(group)
-    return groups
+        if not isinstance(group, dict):
+            continue
+        for hook in group.get("hooks", []):
+            if not isinstance(hook, dict):
+                continue
+            single_hook_group = dict(group)
+            single_hook_group["hooks"] = [hook]
+            surfaces = enumerate_hook_surfaces(
+                {"hooks": {event_name: [single_hook_group]}},
+                project_root=project_root,
+            )
+            if required.intersection(surface.lower() for surface in surfaces):
+                routes.append((group, hook))
+    return routes
 
 
-def _codex_workstream_hook_groups(codex_hooks: dict[str, Any], event_name: str) -> list[dict[str, Any]]:
+def _route_uses_batch(command: str) -> bool:
+    normalized = command.replace("\\", "/").lower()
+    return "--batch" in normalized and "run_py_no_window" in normalized
+
+
+def _batch_route_errors(command: str, hook: dict[str, Any], label: str) -> list[str]:
+    """Validate the outer no-window batch route without imposing child caps."""
+
+    errors: list[str] = []
+    normalized = command.replace("\\", "/").lower()
+    tokens = command.split()
+    if not tokens or not tokens[0].lower().endswith("pythonw.exe"):
+        errors.append(f"{label} batch route must launch through pythonw.exe")
+    if "run_py_no_window.py" in normalized or "run_py_no_window" not in normalized:
+        errors.append(f"{label} batch route must call the extensionless run_py_no_window wrapper")
+    if re.search(r"(?:^|\s)--batch(?:\s+|=)[A-Za-z0-9_.-]+(?:\s|$)", command) is None:
+        errors.append(f"{label} batch route must name one declarative batch")
+    if _uses_shell_command_substitution(command):
+        errors.append(f"{label} batch route must avoid shell command substitution")
+    timeout = hook.get("timeout")
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or float(timeout) <= 0:
+        errors.append(f"{label} batch route timeout must be a positive number")
+    return errors
+
+
+def _unique_route_groups(
+    routes: list[tuple[dict[str, Any], dict[str, Any]]],
+) -> list[dict[str, Any]]:
     groups: list[dict[str, Any]] = []
-    for group in codex_hooks.get("hooks", {}).get(event_name, []):
-        commands = [hook.get("command", "") for hook in group.get("hooks", []) if isinstance(hook.get("command"), str)]
-        if any(
-            _contains_hook_path(command, WORKSTREAM_FOCUS_HOOK)
-            or _contains_hook_wrapper(command, CODEX_WORKSTREAM_FOCUS_WRAPPER)
-            for command in commands
-        ):
+    for group, _hook in routes:
+        if not any(existing is group for existing in groups):
             groups.append(group)
     return groups
+
+
+def _codex_formal_hook_groups(
+    codex_hooks: dict[str, Any], *, project_root: Path = PROJECT_ROOT
+) -> list[dict[str, Any]]:
+    routes = _codex_surface_routes(
+        codex_hooks,
+        "PreToolUse",
+        FORMAL_APPROVAL_HOOK,
+        CODEX_FORMAL_APPROVAL_WRAPPER,
+        project_root=project_root,
+    )
+    return _unique_route_groups(routes)
+
+
+def _codex_bridge_compliance_hook_groups(
+    codex_hooks: dict[str, Any], event_name: str, *, project_root: Path = PROJECT_ROOT
+) -> list[dict[str, Any]]:
+    routes = _codex_surface_routes(
+        codex_hooks,
+        event_name,
+        BRIDGE_COMPLIANCE_HOOK,
+        CODEX_BRIDGE_COMPLIANCE_WRAPPER,
+        CODEX_BRIDGE_COMPLIANCE_AUDIT_DISPATCHER,
+        project_root=project_root,
+    )
+    return _unique_route_groups(routes)
+
+
+def _codex_workstream_hook_groups(
+    codex_hooks: dict[str, Any], event_name: str, *, project_root: Path = PROJECT_ROOT
+) -> list[dict[str, Any]]:
+    routes = _codex_surface_routes(
+        codex_hooks,
+        event_name,
+        WORKSTREAM_FOCUS_HOOK,
+        CODEX_WORKSTREAM_FOCUS_WRAPPER,
+        project_root=project_root,
+    )
+    return _unique_route_groups(routes)
 
 
 def _function_body_text(source_text: str, function_name: str) -> str:
@@ -1133,21 +1209,28 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         errors.extend(_resolution_table_parity_errors(project_root))
         return errors
 
-    formal_groups = _codex_formal_hook_groups(codex_hooks)
-    if not formal_groups:
+    formal_routes = _codex_surface_routes(
+        codex_hooks,
+        "PreToolUse",
+        FORMAL_APPROVAL_HOOK,
+        CODEX_FORMAL_APPROVAL_WRAPPER,
+        project_root=project_root,
+    )
+    if not formal_routes:
         errors.append(".codex/hooks.json does not register the formal artifact approval PreToolUse hook")
-    for group in formal_groups:
+    elif len(formal_routes) != 1:
+        errors.append("Codex formal artifact PreToolUse:Bash hook must have exactly one expanded route")
+    for group, hook in formal_routes:
         if group.get("matcher") != "Bash":
             errors.append("Codex formal artifact PreToolUse hook must use matcher = 'Bash'")
-        for hook in group.get("hooks", []):
-            command = hook.get("command", "")
-            if not isinstance(command, str) or not (
-                _contains_hook_path(command, FORMAL_APPROVAL_HOOK)
-                or _contains_hook_wrapper(command, CODEX_FORMAL_APPROVAL_WRAPPER)
-            ):
-                continue
-            if hook.get("type") != "command":
-                errors.append("Codex formal artifact hook must be a command hook")
+        command = hook.get("command", "")
+        if not isinstance(command, str):
+            continue
+        if hook.get("type") != "command":
+            errors.append("Codex formal artifact hook must be a command hook")
+        if _route_uses_batch(command):
+            errors.extend(_batch_route_errors(command, hook, "Codex formal artifact hook"))
+        else:
             if _uses_shell_command_substitution(command):
                 errors.append("Codex formal artifact hook command must avoid shell command substitution")
             if not _contains_hook_wrapper(command, CODEX_FORMAL_APPROVAL_WRAPPER):
@@ -1163,25 +1246,32 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     )
     codex_hooks_enabled = _codex_hooks_enabled(codex_config)
     if claude_has_bridge_compliance and codex_hooks_enabled:
-        bridge_pre_groups = _codex_bridge_compliance_hook_groups(codex_hooks, "PreToolUse")
-        if not bridge_pre_groups:
+        bridge_pre_routes = _codex_surface_routes(
+            codex_hooks,
+            "PreToolUse",
+            BRIDGE_COMPLIANCE_HOOK,
+            CODEX_BRIDGE_COMPLIANCE_WRAPPER,
+            project_root=project_root,
+        )
+        if not bridge_pre_routes:
             errors.append(
                 ".codex/hooks.json must register the bridge-compliance PreToolUse:Bash hook when "
                 "Claude's bridge-compliance-gate.py is active "
                 "(per SPEC-CODEX-HARNESS-GOVERNANCE-PARITY-001 A1)"
             )
-        for group in bridge_pre_groups:
+        elif len(bridge_pre_routes) != 1:
+            errors.append("Codex bridge-compliance PreToolUse:Bash hook must have exactly one expanded route")
+        for group, hook in bridge_pre_routes:
             if group.get("matcher") != "Bash":
                 errors.append("Codex bridge-compliance PreToolUse hook must use matcher = 'Bash'")
-            for hook in group.get("hooks", []):
-                command = hook.get("command", "")
-                if not isinstance(command, str) or not (
-                    _contains_hook_path(command, BRIDGE_COMPLIANCE_HOOK)
-                    or _contains_hook_wrapper(command, CODEX_BRIDGE_COMPLIANCE_WRAPPER)
-                ):
-                    continue
-                if hook.get("type") != "command":
-                    errors.append("Codex bridge-compliance hook must be a command hook")
+            command = hook.get("command", "")
+            if not isinstance(command, str):
+                continue
+            if hook.get("type") != "command":
+                errors.append("Codex bridge-compliance hook must be a command hook")
+            if _route_uses_batch(command):
+                errors.extend(_batch_route_errors(command, hook, "Codex bridge-compliance hook"))
+            else:
                 if _uses_shell_command_substitution(command):
                     errors.append("Codex bridge-compliance hook command must avoid shell command substitution")
                 if not _contains_hook_wrapper(command, CODEX_BRIDGE_COMPLIANCE_WRAPPER):
@@ -1190,25 +1280,32 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
                 if not isinstance(timeout, int) or timeout > 5:
                     errors.append("Codex bridge-compliance hook timeout must be an integer no greater than 5 seconds")
 
-        bridge_post_groups = _codex_bridge_compliance_hook_groups(codex_hooks, "PostToolUse")
-        if not bridge_post_groups:
+        bridge_post_routes = _codex_surface_routes(
+            codex_hooks,
+            "PostToolUse",
+            BRIDGE_COMPLIANCE_HOOK,
+            CODEX_BRIDGE_COMPLIANCE_AUDIT_DISPATCHER,
+            project_root=project_root,
+        )
+        if not bridge_post_routes:
             errors.append(
                 ".codex/hooks.json must register the bridge-compliance PostToolUse:Bash audit hook when "
                 "Claude's bridge-compliance-gate.py is active "
                 "(per SPEC-CODEX-HARNESS-GOVERNANCE-PARITY-001 A1)"
             )
-        for group in bridge_post_groups:
+        elif len(bridge_post_routes) != 1:
+            errors.append("Codex bridge-compliance PostToolUse:Bash hook must have exactly one expanded route")
+        for group, hook in bridge_post_routes:
             if group.get("matcher") not in ("Bash", None, ""):
                 errors.append("Codex bridge-compliance PostToolUse hook must use matcher = 'Bash' or no matcher")
-            for hook in group.get("hooks", []):
-                command = hook.get("command", "")
-                if not isinstance(command, str) or not (
-                    _contains_hook_path(command, BRIDGE_COMPLIANCE_HOOK)
-                    or _contains_hook_wrapper(command, CODEX_BRIDGE_COMPLIANCE_AUDIT_DISPATCHER)
-                ):
-                    continue
-                if hook.get("type") != "command":
-                    errors.append("Codex bridge-compliance audit hook must be a command hook")
+            command = hook.get("command", "")
+            if not isinstance(command, str):
+                continue
+            if hook.get("type") != "command":
+                errors.append("Codex bridge-compliance audit hook must be a command hook")
+            if _route_uses_batch(command):
+                errors.extend(_batch_route_errors(command, hook, "Codex bridge-compliance audit hook"))
+            else:
                 if _uses_shell_command_substitution(command):
                     errors.append("Codex bridge-compliance audit command must avoid shell command substitution")
                 if not _contains_hook_wrapper(command, CODEX_BRIDGE_COMPLIANCE_AUDIT_DISPATCHER):
@@ -1236,25 +1333,32 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
             )
         )
 
-    workstream_pre_tool_groups = _codex_workstream_hook_groups(codex_hooks, "PreToolUse")
-    if not workstream_pre_tool_groups:
+    workstream_pre_routes = _codex_surface_routes(
+        codex_hooks,
+        "PreToolUse",
+        WORKSTREAM_FOCUS_HOOK,
+        CODEX_WORKSTREAM_FOCUS_WRAPPER,
+        project_root=project_root,
+    )
+    if not workstream_pre_routes:
         errors.append(".codex/hooks.json does not register the workstream focus PreToolUse hook")
-    workstream_pre_tool_matchers = {group.get("matcher") for group in workstream_pre_tool_groups}
     for matcher in ("Bash", "apply_patch"):
-        if matcher not in workstream_pre_tool_matchers:
+        route_count = sum(group.get("matcher") == matcher for group, _hook in workstream_pre_routes)
+        if route_count == 0:
             errors.append(f"Codex workstream focus PreToolUse hook must cover matcher = {matcher!r}")
-    for group in workstream_pre_tool_groups:
+        elif route_count != 1:
+            errors.append(f"Codex workstream focus PreToolUse:{matcher} must have exactly one expanded route")
+    for group, hook in workstream_pre_routes:
         if group.get("matcher") not in {"Bash", "apply_patch"}:
             errors.append("Codex workstream focus PreToolUse hook must use matcher = 'Bash' or 'apply_patch'")
-        for hook in group.get("hooks", []):
-            command = hook.get("command", "")
-            if not isinstance(command, str) or not (
-                _contains_hook_path(command, WORKSTREAM_FOCUS_HOOK)
-                or _contains_hook_wrapper(command, CODEX_WORKSTREAM_FOCUS_WRAPPER)
-            ):
-                continue
-            if hook.get("type") != "command":
-                errors.append("Codex workstream focus hook must be a command hook")
+        command = hook.get("command", "")
+        if not isinstance(command, str):
+            continue
+        if hook.get("type") != "command":
+            errors.append("Codex workstream focus hook must be a command hook")
+        if _route_uses_batch(command):
+            errors.extend(_batch_route_errors(command, hook, "Codex workstream focus hook"))
+        else:
             if _uses_shell_command_substitution(command):
                 errors.append("Codex workstream focus hook command must avoid shell command substitution")
             if not _contains_hook_wrapper(command, CODEX_WORKSTREAM_FOCUS_WRAPPER):
@@ -1263,19 +1367,26 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
             if not isinstance(timeout, int) or timeout > 10:
                 errors.append("Codex workstream focus hook timeout must be an integer no greater than 10 seconds")
 
-    workstream_prompt_groups = _codex_workstream_hook_groups(codex_hooks, "UserPromptSubmit")
-    if not workstream_prompt_groups:
+    workstream_prompt_routes = _codex_surface_routes(
+        codex_hooks,
+        "UserPromptSubmit",
+        WORKSTREAM_FOCUS_HOOK,
+        CODEX_WORKSTREAM_FOCUS_WRAPPER,
+        project_root=project_root,
+    )
+    if not workstream_prompt_routes:
         errors.append(".codex/hooks.json does not register the workstream focus UserPromptSubmit hook")
-    for group in workstream_prompt_groups:
-        for hook in group.get("hooks", []):
-            command = hook.get("command", "")
-            if not isinstance(command, str) or not (
-                _contains_hook_path(command, WORKSTREAM_FOCUS_HOOK)
-                or _contains_hook_wrapper(command, CODEX_WORKSTREAM_FOCUS_WRAPPER)
-            ):
-                continue
-            if hook.get("type") != "command":
-                errors.append("Codex workstream focus UserPromptSubmit hook must be a command hook")
+    elif len(workstream_prompt_routes) != 1:
+        errors.append("Codex workstream focus UserPromptSubmit must have exactly one expanded route")
+    for _group, hook in workstream_prompt_routes:
+        command = hook.get("command", "")
+        if not isinstance(command, str):
+            continue
+        if hook.get("type") != "command":
+            errors.append("Codex workstream focus UserPromptSubmit hook must be a command hook")
+        if _route_uses_batch(command):
+            errors.extend(_batch_route_errors(command, hook, "Codex workstream focus UserPromptSubmit hook"))
+        else:
             if _uses_shell_command_substitution(command):
                 errors.append("Codex workstream focus UserPromptSubmit command must avoid shell command substitution")
             if not _contains_hook_wrapper(command, CODEX_WORKSTREAM_FOCUS_WRAPPER):
@@ -1310,13 +1421,15 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         encoding="utf-8"
     ):
         errors.append("Codex legacy session_stop_dispatch.py must discover the role profile instead of forcing one")
-    stop_commands = _commands_for_event(codex_hooks, "Stop")
-    if any(
-        _contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT)
-        or _contains_hook_wrapper(command, CODEX_SESSION_STOP_DISPATCHER)
-        or _contains_hook_wrapper(command, CODEX_WRAPUP_TRIGGER_DISPATCHER)
-        for command in stop_commands
-    ):
+    stop_lifecycle_routes = _codex_surface_routes(
+        codex_hooks,
+        "Stop",
+        SESSION_SELF_INITIALIZATION_SCRIPT,
+        CODEX_SESSION_STOP_DISPATCHER,
+        CODEX_WRAPUP_TRIGGER_DISPATCHER,
+        project_root=project_root,
+    )
+    if stop_lifecycle_routes:
         errors.append(
             "Codex wrap-up must not be registered on Stop; use the explicit UserPromptSubmit trigger dispatcher"
         )
@@ -1327,34 +1440,31 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     }
 
     for event_name, (wrapper_path, _required_flag) in lifecycle_wrappers.items():
-        hook_entries = [
-            hook
-            for group in codex_hooks.get("hooks", {}).get(event_name, [])
-            for hook in group.get("hooks", [])
-            if isinstance(hook.get("command"), str)
-        ]
-        commands = [hook["command"] for hook in hook_entries]
-        matching_commands = [
-            command
-            for command in commands
-            if _contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT)
-            or _contains_hook_wrapper(command, wrapper_path)
-        ]
-        if not matching_commands:
+        lifecycle_routes = _codex_surface_routes(
+            codex_hooks,
+            event_name,
+            SESSION_SELF_INITIALIZATION_SCRIPT,
+            wrapper_path,
+            project_root=project_root,
+        )
+        if not lifecycle_routes:
             errors.append(f".codex/hooks.json does not register the {event_name} session lifecycle hook")
-        for command in matching_commands:
-            if _uses_shell_command_substitution(command):
+        elif len(lifecycle_routes) != 1:
+            errors.append(f"Codex {event_name} session lifecycle hook must have exactly one expanded route")
+        for _group, hook in lifecycle_routes:
+            command = hook.get("command", "")
+            if not isinstance(command, str):
+                continue
+            if hook.get("type") != "command":
+                errors.append(f"Codex {event_name} lifecycle hook must be a command hook")
+            if _route_uses_batch(command):
+                errors.extend(_batch_route_errors(command, hook, f"Codex {event_name} lifecycle hook"))
+            elif _uses_shell_command_substitution(command):
                 errors.append(f"Codex {event_name} hook command must avoid shell command substitution")
-            if not _contains_hook_wrapper(command, wrapper_path):
+            if not _route_uses_batch(command) and not _contains_hook_wrapper(command, wrapper_path):
                 errors.append(f"Codex {event_name} hook command must call the no-space wrapper")
         if event_name == "SessionStart":
-            for hook in hook_entries:
-                command = hook["command"]
-                if not (
-                    _contains_hook_path(command, SESSION_SELF_INITIALIZATION_SCRIPT)
-                    or _contains_hook_wrapper(command, wrapper_path)
-                ):
-                    continue
+            for _group, hook in lifecycle_routes:
                 timeout = hook.get("timeout")
                 if not isinstance(timeout, int) or timeout < 60:
                     errors.append("Codex SessionStart hook timeout must be at least 60 seconds")

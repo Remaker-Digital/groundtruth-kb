@@ -75,7 +75,8 @@ def test_staged_python_files_filters_to_py(tmp_path):
 def test_check_files_passes_on_formatted(tmp_path):
     ruff = guardrail.resolve_ruff(REPO_ROOT)
     assert ruff is not None, "project venv ruff must resolve in this checkout"
-    (tmp_path / "f.py").write_text(_FORMATTED, encoding="utf-8")
+    _init_repo(tmp_path)
+    _stage(tmp_path, "f.py", _FORMATTED)
     ok, _ = guardrail.check_files(ruff, ["f.py"], tmp_path)
     assert ok is True
 
@@ -83,9 +84,21 @@ def test_check_files_passes_on_formatted(tmp_path):
 def test_check_files_fails_on_unformatted(tmp_path):
     ruff = guardrail.resolve_ruff(REPO_ROOT)
     assert ruff is not None
-    (tmp_path / "f.py").write_text(_UNFORMATTED, encoding="utf-8")
+    _init_repo(tmp_path)
+    _stage(tmp_path, "f.py", _UNFORMATTED)
     ok, _ = guardrail.check_files(ruff, ["f.py"], tmp_path)
     assert ok is False
+
+
+def test_check_files_fails_closed_when_staged_blob_is_unreadable(tmp_path, monkeypatch):
+    ruff = guardrail.resolve_ruff(REPO_ROOT)
+    assert ruff is not None
+    monkeypatch.setattr(guardrail, "_staged_blob", lambda _root, _path: None)
+
+    ok, output = guardrail.check_files(ruff, ["missing.py"], tmp_path)
+
+    assert ok is False
+    assert "Unable to read staged blob: missing.py" in output
 
 
 # --- F2 regression: deterministic venv-first resolution ---------------------- #
@@ -134,6 +147,7 @@ def test_main_blocks_unformatted(tmp_path):
     assert result.returncode == 1, result.stdout + result.stderr
     assert "[FAIL]" in result.stdout
     assert "bad.py" in result.stdout
+    assert "then re-stage (git add)" in result.stdout
 
 
 def test_main_ignores_non_python(tmp_path):
@@ -143,3 +157,58 @@ def test_main_ignores_non_python(tmp_path):
     result = _run_guardrail(tmp_path)
     # The .md is ignored; only the formatted .py is checked -> PASS.
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_main_checks_staged_lf_blob_not_mixed_eol_worktree(tmp_path):
+    _init_repo(tmp_path)
+    _stage(tmp_path, "mixed.py", "x = [1, 2, 3]\ny = 4\n")
+    (tmp_path / "mixed.py").write_bytes(b"x = [1, 2, 3]\r\ny = 4\n")
+    ruff = guardrail.resolve_ruff(REPO_ROOT)
+    assert ruff is not None
+    path_check = subprocess.run(
+        ruff + ["format", "--check", "mixed.py"],
+        cwd=tmp_path,
+        capture_output=True,
+    )
+    assert path_check.returncode != 0, "fixture must reproduce the old path-based false failure"
+
+    result = _run_guardrail(tmp_path)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_main_pins_index_vs_worktree_divergence_both_directions(tmp_path):
+    _init_repo(tmp_path)
+    _stage(tmp_path, "clean_index.py", _FORMATTED)
+    (tmp_path / "clean_index.py").write_text(_UNFORMATTED, encoding="utf-8")
+
+    clean_index = _run_guardrail(tmp_path)
+
+    assert clean_index.returncode == 0, clean_index.stdout + clean_index.stderr
+
+    _stage(tmp_path, "dirty_index.py", _UNFORMATTED)
+    (tmp_path / "dirty_index.py").write_text(_FORMATTED, encoding="utf-8")
+
+    dirty_index = _run_guardrail(tmp_path)
+
+    assert dirty_index.returncode == 1, dirty_index.stdout + dirty_index.stderr
+    assert "dirty_index.py" in dirty_index.stdout
+
+
+def test_main_autocrlf_staged_blob_still_blocks_real_format_error(tmp_path):
+    _init_repo(tmp_path)
+    subprocess.run(["git", "config", "core.autocrlf", "true"], cwd=tmp_path, check=True)
+    (tmp_path / "bad_crlf.py").write_bytes(b"x = [1,2,3]\r\n")
+    subprocess.run(["git", "add", "bad_crlf.py"], cwd=tmp_path, check=True)
+    staged = subprocess.run(
+        ["git", "show", ":0:bad_crlf.py"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    ).stdout
+    assert b"\r\n" not in staged
+
+    result = _run_guardrail(tmp_path)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "bad_crlf.py" in result.stdout

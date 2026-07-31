@@ -6,6 +6,7 @@ Licensed under AGPL-3.0-or-later.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import sys
@@ -109,9 +110,31 @@ def _current_row(db_path: Path, spec_id: str) -> sqlite3.Row | None:
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
         return conn.execute(
-            "SELECT id, version, title, status, type, description, priority FROM current_specifications WHERE id = ?",
+            "SELECT * FROM current_specifications WHERE id = ?",
             (spec_id,),
         ).fetchone()
+
+
+def _semantic_postimage(row: sqlite3.Row) -> dict[str, object]:
+    structured = {"tags", "assertions", "constraints", "affected_by", "source_paths"}
+    names = (
+        "title",
+        "status",
+        "priority",
+        "scope",
+        "section",
+        "handle",
+        "tags",
+        "assertions",
+        "constraints",
+        "affected_by",
+        "testability",
+        "source_paths",
+        "application_scope",
+    )
+    return {
+        name: json.loads(row[name]) if name in structured and row[name] is not None else row[name] for name in names
+    }
 
 
 def _packet_files(root: Path) -> list[Path]:
@@ -190,11 +213,180 @@ def test_dry_run_constructs_valid_update_packet_and_writes_nothing(tmp_path: Pat
     assert packet["artifact_id"] == "GOV-UPD-001"
     assert packet["artifact_type"] == "governance"
     assert packet["full_content"] == new_body.read_text(encoding="utf-8")
+    assert (
+        packet["full_content_sha256"]
+        == hashlib.sha256(new_body.read_text(encoding="utf-8").encode("utf-8")).hexdigest()
+    )
+    assert packet["postimage_fields"] == {
+        "title": "Seed spec",
+        "status": "specified",
+        "priority": None,
+        "scope": None,
+        "section": None,
+        "handle": None,
+        "tags": None,
+        "assertions": None,
+        "constraints": None,
+        "affected_by": None,
+        "testability": None,
+        "source_paths": None,
+        "application_scope": None,
+    }
     assert payload["dry_run"] is True
     assert payload["to_version"] == 2
     # No DB write, no new packet file.
     assert _spec_versions(root / "groundtruth.db", "GOV-UPD-001") == [1]
     assert _packet_files(root) == before
+
+
+def test_structured_update_packet_matches_dry_run_and_persisted_postimage(tmp_path: Path) -> None:
+    root, config, content = _project(tmp_path)
+    _seed_spec(config, content)
+    new_body = _content(root, "structured.md", "Structured update body.\n")
+    structured_args = (
+        "--title",
+        "Structured title",
+        "--status",
+        "implemented",
+        "--priority",
+        "P1",
+        "--scope",
+        "platform",
+        "--section",
+        "Governance",
+        "--handle",
+        "structured-handle",
+        "--tags-json",
+        '["approval", "café"]',
+        "--assertions-json",
+        '[{"type": "file_exists", "file": "README.md"}]',
+        "--constraints-json",
+        '{"mode": "strict"}',
+        "--affected-by-json",
+        '["ADR-TEST-001"]',
+        "--testability",
+        "structural",
+        "--source-paths-json",
+        '["groundtruth-kb/src/**/*.py"]',
+        "--application-scope",
+        "gtkb_platform",
+    )
+    expected = {
+        "title": "Structured title",
+        "status": "implemented",
+        "priority": "P1",
+        "scope": "platform",
+        "section": "Governance",
+        "handle": "structured-handle",
+        "tags": ["approval", "café"],
+        "assertions": [{"type": "file_exists", "file": "README.md"}],
+        "constraints": {"mode": "strict"},
+        "affected_by": ["ADR-TEST-001"],
+        "testability": "structural",
+        "source_paths": ["groundtruth-kb/src/**/*.py"],
+        "application_scope": "gtkb_platform",
+    }
+
+    dry_result = CliRunner().invoke(
+        main,
+        _update_args(config, new_body, "--owner-presented", "--dry-run", "--json", *structured_args),
+    )
+    assert dry_result.exit_code == 0, dry_result.output
+    dry_payload = json.loads(dry_result.output)
+    assert dry_payload["approval_packet"]["postimage_fields"] == expected
+
+    write_result = CliRunner().invoke(
+        main,
+        _update_args(config, new_body, "--owner-presented", "--json", *structured_args),
+    )
+    assert write_result.exit_code == 0, write_result.output
+    write_payload = json.loads(write_result.output)
+    assert write_payload["approval_packet"]["postimage_fields"] == expected
+    assert write_payload["approval_packet"]["postimage_sha256"] == dry_payload["approval_packet"]["postimage_sha256"]
+
+    row = _current_row(root / "groundtruth.db", "GOV-UPD-001")
+    assert row is not None
+    assert _semantic_postimage(row) == expected
+
+
+def test_update_postimage_preserves_explicit_empty_collections(tmp_path: Path) -> None:
+    root, config, content = _project(tmp_path)
+    _seed_spec(
+        config,
+        content,
+        "--tags-json",
+        '["seed"]',
+        "--assertions-json",
+        '[{"type": "file_exists", "file": "README.md"}]',
+        "--constraints-json",
+        '{"seed": true}',
+        "--affected-by-json",
+        '["ADR-SEED-001"]',
+        "--source-paths-json",
+        '["seed.py"]',
+    )
+    new_body = _content(root, "empty-collections.md", "Explicit empty collections.\n")
+    result = CliRunner().invoke(
+        main,
+        _update_args(
+            config,
+            new_body,
+            "--owner-presented",
+            "--json",
+            "--tags-json",
+            "[]",
+            "--assertions-json",
+            "[]",
+            "--constraints-json",
+            "{}",
+            "--affected-by-json",
+            "[]",
+            "--source-paths-json",
+            "[]",
+        ),
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    postimage = payload["approval_packet"]["postimage_fields"]
+    assert {name: postimage[name] for name in ("tags", "assertions", "constraints", "affected_by", "source_paths")} == {
+        "tags": [],
+        "assertions": [],
+        "constraints": {},
+        "affected_by": [],
+        "source_paths": [],
+    }
+    row = _current_row(root / "groundtruth.db", "GOV-UPD-001")
+    assert row is not None
+    assert _semantic_postimage(row) == postimage
+
+
+def test_description_only_update_carries_current_semantic_postimage(tmp_path: Path) -> None:
+    root, config, content = _project(tmp_path)
+    _seed_spec(
+        config,
+        content,
+        "--priority",
+        "P2",
+        "--tags-json",
+        '["carried"]',
+        "--constraints-json",
+        '{"limit": 2}',
+    )
+    current = _current_row(root / "groundtruth.db", "GOV-UPD-001")
+    assert current is not None
+    expected = _semantic_postimage(current)
+    new_body = _content(root, "description-only.md", "Description only.\n")
+
+    result = CliRunner().invoke(
+        main,
+        _update_args(config, new_body, "--owner-presented", "--dry-run", "--json"),
+    )
+    assert result.exit_code == 0, result.output
+    packet = json.loads(result.output)["approval_packet"]
+
+    assert packet["full_content"] == "Description only.\n"
+    assert packet["full_content_sha256"] == hashlib.sha256(b"Description only.\n").hexdigest()
+    assert packet["postimage_fields"] == expected
 
 
 # --- T-SU-5: content file outside project root is rejected -----------------

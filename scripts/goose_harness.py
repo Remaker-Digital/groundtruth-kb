@@ -5,6 +5,8 @@ Wraps `goose run` CLI to provide a provider-harness-compatible interface
 for the Alibaba-hosted DeepSeek V4 Pro model via the Goose desktop CLI.
 
 Phase 1: thin CLI wrapper. Phase 2 target: direct Alibaba API harness.
+WI-5831 (Goose Execution Reliability Floor): integrates the execution guard
+for write verification, leak detection, and provenance-drift detection.
 """
 
 from __future__ import annotations
@@ -13,9 +15,16 @@ import argparse
 import json
 import subprocess
 import sys
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
+from goose_execution_guard import (
+    ExecutionFloorConfig,
+    RunDiagnostic,
+    evaluate_run,
+    export_model_configuration,
+)
 from windows_subprocess import no_window_subprocess_kwargs
 
 AUTHOR_IDENTITY = "Goose G"
@@ -108,12 +117,23 @@ def build_system_prompt(skill: str | None) -> str | None:
     return skill_prompts.get(skill)
 
 
+def _load_floor_config(project_root: Path) -> ExecutionFloorConfig:
+    """Load the execution reliability floor configuration."""
+    config_path = project_root / "config" / "agent-control" / "goose-execution-floor.toml"
+    return ExecutionFloorConfig.from_toml(config_path)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     parser = build_arg_parser()
     args = parser.parse_args(raw_argv)
 
     project_root = Path(args.project_root).resolve() if args.project_root else resolve_project_root()
+
+    # WI-5831: Export live model configuration before spawning the child.
+    # This ensures the child environment carries the spawn model identity
+    # for provenance-guard comparison.
+    export_model_configuration(args.model or "")
 
     goose_cli = _find_goose_cli()
 
@@ -140,6 +160,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.model:
         cmd.extend(["--model", args.model])
 
+    # WI-5831: Record the spawn window start for run-window sweep and
+    # provenance-guard time-bounding.
+    window_start = time.time()
+
     try:
         result = subprocess.run(
             cmd,
@@ -165,6 +189,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
 
+    # WI-5831: Record the spawn window end.
+    window_end = time.time()
+
     if result.returncode != 0:
         print(
             f"goose_harness: goose run exited {result.returncode}: {result.stderr[:500]}",
@@ -186,6 +213,36 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not messages:
         print("goose_harness: no messages in goose output", file=sys.stderr)
         return 1
+
+    # WI-5831: Run the execution reliability floor guard after payload parsing
+    # but before returning. This runs every enabled check and emits structured
+    # diagnostics on stderr if findings are detected.
+    floor_config = _load_floor_config(project_root)
+    diagnostic: RunDiagnostic = evaluate_run(
+        data,
+        project_root,
+        floor_config,
+        window_start=window_start,
+        window_end=window_end,
+        max_turns=args.max_turns,
+    )
+
+    if diagnostic.findings:
+        print(diagnostic.to_json(), file=sys.stderr)
+        # Still extract and print assistant text so the caller sees the content,
+        # but exit with the diagnostic's non-zero code.
+        for msg in reversed(messages):
+            if msg.get("role") == "assistant":
+                content = msg.get("content", [])
+                text_blocks = [
+                    block.get("text", "")
+                    for block in content
+                    if isinstance(block, dict) and block.get("type") == "text"
+                ]
+                if text_blocks:
+                    print("\n".join(text_blocks))
+                    break
+        return diagnostic.exit_code
 
     # Extract the final assistant text message
     for msg in reversed(messages):

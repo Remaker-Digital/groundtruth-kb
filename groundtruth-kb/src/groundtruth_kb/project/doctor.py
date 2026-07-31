@@ -2576,7 +2576,7 @@ def _check_skill_rename_reference_sweep(target: Path) -> ToolCheck:
         completed = subprocess.run(
             ["git", "-C", str(target), "grep", "-n", "-E", grep_pattern],
             capture_output=True,
-            text=True,
+            text=False,
             timeout=30,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
@@ -2600,7 +2600,18 @@ def _check_skill_rename_reference_sweep(target: Path) -> ToolCheck:
     excluded = ("bridge/", "RETIRED-", "BARRED-", "archive/", "archive-", ".gtkb-state/")
     hits: list[str] = []
     if completed.returncode == 0:
-        for line in completed.stdout.splitlines():
+        stdout_text = (
+            completed.stdout.decode("utf-8", errors="replace") if isinstance(completed.stdout, bytes) else None
+        )
+        if not stdout_text:
+            return ToolCheck(
+                name=name,
+                required=False,
+                found=True,
+                status="warning",
+                message="skill-rename sweep scan unavailable: git grep output could not be decoded",
+            )
+        for line in stdout_text.splitlines():
             path_part, sep, rest = line.replace("\\", "/").partition(":")
             if not sep:
                 continue

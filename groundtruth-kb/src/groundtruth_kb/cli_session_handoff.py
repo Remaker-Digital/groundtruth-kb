@@ -23,6 +23,14 @@ import click
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.session.envelope import TOPIC_TYPES
 
+_HOST_SESSION_ID_ENV_BY_HARNESS = {
+    "codex": "CODEX_THREAD_ID",
+    "cursor": "CURSOR_CONVERSATION_ID",
+}
+_HOST_MODEL_METADATA_SOURCE_BY_HARNESS = {
+    "codex": "x-codex-turn-metadata",
+    "cursor": "cursor-conversation-metadata",
+}
 _PLACEHOLDER_TURN_METADATA = {
     "",
     "-",
@@ -50,8 +58,16 @@ def _required_turn_metadata(value: str, option_name: str) -> str:
         or "\r" in normalized
         or len(normalized) > 256
     ):
-        raise click.ClickException(f"{option_name} must be non-placeholder single-line Codex turn metadata.")
+        raise click.ClickException(f"{option_name} must be non-placeholder single-line host turn metadata.")
     return normalized
+
+
+def _host_session_id(harness_name: str) -> str | None:
+    env_name = _HOST_SESSION_ID_ENV_BY_HARNESS.get(harness_name)
+    if env_name is None:
+        return None
+    value = os.environ.get(env_name)
+    return _required_turn_metadata(value, env_name) if value is not None else None
 
 
 @click.group("session")
@@ -96,6 +112,7 @@ def envelope_open_cmd(
         parse_canonical_init_keyword,
         resolve_harness_identity,
         resolve_worker_role_provenance,
+        write_current,
     )
 
     parsed_keyword = parse_canonical_init_keyword(init_keyword) if init_keyword is not None else None
@@ -121,11 +138,11 @@ def envelope_open_cmd(
     project_root = Path(config.project_root)
     envelope = None
     host_session_id = None
+    subject_default_upgrade = False
     normalized_harness = harness_name.strip().lower()
-    codex_thread_id = os.environ.get("CODEX_THREAD_ID") if normalized_harness == "codex" else None
     try:
-        if codex_thread_id is not None:
-            host_session_id = _required_turn_metadata(codex_thread_id, "CODEX_THREAD_ID")
+        host_session_id = _host_session_id(normalized_harness)
+        if host_session_id is not None:
             resolved_name, resolved_id = resolve_harness_identity(
                 project_root,
                 harness_name=normalized_harness,
@@ -147,7 +164,12 @@ def envelope_open_cmd(
                 if role is not None and provenance["role"] != role:
                     raise EnvelopeError("Requested role conflicts with the exact host-bound session envelope.")
                 if subject is not None and existing.get("subject") != subject:
-                    raise EnvelopeError("Requested subject conflicts with the exact host-bound session envelope.")
+                    if existing.get("subject_asserted") is not None:
+                        raise EnvelopeError("Requested subject conflicts with the exact host-bound session envelope.")
+                    existing["subject_asserted"] = subject
+                    existing["subject_resolved"] = subject
+                    existing["subject"] = subject
+                    subject_default_upgrade = True
                 envelope = existing
 
         if envelope is None:
@@ -162,6 +184,8 @@ def envelope_open_cmd(
                 session_id=host_session_id if parsed_role is not None else None,
                 worker_role_source="transcript_init_keyword" if parsed_role is not None else None,
             )
+        elif subject_default_upgrade:
+            write_current(project_root, normalized_harness, envelope)
     except EnvelopeError as exc:
         raise click.ClickException(str(exc)) from exc
     if json_output:
@@ -203,7 +227,7 @@ def envelope_attest_author_metadata_cmd(
     thread_source: str,
     json_output: bool,
 ) -> None:
-    """Attest host-provided Codex turn metadata for one exact open session."""
+    """Attest host-provided model metadata for one exact open session."""
     from groundtruth_kb.session.envelope import (
         EnvelopeError,
         load_current,
@@ -215,12 +239,17 @@ def envelope_attest_author_metadata_cmd(
     )
 
     normalized_harness = harness_name.strip().lower()
-    if normalized_harness != "codex":
-        raise click.ClickException("Author metadata attestation currently accepts only the Codex harness.")
+    metadata_source = _HOST_MODEL_METADATA_SOURCE_BY_HARNESS.get(normalized_harness)
+    if metadata_source is None:
+        supported = ", ".join(sorted(_HOST_MODEL_METADATA_SOURCE_BY_HARNESS))
+        raise click.ClickException(f"Author metadata attestation accepts only host-attested harnesses: {supported}.")
     normalized_session_id = _required_turn_metadata(session_id, "--session-id")
     normalized_model = _required_turn_metadata(model, "--model")
     normalized_reasoning = _required_turn_metadata(reasoning_effort, "--reasoning-effort")
     normalized_thread_source = _required_turn_metadata(thread_source, "--thread-source")
+    host_session_id = _host_session_id(normalized_harness)
+    if normalized_harness == "cursor" and host_session_id != normalized_session_id:
+        raise click.ClickException("--session-id must match CURSOR_CONVERSATION_ID for Cursor attestation.")
 
     config = _resolve_config(ctx)
     project_root = Path(config.project_root)
@@ -237,8 +266,7 @@ def envelope_attest_author_metadata_cmd(
             raise EnvelopeError("Current harness session envelope is missing.")
         current_session_id = current.get("session_id")
         if current_session_id != normalized_session_id:
-            host_thread_id = str(os.environ.get("CODEX_THREAD_ID") or "").strip()
-            if host_thread_id != normalized_session_id:
+            if host_session_id != normalized_session_id:
                 raise EnvelopeError("Exact session envelope is not the current harness session.")
             if envelope is None:
                 if current.get("harness_name") != resolved_name or current.get("harness_id") != resolved_id:
@@ -274,13 +302,13 @@ def envelope_attest_author_metadata_cmd(
         raise click.ClickException(str(exc)) from exc
 
     envelope["model_id"] = normalized_model
-    # Codex request metadata exposes one opaque model identifier, not a
+    # Host request metadata exposes one opaque model identifier, not a
     # separately versioned semantic model. Preserve that value without parsing.
     envelope["model_version"] = normalized_model
     envelope["model_configuration"] = (
         f"reasoning_effort={normalized_reasoning}; thread_source={normalized_thread_source}"
     )
-    envelope["model_metadata_source"] = "x-codex-turn-metadata"
+    envelope["model_metadata_source"] = metadata_source
     envelope["model_metadata_attested_at"] = utc_now_iso()
     write_current(project_root, resolved_name, envelope)
 

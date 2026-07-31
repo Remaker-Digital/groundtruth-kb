@@ -26,14 +26,10 @@ SW_HIDE = 0
 ERROR_ALREADY_EXISTS = 183
 MUTEX_NAME = "Local\\GTKB-CodexSnapshotWindowHider-v1"
 
-SNAPSHOT_GIT_ARGUMENTS = (
-    "-c",
-    "core.hooksPath=NUL",
-    "-c",
-    "core.fsmonitor=",
-    "add",
-    "-u",
-)
+REQUIRED_GIT_CONFIG = {
+    "core.hookspath": "NUL",
+    "core.fsmonitor": "",
+}
 
 
 def is_target_window_show_event(
@@ -47,13 +43,38 @@ def is_target_window_show_event(
     return event == EVENT_OBJECT_SHOW and bool(hwnd) and object_id == OBJID_WINDOW and child_id == 0
 
 
-def is_snapshot_git_commandline(commandline: Sequence[str]) -> bool:
-    """Return true only for Codex Desktop's exact working-tree snapshot Git call."""
+def is_codex_git_manager_commandline(commandline: Sequence[str]) -> bool:
+    """Return true only for a marker-qualified Codex Desktop Git-manager call."""
 
-    if len(commandline) != len(SNAPSHOT_GIT_ARGUMENTS) + 1:
+    if len(commandline) < 2 or not all(isinstance(argument, str) for argument in commandline):
         return False
     executable = ntpath.basename(str(commandline[0]).strip('"')).casefold()
-    return executable == "git.exe" and tuple(commandline[1:]) == SNAPSHOT_GIT_ARGUMENTS
+    if executable != "git.exe":
+        return False
+
+    required_values: dict[str, str] = {}
+    argument_index = 1
+    while argument_index < len(commandline) and commandline[argument_index] == "-c":
+        value_index = argument_index + 1
+        if value_index >= len(commandline):
+            return False
+        override = commandline[value_index]
+        if "=" not in override:
+            return False
+        key, value = override.split("=", 1)
+        normalized_key = key.casefold()
+        if not key:
+            return False
+        if normalized_key in REQUIRED_GIT_CONFIG:
+            if normalized_key in required_values or value != REQUIRED_GIT_CONFIG[normalized_key]:
+                return False
+            required_values[normalized_key] = value
+        argument_index += 2
+
+    if required_values != REQUIRED_GIT_CONFIG or argument_index >= len(commandline):
+        return False
+    subcommand = commandline[argument_index]
+    return bool(subcommand) and subcommand == subcommand.strip() and not subcommand.startswith("-")
 
 
 def is_qualifying_console_process(
@@ -73,15 +94,22 @@ def is_qualifying_console_process(
             return False
 
         snapshot_git = console.parent()
-        if snapshot_git is None or not is_snapshot_git_commandline(snapshot_git.cmdline()):
+        if (
+            snapshot_git is None
+            or snapshot_git.name().casefold() != "git.exe"
+            or not is_codex_git_manager_commandline(snapshot_git.cmdline())
+        ):
             return False
 
         ancestor = snapshot_git.parent()
         for _ in range(6):
             if ancestor is None:
                 return False
-            if ancestor.name().casefold() == "chatgpt.exe":
+            ancestor_name = ancestor.name().casefold()
+            if ancestor_name == "chatgpt.exe":
                 return True
+            if ancestor_name == "git.exe":
+                return False
             ancestor = ancestor.parent()
     except (AttributeError, TypeError, psutil.Error, OSError, RuntimeError, ValueError):
         return False

@@ -350,6 +350,11 @@ def bridge_propose(
 @click.option("--slug", required=True, help="Bridge slug, lowercase kebab-case.")
 @click.option("--target-path", "target_paths", multiple=True, required=True, help="Repeatable target path.")
 @click.option("--project", "project_id", help="Project id to use when membership is missing or ambiguous.")
+@click.option(
+    "--project-authorization",
+    "project_authorization_id",
+    help="Select one equally best-ranked current covering project authorization.",
+)
 @click.option("--owner-decision", help="DELIB id required when creating missing membership or PAUTH state.")
 @click.option("--add-spec", "add_specs", multiple=True, help="Repeatable spec id to add to generated links.")
 @click.option("--scope", "scope_lines", multiple=True, help="Repeatable proposed-scope bullet.")
@@ -377,6 +382,7 @@ def bridge_file_implementation_proposal(
     slug: str,
     target_paths: tuple[str, ...],
     project_id: str | None,
+    project_authorization_id: str | None,
     owner_decision: str | None,
     add_specs: tuple[str, ...],
     scope_lines: tuple[str, ...],
@@ -396,6 +402,7 @@ def bridge_file_implementation_proposal(
         slug=slug,
         target_paths=target_paths,
         project_id=project_id,
+        project_authorization_id=project_authorization_id,
         owner_decision=owner_decision,
         add_specs=add_specs,
         scope_lines=scope_lines,
@@ -408,7 +415,22 @@ def bridge_file_implementation_proposal(
     )
     try:
         result = file_implementation_proposal(db, config.project_root, request)
-    except (ProposalFilingError, ValueError) as exc:
+    except ProposalFilingError as exc:
+        if exc.decision:
+            if emit_json:
+                click.echo(
+                    json.dumps(
+                        {"error": str(exc), "authorization_decision": exc.decision},
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+                ctx.exit(1)
+            click.echo(
+                "Project Authorization Decision: " + json.dumps(exc.decision, sort_keys=True, separators=(",", ":"))
+            )
+        raise click.ClickException(str(exc)) from exc
+    except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
     finally:
         db.close()
@@ -420,6 +442,7 @@ def bridge_file_implementation_proposal(
         "project_authorization_candidates": [
             candidate.to_dict() for candidate in result.project_authorization_candidates
         ],
+        "authorization_decision": result.authorization_decision,
         "preflights": [
             {
                 "name": preflight.name,
@@ -443,6 +466,10 @@ def bridge_file_implementation_proposal(
             sort_keys=True,
             separators=(",", ":"),
         )
+    )
+    click.echo(
+        "Project Authorization Decision: "
+        + json.dumps(result.authorization_decision, sort_keys=True, separators=(",", ":"))
     )
     for preflight in result.preflight_results:
         click.echo(f"preflight {preflight.name}: exit {preflight.returncode}")

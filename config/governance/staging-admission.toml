@@ -1,0 +1,46 @@
+# Staged-artifact admission exclusion rules (WI-5699)
+#
+# Every staged ADDITION must resolve to exactly one admission basis:
+#   authorized  - the path matches a bridge thread's declared target_paths
+#   registered  - the path resolves to a SoT registry record
+#   excluded    - the path matches a rule below
+#   unresolved  - none of the above (the finding this gate exists to produce)
+#
+# Rules are evaluated in file order; the first match wins and is reported
+# alongside the excluded path, so an over-broad rule is visible in the output
+# rather than silent. Every rule MUST carry a reason.
+#
+# Adding a rule here is a configuration change reviewable on its own merits.
+# That is the point: the disposable set becomes an artifact instead of a habit.
+
+schema_version = 1
+
+[[rules]]
+id = "root-session-scratch-underscore"
+glob = "_*.py"
+root_only = true
+reason = "Session-scratch debug scripts written at repository root (_debug_*.py, _scan*.py). Ephemeral per the Clean-Before-You-Leave principle; never durable work product."
+
+[[rules]]
+id = "root-session-scratch-tmp"
+glob = "tmp_*"
+root_only = true
+reason = "Session-scratch working files written at repository root (tmp_*.py, tmp_*.txt, tmp_*.json). Ephemeral per the Clean-Before-You-Leave principle."
+
+[[rules]]
+id = "runtime-gtkb-state"
+glob = ".gtkb-state/**"
+root_only = false
+reason = "Runtime state directory: claims, packets, drafts, dispatcher state. Regenerable and machine-owned; not change-controlled work product."
+
+[[rules]]
+id = "runtime-tmp"
+glob = ".tmp/**"
+root_only = false
+reason = "Transient tooling scratch (pycache prefix, scan summaries). Regenerable."
+
+[[rules]]
+id = "generated-inventory"
+glob = ".groundtruth/inventory/**"
+root_only = false
+reason = "Generated dev-environment inventory. Produced by collect_dev_environment_inventory.py and governed by its own drift check, not by admission."

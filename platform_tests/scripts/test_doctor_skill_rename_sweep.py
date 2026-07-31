@@ -89,3 +89,50 @@ def test_self_maintaining_derivation_no_gtkb_dirs(tmp_path: Path) -> None:
 
     # No gtkb- dirs → no bare-name set to sweep → info (nothing to enforce yet).
     assert result.status == "info"
+
+
+def test_sweep_unicode_output_preserves_warning(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _make_gtkb_skill(tmp_path, "verify")
+    bare = "verify"
+    _write_tracked(
+        tmp_path,
+        "scripts/unicode.py",
+        f'# UTF-8 left arrow: ←; HELPER = ".claude/skills/{bare}/helpers/w.py"\n',
+    )
+    _git(tmp_path, "add", "-A")
+
+    result = _check_skill_rename_reference_sweep(tmp_path)
+
+    assert result.status == "warning"
+    assert "1 pre-rename bare skill-dir reference(s) remain" in result.message
+    assert "scripts/unicode.py" in result.message
+
+
+def test_sweep_exit0_without_usable_output_is_not_pass(tmp_path: Path, monkeypatch) -> None:
+    _make_gtkb_skill(tmp_path, "verify")
+
+    def _missing_output(*args, **kwargs):
+        return subprocess.CompletedProcess(args=args[0], returncode=0, stdout=None)
+
+    monkeypatch.setattr(subprocess, "run", _missing_output)
+
+    result = _check_skill_rename_reference_sweep(tmp_path)
+
+    assert result.status == "warning"
+    assert "scan unavailable" in result.message
+    assert "sweep complete" not in result.message
+
+
+def test_sweep_pass_only_at_zero(tmp_path: Path, monkeypatch) -> None:
+    _make_gtkb_skill(tmp_path, "verify")
+
+    def _no_matches(*args, **kwargs):
+        return subprocess.CompletedProcess(args=args[0], returncode=1, stdout=b"")
+
+    monkeypatch.setattr(subprocess, "run", _no_matches)
+
+    result = _check_skill_rename_reference_sweep(tmp_path)
+
+    assert result.status == "pass"
+    assert "sweep complete" in result.message

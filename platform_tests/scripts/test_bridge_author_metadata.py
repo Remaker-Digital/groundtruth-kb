@@ -11,6 +11,7 @@ from scripts import ollama_harness as oh
 from scripts import openrouter_harness as orh
 from scripts.bridge_author_metadata import (
     CODEX_TURN_METADATA_SOURCE,
+    CURSOR_CONVERSATION_METADATA_SOURCE,
     ENV_VAR_HARNESS_NAME,
     FIELD_ENV_NAMES,
     BridgeAuthorMetadataError,
@@ -42,7 +43,7 @@ AUTHOR_METADATA = {
 _AUTHOR_ENV_VARS = tuple(
     sorted(
         {name for names in FIELD_ENV_NAMES.values() for name in names}
-        | {ENV_VAR_HARNESS_NAME, "GTKB_HARNESS_REGISTRY_PATH"}
+        | {ENV_VAR_HARNESS_NAME, "GTKB_HARNESS_REGISTRY_PATH", "CURSOR_AGENT", "CURSOR_CONVERSATION_ID"}
     )
 )
 
@@ -57,6 +58,10 @@ _SINGLE_PB_REGISTRY = [
 _PB_AND_LO_REGISTRY = [
     {"id": "A", "harness_name": "codex", "role": ["prime-builder"], "status": "active"},
     {"id": "B", "harness_name": "claude", "role": ["loyal-opposition"], "status": "active"},
+]
+_CURSOR_LO_REGISTRY = [
+    {"id": "A", "harness_name": "codex", "role": ["prime-builder"], "status": "active"},
+    {"id": "E", "harness_name": "cursor", "role": ["loyal-opposition"], "status": "active"},
 ]
 
 # The four per-session runtime fields a filing harness supplies through its own
@@ -136,6 +141,46 @@ def _write_attested_codex_session(
                 "model_version": model_version,
                 "model_configuration": model_configuration,
                 "model_metadata_source": metadata_source,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_attested_cursor_session(project_root: Path, session_id: str) -> None:
+    path = project_root / "harness-state" / "cursor" / "session-envelopes" / f"{session_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "session_id": session_id,
+                "harness_id": "E",
+                "harness_name": "cursor",
+                "status": "open",
+                "role": "loyal-opposition",
+                "role_asserted": "loyal-opposition",
+                "role_resolved": "loyal-opposition",
+                "role_resolution": {
+                    "interactive_resolved_role": "loyal-opposition",
+                    "interactive_role_source": "transcript_init_keyword",
+                    "authority_mode": "interactive_transcript",
+                },
+                "worker_role_provenance": {
+                    "schema_version": 1,
+                    "session_id": session_id,
+                    "harness_id": "E",
+                    "harness_name": "cursor",
+                    "role": "loyal-opposition",
+                    "role_resolution_source": "transcript_init_keyword",
+                    "dispatch_run_id": None,
+                    "issued_at": "2026-07-18T00:00:00Z",
+                },
+                "model_id": "gpt-5.6-terra",
+                "model_version": "gpt-5.6-terra",
+                "model_configuration": "reasoning_effort=xhigh; thread_source=cursor-agent-runtime",
+                "model_metadata_source": CURSOR_CONVERSATION_METADATA_SOURCE,
             },
             indent=2,
         )
@@ -368,6 +413,29 @@ def test_exact_session_envelope_supplies_attested_codex_model_metadata(
     }
 
 
+def test_exact_session_envelope_supplies_attested_cursor_model_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conversation_id = "12a16794-f84d-457f-81b4-8e803034e4d5"
+    _write_registry_projection(tmp_path, _CURSOR_LO_REGISTRY)
+    _write_attested_cursor_session(tmp_path, conversation_id)
+    monkeypatch.setenv("CURSOR_AGENT", "1")
+    monkeypatch.setenv("CURSOR_CONVERSATION_ID", conversation_id)
+
+    result = load_author_metadata(tmp_path)
+
+    assert result == {
+        "author_identity": "loyal-opposition/cursor",
+        "author_harness_id": "E",
+        "author_session_context_id": conversation_id,
+        "author_model": "gpt-5.6-terra",
+        "author_model_version": "gpt-5.6-terra",
+        "author_model_configuration": "reasoning_effort=xhigh; thread_source=cursor-agent-runtime",
+        "author_metadata_source": CURSOR_CONVERSATION_METADATA_SOURCE,
+    }
+
+
 def test_exact_session_loader_never_uses_shared_current_projection(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -439,6 +507,36 @@ def test_environment_model_metadata_precedes_exact_session_envelope(
     assert result["author_model"] == "environment-model"
     assert result["author_model_version"] == "environment-version"
     assert result["author_model_configuration"] == "environment-config"
+
+
+@pytest.mark.parametrize(
+    "partial_runtime_metadata",
+    [
+        {"GTKB_AUTHOR_MODEL": "environment-model"},
+        {"GTKB_AUTHOR_MODEL_VERSION": "environment-version"},
+        {"GTKB_AUTHOR_MODEL_CONFIGURATION": "environment-config"},
+        {"GTKB_AUTHOR_METADATA_SOURCE": "environment-source"},
+        {"GTKB_AUTHOR_MODEL_CONTEXT_WINDOW": "128000"},
+        {
+            "GTKB_AUTHOR_MODEL": "environment-model",
+            "GTKB_AUTHOR_MODEL_VERSION": "environment-version",
+        },
+    ],
+)
+def test_partial_runtime_model_metadata_cannot_hybridize_exact_session_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    partial_runtime_metadata: dict[str, str],
+) -> None:
+    _write_registry_projection(tmp_path, _PB_AND_LO_REGISTRY)
+    _write_attested_codex_session(tmp_path, "codex-thread-123")
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("CODEX_THREAD_ID", "codex-thread-123")
+    for name, value in partial_runtime_metadata.items():
+        monkeypatch.setenv(name, value)
+
+    with pytest.raises(BridgeAuthorMetadataError, match="partial runtime model metadata"):
+        load_author_metadata(tmp_path)
 
 
 def test_dispatch_run_id_wins_for_runtime_session_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

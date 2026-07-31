@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sqlite3
+import subprocess
 import time
 import tomllib
 from collections.abc import Callable, Sequence
@@ -395,6 +396,350 @@ class GitLifecycleService:
                 "project_branch": binding["project_branch"],
             },
         )
+
+    def publish_candidate_branch(
+        self,
+        *,
+        source_commit: str,
+        source_tree: str,
+        base_ref: str,
+        target_ref: str,
+        remote: str = "origin",
+        expected_remote_url: str | None = None,
+        exclude_paths: Sequence[str] = (),
+        max_blob_bytes: int = 10_000_000,
+        message: str,
+        push: bool = True,
+    ) -> OperationResult:
+        """Publish one unattached candidate commit to one new remote ref.
+
+        Every gate below fails closed and stops before the next side effect.
+        The operation never forces, never deletes, never rewrites history, and
+        never updates a ref that already exists.
+        """
+        excluded = tuple(sorted({str(path).strip().replace("\\", "/") for path in exclude_paths if str(path).strip()}))
+        base_branch = self._validate_branch_name(base_ref)
+        target_branch = self._validate_branch_name(target_ref)
+        self.validate_remote_push(target_branch, target_branch)
+
+        # 1. Bind immutable inputs before any side effect.
+        bound_commit = self.repo.resolve_commit(source_commit)
+        bound_tree = self._resolve_tree(bound_commit)
+        if bound_tree != source_tree:
+            raise OperationDenied(
+                "source_tree_mismatch",
+                "declared source tree does not match the declared source commit",
+                declared_tree=source_tree,
+                actual_tree=bound_tree,
+            )
+        index_before = self._byte_hash(self.repo.index_snapshot())
+        self._assert_remote_url(remote, expected_remote_url)
+
+        # 2. Exactly one narrow fetch binds the base at operation time.
+        base_commit = self._fetch_single_base(remote, base_branch)
+
+        # 3. Prove the target ref is new on both sides before creating anything.
+        self._assert_target_ref_absent(remote, target_branch)
+
+        # 4. Create the unattached candidate and prove its shape exactly.
+        candidate = self._commit_tree(tree=bound_tree, parent=base_commit, message=message)
+        self._assert_candidate_shape(
+            candidate=candidate,
+            base_commit=base_commit,
+            expected_tree=bound_tree,
+            excluded=excluded,
+        )
+
+        # 5. Enumerate and size the actual published range.
+        inventory = self._enumerate_range(
+            base_commit=base_commit,
+            candidate=candidate,
+            excluded=excluded,
+            max_blob_bytes=max_blob_bytes,
+        )
+
+        # 6. Revalidate immediately before the first mutating step, then act once.
+        index_before_ref = self._byte_hash(self.repo.index_snapshot())
+        if index_before_ref != index_before:
+            raise OperationDenied(
+                "index_changed_during_publication",
+                "the git index changed between binding and ref creation",
+                index_before=index_before,
+                index_now=index_before_ref,
+            )
+        self._assert_target_ref_absent(remote, target_branch)
+        self._create_ref_compare_and_create(target_branch, candidate)
+
+        pushed = False
+        if push:
+            self._push_single_ref(remote, target_branch)
+            pushed = True
+
+        return OperationResult(
+            operation="publish",
+            code="candidate_branch_published" if pushed else "candidate_ref_created",
+            work_item_id=target_branch,
+            branch=target_branch,
+            commit_sha=candidate,
+            details={
+                "base_commit": base_commit,
+                "base_ref": base_branch,
+                "excluded_paths": list(excluded),
+                "index_hash": index_before,
+                "max_blob_bytes": max_blob_bytes,
+                "object_counts": inventory["counts"],
+                "largest_blob_bytes": inventory["largest_blob_bytes"],
+                "largest_blob_path": inventory["largest_blob_path"],
+                "pushed": pushed,
+                "remote": remote,
+                "source_commit": bound_commit,
+                "tree": bound_tree,
+            },
+        )
+
+    def _resolve_tree(self, commit_sha: str) -> str:
+        completed = self.repo.run("rev-parse", f"{commit_sha}^{{tree}}")
+        tree = completed.stdout.strip()
+        if not re.fullmatch(r"[0-9a-f]{40}", tree):
+            raise OperationDenied("tree_unresolvable", "source tree did not resolve to one object", commit=commit_sha)
+        return tree
+
+    def _assert_remote_url(self, remote: str, expected_remote_url: str | None) -> None:
+        if expected_remote_url is None:
+            return
+        completed = self.repo.run("remote", "get-url", remote, check=False)
+        actual = completed.stdout.strip()
+        if completed.returncode != 0 or actual != expected_remote_url:
+            raise OperationDenied(
+                "remote_url_mismatch",
+                "remote url does not match the declared expectation",
+                remote=remote,
+                expected=expected_remote_url,
+                actual=actual,
+            )
+
+    def _no_prompt_env(self) -> dict[str, str]:
+        return {"GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": "", "GCM_INTERACTIVE": "never"}
+
+    def _fetch_single_base(self, remote: str, base_branch: str) -> str:
+        result = self.command_boundary.run(
+            (
+                "git",
+                "-C",
+                str(self.repo.root),
+                "-c",
+                "maintenance.auto=false",
+                "-c",
+                "gc.auto=0",
+                "fetch",
+                "--no-tags",
+                "--no-recurse-submodules",
+                remote,
+                base_branch,
+            ),
+            cwd=self.repo.root,
+        )
+        if result.returncode != 0:
+            raise OperationDenied(
+                "base_fetch_failed",
+                "the single narrow base fetch did not succeed",
+                remote=remote,
+                base_ref=base_branch,
+                reason=(result.stderr or result.stdout).strip()[:500],
+            )
+        completed = self.repo.run("rev-parse", "FETCH_HEAD^{commit}", check=False)
+        base_commit = completed.stdout.strip()
+        if completed.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40}", base_commit):
+            raise OperationDenied(
+                "base_fetch_ambiguous",
+                "fetched base state is missing, ambiguous, or not a commit",
+                remote=remote,
+                base_ref=base_branch,
+            )
+        return base_commit
+
+    def _assert_target_ref_absent(self, remote: str, target_branch: str) -> None:
+        if self.repo.branch_exists(target_branch):
+            raise OperationDenied(
+                "target_ref_exists_locally",
+                "the target ref already exists locally",
+                target_ref=target_branch,
+            )
+        result = self.command_boundary.run(
+            ("git", "-C", str(self.repo.root), "ls-remote", "--exit-code", "--heads", remote, target_branch),
+            cwd=self.repo.root,
+        )
+        if result.returncode == 0:
+            raise OperationDenied(
+                "target_ref_exists_remotely",
+                "the target ref already exists on the remote",
+                target_ref=target_branch,
+            )
+        if result.returncode != 2:
+            raise OperationDenied(
+                "target_ref_absence_unproven",
+                "remote ref absence could not be proven; an error is not absence",
+                target_ref=target_branch,
+                returncode=result.returncode,
+                reason=(result.stderr or result.stdout).strip()[:500],
+            )
+
+    def _commit_tree(self, *, tree: str, parent: str, message: str) -> str:
+        completed = self.repo.run("commit-tree", tree, "-p", parent, "-m", message)
+        candidate = completed.stdout.strip()
+        if not re.fullmatch(r"[0-9a-f]{40}", candidate):
+            raise OperationDenied("candidate_creation_failed", "commit-tree did not return one commit object")
+        return candidate
+
+    def _assert_candidate_shape(
+        self,
+        *,
+        candidate: str,
+        base_commit: str,
+        expected_tree: str,
+        excluded: tuple[str, ...],
+    ) -> None:
+        if self._resolve_tree(candidate) != expected_tree:
+            raise OperationDenied("candidate_tree_mismatch", "candidate tree is not the declared source tree")
+        parents = self.repo.parents(candidate)
+        if parents != (base_commit,):
+            raise OperationDenied(
+                "candidate_parentage_invalid",
+                "candidate must have exactly one parent equal to the fetched base",
+                parents=list(parents),
+                base_commit=base_commit,
+            )
+        ahead = self.repo.run("rev-list", "--count", f"{base_commit}..{candidate}").stdout.strip()
+        if ahead != "1":
+            raise OperationDenied(
+                "candidate_not_single_commit_ahead",
+                "candidate must be exactly one commit ahead of the base",
+                commits_ahead=ahead,
+            )
+        if not self.repo.is_ancestor(base_commit, candidate):
+            raise OperationDenied("candidate_ancestry_invalid", "base is not an ancestor of the candidate")
+        if excluded:
+            changed = self.repo.run(
+                "diff", "--name-only", base_commit, candidate, "--", *excluded, check=False
+            ).stdout.strip()
+            if changed:
+                raise OperationDenied(
+                    "excluded_path_delta",
+                    "a declared-excluded path differs between base and candidate",
+                    paths=[line for line in changed.splitlines() if line],
+                )
+
+    def _enumerate_range(
+        self,
+        *,
+        base_commit: str,
+        candidate: str,
+        excluded: tuple[str, ...],
+        max_blob_bytes: int,
+    ) -> dict[str, Any]:
+        listing = self.repo.run("rev-list", "--objects", f"{base_commit}..{candidate}").stdout.splitlines()
+        entries = [line.strip() for line in listing if line.strip()]
+        if not entries:
+            raise OperationDenied("empty_publication_range", "the candidate range contains no objects")
+        oids: list[str] = []
+        paths: dict[str, str] = {}
+        for entry in entries:
+            oid, _, path = entry.partition(" ")
+            if not re.fullmatch(r"[0-9a-f]{40}", oid):
+                raise OperationDenied("range_object_unresolvable", "range listing contained a non-object entry")
+            oids.append(oid)
+            if path:
+                paths[oid] = path
+        completed = subprocess.run(
+            ["git", "-C", str(self.repo.root), "cat-file", "--batch-check"],
+            input="\n".join(oids) + "\n",
+            capture_output=True,
+            text=True,
+            shell=False,
+        )
+        if completed.returncode != 0:
+            raise OperationDenied(
+                "range_object_unresolvable",
+                "object metadata could not be resolved for the candidate range",
+                reason=(completed.stderr or completed.stdout).strip()[:500],
+            )
+        counts: dict[str, int] = {}
+        largest_blob_bytes = 0
+        largest_blob_path = ""
+        for line in completed.stdout.splitlines():
+            fields = line.split()
+            if len(fields) != 3:
+                raise OperationDenied("range_object_unresolvable", "unresolvable object in the candidate range")
+            oid, kind, size_text = fields
+            counts[kind] = counts.get(kind, 0) + 1
+            if kind not in {"blob", "tree", "commit", "tag"}:
+                raise OperationDenied("range_object_type_unexpected", "unexpected object type in range", kind=kind)
+            if kind != "blob":
+                continue
+            size = int(size_text)
+            path = paths.get(oid, "")
+            if path and any(path == item or path.startswith(f"{item.rstrip('/')}/") for item in excluded):
+                raise OperationDenied(
+                    "excluded_path_in_range",
+                    "a declared-excluded path appears in the range",
+                    path=path,
+                )
+            if size > largest_blob_bytes:
+                largest_blob_bytes = size
+                largest_blob_path = path
+            if size > max_blob_bytes:
+                raise OperationDenied(
+                    "blob_size_ceiling_exceeded",
+                    "a blob in the candidate range exceeds the declared ceiling",
+                    path=path,
+                    size_bytes=size,
+                    max_blob_bytes=max_blob_bytes,
+                )
+        return {
+            "counts": dict(sorted(counts.items())),
+            "largest_blob_bytes": largest_blob_bytes,
+            "largest_blob_path": largest_blob_path,
+        }
+
+    def _create_ref_compare_and_create(self, target_branch: str, candidate: str) -> None:
+        completed = self.repo.run(
+            "update-ref",
+            "--create-reflog",
+            f"refs/heads/{target_branch}",
+            candidate,
+            "0" * 40,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise OperationDenied(
+                "ref_creation_failed",
+                "compare-and-create ref creation did not succeed",
+                target_ref=target_branch,
+                reason=(completed.stderr or completed.stdout).strip()[:500],
+            )
+
+    def _push_single_ref(self, remote: str, target_branch: str) -> None:
+        result = self.command_boundary.run(
+            (
+                "git",
+                "-C",
+                str(self.repo.root),
+                "push",
+                "--no-force-with-lease",
+                "--no-verify",
+                remote,
+                f"refs/heads/{target_branch}:refs/heads/{target_branch}",
+            ),
+            cwd=self.repo.root,
+        )
+        if result.returncode != 0:
+            raise OperationDenied(
+                "publication_push_failed",
+                "the single non-forced same-name push did not succeed; no retry is inferred",
+                remote=remote,
+                target_ref=target_branch,
+                reason=(result.stderr or result.stdout).strip()[:500],
+            )
 
     def close_work_item(self, *, work_item_id: str, operation_id: str | None = None) -> OperationResult:
         binding, _ = self._binding(work_item_id)

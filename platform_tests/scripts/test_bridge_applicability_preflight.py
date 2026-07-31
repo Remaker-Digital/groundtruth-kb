@@ -11,6 +11,7 @@ import importlib.util
 import json
 import sqlite3
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -965,7 +966,7 @@ target_paths: ["applications/Agent_Red/src/app.py"]
     assert diag["candidate_heading"] == "## Carried-Forward Specification Links"
 
 
-def test_schema_v2_hash_is_stable_across_db_invocation_and_filesystem(tmp_path: Path) -> None:
+def test_schema_v3_hash_is_stable_across_db_invocation_and_filesystem(tmp_path: Path) -> None:
     bridge_id = "stable-packet"
     target_path = "applications/missing/src/app.py"
     _write_bridge(
@@ -1025,7 +1026,7 @@ target_paths: ["{target_path}"]
         content_file=source,
     )
 
-    assert live["packet_hash_schema_version"] == 2
+    assert live["packet_hash_schema_version"] == 3
     assert set(live["packet_hash_material"]) == preflight.PACKET_HASH_MATERIAL_KEYS
     assert live["source_identity"] == {
         "path": f"bridge/{bridge_id}-001.md",
@@ -1057,7 +1058,7 @@ target_paths: ["{target_path}"]
     assert parent_present["packet_hash"] == live["packet_hash"]
 
 
-def test_schema_v2_hash_excludes_blocking_diagnostics_but_preserves_rejection(
+def test_schema_v3_hash_excludes_blocking_diagnostics_but_preserves_rejection(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -1160,7 +1161,7 @@ def test_explicit_canonical_source_ignores_newer_siblings_and_rejects_mismatch(
         )
 
 
-def test_schema_v2_hash_tracks_source_and_rules_bytes_with_lf_normalization(tmp_path: Path) -> None:
+def test_schema_v3_hash_tracks_source_and_rules_bytes_with_lf_normalization(tmp_path: Path) -> None:
     bridge_id = "mutation-sensitive"
     _write_bridge(tmp_path, bridge_id, "# Proposal\n\nWI-5441\n")
     source = tmp_path / "bridge" / f"{bridge_id}-001.md"
@@ -1208,3 +1209,326 @@ def test_schema_v2_hash_tracks_source_and_rules_bytes_with_lf_normalization(tmp_
     )
     assert rules_changed["rules_content_hash"] != baseline["rules_content_hash"]
     assert rules_changed["packet_hash"] != baseline["packet_hash"]
+
+
+def _operation_time_envelope(*, allow_bridge: bool = True, forbidden: list[str] | None = None) -> dict[str, object]:
+    allowed = ["source", "test_addition"]
+    if allow_bridge:
+        allowed.append("bridge")
+    return {
+        "id": "PAUTH-FIXTURE",
+        "version": 3,
+        "project_id": "PROJECT-FIXTURE",
+        "status": "active",
+        "allowed_mutation_classes": allowed,
+        "forbidden_operations": list(forbidden or []),
+        "included_work_item_ids": [],
+        "excluded_work_item_ids": [],
+        "included_spec_ids": [],
+        "excluded_spec_ids": [],
+    }
+
+
+def _install_operation_time_fixture(monkeypatch, envelope: dict[str, object]) -> None:
+    taxonomy = preflight._load_operation_taxonomy(REPO_ROOT)
+    monkeypatch.setattr(preflight, "_load_operation_taxonomy", lambda _root: taxonomy)
+    monkeypatch.setattr(
+        preflight,
+        "extract_and_validate_project_authorization",
+        lambda *_args, **_kwargs: dict(envelope),
+    )
+
+
+def _implementation_content(*, kind: str, version: int, targets: list[str], approved: int | None = None) -> str:
+    approved_line = f"Approved proposal: bridge/pauth-phase-{approved:03d}.md\n" if approved is not None else ""
+    return (
+        "NEW\n"
+        f"bridge_kind: {kind}\n"
+        "Document: pauth-phase\n"
+        f"Version: {version:03d}\n"
+        f"{approved_line}"
+        "Project Authorization: PAUTH-FIXTURE\n"
+        "Project: PROJECT-FIXTURE\n"
+        "Work Item: WI-FIXTURE\n"
+        f"target_paths: {json.dumps(targets)}\n\n"
+        "## Specification Links\n\n"
+        "- GOV-FILE-BRIDGE-AUTHORITY-001\n"
+    )
+
+
+def test_pauth_proposal_allowed_finalization_denied_when_bridge_class_missing(tmp_path: Path, monkeypatch) -> None:
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    (tmp_path / "bridge").mkdir()
+    proposal = tmp_path / "proposal.md"
+    proposal.write_text(
+        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+        encoding="utf-8",
+    )
+    _install_operation_time_fixture(monkeypatch, _operation_time_envelope(allow_bridge=False))
+
+    proposal_packet = preflight.build_packet(
+        bridge_id="pauth-phase",
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=proposal,
+    )
+    proposal_pauth = proposal_packet["project_authorization_operation_time"]
+    assert proposal_pauth["status"] == "allowed"
+    assert proposal_pauth["requested_operations"] == ["implementation_packet_create", "implementation_start"]
+    assert proposal_pauth["cohort"] == ["scripts/tool.py"]
+
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        1,
+        "REVISED",
+        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+    )
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        2,
+        "GO",
+        "Responds to: bridge/pauth-phase-001.md\n\n# Reviewed proposal\n",
+    )
+    report = tmp_path / "report.md"
+    report.write_text(
+        _implementation_content(
+            kind="implementation_report",
+            version=3,
+            targets=["platform_tests/test_tool.py"],
+            approved=1,
+        ),
+        encoding="utf-8",
+    )
+    report_packet = preflight.build_packet(
+        bridge_id="pauth-phase",
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=report,
+    )
+    report_pauth = report_packet["project_authorization_operation_time"]
+    assert report_pauth["status"] == "denied"
+    assert report_pauth["reason_code"] == "target_mutation_class_not_allowed"
+    assert report_pauth["cohort"] == [
+        "bridge/pauth-phase-001.md",
+        "bridge/pauth-phase-002.md",
+        "bridge/pauth-phase-003.md",
+        "bridge/pauth-phase-004.md",
+        "platform_tests/test_tool.py",
+        "scripts/tool.py",
+    ]
+    assert {decision["reason_code"] for decision in report_pauth["decisions"]} == {"target_mutation_class_not_allowed"}
+    assert report_packet["preflight_passed"] is False
+
+
+def test_pauth_phase_cohort_allowed_and_reported(tmp_path: Path, monkeypatch) -> None:
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        1,
+        "REVISED",
+        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+    )
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        2,
+        "GO",
+        "Responds to: bridge/pauth-phase-001.md\n\n# Reviewed proposal\n",
+    )
+    report = tmp_path / "report.md"
+    report.write_text(
+        _implementation_content(
+            kind="implementation_report",
+            version=3,
+            targets=["platform_tests/test_tool.py"],
+            approved=1,
+        ),
+        encoding="utf-8",
+    )
+    _install_operation_time_fixture(monkeypatch, _operation_time_envelope())
+
+    first = preflight.build_packet(
+        bridge_id="pauth-phase",
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=report,
+    )
+    second = preflight.build_packet(
+        bridge_id="pauth-phase",
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=report,
+    )
+    pauth = first["project_authorization_operation_time"]
+    assert pauth["status"] == "allowed"
+    assert pauth["authorization_source"] == "bridge/pauth-phase-001.md"
+    assert pauth["evaluator_id"]
+    assert pauth["taxonomy_sha256"]
+    assert first["packet_hash"] == second["packet_hash"]
+    assert "Project Authorization Operation-Time Evaluation" in preflight.format_markdown(first)
+
+
+def test_finalization_binds_cohort_to_go_approved_proposal(tmp_path: Path, monkeypatch) -> None:
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        1,
+        "REVISED",
+        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/approved.py"]),
+    )
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        2,
+        "GO",
+        "Responds to: bridge/pauth-phase-001.md\n\n# Approved v001\n",
+    )
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        3,
+        "REVISED",
+        _implementation_content(kind="prime_proposal", version=3, targets=["config/unapproved.toml"]),
+    )
+    report = tmp_path / "report.md"
+    report.write_text(
+        _implementation_content(
+            kind="implementation_report",
+            version=4,
+            targets=["platform_tests/test_approved.py"],
+            approved=1,
+        ),
+        encoding="utf-8",
+    )
+    _install_operation_time_fixture(monkeypatch, _operation_time_envelope())
+
+    packet = preflight.build_packet(
+        bridge_id="pauth-phase",
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=report,
+    )
+
+    pauth = packet["project_authorization_operation_time"]
+    assert pauth["status"] == "allowed"
+    assert pauth["authorization_source"] == "bridge/pauth-phase-001.md"
+    assert "scripts/approved.py" in pauth["cohort"]
+    assert "platform_tests/test_approved.py" in pauth["cohort"]
+    assert "config/unapproved.toml" not in pauth["cohort"]
+
+
+def test_finalization_rejects_proposal_without_matching_go(tmp_path: Path, monkeypatch) -> None:
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        1,
+        "REVISED",
+        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+    )
+    _write_bridge_version(tmp_path, "pauth-phase", 2, "NO-GO", "# Rejected proposal\n")
+    report = tmp_path / "report.md"
+    report.write_text(
+        _implementation_content(
+            kind="implementation_report",
+            version=3,
+            targets=["platform_tests/test_tool.py"],
+            approved=1,
+        ),
+        encoding="utf-8",
+    )
+    _install_operation_time_fixture(monkeypatch, _operation_time_envelope())
+
+    packet = preflight.build_packet(
+        bridge_id="pauth-phase",
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=report,
+    )
+
+    pauth = packet["project_authorization_operation_time"]
+    assert pauth["status"] == "error"
+    assert pauth["reason_code"] == "approved_proposal_resolution_failed"
+    assert "no matching earlier GO verdict" in pauth["error"]
+    assert packet["preflight_passed"] is False
+
+
+def test_pauth_load_or_evaluator_failure_is_distinct_cli_error(tmp_path: Path, monkeypatch, capsys) -> None:
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    (tmp_path / "bridge").mkdir()
+    proposal = tmp_path / "proposal.md"
+    proposal.write_text(
+        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        preflight,
+        "extract_and_validate_project_authorization",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(preflight.AuthorizationError("malformed PAUTH fixture")),
+    )
+
+    result = preflight.main(
+        [
+            "--bridge-id",
+            "pauth-phase",
+            "--content-file",
+            str(proposal),
+            "--bridge-dir",
+            str(tmp_path / "bridge"),
+            "--config",
+            str(config),
+            "--db",
+            str(tmp_path / "missing.db"),
+            "--json",
+        ]
+    )
+    packet = json.loads(capsys.readouterr().out)
+    assert result == 6
+    assert packet["project_authorization_operation_time"]["status"] == "error"
+    assert "malformed PAUTH fixture" in packet["blocking_errors"][0]
+
+
+def test_pauth_preflight_matches_canonical_evaluator(tmp_path: Path, monkeypatch) -> None:
+    envelope = _operation_time_envelope()
+    _install_operation_time_fixture(monkeypatch, envelope)
+    cohort = ["bridge/parity-001.md", "scripts/tool.py"]
+    decision_time = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
+
+    projected, errors = preflight._evaluate_pauth_phase(
+        content="Project Authorization: PAUTH-FIXTURE\n",
+        project_root=tmp_path,
+        phase="finalization",
+        cohort=cohort,
+        cited_specs=set(),
+        decision_time=decision_time,
+    )
+    taxonomy = preflight._load_operation_taxonomy(REPO_ROOT)
+    canonical = [
+        preflight._evaluate_envelope(
+            envelope,
+            requested_operation=operation,
+            target_paths=cohort,
+            decision_time=decision_time,
+            taxonomy=taxonomy,
+        ).as_dict()
+        for operation in preflight.PAUTH_PHASE_OPERATIONS["finalization"]
+    ]
+
+    assert errors == []
+    assert projected["decisions"] == canonical
+    assert projected["allowed"] is all(decision["allowed"] for decision in canonical)

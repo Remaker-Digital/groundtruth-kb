@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -34,6 +36,12 @@ VALID_ARTIFACT_TYPES = {
 
 VALID_APPROVAL_MODES = {"approve", "acknowledge", "edit-and-approve", "auto"}
 VALID_CAPTURE_CONTEXTS = {"gap_state"}
+POSTIMAGE_SCHEMA_VERSION = 1
+POSTIMAGE_PACKET_FIELDS = {
+    "postimage_schema_version",
+    "postimage_fields",
+    "postimage_sha256",
+}
 
 
 @dataclass(frozen=True)
@@ -48,6 +56,132 @@ def content_hash(content: str) -> str:
     """Return the formal packet SHA-256 hash for a native content string."""
 
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _copy_json_native(value: object, *, path: str, active_containers: set[int] | None = None) -> object:
+    """Return a detached JSON-native copy or raise for unsupported values."""
+
+    active_containers = active_containers if active_containers is not None else set()
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"{path} must not contain non-finite floats")
+        return value
+    if isinstance(value, list):
+        container_id = id(value)
+        if container_id in active_containers:
+            raise ValueError(f"{path} must not contain reference cycles")
+        active_containers.add(container_id)
+        try:
+            return [
+                _copy_json_native(item, path=f"{path}[{index}]", active_containers=active_containers)
+                for index, item in enumerate(value)
+            ]
+        finally:
+            active_containers.remove(container_id)
+    if isinstance(value, dict):
+        container_id = id(value)
+        if container_id in active_containers:
+            raise ValueError(f"{path} must not contain reference cycles")
+        active_containers.add(container_id)
+        copied: dict[str, object] = {}
+        try:
+            for key, item in value.items():
+                if not isinstance(key, str):
+                    raise ValueError(f"{path} must contain only string object keys")
+                copied[key] = _copy_json_native(
+                    item,
+                    path=f"{path}.{key}",
+                    active_containers=active_containers,
+                )
+            return copied
+        finally:
+            active_containers.remove(container_id)
+    raise ValueError(f"{path} contains unsupported JSON value type {type(value).__name__}")
+
+
+def _detached_json_object(value: object, *, path: str) -> dict[str, object]:
+    copied = _copy_json_native(value, path=path)
+    if not isinstance(copied, dict):
+        raise ValueError(f"{path} must be a JSON object")
+    canonical = json.dumps(
+        copied,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+    detached = json.loads(canonical)
+    if not isinstance(detached, dict):
+        raise ValueError(f"{path} must be a JSON object")
+    return detached
+
+
+def _postimage_hash(
+    *,
+    artifact_type: object,
+    artifact_id: object,
+    action: object,
+    source_ref: object,
+    full_content_sha256: object,
+    fields: dict[str, object],
+) -> str:
+    envelope = {
+        "schema_version": POSTIMAGE_SCHEMA_VERSION,
+        "artifact_type": artifact_type,
+        "artifact_id": artifact_id,
+        "action": action,
+        "source_ref": source_ref,
+        "full_content_sha256": full_content_sha256,
+        "fields": fields,
+    }
+    canonical = json.dumps(
+        envelope,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+    return content_hash(canonical)
+
+
+def _validate_postimage(packet: Mapping[str, object]) -> str | None:
+    present = POSTIMAGE_PACKET_FIELDS & set(packet)
+    if not present:
+        return None
+    if present != POSTIMAGE_PACKET_FIELDS:
+        missing = sorted(POSTIMAGE_PACKET_FIELDS - present)
+        return f"approval packet postimage extension missing required fields: {', '.join(missing)}"
+
+    schema_version = packet.get("postimage_schema_version")
+    if type(schema_version) is not int or schema_version != 1:
+        return "approval packet postimage_schema_version must be integer 1"
+
+    fields = packet.get("postimage_fields")
+    if not isinstance(fields, dict) or not fields:
+        return "approval packet postimage_fields must be a non-empty JSON object"
+    try:
+        detached = _detached_json_object(fields, path="postimage_fields")
+        expected_hash = _postimage_hash(
+            artifact_type=packet.get("artifact_type"),
+            artifact_id=packet.get("artifact_id"),
+            action=packet.get("action"),
+            source_ref=packet.get("source_ref"),
+            full_content_sha256=packet.get("full_content_sha256"),
+            fields=detached,
+        )
+    except (TypeError, ValueError) as exc:
+        return f"approval packet postimage_fields must be JSON-native: {exc}"
+
+    postimage_sha256 = packet.get("postimage_sha256")
+    if (
+        not isinstance(postimage_sha256, str)
+        or re.fullmatch(r"[0-9a-f]{64}", postimage_sha256) is None
+        or postimage_sha256 != expected_hash
+    ):
+        return "approval packet postimage_sha256 does not match the canonical postimage envelope"
+    return None
 
 
 # WI-3313: project-authorization spec-amendment approval-packet helpers
@@ -134,6 +268,11 @@ def validate_packet(packet: Mapping[str, object]) -> ValidationResult:
         errors.append("approval packet full_content_sha256 does not match full_content")
         return ValidationResult(is_valid=False, errors=tuple(errors))
 
+    postimage_error = _validate_postimage(packet)
+    if postimage_error is not None:
+        errors.append(postimage_error)
+        return ValidationResult(is_valid=False, errors=tuple(errors))
+
     for flag_name in ("presented_to_user", "transcript_captured"):
         if packet.get(flag_name) is not True:
             errors.append(f"approval packet requires {flag_name}=true")
@@ -208,6 +347,7 @@ def construct_approval_packet(
     gap_state_bridge_id: str | None = None,
     gap_state_reason: str | None = None,
     intended_db_operation: Mapping[str, object] | None = None,
+    postimage_fields: Mapping[str, object] | None = None,
     expires_at: str | None = None,
 ) -> dict[str, object]:
     """Construct a formal approval packet dictionary with a bound content hash."""
@@ -242,6 +382,18 @@ def construct_approval_packet(
         packet["gap_state_reason"] = gap_state_reason
     if intended_db_operation:
         packet["intended_db_operation"] = dict(intended_db_operation)
+    if postimage_fields is not None:
+        detached = _detached_json_object(dict(postimage_fields), path="postimage_fields")
+        packet["postimage_schema_version"] = POSTIMAGE_SCHEMA_VERSION
+        packet["postimage_fields"] = detached
+        packet["postimage_sha256"] = _postimage_hash(
+            artifact_type=artifact_type,
+            artifact_id=artifact_id,
+            action=action,
+            source_ref=source_ref,
+            full_content_sha256=packet["full_content_sha256"],
+            fields=detached,
+        )
     if expires_at:
         packet["expires_at"] = expires_at
     return packet

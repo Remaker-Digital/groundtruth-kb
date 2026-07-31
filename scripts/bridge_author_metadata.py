@@ -42,6 +42,11 @@ OPTIONAL_AUTHOR_METADATA_FIELDS: tuple[str, ...] = (
 # once no readers remain.
 AUTHOR_METADATA_RELATIVE_PATH = Path(".gtkb-state") / "bridge-author-metadata" / "current.json"
 CODEX_TURN_METADATA_SOURCE = "x-codex-turn-metadata"
+CURSOR_CONVERSATION_METADATA_SOURCE = "cursor-conversation-metadata"
+_EXACT_SESSION_METADATA_SOURCE_BY_HARNESS: dict[str, str] = {
+    "codex": CODEX_TURN_METADATA_SOURCE,
+    "cursor": CURSOR_CONVERSATION_METADATA_SOURCE,
+}
 
 # Three-source harness-name resolution shares this env var with
 # `scripts/_kb_attribution.ENV_VAR_HARNESS_NAME` (the canonical `changed_by`
@@ -335,7 +340,8 @@ def _metadata_from_exact_session_envelope(
     harness_id = identity_fields.get("author_harness_id", "")
     if not session_id or not harness_name or not harness_id:
         return {}
-    if harness_name != "codex":
+    expected_metadata_source = _EXACT_SESSION_METADATA_SOURCE_BY_HARNESS.get(harness_name)
+    if expected_metadata_source is None:
         return {}
 
     try:
@@ -348,8 +354,10 @@ def _metadata_from_exact_session_envelope(
             raise BridgeAuthorMetadataError("exact session author metadata has mismatched harness identity")
         if envelope.get("status") != "open":
             raise BridgeAuthorMetadataError("exact session author metadata requires an open session envelope")
-        if envelope.get("model_metadata_source") != CODEX_TURN_METADATA_SOURCE:
-            raise BridgeAuthorMetadataError("exact session author metadata is not attested by x-codex-turn-metadata")
+        if envelope.get("model_metadata_source") != expected_metadata_source:
+            raise BridgeAuthorMetadataError(
+                f"exact session author metadata is not attested by {expected_metadata_source}"
+            )
         resolve_worker_role_provenance(
             project_root,
             current_session_id=session_id,
@@ -443,6 +451,8 @@ def _resolve_durable_identity_fields(
     identities = load_harness_identities(project_root).get("harnesses", {})
 
     harness_name = (environ.get(ENV_VAR_HARNESS_NAME) or "").strip()
+    if not harness_name and environ.get("CURSOR_AGENT") == "1" and environ.get("CURSOR_CONVERSATION_ID"):
+        harness_name = "cursor"
     if not harness_name:
         dispatch_harness_id = _dispatch_harness_id_from_run_id(environ.get("GTKB_BRIDGE_POLLER_RUN_ID"))
         if dispatch_harness_id:
@@ -530,6 +540,24 @@ def load_author_metadata(
         "author_model_version",
         "author_model_configuration",
     }
+    runtime_model_fields = {
+        "author_model",
+        "author_model_version",
+        "author_model_configuration",
+        "author_model_context_window",
+        "author_metadata_source",
+    }
+    required_runtime_model_fields = {
+        "author_model",
+        "author_model_version",
+        "author_model_configuration",
+    }
+    supplied_runtime_model_fields = runtime_model_fields.intersection(supplied_runtime_fields)
+    if supplied_runtime_model_fields and not required_runtime_model_fields.issubset(supplied_runtime_fields):
+        missing = sorted(required_runtime_model_fields.difference(supplied_runtime_fields))
+        raise BridgeAuthorMetadataError(
+            "partial runtime model metadata is invalid; missing required fields: " + ", ".join(missing)
+        )
 
     merged.update(identity_fields)
     if not runtime_fields.issubset(supplied_runtime_fields):

@@ -10,6 +10,12 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 
 from groundtruth_kb.cli import main  # noqa: E402
+from groundtruth_kb.db import KnowledgeDB  # noqa: E402
+from groundtruth_kb.project.registry_control_plane import (  # noqa: E402
+    append_passive_observation,
+    serialize_registry,
+)
+from groundtruth_kb.project.sot_registry import SoTArtifact, sync_projection  # noqa: E402
 
 
 def _project(tmp_path: Path) -> tuple[Path, Path]:
@@ -139,6 +145,56 @@ rules = []
     return root, config
 
 
+def _enable_bridge_registry(root: Path) -> tuple[Path, Path, Path]:
+    record = SoTArtifact(
+        id="bridge-versioned-files",
+        domain="bridge_protocol",
+        lifecycle="active",
+        storage_path="bridge/*-[0-9][0-9][0-9].md",
+        authority_spec_id="GOV-FILE-BRIDGE-AUTHORITY-001",
+        mutation_api="governed bridge publication",
+        versioning_policy="git_tracked",
+        backup_policy="git_tracked",
+        health_check_function="_check_file_bridge_setup",
+        owner_role="shared",
+        restore_action="git_restore",
+        coverage_mode="glob",
+    )
+    payload = serialize_registry([record])
+    canonical = root / "config" / "registry" / "sot-artifacts.toml"
+    packaged = (
+        root
+        / "groundtruth-kb"
+        / "src"
+        / "groundtruth_kb"
+        / "context"
+        / "registries"
+        / "v1"
+        / "config"
+        / "registry"
+        / "sot-artifacts.toml"
+    )
+    canonical.parent.mkdir(parents=True)
+    packaged.parent.mkdir(parents=True)
+    canonical.write_bytes(payload)
+    packaged.write_bytes(payload)
+
+    db_path = root / "groundtruth.db"
+    KnowledgeDB(db_path=db_path)
+    sync_projection([record], db_path, changed_by="test", change_reason="state-report fixture")
+    append_passive_observation(
+        target_paths=["bridge/alpha-001.md"],
+        actor_session="test-session",
+        changed_by="test",
+        change_reason="establish current bridge aggregate",
+        project_root=root,
+        registry_path=canonical,
+        packaged_registry_path=packaged,
+        db_path=db_path,
+    )
+    return canonical, packaged, db_path
+
+
 def test_bridge_state_report_json_uses_exact_threads_and_harness_model_config(tmp_path: Path) -> None:
     _root, config = _project(tmp_path)
 
@@ -165,6 +221,12 @@ def test_bridge_state_report_json_uses_exact_threads_and_harness_model_config(tm
     }
     assert payload["dispatcher"]["health"] == "PASS"
     assert payload["dispatcher"]["selected"] == {"loyal-opposition": ["D"], "prime-builder": ["A"]}
+    assert payload["registry_publication"] == {
+        "enabled": False,
+        "aggregate_current": None,
+        "stale_count": 0,
+        "stale_record_ids": [],
+    }
 
     harnesses = {row["id"]: row for row in payload["harnesses"]["rows"]}
     assert harnesses["A"]["model_config"] == "gpt-5.5; reasoning=xhigh; approval_policy=never"
@@ -173,7 +235,7 @@ def test_bridge_state_report_json_uses_exact_threads_and_harness_model_config(tm
     assert harnesses["D"]["dispatchable"] == "yes"
 
 
-def test_bridge_state_report_markdown_is_three_owner_tables(tmp_path: Path) -> None:
+def test_bridge_state_report_markdown_is_four_owner_tables(tmp_path: Path) -> None:
     _root, config = _project(tmp_path)
 
     result = CliRunner().invoke(main, ["--config", str(config), "bridge", "state-report", "--markdown"])
@@ -181,19 +243,82 @@ def test_bridge_state_report_markdown_is_three_owner_tables(tmp_path: Path) -> N
     assert result.exit_code == 0, result.output
     assert "| Status | Count |" in result.output
     assert "| Aspect | Value |" in result.output
+    assert "## REGISTRY PUBLICATION" in result.output
+    assert "| Enabled | no |" in result.output
+    assert "| Aggregate current | (unavailable) |" in result.output
     assert "| ID | Harness | Model / Config | Role | Active | Dispatchable | Events |" in result.output
     assert "| LO_ACTIONABLE_LATEST_NEW_REVISED_NO_ACTION | 3: alpha-child" in result.output
-    assert sum(1 for line in result.output.splitlines() if line.startswith("| ---")) == 3
+    assert sum(1 for line in result.output.splitlines() if line.startswith("| ---")) == 4
+
+
+def test_bridge_state_report_surfaces_current_and_stale_registry_aggregate(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _enable_bridge_registry(root)
+
+    current_result = CliRunner().invoke(main, ["--config", str(config), "bridge", "state-report", "--json"])
+    assert current_result.exit_code == 0, current_result.output
+    current_payload = json.loads(current_result.output)
+    assert current_payload["registry_publication"] == {
+        "enabled": True,
+        "aggregate_current": True,
+        "stale_count": 0,
+        "stale_record_ids": [],
+    }
+
+    bridge_before = current_payload["bridge"]
+    (root / "bridge" / "alpha-001.md").write_text("NEW\n\n# Alpha proposal drift\n", encoding="utf-8")
+
+    stale_result = CliRunner().invoke(main, ["--config", str(config), "bridge", "state-report", "--json"])
+    assert stale_result.exit_code == 0, stale_result.output
+    stale_payload = json.loads(stale_result.output)
+    assert stale_payload["registry_publication"] == {
+        "enabled": True,
+        "aggregate_current": False,
+        "stale_count": 1,
+        "stale_record_ids": ["bridge-versioned-files"],
+    }
+    assert stale_payload["bridge"] == bridge_before
+
+    markdown = CliRunner().invoke(main, ["--config", str(config), "bridge", "state-report", "--markdown"])
+    assert markdown.exit_code == 0, markdown.output
+    assert "| Aggregate current | no |" in markdown.output
+    assert "| Stale count | 1 |" in markdown.output
+    assert "| Stale record IDs | bridge-versioned-files |" in markdown.output
+    assert "WARNING: The bridge publication gate will refuse ALL publications" in markdown.output
+    assert "gt registry observe --artifact bridge-versioned-files" in markdown.output
+    assert '--change-reason "Re-observe bridge publication aggregate"' in markdown.output
+
+
+def test_bridge_state_report_disables_incomplete_registry_control_plane(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    canonical = root / "config" / "registry" / "sot-artifacts.toml"
+    canonical.parent.mkdir(parents=True)
+    canonical.write_text("# incomplete fixture\n", encoding="utf-8")
+
+    result = CliRunner().invoke(main, ["--config", str(config), "bridge", "state-report", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["registry_publication"] == {
+        "enabled": False,
+        "aggregate_current": None,
+        "stale_count": 0,
+        "stale_record_ids": [],
+    }
 
 
 def test_bridge_state_report_is_read_only_for_state_inputs(tmp_path: Path) -> None:
     root, config = _project(tmp_path)
+    canonical, packaged, db_path = _enable_bridge_registry(root)
     tracked = [
         root / "bridge" / "alpha-001.md",
         root / "bridge" / "alpha-002.md",
         root / "config" / "dispatcher" / "rules.toml",
         root / "harness-state" / "harness-registry.json",
         root / ".gtkb-state" / "bridge-poller" / "dispatch-state.json",
+        canonical,
+        packaged,
+        db_path,
     ]
     before = {path: path.read_bytes() for path in tracked}
 

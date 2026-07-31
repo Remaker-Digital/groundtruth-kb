@@ -6,13 +6,24 @@ state and helper-level latest-status validation live above this module.
 
 from __future__ import annotations
 
+import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
+from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.project import registry_control_plane
+from groundtruth_kb.project.registry_control_plane import (
+    append_passive_observation,
+    load_registry_snapshot,
+    registry_currentness,
+    serialize_registry,
+)
+from groundtruth_kb.project.sot_registry import SoTArtifact, sync_projection
 
 from scripts import gtkb_bridge_writer as writer
+from scripts.bridge_work_intent_registry import acquire
 from scripts.gtkb_bridge_writer import (
     PRIME_STATUSES,
     VALID_STATUSES,
@@ -186,6 +197,55 @@ def _enable_typed_publication(tmp_path: Path) -> None:
     (tmp_path / "groundtruth.db").write_bytes(b"fixture")
 
 
+def _enable_real_typed_publication(tmp_path: Path, slug: str, session_id: str) -> None:
+    bridge = tmp_path / "bridge"
+    bridge.mkdir()
+    (bridge / "baseline-001.md").write_text("NEW\n", encoding="utf-8")
+    record = SoTArtifact(
+        id="bridge-versioned-files",
+        domain="bridge_protocol",
+        lifecycle="active",
+        storage_path="bridge/*-[0-9][0-9][0-9].md",
+        authority_spec_id="GOV-FILE-BRIDGE-AUTHORITY-001",
+        mutation_api="governed bridge publication",
+        versioning_policy="git_tracked",
+        backup_policy="git_tracked",
+        health_check_function="",
+        owner_role="shared",
+        restore_action="git_restore",
+        coverage_mode="glob",
+    )
+    payload = serialize_registry([record])
+    canonical = tmp_path / "config" / "registry" / "sot-artifacts.toml"
+    packaged = (
+        tmp_path
+        / "groundtruth-kb"
+        / "src"
+        / "groundtruth_kb"
+        / "context"
+        / "registries"
+        / "v1"
+        / "config"
+        / "registry"
+        / "sot-artifacts.toml"
+    )
+    canonical.parent.mkdir(parents=True)
+    packaged.parent.mkdir(parents=True)
+    canonical.write_bytes(payload)
+    packaged.write_bytes(payload)
+    db_path = tmp_path / "groundtruth.db"
+    KnowledgeDB(db_path=db_path)
+    sync_projection([record], db_path, changed_by="test", change_reason="writer crash fixture")
+    append_passive_observation(
+        record_ids=[record.id],
+        actor_session=session_id,
+        changed_by="test",
+        change_reason="establish bridge aggregate preimage",
+        project_root=tmp_path,
+    )
+    assert acquire(slug, session_id, project_root=tmp_path)
+
+
 def _typed_publication_content(status: str, document_name: str, version: int) -> str:
     return (
         f"{status}\n"
@@ -263,6 +323,330 @@ def test_typed_publication_observes_before_claim_release(
 
     assert path == target
     assert events == ["mint", "consume-current", "release"]
+
+
+def test_pending_publication_sidecar_is_secret_free_and_recovers_after_process_restart(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_typed_publication(tmp_path)
+    document_name = "typed-durable-pending"
+    relative_target = f"bridge/{document_name}-001.md"
+    target = tmp_path / relative_target
+    events: list[str] = []
+
+    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+    monkeypatch.setattr(writer, "_run_provider_verdict_guards", lambda **_kwargs: ())
+    monkeypatch.setattr(
+        registry_control_plane,
+        "mint_bridge_publication_capability",
+        lambda **_kwargs: {
+            "capability": "raw-secret-must-not-persist",
+            "capability_hash": "sha256:" + "a" * 64,
+            "content_digest": "sha256:" + "b" * 64,
+            "target_path": relative_target,
+        },
+    )
+    monkeypatch.setattr(
+        registry_control_plane,
+        "consume_bridge_publication_capability",
+        lambda **_kwargs: events.append("consume"),
+    )
+
+    def recover(**kwargs: object) -> registry_control_plane.BridgePublicationReceipt:
+        events.append(f"recover:{kwargs['mode']}")
+        return registry_control_plane.BridgePublicationReceipt(
+            capability_hash="sha256:" + "a" * 64,
+            revision_id="revision-test",
+            target_path=relative_target,
+            aggregate_digest="sha256:" + "e" * 64,
+            capability_state="consumed",
+        )
+
+    monkeypatch.setattr(registry_control_plane, "recover_bridge_publication", recover, raising=False)
+    monkeypatch.setattr(writer, "_release_claim", lambda *_args, **_kwargs: events.append("release"))
+
+    write_bridge_file(
+        document_name,
+        1,
+        _typed_publication_content("VERIFIED", document_name, 1),
+        tmp_path,
+        require_author_metadata=False,
+        release_claim=False,
+    )
+
+    sidecars = list((tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json"))
+    assert len(sidecars) == 1
+    assert "raw-secret-must-not-persist" not in sidecars[0].read_text(encoding="utf-8")
+    writer._PENDING_BRIDGE_PUBLICATIONS.clear()
+
+    writer.finalize_pending_bridge_publication(target, tmp_path)
+
+    assert events == ["consume", "recover:finalize", "release"]
+    assert not sidecars[0].exists()
+
+
+def test_pending_publication_sidecar_rolls_back_after_process_restart(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_typed_publication(tmp_path)
+    document_name = "typed-durable-rollback"
+    relative_target = f"bridge/{document_name}-001.md"
+    target = tmp_path / relative_target
+    events: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+    monkeypatch.setattr(writer, "_run_provider_verdict_guards", lambda **_kwargs: ())
+    monkeypatch.setattr(
+        registry_control_plane,
+        "mint_bridge_publication_capability",
+        lambda **_kwargs: {
+            "capability": "rollback-secret-must-not-persist",
+            "capability_hash": "sha256:" + "c" * 64,
+            "content_digest": "sha256:" + "d" * 64,
+            "target_path": relative_target,
+        },
+    )
+    monkeypatch.setattr(
+        registry_control_plane,
+        "consume_bridge_publication_capability",
+        lambda **_kwargs: None,
+    )
+
+    def recover(**kwargs: object) -> None:
+        events.append((str(kwargs["mode"]), str(kwargs["session_id"])))
+
+    monkeypatch.setattr(registry_control_plane, "recover_bridge_publication", recover, raising=False)
+
+    write_bridge_file(
+        document_name,
+        1,
+        _typed_publication_content("VERIFIED", document_name, 1),
+        tmp_path,
+        require_author_metadata=False,
+        release_claim=False,
+    )
+    sidecars = list((tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json"))
+    assert len(sidecars) == 1
+    assert "rollback-secret-must-not-persist" not in sidecars[0].read_text(encoding="utf-8")
+    writer._PENDING_BRIDGE_PUBLICATIONS.clear()
+
+    writer.rollback_pending_bridge_publication(target, tmp_path, reason="outer transaction failed")
+
+    assert events == [("rollback", "session-123")]
+    assert not sidecars[0].exists()
+
+
+def test_hard_exit_between_create_and_consume_recovers_in_fresh_process(tmp_path: Path) -> None:
+    document_name = "typed-hard-exit"
+    session_id = "session-123"
+    _enable_real_typed_publication(tmp_path, document_name, session_id)
+    content = _typed_publication_content("NEW", document_name, 1)
+    child = """
+import os
+import sys
+from pathlib import Path
+from groundtruth_kb.project import registry_control_plane
+from scripts import gtkb_bridge_writer as writer
+
+root = Path(sys.argv[1])
+document_name = sys.argv[2]
+content = sys.argv[3]
+writer.run_bridge_compliance_audit = lambda **_kwargs: {"decision": "pass"}
+writer._run_provider_verdict_guards = lambda **_kwargs: ()
+registry_control_plane.consume_bridge_publication_capability = lambda **_kwargs: os._exit(71)
+writer.write_bridge_file(
+    document_name,
+    1,
+    content,
+    root,
+    require_author_metadata=False,
+    release_claim=False,
+)
+"""
+
+    crashed = subprocess.run(
+        [sys.executable, "-c", child, str(tmp_path), document_name, content],
+        text=True,
+        capture_output=True,
+        check=False,
+        **no_window_subprocess_kwargs(),
+    )
+
+    assert crashed.returncode == 71, crashed.stderr
+    target = tmp_path / "bridge" / f"{document_name}-001.md"
+    written = target.read_text(encoding="utf-8")
+    assert written.startswith("NEW\n::init gtkb pb\n::open build\n")
+    assert f"Document: {document_name}\n" in written
+    sidecars = list((tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json"))
+    assert len(sidecars) == 1
+    sidecar = json.loads(sidecars[0].read_text(encoding="utf-8"))
+    assert "capability" not in sidecar
+    assert sidecar["capability_hash"].startswith("sha256:")
+
+    writer.finalize_pending_bridge_publication(target, tmp_path)
+
+    assert not sidecars[0].exists()
+    assert writer._claim_holder(tmp_path, document_name) is None
+    snapshot = load_registry_snapshot(project_root=tmp_path)
+    assert registry_currentness(
+        snapshot,
+        project_root=tmp_path,
+        db_path=tmp_path / "groundtruth.db",
+        record_ids={"bridge-versioned-files"},
+    )["current"]
+
+
+@pytest.mark.parametrize("crash_window", ("before_commit", "after_commit"))
+def test_rollback_recovery_is_idempotent_across_hard_exit_windows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    crash_window: str,
+) -> None:
+    document_name = f"typed-rollback-{crash_window}"
+    session_id = "session-123"
+    _enable_real_typed_publication(tmp_path, document_name, session_id)
+    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+    monkeypatch.setattr(writer, "_run_provider_verdict_guards", lambda **_kwargs: ())
+    target = write_bridge_file(
+        document_name,
+        1,
+        _typed_publication_content("NEW", document_name, 1),
+        tmp_path,
+        require_author_metadata=False,
+        release_claim=False,
+    )
+    writer._PENDING_BRIDGE_PUBLICATIONS.clear()
+    child = """
+import os
+import sys
+from pathlib import Path
+from groundtruth_kb.project import registry_control_plane
+
+root = Path(sys.argv[1])
+target = Path(sys.argv[2])
+window = sys.argv[3]
+if window == "before_commit":
+    registry_control_plane._append_revision = lambda *_args, **_kwargs: os._exit(72)
+else:
+    real_unlink = Path.unlink
+    def crash_on_quarantine_cleanup(path, *args, **kwargs):
+        if path.parent.name == "bridge-publication-recovery":
+            os._exit(73)
+        return real_unlink(path, *args, **kwargs)
+    Path.unlink = crash_on_quarantine_cleanup
+registry_control_plane.recover_bridge_publication(
+    target_path=target,
+    session_id="session-123",
+    mode="rollback",
+    changed_by="test",
+    change_reason="hard-exit rollback fixture",
+    project_root=root,
+)
+"""
+    expected_exit = 72 if crash_window == "before_commit" else 73
+
+    crashed = subprocess.run(
+        [sys.executable, "-c", child, str(tmp_path), str(target), crash_window],
+        text=True,
+        capture_output=True,
+        check=False,
+        **no_window_subprocess_kwargs(),
+    )
+
+    assert crashed.returncode == expected_exit, crashed.stderr
+    assert not target.exists()
+    quarantine = list((tmp_path / ".gtkb-state" / "bridge-publication-recovery").glob("*.rollback"))
+    assert len(quarantine) == 1
+
+    writer.rollback_pending_bridge_publication(target, tmp_path, reason="resume hard-exit rollback")
+
+    assert not target.exists()
+    assert not quarantine[0].exists()
+    assert not list((tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json"))
+
+
+def test_sidecar_cleanup_failure_does_not_compensate_released_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_typed_publication(tmp_path)
+    document_name = "typed-sidecar-cleanup"
+    relative_target = f"bridge/{document_name}-001.md"
+    target = tmp_path / relative_target
+    events: list[str] = []
+    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+    monkeypatch.setattr(writer, "_run_provider_verdict_guards", lambda **_kwargs: ())
+    monkeypatch.setattr(
+        registry_control_plane,
+        "mint_bridge_publication_capability",
+        lambda **_kwargs: {
+            "capability": "cleanup-secret",
+            "capability_hash": "sha256:" + "a" * 64,
+            "content_digest": "sha256:" + "b" * 64,
+            "target_path": relative_target,
+        },
+    )
+    monkeypatch.setattr(
+        registry_control_plane,
+        "consume_bridge_publication_capability",
+        lambda **_kwargs: events.append("consume"),
+    )
+    monkeypatch.setattr(writer, "_release_claim", lambda *_args, **_kwargs: events.append("release"))
+    monkeypatch.setattr(
+        registry_control_plane,
+        "compensate_bridge_publication",
+        lambda **_kwargs: pytest.fail("cleanup failure must not compensate a completed publication"),
+    )
+    monkeypatch.setattr(
+        writer,
+        "_delete_pending_publication_sidecar",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("injected cleanup failure")),
+    )
+
+    written = write_bridge_file(
+        document_name,
+        1,
+        _typed_publication_content("NEW", document_name, 1),
+        tmp_path,
+        require_author_metadata=False,
+    )
+
+    assert written == target
+    assert target.exists()
+    assert events == ["consume", "release"]
+
+
+def test_restart_recovery_rejects_sidecar_capability_hash_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document_name = "typed-sidecar-binding"
+    session_id = "session-123"
+    _enable_real_typed_publication(tmp_path, document_name, session_id)
+    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+    monkeypatch.setattr(writer, "_run_provider_verdict_guards", lambda **_kwargs: ())
+    target = write_bridge_file(
+        document_name,
+        1,
+        _typed_publication_content("NEW", document_name, 1),
+        tmp_path,
+        require_author_metadata=False,
+        release_claim=False,
+    )
+    writer._PENDING_BRIDGE_PUBLICATIONS.clear()
+    sidecar = next((tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json"))
+    payload = json.loads(sidecar.read_text(encoding="utf-8"))
+    payload["capability_hash"] = "sha256:" + "f" * 64
+    sidecar.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(registry_control_plane.RegistryAuthorizationError, match="exact.*row"):
+        writer.finalize_pending_bridge_publication(target, tmp_path)
+
+    assert target.exists()
+    assert sidecar.exists()
+    assert writer._claim_holder(tmp_path, document_name) is not None
 
 
 @pytest.mark.parametrize(
@@ -459,6 +843,10 @@ def test_write_bridge_file_accepts_pre_metadata_content_when_injection_skipped(
 def test_no_action_is_valid_prime_authored_status() -> None:
     assert "NO-ACTION" in VALID_STATUSES
     assert "NO-ACTION" in PRIME_STATUSES
+    assert (
+        frozenset({"NEW", "REVISED", "GO", "NO-GO", "NO-ACTION", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN"})
+        == VALID_STATUSES
+    )
 
 
 def test_write_bridge_file_materializes_no_action_envelope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

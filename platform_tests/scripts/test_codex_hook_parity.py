@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from scripts.parity_discovery_diff import enumerate_hook_surfaces
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "check_codex_hook_parity.py"
 CODEX_SESSION_START_DISPATCHER = REPO_ROOT / ".codex" / "gtkb-hooks" / "session_start_dispatch.py"
@@ -51,11 +53,42 @@ def _hooks_for_event(codex_hooks: dict, event_name: str) -> list[dict]:
 
 
 def _hook_with_command_fragment(codex_hooks: dict, event_name: str, command_fragment: str) -> dict:
-    matches = [
-        hook for hook in _hooks_for_event(codex_hooks, event_name) if command_fragment in hook.get("command", "")
-    ]
+    target_surface = Path(command_fragment.replace("\\", "/")).stem.lower()
+    matches: list[dict] = []
+    for group in codex_hooks["hooks"].get(event_name, []):
+        for hook in group.get("hooks", []):
+            single_hook_group = dict(group)
+            single_hook_group["hooks"] = [hook]
+            surfaces = enumerate_hook_surfaces(
+                {"hooks": {event_name: [single_hook_group]}},
+                project_root=REPO_ROOT,
+            )
+            if target_surface in {surface.lower() for surface in surfaces}:
+                matches.append(hook)
     assert len(matches) == 1
     return matches[0]
+
+
+def _expanded_routes(
+    hooks_document: dict,
+    event_name: str,
+    command_fragment: str,
+    *,
+    project_root: Path = REPO_ROOT,
+) -> list[tuple[dict, dict]]:
+    target_surface = Path(command_fragment.replace("\\", "/")).stem.lower()
+    routes: list[tuple[dict, dict]] = []
+    for group in hooks_document.get("hooks", {}).get(event_name, []):
+        for hook in group.get("hooks", []):
+            single_hook_group = dict(group)
+            single_hook_group["hooks"] = [hook]
+            surfaces = enumerate_hook_surfaces(
+                {"hooks": {event_name: [single_hook_group]}},
+                project_root=project_root,
+            )
+            if target_surface in {surface.lower() for surface in surfaces}:
+                routes.append((group, hook))
+    return routes
 
 
 def _float_constant_from_python_module(path: Path, constant_name: str) -> float:
@@ -121,7 +154,7 @@ def test_claude_proactive_wrapup_stop_hook_has_sixty_second_allowance() -> None:
     assert wrapup_hook["timeout"] == 60
 
 
-def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
+def test_codex_hook_parity_requires_session_lifecycle_hook_intent(tmp_path) -> None:
     module = _load_module()
 
     errors = module.check_project(REPO_ROOT)
@@ -130,11 +163,7 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
     codex_hooks = _load_codex_hooks()
     _skip_if_codex_hooks_intentionally_empty(codex_hooks)
     claude_settings = json.loads((REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
-    assert any(
-        "gtkb-hooks" in hook["command"] and "session_start_dispatch.py" in hook["command"]
-        for group in codex_hooks["hooks"]["SessionStart"]
-        for hook in group["hooks"]
-    )
+    assert len(_expanded_routes(codex_hooks, "SessionStart", "session_start_dispatch.py")) == 1
     assert not any(
         "gtkb_dispatcher_daemon.py" in hook["command"] or "dispatcher-daemon.cmd" in hook["command"]
         for groups in codex_hooks["hooks"].values()
@@ -144,35 +173,16 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
     session_start_hook = _hook_with_command_fragment(codex_hooks, "SessionStart", "session_start_dispatch.py")
     inner_timeout = _float_constant_from_python_module(SESSION_START_DISPATCH_CORE, "STARTUP_SERVICE_TIMEOUT_SECONDS")
     assert session_start_hook["timeout"] > inner_timeout
-    assert any(
-        "gtkb-hooks" in hook["command"] and "session_wrapup_trigger_dispatch.py" in hook["command"]
-        for group in codex_hooks["hooks"]["UserPromptSubmit"]
-        for hook in group["hooks"]
-    )
-    assert any(
-        "gtkb-hooks" in hook["command"] and "workstream-focus.cmd" in hook["command"]
-        for group in codex_hooks["hooks"]["UserPromptSubmit"]
-        for hook in group["hooks"]
-    )
-    assert any(
-        group.get("matcher") == "Bash" and any("workstream-focus.cmd" in hook["command"] for hook in group["hooks"])
-        for group in codex_hooks["hooks"]["PreToolUse"]
-    )
-    assert any(
-        group.get("matcher") == "apply_patch"
-        and any("workstream-focus.cmd" in hook["command"] for hook in group["hooks"])
-        for group in codex_hooks["hooks"]["PreToolUse"]
-    )
-    assert any(
-        group.get("matcher") == "Bash"
-        and any("bridge-compliance-gate.cmd" in hook["command"] for hook in group["hooks"])
-        for group in codex_hooks["hooks"]["PreToolUse"]
-    )
-    assert any(
-        group.get("matcher") == "Bash"
-        and any("bridge-compliance-audit.cmd" in hook["command"] for hook in group["hooks"])
-        for group in codex_hooks["hooks"]["PostToolUse"]
-    )
+    assert len(_expanded_routes(codex_hooks, "UserPromptSubmit", "session_wrapup_trigger_dispatch.py")) == 1
+    assert len(_expanded_routes(codex_hooks, "UserPromptSubmit", "workstream-focus.cmd")) == 1
+    workstream_pre_routes = _expanded_routes(codex_hooks, "PreToolUse", "workstream-focus.cmd")
+    assert sorted(group.get("matcher") for group, _hook in workstream_pre_routes) == ["Bash", "apply_patch"]
+    bridge_pre_routes = _expanded_routes(codex_hooks, "PreToolUse", "bridge-compliance-gate.cmd")
+    assert len(bridge_pre_routes) == 1
+    assert bridge_pre_routes[0][0].get("matcher") == "Bash"
+    bridge_post_routes = _expanded_routes(codex_hooks, "PostToolUse", "bridge-compliance-audit.cmd")
+    assert len(bridge_post_routes) == 1
+    assert bridge_post_routes[0][0].get("matcher") == "Bash"
     assert "Stop" in codex_hooks["hooks"], (
         "Codex Stop hook must be registered for non-dispatch lifecycle parity "
         "(auto-finalization, advisory scan, and backlog reconciliation)."
@@ -181,12 +191,8 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
     # Stop matchers are not supported by Codex; entries must be matcher-less.
     for group in codex_stop_hooks:
         assert group.get("matcher") in (None, ""), "Codex Stop entries must not declare a matcher (Codex hooks docs)"
-    assert any(
-        "auto_finalize_sweep.py" in hook.get("command", "") for group in codex_stop_hooks for hook in group["hooks"]
-    )
-    assert any(
-        "advisory-router-scan.py" in hook.get("command", "") for group in codex_stop_hooks for hook in group["hooks"]
-    )
+    assert len(_expanded_routes(codex_hooks, "Stop", "auto_finalize_sweep.py")) == 1
+    assert len(_expanded_routes(codex_hooks, "Stop", "advisory-router-scan.py")) == 1
     codex_stop_commands = [hook["command"] for group in codex_stop_hooks for hook in group["hooks"]]
     assert not any("session_wrapup" in cmd or "session_self_initialization.py" in cmd for cmd in codex_stop_commands), (
         "Codex Stop must not register lifecycle wrap-up scripts. Stop is limited "
@@ -209,8 +215,8 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
     # Per bridge/gtkb-startup-enhancements-p1-003.md §2.4 (Codex GO at -004):
     # the previously-registered owner-decision-tracker-ups.cmd entry has been
     # removed because the wrapper file does not exist on disk, Codex hooks
-    # are disabled on Windows per ADR-CODEX-HOOK-PARITY-FALLBACK-001, and the
-    # active mechanism is scripts/check_pending_owner_decisions_parity.py in
+    # remain batch-routed through the no-window runner, and the active mechanism
+    # is scripts/check_pending_owner_decisions_parity.py in
     # the release-candidate gate. This assertion guards against regression.
     all_codex_commands = [
         hook["command"]
@@ -223,6 +229,57 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         "the wrapper file is created on disk. Active fallback is in the "
         "release-candidate gate via check_pending_owner_decisions_parity.py."
     )
+
+    # Required child surfaces fail closed when the public batch enumerator
+    # cannot read a complete declarative batch. Direct wrappers remain valid.
+    batch_group = codex_hooks["hooks"]["PreToolUse"][0]
+    batch_document = {"hooks": {"PreToolUse": [batch_group]}}
+    valid_root = tmp_path / "valid"
+    valid_runner = valid_root / ".codex" / "gtkb-hooks" / "run_py_no_window.py"
+    valid_runner.parent.mkdir(parents=True)
+    valid_runner.write_bytes((REPO_ROOT / ".codex" / "gtkb-hooks" / "run_py_no_window.py").read_bytes())
+    assert "formal-artifact-approval" in enumerate_hook_surfaces(batch_document, project_root=valid_root)
+
+    missing_root = tmp_path / "missing"
+    assert "formal-artifact-approval" not in enumerate_hook_surfaces(batch_document, project_root=missing_root)
+
+    malformed_root = tmp_path / "malformed"
+    malformed_runner = malformed_root / ".codex" / "gtkb-hooks" / "run_py_no_window.py"
+    malformed_runner.parent.mkdir(parents=True)
+    malformed_runner.write_text("BATCHES = {\n", encoding="utf-8")
+    assert "formal-artifact-approval" not in enumerate_hook_surfaces(batch_document, project_root=malformed_root)
+
+    unreadable_root = tmp_path / "unreadable"
+    unreadable_runner = unreadable_root / ".codex" / "gtkb-hooks" / "run_py_no_window.py"
+    unreadable_runner.mkdir(parents=True)
+    assert "formal-artifact-approval" not in enumerate_hook_surfaces(batch_document, project_root=unreadable_root)
+
+    incomplete_root = tmp_path / "incomplete"
+    incomplete_runner = incomplete_root / ".codex" / "gtkb-hooks" / "run_py_no_window.py"
+    incomplete_runner.parent.mkdir(parents=True)
+    incomplete_runner.write_text(
+        'BATCHES = {"pretooluse-bash": (("cmd", ".codex/gtkb-hooks/workstream-focus.cmd"),)}\n',
+        encoding="utf-8",
+    )
+    assert "formal-artifact-approval" not in enumerate_hook_surfaces(batch_document, project_root=incomplete_root)
+
+    direct_document = {
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "matcher": "Bash",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "python .codex/gtkb-hooks/formal-artifact-approval.cmd",
+                            "timeout": 5,
+                        }
+                    ],
+                }
+            ]
+        }
+    }
+    assert "formal-artifact-approval" in enumerate_hook_surfaces(direct_document, project_root=missing_root)
     # Per gtkb-claude-session-start-parity GO at -002, the SessionStart
     # registration may be either the canonical script directly (legacy)
     # or a dispatcher under .claude/hooks/ that delegates to it via the
@@ -324,22 +381,18 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
         "gtkb-hooks" in command and "session_start_dispatch.py" in command and "run_py_no_window " in command
         for command in commands
     )
-    assert any(
-        "gtkb-hooks" in command and "session_wrapup_trigger_dispatch.py" in command and "run_py_no_window " in command
-        for command in commands
-    )
-    assert any(
-        "gtkb-hooks" in command and "workstream-focus.cmd" in command and "run_cmd_no_window " in command
-        for command in commands
-    )
-    assert any(
-        "gtkb-hooks" in command and "bridge-compliance-gate.cmd" in command and "run_cmd_no_window " in command
-        for command in commands
-    )
-    assert any(
-        "gtkb-hooks" in command and "bridge-compliance-audit.cmd" in command and "run_cmd_no_window " in command
-        for command in commands
-    )
+    batch_commands = [command for command in commands if "--batch" in command]
+    assert batch_commands
+    assert all("run_py_no_window " in command for command in batch_commands)
+    assert any("--batch user-prompt-submit" in command for command in batch_commands)
+    assert any("--batch pretooluse-bash" in command for command in batch_commands)
+    assert any("--batch pretooluse-apply-patch" in command for command in batch_commands)
+    assert any("--batch posttooluse-bash" in command for command in batch_commands)
+    assert len(_expanded_routes(codex_hooks, "UserPromptSubmit", "session_wrapup_trigger_dispatch.py")) == 1
+    assert len(_expanded_routes(codex_hooks, "UserPromptSubmit", "workstream-focus.cmd")) == 1
+    assert len(_expanded_routes(codex_hooks, "PreToolUse", "formal-artifact-approval.cmd")) == 1
+    assert len(_expanded_routes(codex_hooks, "PreToolUse", "bridge-compliance-gate.cmd")) == 1
+    assert len(_expanded_routes(codex_hooks, "PostToolUse", "bridge-compliance-audit.cmd")) == 1
 
     start_dispatcher = REPO_ROOT / ".codex" / "gtkb-hooks" / "session_start_dispatch.py"
     core_module = REPO_ROOT / "scripts" / "session_start_dispatch_core.py"
@@ -371,7 +424,8 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     assert "STARTUP_SERVICE_TIMEOUT_SECONDS = 150.0" in core_text
     assert "STARTUP_SERVICE_TIMEOUT_ENV" in core_text
     assert "_startup_service_timeout_seconds" in core_text
-    assert "timeout=_startup_service_timeout_seconds()" in core_text
+    assert "_startup_service_timeout_seconds_for_harness" in core_text
+    assert "timeout=_startup_service_timeout_seconds_for_harness()" in core_text
     assert "Startup First-Response Directive" not in core_text
     assert "_live_bridge_index_context" not in core_text
     assert "Mandatory Direct Live Bridge Index Read" not in core_text
@@ -420,6 +474,7 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     assert 'HARNESS_ID = "A"' not in wrapup_text
     assert "resolved_harness_id" in wrapup_text
     assert "--role-profile" not in wrapup_text
+    assert "_interactive_role_profile" not in wrapup_text
     assert "UserPromptSubmit" in wrapup_text
     assert "ACCEPTED_TRIGGER_PHRASES" in wrapup_text
     assert "_is_wrapup_trigger" in wrapup_text

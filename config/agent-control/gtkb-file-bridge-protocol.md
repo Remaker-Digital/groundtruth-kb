@@ -280,6 +280,41 @@ numbered bridge file.
 | DEFERRED | Owner | Owner-directed parked bridge state; non-actionable until the owner-directed clear/resume condition is met. |
 | NO-ACTION | Prime Builder | Prime Builder rejection of an LO GO/NO-GO verdict for governance non-compliance; the reason states what the reviewer must fix. Loyal-Opposition-actionable (routes back to LO to re-issue a corrected verdict); NOT terminal, NOT owner-visible. MUST NOT be used to dispose of an ADVISORY thread. See `DCL-NO-ACTION-STATUS-SEMANTICS-001`. |
 
+## Post-Verdict Transition Table
+
+The single authoritative transition table for ordinary bridge lifecycles is
+the `ORDINARY_TRANSITIONS` constant in `scripts/bridge_lifecycle_resolver.py`
+(the code of record). This section renders that table; the doc-code
+consistency test
+`platform_tests/scripts/test_bridge_protocol_transition_table_consistency.py`
+asserts the rendering matches the constant on every surface.
+
+| Previous status | Allowed successors |
+|---|---|
+| NEW | GO, NO-GO, WITHDRAWN, DEFERRED |
+| REVISED | GO, NO-GO, WITHDRAWN, DEFERRED |
+| GO | NEW, REVISED, NO-ACTION, DEFERRED, WITHDRAWN |
+| NO-GO | REVISED, NO-ACTION, DEFERRED, WITHDRAWN |
+| NO-ACTION | GO, NO-GO, VERIFIED |
+| ADVISORY | ADVISORY, ACCEPTED, BLOCKED, DEFERRED, WITHDRAWN |
+| BLOCKED | REVISED, WITHDRAWN |
+| DEFERRED | REVISED, WITHDRAWN |
+
+Post-GO augmentations (`POST_GO_REPORT_AUGMENTATIONS` in the same module),
+applied only once a `GO` has been seen earlier in the chain:
+
+| Previous status (post-GO) | Additional allowed successors |
+|---|---|
+| NEW | REVISED, VERIFIED |
+| REVISED | VERIFIED |
+
+Post-`NO-GO`, the lawful Prime Builder statuses are `REVISED` (the corrected
+proposal or corrected implementation report) and `NO-ACTION` (Prime rejection
+of a governance-non-compliant verdict per
+`DCL-NO-ACTION-STATUS-SEMANTICS-001`); `DEFERRED` (owner parking) and
+`WITHDRAWN` (terminal) complete the set. `NEW` is never a lawful successor to
+`NO-GO`.
+
 ## Review Independence Boundary
 
 Formal bridge review must come from a **different model session context** than
@@ -418,10 +453,15 @@ unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
 
 After Prime implements a GO'd proposal:
 1. Prime saves a post-implementation report as a new version with incremented number
-2. Prime uses the governed writer to publish a NEW verification-request entry
+2. The FIRST post-implementation report after a GO publishes as a NEW
+   verification-request entry through the governed writer
 3. Loyal Opposition reviews and responds with NO-GO, or records VERIFIED only
    through the commit-finalization helper so the verified work, implementation
    report, and verdict artifact enter git history in the same local commit.
+4. After a Loyal Opposition NO-GO on a post-implementation report, the
+   corrected report publishes as REVISED — never NEW — mirroring § Prime
+   Workflow step 6 and the § Post-Verdict Transition Table (`NO-GO ->
+   REVISED`; `NEW` is never a lawful successor to `NO-GO`).
 
 ## Bridge State Maintenance
 

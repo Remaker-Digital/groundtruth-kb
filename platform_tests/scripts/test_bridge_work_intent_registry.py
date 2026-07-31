@@ -18,6 +18,8 @@ import importlib.util
 import json
 import sqlite3
 import sys
+import threading
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -781,3 +783,343 @@ def test_unreadable_or_duplicate_version_still_raises(tmp_path: Path, env) -> No
         env._thread_version_entries("shadowed-thread", project_root=tmp_path)
 
     unreadable_dir.rmdir()
+
+
+# WI-5784 — deterministic real-SQLite contention coverage for the narrow
+# acquire/release write boundary.
+
+
+def _prepare_draft_thread(root: Path, env, slug: str = "thread-a") -> Path:
+    _write_index(root, {slug: "NEW"})
+    conn = env._get_conn(root)
+    conn.close()
+    return root / "groundtruth.db"
+
+
+def _hold_write_lock(database_path: Path) -> sqlite3.Connection:
+    conn = sqlite3.connect(database_path, timeout=0)
+    conn.execute("BEGIN IMMEDIATE")
+    return conn
+
+
+def _configure_fast_contention(monkeypatch: pytest.MonkeyPatch, env, *, deadline: float = 1.0) -> None:
+    monkeypatch.setattr(env, "WORK_INTENT_WRITE_RETRY_DEADLINE_SECONDS", deadline)
+    monkeypatch.setattr(env, "WORK_INTENT_WRITE_ATTEMPT_TIMEOUT_SECONDS", 0.0)
+    monkeypatch.setattr(env, "WORK_INTENT_WRITE_INITIAL_BACKOFF_SECONDS", 0.001)
+    monkeypatch.setattr(env, "WORK_INTENT_WRITE_MAX_BACKOFF_SECONDS", 0.001)
+
+
+def test_acquire_retries_real_lock_and_succeeds_when_unlocked_within_budget(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    database_path = _prepare_draft_thread(tmp_path, env)
+    blocker = _hold_write_lock(database_path)
+    _configure_fast_contention(monkeypatch, env)
+    sleeps: list[float] = []
+
+    def unlock_on_retry(seconds: float) -> None:
+        sleeps.append(seconds)
+        blocker.commit()
+
+    monkeypatch.setattr(env, "_retry_sleep", unlock_on_retry)
+    try:
+        assert env.acquire("thread-a", "owner-session", project_root=tmp_path)
+    finally:
+        blocker.close()
+
+    assert sleeps
+    holder = env.current_holder("thread-a", project_root=tmp_path)
+    assert holder is not None
+    assert holder["session_id"] == "owner-session"
+
+
+def test_acquire_retry_preserves_foreign_holder_published_during_contention(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    database_path = _prepare_draft_thread(tmp_path, env)
+    blocker = _hold_write_lock(database_path)
+    now = datetime.now(UTC)
+    blocker.execute(
+        """
+        INSERT INTO work_intent_claims
+        (thread_slug, session_id, acquired_at, ttl_expires_at, claim_kind)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            "thread-a",
+            "replacement-session",
+            now.isoformat().replace("+00:00", "Z"),
+            (now + timedelta(minutes=10)).isoformat().replace("+00:00", "Z"),
+            env.CLAIM_KIND_DRAFT,
+        ),
+    )
+    _configure_fast_contention(monkeypatch, env)
+    committed = False
+
+    def publish_replacement(_seconds: float) -> None:
+        nonlocal committed
+        if not committed:
+            blocker.commit()
+            committed = True
+
+    monkeypatch.setattr(env, "_retry_sleep", publish_replacement)
+    try:
+        assert not env.acquire("thread-a", "owner-session", project_root=tmp_path)
+    finally:
+        blocker.close()
+
+    holder = env.current_holder("thread-a", project_root=tmp_path)
+    assert holder is not None
+    assert holder["session_id"] == "replacement-session"
+
+
+def test_acquire_retry_revalidates_bootstrap_authority_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_bootstrap_thread(tmp_path, "bootstrap-thread")
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-bootstrap"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+    authority = {
+        "owner_decision_id": "DELIB-BOOTSTRAP",
+        "project_id": "PROJECT-X",
+        "work_item_id": "WI-5279",
+        "authorization_id": "PAUTH-BOOTSTRAP",
+        "carrier_targets": ["groundtruth.db"],
+    }
+    assert env.acquire(
+        "bootstrap-thread",
+        session_id,
+        project_root=tmp_path,
+        claim_kind=env.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
+        bootstrap_authority=authority,
+    )
+
+    database_path = tmp_path / "groundtruth.db"
+    blocker = _hold_write_lock(database_path)
+    blocker.execute(
+        """
+        UPDATE work_intent_claims
+        SET bootstrap_authorization_id = ?
+        WHERE thread_slug = ? AND session_id = ?
+        """,
+        ("PAUTH-REPLACEMENT", "bootstrap-thread", session_id),
+    )
+    _configure_fast_contention(monkeypatch, env)
+    committed = False
+
+    def publish_replacement(_seconds: float) -> None:
+        nonlocal committed
+        if not committed:
+            blocker.commit()
+            committed = True
+
+    monkeypatch.setattr(env, "_retry_sleep", publish_replacement)
+    try:
+        with pytest.raises(env.WorkIntentRegistryError, match="metadata differs"):
+            env.acquire(
+                "bootstrap-thread",
+                session_id,
+                project_root=tmp_path,
+                claim_kind=env.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
+                bootstrap_authority=authority,
+            )
+    finally:
+        blocker.close()
+
+    holder = env.current_holder("bootstrap-thread", project_root=tmp_path)
+    assert holder is not None
+    assert holder["bootstrap_authorization_id"] == "PAUTH-REPLACEMENT"
+
+
+def test_acquire_deadline_exhaustion_is_typed_and_leaves_no_partial_claim(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    database_path = _prepare_draft_thread(tmp_path, env)
+    blocker = _hold_write_lock(database_path)
+    _configure_fast_contention(monkeypatch, env, deadline=0.1)
+    opened: list[sqlite3.Connection] = []
+    original_get_conn = env._get_conn
+
+    def tracking_get_conn(*args, **kwargs):
+        conn = original_get_conn(*args, **kwargs)
+        opened.append(conn)
+        return conn
+
+    monkeypatch.setattr(env, "_get_conn", tracking_get_conn)
+    try:
+        with pytest.raises(env.WorkIntentWriteContentionError) as excinfo:
+            env.acquire("thread-a", "owner-session", project_root=tmp_path)
+    finally:
+        blocker.commit()
+        blocker.close()
+
+    error = excinfo.value
+    assert error.operation == "acquire"
+    assert error.phase == "begin_immediate"
+    assert error.attempts >= 1
+    assert error.elapsed_seconds >= 0
+    assert error.sqlite_errorcode is not None
+    assert (error.sqlite_errorcode & 0xFF) in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}
+    assert error.database_path == database_path
+    assert error.as_dict()["contention_exhausted"] is True
+    assert env.claim_status("thread-a", project_root=tmp_path) is None
+    assert opened
+    for conn in opened:
+        with pytest.raises(sqlite3.ProgrammingError):
+            conn.execute("SELECT 1")
+
+
+def test_release_retry_revalidates_and_preserves_replacement_holder(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    database_path = _prepare_draft_thread(tmp_path, env)
+    assert env.acquire("thread-a", "owner-session", project_root=tmp_path)
+    blocker = _hold_write_lock(database_path)
+    blocker.execute(
+        "UPDATE work_intent_claims SET session_id = ? WHERE thread_slug = ?",
+        ("replacement-session", "thread-a"),
+    )
+    _configure_fast_contention(monkeypatch, env)
+    committed = False
+
+    def publish_replacement(_seconds: float) -> None:
+        nonlocal committed
+        if not committed:
+            blocker.commit()
+            committed = True
+
+    monkeypatch.setattr(env, "_retry_sleep", publish_replacement)
+    try:
+        env.release("thread-a", "owner-session", project_root=tmp_path)
+    finally:
+        blocker.close()
+
+    holder = env.current_holder("thread-a", project_root=tmp_path)
+    assert holder is not None
+    assert holder["session_id"] == "replacement-session"
+
+
+def test_release_retries_real_lock_and_deletes_exact_holder_when_unlocked_within_budget(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    database_path = _prepare_draft_thread(tmp_path, env)
+    assert env.acquire("thread-a", "owner-session", project_root=tmp_path)
+    blocker = _hold_write_lock(database_path)
+    _configure_fast_contention(monkeypatch, env)
+    sleeps: list[float] = []
+
+    def unlock_on_retry(seconds: float) -> None:
+        sleeps.append(seconds)
+        blocker.rollback()
+
+    monkeypatch.setattr(env, "_retry_sleep", unlock_on_retry)
+    try:
+        env.release("thread-a", "owner-session", project_root=tmp_path)
+    finally:
+        blocker.close()
+
+    assert sleeps
+    assert env.claim_status("thread-a", project_root=tmp_path) is None
+
+
+def test_release_commit_wait_cannot_outlive_total_deadline(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    database_path = _prepare_draft_thread(tmp_path, env)
+    assert env.acquire("thread-a", "owner-session", project_root=tmp_path)
+
+    reader = sqlite3.connect(database_path, timeout=0)
+    reader.execute("BEGIN")
+    reader.execute("SELECT * FROM work_intent_claims").fetchall()
+    blocker = _hold_write_lock(database_path)
+    _configure_fast_contention(monkeypatch, env, deadline=0.5)
+    monkeypatch.setattr(env, "WORK_INTENT_WRITE_ATTEMPT_TIMEOUT_SECONDS", 0.5)
+    completed = threading.Event()
+    outcome: list[BaseException | str] = []
+
+    def release_in_thread() -> None:
+        try:
+            env.release("thread-a", "owner-session", project_root=tmp_path)
+        except BaseException as exc:  # noqa: BLE001 - assertion captures the worker outcome
+            outcome.append(exc)
+        else:
+            outcome.append("success")
+        finally:
+            completed.set()
+
+    worker = threading.Thread(target=release_in_thread, daemon=True)
+    worker.start()
+    try:
+        assert not completed.wait(0.05)
+        time.sleep(0.25)
+        blocker.rollback()
+        completed_before_reader_release = completed.wait(0.3)
+    finally:
+        blocker.close()
+        reader.commit()
+        reader.close()
+        worker.join(timeout=1.0)
+
+    assert completed_before_reader_release
+    assert len(outcome) == 1
+    error = outcome[0]
+    assert isinstance(error, env.WorkIntentWriteContentionError)
+    assert error.operation == "release"
+    assert error.phase == "commit"
+    assert error.contention_exhausted is True
+    holder = env.current_holder("thread-a", project_root=tmp_path)
+    assert holder is not None
+    assert holder["session_id"] == "owner-session"
+
+
+def test_release_is_idempotent_for_missing_claim(tmp_path: Path, env) -> None:
+    _prepare_draft_thread(tmp_path, env)
+
+    env.release("thread-a", "owner-session", project_root=tmp_path)
+    env.release("thread-a", "owner-session", project_root=tmp_path)
+
+    assert env.claim_status("thread-a", project_root=tmp_path) is None
+
+
+def test_non_busy_schema_failure_is_not_retried_and_closes_connection(tmp_path: Path, env) -> None:
+    database_path = tmp_path / "groundtruth.db"
+    database_path.write_bytes(b"not-a-sqlite-database")
+
+    with pytest.raises(env.WorkIntentDatabaseError) as excinfo:
+        env.release("thread-a", "owner-session", project_root=tmp_path)
+
+    error = excinfo.value
+    assert not isinstance(error, env.WorkIntentWriteContentionError)
+    assert error.operation == "release"
+    assert error.phase == "open_or_schema"
+    assert error.attempts == 1
+    assert error.contention_exhausted is False
+    renamed = tmp_path / "closed-after-error.db"
+    database_path.rename(renamed)
+    assert renamed.is_file()
+
+
+def test_narrow_schema_setup_does_not_initialize_global_groundtruth_schema(tmp_path: Path, env) -> None:
+    conn = env._get_conn(tmp_path)
+    try:
+        tables = {str(row[0]) for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()}
+    finally:
+        conn.close()
+
+    assert "work_intent_claims" in tables
+    assert "work_items" not in tables

@@ -25,6 +25,23 @@ from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.governance.approval_packet import construct_approval_packet, validate_packet
 
+_POSTIMAGE_FIELD_NAMES = (
+    "title",
+    "status",
+    "priority",
+    "scope",
+    "section",
+    "handle",
+    "tags",
+    "assertions",
+    "constraints",
+    "affected_by",
+    "testability",
+    "source_paths",
+    "application_scope",
+)
+_JSON_POSTIMAGE_FIELDS = ("tags", "assertions", "constraints", "affected_by", "source_paths")
+
 
 class SpecUpdateError(Exception):
     """Raised when ``gt spec update`` cannot safely proceed."""
@@ -137,6 +154,7 @@ def _build_packet(
     current_version: int,
     full_content: str,
     changed_by: str,
+    postimage_fields: dict[str, Any],
 ) -> dict[str, object]:
     return construct_approval_packet(
         artifact_type=artifact_type,
@@ -151,12 +169,13 @@ def _build_packet(
         approved_by=request.approved_by or "owner",
         changed_by=changed_by,
         change_reason=request.change_reason,
+        postimage_fields=postimage_fields,
     )
 
 
-def _merged_fields(
+def _normalized_postimage_fields(
     request: SpecUpdateRequest,
-    full_content: str,
+    current: dict[str, Any],
     *,
     tags: list[str] | None,
     assertions: list[dict[str, Any]] | None,
@@ -164,40 +183,33 @@ def _merged_fields(
     affected_by: list[str] | None,
     source_paths: list[str] | None,
 ) -> dict[str, Any]:
-    """Build the mutation-field kwargs for :meth:`KnowledgeDB.update_spec`.
+    """Return the complete normalized non-description row postimage."""
 
-    Only options the caller actually supplied are included; omitted optional
-    fields are absent from the kwargs so ``update_spec`` carries forward the
-    previous version's values per its documented contract. ``description`` is
-    always supplied because ``--content-file`` is required for an update.
-    """
-    fields: dict[str, Any] = {"description": full_content}
-    if request.title is not None:
-        fields["title"] = request.title
-    if request.status is not None:
-        fields["status"] = request.status
-    if request.priority is not None:
-        fields["priority"] = request.priority
-    if request.scope is not None:
-        fields["scope"] = request.scope
-    if request.section is not None:
-        fields["section"] = request.section
-    if request.handle is not None:
-        fields["handle"] = request.handle
-    if request.testability is not None:
-        fields["testability"] = request.testability
-    if request.tags_json is not None:
-        fields["tags"] = tags
-    if request.assertions_json is not None:
-        fields["assertions"] = assertions
-    if request.constraints_json is not None:
-        fields["constraints"] = constraints
-    if request.affected_by_json is not None:
-        fields["affected_by"] = affected_by
-    if request.source_paths_json is not None:
-        fields["source_paths"] = source_paths
-    if request.application_scope is not None:
-        fields["application_scope"] = request.application_scope
+    supplied_json = {
+        "tags": (request.tags_json, tags),
+        "assertions": (request.assertions_json, assertions),
+        "constraints": (request.constraints_json, constraints),
+        "affected_by": (request.affected_by_json, affected_by),
+        "source_paths": (request.source_paths_json, source_paths),
+    }
+    fields: dict[str, Any] = {}
+    for name in _POSTIMAGE_FIELD_NAMES:
+        if name in _JSON_POSTIMAGE_FIELDS:
+            raw_option, parsed_option = supplied_json[name]
+            if raw_option is not None:
+                fields[name] = parsed_option
+                continue
+            if current.get(name) is None:
+                fields[name] = None
+                continue
+            parsed_name = f"{name}_parsed"
+            if parsed_name not in current:
+                raise SpecUpdateError(f"stored {name} for {request.spec_id} is not valid JSON")
+            fields[name] = current[parsed_name]
+            continue
+
+        supplied_value = getattr(request, name)
+        fields[name] = supplied_value if supplied_value is not None else current.get(name)
     return fields
 
 
@@ -237,6 +249,17 @@ def update_spec(config: GTConfig, request: SpecUpdateRequest) -> dict[str, Any]:
     current_version = int(current["version"])
     new_version = current_version + 1
 
+    postimage_fields = _normalized_postimage_fields(
+        request,
+        current,
+        tags=tags,
+        assertions=assertions,
+        constraints=constraints,
+        affected_by=affected_by,
+        source_paths=source_paths,
+    )
+    merged_fields = {"description": full_content, **postimage_fields}
+
     changed_by = _changed_by()
     packet = _build_packet(
         request=request,
@@ -244,20 +267,11 @@ def update_spec(config: GTConfig, request: SpecUpdateRequest) -> dict[str, Any]:
         current_version=current_version,
         full_content=full_content,
         changed_by=changed_by,
+        postimage_fields=postimage_fields,
     )
     validation = validate_packet(packet)
     if not validation.is_valid:
         raise SpecUpdateError("; ".join(validation.errors))
-
-    merged_fields = _merged_fields(
-        request,
-        full_content,
-        tags=tags,
-        assertions=assertions,
-        constraints=constraints,
-        affected_by=affected_by,
-        source_paths=source_paths,
-    )
 
     packet_path = _approval_packet_path(project_root, request.spec_id, new_version)
     db_operation = {

@@ -119,10 +119,10 @@ def test_dispatcher_status_rules_match_prime_and_lo_bridge_boundaries() -> None:
         ".claude/rules/codex-review-operating-contract.md",
         ".claude/rules/codex-loyal-opposition-runbook.md",
         ".claude/rules/prime-bridge-collaboration-protocol.md",
-        ".claude/skills/bridge/SKILL.md",
-        ".codex/skills/bridge/SKILL.md",
-        ".agent/skills/bridge/SKILL.md",
-        ".api-harness/skills/bridge/SKILL.md",
+        ".claude/skills/gtkb-bridge/SKILL.md",
+        ".codex/skills/gtkb-bridge/SKILL.md",
+        ".agent/skills/gtkb-bridge/SKILL.md",
+        ".api-harness/skills/gtkb-bridge/SKILL.md",
         "scripts/dispatcher_runtime.py",
         "scripts/ollama_harness.py",
         "scripts/openrouter_harness.py",
@@ -172,7 +172,7 @@ def test_capability_registry_tracks_shared_skill_and_low_cost_harness_floors() -
     capability_registry = _read_toml("config/agent-control/harness-capability-registry.toml")
 
     capability_by_name = {row["canonical_name"]: row for row in capability_registry["capabilities"]}
-    for skill_name in ("gtkb-bridge", "gtkb-bridge-propose", "harness-parity-review", "gtkb-verify"):
+    for skill_name in ("gtkb-bridge", "gtkb-bridge-propose", "gtkb-harness-parity-review", "gtkb-verify"):
         row = capability_by_name[skill_name]
         assert row["claude"]["status"] == "native"
         assert row["codex"]["status"] == "adapter"
@@ -188,7 +188,7 @@ def test_capability_registry_tracks_shared_skill_and_low_cost_harness_floors() -
 
 
 def test_harness_parity_skill_separates_catalog_operational_and_hook_scope() -> None:
-    skill_text = _read_text(".claude/skills/harness-parity-review/SKILL.md")
+    skill_text = _read_text(".claude/skills/gtkb-harness-parity-review/SKILL.md")
 
     assert "phase-1 catalog parity" in skill_text
     assert "phase-2 operational readiness" in skill_text

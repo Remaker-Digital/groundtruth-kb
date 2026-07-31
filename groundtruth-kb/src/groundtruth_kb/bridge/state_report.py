@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sqlite3
 import sys
 from collections import Counter
 from pathlib import Path
@@ -17,8 +18,17 @@ from groundtruth_kb.bridge_dispatch_config import (
     collect_bridge_dispatch_status,
 )
 from groundtruth_kb.harness_projection import read_roles
+from groundtruth_kb.project.registry_control_plane import (
+    RegistryPaths,
+    load_registry_snapshot,
+    registry_currentness,
+)
 
 BRIDGE_THREAD_HELPER = Path("scripts") / "bridge_thread_files.py"
+BRIDGE_AGGREGATE_ID = "bridge-versioned-files"
+BRIDGE_AGGREGATE_REMEDY = (
+    'gt registry observe --artifact bridge-versioned-files --change-reason "Re-observe bridge publication aggregate"'
+)
 
 
 def build_state_report(project_root: Path) -> dict[str, Any]:
@@ -28,10 +38,12 @@ def build_state_report(project_root: Path) -> dict[str, Any]:
     dispatch_status = collect_bridge_dispatch_status(root)
     return {
         "bridge": _bridge_section(root),
+        "registry_publication": _registry_publication_section(root),
         "dispatcher": _dispatcher_section(dispatch_status),
         "harnesses": _harness_section(root, dispatch_status),
         "source_authority": {
             "bridge": "status-bearing numbered bridge files via scripts/bridge_thread_files.py",
+            "registry_publication": "registry_currentness scoped to bridge-versioned-files",
             "dispatcher": "collect_bridge_dispatch_status",
             "harnesses": "harness-state/harness-registry.json plus config/dispatcher/rules.toml",
         },
@@ -39,9 +51,10 @@ def build_state_report(project_root: Path) -> dict[str, Any]:
 
 
 def render_markdown(report: dict[str, Any]) -> str:
-    """Render the report as the owner-standard three-table Markdown report."""
+    """Render the report as the owner-standard Markdown tables."""
 
     bridge = report["bridge"]
+    registry_publication = report["registry_publication"]
     dispatcher = report["dispatcher"]
     harnesses = report["harnesses"]["rows"]
 
@@ -58,6 +71,28 @@ def render_markdown(report: dict[str, Any]) -> str:
 
     lines = ["## BRIDGE", "| Status | Count |", "| --- | --- |"]
     lines.extend(f"| {_md_cell(status)} | {_md_cell(count)} |" for status, count in bridge_rows)
+
+    aggregate_current = registry_publication["aggregate_current"]
+    lines.extend(
+        [
+            "",
+            "## REGISTRY PUBLICATION",
+            "| Aspect | Value |",
+            "| --- | --- |",
+            f"| Enabled | {_md_cell(_yes_no(registry_publication['enabled']))} |",
+            f"| Aggregate current | {_md_cell(_yes_no(aggregate_current) if aggregate_current is not None else '(unavailable)')} |",
+            f"| Stale count | {_md_cell(registry_publication['stale_count'])} |",
+            f"| Stale record IDs | {_md_cell(', '.join(registry_publication['stale_record_ids']) or '(none)')} |",
+        ]
+    )
+    if registry_publication["enabled"] and aggregate_current is False:
+        lines.extend(
+            [
+                "",
+                "WARNING: The bridge publication gate will refuse ALL publications until the "
+                f"aggregate is re-observed. Remedy: `{BRIDGE_AGGREGATE_REMEDY}`.",
+            ]
+        )
 
     lines.extend(
         [
@@ -88,6 +123,49 @@ def render_markdown(report: dict[str, Any]) -> str:
             )
         )
     return "\n".join(lines) + "\n"
+
+
+def _registry_publication_section(root: Path) -> dict[str, Any]:
+    disabled = {
+        "enabled": False,
+        "aggregate_current": None,
+        "stale_count": 0,
+        "stale_record_ids": [],
+    }
+    paths = RegistryPaths.resolve(project_root=root)
+    if not all(path.is_file() for path in (paths.registry_path, paths.packaged_registry_path, paths.db_path)):
+        return disabled
+
+    try:
+        snapshot = load_registry_snapshot(
+            project_root=paths.project_root,
+            registry_path=paths.registry_path,
+            packaged_registry_path=paths.packaged_registry_path,
+            db_path=paths.db_path,
+        )
+        if not any(record.id == BRIDGE_AGGREGATE_ID for record in snapshot.records):
+            return disabled
+        currentness = registry_currentness(
+            snapshot,
+            project_root=paths.project_root,
+            db_path=paths.db_path,
+            record_ids={BRIDGE_AGGREGATE_ID},
+        )
+    except (OSError, RuntimeError, sqlite3.Error, ValueError):
+        return disabled
+
+    stale_record_ids = sorted(
+        {
+            *(str(record_id) for record_id in currentness.get("missing_revisions", [])),
+            *(str(row["id"]) for row in currentness.get("stale", []) if row.get("id")),
+        }
+    )
+    return {
+        "enabled": True,
+        "aggregate_current": bool(currentness.get("current")),
+        "stale_count": len(stale_record_ids),
+        "stale_record_ids": stale_record_ids,
+    }
 
 
 def _bridge_section(root: Path) -> dict[str, Any]:

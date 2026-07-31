@@ -53,6 +53,25 @@ def _parser() -> argparse.ArgumentParser:
     preserve.add_argument("--operation-id")
     _drain_bounds(preserve)
 
+    publish = commands.add_parser(
+        "publish",
+        help="publish one unattached candidate commit to one new remote ref",
+    )
+    publish.add_argument("--source-commit", required=True)
+    publish.add_argument("--source-tree", required=True)
+    publish.add_argument("--base-ref", required=True)
+    publish.add_argument("--target-ref", required=True)
+    publish.add_argument("--message", required=True)
+    publish.add_argument("--remote", default="origin")
+    publish.add_argument("--expected-remote-url")
+    publish.add_argument("--exclude-path", action="append", default=[])
+    publish.add_argument("--max-blob-bytes", type=int, default=10_000_000)
+    publish.add_argument(
+        "--no-push",
+        action="store_true",
+        help="create the local ref only; do not push (dry-run of every gate up to publication)",
+    )
+
     promote = commands.add_parser("promote", help="run work-item, project, or stage promotion")
     promote.add_argument("--level", choices=("work-item", "project", "stage"), required=True)
     promote.add_argument("--work-item-id")
@@ -168,6 +187,19 @@ def _execute(
             operation_id=args.operation_id,
             ttl_seconds=args.ttl_seconds,
             wait_seconds=args.wait_seconds,
+        )
+    if args.command == "publish":
+        return service.publish_candidate_branch(
+            source_commit=args.source_commit,
+            source_tree=args.source_tree,
+            base_ref=args.base_ref,
+            target_ref=args.target_ref,
+            remote=args.remote,
+            expected_remote_url=args.expected_remote_url,
+            exclude_paths=tuple(args.exclude_path),
+            max_blob_bytes=args.max_blob_bytes,
+            message=args.message,
+            push=not args.no_push,
         )
     if args.command == "promote":
         evidence = PromotionEvidence(bundle_path=args.evidence_path, bundle_sha256=args.evidence_sha256)

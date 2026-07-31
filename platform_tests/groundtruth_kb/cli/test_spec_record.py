@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import subprocess
@@ -76,9 +77,31 @@ def _spec_row(db_path: Path, spec_id: str) -> sqlite3.Row | None:
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
         return conn.execute(
-            "SELECT id, title, status, type, description FROM current_specifications WHERE id = ?",
+            "SELECT * FROM current_specifications WHERE id = ?",
             (spec_id,),
         ).fetchone()
+
+
+def _semantic_postimage(row: sqlite3.Row) -> dict[str, object]:
+    structured = {"tags", "assertions", "constraints", "affected_by", "source_paths"}
+    names = (
+        "title",
+        "status",
+        "priority",
+        "scope",
+        "section",
+        "handle",
+        "tags",
+        "assertions",
+        "constraints",
+        "affected_by",
+        "testability",
+        "source_paths",
+        "application_scope",
+    )
+    return {
+        name: json.loads(row[name]) if name in structured and row[name] is not None else row[name] for name in names
+    }
 
 
 def _packet_files(root: Path) -> list[Path]:
@@ -152,10 +175,92 @@ def test_dry_run_constructs_valid_packet_and_writes_nothing(tmp_path: Path) -> N
     assert packet["artifact_id"] == "GOV-TEST-001"
     assert packet["approved_by"] == "owner"
     assert packet["full_content"] == content.read_text(encoding="utf-8")
+    assert (
+        packet["full_content_sha256"] == hashlib.sha256(content.read_text(encoding="utf-8").encode("utf-8")).hexdigest()
+    )
+    assert packet["postimage_fields"] == {
+        "title": "Test spec",
+        "status": "specified",
+        "priority": None,
+        "scope": None,
+        "section": None,
+        "handle": None,
+        "tags": None,
+        "assertions": None,
+        "constraints": None,
+        "affected_by": None,
+        "testability": None,
+        "source_paths": None,
+        "application_scope": None,
+    }
     assert payload["dry_run"] is True
     assert Path(payload["approval_packet_path"]).name.endswith("-gov-test-001.json")
     assert _spec_count(root / "groundtruth.db") == 0
     assert _packet_files(root) == []
+
+
+def test_structured_record_packet_matches_writer_inputs_and_persisted_postimage(tmp_path: Path) -> None:
+    root, config, content = _project(tmp_path)
+    structured_args = (
+        "--priority",
+        "P1",
+        "--scope",
+        "platform",
+        "--section",
+        "Governance",
+        "--handle",
+        "record-handle",
+        "--tags-json",
+        '["approval", "café"]',
+        "--assertions-json",
+        '[{"type": "file_exists", "file": "README.md"}]',
+        "--constraints-json",
+        '{"mode": "strict"}',
+        "--affected-by-json",
+        '["ADR-TEST-001"]',
+        "--testability",
+        "structural",
+        "--source-paths-json",
+        '["groundtruth-kb/src/**/*.py"]',
+        "--application-scope",
+        "gtkb_platform",
+    )
+    expected = {
+        "title": "Test spec",
+        "status": "specified",
+        "priority": "P1",
+        "scope": "platform",
+        "section": "Governance",
+        "handle": "record-handle",
+        "tags": ["approval", "café"],
+        "assertions": [{"type": "file_exists", "file": "README.md"}],
+        "constraints": {"mode": "strict"},
+        "affected_by": ["ADR-TEST-001"],
+        "testability": "structural",
+        "source_paths": ["groundtruth-kb/src/**/*.py"],
+        "application_scope": "gtkb_platform",
+    }
+
+    dry_result = CliRunner().invoke(
+        main,
+        _record_args(config, content, "--owner-presented", "--dry-run", "--json", *structured_args),
+    )
+    assert dry_result.exit_code == 0, dry_result.output
+    dry_payload = json.loads(dry_result.output)
+    assert dry_payload["approval_packet"]["postimage_fields"] == expected
+
+    write_result = CliRunner().invoke(
+        main,
+        _record_args(config, content, "--owner-presented", "--json", *structured_args),
+    )
+    assert write_result.exit_code == 0, write_result.output
+    write_payload = json.loads(write_result.output)
+    assert write_payload["approval_packet"]["postimage_fields"] == expected
+    assert write_payload["approval_packet"]["postimage_sha256"] == dry_payload["approval_packet"]["postimage_sha256"]
+
+    row = _spec_row(root / "groundtruth.db", "GOV-TEST-001")
+    assert row is not None
+    assert _semantic_postimage(row) == expected
 
 
 def test_gap_state_spec_capture_dry_run_carries_context_and_writes_nothing(tmp_path: Path) -> None:

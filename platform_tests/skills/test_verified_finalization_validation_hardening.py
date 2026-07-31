@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from types import ModuleType
 
@@ -15,8 +16,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 HELPER_COPIES: dict[str, Path] = {
     "claude": REPO_ROOT / ".claude" / "skills" / "gtkb-verify" / "helpers" / "write_verdict.py",
     "codex": REPO_ROOT / ".codex" / "skills" / "gtkb-verify" / "helpers" / "write_verdict.py",
-    "cursor": REPO_ROOT / ".cursor" / "skills" / "gtkb-verify" / "helpers" / "write_verdict.py",
 }
+CURSOR_SKILL = REPO_ROOT / ".cursor" / "skills" / "gtkb-verify" / "SKILL.md"
+CURSOR_HELPER = CURSOR_SKILL.parent / "helpers" / "write_verdict.py"
+CAPABILITY_REGISTRY = REPO_ROOT / "config" / "agent-control" / "harness-capability-registry.toml"
 
 
 def _load_helper(path: Path, module_name: str) -> ModuleType:
@@ -31,6 +34,11 @@ def _load_helper(path: Path, module_name: str) -> ModuleType:
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def _verify_capability() -> dict:
+    registry = tomllib.loads(CAPABILITY_REGISTRY.read_text(encoding="utf-8"))
+    return next(capability for capability in registry["capabilities"] if capability["id"] == "skill.verify")
 
 
 def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -257,6 +265,26 @@ Owner-approved by-reference waiver captured at `DELIB-TEST-BY-REFERENCE-WAIVER`.
     )
 
 
+@pytest.mark.parametrize(
+    "contract",
+    ("status", "surface", "fallback", "skill_absent", "helper_absent"),
+)
+def test_cursor_verify_uses_declared_absent_fallback(contract: str) -> None:
+    cursor = _verify_capability()["cursor"]
+
+    if contract == "status":
+        assert cursor["status"] == "fallback"
+    elif contract == "surface":
+        assert cursor["surface"] == ".cursor/skills/gtkb-verify/SKILL.md"
+    elif contract == "fallback":
+        assert cursor["fallback"].strip()
+    elif contract == "skill_absent":
+        assert not CURSOR_SKILL.exists()
+    else:
+        assert contract == "helper_absent"
+        assert not CURSOR_HELPER.exists()
+
+
 @pytest.mark.parametrize("harness_name", list(HELPER_COPIES))
 def test_report_claim_include_check_ignores_target_paths_envelope(
     harness_name: str,
@@ -348,7 +376,7 @@ def test_claimed_repo_path_parser_does_not_extract_subpath_suffix(harness_name: 
 
 
 @pytest.mark.parametrize("harness_name", list(HELPER_COPIES))
-def test_three_helper_copies_share_validation_behavior(harness_name: str, tmp_path: Path) -> None:
+def test_helper_copies_share_validation_behavior(harness_name: str, tmp_path: Path) -> None:
     helper = _load_helper(HELPER_COPIES[harness_name], f"write_verdict_{harness_name}_hardening")
     project_root = tmp_path / "repo"
     project_root.mkdir()

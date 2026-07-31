@@ -39,6 +39,7 @@ from groundtruth_kb.project.registry_control_plane import (
     mint_bridge_publication_capability,
     mint_observation_capability,
     preview_registry_registration,
+    recover_bridge_publication,
     recover_registry,
     recover_wi5441_bridge_aggregate,
     register_artifacts,
@@ -465,6 +466,43 @@ def test_passive_observation_records_view_without_authorizing_content(tmp_path: 
     assert row["actor_session"] == "unattributed_external"
     assert row["evidence_view"] == "working_tree"
     assert row["evidence_source_reference"] == "filesystem-audit:test"
+
+
+def test_passive_observation_accepts_exact_aggregate_record_id(tmp_path: Path) -> None:
+    bridge = tmp_path / "bridge"
+    bridge.mkdir()
+    (bridge / "existing-001.md").write_text("NEW\n", encoding="utf-8")
+    records = [_record("bridge-versioned-files", "bridge/*-[0-9][0-9][0-9].md", "glob")]
+    registry, packaged, db_path = _fixture_generation(tmp_path, records)
+    apply_registry_transaction(
+        records,
+        operation="legacy_bootstrap",
+        **_transaction_kwargs(tmp_path, registry, packaged, db_path),
+    )
+    (bridge / "observed-001.md").write_text("NEW\n", encoding="utf-8")
+
+    revisions = append_passive_observation(
+        record_ids=["bridge-versioned-files"],
+        evidence_source_reference="aggregate-observer:test",
+        project_root=tmp_path,
+        registry_path=registry,
+        packaged_registry_path=packaged,
+        db_path=db_path,
+    )
+
+    assert len(revisions) == 1
+    snapshot = load_registry_snapshot(
+        project_root=tmp_path,
+        registry_path=registry,
+        packaged_registry_path=packaged,
+        db_path=db_path,
+    )
+    assert registry_currentness(
+        snapshot,
+        project_root=tmp_path,
+        db_path=db_path,
+        record_ids={"bridge-versioned-files"},
+    )["current"]
 
 
 def test_registration_preview_binds_generation_manifest_and_authority(tmp_path: Path) -> None:
@@ -982,6 +1020,54 @@ def test_bridge_publication_capability_is_exact_single_use_and_current(
         )
 
 
+def test_three_sequential_bridge_publications_remain_current_without_manual_observation(
+    tmp_path: Path,
+) -> None:
+    first_slug, session_id, first_content, first_target, kwargs = _bridge_publication_fixture(tmp_path)
+    publications = [(first_slug, first_content, first_target)]
+    for index in range(2, 4):
+        slug = f"typed-publication-fixture-{index}"
+        publications.append(
+            (
+                slug,
+                first_content.replace(first_slug.encode(), slug.encode()),
+                first_target.with_name(f"{slug}-001.md"),
+            )
+        )
+
+    for index, (slug, content, target) in enumerate(publications):
+        if index:
+            assert acquire(slug, session_id, project_root=tmp_path)
+        minted = mint_bridge_publication_capability(
+            document_name=slug,
+            version=1,
+            status="NEW",
+            target_path=target,
+            content=content,
+            session_id=session_id,
+            compliance_digest=f"sha256:test-compliance-{index}",
+            **kwargs,
+        )
+        target.write_bytes(content)
+        consume_bridge_publication_capability(
+            capability=minted["capability"],
+            target_path=target,
+            content=content,
+            session_id=session_id,
+            changed_by="test",
+            change_reason=f"sequential publication {index + 1}",
+            **kwargs,
+        )
+        snapshot = load_registry_snapshot(**kwargs)
+        assert registry_currentness(
+            snapshot,
+            project_root=tmp_path,
+            db_path=kwargs["db_path"],
+            record_ids={"bridge-versioned-files"},
+        )["current"]
+        release_claim(slug, session_id, project_root=tmp_path)
+
+
 def test_bridge_publication_compensation_restores_preimage_currentness(
     tmp_path: Path,
 ) -> None:
@@ -1186,6 +1272,229 @@ def test_bridge_publication_rejects_expired_capability(tmp_path: Path) -> None:
         changed_by="test",
         **kwargs,
     )
+
+
+def test_bridge_publication_recovery_finalizes_crash_idempotently(tmp_path: Path) -> None:
+    slug, session_id, content, target, kwargs = _bridge_publication_fixture(tmp_path)
+    minted = mint_bridge_publication_capability(
+        document_name=slug,
+        version=1,
+        status="NEW",
+        target_path=target,
+        content=content,
+        session_id=session_id,
+        compliance_digest="sha256:test-compliance",
+        **kwargs,
+    )
+    target.write_bytes(content)
+
+    receipt = recover_bridge_publication(
+        target_path=target,
+        session_id=session_id,
+        mode="finalize",
+        changed_by="test",
+        change_reason="finish crashed publication",
+        **kwargs,
+    )
+    retry = recover_bridge_publication(
+        target_path=target,
+        session_id=session_id,
+        mode="finalize",
+        changed_by="test",
+        change_reason="idempotent finish",
+        **kwargs,
+    )
+
+    assert receipt.capability_hash == minted["capability_hash"]
+    assert receipt.capability_state == "consumed"
+    assert retry.revision_id == receipt.revision_id
+    with sqlite3.connect(str(kwargs["db_path"])) as conn:
+        revision_count = conn.execute(
+            "SELECT COUNT(*) FROM sot_artifact_revisions WHERE capability_hash = ?",
+            (minted["capability_hash"],),
+        ).fetchone()[0]
+    assert revision_count == 1
+
+
+def test_bridge_publication_recovery_rolls_back_expired_crash(tmp_path: Path) -> None:
+    slug, session_id, content, target, kwargs = _bridge_publication_fixture(tmp_path)
+    minted = mint_bridge_publication_capability(
+        document_name=slug,
+        version=1,
+        status="NEW",
+        target_path=target,
+        content=content,
+        session_id=session_id,
+        compliance_digest="sha256:test-compliance",
+        **kwargs,
+    )
+    target.write_bytes(content)
+    with sqlite3.connect(str(kwargs["db_path"])) as conn:
+        conn.execute(
+            "UPDATE sot_registry_bridge_publication_capabilities "
+            "SET capability_state = 'expired' WHERE capability_hash = ?",
+            (minted["capability_hash"],),
+        )
+
+    receipt = recover_bridge_publication(
+        target_path=target,
+        session_id=session_id,
+        mode="rollback",
+        changed_by="test",
+        change_reason="roll back crashed publication",
+        **kwargs,
+    )
+
+    assert receipt.capability_state == "compensated"
+    assert not target.exists()
+    snapshot = load_registry_snapshot(**kwargs)
+    assert registry_currentness(
+        snapshot,
+        project_root=tmp_path,
+        db_path=kwargs["db_path"],
+        record_ids={"bridge-versioned-files"},
+    )["current"]
+
+
+def test_bridge_publication_recovery_rejects_byte_mismatch(tmp_path: Path) -> None:
+    slug, session_id, content, target, kwargs = _bridge_publication_fixture(tmp_path)
+    mint_bridge_publication_capability(
+        document_name=slug,
+        version=1,
+        status="NEW",
+        target_path=target,
+        content=content,
+        session_id=session_id,
+        compliance_digest="sha256:test-compliance",
+        **kwargs,
+    )
+    target.write_bytes(content + b"tampered")
+
+    with pytest.raises(RegistryAuthorizationError, match="exact row"):
+        recover_bridge_publication(
+            target_path=target,
+            session_id=session_id,
+            mode="finalize",
+            changed_by="test",
+            change_reason="must fail closed",
+            **kwargs,
+        )
+
+
+def test_compensation_failure_observes_retained_file_and_preserves_audit_state(
+    tmp_path: Path,
+) -> None:
+    slug, session_id, content, target, kwargs = _bridge_publication_fixture(tmp_path)
+    minted = mint_bridge_publication_capability(
+        document_name=slug,
+        version=1,
+        status="NEW",
+        target_path=target,
+        content=content,
+        session_id=session_id,
+        compliance_digest="sha256:test-compliance",
+        **kwargs,
+    )
+    target.write_bytes(content + b"tampered")
+
+    with pytest.raises(RegistryRecoveryRequired, match="target bytes changed"):
+        compensate_bridge_publication(
+            capability=minted["capability"],
+            target_path=target,
+            session_id=session_id,
+            reason="compensation must retain unknown bytes",
+            changed_by="test",
+            **kwargs,
+        )
+
+    with sqlite3.connect(str(kwargs["db_path"])) as conn:
+        conn.row_factory = sqlite3.Row
+        capability_row = conn.execute(
+            "SELECT * FROM sot_registry_bridge_publication_capabilities WHERE capability_hash = ?",
+            (minted["capability_hash"],),
+        ).fetchone()
+        revision = conn.execute(
+            "SELECT * FROM sot_artifact_revisions WHERE entry_id = 'bridge-versioned-files' ORDER BY rowid DESC LIMIT 1"
+        ).fetchone()
+    assert target.exists()
+    assert capability_row["capability_state"] == "recovery_required"
+    assert revision["operation"] == "direct_in_place_content_change"
+    assert revision["evidence_source_reference"] == minted["capability_hash"]
+    snapshot = load_registry_snapshot(**kwargs)
+    assert registry_currentness(
+        snapshot,
+        project_root=tmp_path,
+        db_path=kwargs["db_path"],
+        record_ids={"bridge-versioned-files"},
+    )["current"]
+
+
+def test_compensation_failure_observes_exactly_restored_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    slug, session_id, content, target, kwargs = _bridge_publication_fixture(tmp_path)
+    minted = mint_bridge_publication_capability(
+        document_name=slug,
+        version=1,
+        status="NEW",
+        target_path=target,
+        content=content,
+        session_id=session_id,
+        compliance_digest="sha256:test-compliance",
+        **kwargs,
+    )
+    target.write_bytes(content)
+    consume_bridge_publication_capability(
+        capability=minted["capability"],
+        target_path=target,
+        content=content,
+        session_id=session_id,
+        changed_by="test",
+        change_reason="typed bridge publication",
+        **kwargs,
+    )
+    real_append = registry_control_plane._append_revision
+    calls = 0
+
+    def fail_once(*args: object, **call_kwargs: object) -> str:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RuntimeError("injected compensation revision failure")
+        return real_append(*args, **call_kwargs)
+
+    monkeypatch.setattr(registry_control_plane, "_append_revision", fail_once)
+    with pytest.raises(RuntimeError, match="injected compensation"):
+        compensate_bridge_publication(
+            capability=minted["capability"],
+            target_path=target,
+            session_id=session_id,
+            reason="exercise exact restoration",
+            changed_by="test",
+            **kwargs,
+        )
+
+    assert target.read_bytes() == content
+    with sqlite3.connect(str(kwargs["db_path"])) as conn:
+        conn.row_factory = sqlite3.Row
+        capability_row = conn.execute(
+            "SELECT * FROM sot_registry_bridge_publication_capabilities WHERE capability_hash = ?",
+            (minted["capability_hash"],),
+        ).fetchone()
+        revision = conn.execute(
+            "SELECT * FROM sot_artifact_revisions WHERE entry_id = 'bridge-versioned-files' ORDER BY rowid DESC LIMIT 1"
+        ).fetchone()
+    assert capability_row["capability_state"] == "recovery_required"
+    assert revision["operation"] == "direct_in_place_content_change"
+    assert revision["evidence_source_reference"] == minted["capability_hash"]
+    snapshot = load_registry_snapshot(**kwargs)
+    assert registry_currentness(
+        snapshot,
+        project_root=tmp_path,
+        db_path=kwargs["db_path"],
+        record_ids={"bridge-versioned-files"},
+    )["current"]
 
 
 def test_retired_wi5441_recovery_entry_point_fails_closed() -> None:

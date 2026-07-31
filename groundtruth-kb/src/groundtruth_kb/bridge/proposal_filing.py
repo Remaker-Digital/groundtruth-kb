@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import ModuleType
@@ -16,7 +18,6 @@ from typing import Any
 from groundtruth_kb.bridge.proposal_autoload import (
     _dedupe,
     _normalize_rel_path,
-    _parsed_list,
     auto_prior_delibs,
     auto_spec_links,
     auto_target_paths_in_root_evidence,
@@ -24,9 +25,18 @@ from groundtruth_kb.bridge.proposal_autoload import (
 )
 from groundtruth_kb.bridge.taxonomy import BridgeKind
 from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.governance.project_authorization_operation_time import (
+    classify_target,
+    evaluate_envelope,
+    evaluator_sha256,
+    load_operation_taxonomy,
+    normalize_operation,
+    normalized_envelope_hash,
+)
 
 APPROVED_SPEC_STATUSES = {"specified", "implemented", "verified"}
 CHANGED_BY = "prime-builder/codex"
+FILING_OPERATION = "bridge_proposal_filing"
 NONIMPAIRMENT_REQUIRED_FIELDS = (
     "applicability",
     "provenance",
@@ -49,6 +59,10 @@ NONIMPAIRMENT_REQUIRED_FIELDS = (
 class ProposalFilingError(RuntimeError):
     """Raised when a dispatchable implementation proposal cannot be filed."""
 
+    def __init__(self, message: str, *, decision: dict[str, Any] | None = None) -> None:
+        super().__init__(message)
+        self.decision = decision
+
 
 @dataclass(frozen=True)
 class FilingRequest:
@@ -56,6 +70,7 @@ class FilingRequest:
     slug: str
     target_paths: tuple[str, ...]
     project_id: str | None = None
+    project_authorization_id: str | None = None
     owner_decision: str | None = None
     add_specs: tuple[str, ...] = ()
     scope_lines: tuple[str, ...] = ()
@@ -80,7 +95,12 @@ class AuthorizationCandidateRank:
     project_authorization_id: str
     coverage: str
     included_work_item_count: int | None
-    specificity_rank: tuple[int, int]
+    specificity_rank: tuple[int, int] | None
+    status: str = "active"
+    normalized_expiry: str | None = None
+    currentness: str = "current"
+    supersession_state: str = "current"
+    disposition: str = "eligible"
     selected: bool = False
 
     def to_dict(self) -> dict[str, Any]:
@@ -88,7 +108,12 @@ class AuthorizationCandidateRank:
             "project_authorization_id": self.project_authorization_id,
             "coverage": self.coverage,
             "included_work_item_count": self.included_work_item_count,
-            "specificity_rank": list(self.specificity_rank),
+            "specificity_rank": list(self.specificity_rank) if self.specificity_rank is not None else None,
+            "status": self.status,
+            "normalized_expiry": self.normalized_expiry,
+            "currentness": self.currentness,
+            "supersession_state": self.supersession_state,
+            "disposition": self.disposition,
             "selected": self.selected,
         }
 
@@ -100,6 +125,7 @@ class FilingResult:
     project_id: str
     project_authorization_id: str
     project_authorization_candidates: tuple[AuthorizationCandidateRank, ...] = field(default_factory=tuple)
+    authorization_decision: dict[str, Any] = field(default_factory=dict)
     preflight_results: tuple[PreflightResult, ...] = field(default_factory=tuple)
 
 
@@ -108,6 +134,7 @@ class _ProjectState:
     project_id: str
     project_authorization_id: str
     project_authorization_candidates: tuple[AuthorizationCandidateRank, ...]
+    authorization_decision: dict[str, Any]
     membership_created: bool
     authorization_created: bool
 
@@ -129,85 +156,573 @@ def _active_memberships_for_work_item(db: KnowledgeDB, wi_id: str) -> list[dict[
     return memberships
 
 
-def _authorization_covers_work_item(authorization: dict[str, Any], wi_id: str) -> bool:
-    included = _parsed_list(authorization, "included_work_item_ids")
-    excluded = _parsed_list(authorization, "excluded_work_item_ids")
-    return wi_id not in excluded and (not included or wi_id in included)
+def _strict_authorization_list(row: dict[str, Any], field: str) -> list[str]:
+    parsed_key = f"{field}_parsed"
+    if parsed_key in row:
+        value = row[parsed_key]
+    elif f"_{field}_parsed" in row:
+        value = row[f"_{field}_parsed"]
+    else:
+        value = row.get(field)
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{field} is not valid JSON") from exc
+    if value is None:
+        return []
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise ValueError(f"{field} must be a JSON list of strings")
+    return [item.strip() for item in value if item.strip()]
+
+
+def _normalize_expiry(value: object, *, decision_time: datetime) -> tuple[str | None, str]:
+    raw = str(value or "").strip()
+    if not raw:
+        return None, "current"
+    candidate = f"{raw[:-1]}+00:00" if raw.endswith("Z") else raw
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        return None, "malformed"
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None, "malformed"
+    normalized = parsed.astimezone(UTC).replace(microsecond=0)
+    rendered = normalized.isoformat().replace("+00:00", "Z")
+    return rendered, "expired" if normalized <= decision_time else "current"
 
 
 def _authorization_candidate_rank(
     authorization: dict[str, Any],
     wi_id: str,
-) -> AuthorizationCandidateRank | None:
-    if not _authorization_covers_work_item(authorization, wi_id):
-        return None
-
+    *,
+    membership_active: bool,
+    decision_time: datetime,
+) -> AuthorizationCandidateRank:
     authorization_id = str(authorization.get("id") or "").strip()
-    included = tuple(dict.fromkeys(_parsed_list(authorization, "included_work_item_ids")))
+    included = tuple(dict.fromkeys(_strict_authorization_list(authorization, "included_work_item_ids")))
+    excluded = set(_strict_authorization_list(authorization, "excluded_work_item_ids"))
     if included == (wi_id,):
         coverage = "exact_singleton"
-        rank = (0, 1)
+        rank: tuple[int, int] | None = (0, 1)
         included_count: int | None = 1
-    elif included:
+    elif included and wi_id in included:
         coverage = "explicit_list"
         rank = (1, len(included))
         included_count = len(included)
-    else:
+    elif not included and membership_active:
         coverage = "project_membership_fallback"
         rank = (2, 0)
         included_count = None
+    else:
+        coverage = "not_covering"
+        rank = None
+        included_count = len(included) if included else None
+
+    disposition = "eligible" if rank is not None else "not_covering"
+    if wi_id in excluded:
+        disposition = "work_item_excluded"
+
+    normalized_expiry, currentness = _normalize_expiry(authorization.get("expires_at"), decision_time=decision_time)
+    superseded = bool(_strict_authorization_list(authorization, "superseded_by"))
+    supersession_state = "superseded" if superseded else "current"
+    if str(authorization.get("status") or "").strip().lower() != "active":
+        currentness = "inactive"
+    elif superseded:
+        currentness = "superseded"
 
     return AuthorizationCandidateRank(
         project_authorization_id=authorization_id,
         coverage=coverage,
         included_work_item_count=included_count,
         specificity_rank=rank,
+        status=str(authorization.get("status") or ""),
+        normalized_expiry=normalized_expiry,
+        currentness=currentness,
+        supersession_state=supersession_state,
+        disposition=disposition,
     )
+
+
+def _authorization_envelope(authorization: dict[str, Any]) -> dict[str, Any]:
+    envelope = dict(authorization)
+    for field_name in (
+        "allowed_mutation_classes",
+        "forbidden_operations",
+        "included_work_item_ids",
+        "excluded_work_item_ids",
+        "included_spec_ids",
+        "excluded_spec_ids",
+        "supersedes",
+        "superseded_by",
+    ):
+        envelope[field_name] = _strict_authorization_list(authorization, field_name)
+    return envelope
+
+
+def _resolve_actor_context(project_root: Path) -> dict[str, str]:
+    try:
+        from scripts.bridge_author_metadata import load_author_metadata
+
+        from groundtruth_kb.session.envelope import resolve_worker_role_provenance
+
+        metadata = load_author_metadata(project_root)
+        identity = str(metadata.get("author_identity") or "")
+        harness_name = identity.rsplit("/", 1)[-1].strip().lower() if "/" in identity else ""
+        session_context_id = str(metadata["author_session_context_id"])
+        provenance = resolve_worker_role_provenance(
+            project_root,
+            current_session_id=session_context_id,
+            harness_name=harness_name or None,
+        )
+    except Exception as exc:  # noqa: BLE001 - absence must fail closed with one stable reason
+        raise ProposalFilingError(f"Unable to resolve filing session identity: {exc}") from exc
+    role = str(provenance.get("role") or "").strip().lower()
+    if role == "acting-prime-builder":
+        role = "prime-builder"
+    if role != "prime-builder":
+        raise ProposalFilingError(
+            f"Implementation-proposal filing requires prime-builder role, got {role or '<missing>'}"
+        )
+    return {
+        "session_context_id": session_context_id,
+        "role": role,
+    }
+
+
+def _bridge_invalidation_inputs(project_root: Path, slug: str) -> dict[str, Any]:
+    pattern = re.compile(rf"^{re.escape(slug)}-(\d{{3}})\.md$")
+    versions: list[tuple[int, Path]] = []
+    bridge_dir = project_root / "bridge"
+    if bridge_dir.is_dir():
+        for path in bridge_dir.glob(f"{slug}-*.md"):
+            match = pattern.fullmatch(path.name)
+            if match is not None:
+                versions.append((int(match.group(1)), path))
+    if not versions:
+        return {
+            "bridge_document": slug,
+            "latest_bridge_status": "ABSENT",
+            "latest_bridge_version": 0,
+            "reviewed_proposal_version": 1,
+            "planned_bridge_status": "NEW",
+            "planned_bridge_version": 1,
+        }
+    version, path = max(versions, key=lambda item: item[0])
+    first_line = next((line.strip() for line in path.read_text(encoding="utf-8-sig").splitlines() if line.strip()), "")
+    return {
+        "bridge_document": slug,
+        "latest_bridge_status": first_line or "UNREADABLE",
+        "latest_bridge_version": version,
+        "reviewed_proposal_version": 1,
+        "planned_bridge_status": "NEW",
+        "planned_bridge_version": 1,
+    }
+
+
+def _decision_payload(
+    *,
+    project_root: Path,
+    request: FilingRequest,
+    project_id: str,
+    spec_links: list[str],
+    actor: dict[str, str],
+    invalidation_inputs: dict[str, Any],
+    candidates: tuple[AuthorizationCandidateRank, ...],
+    best_rank: tuple[int, int] | None,
+    authorization: dict[str, Any] | None,
+    allowed: bool,
+    reason_code: str,
+    reason: str,
+    recovery: str,
+    decision_time: datetime,
+    envelope_decision: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    taxonomy = load_operation_taxonomy(project_root)
+    envelope = _authorization_envelope(authorization) if authorization is not None else {}
+    selected_id = str(authorization.get("id") or "") if authorization is not None else None
+    payload: dict[str, Any] = {
+        "schema_version": 1,
+        "selector_mode": "explicit" if request.project_authorization_id else "automatic",
+        "requested_project_authorization_id": request.project_authorization_id,
+        "selected_project_authorization_id": selected_id,
+        "project_authorization_candidates": [candidate.to_dict() for candidate in candidates],
+        "fixed_best_rank": list(best_rank) if best_rank is not None else None,
+        "fixed_best_cohort_ids": [
+            candidate.project_authorization_id
+            for candidate in candidates
+            if best_rank is not None and candidate.specificity_rank == best_rank
+        ],
+        "authorization": {
+            "id": selected_id,
+            "version": authorization.get("version") if authorization is not None else None,
+            "status": authorization.get("status") if authorization is not None else None,
+            "normalized_expiry": next(
+                (
+                    candidate.normalized_expiry
+                    for candidate in candidates
+                    if candidate.project_authorization_id == selected_id
+                ),
+                None,
+            ),
+            "supersession_state": next(
+                (
+                    candidate.supersession_state
+                    for candidate in candidates
+                    if candidate.project_authorization_id == selected_id
+                ),
+                None,
+            ),
+            "owner_decision_deliberation_id": (
+                authorization.get("owner_decision_deliberation_id") if authorization is not None else None
+            ),
+            "owner_decision_snapshot": (
+                authorization.get("_owner_decision_snapshot") if authorization is not None else None
+            ),
+            "normalized_envelope_hash": (
+                normalized_envelope_hash(envelope, taxonomy) if authorization is not None else None
+            ),
+            "included_work_item_ids": envelope.get("included_work_item_ids", []),
+            "excluded_work_item_ids": envelope.get("excluded_work_item_ids", []),
+            "included_spec_ids": envelope.get("included_spec_ids", []),
+            "excluded_spec_ids": envelope.get("excluded_spec_ids", []),
+            "allowed_mutation_classes": envelope.get("allowed_mutation_classes", []),
+            "forbidden_operations": envelope.get("forbidden_operations", []),
+        },
+        "actor": actor,
+        "request": {
+            "project_id": project_id,
+            "work_item_id": request.wi_id,
+            "bridge_document": request.slug,
+            "target_paths": list(request.target_paths),
+            "linked_specifications": list(spec_links),
+        },
+        "invalidation_inputs": invalidation_inputs,
+        "normalized_operation": normalize_operation(FILING_OPERATION, taxonomy),
+        "classified_targets": [
+            {"path": item.path, "mutation_class": item.mutation_class}
+            for item in (classify_target(path, taxonomy) for path in request.target_paths)
+        ],
+        "evaluator_id": taxonomy.evaluator_id,
+        "evaluator_version": taxonomy.evaluator_version,
+        "evaluator_sha256": evaluator_sha256(),
+        "taxonomy_version": taxonomy.taxonomy_version,
+        "taxonomy_sha256": taxonomy.source_sha256,
+        "decision_time": decision_time.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "allowed": allowed,
+        "reason_code": reason_code,
+        "reason": reason,
+        "recovery": recovery,
+    }
+    if envelope_decision is not None:
+        payload["envelope_decision"] = envelope_decision
+    identity_material = json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("ascii")
+    payload["decision_id"] = "sha256:" + hashlib.sha256(identity_material).hexdigest()
+    return payload
+
+
+def _deny_from_decision(
+    decision: dict[str, Any],
+    *,
+    reason_code: str,
+    reason: str,
+    recovery: str,
+) -> dict[str, Any]:
+    payload = json.loads(json.dumps(decision))
+    payload.pop("decision_id", None)
+    payload.update(
+        {
+            "allowed": False,
+            "reason_code": reason_code,
+            "reason": reason,
+            "recovery": recovery,
+        }
+    )
+    identity_material = json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("ascii")
+    payload["decision_id"] = "sha256:" + hashlib.sha256(identity_material).hexdigest()
+    return payload
+
+
+def _decision_invalidation_fingerprint(decision: dict[str, Any]) -> str:
+    """Return a stable identity for authorization inputs, excluding evaluation time."""
+    payload = json.loads(json.dumps(decision))
+    payload.pop("decision_id", None)
+    payload.pop("decision_time", None)
+    envelope_decision = payload.get("envelope_decision")
+    if isinstance(envelope_decision, dict):
+        envelope_decision.pop("decision_time", None)
+    material = json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("ascii")
+    return "sha256:" + hashlib.sha256(material).hexdigest()
 
 
 def _active_authorization_for_work_item(
     db: KnowledgeDB,
+    project_root: Path,
+    request: FilingRequest,
     *,
     project_id: str,
-    wi_id: str,
-) -> tuple[dict[str, Any] | None, tuple[AuthorizationCandidateRank, ...]]:
-    candidates: list[tuple[dict[str, Any], AuthorizationCandidateRank]] = []
-    for authorization in db.list_project_authorizations(project_id, status="active"):
-        candidate = _authorization_candidate_rank(authorization, wi_id)
-        if candidate is not None:
-            candidates.append((authorization, candidate))
-
-    if not candidates:
-        return None, ()
-
-    candidates.sort(key=lambda item: (item[1].specificity_rank, item[1].project_authorization_id))
-    best_rank = candidates[0][1].specificity_rank
-    best = [item for item in candidates if item[1].specificity_rank == best_rank]
-    if len(best) > 1:
-        authorization_ids = ", ".join(item[1].project_authorization_id for item in best)
-        raise ProposalFilingError(
-            f"Ambiguous active project authorizations cover {wi_id} at specificity rank "
-            f"{list(best_rank)}: {authorization_ids}"
-        )
-
-    selected_authorization, selected_candidate = best[0]
-    ranked_candidates = tuple(
-        AuthorizationCandidateRank(
-            project_authorization_id=candidate.project_authorization_id,
-            coverage=candidate.coverage,
-            included_work_item_count=candidate.included_work_item_count,
-            specificity_rank=candidate.specificity_rank,
-            selected=candidate.project_authorization_id == selected_candidate.project_authorization_id,
-        )
-        for _, candidate in candidates
+    membership_active: bool,
+    spec_links: list[str],
+    actor: dict[str, str],
+    invalidation_inputs: dict[str, Any],
+    decision_time: datetime,
+    authorizations: list[dict[str, Any]] | None = None,
+) -> tuple[dict[str, Any] | None, tuple[AuthorizationCandidateRank, ...], dict[str, Any] | None]:
+    rows = (
+        authorizations
+        if authorizations is not None
+        else db.list_project_authorizations(project_id, include_terminal=True)
     )
-    return selected_authorization, ranked_candidates
+    evaluations: list[dict[str, Any]] = []
+    for authorization in rows:
+        try:
+            candidate = _authorization_candidate_rank(
+                authorization,
+                request.wi_id,
+                membership_active=membership_active,
+                decision_time=decision_time,
+            )
+        except ValueError as exc:
+            decision = _decision_payload(
+                project_root=project_root,
+                request=request,
+                project_id=project_id,
+                spec_links=spec_links,
+                actor=actor,
+                invalidation_inputs=invalidation_inputs,
+                candidates=(),
+                best_rank=None,
+                authorization=None,
+                allowed=False,
+                reason_code="malformed_authorization_envelope",
+                reason=f"Project authorization {authorization.get('id')} has malformed list fields: {exc}",
+                recovery="Append a valid owner-approved PAUTH successor whose list fields are JSON arrays of strings.",
+                decision_time=decision_time,
+            )
+            raise ProposalFilingError(
+                f"Malformed project authorization {authorization.get('id')}: {exc}", decision=decision
+            ) from exc
+        evaluations.append({"authorization": authorization, "candidate": candidate})
+
+    def candidates_tuple() -> tuple[AuthorizationCandidateRank, ...]:
+        return tuple(
+            item["candidate"]
+            for item in sorted(
+                evaluations,
+                key=lambda value: (
+                    value["candidate"].specificity_rank is None,
+                    value["candidate"].specificity_rank or (99, 99),
+                    value["candidate"].project_authorization_id,
+                ),
+            )
+        )
+
+    def deny(
+        code: str,
+        reason: str,
+        recovery: str,
+        *,
+        best_rank: tuple[int, int] | None = None,
+        authorization: dict[str, Any] | None = None,
+        envelope_decision: dict[str, Any] | None = None,
+    ) -> None:
+        decision = _decision_payload(
+            project_root=project_root,
+            request=request,
+            project_id=project_id,
+            spec_links=spec_links,
+            actor=actor,
+            invalidation_inputs=invalidation_inputs,
+            candidates=candidates_tuple(),
+            best_rank=best_rank,
+            authorization=authorization,
+            allowed=False,
+            reason_code=code,
+            reason=reason,
+            recovery=recovery,
+            decision_time=decision_time,
+            envelope_decision=envelope_decision,
+        )
+        raise ProposalFilingError(f"{reason} [{code}]", decision=decision)
+
+    excluded = [item for item in evaluations if item["candidate"].disposition == "work_item_excluded"]
+    if excluded:
+        denied = excluded[0]["authorization"]
+        deny(
+            "work_item_excluded",
+            f"Project authorization {denied.get('id')} excludes {request.wi_id}",
+            "Correct the exclusion through governed owner-approved PAUTH lifecycle, then retry.",
+            authorization=denied,
+        )
+
+    malformed = [item for item in evaluations if item["candidate"].currentness == "malformed"]
+    if malformed:
+        denied = malformed[0]["authorization"]
+        deny(
+            "malformed_authorization_expiry",
+            f"Project authorization {denied.get('id')} has a malformed or timezone-naive expires_at value",
+            "Append an owner-approved PAUTH successor with a timezone-aware ISO-8601 expiry.",
+            authorization=denied,
+        )
+
+    covering = [item for item in evaluations if item["candidate"].specificity_rank is not None]
+    if not covering:
+        if request.project_authorization_id:
+            selected = db.get_project_authorization(request.project_authorization_id)
+            if selected is None or selected.get("project_id") != project_id:
+                deny(
+                    "selected_authorization_unknown_or_cross_project",
+                    f"Selected project authorization {request.project_authorization_id} is unknown or belongs to another project",
+                    "Select a current same-project authorization that covers the requested work item.",
+                )
+        return None, candidates_tuple(), None
+
+    best_rank = min(item["candidate"].specificity_rank for item in covering)
+    best = [item for item in covering if item["candidate"].specificity_rank == best_rank]
+    for item in covering:
+        candidate = item["candidate"]
+        if candidate.specificity_rank != best_rank:
+            item["candidate"] = replace(candidate, disposition="lower_rank")
+
+    current_best: list[dict[str, Any]] = []
+    for item in best:
+        candidate = item["candidate"]
+        if candidate.currentness in {"expired", "superseded", "inactive"}:
+            item["candidate"] = replace(candidate, disposition=f"best_rank_{candidate.currentness}")
+        else:
+            item["candidate"] = replace(candidate, disposition="best_rank_current")
+            current_best.append(item)
+
+    if not current_best:
+        deny(
+            "best_rank_cohort_stale",
+            f"The best authorization specificity cohort {list(best_rank)} contains no current candidate",
+            "Renew or replace the stale best-rank PAUTH; broader authorization fallback is prohibited.",
+            best_rank=best_rank,
+        )
+
+    for item in current_best:
+        authorization = item["authorization"]
+        owner_id = str(authorization.get("owner_decision_deliberation_id") or "").strip()
+        owner = db.get_deliberation(owner_id) if owner_id else None
+        if owner is None or owner.get("source_type") != "owner_conversation":
+            deny(
+                "owner_decision_unresolvable",
+                f"Project authorization {authorization.get('id')} lacks a resolvable owner decision",
+                "Attach a current owner_conversation decision to a governed PAUTH successor.",
+                best_rank=best_rank,
+                authorization=authorization,
+            )
+        authorization["_owner_decision_snapshot"] = {
+            "id": owner.get("id"),
+            "version": owner.get("version"),
+            "source_type": owner.get("source_type"),
+            "outcome": owner.get("outcome"),
+        }
+        excluded_specs = set(_strict_authorization_list(authorization, "excluded_spec_ids"))
+        blocked_specs = sorted(excluded_specs.intersection(spec_links))
+        if blocked_specs:
+            deny(
+                "linked_specification_excluded",
+                f"Project authorization {authorization.get('id')} excludes linked specification(s): {', '.join(blocked_specs)}",
+                "Use an owner-approved PAUTH whose exclusions do not conflict with the proposal's linked specifications.",
+                best_rank=best_rank,
+                authorization=authorization,
+            )
+        envelope = _authorization_envelope(authorization)
+        evaluated = evaluate_envelope(
+            envelope,
+            requested_operation=FILING_OPERATION,
+            target_paths=request.target_paths,
+            decision_time=decision_time,
+            taxonomy=load_operation_taxonomy(project_root),
+        )
+        if not evaluated.allowed:
+            deny(
+                evaluated.reason_code,
+                evaluated.reason,
+                evaluated.recovery,
+                best_rank=best_rank,
+                authorization=authorization,
+                envelope_decision=evaluated.as_dict(),
+            )
+        item["envelope_decision"] = evaluated.as_dict()
+
+    if request.project_authorization_id:
+        selected_item = next(
+            (
+                item
+                for item in current_best
+                if item["candidate"].project_authorization_id == request.project_authorization_id
+            ),
+            None,
+        )
+        if selected_item is None:
+            requested_item = next(
+                (
+                    item
+                    for item in evaluations
+                    if item["candidate"].project_authorization_id == request.project_authorization_id
+                ),
+                None,
+            )
+            selected_authorization = requested_item["authorization"] if requested_item is not None else None
+            deny(
+                "selected_authorization_not_best_current_covering",
+                f"Selected project authorization {request.project_authorization_id} is not an equally best-ranked current covering candidate",
+                "Select one of the disclosed equally best-ranked current candidates.",
+                best_rank=best_rank,
+                authorization=selected_authorization,
+            )
+    else:
+        if len(current_best) > 1:
+            authorization_ids = ", ".join(item["candidate"].project_authorization_id for item in current_best)
+            deny(
+                "ambiguous_best_rank",
+                f"Ambiguous active project authorizations cover {request.wi_id} at specificity rank "
+                f"{list(best_rank)}: {authorization_ids}",
+                "Pass --project-authorization with one disclosed equally best-ranked current candidate.",
+                best_rank=best_rank,
+            )
+        selected_item = current_best[0]
+
+    selected_id = selected_item["candidate"].project_authorization_id
+    for item in evaluations:
+        candidate = item["candidate"]
+        item["candidate"] = replace(
+            candidate,
+            disposition="selected" if candidate.project_authorization_id == selected_id else candidate.disposition,
+            selected=candidate.project_authorization_id == selected_id,
+        )
+    selected_authorization = selected_item["authorization"]
+    selected_envelope = selected_item.get("envelope_decision")
+    decision = _decision_payload(
+        project_root=project_root,
+        request=request,
+        project_id=project_id,
+        spec_links=spec_links,
+        actor=actor,
+        invalidation_inputs=invalidation_inputs,
+        candidates=candidates_tuple(),
+        best_rank=best_rank,
+        authorization=selected_authorization,
+        allowed=True,
+        reason_code="allowed",
+        reason="The selected current authorization covers the work item, operation, targets, and linked-spec exclusions.",
+        recovery="Re-evaluate from fresh state if any invalidation input changes before filing.",
+        decision_time=decision_time,
+        envelope_decision=selected_envelope,
+    )
+    return selected_authorization, candidates_tuple(), decision
 
 
 def _require_owner_decision(db: KnowledgeDB, owner_decision: str | None) -> str:
     delib_id = _require(owner_decision, "owner_decision")
-    if db.get_deliberation(delib_id) is None:
+    deliberation = db.get_deliberation(delib_id)
+    if deliberation is None:
         raise ProposalFilingError(f"Owner-decision deliberation not found: {delib_id}")
+    if deliberation.get("source_type") != "owner_conversation":
+        raise ProposalFilingError(f"Owner-decision deliberation is not owner_conversation evidence: {delib_id}")
     return delib_id
 
 
@@ -222,95 +737,210 @@ def _approved_existing_specs(db: KnowledgeDB, spec_ids: list[str]) -> list[str]:
 
 def _resolve_project_state(
     db: KnowledgeDB,
+    project_root: Path,
     request: FilingRequest,
     *,
     spec_links: list[str],
+    decision_time: datetime,
+    allow_state_creation: bool = True,
 ) -> _ProjectState:
     work_item = get_work_item_or_raise(db, request.wi_id)
     memberships = _active_memberships_for_work_item(db, request.wi_id)
 
     project_id = request.project_id.strip() if request.project_id else None
-    if project_id:
-        if db.get_project(project_id) is None:
-            raise ProposalFilingError(f"Project not found: {project_id}")
-    elif len(memberships) == 1:
+    if not project_id and len(memberships) == 1:
         project_id = str(memberships[0].get("project_id") or "")
-    elif len(memberships) > 1:
+    elif not project_id and len(memberships) > 1:
         raise ProposalFilingError(f"Work item {request.wi_id} has multiple active project memberships; pass --project.")
-    else:
+    elif not project_id:
         compatibility_project = str(work_item.get("project_name") or "").strip()
         project_id = compatibility_project or None
 
     project_id = _require(project_id, "project")
+    project = db.get_project(project_id)
+    if project is None:
+        raise ProposalFilingError(f"Project not found: {project_id}")
     membership = next((item for item in memberships if item.get("project_id") == project_id), None)
-    membership_created = False
-    if membership is None:
-        if not request.create_missing_state:
-            raise ProposalFilingError(
-                f"Work item {request.wi_id} has no active membership in {project_id}; "
-                "pass --create-missing-state with --owner-decision to create it."
-            )
-        owner_decision = _require_owner_decision(db, request.owner_decision)
-        db.link_project_work_item(
-            project_id,
-            request.wi_id,
-            CHANGED_BY,
-            f"gt bridge file-implementation-proposal membership creation approved by {owner_decision}",
-            source="gt bridge file-implementation-proposal",
-        )
-        membership_created = True
+    actor = _resolve_actor_context(project_root)
+    invalidation_inputs = {
+        **_bridge_invalidation_inputs(project_root, request.slug),
+        "project_version": project.get("version"),
+        "project_status": project.get("status"),
+        "project_completed_at": project.get("completed_at"),
+        "membership_id": membership.get("id") if membership is not None else None,
+        "membership_version": membership.get("version") if membership is not None else None,
+        "membership_status": membership.get("status") if membership is not None else None,
+    }
 
-    authorization, authorization_candidates = _active_authorization_for_work_item(
+    def deny_state(code: str, reason: str, recovery: str) -> None:
+        decision = _decision_payload(
+            project_root=project_root,
+            request=request,
+            project_id=project_id,
+            spec_links=spec_links,
+            actor=actor,
+            invalidation_inputs=invalidation_inputs,
+            candidates=(),
+            best_rank=None,
+            authorization=None,
+            allowed=False,
+            reason_code=code,
+            reason=reason,
+            recovery=recovery,
+            decision_time=decision_time,
+        )
+        raise ProposalFilingError(f"{reason} [{code}]", decision=decision)
+
+    if project.get("status") != "active":
+        deny_state(
+            "project_not_active",
+            f"Project {project_id} is not active",
+            "Reactivate the project through the governed append-only lifecycle before filing.",
+        )
+    if invalidation_inputs["latest_bridge_status"] != "ABSENT":
+        deny_state(
+            "bridge_preimage_not_absent",
+            f"Bridge thread {request.slug} already exists at version "
+            f"{invalidation_inputs['latest_bridge_version']} with status "
+            f"{invalidation_inputs['latest_bridge_status']}",
+            "Choose a fresh bridge slug or continue the existing thread through its role-correct workflow.",
+        )
+
+    authorization, authorization_candidates, authorization_decision = _active_authorization_for_work_item(
         db,
+        project_root,
+        request,
         project_id=project_id,
-        wi_id=request.wi_id,
+        membership_active=membership is not None,
+        spec_links=spec_links,
+        actor=actor,
+        invalidation_inputs=invalidation_inputs,
+        decision_time=decision_time,
     )
+    membership_created = False
     authorization_created = False
     if authorization is None:
         if not request.create_missing_state:
-            raise ProposalFilingError(
-                f"No active project authorization covers {request.wi_id} in {project_id}; "
-                "pass --create-missing-state with --owner-decision to create a bounded PAUTH."
+            deny_state(
+                "no_current_covering_authorization",
+                f"No current project authorization covers {request.wi_id} in {project_id}",
+                "Pass --create-missing-state with owner-decision evidence, or create a governed bounded PAUTH.",
             )
-        owner_decision = _require_owner_decision(db, request.owner_decision)
+        try:
+            owner_decision = _require_owner_decision(db, request.owner_decision)
+        except ProposalFilingError as exc:
+            deny_state(
+                "owner_decision_unresolvable",
+                str(exc),
+                "Supply a resolvable owner_conversation deliberation id before creating authorization state.",
+            )
         approved_specs = _approved_existing_specs(db, spec_links)
         if not approved_specs:
-            raise ProposalFilingError(
-                "Cannot create an active project authorization: no auto-linked or added specs "
-                "resolve to an approved specification."
+            deny_state(
+                "no_approved_linked_specification",
+                "Cannot create an active project authorization because no linked spec is approved",
+                "Approve and link at least one governing specification before creating authorization state.",
             )
-        authorization = db.insert_project_authorization(
-            project_id,
-            f"{request.wi_id} implementation proposal filing",
-            owner_decision,
-            f"Bounded implementation-proposal filing authorization for {request.wi_id}.",
-            CHANGED_BY,
-            f"gt bridge file-implementation-proposal PAUTH creation approved by {owner_decision}",
-            included_work_item_ids=[request.wi_id],
-            included_spec_ids=approved_specs,
-            allowed_mutation_classes=["bridge", "metadata"],
+        authorization_id = "PAUTH-" + re.sub(
+            r"[^A-Z0-9]+", "-", f"{project_id}-{request.wi_id}-BRIDGE-PROPOSAL-FILING".upper()
+        ).strip("-")
+        virtual_authorization: dict[str, Any] = {
+            "id": authorization_id,
+            "version": 1,
+            "project_id": project_id,
+            "status": "active",
+            "authorization_name": f"{request.wi_id} implementation proposal filing",
+            "owner_decision_deliberation_id": owner_decision,
+            "scope_summary": f"Bounded implementation-proposal filing authorization for {request.wi_id}.",
+            "allowed_mutation_classes": ["bridge", "metadata"],
+            "forbidden_operations": [],
+            "included_work_item_ids": [request.wi_id],
+            "excluded_work_item_ids": [],
+            "included_spec_ids": approved_specs,
+            "excluded_spec_ids": [],
+            "expires_at": None,
+            "supersedes": [],
+            "superseded_by": [],
+        }
+        authorization, authorization_candidates, authorization_decision = _active_authorization_for_work_item(
+            db,
+            project_root,
+            request,
+            project_id=project_id,
+            membership_active=membership is not None,
+            spec_links=spec_links,
+            actor=actor,
+            invalidation_inputs=invalidation_inputs,
+            decision_time=decision_time,
+            authorizations=[virtual_authorization],
         )
-        authorization_created = True
-        created_candidate = _authorization_candidate_rank(authorization, request.wi_id)
-        if created_candidate is None:
-            raise ProposalFilingError("Created project authorization does not cover the requested work item")
-        authorization_candidates = (
-            AuthorizationCandidateRank(
-                project_authorization_id=created_candidate.project_authorization_id,
-                coverage=created_candidate.coverage,
-                included_work_item_count=created_candidate.included_work_item_count,
-                specificity_rank=created_candidate.specificity_rank,
-                selected=True,
-            ),
-        )
+        if authorization is None or authorization_decision is None:
+            raise ProposalFilingError("Virtual project authorization evaluation returned no decision")
 
-    if authorization is None:
+        if not request.dry_run and allow_state_creation:
+            conn = db._get_conn()
+            try:
+                if membership is None:
+                    db.link_project_work_item(
+                        project_id,
+                        request.wi_id,
+                        CHANGED_BY,
+                        f"gt bridge file-implementation-proposal membership creation approved by {owner_decision}",
+                        source="gt bridge file-implementation-proposal",
+                        commit=False,
+                    )
+                    membership_created = True
+                authorization = db.insert_project_authorization(
+                    project_id,
+                    f"{request.wi_id} implementation proposal filing",
+                    owner_decision,
+                    f"Bounded implementation-proposal filing authorization for {request.wi_id}.",
+                    CHANGED_BY,
+                    f"gt bridge file-implementation-proposal PAUTH creation approved by {owner_decision}",
+                    id=authorization_id,
+                    included_work_item_ids=[request.wi_id],
+                    included_spec_ids=approved_specs,
+                    allowed_mutation_classes=["bridge", "metadata"],
+                    forbidden_operations=[],
+                    excluded_work_item_ids=[],
+                    excluded_spec_ids=[],
+                    supersedes=[],
+                    superseded_by=[],
+                )
+            except Exception as exc:  # noqa: BLE001 - rollback must cover every database/service failure
+                conn.rollback()
+                denied = _deny_from_decision(
+                    authorization_decision,
+                    reason_code="authorization_state_creation_failed",
+                    reason=f"Atomic membership/authorization creation failed: {exc}",
+                    recovery="Correct the database failure and retry; no bridge publication was attempted.",
+                )
+                raise ProposalFilingError(
+                    "Atomic project membership and authorization creation failed", decision=denied
+                ) from exc
+            authorization_created = True
+            persisted_state = _resolve_project_state(
+                db,
+                project_root,
+                request,
+                spec_links=spec_links,
+                decision_time=decision_time,
+                allow_state_creation=False,
+            )
+            return replace(
+                persisted_state,
+                membership_created=membership_created,
+                authorization_created=True,
+            )
+
+    if authorization is None or authorization_decision is None:
         raise ProposalFilingError("Project authorization insert did not return a current row")
 
     return _ProjectState(
         project_id=project_id,
         project_authorization_id=str(authorization.get("id") or ""),
         project_authorization_candidates=authorization_candidates,
+        authorization_decision=authorization_decision,
         membership_created=membership_created,
         authorization_created=authorization_created,
     )
@@ -541,8 +1171,11 @@ Date: {date}
 
 Project Authorization: {project_state.project_authorization_id}
 Project Authorization Candidates: {json.dumps([candidate.to_dict() for candidate in project_state.project_authorization_candidates], ensure_ascii=True, separators=(",", ":"))}
+Project Authorization Decision: {json.dumps(project_state.authorization_decision, ensure_ascii=True, separators=(",", ":"), sort_keys=True)}
 Project: {project_state.project_id}
 Work Item: {request.wi_id}
+Latest Bridge Status: {project_state.authorization_decision["invalidation_inputs"]["latest_bridge_status"]}
+Reviewed Proposal Version: {project_state.authorization_decision["invalidation_inputs"]["reviewed_proposal_version"]}
 
 target_paths: {target_paths_json}
 
@@ -707,12 +1340,38 @@ def file_implementation_proposal(
         request.target_paths,
         request.add_specs,
     )
-    project_state = _resolve_project_state(db, request, spec_links=spec_links)
+    decision_time = datetime.now(UTC).replace(microsecond=0)
+    project_state = _resolve_project_state(
+        db,
+        project_root,
+        request,
+        spec_links=spec_links,
+        decision_time=decision_time,
+    )
     content = _build_content(db, project_root, request, project_state, spec_links=spec_links)
 
     preflight_results: list[PreflightResult] = []
     if run_candidate_preflights:
         preflight_results.extend(_run_candidate_preflights(project_root, content))
+    revalidation_time = datetime.now(UTC).replace(microsecond=0)
+    revalidated_state = _resolve_project_state(
+        db,
+        project_root,
+        request,
+        spec_links=spec_links,
+        decision_time=revalidation_time,
+        allow_state_creation=False,
+    )
+    initial_fingerprint = _decision_invalidation_fingerprint(project_state.authorization_decision)
+    revalidated_fingerprint = _decision_invalidation_fingerprint(revalidated_state.authorization_decision)
+    if initial_fingerprint != revalidated_fingerprint:
+        denied = _deny_from_decision(
+            revalidated_state.authorization_decision,
+            reason_code="authorization_inputs_changed_before_filing",
+            reason="Project authorization or bridge invalidation inputs changed after candidate preflight",
+            recovery="Restart proposal filing from a fresh snapshot; do not reuse the stale authorization decision.",
+        )
+        raise ProposalFilingError("Authorization inputs changed before bridge filing", decision=denied)
     if request.dry_run:
         return FilingResult(
             bridge_path=None,
@@ -720,6 +1379,7 @@ def file_implementation_proposal(
             project_id=project_state.project_id,
             project_authorization_id=project_state.project_authorization_id,
             project_authorization_candidates=project_state.project_authorization_candidates,
+            authorization_decision=project_state.authorization_decision,
             preflight_results=tuple(preflight_results),
         )
 
@@ -744,5 +1404,6 @@ def file_implementation_proposal(
         project_id=project_state.project_id,
         project_authorization_id=project_state.project_authorization_id,
         project_authorization_candidates=project_state.project_authorization_candidates,
+        authorization_decision=project_state.authorization_decision,
         preflight_results=tuple(preflight_results),
     )

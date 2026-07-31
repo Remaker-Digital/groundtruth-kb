@@ -172,6 +172,7 @@ def _build_packet(
     full_content: str,
     changed_by: str,
     db_operation: dict[str, object],
+    postimage_fields: dict[str, Any],
 ) -> dict[str, object]:
     return construct_approval_packet(
         artifact_type=resolved_type,
@@ -190,6 +191,7 @@ def _build_packet(
         gap_state_bridge_id=request.gap_state_bridge_id if request.gap_state_capture else None,
         gap_state_reason=request.gap_state_reason if request.gap_state_capture else None,
         intended_db_operation=db_operation if request.gap_state_capture else None,
+        postimage_fields=postimage_fields,
     )
 
 
@@ -230,12 +232,28 @@ def record_spec(config: GTConfig, request: SpecRecordRequest) -> dict[str, Any]:
         "type": resolved_type,
         "status": request.status,
     }
+    postimage_fields: dict[str, Any] = {
+        "title": request.title,
+        "status": request.status,
+        "priority": request.priority,
+        "scope": request.scope,
+        "section": request.section,
+        "handle": request.handle,
+        "tags": tags,
+        "assertions": assertions,
+        "constraints": constraints,
+        "affected_by": affected_by,
+        "testability": request.testability,
+        "source_paths": source_paths,
+        "application_scope": request.application_scope,
+    }
     packet = _build_packet(
         request=request,
         resolved_type=resolved_type,
         full_content=full_content,
         changed_by=changed_by,
         db_operation=db_operation,
+        postimage_fields=postimage_fields,
     )
     validation = validate_packet(packet)
     if not validation.is_valid:
@@ -261,23 +279,11 @@ def record_spec(config: GTConfig, request: SpecRecordRequest) -> dict[str, Any]:
 
     row = db.insert_spec(
         id=request.spec_id,
-        title=request.title,
         description=full_content,
-        status=request.status,
         changed_by=changed_by,
         change_reason=request.change_reason,
-        priority=request.priority,
-        scope=request.scope,
-        section=request.section,
-        handle=request.handle,
-        tags=tags,
-        assertions=assertions,
         type=resolved_type,
-        constraints=constraints,
-        affected_by=affected_by,
-        testability=request.testability,
-        source_paths=source_paths,
-        application_scope=request.application_scope,
+        **postimage_fields,
     )
     if row is None:
         raise SpecRecordError(f"Unexpected error: inserted spec {request.spec_id} not found on readback.")

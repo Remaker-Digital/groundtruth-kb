@@ -1501,7 +1501,11 @@ def test_transaction_manifest_rejects_casefold_collision(tmp_path: Path) -> None
         ("not_finalized", "packet is not finalized"),
         ("decision_denied", "lacks an allowed project decision"),
         ("missing_pauth", "lacks project authorization"),
-        ("expired", "packet has expired"),
+        # WI-5824 Fix B (DELIB-202667723): ambient-now expiry no longer denies
+        # transaction-local evidence; this fixture's mutated packet (expiry in
+        # 2000, finalized_at in 2026) is the never-live-at-implementation shape,
+        # which stays fail-closed under the implementation-time-authority rule.
+        ("expired", "was not live at implementation"),
         ("invalid_expiry", "packet has invalid expiry"),
         ("proposal_drift", "resolver-approved proposal"),
         ("go_drift", "resolver-approved GO"),
@@ -3548,3 +3552,387 @@ applies_when_doc_matches = ["gtkb-schema-v2-index-fixture"]
             candidate_path=candidate_rel,
             content=candidate_mutation,
         )
+
+
+# ---------------------------------------------------------------------------
+# WI-5824 Fix A: state-first, null-safe capability clearance.
+
+
+def _wi5824_capability_row(**overrides: object) -> dict[str, object]:
+    """Duck-typed sqlite3.Row stand-in for direct clearance-helper calls."""
+    row: dict[str, object] = {
+        "version": 1,
+        "document_name": "gtkb-state-first",
+        "target_path": "bridge/gtkb-state-first-001.md",
+        "aggregate_entry_id": "bridge-versioned-files",
+        "authority_kind": "bridge_publication",
+        "operation": "bridge_publication",
+        "expires_at": "2026-01-01T00:02:00Z",
+        "capability_state": "recovery_required",
+        "compensation_revision_id": None,
+        "compensation_digest": None,
+        "consumed_at": None,
+        "result_digest": "sha256:result",
+        "revision_id": "revision-1",
+        "failure_reason": None,
+    }
+    row.update(overrides)
+    return row
+
+
+def _wi5824_clearance(module, tmp_path: Path, row: dict[str, object]) -> tuple[bool, str]:
+    return module._bridge_publication_capability_clearance(
+        None,
+        root=tmp_path,
+        record_id="bridge-versioned-files",
+        rel_path="bridge/gtkb-state-first-001.md",
+        index_snapshot=None,
+        capability=row,
+    )
+
+
+def test_capability_clearance_denies_cleanly_on_null_consumed_at(tmp_path: Path) -> None:
+    """WI-5824 (a): recovery_required + consumed_at NULL is a clean state deny.
+
+    The r2b-008 incident shape: parse_iso(None) raised AttributeError and
+    killed the pre-commit hook. The deny must name the capability state and no
+    exception of any kind may escape.
+    """
+    module = _load_module()
+
+    allowed, reason = _wi5824_clearance(
+        module,
+        tmp_path,
+        _wi5824_capability_row(capability_state="recovery_required", consumed_at=None),
+    )
+
+    assert allowed is False
+    assert reason == "bridge publication capability is not consumed ('recovery_required')"
+
+    # End-to-end through the staged registry assessment: the same row shape in
+    # a real fixture database must yield a finding, never a traceback.
+    rel_path = "bridge/gtkb-publication-nullsafe-001.md"
+    capability_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[rel_path]
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    try:
+        conn.execute(
+            "UPDATE sot_registry_bridge_publication_capabilities "
+            "SET capability_state = 'recovery_required', consumed_at = NULL WHERE capability_hash = ?",
+            (capability_hash,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    findings = _staged_registry_findings(module, tmp_path, [rel_path])
+
+    assert len(findings) == 1
+    assert findings[0]["path"] == rel_path
+    assert findings[0]["reason"] == "bridge publication capability is not consumed ('recovery_required')"
+
+
+def test_capability_clearance_checks_state_before_consumed_timestamp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-5824 (a): non-consumed rows deny on state before consumed_at parsing."""
+    module = _load_module()
+    parsed_values: list[object] = []
+    real_parse_iso = implementation_authorization.parse_iso
+
+    def recording_parse_iso(value):
+        parsed_values.append(value)
+        return real_parse_iso(value)
+
+    monkeypatch.setattr(module, "parse_iso", recording_parse_iso)
+
+    for state in ("minted", "recovery_required", "expired"):
+        parsed_values.clear()
+        allowed, reason = _wi5824_clearance(
+            module,
+            tmp_path,
+            _wi5824_capability_row(capability_state=state, consumed_at="SENTINEL-NEVER-PARSED"),
+        )
+        assert allowed is False
+        assert reason == f"bridge publication capability is not consumed ({state!r})"
+        assert "SENTINEL-NEVER-PARSED" not in parsed_values
+
+
+def test_capability_clearance_consumed_row_normal_path_unchanged(tmp_path: Path) -> None:
+    """WI-5824 (a): consumed rows with valid timestamps clear exactly as before,
+    including the staged-digest match against the copied index."""
+    module = _load_module()
+    rel_path = "bridge/gtkb-publication-normal-001.md"
+    capability_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[rel_path]
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    conn.row_factory = sqlite3.Row
+    try:
+        capability = conn.execute(
+            "SELECT * FROM sot_registry_bridge_publication_capabilities WHERE capability_hash = ?",
+            (capability_hash,),
+        ).fetchone()
+        assert capability is not None
+        with module._index_snapshot(tmp_path) as snapshot:
+            allowed, reason = module._bridge_publication_capability_clearance(
+                conn,
+                root=tmp_path,
+                record_id="bridge-versioned-files",
+                rel_path=rel_path,
+                index_snapshot=snapshot,
+                capability=capability,
+            )
+    finally:
+        conn.close()
+
+    assert (allowed, reason) == (True, "")
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("consumed_at", None),
+        ("consumed_at", 12345),
+        ("consumed_at", "not-a-timestamp"),
+        ("expires_at", None),
+        ("expires_at", 12345),
+        ("expires_at", "not-a-timestamp"),
+    ],
+)
+def test_capability_clearance_non_string_timestamps_deny_cleanly(
+    tmp_path: Path,
+    field: str,
+    value: object,
+) -> None:
+    """WI-5824 (a) defense in depth: invalid timestamp shapes on a consumed row
+    yield the clean incomplete-timestamp deny; no traceback for any shape."""
+    module = _load_module()
+
+    allowed, reason = _wi5824_clearance(
+        module,
+        tmp_path,
+        _wi5824_capability_row(capability_state="consumed", **{field: value}),
+    )
+
+    assert allowed is False
+    assert reason == "bridge publication capability has incomplete or invalid timestamps"
+
+
+# ---------------------------------------------------------------------------
+# WI-5824 Fix B: transaction-local terminal-evidence ordering.
+
+
+def _wi5824_mock_content_validators(module, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Neutralize verdict content-quality validators (same convention as the
+    existing transaction-local e2e test); packet and chain validation stay real."""
+    monkeypatch.setattr(module, "run_bridge_compliance_audit", lambda **kwargs: {"decision": "pass"})
+    monkeypatch.setattr(module, "validate_verdict_evidence_anchors", lambda content, project_root: [])
+    monkeypatch.setattr(module, "verdict_self_review_reason", lambda *args, **kwargs: None)
+
+
+def _wi5824_rewrite_packet_expiry(module, tmp_path: Path, bridge_id: str, expires_at: str) -> None:
+    """Re-time the fixture packet with the schema-v2/v3 hash dance intact."""
+    packet_path = tmp_path / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / f"{bridge_id}.json"
+    packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    start = packet.pop("implementation_start")
+    packet.pop("packet_hash")
+    packet["schema_version"] = 2
+    packet["expires_at"] = expires_at
+    packet["packet_hash"] = module.packet_hash(packet)
+    start["pre_start_packet_hash"] = packet.pop("packet_hash")
+    packet["schema_version"] = 3
+    packet["implementation_start"] = start
+    packet["packet_hash"] = module.packet_hash(packet)
+    packet_path.write_text(json.dumps(packet), encoding="utf-8")
+
+
+@pytest.mark.parametrize("packet_expired", [False, True])
+def test_finalize_verified_same_transaction_phase_evaluation_passes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    packet_expired: bool,
+) -> None:
+    """WI-5824 (b): a finalize-verified transaction (implementation paths +
+    same-transaction VERIFIED verdict + finalization evidence + bound finalized
+    packet) passes phase evaluation with the REAL packet listing in play.
+
+    ``packet_expired=True`` is the wi5759/wi5758 wedge shape: the packet was
+    live at implementation but expired before verification; ambient-now packet
+    state (route 1) is invalid, yet transaction-local terminal evidence must
+    clear the staged paths. ``packet_expired=False`` locks that the
+    phase-closure conclusion derived from the same in-transaction verdict
+    ("implementation phase ... closed") never denies the transaction.
+    """
+    module = _load_module()
+    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    _stage_transaction(tmp_path, selected_paths, report, verdict)
+    _wi5824_mock_content_validators(module, monkeypatch)
+    bridge_id = "gtkb-wi5629-fixture"
+    if packet_expired:
+        # Live at implementation (finalized 2026-07-19T00:00:00Z <= expiry),
+        # expired long before the finalize-verified evaluation runs.
+        _wi5824_rewrite_packet_expiry(module, tmp_path, bridge_id, "2026-07-19T02:00:00Z")
+
+    packets, errors, scanned = module._load_live_go_evidence(tmp_path)
+    assert packets == []
+    assert scanned == 1
+    if packet_expired:
+        assert any("has expired" in error for error in errors)
+    else:
+        assert any("implementation phase for this proposal is closed" in error for error in errors)
+
+    result = module.evaluate(tmp_path)
+
+    assert result["status"] == "pass"
+    assert result["evidence_summary"]["live_go_packets_scanned"] == 1
+    assert result["evidence_summary"]["live_go_packets_valid"] == 0
+    cleared_by_path = {item["path"]: item for item in result["cleared"]}
+    for rel_path in (
+        "scripts/bridge_lifecycle_resolver.py",
+        "platform_tests/scripts/test_bridge_lifecycle_resolver.py",
+    ):
+        assert cleared_by_path[rel_path]["evidence"] == "transaction_local_verified_manifest"
+        assert cleared_by_path[rel_path]["source"] == bridge_id
+
+
+def test_committed_terminal_thread_still_denies_new_mutations(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-5824 (b) fail-closed floor: a committed-terminal thread keeps denying
+    newly staged post-terminal mutations of its target paths (wi4894-002
+    denial class) when no clearing evidence exists."""
+    module = _load_module()
+    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    _stage_transaction(tmp_path, selected_paths, report, verdict)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            f"core.hooksPath={tmp_path / 'empty-hooks'}",
+            "commit",
+            "-qm",
+            "fixture terminal",
+        ],
+        cwd=tmp_path,
+        check=True,
+    )
+    packet_path = tmp_path / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / "gtkb-wi5629-fixture.json"
+    packet_path.unlink()
+    mutated = tmp_path / "scripts" / "bridge_lifecycle_resolver.py"
+    mutated.write_text("# post-terminal mutation\n", encoding="utf-8")
+    subprocess.run(["git", "add", "--", "scripts/bridge_lifecycle_resolver.py"], cwd=tmp_path, check=True)
+
+    result = module.evaluate(tmp_path)
+
+    assert result["status"] == "fail"
+    assert [finding["path"] for finding in result["findings"]] == ["scripts/bridge_lifecycle_resolver.py"]
+    assert result["findings"][0]["reason"].startswith("protected path lacks")
+
+
+def test_transaction_local_multiple_verified_candidates_denied(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-5824 (b) fail-closed floor: two live VERIFIED candidates in one
+    transaction are denied by the exactly-one-candidate rule."""
+    module = _load_module()
+    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    _stage_transaction(tmp_path, selected_paths, report, verdict)
+    second_verdict = "bridge/gtkb-wi5824-second-thread-002.md"
+    (tmp_path / second_verdict).write_text(
+        f"""VERIFIED
+{_author("loyal-opposition", "other-lo-session")}
+# Second verification
+
+Document: gtkb-wi5824-second-thread
+Version: 002
+
+## Commit Finalization Evidence
+
+- Finalization helper: `fixture`
+- Intended commit subject: `fix: fixture`
+- Same-transaction path set:
+- `{second_verdict}`
+- Final commit SHA is emitted after commit creation.
+""",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "--", second_verdict], cwd=tmp_path, check=True)
+    _wi5824_mock_content_validators(module, monkeypatch)
+
+    result = module.evaluate(tmp_path)
+
+    assert result["status"] == "fail"
+    assert any(
+        "same-transaction clearance requires exactly one VERIFIED candidate" in error
+        for finding in result["findings"]
+        for error in finding.get("evidence_errors", [])
+    )
+
+
+def test_transaction_local_manifest_mismatch_denied(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-5824 (b) fail-closed floor: manifest != staged set stays a deny."""
+    module = _load_module()
+    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    verdict_path = tmp_path / verdict
+    verdict_path.write_text(
+        verdict_path.read_text(encoding="utf-8").replace("- `scripts/bridge_lifecycle_resolver.py`\n", ""),
+        encoding="utf-8",
+    )
+    _stage_transaction(tmp_path, selected_paths, report, verdict)
+    _wi5824_mock_content_validators(module, monkeypatch)
+
+    result = module.evaluate(tmp_path)
+
+    assert result["status"] == "fail"
+    assert any(
+        "same-transaction manifest does not equal the staged path set" in error
+        for finding in result["findings"]
+        for error in finding.get("evidence_errors", [])
+    )
+
+
+def test_transaction_local_unbound_packet_denied(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-5824 (b) / DCL-PROJECT-AUTHORIZATION-OPERATION-TIME-ENFORCEMENT-001:
+    a transaction-local candidate without a bound finalized packet is denied,
+    and a packet that was never live at implementation is denied."""
+    module = _load_module()
+    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    _stage_transaction(tmp_path, selected_paths, report, verdict)
+    _wi5824_mock_content_validators(module, monkeypatch)
+    bridge_id = "gtkb-wi5629-fixture"
+    packet_path = tmp_path / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / f"{bridge_id}.json"
+    original_packet = packet_path.read_text(encoding="utf-8")
+    packet_path.unlink()
+
+    result = module.evaluate(tmp_path)
+
+    assert result["status"] == "fail"
+    assert any(
+        "implementation-start packet is absent" in error
+        for finding in result["findings"]
+        for error in finding.get("evidence_errors", [])
+    )
+
+    # Never-live packet: finalized_at after expires_at is not implementation-time
+    # authority and must not clear the transaction.
+    packet_path.write_text(original_packet, encoding="utf-8")
+    _wi5824_rewrite_packet_expiry(module, tmp_path, bridge_id, "2026-07-18T00:00:00Z")
+    never_live = module.evaluate(tmp_path)
+
+    assert never_live["status"] == "fail"
+    assert any(
+        "was not live at implementation" in error
+        for finding in never_live["findings"]
+        for error in finding.get("evidence_errors", [])
+    )

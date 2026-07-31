@@ -96,6 +96,24 @@ def _bridge_advisory(date_str: str = "2026-05-10") -> str:
     )
 
 
+def _write_bridge_advisory(project_root: Path, slug: str, version: int) -> Path:
+    path = project_root / "bridge" / f"{slug}-{version:03d}.md"
+    body = (
+        _bridge_advisory()
+        .replace("gtkb-application-boundary-advisory", slug)
+        .replace("Version: 001", f"Version: {version:03d}")
+    )
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
+def _write_candidate_event(project_root: Path, record: dict) -> None:
+    store = project_root / ".gtkb-state" / "advisory-candidates" / "candidates.jsonl"
+    store.parent.mkdir(parents=True, exist_ok=True)
+    with store.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+
 def _candidate_events(project_root: Path) -> list[dict]:
     store = project_root / ".gtkb-state" / "advisory-candidates" / "candidates.jsonl"
     if not store.exists():
@@ -147,12 +165,122 @@ def test_router_stages_bridge_advisory_candidates_creates_no_work_items(
     events = _candidate_events(fake_project)
     assert len(events) == 1
     assert events[0]["source"] == "bridge"
-    assert events[0]["source_key"] == "gtkb-application-boundary-advisory"
-    assert events[0]["proposed_title"] == "Route bridge ADVISORY: gtkb-application-boundary-advisory"
+    assert events[0]["source_key"] == "gtkb-application-boundary-advisory-001"
+    assert events[0]["proposed_title"] == "Route bridge ADVISORY: gtkb-application-boundary-advisory-001"
     assert events[0]["source_spec_id"] == "GOV-STANDING-BACKLOG-001"
     assert events[0]["related_bridge_threads"] is None
     assert events[0]["related_bridge_threads_role"] is None
     assert events[0]["provenance_bridge_thread"] == "gtkb-application-boundary-advisory"
+
+
+def test_new_bridge_advisory_version_is_staged_after_prior_version(router, fake_project: Path, db_factory) -> None:
+    slug = "gtkb-versioned-advisory"
+    _write_bridge_advisory(fake_project, slug, 1)
+    first = router.run(project_root=fake_project, source="bridge", since=None, dry_run=False, db_factory=db_factory)
+    _write_bridge_advisory(fake_project, slug, 2)
+    second = router.run(project_root=fake_project, source="bridge", since=None, dry_run=False, db_factory=db_factory)
+
+    assert [row["source_key"] for row in first.staged] == [f"{slug}-001"]
+    assert [row["source_key"] for row in second.staged] == [f"{slug}-002"]
+    assert [row["source_key"] for row in _candidate_events(fake_project)] == [f"{slug}-001", f"{slug}-002"]
+
+
+def test_legacy_candidate_for_same_physical_file_is_not_duplicated(router, fake_project: Path, db_factory) -> None:
+    slug = "gtkb-legacy-same-file"
+    path = _write_bridge_advisory(fake_project, slug, 1)
+    _write_candidate_event(
+        fake_project,
+        {
+            "event": "staged",
+            "status": "staged",
+            "source": "bridge",
+            "source_key": slug,
+            "relative_path": path.relative_to(fake_project).as_posix(),
+        },
+    )
+
+    result = router.run(project_root=fake_project, source="bridge", since=None, dry_run=False, db_factory=db_factory)
+
+    assert result.staged == []
+    assert result.skipped_existing[0]["source_key"] == f"{slug}-001"
+    assert result.skipped_existing[0]["matched_source_key"] == slug
+    assert len(_candidate_events(fake_project)) == 1
+
+
+def test_versioned_work_item_key_blocks_only_that_version(router, fake_project: Path, db_factory) -> None:
+    slug = "gtkb-versioned-work-item"
+    _write_bridge_advisory(fake_project, slug, 2)
+    db = db_factory()
+    db.insert_work_item(
+        id="WI-9201",
+        title="Versioned advisory",
+        origin="hygiene",
+        component="backlog",
+        resolution_status="open",
+        changed_by="test",
+        change_reason="seed versioned advisory",
+        source_spec_id="GOV-STANDING-BACKLOG-001",
+        related_deliberation_ids=f"{slug}-002",
+    )
+
+    result = router.run(project_root=fake_project, source="bridge", since=None, dry_run=False, db_factory=lambda: db)
+
+    assert result.staged == []
+    assert result.skipped_existing[0]["matched_wi"] == "WI-9201"
+
+
+def test_legacy_bare_slug_work_item_does_not_block_newer_version(router, fake_project: Path, db_factory) -> None:
+    slug = "gtkb-legacy-work-item-new-head"
+    _write_bridge_advisory(fake_project, slug, 2)
+    db = db_factory()
+    db.insert_work_item(
+        id="WI-9202",
+        title="Legacy advisory",
+        origin="hygiene",
+        component="backlog",
+        resolution_status="open",
+        changed_by="test",
+        change_reason="seed legacy advisory",
+        source_spec_id="GOV-STANDING-BACKLOG-001",
+        related_deliberation_ids=slug,
+    )
+
+    result = router.run(project_root=fake_project, source="bridge", since=None, dry_run=False, db_factory=lambda: db)
+
+    assert [row["source_key"] for row in result.staged] == [f"{slug}-002"]
+
+
+def test_legacy_bare_slug_work_item_blocks_legacy_recorded_version(router, fake_project: Path, db_factory) -> None:
+    slug = "gtkb-legacy-work-item-recorded-head"
+    _write_bridge_advisory(fake_project, slug, 2)
+    _write_candidate_event(
+        fake_project,
+        {
+            "event": "rejected",
+            "status": "rejected",
+            "source": "bridge",
+            "source_key": slug,
+            "relative_path": f"archive/{slug}-002.md",
+        },
+    )
+    db = db_factory()
+    db.insert_work_item(
+        id="WI-9203",
+        title="Legacy advisory",
+        origin="hygiene",
+        component="backlog",
+        resolution_status="open",
+        changed_by="test",
+        change_reason="seed legacy advisory",
+        source_spec_id="GOV-STANDING-BACKLOG-001",
+        related_deliberation_ids=slug,
+    )
+
+    result = router.run(project_root=fake_project, source="bridge", since=None, dry_run=False, db_factory=lambda: db)
+
+    assert result.staged == []
+    assert result.skipped_existing[0]["matched_in"] == "work_items"
+    assert result.skipped_existing[0]["matched_wi"] == "WI-9203"
 
 
 def test_router_idempotent_on_rerun(router, fake_project: Path, db_factory) -> None:
@@ -244,6 +372,7 @@ def test_router_writes_last_scan_with_staged_count(router, fake_project: Path, d
     assert payload["scanned"] == 1
     assert payload["staged_count"] == 1
     assert payload["skipped_existing_count"] == 0
+    assert payload["starvation_signal"] is False
 
 
 def test_router_compact_mode_reports_staged_count(router, fake_project: Path, db_factory) -> None:
@@ -259,6 +388,7 @@ def test_router_compact_mode_reports_staged_count(router, fake_project: Path, db
     assert "staged" not in compact_json
     assert compact_json["staged_count"] == 1
     assert compact_json["skipped_expired_count"] == 0
+    assert compact_json["starvation_signal"] is False
 
 
 def test_router_compact_mode_suppresses_skipped_existing_items(router, fake_project: Path, db_factory) -> None:
@@ -277,6 +407,71 @@ def test_router_compact_mode_suppresses_skipped_existing_items(router, fake_proj
     assert "skipped_existing" not in compact_json
     assert compact_json["skipped_existing_count"] == 1
     assert compact_json["staged_count"] == 0
+    assert compact_json["starvation_signal"] is True
+
+
+def test_starvation_signal_is_persisted_for_all_skip_run(router, fake_project: Path, db_factory) -> None:
+    slug = "gtkb-starvation-signal"
+    _write_bridge_advisory(fake_project, slug, 1)
+    first = router.run(project_root=fake_project, source="bridge", since=None, dry_run=False, db_factory=db_factory)
+    second = router.run(project_root=fake_project, source="bridge", since=None, dry_run=False, db_factory=db_factory)
+
+    assert first.starvation_signal is False
+    assert second.starvation_signal is True
+    payload = json.loads(
+        (fake_project / ".gtkb-state" / "advisory-router" / "last-scan.json").read_text(encoding="utf-8")
+    )
+    assert payload["starvation_signal"] is True
+
+
+def test_versioned_backfill_is_idempotent_and_bridge_read_only(router, fake_project: Path, db_factory) -> None:
+    slugs = ("gtkb-starved-alpha", "gtkb-starved-beta")
+    for slug in slugs:
+        old_path = _write_bridge_advisory(fake_project, slug, 1)
+        _write_candidate_event(
+            fake_project,
+            {
+                "event": "staged",
+                "status": "staged",
+                "source": "bridge",
+                "source_key": slug,
+                "relative_path": old_path.relative_to(fake_project).as_posix(),
+            },
+        )
+        _write_bridge_advisory(fake_project, slug, 2)
+    before = {path.name: path.read_bytes() for path in sorted((fake_project / "bridge").glob("*.md"))}
+
+    first = router.run(project_root=fake_project, source="bridge", since=None, dry_run=False, db_factory=db_factory)
+    second = router.run(project_root=fake_project, source="bridge", since=None, dry_run=False, db_factory=db_factory)
+    after = {path.name: path.read_bytes() for path in sorted((fake_project / "bridge").glob("*.md"))}
+
+    assert [row["source_key"] for row in first.staged] == [f"{slug}-002" for slug in slugs]
+    assert second.staged == []
+    assert len(second.skipped_existing) == 2
+    assert before == after
+
+
+def test_cli_emits_one_warning_line_for_starvation(router, fake_project: Path, capsys) -> None:
+    slug = "gtkb-cli-starvation"
+    path = _write_bridge_advisory(fake_project, slug, 1)
+    _write_candidate_event(
+        fake_project,
+        {
+            "event": "staged",
+            "status": "staged",
+            "source": "bridge",
+            "source_key": f"{slug}-001",
+            "relative_path": path.relative_to(fake_project).as_posix(),
+        },
+    )
+
+    assert router.main(["--project-root", str(fake_project), "--source", "bridge", "--compact"]) == 0
+
+    output = capsys.readouterr().out.splitlines()
+    assert output[0].startswith("WARNING: advisory router starvation signal:")
+    assert sum(line.startswith("WARNING:") for line in output) == 1
+    payload = json.loads("\n".join(output[1:]))
+    assert payload["starvation_signal"] is True
 
 
 def test_router_retention_policy_skips_expired_advisories(router, fake_project: Path, db_factory) -> None:

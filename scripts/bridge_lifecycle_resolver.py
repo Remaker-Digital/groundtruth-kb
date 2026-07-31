@@ -31,6 +31,43 @@ PRIME_STATUSES = frozenset({"NEW", "REVISED", "NO-ACTION"})
 LOYAL_OPPOSITION_STATUSES = frozenset({"GO", "NO-GO", "VERIFIED"})
 PENDING_CORRECTION_DIAGNOSTIC = "PENDING_CORRECTION_NO_IMPLEMENTATION_AUTHORITY"
 
+# The single in-code authority for ordinary bridge transitions (WI-5827).
+# Each key is a previous status; the value is the base set of lawful successor
+# statuses. Post-``NO-GO``, the lawful Prime statuses are ``REVISED`` and
+# ``NO-ACTION`` (per DCL-NO-ACTION-STATUS-SEMANTICS-001); ``DEFERRED`` (owner
+# parking) and ``WITHDRAWN`` (terminal) complete the set. ``NEW`` is never a
+# lawful successor to ``NO-GO``. Narrative surfaces (the canonical file-bridge
+# protocol prose and its generated projection) render this table and are bound
+# to it by ``platform_tests/scripts/
+# test_bridge_protocol_transition_table_consistency.py``.
+ORDINARY_TRANSITIONS: dict[str, frozenset[str]] = {
+    "NEW": frozenset({"GO", "NO-GO", "WITHDRAWN", "DEFERRED"}),
+    "REVISED": frozenset({"GO", "NO-GO", "WITHDRAWN", "DEFERRED"}),
+    "GO": frozenset({"NEW", "REVISED", "NO-ACTION", "DEFERRED", "WITHDRAWN"}),
+    "NO-GO": frozenset({"REVISED", "NO-ACTION", "DEFERRED", "WITHDRAWN"}),
+    "NO-ACTION": frozenset({"GO", "NO-GO", "VERIFIED"}),
+    "ADVISORY": frozenset({"ADVISORY", "ACCEPTED", "BLOCKED", "DEFERRED", "WITHDRAWN"}),
+    "BLOCKED": frozenset({"REVISED", "WITHDRAWN"}),
+    "DEFERRED": frozenset({"REVISED", "WITHDRAWN"}),
+}
+
+# Post-GO augmentations to ORDINARY_TRANSITIONS, applied only once a GO has
+# been seen earlier in the chain (``prior_go_seen``).
+#
+# A Prime NEW filed after a GO is normally an implementation report.
+# An owner may explicitly defer that report's VERIFIED because its
+# intermediate worktree cannot be finalized, then require a fresh
+# reviewed REVISED proposal for the corrective implementation that
+# will make the single governed commit possible.  That edge still
+# has no implementation authority: the REVISED remains LO-review
+# actionable until a later independent GO.
+#
+# Additionally, post-GO NEW/REVISED reports may receive a terminal VERIFIED.
+POST_GO_REPORT_AUGMENTATIONS: dict[str, frozenset[str]] = {
+    "NEW": frozenset({"REVISED", "VERIFIED"}),
+    "REVISED": frozenset({"VERIFIED"}),
+}
+
 _PRIME_AUTHORED_STATUSES = PRIME_STATUSES | {"DEFERRED", "WITHDRAWN"}
 _LOYAL_AUTHORED_STATUSES = LOYAL_OPPOSITION_STATUSES | {"ADVISORY"}
 _OWNER_AUTHORED_STATUSES = frozenset({"ACCEPTED", "BLOCKED"})
@@ -418,32 +455,11 @@ def _validate_ordinary_transitions(versions: tuple[BridgeVersion, ...]) -> None:
                 version=current.version,
             )
 
-        allowed: set[str]
-        if previous.status in {"NEW", "REVISED"}:
-            allowed = {"GO", "NO-GO", "WITHDRAWN", "DEFERRED"}
-            # A Prime NEW filed after a GO is normally an implementation report.
-            # An owner may explicitly defer that report's VERIFIED because its
-            # intermediate worktree cannot be finalized, then require a fresh
-            # reviewed REVISED proposal for the corrective implementation that
-            # will make the single governed commit possible.  That edge still
-            # has no implementation authority: the REVISED remains LO-review
-            # actionable until a later independent GO.
-            if previous.status == "NEW" and prior_go_seen:
-                allowed.add("REVISED")
-            if prior_go_seen:
-                allowed.add("VERIFIED")
-        elif previous.status == "GO":
-            allowed = {"NEW", "REVISED", "NO-ACTION", "DEFERRED", "WITHDRAWN"}
-        elif previous.status == "NO-GO":
-            allowed = {"REVISED", "NO-ACTION", "DEFERRED", "WITHDRAWN"}
-        elif previous.status == "NO-ACTION":
-            allowed = {"GO", "NO-GO", "VERIFIED"}
-        elif previous.status == "ADVISORY":
-            allowed = {"ADVISORY", "ACCEPTED", "BLOCKED", "DEFERRED", "WITHDRAWN"}
-        elif previous.status in {"BLOCKED", "DEFERRED"}:
-            allowed = {"REVISED", "WITHDRAWN"}
-        else:
-            allowed = set()
+        # WI-5827: consume the module-level authoritative table (base map plus
+        # the documented post-GO augmentations); no allowed set changes.
+        allowed: set[str] = set(ORDINARY_TRANSITIONS.get(previous.status, frozenset()))
+        if prior_go_seen:
+            allowed |= POST_GO_REPORT_AUGMENTATIONS.get(previous.status, frozenset())
 
         if current.status not in allowed:
             _fail(

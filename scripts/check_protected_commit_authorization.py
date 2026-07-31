@@ -44,7 +44,6 @@ from scripts.implementation_authorization import (  # noqa: E402
     AuthorizationError,
     extract_target_paths,
     list_named_packets,
-    now_utc,
     packet_hash,
     packet_path_for_bridge,
     parse_iso,
@@ -1641,10 +1640,16 @@ def _load_finalized_packet(
         return None, [f"{bridge_id}: implementation-start packet root is not an object"]
     errors.extend(_packet_binding_errors(named_path, packet, bridge_id, chain, require_schema_v3=True))
     target_paths = _packet_target_paths(packet)
+    # WI-5824 Fix B (DELIB-202667723): the finalized implementation-start packet
+    # is evidence of implementation-time authority. Transaction-local terminal
+    # evidence is judged by the time of the act -- the implementation start must
+    # fall inside the packet's live window -- not by ambient wall-clock time, so
+    # an atomic finalize-verified transaction is not denied merely because the
+    # packet expired between implementation start and verification.
     try:
-        if parse_iso(str(packet["expires_at"])) < now_utc():
-            errors.append(f"{bridge_id}: implementation-start packet has expired")
+        packet_expires = parse_iso(str(packet["expires_at"]))
     except (KeyError, TypeError, ValueError):
+        packet_expires = None
         errors.append(f"{bridge_id}: implementation-start packet has invalid expiry")
 
     implementation_start = packet.get("implementation_start")
@@ -1660,6 +1665,14 @@ def _load_finalized_packet(
             or not implementation_start["finalized_at"].strip()
         ):
             errors.append(f"{bridge_id}: implementation-start packet is not finalized")
+        else:
+            try:
+                finalized_at = parse_iso(implementation_start["finalized_at"])
+            except (TypeError, ValueError):
+                finalized_at = None
+                errors.append(f"{bridge_id}: implementation-start finalized_at is unparseable")
+            if finalized_at is not None and packet_expires is not None and finalized_at > packet_expires:
+                errors.append(f"{bridge_id}: implementation-start packet was not live at implementation")
         start_targets = implementation_start.get("target_path_globs")
         normalized_start_targets = (
             [_normalize_rel(target) for target in start_targets]
@@ -1977,6 +1990,22 @@ def _staged_index_content_digest(
     return "sha256:" + hashlib.sha256(blob.stdout).hexdigest(), None
 
 
+def _is_valid_iso_timestamp(value: object) -> bool:
+    """Null-safe timestamp validity: a non-empty string that ``parse_iso`` accepts.
+
+    WI-5824 Fix A: ``parse_iso`` requires a string (``None.endswith`` raises
+    ``AttributeError``), so capability timestamp checks route through this
+    guard instead of parsing raw row values directly.
+    """
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        parse_iso(value)
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
 def _newest_exact_bridge_publication_capability(
     conn: sqlite3.Connection,
     *,
@@ -2025,12 +2054,14 @@ def _bridge_publication_capability_clearance(
     if capability["authority_kind"] != "bridge_publication" or capability["operation"] != "bridge_publication":
         return False, "bridge publication capability has the wrong authority type"
 
+    # WI-5824 Fix A: capability_state is evaluated before any consumed_at
+    # handling, and every timestamp check is null-safe, so no capability row
+    # shape can escape this function as an uncaught exception. consumed_at is
+    # null by design on minted/recovery_required rows, which deny precisely on
+    # state below without ever reaching consumed_at parsing.
     # expires_at bounds mint-to-consume use. Once consumed, the immutable row is
     # archival commit evidence and remains valid after that short publication TTL.
-    try:
-        parse_iso(capability["expires_at"])
-        parse_iso(capability["consumed_at"])
-    except (TypeError, ValueError):
+    if not _is_valid_iso_timestamp(capability["expires_at"]):
         return False, "bridge publication capability has incomplete or invalid timestamps"
     if (
         capability["capability_state"] == "compensated"
@@ -2040,6 +2071,10 @@ def _bridge_publication_capability_clearance(
         return False, "bridge publication capability was compensated or failed"
     if capability["capability_state"] != "consumed":
         return False, f"bridge publication capability is not consumed ({capability['capability_state']!r})"
+    # Defense in depth for rows on the consumed path: consumed_at must be a
+    # non-null string that parses; any other shape is the clean deny below.
+    if not _is_valid_iso_timestamp(capability["consumed_at"]):
+        return False, "bridge publication capability has incomplete or invalid timestamps"
     if not capability["result_digest"] or not capability["revision_id"]:
         return False, "bridge publication capability lacks consumed result or revision evidence"
     if capability["failure_reason"]:

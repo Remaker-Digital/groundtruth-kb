@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 from groundtruth_kb.cli import main
-from groundtruth_kb.session.envelope import resolve_worker_role_provenance, worker_session_envelope_path
+from groundtruth_kb.session.envelope import open_session, resolve_worker_role_provenance, worker_session_envelope_path
 
 import scripts._kb_attribution as kb
 
@@ -18,14 +18,25 @@ def _seed_project(tmp_path: Path) -> tuple[Path, Path]:
     state = root / "harness-state"
     state.mkdir(parents=True)
     (state / "harness-identities.json").write_text(
-        json.dumps({"schema_version": 1, "harnesses": {"codex": {"id": "A"}}}),
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "codex": {"id": "A"},
+                    "cursor": {"id": "E"},
+                },
+            }
+        ),
         encoding="utf-8",
     )
     (state / "harness-registry.json").write_text(
         json.dumps(
             {
                 "schema_version": 1,
-                "harnesses": [{"id": "A", "harness_name": "codex", "role": ["loyal-opposition"]}],
+                "harnesses": [
+                    {"id": "A", "harness_name": "codex", "role": ["loyal-opposition"]},
+                    {"id": "E", "harness_name": "cursor", "role": ["loyal-opposition"]},
+                ],
             }
         ),
         encoding="utf-8",
@@ -147,6 +158,75 @@ def test_cli_role_bearing_codex_open_binds_exact_host_thread(
     assert envelope["worker_role_provenance"]["role"] == "prime-builder"
     exact = worker_session_envelope_path(root, "codex", "codex-thread-123")
     assert json.loads(exact.read_text(encoding="utf-8")) == envelope
+
+
+def test_cli_role_bearing_cursor_open_binds_exact_host_conversation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, config = _seed_project(tmp_path)
+    conversation_id = "12a16794-f84d-457f-81b4-8e803034e4d5"
+    monkeypatch.setenv("CURSOR_CONVERSATION_ID", conversation_id)
+
+    result = _invoke_open(
+        config,
+        "--harness-name",
+        "cursor",
+        "--harness-id",
+        "E",
+        "--init-keyword",
+        "::init gtkb lo",
+        "--subject",
+        "gtkb",
+        "--role",
+        "loyal-opposition",
+    )
+
+    assert result.exit_code == 0, result.output
+    envelope = json.loads(result.output)
+    assert envelope["session_id"] == conversation_id
+    assert envelope["worker_role_provenance"]["session_id"] == conversation_id
+    exact = worker_session_envelope_path(root, "cursor", conversation_id)
+    assert json.loads(exact.read_text(encoding="utf-8")) == envelope
+
+
+def test_cli_cursor_init_upgrades_unasserted_startup_subject(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, config = _seed_project(tmp_path)
+    conversation_id = "12a16794-f84d-457f-81b4-8e803034e4d5"
+    monkeypatch.setenv("CURSOR_CONVERSATION_ID", conversation_id)
+    startup = open_session(
+        root,
+        harness_name="cursor",
+        harness_id="E",
+        role="loyal-opposition",
+        session_id=conversation_id,
+        worker_role_source="session_resolver_fallback",
+    )
+    assert startup["subject"] == "gtkb_infrastructure"
+    assert startup["subject_asserted"] is None
+
+    result = _invoke_open(
+        config,
+        "--harness-name",
+        "cursor",
+        "--harness-id",
+        "E",
+        "--init-keyword",
+        "::init gtkb lo",
+        "--subject",
+        "gtkb",
+        "--role",
+        "loyal-opposition",
+    )
+
+    assert result.exit_code == 0, result.output
+    envelope = json.loads(result.output)
+    assert envelope["session_id"] == conversation_id
+    assert envelope["subject"] == "gtkb"
+    assert envelope["subject_asserted"] == "gtkb"
 
 
 def test_cli_same_host_refresh_returns_exact_envelope_without_rewrite(
@@ -294,6 +374,51 @@ def test_cli_attests_exact_open_codex_session_metadata(tmp_path: Path) -> None:
     assert authoritative == projection
     assert authoritative["model_id"] == "gpt-5.6-sol"
     assert authoritative["model_metadata_source"] == "x-codex-turn-metadata"
+
+
+def test_cli_attests_exact_open_cursor_session_metadata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root, config = _seed_project(tmp_path)
+    conversation_id = "12a16794-f84d-457f-81b4-8e803034e4d5"
+    monkeypatch.setenv("CURSOR_CONVERSATION_ID", conversation_id)
+    opened = _invoke_open(
+        config,
+        "--harness-name",
+        "cursor",
+        "--harness-id",
+        "E",
+        "--init-keyword",
+        "::init gtkb lo",
+        "--role",
+        "loyal-opposition",
+    )
+    assert opened.exit_code == 0, opened.output
+    assert json.loads(opened.output)["session_id"] == conversation_id
+
+    result = _invoke_attest(
+        config,
+        conversation_id,
+        "--model",
+        "gpt-5.6-terra",
+        "--reasoning-effort",
+        "xhigh",
+        "--thread-source",
+        "cursor-agent-runtime",
+        "--harness-name",
+        "cursor",
+        "--harness-id",
+        "E",
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["session_id"] == conversation_id
+    assert payload["model_id"] == "gpt-5.6-terra"
+    assert payload["model_metadata_source"] == "cursor-conversation-metadata"
+    authoritative = json.loads(
+        worker_session_envelope_path(root, "cursor", conversation_id).read_text(encoding="utf-8")
+    )
+    assert authoritative["model_configuration"] == "reasoning_effort=xhigh; thread_source=cursor-agent-runtime"
+    assert authoritative["model_metadata_source"] == "cursor-conversation-metadata"
 
 
 @pytest.mark.parametrize(

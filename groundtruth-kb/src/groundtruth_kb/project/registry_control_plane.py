@@ -2297,7 +2297,8 @@ def consume_observation_capability(
 
 def append_passive_observation(
     *,
-    target_paths: Sequence[str | Path],
+    target_paths: Sequence[str | Path] = (),
+    record_ids: Sequence[str] = (),
     evidence_view: Literal["working_tree", "git_index"] = "working_tree",
     evidence_source_reference: str | None = None,
     actor_session: str = "unattributed_external",
@@ -2312,7 +2313,10 @@ def append_passive_observation(
 
     This API is intentionally capability-free because it is an after-the-fact
     observer. It can record only present content at an already-registered
-    locator; identity transitions remain outside its authority.
+    locator; identity transitions remain outside its authority. ``record_ids``
+    selects declarations exactly and may be combined with path resolution. It
+    exists for aggregate declarations whose locator is a glob rather than a
+    concrete member path.
     """
 
     paths = RegistryPaths.resolve(
@@ -2324,7 +2328,9 @@ def append_passive_observation(
     with _RegistryFileLock(paths.lock_path):
         _ensure_no_nonterminal_journal(paths.db_path)
         snapshot = _load_snapshot_unlocked(paths)
-        normalized = _normalize_event_paths(paths.project_root, target_paths)
+        if not target_paths and not record_ids:
+            raise RegistryAuthorizationError("passive observation requires target_paths or exact record_ids")
+        normalized = _normalize_event_paths(paths.project_root, target_paths) if target_paths else ()
         records: dict[str, SoTArtifact] = {}
         for relative in normalized:
             record = snapshot.resolver.resolve(relative)
@@ -2334,6 +2340,29 @@ def append_passive_observation(
             if not target.exists() and not target.is_symlink():
                 raise RegistryAuthorizationError(
                     f"passive observation cannot record a missing identity transition: {relative}"
+                )
+            records[record.id] = record
+        records_by_id = {record.id: record for record in snapshot.records}
+        for raw_record_id in record_ids:
+            record_id = str(raw_record_id).strip()
+            record = records_by_id.get(record_id)
+            if not record_id or record is None:
+                raise RegistryAuthorizationError(
+                    f"passive observation record is unregistered: {record_id or raw_record_id!s}"
+                )
+            if record.coverage_mode == "virtual":
+                raise RegistryAuthorizationError(f"passive observation cannot record a virtual identity: {record_id}")
+            if record.coverage_mode == "glob":
+                try:
+                    present = any(paths.project_root.glob(record.storage_path))
+                except (NotImplementedError, OSError, ValueError):
+                    present = False
+            else:
+                target = paths.project_root / record.storage_path.rstrip("/")
+                present = target.exists() or target.is_symlink()
+            if not present:
+                raise RegistryAuthorizationError(
+                    f"passive observation cannot record a missing identity transition: {record.storage_path}"
                 )
             records[record.id] = record
         conn = sqlite3.connect(str(paths.db_path))
@@ -2542,6 +2571,11 @@ def _bridge_aggregate_digest_without_target(
     return _json_digest(entries)
 
 
+def _bridge_publication_quarantine_path(project_root: Path, capability_hash: str) -> Path:
+    digest = capability_hash.removeprefix("sha256:")
+    return project_root / ".gtkb-state" / "bridge-publication-recovery" / f"{digest}.rollback"
+
+
 def _mark_bridge_publication_recovery_required(
     conn: sqlite3.Connection,
     capability_hash: str,
@@ -2554,6 +2588,54 @@ def _mark_bridge_publication_recovery_required(
         (reason, capability_hash),
     )
     conn.commit()
+
+
+def _mark_bridge_publication_recovery_required_with_observation(
+    conn: sqlite3.Connection,
+    *,
+    project_root: Path,
+    aggregate_record: SoTArtifact,
+    capability_hash: str,
+    document_name: str,
+    session_id: str,
+    changed_by: str,
+    reason: str,
+) -> str:
+    """Preserve a recovery failure and truthfully observe the retained aggregate."""
+
+    if conn.in_transaction:
+        conn.rollback()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        updated = conn.execute(
+            "UPDATE sot_registry_bridge_publication_capabilities "
+            "SET capability_state = 'recovery_required', failure_reason = ? "
+            "WHERE capability_hash = ?",
+            (reason, capability_hash),
+        )
+        if updated.rowcount != 1:
+            raise RegistryAuthorizationError("bridge publication recovery audit row disappeared")
+        revision_id = _append_revision(
+            conn,
+            project_root=project_root,
+            record=aggregate_record,
+            actor_session=session_id,
+            operation="direct_in_place_content_change",
+            changed_by=changed_by,
+            changed_at=_utc_now(),
+            change_reason=reason,
+            capability_hash=capability_hash,
+            bridge_id=document_name,
+            evidence_view="working_tree",
+            evidence_source_reference=capability_hash,
+        )
+        conn.commit()
+        return revision_id
+    except Exception:
+        if conn.in_transaction:
+            conn.rollback()
+        _mark_bridge_publication_recovery_required(conn, capability_hash, reason)
+        raise
 
 
 def mint_bridge_publication_capability(
@@ -2846,6 +2928,468 @@ def consume_bridge_publication_capability(
     )
 
 
+def recover_bridge_publication(
+    *,
+    target_path: str | Path,
+    session_id: str,
+    mode: Literal["finalize", "rollback"],
+    changed_by: str,
+    change_reason: str,
+    expected_capability_hash: str | None = None,
+    expected_content_digest: str | None = None,
+    expected_document_name: str | None = None,
+    expected_version: int | None = None,
+    expected_status: str | None = None,
+    project_root: Path | None = None,
+    registry_path: Path | None = None,
+    packaged_registry_path: Path | None = None,
+    db_path: Path | None = None,
+) -> BridgePublicationReceipt:
+    """Recover an exact crashed bridge publication without exposing its secret."""
+
+    if mode not in {"finalize", "rollback"}:
+        raise RegistryAuthorizationError("bridge publication recovery mode must be finalize or rollback")
+    if not session_id or not changed_by or not change_reason:
+        raise RegistryAuthorizationError("bridge publication recovery bindings must be non-empty")
+    paths = RegistryPaths.resolve(
+        project_root=project_root,
+        registry_path=registry_path,
+        packaged_registry_path=packaged_registry_path,
+        db_path=db_path,
+    )
+    normalized = _normalize_event_paths(paths.project_root, [target_path])
+    if len(normalized) != 1:
+        raise RegistryAuthorizationError("bridge publication recovery requires one exact target")
+    requested_target = normalized[0]
+
+    with _RegistryFileLock(paths.lock_path):
+        _ensure_no_nonterminal_journal(paths.db_path)
+        snapshot = _load_snapshot_unlocked(paths)
+        conn = sqlite3.connect(str(paths.db_path))
+        conn.row_factory = sqlite3.Row
+        target: Path | None = None
+        quarantine: Path | None = None
+        quarantine_moved = False
+        rollback_committed = False
+        try:
+            ensure_control_plane_schema(conn)
+            conn.commit()
+            if expected_capability_hash:
+                row = conn.execute(
+                    "SELECT * FROM sot_registry_bridge_publication_capabilities "
+                    "WHERE capability_hash = ? AND target_path = ? AND claim_session = ?",
+                    (expected_capability_hash, requested_target, session_id),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT * FROM sot_registry_bridge_publication_capabilities "
+                    "WHERE target_path = ? AND claim_session = ? ORDER BY rowid DESC LIMIT 1",
+                    (requested_target, session_id),
+                ).fetchone()
+            if row is None:
+                raise RegistryAuthorizationError("exact bridge publication recovery row was not found")
+            expected_bindings = {
+                "capability_hash": expected_capability_hash,
+                "content_digest": expected_content_digest,
+                "document_name": expected_document_name,
+                "version": expected_version,
+                "status": expected_status,
+            }
+            mismatched = [
+                name
+                for name, expected in expected_bindings.items()
+                if expected is not None and str(row[name]) != str(expected)
+            ]
+            if mismatched:
+                raise RegistryAuthorizationError(
+                    "bridge publication recovery sidecar binding mismatch: " + ", ".join(sorted(mismatched))
+                )
+            relative, target = _bridge_publication_target(
+                paths.project_root,
+                document_name=row["document_name"],
+                version=int(row["version"]),
+                target_path=target_path,
+            )
+            if relative != row["target_path"]:
+                raise RegistryAuthorizationError("bridge publication recovery target binding mismatch")
+            capability_hash = row["capability_hash"]
+            state = row["capability_state"]
+            quarantine = _bridge_publication_quarantine_path(paths.project_root, capability_hash)
+            aggregate_record = _bridge_aggregate_record(snapshot, relative)
+            latest = _latest_artifact_revision(conn, aggregate_record.id)
+            if latest is None:
+                raise RegistryRecoveryRequired("bridge aggregate has no recovery revision")
+
+            target_present = target.exists() or target.is_symlink()
+            quarantine_present = quarantine.exists() or quarantine.is_symlink()
+            if quarantine_present:
+                if quarantine.is_symlink() or not quarantine.is_file():
+                    raise RegistryRecoveryRequired("bridge publication rollback quarantine is not a regular file")
+                if _hash_file(quarantine) != row["content_digest"]:
+                    raise RegistryRecoveryRequired("bridge publication rollback quarantine bytes are not exact")
+                if target_present:
+                    raise RegistryRecoveryRequired(
+                        "bridge publication recovery found both target and rollback quarantine"
+                    )
+                if mode == "finalize":
+                    raise RegistryRecoveryRequired(
+                        "bridge publication finalize found an interrupted rollback quarantine"
+                    )
+            if target_present:
+                if target.is_symlink() or not target.is_file():
+                    failure = "bridge publication recovery target is not a regular file"
+                    if mode == "rollback":
+                        _mark_bridge_publication_recovery_required_with_observation(
+                            conn,
+                            project_root=paths.project_root,
+                            aggregate_record=aggregate_record,
+                            capability_hash=capability_hash,
+                            document_name=row["document_name"],
+                            session_id=session_id,
+                            changed_by=changed_by,
+                            reason=failure,
+                        )
+                        raise RegistryRecoveryRequired(failure)
+                    raise RegistryAuthorizationError(failure)
+                if _hash_file(target) != row["content_digest"]:
+                    failure = "bridge publication recovery target bytes do not match the exact row"
+                    if mode == "rollback":
+                        _mark_bridge_publication_recovery_required_with_observation(
+                            conn,
+                            project_root=paths.project_root,
+                            aggregate_record=aggregate_record,
+                            capability_hash=capability_hash,
+                            document_name=row["document_name"],
+                            session_id=session_id,
+                            changed_by=changed_by,
+                            reason=failure,
+                        )
+                        raise RegistryRecoveryRequired(failure)
+                    raise RegistryAuthorizationError(failure)
+
+            if mode == "finalize":
+                if state == "consumed":
+                    if not target_present:
+                        raise RegistryAuthorizationError("consumed bridge publication recovery target is missing")
+                    revision = conn.execute(
+                        "SELECT content_digest FROM sot_artifact_revisions WHERE revision_id = ?",
+                        (row["revision_id"],),
+                    ).fetchone()
+                    if revision is None:
+                        raise RegistryRecoveryRequired("consumed bridge publication recovery revision is missing")
+                    aggregate_digest, _, _ = artifact_content_state(
+                        paths.project_root,
+                        aggregate_record,
+                    )
+                    final_currentness = registry_currentness(
+                        snapshot,
+                        project_root=paths.project_root,
+                        db_path=paths.db_path,
+                        record_ids={aggregate_record.id},
+                    )
+                    if not final_currentness["current"]:
+                        raise RegistryRecoveryRequired(
+                            f"idempotent bridge publication finalize found stale aggregate: {final_currentness}"
+                        )
+                    return BridgePublicationReceipt(
+                        capability_hash=capability_hash,
+                        revision_id=row["revision_id"],
+                        target_path=relative,
+                        aggregate_digest=aggregate_digest,
+                        capability_state="consumed",
+                    )
+                if state not in {"minted", "expired"}:
+                    raise RegistryAuthorizationError(f"bridge publication cannot be finalized from {state}")
+                if not target_present:
+                    raise RegistryAuthorizationError("bridge publication recovery target is missing")
+                predicted = _bridge_aggregate_digest_without_target(
+                    paths.project_root,
+                    aggregate_record,
+                    target,
+                )
+                if predicted != row["aggregate_preimage_digest"]:
+                    raise RegistryRecoveryRequired(
+                        "bridge publication finalize cannot prove its exact aggregate preimage"
+                    )
+                if latest["content_digest"] != row["aggregate_preimage_digest"]:
+                    raise RegistryRecoveryRequired(
+                        "bridge publication finalize no longer has its aggregate preimage revision"
+                    )
+                aggregate_digest, _, _ = artifact_content_state(paths.project_root, aggregate_record)
+                if _hash_file(target) != row["content_digest"]:
+                    raise RegistryRecoveryRequired(
+                        "bridge publication finalize target changed during aggregate observation"
+                    )
+                confirmed_aggregate_digest, _, _ = artifact_content_state(
+                    paths.project_root,
+                    aggregate_record,
+                )
+                if confirmed_aggregate_digest != aggregate_digest or _hash_file(target) != row["content_digest"]:
+                    raise RegistryRecoveryRequired(
+                        "bridge publication finalize aggregate changed during stable observation"
+                    )
+                now = _utc_now()
+                conn.execute("BEGIN IMMEDIATE")
+                revision_id = _append_revision(
+                    conn,
+                    project_root=paths.project_root,
+                    record=aggregate_record,
+                    actor_session=session_id,
+                    operation=_BRIDGE_PUBLICATION_AUTHORITY_KIND,
+                    changed_by=changed_by,
+                    changed_at=now,
+                    change_reason=change_reason,
+                    capability_hash=capability_hash,
+                    bridge_id=row["document_name"],
+                    evidence_view="recovery",
+                    evidence_source_reference=capability_hash,
+                )
+                result_digest = _json_digest(
+                    {
+                        "target_path": relative,
+                        "content_digest": row["content_digest"],
+                        "aggregate_digest": aggregate_digest,
+                        "transition_digest": row["transition_digest"],
+                        "compliance_digest": row["compliance_digest"],
+                        "revision_id": revision_id,
+                    }
+                )
+                updated = conn.execute(
+                    "UPDATE sot_registry_bridge_publication_capabilities "
+                    "SET capability_state = 'consumed', consumed_at = ?, result_digest = ?, "
+                    "revision_id = ?, failure_reason = NULL "
+                    "WHERE capability_hash = ? AND capability_state = ?",
+                    (now, result_digest, revision_id, capability_hash, state),
+                )
+                if updated.rowcount != 1:
+                    raise RegistryAuthorizationError("bridge publication recovery lost its finalize single-use race")
+                conn.commit()
+                final_currentness = registry_currentness(
+                    snapshot,
+                    project_root=paths.project_root,
+                    db_path=paths.db_path,
+                    record_ids={aggregate_record.id},
+                )
+                if not final_currentness["current"]:
+                    raise RegistryRecoveryRequired(f"recovered bridge publication remains stale: {final_currentness}")
+                return BridgePublicationReceipt(
+                    capability_hash=capability_hash,
+                    revision_id=revision_id,
+                    target_path=relative,
+                    aggregate_digest=aggregate_digest,
+                    capability_state="consumed",
+                )
+
+            if state == "compensated":
+                if target_present:
+                    raise RegistryRecoveryRequired("compensated bridge publication recovery target unexpectedly exists")
+                observed, _, _ = artifact_content_state(paths.project_root, aggregate_record)
+                if observed != row["aggregate_preimage_digest"] or latest["content_digest"] != observed:
+                    raise RegistryRecoveryRequired(
+                        "idempotent bridge publication rollback no longer matches its aggregate preimage"
+                    )
+                final_currentness = registry_currentness(
+                    snapshot,
+                    project_root=paths.project_root,
+                    db_path=paths.db_path,
+                    record_ids={aggregate_record.id},
+                )
+                if not final_currentness["current"]:
+                    raise RegistryRecoveryRequired(
+                        f"idempotent bridge publication rollback found stale aggregate: {final_currentness}"
+                    )
+                if quarantine_present:
+                    quarantine.unlink()
+                return BridgePublicationReceipt(
+                    capability_hash=capability_hash,
+                    revision_id=row["compensation_revision_id"],
+                    target_path=relative,
+                    aggregate_digest=observed,
+                    capability_state="compensated",
+                )
+            if state not in {"minted", "expired", "consumed"}:
+                raise RegistryAuthorizationError(f"bridge publication cannot be rolled back from {state}")
+            predicted = _bridge_aggregate_digest_without_target(
+                paths.project_root,
+                aggregate_record,
+                target,
+            )
+            if predicted != row["aggregate_preimage_digest"]:
+                failure = "bridge publication rollback cannot restore its exact aggregate preimage"
+                _mark_bridge_publication_recovery_required_with_observation(
+                    conn,
+                    project_root=paths.project_root,
+                    aggregate_record=aggregate_record,
+                    capability_hash=capability_hash,
+                    document_name=row["document_name"],
+                    session_id=session_id,
+                    changed_by=changed_by,
+                    reason=failure,
+                )
+                raise RegistryRecoveryRequired(failure)
+            if state in {"minted", "expired"}:
+                if latest["content_digest"] != row["aggregate_preimage_digest"]:
+                    failure = "unconsumed bridge publication no longer has its aggregate preimage"
+                    _mark_bridge_publication_recovery_required_with_observation(
+                        conn,
+                        project_root=paths.project_root,
+                        aggregate_record=aggregate_record,
+                        capability_hash=capability_hash,
+                        document_name=row["document_name"],
+                        session_id=session_id,
+                        changed_by=changed_by,
+                        reason=failure,
+                    )
+                    raise RegistryRecoveryRequired(failure)
+            elif latest["revision_id"] != row["revision_id"]:
+                failure = "another bridge aggregate revision followed the publication"
+                _mark_bridge_publication_recovery_required_with_observation(
+                    conn,
+                    project_root=paths.project_root,
+                    aggregate_record=aggregate_record,
+                    capability_hash=capability_hash,
+                    document_name=row["document_name"],
+                    session_id=session_id,
+                    changed_by=changed_by,
+                    reason=failure,
+                )
+                raise RegistryRecoveryRequired(failure)
+
+            quarantine_moved = quarantine_present
+            if target_present:
+                quarantine.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(target, quarantine)
+                quarantine_moved = True
+                if _hash_file(quarantine) != row["content_digest"]:
+                    if not target.exists() and not target.is_symlink():
+                        os.replace(quarantine, target)
+                        quarantine_moved = False
+                    failure = "bridge publication rollback target changed before atomic quarantine"
+                    _mark_bridge_publication_recovery_required_with_observation(
+                        conn,
+                        project_root=paths.project_root,
+                        aggregate_record=aggregate_record,
+                        capability_hash=capability_hash,
+                        document_name=row["document_name"],
+                        session_id=session_id,
+                        changed_by=changed_by,
+                        reason=failure,
+                    )
+                    raise RegistryRecoveryRequired(failure)
+            now = _utc_now()
+            conn.execute("BEGIN IMMEDIATE")
+            observed, _, _ = artifact_content_state(paths.project_root, aggregate_record)
+            if observed != row["aggregate_preimage_digest"]:
+                raise RegistryRecoveryRequired("bridge aggregate changed during recovery rollback")
+            compensation_revision_id: str | None = None
+            if latest["content_digest"] != observed:
+                compensation_revision_id = _append_revision(
+                    conn,
+                    project_root=paths.project_root,
+                    record=aggregate_record,
+                    actor_session=session_id,
+                    operation="bridge_publication_compensation",
+                    changed_by=changed_by,
+                    changed_at=now,
+                    change_reason=change_reason,
+                    capability_hash=capability_hash,
+                    bridge_id=row["document_name"],
+                    evidence_view="recovery",
+                    evidence_source_reference=capability_hash,
+                )
+            compensation_digest = _json_digest(
+                {
+                    "target_path": relative,
+                    "restored_aggregate_digest": observed,
+                    "reason": change_reason,
+                    "compensation_revision_id": compensation_revision_id,
+                }
+            )
+            updated = conn.execute(
+                "UPDATE sot_registry_bridge_publication_capabilities "
+                "SET capability_state = 'compensated', consumed_at = COALESCE(consumed_at, ?), "
+                "compensation_revision_id = ?, compensation_digest = ?, failure_reason = ? "
+                "WHERE capability_hash = ? AND capability_state = ?",
+                (
+                    now,
+                    compensation_revision_id,
+                    compensation_digest,
+                    change_reason,
+                    capability_hash,
+                    state,
+                ),
+            )
+            if updated.rowcount != 1:
+                raise RegistryAuthorizationError("bridge publication recovery lost its rollback single-use race")
+            conn.commit()
+            rollback_committed = True
+            if quarantine_moved:
+                quarantine.unlink()
+                quarantine_moved = False
+        except Exception as exc:
+            if conn.in_transaction:
+                conn.rollback()
+            if rollback_committed:
+                raise
+            if quarantine_moved and quarantine is not None and target is not None and not target.exists():
+                try:
+                    os.replace(quarantine, target)
+                    quarantine_moved = False
+                    if _hash_file(target) != row["content_digest"]:
+                        raise OSError("restored bytes differ")
+                except OSError as restore_exc:
+                    try:
+                        _mark_bridge_publication_recovery_required(
+                            conn,
+                            capability_hash,
+                            f"recovery rollback restoration failed: {restore_exc}",
+                        )
+                    finally:
+                        raise RegistryRecoveryRequired(
+                            "bridge publication recovery failed and exact file restoration failed"
+                        ) from exc
+                _mark_bridge_publication_recovery_required_with_observation(
+                    conn,
+                    project_root=paths.project_root,
+                    aggregate_record=aggregate_record,
+                    capability_hash=capability_hash,
+                    document_name=row["document_name"],
+                    session_id=session_id,
+                    changed_by=changed_by,
+                    reason=f"recovery rollback failed after exact file restoration: {exc}",
+                )
+            elif quarantine_moved and quarantine is not None and target is not None:
+                _mark_bridge_publication_recovery_required_with_observation(
+                    conn,
+                    project_root=paths.project_root,
+                    aggregate_record=aggregate_record,
+                    capability_hash=capability_hash,
+                    document_name=row["document_name"],
+                    session_id=session_id,
+                    changed_by=changed_by,
+                    reason=f"recovery rollback failed with exact file retained: {exc}",
+                )
+            raise
+        finally:
+            conn.close()
+
+        final_currentness = registry_currentness(
+            snapshot,
+            project_root=paths.project_root,
+            db_path=paths.db_path,
+            record_ids={aggregate_record.id},
+        )
+        if not final_currentness["current"]:
+            raise RegistryRecoveryRequired(f"bridge publication recovery rollback remains stale: {final_currentness}")
+    return BridgePublicationReceipt(
+        capability_hash=capability_hash,
+        revision_id=compensation_revision_id,
+        target_path=relative,
+        aggregate_digest=observed,
+        capability_state="compensated",
+    )
+
+
 def compensate_bridge_publication(
     *,
     capability: str,
@@ -2875,6 +3419,7 @@ def compensate_bridge_publication(
         conn = sqlite3.connect(str(paths.db_path))
         conn.row_factory = sqlite3.Row
         deleted_bytes: bytes | None = None
+        candidate_bytes: bytes | None = None
         target: Path | None = None
         try:
             ensure_control_plane_schema(conn)
@@ -2906,12 +3451,30 @@ def compensate_bridge_publication(
             if target.exists() or target.is_symlink():
                 if target.is_symlink() or not target.is_file():
                     failure = "bridge publication compensation target is not a regular file"
-                    _mark_bridge_publication_recovery_required(conn, capability_hash, failure)
+                    _mark_bridge_publication_recovery_required_with_observation(
+                        conn,
+                        project_root=paths.project_root,
+                        aggregate_record=aggregate_record,
+                        capability_hash=capability_hash,
+                        document_name=row["document_name"],
+                        session_id=session_id,
+                        changed_by=changed_by,
+                        reason=failure,
+                    )
                     raise RegistryRecoveryRequired(failure)
-                deleted_bytes = target.read_bytes()
-                if _sha256_bytes(deleted_bytes) != row["content_digest"]:
+                candidate_bytes = target.read_bytes()
+                if _sha256_bytes(candidate_bytes) != row["content_digest"]:
                     failure = "bridge publication compensation target bytes changed"
-                    _mark_bridge_publication_recovery_required(conn, capability_hash, failure)
+                    _mark_bridge_publication_recovery_required_with_observation(
+                        conn,
+                        project_root=paths.project_root,
+                        aggregate_record=aggregate_record,
+                        capability_hash=capability_hash,
+                        document_name=row["document_name"],
+                        session_id=session_id,
+                        changed_by=changed_by,
+                        reason=failure,
+                    )
                     raise RegistryRecoveryRequired(failure)
             predicted = _bridge_aggregate_digest_without_target(
                 paths.project_root,
@@ -2920,18 +3483,46 @@ def compensate_bridge_publication(
             )
             if predicted != row["aggregate_preimage_digest"]:
                 failure = "bridge publication aggregate preimage cannot be restored exactly"
-                _mark_bridge_publication_recovery_required(conn, capability_hash, failure)
+                _mark_bridge_publication_recovery_required_with_observation(
+                    conn,
+                    project_root=paths.project_root,
+                    aggregate_record=aggregate_record,
+                    capability_hash=capability_hash,
+                    document_name=row["document_name"],
+                    session_id=session_id,
+                    changed_by=changed_by,
+                    reason=failure,
+                )
                 raise RegistryRecoveryRequired(failure)
             if row["capability_state"] == "minted":
                 if latest["content_digest"] != row["aggregate_preimage_digest"]:
                     failure = "minted bridge publication no longer has its aggregate preimage"
-                    _mark_bridge_publication_recovery_required(conn, capability_hash, failure)
+                    _mark_bridge_publication_recovery_required_with_observation(
+                        conn,
+                        project_root=paths.project_root,
+                        aggregate_record=aggregate_record,
+                        capability_hash=capability_hash,
+                        document_name=row["document_name"],
+                        session_id=session_id,
+                        changed_by=changed_by,
+                        reason=failure,
+                    )
                     raise RegistryRecoveryRequired(failure)
             elif latest["revision_id"] != row["revision_id"]:
                 failure = "another bridge aggregate revision followed the publication"
-                _mark_bridge_publication_recovery_required(conn, capability_hash, failure)
+                _mark_bridge_publication_recovery_required_with_observation(
+                    conn,
+                    project_root=paths.project_root,
+                    aggregate_record=aggregate_record,
+                    capability_hash=capability_hash,
+                    document_name=row["document_name"],
+                    session_id=session_id,
+                    changed_by=changed_by,
+                    reason=failure,
+                )
                 raise RegistryRecoveryRequired(failure)
 
+            deleted_bytes = candidate_bytes
             now = _utc_now()
             conn.execute("BEGIN IMMEDIATE")
             if deleted_bytes is not None:
@@ -2991,6 +3582,27 @@ def compensate_bridge_publication(
                         raise RegistryRecoveryRequired(
                             "bridge publication compensation failed and exact file restoration failed"
                         ) from exc
+                _mark_bridge_publication_recovery_required_with_observation(
+                    conn,
+                    project_root=paths.project_root,
+                    aggregate_record=aggregate_record,
+                    capability_hash=capability_hash,
+                    document_name=row["document_name"],
+                    session_id=session_id,
+                    changed_by=changed_by,
+                    reason=f"compensation failed after exact file restoration: {exc}",
+                )
+            elif deleted_bytes is not None and target is not None:
+                _mark_bridge_publication_recovery_required_with_observation(
+                    conn,
+                    project_root=paths.project_root,
+                    aggregate_record=aggregate_record,
+                    capability_hash=capability_hash,
+                    document_name=row["document_name"],
+                    session_id=session_id,
+                    changed_by=changed_by,
+                    reason=f"compensation failed with exact file retained: {exc}",
+                )
             raise
         finally:
             conn.close()

@@ -16,6 +16,7 @@ import sys
 import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -881,11 +882,98 @@ def _hunk_patch_covered_paths(
 @dataclass(frozen=True)
 class _PendingBridgePublication:
     capability: str
+    capability_hash: str
     target_path: str
     session_id: str
+    content_digest: str
+    document_name: str
+    version: int
+    status: str
 
 
 _PENDING_BRIDGE_PUBLICATIONS: dict[str, _PendingBridgePublication] = {}
+
+
+def _pending_publication_sidecar_path(target: Path, project_root: Path) -> Path:
+    try:
+        relative = target.resolve().relative_to(project_root.resolve()).as_posix()
+    except ValueError as exc:
+        raise BridgePublicationError(f"pending bridge target escapes project root: {target}") from exc
+    digest = hashlib.sha256(relative.encode("utf-8")).hexdigest()[:16]
+    return project_root / ".gtkb-state" / "bridge-publication-pending" / f"{target.stem}-{digest}.json"
+
+
+def _write_pending_publication_sidecar(
+    publication: _PendingBridgePublication,
+    *,
+    target: Path,
+    project_root: Path,
+) -> Path:
+    """Persist secret-free recovery context before the bridge file is created."""
+
+    sidecar = _pending_publication_sidecar_path(target, project_root)
+    payload = {
+        "schema_version": 1,
+        "capability_hash": publication.capability_hash,
+        "content_digest": publication.content_digest,
+        "created_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "document_name": publication.document_name,
+        "session_id": publication.session_id,
+        "status": publication.status,
+        "target_path": publication.target_path,
+        "version": publication.version,
+    }
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_name = tempfile.mkstemp(prefix=sidecar.name + ".", suffix=".tmp", dir=sidecar.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(payload, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, sidecar)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
+    return sidecar
+
+
+def _load_pending_publication_sidecar(target: Path, project_root: Path) -> dict[str, object] | None:
+    sidecar = _pending_publication_sidecar_path(target, project_root)
+    if not sidecar.is_file():
+        return None
+    try:
+        payload = json.loads(sidecar.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError) as exc:
+        raise BridgePublicationError(f"pending bridge publication sidecar is unreadable: {sidecar}") from exc
+    if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+        raise BridgePublicationError(f"pending bridge publication sidecar is malformed: {sidecar}")
+    expected = target.resolve().relative_to(project_root.resolve()).as_posix()
+    if str(payload.get("target_path") or "") != expected:
+        raise BridgePublicationError("pending bridge publication sidecar target binding mismatch")
+    document_name = str(payload.get("document_name") or "")
+    status = str(payload.get("status") or "")
+    session_id = str(payload.get("session_id") or "")
+    capability_hash = str(payload.get("capability_hash") or "")
+    content_digest = str(payload.get("content_digest") or "")
+    version = payload.get("version")
+    if (
+        not document_name
+        or status not in VALID_STATUSES
+        or not session_id
+        or not re.fullmatch(r"sha256:[0-9a-f]{64}", capability_hash)
+        or not re.fullmatch(r"sha256:[0-9a-f]{64}", content_digest)
+        or not isinstance(version, int)
+        or version < 1
+        or expected != f"bridge/{document_name}-{version:03d}.md"
+    ):
+        raise BridgePublicationError("pending bridge publication sidecar bindings are malformed")
+    return payload
+
+
+def _delete_pending_publication_sidecar(target: Path, project_root: Path) -> None:
+    _pending_publication_sidecar_path(target, project_root).unlink(missing_ok=True)
 
 
 def _registry_publication_enabled(project_root: Path) -> bool:
@@ -950,6 +1038,10 @@ def _compensate_publication(
             changed_by="bridge-publication-writer",
             project_root=project_root,
         )
+        _delete_pending_publication_sidecar(
+            project_root / publication.target_path,
+            project_root,
+        )
     except Exception as exc:
         raise BridgePublicationError(
             "BRIDGE_PUBLICATION_REPAIR_REQUIRED: compensation could not restore the "
@@ -963,6 +1055,31 @@ def finalize_pending_bridge_publication(target: Path, project_root: Path) -> Non
     key = str(target.resolve())
     publication = _PENDING_BRIDGE_PUBLICATIONS.get(key)
     if publication is None:
+        pending = _load_pending_publication_sidecar(target, project_root)
+        if pending is not None and _registry_publication_enabled(project_root):
+            from groundtruth_kb.project.registry_control_plane import recover_bridge_publication
+
+            session_id = str(pending.get("session_id") or "")
+            receipt = recover_bridge_publication(
+                target_path=str(pending.get("target_path") or ""),
+                session_id=session_id,
+                mode="finalize",
+                changed_by="bridge-publication-writer",
+                change_reason="Recover interrupted bridge publication after outer commit",
+                expected_capability_hash=str(pending.get("capability_hash") or ""),
+                expected_content_digest=str(pending.get("content_digest") or ""),
+                expected_document_name=str(pending.get("document_name") or ""),
+                expected_version=int(pending.get("version") or 0),
+                expected_status=str(pending.get("status") or ""),
+                project_root=project_root,
+            )
+            document_name = Path(receipt.target_path).name.rsplit("-", 1)[0]
+            _release_claim(project_root, document_name, session_id)
+            try:
+                _delete_pending_publication_sidecar(target, project_root)
+            except OSError:
+                pass
+            return
         content = target.read_text(encoding="utf-8")
         session_id, _ = _publication_author_session(content)
         holder = _claim_holder(project_root, target.name.rsplit("-", 1)[0])
@@ -971,6 +1088,10 @@ def finalize_pending_bridge_publication(target: Path, project_root: Path) -> Non
         return
     document_name = Path(publication.target_path).name.rsplit("-", 1)[0]
     _release_claim(project_root, document_name, publication.session_id)
+    try:
+        _delete_pending_publication_sidecar(target, project_root)
+    except OSError:
+        pass
     _PENDING_BRIDGE_PUBLICATIONS.pop(key, None)
 
 
@@ -988,9 +1109,29 @@ def rollback_pending_bridge_publication(
         if not _registry_publication_enabled(project_root):
             target.unlink(missing_ok=True)
             return
-        raise BridgePublicationError(
-            "BRIDGE_PUBLICATION_REPAIR_REQUIRED: pending capability context is unavailable; file and claim are retained"
+        pending = _load_pending_publication_sidecar(target, project_root)
+        if pending is None:
+            raise BridgePublicationError(
+                "BRIDGE_PUBLICATION_REPAIR_REQUIRED: pending capability context is unavailable; "
+                "file and claim are retained"
+            )
+        from groundtruth_kb.project.registry_control_plane import recover_bridge_publication
+
+        recover_bridge_publication(
+            target_path=str(pending.get("target_path") or ""),
+            session_id=str(pending.get("session_id") or ""),
+            mode="rollback",
+            changed_by="bridge-publication-writer",
+            change_reason=reason,
+            expected_capability_hash=str(pending.get("capability_hash") or ""),
+            expected_content_digest=str(pending.get("content_digest") or ""),
+            expected_document_name=str(pending.get("document_name") or ""),
+            expected_version=int(pending.get("version") or 0),
+            expected_status=str(pending.get("status") or ""),
+            project_root=project_root,
         )
+        _delete_pending_publication_sidecar(target, project_root)
+        return
     _compensate_publication(publication=publication, project_root=project_root, reason=reason)
     _PENDING_BRIDGE_PUBLICATIONS.pop(key, None)
 
@@ -1076,9 +1217,32 @@ def write_bridge_file(
             raise BridgePublicationError(f"typed bridge publication authorization failed: {exc}") from exc
         publication = _PendingBridgePublication(
             capability=str(minted["capability"]),
+            capability_hash=str(
+                minted.get("capability_hash")
+                or "sha256:" + hashlib.sha256(str(minted["capability"]).encode("utf-8")).hexdigest()
+            ),
             target_path=str(minted["target_path"]),
             session_id=session_id,
+            content_digest=str(
+                minted.get("content_digest") or "sha256:" + hashlib.sha256(content_to_write.encode("utf-8")).hexdigest()
+            ),
+            document_name=document_name,
+            version=version,
+            status=status,
         )
+        try:
+            _write_pending_publication_sidecar(
+                publication,
+                target=target,
+                project_root=project_root,
+            )
+        except Exception as exc:
+            _compensate_publication(
+                publication=publication,
+                project_root=project_root,
+                reason=f"pending publication sidecar write failed: {exc}",
+            )
+            raise BridgePublicationError(f"pending publication sidecar write failed: {exc}") from exc
 
     target.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -1150,6 +1314,10 @@ def write_bridge_file(
                     publication.session_id,
                     claim_registry=claim_registry,
                 )
+                try:
+                    _delete_pending_publication_sidecar(target, project_root)
+                except OSError:
+                    pass
             else:
                 _PENDING_BRIDGE_PUBLICATIONS[str(target.resolve())] = publication
         except Exception as exc:

@@ -71,6 +71,20 @@ def staged_python_files(root: Path) -> list[str]:
     return [line.strip() for line in out.stdout.splitlines() if line.strip().endswith(".py")]
 
 
+def _staged_blob(root: Path, path: str) -> bytes | None:
+    """Return the stage-0 bytes for ``path``, or ``None`` on any anomaly."""
+    try:
+        out = subprocess.run(
+            ["git", "-c", "core.quotepath=off", "show", f":0:{path}"],
+            capture_output=True,
+            cwd=str(root),
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out.stdout if out.returncode == 0 else None
+
+
 def _venv_python(search_root: Path) -> Path | None:
     """Return the project venv interpreter path if it exists (Windows/POSIX)."""
     for rel in ("groundtruth-kb/.venv/Scripts/python.exe", "groundtruth-kb/.venv/bin/python"):
@@ -113,18 +127,32 @@ def resolve_ruff(search_root: Path) -> list[str] | None:
 
 
 def check_files(ruff_cmd: list[str], files: list[str], root: Path) -> tuple[bool, str]:
-    """Run ``ruff format --check`` on ``files``. Returns (ok, combined output)."""
-    try:
-        out = subprocess.run(
-            ruff_cmd + ["format", "--check", *files],
-            capture_output=True,
-            text=True,
-            cwd=str(root),
-            timeout=300,
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
-        return False, f"ruff invocation failed: {exc}"
-    return out.returncode == 0, (out.stdout or "") + (out.stderr or "")
+    """Check the staged blob for each path. Return ``(ok, combined_output)``."""
+    failures: list[str] = []
+    for path in files:
+        blob = _staged_blob(root, path)
+        if blob is None:
+            failures.append(f"Unable to read staged blob: {path}")
+            continue
+        try:
+            out = subprocess.run(
+                ruff_cmd + ["format", "--check", "--stdin-filename", path, "-"],
+                input=blob,
+                capture_output=True,
+                cwd=str(root),
+                timeout=300,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            failures.append(f"ruff invocation failed for {path}: {exc}")
+            continue
+        if out.returncode == 0:
+            continue
+        detail = (out.stdout + out.stderr).decode("utf-8", errors="replace").strip()
+        failure = f"Would reformat: {path}"
+        if detail:
+            failure = f"{failure}\n{detail}"
+        failures.append(failure)
+    return not failures, "\n".join(failures)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -163,7 +191,7 @@ def main(argv: list[str] | None = None) -> int:
     print("[FAIL] ruff format: staged Python file(s) would be reformatted:")
     if output.strip():
         print(output.rstrip())
-    print(f"  Remedy: run  ruff format {' '.join(files)}")
+    print(f"  Remedy: run  ruff format {' '.join(files)}  then re-stage (git add) the listed files")
     return 1
 
 

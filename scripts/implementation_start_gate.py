@@ -18,10 +18,12 @@ from typing import Any
 try:
     from scripts.implementation_authorization import (
         AuthorizationError,
+        assess_packet_terminal_evidence,
         canonical_project_root,
         cross_claim_path_collision_reason,
         finalization_target_paths_for_verified,
         normalize_relative_path,
+        packet_path_for_bridge,
         path_authorized_by_target_paths,
         peer_report_dirty_path_collision_reason,
         resolve_work_intent_session_id,
@@ -32,10 +34,12 @@ try:
 except ImportError:  # pragma: no cover - direct script execution path
     from implementation_authorization import (
         AuthorizationError,
+        assess_packet_terminal_evidence,
         canonical_project_root,
         cross_claim_path_collision_reason,
         finalization_target_paths_for_verified,
         normalize_relative_path,
+        packet_path_for_bridge,
         path_authorized_by_target_paths,
         peer_report_dirty_path_collision_reason,
         resolve_work_intent_session_id,
@@ -243,6 +247,13 @@ _HEREDOC_OPENER_RE = re.compile(
     r"(?P<q>['\"])(?P<delim>[A-Za-z_][A-Za-z0-9_]*)(?P=q)"
 )
 _PYTHON_EXECUTABLE_NAMES = {"py", "python", "python.exe"}
+# Placeholder recorded when a command carries a mutating signal but the gate
+# cannot enumerate its concrete targets. It is a sentinel, never a real path.
+UNKNOWN_MUTATING_TARGET = "<unknown-mutating-target>"
+# WI-5694 cycle 2: the canonical Loyal Opposition verdict-finalization helper.
+# Compared against a lowercased, forward-slash-normalized script token suffix so
+# both repo-relative and absolute invocations resolve.
+VERIFICATION_FINALIZATION_HELPER_PATH = ".claude/skills/gtkb-verify/helpers/write_verdict.py"
 _WRAP_DIAGNOSTIC_SCRIPT_NAMES = {
     "wrap_capture_transcript.py",
     "wrap_scan_hygiene.py",
@@ -1487,6 +1498,246 @@ def _post_verified_finalization_clearance(root: Path, payload: dict[str, Any]) -
     )
 
 
+def _arg_values(args: list[str], flag: str) -> list[str]:
+    """Return every value supplied for a repeatable ``--flag value`` / ``--flag=value``."""
+    values: list[str] = []
+    for index, token in enumerate(args):
+        if token == flag and index + 1 < len(args):
+            values.append(args[index + 1])
+        elif token.startswith(flag + "="):
+            values.append(token.split("=", 1)[1])
+    return values
+
+
+def _verification_finalization_corridor(command: str) -> tuple[str, list[str]] | None:
+    """Return ``(slug, include_values)`` for the canonical finalization invocation.
+
+    The corridor key for the WI-5694 cycle-2 terminal-evidence clearance. Returns
+    ``None`` (disqualified) unless ``command`` is a single-stage shell invocation
+    of the canonical Loyal Opposition verdict helper
+    ``.claude/skills/gtkb-verify/helpers/write_verdict.py`` carrying BOTH
+    ``--finalize-verified`` and an explicit ``--slug <bridge-id>``.
+
+    Disqualifiers mirror :func:`_finalization_git_add_targets`: chaining,
+    pipelines, control or command-substitution markers, unparseable tokens, a
+    non-python executable, a different script, a missing ``--finalize-verified``,
+    or a missing/empty ``--slug``. A leading PowerShell call operator (``&``) is
+    accepted because it is the project's documented invocation form; an ``&``
+    token anywhere else disqualifies.
+    """
+    scan_command = command or ""
+    if _has_disqualifying_control_marker(scan_command):
+        return None
+    stages = _split_pipeline_stages(scan_command)
+    if len(stages) != 1:
+        return None
+    raw_tokens = _shell_split(stages[0])
+    if raw_tokens is None:
+        return None
+    tokens = [token for token in (_clean_shell_token(raw) for raw in raw_tokens) if token]
+    if not tokens:
+        return None
+    # A leading PowerShell call operator is the documented invocation form; any
+    # other bare `&` token is a control marker and disqualifies.
+    if tokens[0] == "&":
+        tokens = tokens[1:]
+    if any(token == "&" for token in tokens):
+        return None
+    verb_index = _shell_verb_index(tokens)
+    if verb_index is None:
+        return None
+    relevant = tokens[verb_index:]
+    if len(relevant) < 3:
+        return None
+    executable = _executable_name(relevant[0])
+    if executable not in _PYTHON_EXECUTABLE_NAMES and not executable.startswith("python"):
+        return None
+    script = relevant[1].replace("\\", "/").lower()
+    if script.startswith("./"):
+        script = script[2:]
+    # Suffix match at a path boundary so a sibling such as
+    # `evil.claude/skills/.../write_verdict.py` cannot impersonate the helper.
+    if script != VERIFICATION_FINALIZATION_HELPER_PATH and not script.endswith(
+        "/" + VERIFICATION_FINALIZATION_HELPER_PATH
+    ):
+        return None
+    args = relevant[2:]
+    if "--finalize-verified" not in args:
+        return None
+    slug = (_arg_value(args, "--slug") or "").strip()
+    if not slug:
+        return None
+    return slug, _arg_values(args, "--include")
+
+
+def _verification_finalization_packet_facts(root: Path, bridge_id: str) -> tuple[list[str], str] | None:
+    """Return ``(approved_target_paths, packet_hash)`` from the named packet.
+
+    Read-only. The packet's ``target_path_globs`` are the GO'd proposal's
+    approved ``target_paths`` recorded at packet-creation time; the packet's hash
+    and pinned-GO chain integrity are verified by
+    :func:`assess_packet_terminal_evidence` on the same file before this helper's
+    result is used. Returns ``None`` on any lookup or parse failure (fail closed).
+    """
+    try:
+        path = packet_path_for_bridge(root, bridge_id)
+    except AuthorizationError:
+        return None
+    if not path.is_file():
+        return None
+    try:
+        packet = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(packet, dict):
+        return None
+    globs = packet.get("target_path_globs")
+    if not isinstance(globs, list) or not globs:
+        return None
+    approved = [str(glob) for glob in globs if str(glob).strip()]
+    if not approved:
+        return None
+    return approved, str(packet.get("packet_hash") or "")
+
+
+def _is_bridge_chain_file(slug: str, relative_path: str) -> bool:
+    """True when ``relative_path`` is a numbered bridge file of ``slug``'s own chain."""
+    return re.fullmatch(rf"bridge/{re.escape(slug)}-\d{{3,}}\.md", relative_path) is not None
+
+
+def _verification_finalization_evidence_clearance(
+    root: Path, payload: dict[str, Any], protected: list[str]
+) -> str | None:
+    """Clear the canonical finalization command under terminal-evidence semantics.
+
+    WI-5694 cycle 2 (owner decision ``DELIB-202667723``, AUQ evidence
+    ``AUQ-20260730-PACKET-EXPIRY-AUTHORITY-MODEL``). The Loyal Opposition
+    verification workflow's only live implementation-start packet consultation is
+    this PreToolUse gate. Per the owner's terminal-evidence-sufficient model an
+    expired packet remains valid EVIDENCE when it was live at implementation and
+    is uncontested, so a clean independent verification is no longer blocked from
+    recording ``VERIFIED`` merely because the Prime Builder packet window closed
+    during review (root incident:
+    ``bridge/gtkb-wi5640-verified-finalization-packet-expiry-advisory-001.md``).
+
+    The clearance is granted only when ALL of the following hold:
+
+    - the command matches the canonical finalization corridor
+      (:func:`_verification_finalization_corridor`);
+    - the session's own work-intent claim identifies exactly the ``--slug``
+      thread, and this session is the claim holder;
+    - the thread's post-GO chain state is ``awaiting_review`` (a post-implementation
+      report awaiting the terminal verdict). The post-terminal re-staging corridor
+      remains exclusively :func:`_post_verified_finalization_clearance`'s;
+    - :func:`assess_packet_terminal_evidence` reports ``evidence_valid``. This
+      imports the four owner-mandated cases wholesale: expired-but-live-at-
+      implementation and uncontested clears; expired-before-implementation,
+      contested, and any registry read error fail closed;
+    - every bound-checked mutation target lies inside the union of the GO'd
+      proposal's approved ``target_paths`` and the thread's own numbered
+      ``bridge/<slug>-NNN.md`` chain files.
+
+    When the gate could not enumerate concrete targets (the
+    ``<unknown-mutating-target>`` sentinel, produced for example by an output
+    redirect), the clearance re-derives the command's declared targets from its
+    own ``--include`` arguments. A redirect into any protected path disqualifies
+    outright: a finalization helper never legitimately redirects into a
+    controlled artifact.
+
+    Returns a human-readable reason string carrying the assessment evidence when
+    the clearance is granted, or ``None`` to fall through to the normal
+    authorization gate (which fails closed). Never raises: any lookup failure
+    returns ``None``.
+    """
+    data = _tool_input(payload)
+    is_shell = _tool_name(payload).lower() in {"bash", "shell_command", "shell"} or (
+        isinstance(data, dict) and "command" in data
+    )
+    if not is_shell:
+        return None
+    command = str((data.get("command") if isinstance(data, dict) else None) or payload.get("command") or "")
+    corridor = _verification_finalization_corridor(command)
+    if corridor is None:
+        return None
+    slug, include_values = corridor
+
+    session_id = resolve_work_intent_session_id(payload)
+    if not session_id:
+        return None
+    try:
+        claimed_bridge_id = bridge_work_intent_registry.current_claimed_bridge_id(session_id, project_root=root)
+    except Exception:  # noqa: BLE001 - registry failure must not clear the gate
+        return None
+    if not claimed_bridge_id or claimed_bridge_id != slug:
+        return None
+    try:
+        holder = bridge_work_intent_registry.current_holder(slug, project_root=root)
+    except Exception:  # noqa: BLE001 - registry failure must not clear the gate
+        return None
+    if not isinstance(holder, dict) or holder.get("session_id") != session_id:
+        return None
+
+    # Fresh assessment at decision time - never cached.
+    try:
+        assessment = assess_packet_terminal_evidence(root, slug)
+    except Exception:  # noqa: BLE001 - assessment failure must not clear the gate
+        return None
+    if not isinstance(assessment, dict) or not assessment.get("evidence_valid"):
+        return None
+    if assessment.get("chain_state") != "awaiting_review":
+        return None
+
+    facts = _verification_finalization_packet_facts(root, slug)
+    if facts is None:
+        return None
+    approved_target_paths, packet_hash_value = facts
+
+    stages = _split_pipeline_stages(command)
+    redirects: list[str] = []
+    for raw_redirect in _redirect_targets(stages[0]) if stages else []:
+        rel = _normalize(root, _clean_shell_token(raw_redirect))
+        if rel is None:
+            return None  # an unresolvable redirect target cannot be bounded
+        redirects.append(rel)
+    if any(is_protected_path(rel) for rel in redirects):
+        return None
+
+    normalized_includes: list[str] = []
+    for raw_include in include_values:
+        cleaned = _clean_shell_token(raw_include).replace("\\", "/")
+        if not cleaned or cleaned == ".":
+            return None
+        try:
+            normalized_includes.append(normalize_relative_path(root, cleaned))
+        except AuthorizationError:
+            return None  # declared target escapes project root -> fail closed
+
+    if UNKNOWN_MUTATING_TARGET in protected:
+        bounded = sorted(set(normalized_includes))
+    else:
+        bounded = sorted(set(protected) | set(normalized_includes))
+    if not bounded:
+        return None
+    for rel in bounded:
+        if path_authorized_by_target_paths(approved_target_paths, rel):
+            continue
+        if _is_bridge_chain_file(slug, rel):
+            continue
+        return None
+
+    return (
+        f"verification-finalization terminal-evidence clearance for bridge {slug!r}: "
+        f"packet_hash={packet_hash_value or '<absent>'} "
+        f"expired={bool(assessment.get('expired'))} "
+        f"live_at_implementation={bool(assessment.get('live_at_implementation'))} "
+        f"contested={bool(assessment.get('contested'))} "
+        f"chain_state={assessment.get('chain_state')!r} "
+        f"cleared_targets={bounded} "
+        "(terminal-evidence-sufficient packet semantics per DELIB-202667723; "
+        "historical evidence only - no active mutation authority conferred)."
+    )
+
+
 def _registry_observation_intent(
     root: Path,
     payload: dict[str, Any],
@@ -1676,7 +1927,7 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     if not mutating:
         return {}
     if not paths:
-        protected = ["<unknown-mutating-target>"]
+        protected = [UNKNOWN_MUTATING_TARGET]
     else:
         protected = [path for path in paths if is_protected_path(path)]
     if not protected:
@@ -1718,6 +1969,24 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
             "post-verified-finalization-staging",
             json.dumps(payload, sort_keys=True),
             finalization_reason,
+            protected,
+        )
+        return {}
+    # WI-5694 cycle 2: verification-finalization terminal-evidence clearance
+    # (owner decision DELIB-202667723). The canonical `write_verdict.py
+    # --finalize-verified` command for a thread whose post-GO chain awaits its
+    # terminal verdict is cleared when the implementation-start packet is valid
+    # historical EVIDENCE -- live at implementation and uncontested -- even after
+    # it has expired. This runs BEFORE validate_targets (whose hard expiry
+    # rejection is the active-authority WI-4532 invariant DELIB-202667723
+    # retains) and leaves _validate_packet untouched: every non-corridor command
+    # falls through to the unchanged path below.
+    evidence_reason = _verification_finalization_evidence_clearance(root, payload, protected)
+    if evidence_reason is not None:
+        _record_gate_exemption(
+            "verification-finalization-terminal-evidence",
+            json.dumps(payload, sort_keys=True),
+            evidence_reason,
             protected,
         )
         return {}

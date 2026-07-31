@@ -60,6 +60,13 @@ def test_claude_code_session_id_beats_legacy_claude_session_in_bridge_order() ->
     assert resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=env) == "cc"
 
 
+def test_cursor_conversation_id_resolves_when_sole() -> None:
+    """Cursor's native conversation ID is a real interactive session context."""
+    env = {"CURSOR_CONVERSATION_ID": "cursor-conversation-123"}
+    assert resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=env) == "cursor-conversation-123"
+    assert resolve_session_id(None, order=MARKER_CONTINUITY_ORDER, environ=env) == "cursor-conversation-123"
+
+
 def test_dispatch_run_id_beats_parent_harness_env_in_bridge_order() -> None:
     """A spawned bridge worker's dispatch id must outrank parent harness env."""
     env = {
@@ -134,6 +141,13 @@ def test_claude_code_session_id_locked_into_all_surfaces() -> None:
     assert "CLAUDE_CODE_SESSION_ID" in SESSION_ID_ENV_VARS
     assert "CLAUDE_CODE_SESSION_ID" in BRIDGE_WORK_INTENT_ORDER
     assert "CLAUDE_CODE_SESSION_ID" in MARKER_CONTINUITY_ORDER
+
+
+def test_cursor_conversation_id_locked_into_all_surfaces() -> None:
+    """Cursor's native conversation ID must not regress to a generated session."""
+    assert "CURSOR_CONVERSATION_ID" in SESSION_ID_ENV_VARS
+    assert "CURSOR_CONVERSATION_ID" in BRIDGE_WORK_INTENT_ORDER
+    assert "CURSOR_CONVERSATION_ID" in MARKER_CONTINUITY_ORDER
 
 
 def test_dispatch_run_id_is_bridge_only_marker_excluded() -> None:

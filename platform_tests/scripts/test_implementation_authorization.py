@@ -1021,7 +1021,8 @@ def test_begin_cli_writes_schema_v3_current_and_named_packet(auth_module, tmp_pa
     )
 
     assert rc == 0
-    packet = json.loads(capsys.readouterr().out)
+    output = json.loads(capsys.readouterr().out)
+    packet = output["packet"]
     assert packet["bridge_id"] == slug
     assert packet["schema_version"] == 3
     assert packet["packet_hash"] == auth_module.packet_hash(packet)
@@ -1058,7 +1059,8 @@ def test_begin_cli_succeeds_when_work_intent_claim_held(auth_module, tmp_path, c
     )
 
     assert rc == 0
-    packet = json.loads(capsys.readouterr().out)
+    output = json.loads(capsys.readouterr().out)
+    packet = output["packet"]
     assert packet["bridge_id"] == slug
     assert not auth_module.packet_path(tmp_path).exists()
     assert not auth_module.packet_path_for_bridge(tmp_path, slug).exists()
@@ -2270,7 +2272,8 @@ def test_begin_cli_passes_owner_sufficiency_deliberation_id(auth_module, tmp_pat
     )
 
     assert rc == 0
-    packet = json.loads(capsys.readouterr().out)
+    output = json.loads(capsys.readouterr().out)
+    packet = output["packet"]
     assert packet["requirement_sufficiency"] == "owner_deliberation"
     assert not auth_module.packet_path(tmp_path).exists()
 
@@ -2927,7 +2930,8 @@ def test_begin_cli_accepts_draft_claim_only_for_report_no_go_resume(auth_module,
     )
 
     assert rc == 0
-    packet = json.loads(capsys.readouterr().out)
+    output = json.loads(capsys.readouterr().out)
+    packet = output["packet"]
     expected = {
         "state": "resumable_report_no_go",
         "originating_go_file": f"bridge/{slug}-002.md",

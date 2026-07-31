@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,25 @@ PROJECT_ID = "PROJECT-GTKB-DETERMINISTIC-SERVICES-TEST"
 AUTH_ID = "PAUTH-WI-4567-TEST"
 DELIB_ID = "DELIB-WI-4567-TEST"
 SPEC_ID = "SPEC-WI-4567-TEST"
+ALLOWED_MUTATION_CLASSES = ["bridge", "configuration", "governance_evidence", "metadata", "source", "test"]
+
+
+@pytest.fixture(autouse=True)
+def _trusted_authorization_runtime(monkeypatch) -> None:
+    canonical_load_operation_taxonomy = proposal_filing.load_operation_taxonomy
+    monkeypatch.setattr(
+        proposal_filing,
+        "load_operation_taxonomy",
+        lambda _project_root=None: canonical_load_operation_taxonomy(),
+    )
+    monkeypatch.setattr(
+        proposal_filing,
+        "_resolve_actor_context",
+        lambda _project_root: {
+            "session_context_id": "wi5458-test-session",
+            "role": "prime-builder",
+        },
+    )
 
 
 def _nonimpairment_disposition(content: str) -> dict[str, Any]:
@@ -107,6 +127,8 @@ def _seed_db(root: Path, *, membership: bool = True, authorization: bool = True)
                 "test",
                 "seed authorization",
                 id=AUTH_ID,
+                allowed_mutation_classes=ALLOWED_MUTATION_CLASSES,
+                forbidden_operations=[],
                 included_work_item_ids=[WI_ID],
                 included_spec_ids=[SPEC_ID],
             )
@@ -118,19 +140,24 @@ def _insert_authorization(
     root: Path,
     authorization_id: str,
     included_work_item_ids: list[str] | None,
+    **kwargs: Any,
 ) -> None:
     db = KnowledgeDB(db_path=root / "groundtruth.db")
     try:
+        project_id = kwargs.pop("project_id", PROJECT_ID)
         db.insert_project_authorization(
-            PROJECT_ID,
+            project_id,
             f"{authorization_id} test authorization",
             DELIB_ID,
             "Bounded authorization for proposal selection tests.",
             "test",
             "seed authorization candidate",
             id=authorization_id,
+            allowed_mutation_classes=kwargs.pop("allowed_mutation_classes", ALLOWED_MUTATION_CLASSES),
+            forbidden_operations=kwargs.pop("forbidden_operations", []),
             included_work_item_ids=included_work_item_ids,
-            included_spec_ids=[SPEC_ID],
+            included_spec_ids=kwargs.pop("included_spec_ids", [SPEC_ID]),
+            **kwargs,
         )
     finally:
         db.close()
@@ -247,7 +274,7 @@ def test_file_implementation_proposal_fails_closed_without_active_authorization(
     )
 
     assert result.exit_code == 1
-    assert "No active project authorization covers" in result.output
+    assert "No current project authorization covers" in result.output
     assert not (tmp_path / "bridge").exists()
 
 
@@ -341,13 +368,12 @@ def test_file_implementation_proposal_prefers_smaller_explicit_authorization(
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["project_authorization_id"] == "PAUTH-EXPLICIT-TWO-TEST"
-    assert payload["project_authorization_candidates"][0] == {
-        "coverage": "explicit_list",
-        "included_work_item_count": 2,
-        "project_authorization_id": "PAUTH-EXPLICIT-TWO-TEST",
-        "selected": True,
-        "specificity_rank": [1, 2],
-    }
+    selected = payload["project_authorization_candidates"][0]
+    assert selected["coverage"] == "explicit_list"
+    assert selected["included_work_item_count"] == 2
+    assert selected["project_authorization_id"] == "PAUTH-EXPLICIT-TWO-TEST"
+    assert selected["selected"] is True
+    assert selected["specificity_rank"] == [1, 2]
 
 
 def test_file_implementation_proposal_fails_before_publication_on_equal_rank_ambiguity(
@@ -412,7 +438,7 @@ def test_file_implementation_proposal_dry_run_text_discloses_candidate_ranks(
     assert '"selected":true' in result.output
 
 
-def test_file_implementation_proposal_can_create_missing_state_with_owner_decision(
+def test_file_implementation_proposal_rejects_source_create_missing_without_side_effects(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -439,6 +465,47 @@ def test_file_implementation_proposal_can_create_missing_state_with_owner_decisi
         SPEC_ID,
     )
 
+    assert result.exit_code == 1
+    assert "target_mutation_class_not_allowed" in result.output
+    db = KnowledgeDB(db_path=tmp_path / "groundtruth.db")
+    try:
+        memberships = db.list_project_work_items(PROJECT_ID)
+        authorizations = db.list_project_authorizations(PROJECT_ID, status="active")
+    finally:
+        db.close()
+    assert memberships == []
+    covering = [auth for auth in authorizations if WI_ID in (auth.get("included_work_item_ids_parsed") or [])]
+    assert covering == []
+    assert not (tmp_path / "bridge").exists()
+
+
+def test_file_implementation_proposal_can_create_bridge_state_with_owner_decision(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path, membership=False, authorization=False)
+    _install_fakes(monkeypatch)
+
+    result = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--slug",
+        "gtkb-wi4567-test",
+        "--project",
+        PROJECT_ID,
+        "--owner-decision",
+        DELIB_ID,
+        "--create-missing-state",
+        "--target-path",
+        "bridge/gtkb-wi4567-test-001.md",
+        "--add-spec",
+        SPEC_ID,
+    )
+
     assert result.exit_code == 0, result.output
     db = KnowledgeDB(db_path=tmp_path / "groundtruth.db")
     try:
@@ -448,8 +515,504 @@ def test_file_implementation_proposal_can_create_missing_state_with_owner_decisi
         db.close()
     assert [item["work_item_id"] for item in memberships] == [WI_ID]
     covering = [auth for auth in authorizations if WI_ID in (auth.get("included_work_item_ids_parsed") or [])]
-    assert covering
+    assert len(covering) == 1
+    assert covering[0]["allowed_mutation_classes_parsed"] == ["bridge", "metadata"]
     assert (tmp_path / "bridge" / "gtkb-wi4567-test-001.md").is_file()
+
+
+@pytest.mark.parametrize(
+    ("membership", "included", "excluded", "expected_code"),
+    [
+        (False, [WI_ID], [], None),
+        (True, None, [], None),
+        (False, None, [], "no_current_covering_authorization"),
+        (True, ["WI-OTHER"], [], "no_current_covering_authorization"),
+        (True, [WI_ID], [WI_ID], "work_item_excluded"),
+    ],
+)
+def test_file_implementation_proposal_restrictive_work_item_coverage(
+    tmp_path: Path,
+    monkeypatch,
+    membership: bool,
+    included: list[str] | None,
+    excluded: list[str],
+    expected_code: str | None,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path, membership=membership, authorization=False)
+    _insert_authorization(
+        tmp_path,
+        "PAUTH-COVERAGE-TEST",
+        included,
+        excluded_work_item_ids=excluded,
+    )
+    writer, preflights = _install_fakes(monkeypatch)
+
+    result = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--project",
+        PROJECT_ID,
+        "--slug",
+        "gtkb-wi4567-coverage-test",
+        "--target-path",
+        "scripts/coverage_test.py",
+        "--add-spec",
+        SPEC_ID,
+        "--dry-run",
+        "--json",
+    )
+
+    if expected_code is None:
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["authorization_decision"]["allowed"] is True
+        assert payload["project_authorization_id"] == "PAUTH-COVERAGE-TEST"
+    else:
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["authorization_decision"]["reason_code"] == expected_code
+        assert writer.calls == []
+        assert preflights == []
+
+
+@pytest.mark.parametrize(
+    ("membership", "included", "excluded", "expected_code"),
+    [
+        (False, [WI_ID], [], None),
+        (True, ["WI-OTHER"], [], "no_current_covering_authorization"),
+        (True, [], [], None),
+        (False, [], [], "no_current_covering_authorization"),
+        (True, [WI_ID], [WI_ID], "work_item_excluded"),
+    ],
+)
+def test_file_implementation_proposal_explicit_selector_restrictive_work_item_coverage(
+    tmp_path: Path,
+    monkeypatch,
+    membership: bool,
+    included: list[str],
+    excluded: list[str],
+    expected_code: str | None,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path, membership=membership, authorization=False)
+    authorization_id = "PAUTH-EXPLICIT-COVERAGE-TEST"
+    _insert_authorization(
+        tmp_path,
+        authorization_id,
+        included,
+        excluded_work_item_ids=excluded,
+    )
+    writer, preflights = _install_fakes(monkeypatch)
+
+    result = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--project",
+        PROJECT_ID,
+        "--slug",
+        "gtkb-wi4567-explicit-coverage-test",
+        "--target-path",
+        "scripts/explicit_coverage_test.py",
+        "--add-spec",
+        SPEC_ID,
+        "--project-authorization",
+        authorization_id,
+        "--dry-run",
+        "--json",
+    )
+
+    payload = json.loads(result.output)
+    decision = payload["authorization_decision"]
+    assert decision["selector_mode"] == "explicit"
+    assert decision["requested_project_authorization_id"] == authorization_id
+    assert decision["decision_id"].startswith("sha256:")
+    assert writer.calls == []
+    if expected_code is None:
+        assert result.exit_code == 0, result.output
+        assert decision["allowed"] is True
+        assert payload["project_authorization_id"] == authorization_id
+    else:
+        assert result.exit_code == 1
+        assert decision["reason_code"] == expected_code
+        assert preflights == []
+
+
+def test_file_implementation_proposal_explicit_selector_resolves_equal_best_only(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path, authorization=False)
+    _insert_authorization(tmp_path, "PAUTH-EXACT-A-TEST", [WI_ID])
+    _insert_authorization(tmp_path, "PAUTH-EXACT-B-TEST", [WI_ID])
+    _insert_authorization(tmp_path, "PAUTH-BROAD-TEST", None)
+    _install_fakes(monkeypatch)
+
+    allowed = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--slug",
+        "gtkb-wi4567-selector-test",
+        "--target-path",
+        "scripts/selector_test.py",
+        "--add-spec",
+        SPEC_ID,
+        "--project-authorization",
+        "PAUTH-EXACT-B-TEST",
+        "--dry-run",
+        "--json",
+    )
+    assert allowed.exit_code == 0, allowed.output
+    allowed_payload = json.loads(allowed.output)
+    assert allowed_payload["authorization_decision"]["selector_mode"] == "explicit"
+    assert allowed_payload["project_authorization_id"] == "PAUTH-EXACT-B-TEST"
+
+    denied = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--slug",
+        "gtkb-wi4567-selector-test-two",
+        "--target-path",
+        "scripts/selector_test.py",
+        "--add-spec",
+        SPEC_ID,
+        "--project-authorization",
+        "PAUTH-BROAD-TEST",
+        "--dry-run",
+        "--json",
+    )
+    assert denied.exit_code == 1
+    denied_payload = json.loads(denied.output)
+    assert denied_payload["authorization_decision"]["reason_code"] == (
+        "selected_authorization_not_best_current_covering"
+    )
+
+
+@pytest.mark.parametrize(
+    ("expires_at", "expected_code"),
+    [
+        ("2099-01-01T00:00:00Z", None),
+        ("2099-01-01T01:00:00+01:00", None),
+        ("2099-01-01T00:00:00", "malformed_authorization_expiry"),
+        ("not-a-date", "malformed_authorization_expiry"),
+        ("2000-01-01T00:00:00Z", "best_rank_cohort_stale"),
+    ],
+)
+def test_file_implementation_proposal_authorization_expiry_is_fail_closed(
+    tmp_path: Path,
+    monkeypatch,
+    expires_at: str,
+    expected_code: str | None,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path, authorization=False)
+    _insert_authorization(tmp_path, "PAUTH-EXPIRY-TEST", [WI_ID], expires_at=expires_at)
+    _install_fakes(monkeypatch)
+    result = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--slug",
+        "gtkb-wi4567-expiry-test",
+        "--target-path",
+        "scripts/expiry_test.py",
+        "--add-spec",
+        SPEC_ID,
+        "--dry-run",
+        "--json",
+    )
+    payload = json.loads(result.output)
+    if expected_code is None:
+        assert result.exit_code == 0, result.output
+        assert payload["authorization_decision"]["authorization"]["normalized_expiry"] == ("2099-01-01T00:00:00Z")
+    else:
+        assert result.exit_code == 1
+        assert payload["authorization_decision"]["reason_code"] == expected_code
+
+
+@pytest.mark.parametrize(
+    "stale_fields",
+    [
+        {"status": "superseded"},
+        {"superseded_by": ["PAUTH-SUCCESSOR-TEST"]},
+    ],
+)
+def test_file_implementation_proposal_does_not_fallback_from_stale_best_cohort(
+    tmp_path: Path,
+    monkeypatch,
+    stale_fields: dict[str, Any],
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path, authorization=False)
+    _insert_authorization(tmp_path, "PAUTH-EXACT-STALE-TEST", [WI_ID], **stale_fields)
+    _insert_authorization(tmp_path, "PAUTH-BROAD-CURRENT-TEST", None)
+    _install_fakes(monkeypatch)
+    result = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--slug",
+        "gtkb-wi4567-stale-test",
+        "--target-path",
+        "scripts/stale_test.py",
+        "--add-spec",
+        SPEC_ID,
+        "--dry-run",
+        "--json",
+    )
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert payload["authorization_decision"]["reason_code"] == "best_rank_cohort_stale"
+
+
+def test_file_implementation_proposal_spec_exclusion_denies(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path, authorization=False)
+    _insert_authorization(
+        tmp_path,
+        "PAUTH-EXCLUDED-SPEC-TEST",
+        [WI_ID],
+        excluded_spec_ids=[SPEC_ID],
+    )
+    _install_fakes(monkeypatch)
+    excluded = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--slug",
+        "gtkb-wi4567-excluded-spec-test",
+        "--target-path",
+        "scripts/spec_test.py",
+        "--add-spec",
+        SPEC_ID,
+        "--dry-run",
+        "--json",
+    )
+    assert excluded.exit_code == 1
+    assert json.loads(excluded.output)["authorization_decision"]["reason_code"] == ("linked_specification_excluded")
+
+
+def test_file_implementation_proposal_forbidden_operation_denies(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path, authorization=False)
+    _insert_authorization(
+        tmp_path,
+        "PAUTH-FORBIDDEN-OPERATION-TEST",
+        [WI_ID],
+        forbidden_operations=["bridge_proposal_filing"],
+    )
+    _install_fakes(monkeypatch)
+    result = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--slug",
+        "gtkb-wi4567-forbidden-operation-test",
+        "--target-path",
+        "scripts/operation_test.py",
+        "--add-spec",
+        SPEC_ID,
+        "--dry-run",
+        "--json",
+    )
+    assert result.exit_code == 1
+    assert json.loads(result.output)["authorization_decision"]["reason_code"] == "forbidden_operation"
+
+
+def test_file_implementation_proposal_create_missing_rolls_back_membership_on_pauth_failure(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path, membership=False, authorization=False)
+    db = KnowledgeDB(db_path=tmp_path / "groundtruth.db")
+
+    def fail_insert(*_args: Any, **_kwargs: Any) -> None:
+        raise RuntimeError("injected PAUTH insert failure")
+
+    monkeypatch.setattr(db, "insert_project_authorization", fail_insert)
+    try:
+        with pytest.raises(proposal_filing.ProposalFilingError) as error:
+            proposal_filing.file_implementation_proposal(
+                db,
+                tmp_path,
+                proposal_filing.FilingRequest(
+                    wi_id=WI_ID,
+                    slug="gtkb-wi4567-rollback-test",
+                    project_id=PROJECT_ID,
+                    owner_decision=DELIB_ID,
+                    create_missing_state=True,
+                    target_paths=("bridge/gtkb-wi4567-rollback-test-001.md",),
+                    add_specs=(SPEC_ID,),
+                ),
+                run_candidate_preflights=False,
+                run_live_preflights=False,
+            )
+        assert error.value.decision["reason_code"] == "authorization_state_creation_failed"
+        assert db.list_project_work_items(PROJECT_ID) == []
+        assert db.list_project_authorizations(PROJECT_ID, include_terminal=True) == []
+        assert not (tmp_path / "bridge").exists()
+    finally:
+        db.close()
+
+
+def test_file_implementation_proposal_revalidates_after_candidate_preflight(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path)
+    writer = _FakeWriter()
+    changed = False
+
+    def fake_preflight(project_root: Path, *, name: str, content_file=None, bridge_id=None):
+        nonlocal changed
+        if not changed:
+            changed = True
+            drift_db = KnowledgeDB(db_path=project_root / "groundtruth.db")
+            try:
+                drift_db.insert_project(
+                    "Deterministic Services",
+                    "test",
+                    "inject project lifecycle drift",
+                    id=PROJECT_ID,
+                    status="retired",
+                )
+            finally:
+                drift_db.close()
+        return proposal_filing.PreflightResult(name=name, returncode=0, stdout="PASS", stderr="")
+
+    monkeypatch.setattr(proposal_filing, "_load_bridge_writer", lambda _root: writer)
+    monkeypatch.setattr(proposal_filing, "_run_preflight_command", fake_preflight)
+    result = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--slug",
+        "gtkb-wi4567-preflight-drift-test",
+        "--target-path",
+        "scripts/preflight_drift_test.py",
+        "--add-spec",
+        SPEC_ID,
+        "--json",
+    )
+    assert result.exit_code == 1
+    assert json.loads(result.output)["authorization_decision"]["reason_code"] == "project_not_active"
+    assert writer.calls == []
+    assert not (tmp_path / "bridge").exists()
+
+
+def test_file_implementation_proposal_denies_expiry_during_candidate_preflight(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path, authorization=False)
+    initial_time = datetime(2026, 7, 29, 20, 0, tzinfo=UTC)
+    _insert_authorization(
+        tmp_path,
+        "PAUTH-PREFLIGHT-EXPIRY-TEST",
+        [WI_ID],
+        expires_at=(initial_time + timedelta(seconds=30)).isoformat(),
+    )
+    writer, preflights = _install_fakes(monkeypatch)
+
+    class _AdvancingDateTime(datetime):
+        calls = iter((initial_time, initial_time, initial_time + timedelta(seconds=60)))
+
+        @classmethod
+        def now(cls, tz=None):
+            value = next(cls.calls)
+            return value if tz is None else value.astimezone(tz)
+
+    monkeypatch.setattr(proposal_filing, "datetime", _AdvancingDateTime)
+    result = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--slug",
+        "gtkb-wi4567-preflight-expiry-test",
+        "--target-path",
+        "scripts/preflight_expiry_test.py",
+        "--add-spec",
+        SPEC_ID,
+        "--json",
+    )
+
+    assert result.exit_code == 1
+    assert result.output, repr(result.exception)
+    payload = json.loads(result.output)
+    assert payload["authorization_decision"]["reason_code"] == "best_rank_cohort_stale"
+    assert payload["authorization_decision"]["decision_time"] == "2026-07-29T20:01:00Z"
+    assert writer.calls == []
+    assert [item["name"] for item in preflights] == ["applicability", "adr_dcl"]
+    assert not (tmp_path / "bridge").exists()
+
+
+def test_file_implementation_proposal_decision_identity_matches_content_and_result(
+    tmp_path: Path,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path)
+    db = KnowledgeDB(db_path=tmp_path / "groundtruth.db")
+    try:
+        result = proposal_filing.file_implementation_proposal(
+            db,
+            tmp_path,
+            proposal_filing.FilingRequest(
+                wi_id=WI_ID,
+                slug="gtkb-wi4567-decision-evidence-test",
+                target_paths=("scripts/decision_evidence_test.py",),
+                add_specs=(SPEC_ID,),
+                dry_run=True,
+            ),
+            run_candidate_preflights=False,
+            run_live_preflights=False,
+        )
+    finally:
+        db.close()
+
+    line = next(item for item in result.content.splitlines() if item.startswith("Project Authorization Decision: "))
+    embedded = json.loads(line.split(": ", 1)[1])
+    assert embedded == result.authorization_decision
+    assert embedded["decision_id"].startswith("sha256:")
+    assert embedded["actor"] == {
+        "session_context_id": "wi5458-test-session",
+        "role": "prime-builder",
+    }
+    assert embedded["invalidation_inputs"]["planned_bridge_status"] == "NEW"
+    assert embedded["invalidation_inputs"]["planned_bridge_version"] == 1
 
 
 def test_file_implementation_proposal_rejects_agent_red_target(tmp_path: Path, monkeypatch) -> None:

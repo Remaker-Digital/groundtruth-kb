@@ -192,11 +192,6 @@ def _interactive_role_details() -> dict[str, str | None]:
         return {}
 
 
-def _interactive_role_profile() -> str | None:
-    role = _interactive_role_details().get("interactive_resolved_role")
-    return role if role in _VALID_ROLE_PROFILES else None
-
-
 def _write_role_latch_diagnostic(
     *,
     details: dict[str, str | None],
@@ -352,10 +347,6 @@ def main() -> int:
         "--harness-id",
         _persistent_harness_id(),
     ]
-    role_profile = _interactive_role_profile()
-    if role_profile:
-        command.extend(["--role-profile", role_profile])
-
     result = subprocess.run(
         command,
         cwd=str(PROJECT_ROOT),

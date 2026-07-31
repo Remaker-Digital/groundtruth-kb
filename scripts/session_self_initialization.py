@@ -7656,6 +7656,13 @@ def main(argv: list[str] | None = None) -> int:
                 or ("claude" if (os.environ.get("CLAUDECODE") or os.environ.get("CLAUDE_CODE_SESSION_ID")) else "codex")
             )
             dispatch_run_id = os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID") or None
+            # WI-5723 / WI-5750: `session_resolver_fallback` is deliberately still
+            # emitted here. It is the trigger for the persistence resolver in
+            # `ensure_worker_session` (DCL-INTERACTIVE-SESSION-ROLE-PERSISTENCE-001,
+            # CLAUSE-PERSISTENCE-ACROSS-BOUNDARIES), which recovers an owner-declared
+            # interactive role from the prior document or the per-session marker before
+            # any registry-derived role is applied. Suppressing this call would orphan
+            # that recovery path and leave the session with no worker document at all.
             role_source = (
                 "dispatcher_composition"
                 if dispatch_run_id

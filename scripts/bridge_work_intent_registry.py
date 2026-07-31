@@ -7,7 +7,9 @@ import json
 import os
 import re
 import sqlite3
+import time
 import tomllib
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -32,6 +34,15 @@ GO_IMPLEMENTATION_GRACE_SECONDS: Final[int] = 10 * 60
 # window keeps the behavior bounded and aligned with the existing timebox.
 GO_IMPLEMENTATION_AUTO_EXTEND_THRESHOLD_SECONDS: Final[int] = GO_IMPLEMENTATION_GRACE_SECONDS
 
+# WI-5784: write contention is retried inside one bounded total deadline.  A
+# short per-attempt SQLite wait leaves room to reopen the connection, re-read
+# the exact claim row, and make progress when a legitimate sibling writer
+# releases the database inside the overall budget.
+WORK_INTENT_WRITE_RETRY_DEADLINE_SECONDS: Final[float] = 10.0
+WORK_INTENT_WRITE_ATTEMPT_TIMEOUT_SECONDS: Final[float] = 0.25
+WORK_INTENT_WRITE_INITIAL_BACKOFF_SECONDS: Final[float] = 0.025
+WORK_INTENT_WRITE_MAX_BACKOFF_SECONDS: Final[float] = 0.5
+
 CLAIM_KIND_DRAFT: Final[str] = "draft"
 CLAIM_KIND_GO_IMPLEMENTATION: Final[str] = "go_implementation"
 # Explicit non-implementation claim for Prime NO-ACTION corrections after
@@ -47,6 +58,57 @@ BRIDGE_WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(
 
 class WorkIntentRegistryError(RuntimeError):
     """Raised when a work-intent registry operation cannot be completed."""
+
+
+class WorkIntentDatabaseError(WorkIntentRegistryError):
+    """Typed SQLite failure with safe operation and timing diagnostics."""
+
+    def __init__(
+        self,
+        detail: str,
+        *,
+        operation: str,
+        phase: str,
+        attempts: int,
+        elapsed_seconds: float,
+        sqlite_errorcode: int | None,
+        sqlite_errorname: str | None,
+        database_path: Path,
+        contention_exhausted: bool = False,
+    ) -> None:
+        self.operation = operation
+        self.phase = phase
+        self.attempts = attempts
+        self.elapsed_seconds = elapsed_seconds
+        self.sqlite_errorcode = sqlite_errorcode
+        self.sqlite_errorname = sqlite_errorname
+        self.database_path = database_path
+        self.contention_exhausted = contention_exhausted
+        reason = "contention_exhausted" if contention_exhausted else "non_retryable"
+        super().__init__(
+            f"Database error during {operation}: reason={reason} phase={phase} "
+            f"attempts={attempts} elapsed_seconds={elapsed_seconds:.6f} "
+            f"sqlite_errorcode={sqlite_errorcode!r} sqlite_errorname={sqlite_errorname!r} "
+            f"database_path={database_path} detail={detail}"
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return machine-readable diagnostics without guessing lock ownership."""
+
+        return {
+            "operation": self.operation,
+            "phase": self.phase,
+            "attempts": self.attempts,
+            "elapsed_seconds": self.elapsed_seconds,
+            "sqlite_errorcode": self.sqlite_errorcode,
+            "sqlite_errorname": self.sqlite_errorname,
+            "database_path": str(self.database_path),
+            "contention_exhausted": self.contention_exhausted,
+        }
+
+
+class WorkIntentWriteContentionError(WorkIntentDatabaseError):
+    """Raised after the bounded SQLITE_BUSY/SQLITE_LOCKED budget is exhausted."""
 
 
 class MalformedBridgeStatusError(WorkIntentRegistryError):
@@ -125,18 +187,13 @@ def _database_path(project_root: Path | None = None) -> Path:
 
 
 def _ensure_schema(conn: sqlite3.Connection) -> None:
-    import sys
+    """Create or upgrade only the narrow work-intent schema.
 
-    src_path = str(PROJECT_ROOT / "groundtruth-kb" / "src")
-    if src_path not in sys.path:
-        sys.path.insert(0, src_path)
-    try:
-        from groundtruth_kb.db import SCHEMA_SQL
-
-        conn.executescript(SCHEMA_SQL)
-    except ImportError:
-        pass
-
+    This hot-path helper deliberately does not execute the global GroundTruth
+    ``SCHEMA_SQL``.  The registry owns one table and its additive migration;
+    initializing every platform table/index on each claim operation made the
+    growing append-only SoT part of routine claim latency.
+    """
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS work_intent_claims (
@@ -177,14 +234,114 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def _get_conn(project_root: Path | None = None) -> sqlite3.Connection:
+def _monotonic() -> float:
+    return time.monotonic()
+
+
+def _retry_sleep(seconds: float) -> None:
+    time.sleep(seconds)
+
+
+def _sqlite_error_fields(exc: sqlite3.Error) -> tuple[int | None, str | None]:
+    code = getattr(exc, "sqlite_errorcode", None)
+    name = getattr(exc, "sqlite_errorname", None)
+    return (int(code) if isinstance(code, int) else None, str(name) if name else None)
+
+
+def _is_retryable_write_contention(exc: sqlite3.Error) -> bool:
+    code, _ = _sqlite_error_fields(exc)
+    if code is not None:
+        return (code & 0xFF) in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}
+    text = str(exc).casefold()
+    return "database is locked" in text or "database table is locked" in text
+
+
+def _database_error(
+    exc: sqlite3.Error,
+    *,
+    operation: str,
+    phase: str,
+    attempts: int,
+    started_at: float,
+    database_path: Path,
+    contention_exhausted: bool = False,
+) -> WorkIntentDatabaseError:
+    code, name = _sqlite_error_fields(exc)
+    error_type = WorkIntentWriteContentionError if contention_exhausted else WorkIntentDatabaseError
+    return error_type(
+        str(exc),
+        operation=operation,
+        phase=phase,
+        attempts=attempts,
+        elapsed_seconds=max(0.0, _monotonic() - started_at),
+        sqlite_errorcode=code,
+        sqlite_errorname=name,
+        database_path=database_path,
+        contention_exhausted=contention_exhausted,
+    )
+
+
+def _deadline_exhausted_error(
+    *,
+    operation: str,
+    phase: str,
+    attempts: int,
+    started_at: float,
+    database_path: Path,
+) -> WorkIntentWriteContentionError:
+    """Return a typed failure before a transaction can outlive its budget."""
+
+    return WorkIntentWriteContentionError(
+        "monotonic write deadline exhausted",
+        operation=operation,
+        phase=phase,
+        attempts=attempts,
+        elapsed_seconds=max(0.0, _monotonic() - started_at),
+        sqlite_errorcode=None,
+        sqlite_errorname=None,
+        database_path=database_path,
+        contention_exhausted=True,
+    )
+
+
+def _apply_remaining_busy_timeout(conn: sqlite3.Connection, *, deadline: float) -> bool:
+    """Clamp the next SQLite lock wait to the remaining total write budget."""
+
+    remaining = deadline - _monotonic()
+    if remaining <= 0:
+        return False
+    timeout_seconds = min(WORK_INTENT_WRITE_ATTEMPT_TIMEOUT_SECONDS, remaining)
+    timeout_milliseconds = max(0, int(timeout_seconds * 1000))
+    conn.execute(f"PRAGMA busy_timeout = {timeout_milliseconds}")
+    return True
+
+
+def _get_conn(
+    project_root: Path | None = None,
+    *,
+    timeout_seconds: float = 10.0,
+    error_context: tuple[str, int, float] | None = None,
+) -> sqlite3.Connection:
     db_path = _database_path(project_root)
+    conn: sqlite3.Connection | None = None
     try:
-        conn = sqlite3.connect(str(db_path), timeout=10)
+        conn = sqlite3.connect(str(db_path), timeout=max(0.0, timeout_seconds))
         conn.row_factory = sqlite3.Row
         _ensure_schema(conn)
         return conn
     except sqlite3.Error as exc:
+        if conn is not None:
+            conn.close()
+        if error_context is not None:
+            operation, attempts, started_at = error_context
+            raise _database_error(
+                exc,
+                operation=operation,
+                phase="open_or_schema",
+                attempts=attempts,
+                started_at=started_at,
+                database_path=db_path,
+            ) from exc
         raise WorkIntentRegistryError(f"Could not open database {db_path}: {exc}") from exc
 
 
@@ -809,6 +966,126 @@ def _claim_operation(
     return "work_intent_renew"
 
 
+def _run_write_transaction(
+    operation: str,
+    action: Callable[[sqlite3.Connection], Any],
+    *,
+    project_root: Path | None,
+) -> Any:
+    """Run one claim-registry write with bounded, exact-state retry.
+
+    Only transaction-phase ``SQLITE_BUSY``/``SQLITE_LOCKED`` failures are
+    retried.  Every attempt owns a fresh connection and a fresh
+    ``BEGIN IMMEDIATE`` transaction, so ``action`` must re-read the exact claim
+    row before changing it.  Open/schema, corruption, and all other failures
+    surface immediately as :class:`WorkIntentDatabaseError`.
+    """
+
+    database_path = _database_path(project_root)
+    started_at = _monotonic()
+    deadline = started_at + WORK_INTENT_WRITE_RETRY_DEADLINE_SECONDS
+    attempts = 0
+    backoff = WORK_INTENT_WRITE_INITIAL_BACKOFF_SECONDS
+    last_contention: sqlite3.Error | None = None
+    last_contention_phase = "begin_immediate"
+
+    while True:
+        if deadline - _monotonic() <= 0 and last_contention is not None:
+            raise _database_error(
+                last_contention,
+                operation=operation,
+                phase=last_contention_phase,
+                attempts=attempts,
+                started_at=started_at,
+                database_path=database_path,
+                contention_exhausted=True,
+            ) from last_contention
+        attempts += 1
+        remaining = max(0.0, deadline - _monotonic())
+        connection_timeout = min(WORK_INTENT_WRITE_ATTEMPT_TIMEOUT_SECONDS, remaining)
+        conn = _get_conn(
+            project_root,
+            timeout_seconds=connection_timeout,
+            error_context=(operation, attempts, started_at),
+        )
+        phase = "begin_immediate"
+        try:
+            if not _apply_remaining_busy_timeout(conn, deadline=deadline):
+                raise _deadline_exhausted_error(
+                    operation=operation,
+                    phase=phase,
+                    attempts=attempts,
+                    started_at=started_at,
+                    database_path=database_path,
+                )
+            conn.execute("BEGIN IMMEDIATE")
+            phase = "transaction"
+            if not _apply_remaining_busy_timeout(conn, deadline=deadline):
+                raise _deadline_exhausted_error(
+                    operation=operation,
+                    phase=phase,
+                    attempts=attempts,
+                    started_at=started_at,
+                    database_path=database_path,
+                )
+            result = action(conn)
+            phase = "commit"
+            if not _apply_remaining_busy_timeout(conn, deadline=deadline):
+                raise _deadline_exhausted_error(
+                    operation=operation,
+                    phase=phase,
+                    attempts=attempts,
+                    started_at=started_at,
+                    database_path=database_path,
+                )
+            conn.commit()
+            return result
+        except sqlite3.Error as exc:
+            try:
+                conn.rollback()
+            except sqlite3.Error:
+                pass
+            if not _is_retryable_write_contention(exc):
+                raise _database_error(
+                    exc,
+                    operation=operation,
+                    phase=phase,
+                    attempts=attempts,
+                    started_at=started_at,
+                    database_path=database_path,
+                ) from exc
+
+            last_contention = exc
+            last_contention_phase = phase
+            remaining = deadline - _monotonic()
+            if remaining <= 0:
+                raise _database_error(
+                    exc,
+                    operation=operation,
+                    phase=phase,
+                    attempts=attempts,
+                    started_at=started_at,
+                    database_path=database_path,
+                    contention_exhausted=True,
+                ) from exc
+        except Exception:
+            try:
+                conn.rollback()
+            except sqlite3.Error:
+                pass
+            raise
+        finally:
+            conn.close()
+
+        sleep_seconds = min(backoff, max(0.0, deadline - _monotonic()))
+        if sleep_seconds <= 0:
+            # The loop-top deadline gate reports the most recent SQLite code
+            # and phase instead of spinning a zero-time connection.
+            continue
+        _retry_sleep(sleep_seconds)
+        backoff = min(WORK_INTENT_WRITE_MAX_BACKOFF_SECONDS, backoff * 2)
+
+
 def acquire(
     thread_slug: str,
     session_id: str,
@@ -853,65 +1130,65 @@ def acquire(
             )
     if operation == "work_intent_renew" and values["claim_kind"] == CLAIM_KIND_GO_IMPLEMENTATION:
         return True
-    conn = _get_conn(project_root)
-    try:
-        with conn:
-            conn.execute("BEGIN IMMEDIATE")
-            row = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)).fetchone()
-            transaction_existing = _row_to_record(row) if row is not None else None
-            transaction_operation = _claim_operation(transaction_existing, values, session_id=session_id, now=now)
-            if transaction_operation is None:
-                return False
-            if transaction_operation != operation:
-                raise WorkIntentRegistryError("Work-intent claim changed during authorization; retry the operation")
-            if operation == "work_intent_renew":
-                conn.execute(
-                    "UPDATE work_intent_claims SET ttl_expires_at = ? WHERE thread_slug = ? AND session_id = ?",
-                    (values["ttl_expires_at"], slug, session_id),
-                )
-                return True
+
+    def write_claim(conn: sqlite3.Connection) -> bool:
+        row = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)).fetchone()
+        transaction_existing = _row_to_record(row) if row is not None else None
+        transaction_operation = _claim_operation(transaction_existing, values, session_id=session_id, now=now)
+        if transaction_operation is None:
+            return False
+        if transaction_existing is not None and not _bootstrap_metadata_matches(transaction_existing, values):
+            raise WorkIntentRegistryError(
+                "Existing project-authorization bootstrap claim metadata differs; release first"
+            )
+        if transaction_operation != operation:
+            raise WorkIntentRegistryError("Work-intent claim changed during authorization; retry the operation")
+        if operation == "work_intent_renew":
             conn.execute(
-                """
-                INSERT INTO work_intent_claims
-                (thread_slug, session_id, acquired_at, ttl_expires_at, claim_kind,
-                 acting_role, project_id,
-                 implementation_deadline, implementation_grace_expires_at,
-                 extensions_used, extension_cap_seconds, extension_capped,
-                 bootstrap_owner_decision_id, bootstrap_project_id, bootstrap_work_item_id,
-                 bootstrap_authorization_id, bootstrap_carrier_targets, bootstrap_consumed_at)
-                VALUES
-                (:thread_slug, :session_id, :acquired_at, :ttl_expires_at, :claim_kind,
-                 :acting_role, :project_id,
-                 :implementation_deadline, :implementation_grace_expires_at,
-                 :extensions_used, :extension_cap_seconds, :extension_capped,
-                 :bootstrap_owner_decision_id, :bootstrap_project_id, :bootstrap_work_item_id,
-                 :bootstrap_authorization_id, :bootstrap_carrier_targets, :bootstrap_consumed_at)
-                ON CONFLICT(thread_slug) DO UPDATE SET
-                    session_id = excluded.session_id,
-                    acquired_at = excluded.acquired_at,
-                    ttl_expires_at = excluded.ttl_expires_at,
-                    claim_kind = excluded.claim_kind,
-                    acting_role = excluded.acting_role,
-                    project_id = excluded.project_id,
-                    implementation_deadline = excluded.implementation_deadline,
-                    implementation_grace_expires_at = excluded.implementation_grace_expires_at,
-                    extensions_used = excluded.extensions_used,
-                    extension_cap_seconds = excluded.extension_cap_seconds,
-                    extension_capped = excluded.extension_capped,
-                    bootstrap_owner_decision_id = excluded.bootstrap_owner_decision_id,
-                    bootstrap_project_id = excluded.bootstrap_project_id,
-                    bootstrap_work_item_id = excluded.bootstrap_work_item_id,
-                    bootstrap_authorization_id = excluded.bootstrap_authorization_id,
-                    bootstrap_carrier_targets = excluded.bootstrap_carrier_targets,
-                    bootstrap_consumed_at = excluded.bootstrap_consumed_at
-                """,
-                values,
+                "UPDATE work_intent_claims SET ttl_expires_at = ? WHERE thread_slug = ? AND session_id = ?",
+                (values["ttl_expires_at"], slug, session_id),
             )
             return True
-    except sqlite3.Error as exc:
-        raise WorkIntentRegistryError(f"Database error during acquire: {exc}") from exc
-    finally:
-        conn.close()
+        conn.execute(
+            """
+            INSERT INTO work_intent_claims
+            (thread_slug, session_id, acquired_at, ttl_expires_at, claim_kind,
+             acting_role, project_id,
+             implementation_deadline, implementation_grace_expires_at,
+             extensions_used, extension_cap_seconds, extension_capped,
+             bootstrap_owner_decision_id, bootstrap_project_id, bootstrap_work_item_id,
+             bootstrap_authorization_id, bootstrap_carrier_targets, bootstrap_consumed_at)
+            VALUES
+            (:thread_slug, :session_id, :acquired_at, :ttl_expires_at, :claim_kind,
+             :acting_role, :project_id,
+             :implementation_deadline, :implementation_grace_expires_at,
+             :extensions_used, :extension_cap_seconds, :extension_capped,
+             :bootstrap_owner_decision_id, :bootstrap_project_id, :bootstrap_work_item_id,
+             :bootstrap_authorization_id, :bootstrap_carrier_targets, :bootstrap_consumed_at)
+            ON CONFLICT(thread_slug) DO UPDATE SET
+                session_id = excluded.session_id,
+                acquired_at = excluded.acquired_at,
+                ttl_expires_at = excluded.ttl_expires_at,
+                claim_kind = excluded.claim_kind,
+                acting_role = excluded.acting_role,
+                project_id = excluded.project_id,
+                implementation_deadline = excluded.implementation_deadline,
+                implementation_grace_expires_at = excluded.implementation_grace_expires_at,
+                extensions_used = excluded.extensions_used,
+                extension_cap_seconds = excluded.extension_cap_seconds,
+                extension_capped = excluded.extension_capped,
+                bootstrap_owner_decision_id = excluded.bootstrap_owner_decision_id,
+                bootstrap_project_id = excluded.bootstrap_project_id,
+                bootstrap_work_item_id = excluded.bootstrap_work_item_id,
+                bootstrap_authorization_id = excluded.bootstrap_authorization_id,
+                bootstrap_carrier_targets = excluded.bootstrap_carrier_targets,
+                bootstrap_consumed_at = excluded.bootstrap_consumed_at
+            """,
+            values,
+        )
+        return True
+
+    return bool(_run_write_transaction("acquire", write_claim, project_root=project_root))
 
 
 def extend(
@@ -1053,18 +1330,22 @@ def maybe_auto_extend(
 def release(thread_slug: str, session_id: str, *, project_root: Path | None = None) -> None:
     """Release a per-thread work-intent record when held by ``session_id``."""
     slug = _validate_slug(thread_slug)
-    conn = _get_conn(project_root)
-    try:
-        with conn:
-            conn.execute("BEGIN IMMEDIATE")
-            conn.execute(
-                "DELETE FROM work_intent_claims WHERE thread_slug = ? AND session_id = ?",
-                (slug, session_id),
-            )
-    except sqlite3.Error as exc:
-        raise WorkIntentRegistryError(f"Database error during release: {exc}") from exc
-    finally:
-        conn.close()
+
+    def delete_exact_holder(conn: sqlite3.Connection) -> None:
+        row = conn.execute(
+            "SELECT session_id FROM work_intent_claims WHERE thread_slug = ?",
+            (slug,),
+        ).fetchone()
+        if row is None or str(row["session_id"]) != session_id:
+            # Missing is idempotent success.  A replacement or foreign holder
+            # is authoritative and must never be deleted by this caller.
+            return
+        conn.execute(
+            "DELETE FROM work_intent_claims WHERE thread_slug = ? AND session_id = ?",
+            (slug, session_id),
+        )
+
+    _run_write_transaction("release", delete_exact_holder, project_root=project_root)
 
 
 def lapsed_go_implementation_claims(*, project_root: Path | None = None) -> list[dict[str, Any]]:
@@ -1160,7 +1441,11 @@ __all__ = [
     "GO_IMPLEMENTATION_EXTENSION_SECONDS",
     "GO_IMPLEMENTATION_GRACE_SECONDS",
     "GO_IMPLEMENTATION_MAX_HOLD_SECONDS",
+    "WORK_INTENT_WRITE_ATTEMPT_TIMEOUT_SECONDS",
+    "WORK_INTENT_WRITE_RETRY_DEADLINE_SECONDS",
+    "WorkIntentDatabaseError",
     "WorkIntentRegistryError",
+    "WorkIntentWriteContentionError",
     "acquire",
     "bootstrap_authority_from_claim",
     "claim_status",
