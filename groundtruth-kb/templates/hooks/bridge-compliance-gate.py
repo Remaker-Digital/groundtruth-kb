@@ -1570,6 +1570,32 @@ def _verdict_preflight_freshness_deny_reason(
             f"expected `{expected_packet_hash}` for `{responds_relative}`."
         )
 
+    # Preflight assertion integrity (WI-5850 emergency-bootstrap, 2026-07-31):
+    # the freshness match above proves packet_hash was built over the current
+    # responded-to content, but NOT that the verdict's asserted PASS/FAIL matches
+    # the re-derived truth. The 2026-07-31 autonomous LO loop exploited exactly
+    # this gap: it embedded the real packet_hash (freshness passes) while
+    # hard-coding `preflight_passed: true` / `missing_required_specs: []` over a
+    # real result of False with required specs missing. Re-derive from the packet
+    # already computed above and refuse any verdict that attests a passing
+    # preflight the source does not actually pass. Authority: WI-5850,
+    # DELIB-HARNESS-NO-ACTION-LO-RESPONSE-SET-20260702, .claude/rules/codex-review-gate.md
+    # ("GO and VERIFIED are valid only when the preflight reports missing_required_specs: []").
+    real_passed = bool(expected_packet.get("preflight_passed"))
+    real_missing = [str(spec) for spec in (expected_packet.get("missing_required_specs") or [])]
+    asserted_passed_raw = _preflight_field(section, "preflight_passed")
+    if asserted_passed_raw is not None:
+        asserted_passed = asserted_passed_raw.strip().strip("`").lower() == "true"
+        if asserted_passed and not real_passed:
+            return (
+                "[Governance] Verdict preflight assertion is fabricated: the verdict asserts "
+                "`preflight_passed: true` but the re-derived applicability preflight for the "
+                f"responded-to artifact `{responds_relative}` returns False "
+                f"(real missing_required_specs: {real_missing}). A GO/NO-GO/VERIFIED verdict may "
+                "not attest a passing preflight the source does not actually pass. "
+                "(Fabricated-attestation guard; WI-5850 emergency-bootstrap.)"
+            )
+
     embedded_candidate_hash = _preflight_field(section, "candidate_evidence_hash")
     expected_candidate_hash = _candidate_evidence_hash(file_path, content, project_root)
     if (
@@ -2023,6 +2049,82 @@ def _no_action_prior_verdict_deny(file_path: str, content: str) -> str | None:
     )
 
 
+# WI-5850 emergency-bootstrap (2026-07-31): close-intent detector for NO-ACTION.
+# DCL-NO-ACTION-STATUS-SEMANTICS-001 forbids using NO-ACTION to record a Prime
+# "no further action" close; a lawful NO-ACTION rejects a governance-noncompliant
+# verdict and states what the reviewer must correct. The 2026-07-31 autonomous
+# Goose loop wrote 322 "auto-disposition" NO-ACTION files that close threads
+# instead of correcting a verdict. Detecting the *presence of remedy* is unusable
+# (the lawful corpus is too inconsistent -- 2.6% false-positive). Detecting
+# *close/disposal intent* (N1) plus *self-granted clearance* (N2) is measured at
+# 0/269 false-positive against the lawful corpus and catches the unlawful set.
+# Regex fragility (do NOT loosen; each loosening was measured to add FPs):
+#   - `disposition-?close` must stay hyphen-optional, NOT `[-\s]?`: lawful files
+#     quote "Advisory-disposition close" (space) while criticizing the practice.
+#   - `acknowledges? receipt` must stay two-word, NOT bare `acknowledg`.
+# Body is whitespace-collapsed and lowercased before matching (matches the audit
+# measurement). Only fires when the first non-blank line is exactly NO-ACTION.
+_NO_ACTION_CLOSE_INTENT_N1 = re.compile(
+    r"this is a terminal disposition"
+    r"|thread'?s? latest status is now no-action"
+    r"|(?:disposed|disposition) as unactionable"
+    r"|auto-?disposition"
+    r"|disposition-?close"
+    r"|removed from the actionable"
+    r"|acknowledges? receipt"
+    r"|carrier acknowledgment"
+    r"|no (?:further|derived) (?:prime builder )?(?:action|work) is (?:due|required)"
+    r"|informational audit trail acknowledged"
+    r"|no action or code mutation is requested"
+)
+_NO_ACTION_CLOSE_INTENT_N2 = re.compile(
+    r"(?:blocking (?:finding|condition)s?|finding f\d|the (?:sole|single) (?:dispositive )?"
+    r"(?:blocking )?(?:finding|question|owner-gated question))[^.]{0,160}?"
+    r"(?:is|are|now|already) (?:already )?(?:resolved|cleared|satisfied|unblocked|moot)"
+    r"|##\s*owner decision applied"
+    r"|resolved by operational intervention"
+    r"|(?:blocking finding|authority gap|ambiguity) (?:is )?(?:already )?resolved"
+    r"|no-action on (?:version )?v?\d+ as (?:a )?(?:blocking|review) verdict"
+)
+
+
+def _no_action_close_intent_deny(file_path: str, content: str) -> str | None:
+    """Block a NO-ACTION whose body is a close/disposal rather than a verdict correction.
+
+    Complements _no_action_prior_verdict_deny (which requires a prior verdict to
+    exist). This guard fires even when a prior GO/NO-GO exists -- the Goose burst
+    files DID sit on prior verdicts, so the prior-verdict check passed; the defect
+    was that the body closed the thread instead of stating a correction.
+    """
+    if not _is_bridge_markdown_file(file_path):
+        return None
+    if _first_nonblank_line(content) != "NO-ACTION":
+        return None
+    body = content
+    # strip the copyright footer so its "(c) ... rights reserved" never matches
+    marker = body.lower().rfind("rights reserved")
+    if marker != -1:
+        line_start = body.rfind("\n", 0, marker)
+        body = body[:line_start] if line_start != -1 else body
+    collapsed = re.sub(r"\s+", " ", body).lower()
+    hit = None
+    if _NO_ACTION_CLOSE_INTENT_N1.search(collapsed):
+        hit = "close/disposal language (N1)"
+    elif _NO_ACTION_CLOSE_INTENT_N2.search(collapsed):
+        hit = "self-granted clearance of a blocking finding (N2)"
+    if hit is None:
+        return None
+    return (
+        "[Governance] NO-ACTION bridge write blocked: the body reads as a "
+        f"{hit}, not a rejection of a governance-noncompliant verdict. Per "
+        "DCL-NO-ACTION-STATUS-SEMANTICS-001 a NO-ACTION must state what the reviewing "
+        "role must fix and route the thread back for a corrected verdict; it MUST NOT be "
+        "used to record a Prime 'no further action' / disposition-close. Use WITHDRAWN "
+        "(with cited owner rationale) to terminate a thread, or file a substantive "
+        "correction directive. (Hard-block per WI-5850 emergency-bootstrap.)"
+    )
+
+
 def _bridge_envelope_head_deny_reason(content: str) -> str | None:
     try:
         validate_bridge_envelope_head(content, require_dispatchable=True)
@@ -2091,6 +2193,9 @@ def _deny_reason_for_content(
             no_action_deny = _no_action_prior_verdict_deny(file_path, content)
             if no_action_deny:
                 return no_action_deny
+            close_intent_deny = _no_action_close_intent_deny(file_path, content)
+            if close_intent_deny:
+                return close_intent_deny
         if first_line in {"GO", "NO-GO", "VERIFIED"}:
             self_review_deny = _verdict_self_review_deny(file_path, content, cwd_path)
             if self_review_deny:

@@ -2526,6 +2526,115 @@ def _check_untracked_terminal_verified_verdicts(target: Path) -> ToolCheck:
     )
 
 
+def _check_raw_written_close_intent_no_action(target: Path) -> ToolCheck:
+    """WI-5811 (detection slice): WARN when an untracked NO-ACTION bridge file
+    reads as a close/disposal rather than a verdict correction.
+
+    The write-time bridge-compliance gate cannot intercept a hook-less harness
+    that writes ``bridge/*.md`` via a raw filesystem write. That is the exact
+    2026-07-31 Goose "auto-disposition" vector: 322 close-intent NO-ACTION files,
+    none written through a gated path (see
+    ``bridge/cleanup-evidence/goose-cursor-autonomous-loop-incident-20260731/``).
+    Write-time enforcement (``_no_action_close_intent_deny`` / the WI-5850
+    preflight-assertion-integrity guard) closes the Write-tool and governed-writer
+    paths; this read-time check closes the residual raw-write path by making such
+    artifacts DISCOVERABLE for quarantine even though no gate could block them.
+
+    Reuses the gate's validated close-intent detector via dynamic import (single
+    source of truth, no drift; N1 ∪ N2, measured 0/269 false-positive against the
+    lawful corpus). Scans only untracked bridge files — committed files are the
+    append-only audit trail and are out of scope for this working-tree detector.
+    Fail-soft ``warning`` (never ``fail``): a surfaced discoverability signal, not
+    a release block, since the artifact is already on disk and unblockable.
+    """
+    name = "raw-written close-intent NO-ACTION"
+    if not (target / "bridge").is_dir():
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=False,
+            status="info",
+            message="no bridge/ directory; nothing to verify",
+        )
+    gate_path = target / ".claude" / "hooks" / "bridge-compliance-gate.py"
+    if not gate_path.is_file():
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=False,
+            status="info",
+            message="bridge-compliance-gate.py absent; close-intent scan skipped",
+        )
+    try:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("_gtkb_bcg_doctor_close_intent", gate_path)
+        gate = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(gate)
+        detect = gate._no_action_close_intent_deny
+    except Exception:  # noqa: BLE001 - detector unavailable must not crash doctor
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="info",
+            message="close-intent detector unavailable; scan skipped",
+        )
+
+    ok, out = _run_cmd(["git", "-C", str(target), "ls-files", "--others", "--exclude-standard", "bridge"])
+    if not ok:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="info",
+            message="git ls-files unavailable; close-intent scan skipped",
+        )
+
+    hits: list[str] = []
+    for line in out.splitlines():
+        rel = line.strip().replace("\\", "/")
+        if not rel.endswith(".md"):
+            continue
+        # Scope to the LIVE top-level chain only: `bridge/<file>.md`. This mirrors
+        # the actionability parsers (status_driver / bridge_thread_files /
+        # versioned_files all use non-recursive glob("*.md")), and it excludes the
+        # `bridge/cleanup-evidence/**` quarantine subtree — files relocated there
+        # are already correctly dispositioned and must not re-alarm.
+        if rel.count("/") != 1:
+            continue
+        try:
+            content = (target / rel).read_text(encoding="utf-8")
+        except OSError:
+            continue
+        try:
+            if detect(str(target / rel), content) is not None:
+                hits.append(rel)
+        except Exception:  # noqa: BLE001 - one bad file must not abort the scan
+            continue
+
+    if hits:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                "untracked NO-ACTION bridge files read as close/disposal rather than a "
+                "verdict correction (raw-write vector bypassed all write-time gates; "
+                "DCL-NO-ACTION-STATUS-SEMANTICS-001) — inspect and quarantine to "
+                "bridge/cleanup-evidence/: " + ", ".join(sorted(hits))
+            ),
+        )
+    return ToolCheck(
+        name=name,
+        required=False,
+        found=True,
+        status="pass",
+        message="no untracked close-intent NO-ACTION bridge files detected",
+    )
+
+
 def _check_skill_rename_reference_sweep(target: Path) -> ToolCheck:
     """WI-5668: WARN while any pre-rename bare skill-directory references remain.
 
@@ -7237,6 +7346,7 @@ def run_doctor(
         checks.append(_check_spec_classifier_settings_registered(target))
         checks.append(_check_registered_hooks_tracked(target))
         checks.append(_check_untracked_terminal_verified_verdicts(target))
+        checks.append(_check_raw_written_close_intent_no_action(target))
         checks.append(_check_skill_rename_reference_sweep(target))
         checks.append(_check_spec_classifier_codex_parity(target))
         checks.append(_check_spec_classifier_test_exists(target))
