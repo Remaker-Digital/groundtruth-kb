@@ -251,10 +251,42 @@ class RegistryPaths:
         return cls(root, canonical, packaged, database, lock)
 
 
+_DEFAULT_REGISTRY_LOCK_TIMEOUT_SECONDS = 300.0
+_REGISTRY_LOCK_TIMEOUT_ENV = "GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS"
+
+
+def _resolve_registry_lock_timeout(explicit: float | None) -> float:
+    """Resolve the control-plane lock acquisition timeout in seconds.
+
+    Precedence: an explicit caller value wins; otherwise the
+    ``GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS`` environment variable; otherwise a
+    generous default. Per DELIB-202667722 (timer governance: relaxed-first,
+    config-backed, no invisible hard-coded values) and WI-5788, the default is
+    generous so sustained concurrent registry writers wait through
+    control-plane.lock contention instead of hard-failing at the retired 30s
+    deadline. Only the acquisition-wait deadline is resolved here; lock
+    ordering, exclusivity, acquisition, and release semantics are unchanged. A
+    lock timeout fails open to the generous default (never fail-closed): a
+    registry operation that errored merely because the env var was unset or
+    malformed would be worse than the contention it guards against.
+    """
+    if explicit is not None:
+        return explicit
+    raw = os.environ.get(_REGISTRY_LOCK_TIMEOUT_ENV)
+    if raw is not None:
+        try:
+            value = float(raw)
+        except ValueError:
+            return _DEFAULT_REGISTRY_LOCK_TIMEOUT_SECONDS
+        if value > 0:
+            return value
+    return _DEFAULT_REGISTRY_LOCK_TIMEOUT_SECONDS
+
+
 class _RegistryFileLock:
-    def __init__(self, path: Path, timeout: float = 30.0) -> None:
+    def __init__(self, path: Path, timeout: float | None = None) -> None:
         self.path = path
-        self.timeout = timeout
+        self.timeout = _resolve_registry_lock_timeout(timeout)
         self._handle: Any = None
 
     def __enter__(self) -> _RegistryFileLock:

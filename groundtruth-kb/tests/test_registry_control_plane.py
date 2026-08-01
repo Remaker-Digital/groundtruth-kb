@@ -191,6 +191,43 @@ def test_opaque_container_authorizes_operations_without_claiming_child_identity(
     assert resolver.resolve_operation_path("outside.json") is None
 
 
+def test_registry_lock_timeout_generous_default_and_env_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-5788: control-plane lock acquisition timeout is generous + env-configurable.
+
+    Precedence: explicit caller value > ``GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS``
+    env var > generous default. A missing/malformed/non-positive env var fails
+    open to the generous default (never fail-closed), and the default is well
+    above the retired 30s deadline that hard-failed under sustained concurrent
+    writers. Lock semantics are unchanged; only the acquisition-wait deadline
+    is resolved here.
+    """
+    lock_path = tmp_path / "control-plane.lock"
+
+    # Generous default when no env var is set (fail-open, not the retired 30s).
+    monkeypatch.delenv("GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS", raising=False)
+    default_timeout = registry_control_plane._RegistryFileLock(lock_path).timeout
+    assert default_timeout == registry_control_plane._DEFAULT_REGISTRY_LOCK_TIMEOUT_SECONDS
+    assert default_timeout >= 120.0
+    assert default_timeout != 30.0
+
+    # Env var overrides the default.
+    monkeypatch.setenv("GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS", "45.5")
+    assert registry_control_plane._RegistryFileLock(lock_path).timeout == 45.5
+
+    # Explicit caller value wins over both env var and default.
+    assert registry_control_plane._RegistryFileLock(lock_path, timeout=3.0).timeout == 3.0
+
+    # Malformed or non-positive env values fail open to the generous default.
+    for bad in ("not-a-number", "0", "-5"):
+        monkeypatch.setenv("GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS", bad)
+        assert (
+            registry_control_plane._RegistryFileLock(lock_path).timeout
+            == registry_control_plane._DEFAULT_REGISTRY_LOCK_TIMEOUT_SECONDS
+        )
+
+
 def test_snapshot_requires_byte_identical_packaged_mirror(tmp_path: Path) -> None:
     (tmp_path / "member.txt").write_text("one", encoding="utf-8")
     records = [_record("member", "member.txt")]
