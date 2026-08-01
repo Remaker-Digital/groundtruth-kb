@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from groundtruth_kb.project.registry_control_plane import (
     RegistryControlPlaneError,
@@ -12,6 +15,55 @@ from groundtruth_kb.project.registry_control_plane import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+# WI-5742 Layer B1: invocation-scoped registry snapshot cache.
+#
+# ``load_registry_snapshot`` acquires the *exclusive* control-plane file lock
+# even though classification is a pure read. Classifying an N-path staged set
+# therefore performed N (plus one for the registry commit assessment) exclusive
+# lock acquisitions and N full snapshot parses of a 1.55 MB registry TOML over
+# an 844 MB store. That is both a CPU cost and the contention amplifier behind
+# the observed ``timed out acquiring registry lock ... control-plane.lock``
+# failures.
+#
+# The cache is DISABLED by default (``None``) so no existing caller changes
+# behavior. A caller that is performing one bounded, read-only evaluation opens
+# :func:`registry_snapshot_cache_scope` for the duration of that single
+# invocation, collapsing N+1 loads to 1. The cache never outlives the scope and
+# is never process-global: a global cache would open a stale-authority window
+# for mutating callers, which was rejected in the WI-5742 proposal.
+_REGISTRY_SNAPSHOT_CACHE: dict[str, Any] | None = None
+
+
+@contextmanager
+def registry_snapshot_cache_scope() -> Iterator[None]:
+    """Memoize registry snapshot loads for the duration of one read-only invocation.
+
+    Re-entrant by save/restore, so a nested scope cannot leak a cache into an
+    enclosing caller that did not ask for one.
+    """
+    global _REGISTRY_SNAPSHOT_CACHE
+    previous = _REGISTRY_SNAPSHOT_CACHE
+    _REGISTRY_SNAPSHOT_CACHE = {}
+    try:
+        yield
+    finally:
+        _REGISTRY_SNAPSHOT_CACHE = previous
+
+
+def load_registry_snapshot_cached(*, project_root: Path) -> Any:
+    """Load a registry snapshot, reusing one already loaded in the active cache scope.
+
+    Outside a :func:`registry_snapshot_cache_scope` this is exactly
+    ``load_registry_snapshot`` -- same lock, same freshness, no caching.
+    """
+    if _REGISTRY_SNAPSHOT_CACHE is None:
+        return load_registry_snapshot(project_root=project_root)
+    key = str(Path(project_root).resolve())
+    if key not in _REGISTRY_SNAPSHOT_CACHE:
+        _REGISTRY_SNAPSHOT_CACHE[key] = load_registry_snapshot(project_root=project_root)
+    return _REGISTRY_SNAPSHOT_CACHE[key]
+
 
 PROTECTED_EXACT = frozenset(
     {
@@ -109,7 +161,7 @@ def _registry_classification(rel: str, project_root: Path) -> ControlledArtifact
     if not registry_path.exists():
         return None
     try:
-        record = load_registry_snapshot(project_root=project_root).resolver.resolve(rel)
+        record = load_registry_snapshot_cached(project_root=project_root).resolver.resolve(rel)
     except RegistryControlPlaneError:
         return ControlledArtifactClassification(rel, True, True, "registry_authority_unavailable", "registry/error")
     if record is None:

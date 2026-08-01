@@ -1,0 +1,103 @@
+# Protected-commit governance timers (WI-5742 Layer A)
+#
+# Authority:
+#   - DELIB-202667722 - timer and throttle governance as a first-class concern
+#     with relaxed-first defaults and a single resolution path.
+#   - WI-5806 - invariant-coupled timers are externalized *together* so that
+#     independent tuning cannot break the invariant that couples them.
+#   - GOV-ENV-LOCAL-AUTHORITY-001 - the env-local layer of the resolution
+#     precedence below.
+#
+# Resolution precedence (implemented by
+# groundtruth-kb/src/groundtruth_kb/project/timer_config.py):
+#
+#   1. env-local override   (GTKB_PROTECTED_COMMIT_EVALUATION_BOUND_SECONDS,
+#                            GTKB_BRIDGE_PUBLICATION_CAPABILITY_TTL_SECONDS)
+#   2. this configuration file
+#   3. the relaxed in-code fallback constants in timer_config.py, used only
+#      when this file is absent
+#
+# ---------------------------------------------------------------------------
+# THE COUPLED INVARIANT
+# ---------------------------------------------------------------------------
+#
+# These two values are an invariant-coupled pair and MUST be tuned together.
+#
+#   evaluation_bound_seconds
+#       The wall-clock budget for one full staged evaluation of the
+#       protected-commit authorization gate
+#       (scripts/check_protected_commit_authorization.py). On exhaustion the
+#       gate DENIES with phase evidence. It never passes on timeout and never
+#       hangs.
+#
+#   bridge_publication_capability_ttl_seconds
+#       The lifetime of a minted bridge-publication capability
+#       (mint_bridge_publication_capability in
+#       groundtruth-kb/src/groundtruth_kb/project/registry_control_plane.py).
+#       Mirrored here so the pair can be validated as a unit.
+#
+# INVARIANT:  evaluation_bound_seconds < bridge_publication_capability_ttl_seconds
+#
+# If the gate bound could equal or exceed the capability TTL, a slow-but-passing
+# gate could outlive the capability minted for the publication it is gating.
+# That is precisely the stranding failure recorded across WI-5368, WI-5758,
+# WI-5759, WI-5824 and eleven incident directories under
+# bridge/cleanup-evidence/: the capability expires mid-gate, the parent commit
+# dies, compensation cannot restore the aggregate preimage because sibling
+# threads appended in the interim, and a terminal VERIFIED verdict is left
+# file-only with no backing commit.
+#
+# The validated accessor in timer_config.py REFUSES to return a bound greater
+# than or equal to the paired TTL, which makes that stranding precondition
+# unrepresentable in configuration rather than merely discouraged.
+#
+# ---------------------------------------------------------------------------
+# RELAXED-FIRST POSTURE
+# ---------------------------------------------------------------------------
+#
+# Per DELIB-202667722 these values start at the most relaxed tolerable posture,
+# not at the measured optimum. Tighten only with fresh measurement evidence;
+# loosening past the TTL is rejected outright by the accessor.
+#
+# WI-5742 measurements (2026-08-01, live repository):
+#
+#   pre-fix,  812-path staged set (94 protected):  241.664s wall / 137.969s cpu
+#   post-fix, 812-path corpus, run 1:               59.367s wall /  11.922s cpu
+#   post-fix, 812-path corpus, run 2:               84.286s wall /  14.953s cpu
+#   post-fix, realistic 7-path staged finalization: 38.744s wall
+#
+# The 812-path corpus is a pathological custodial-sweep shape, not a normal
+# finalization commit; the 7-path figure is the realistic case. Run-to-run
+# variance on the pathological corpus (59s -> 84s) comes from concurrent
+# sessions contending for the control-plane lock, so the bound is set well above
+# the WORST observation rather than the mean.
+#
+# KNOWN RESIDUAL (disclosed, not resolved by this change): because the bound
+# must stay under the capability TTL, a gate that genuinely ran near the bound
+# would leave only the remaining margin for the publish-and-commit step. The
+# structural removal of that residual is WI-5742 Layer C (mint the capability
+# AFTER the gates pass, so capability lifetime never covers the long
+# evaluation), which is DEFERRED to its own governed cycle. Until Layer C
+# lands, the bound/TTL inequality below is the guarantee, and it is a
+# substantial improvement on the pre-fix state where the gate ran at 2.01x the
+# capability TTL.
+
+schema_version = 1
+
+[protected_commit]
+
+# Wall-clock budget for one full staged evaluation, in seconds.
+# Tolerance bound: must be >= 1 and strictly less than
+# bridge_publication_capability_ttl_seconds below.
+#
+# 110s is ~2.8x the realistic 7-path finalization cost (38.7s) and ~1.3x the
+# worst pathological 812-path observation (84.3s), while holding 10s under the
+# paired TTL.
+evaluation_bound_seconds = 110
+
+# Lifetime of a minted bridge-publication capability, in seconds.
+# Tolerance bound: must be >= 1 and <= 300. The 300-second ceiling mirrors the
+# hard rejection in mint_bridge_publication_capability; a value above it would
+# be accepted here but rejected at mint time, so the accessor enforces the same
+# ceiling to keep configuration and runtime in agreement.
+bridge_publication_capability_ttl_seconds = 120

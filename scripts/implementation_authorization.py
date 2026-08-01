@@ -2830,7 +2830,46 @@ def activate_packet(project_root: Path, bridge_id: str) -> dict[str, Any]:
     return packet
 
 
-def list_named_packets(project_root: Path) -> list[dict[str, Any]]:
+def _packet_cannot_authorize_any(packet: dict[str, Any], candidate_paths: list[str]) -> str | None:
+    """Cheap, provably-safe pre-filter reason, or ``None`` to admit full validation.
+
+    WI-5742 Layer B2. Full validation of one packet costs two complete bridge
+    lifecycle-chain resolutions (``_validate_packet`` plus
+    ``assess_packet_terminal_evidence``). Running that over every packet in the
+    named cache to find the handful that are live dominated the protected-commit
+    gate's cost.
+
+    Both criteria below are *necessary conditions* for a packet to authorize a
+    candidate path, so excluding a packet that fails one cannot change any
+    clearance outcome:
+
+    * **Expired.** ``_validate_packet`` raises ``AuthorizationError`` on an
+      expired packet, so an expired packet can never be reported ``valid=True``
+      and can never clear a path.
+    * **No path match.** Clearance is decided by ``path_authorized``, which
+      tests exactly the ``target_path_globs`` read here. A packet that
+      authorizes none of the candidate paths cannot clear any of them.
+
+    An unparseable ``expires_at`` is *not* treated as expired -- it is admitted
+    to full validation so the existing fail-closed error reporting is preserved
+    rather than replaced by a cheap-filter verdict.
+    """
+    globs = packet.get("target_path_globs") or []
+    if not any(path_authorized(packet, candidate) for candidate in candidate_paths):
+        return f"pre-filtered: authorizes none of the {len(candidate_paths)} candidate path(s)"
+    raw_expiry = packet.get("expires_at")
+    if isinstance(raw_expiry, str) and raw_expiry.strip():
+        try:
+            if parse_iso(raw_expiry) < now_utc():
+                return f"pre-filtered: packet expired at {raw_expiry}"
+        except (TypeError, ValueError):
+            return None
+    if not globs:
+        return "pre-filtered: packet declares no target path globs"
+    return None
+
+
+def list_named_packets(project_root: Path, candidate_paths: list[str] | None = None) -> list[dict[str, Any]]:
     """Enumerate all named-cache packets under
     `.gtkb-state/implementation-authorizations/by-bridge/`. Each row reports
     `(bridge_id, expires_at, target_path_globs, valid, error)`. A row is
@@ -2839,10 +2878,24 @@ def list_named_packets(project_root: Path) -> list[dict[str, Any]]:
 
     Per WI-5694 (DELIB-202667723), rows also carry additive terminal-evidence
     fields: `evidence_valid`, `evidence_error`, `expired`.
+
+    WI-5742 Layer B2: when `candidate_paths` is supplied, packets that provably
+    cannot authorize any of those paths (expired, or matching none of them) are
+    reported from a cheap JSON read instead of two full bridge-chain
+    resolutions. Every row is still returned, still carries `valid=False` and a
+    populated `error`, and the clearance outcome is unchanged -- see
+    `_packet_cannot_authorize_any` for why both criteria are necessary
+    conditions for clearance. `candidate_paths=None` (the default) preserves the
+    original exhaustive behavior for every existing caller.
     """
     by_bridge_dir = project_root / BY_BRIDGE_DIRECTORY_RELATIVE_PATH
     if not by_bridge_dir.is_dir():
         return []
+    # No pre-normalization: ``path_authorized`` -> ``_target_pattern_authorizes_path``
+    # normalizes both the pattern and the candidate path itself, so passing raw
+    # candidates keeps the pre-filter's matching semantics byte-identical to the
+    # clearance check in ``_live_go_authorization``.
+    normalized_candidates = None if candidate_paths is None else list(candidate_paths)
     rows: list[dict[str, Any]] = []
     for path in sorted(by_bridge_dir.glob("*.json")):
         rel = path.relative_to(project_root).as_posix()
@@ -2863,6 +2916,39 @@ def list_named_packets(project_root: Path) -> list[dict[str, Any]]:
                 }
             )
             continue
+        if not isinstance(packet, dict):
+            rows.append(
+                {
+                    "path": rel,
+                    "bridge_id": None,
+                    "expires_at": None,
+                    "target_path_globs": [],
+                    "valid": False,
+                    "error": "packet root is not an object",
+                    "evidence_valid": False,
+                    "evidence_error": "packet root is not an object",
+                    "expired": False,
+                }
+            )
+            continue
+        if normalized_candidates is not None:
+            prefilter_reason = _packet_cannot_authorize_any(packet, normalized_candidates)
+            if prefilter_reason is not None:
+                rows.append(
+                    {
+                        "path": rel,
+                        "bridge_id": packet.get("bridge_id"),
+                        "expires_at": packet.get("expires_at"),
+                        "target_path_globs": packet.get("target_path_globs", []),
+                        "valid": False,
+                        "error": prefilter_reason,
+                        "evidence_valid": False,
+                        "evidence_error": prefilter_reason,
+                        "expired": prefilter_reason.startswith("pre-filtered: packet expired"),
+                        "prefiltered": True,
+                    }
+                )
+                continue
         bridge_id = packet.get("bridge_id")
         try:
             _validate_packet(project_root, packet)

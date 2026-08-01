@@ -14,6 +14,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unicodedata
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -38,6 +39,7 @@ from scripts.bridge_review_independence import verdict_self_review_reason  # noq
 from scripts.controlled_artifact_paths import (  # noqa: E402
     classify_controlled_artifact,
     is_versioned_bridge_status_file,
+    registry_snapshot_cache_scope,
 )
 from scripts.gtkb_bridge_writer import BridgeComplianceError  # noqa: E402
 from scripts.implementation_authorization import (  # noqa: E402
@@ -79,6 +81,141 @@ EXTRA_PROTECTED_PREFIXES = (".githooks/",)
 
 class GateError(RuntimeError):
     """Raised when the commit gate cannot evaluate safely."""
+
+
+# WI-5742 Layer A: fail-closed wall-clock bound on the full staged evaluation.
+#
+# Before this bound existed the gate had a per-subprocess Git timeout but no
+# outer budget, so one evaluation could run for minutes while the parent
+# ``git commit`` waited. Measured on the live repository at 241.7s wall against
+# a 120s bridge-publication capability TTL, the gate routinely outlived the
+# capability minted for the publication it was gating -- which is the mechanism
+# that stranded terminal VERIFIED verdicts with no backing commit.
+#
+# The budget denies on exhaustion. It never passes on timeout and never hangs.
+_EVALUATION_PHASES = (
+    "index_snapshot",
+    "classification",
+    "registry_assessment",
+    "live_go_evidence",
+    "verified_evidence",
+    "transaction_evidence",
+    "per_path",
+)
+
+
+class EvaluationBoundExceeded(GateError):
+    """Raised when a staged evaluation exhausts its configured wall-clock budget."""
+
+    def __init__(self, *, phase: str, elapsed: float, bound: float, source: str) -> None:
+        self.phase = phase
+        self.elapsed = elapsed
+        self.bound = bound
+        self.source = source
+        super().__init__(
+            f"protected-commit evaluation exceeded its {bound:g}s budget while executing phase "
+            f"{phase!r} (elapsed {elapsed:.1f}s; bound resolved from {source})"
+        )
+
+    def as_result(self) -> dict[str, Any]:
+        """Render the exhaustion as a deterministic deny verdict with phase evidence."""
+        return {
+            "status": "fail",
+            "findings": [
+                {
+                    "path": "<evaluation-bound>",
+                    "reason": (
+                        f"protected-commit evaluation exceeded its configured {self.bound:g}s wall-clock "
+                        f"bound while executing phase {self.phase!r}"
+                    ),
+                    "evidence_errors": [
+                        f"executing phase: {self.phase}",
+                        f"elapsed: {self.elapsed:.1f}s",
+                        f"configured bound: {self.bound:g}s",
+                        f"bound source: {self.source}",
+                        (
+                            "remediation: re-run the commit; if this recurs, the phase named above is the "
+                            "slow phase to investigate. Raise evaluation_bound_seconds in "
+                            "config/governance/protected-commit-timers.toml only up to (not including) the "
+                            "paired bridge_publication_capability_ttl_seconds -- a bound at or above that TTL "
+                            "re-creates the publication-stranding precondition and is rejected by the accessor."
+                        ),
+                    ],
+                }
+            ],
+            "cleared": [],
+            "skipped_unprotected": [],
+            "protected_paths": [],
+            "audit_gaps": [],
+            "evaluation_bound": {
+                "exhausted": True,
+                "phase": self.phase,
+                "elapsed_seconds": round(self.elapsed, 3),
+                "bound_seconds": self.bound,
+                "source": self.source,
+            },
+            "evidence_summary": {
+                "live_go_packets_scanned": 0,
+                "live_go_packets_valid": 0,
+                "terminal_verified_packets_scanned": 0,
+                "terminal_verified_threads_loaded": 0,
+            },
+        }
+
+
+class _EvaluationBudget:
+    """Monotonic wall-clock budget with phase tracking for one staged evaluation."""
+
+    def __init__(self, bound_seconds: float, *, source: str, clock: Any = None) -> None:
+        self._bound = float(bound_seconds)
+        self._source = source
+        self._clock = clock or time.monotonic
+        self._start = self._clock()
+        self._phase = "startup"
+
+    @property
+    def phase(self) -> str:
+        return self._phase
+
+    @property
+    def bound_seconds(self) -> float:
+        return self._bound
+
+    def elapsed(self) -> float:
+        return float(self._clock() - self._start)
+
+    def enter(self, phase: str) -> None:
+        """Mark the phase now executing, then check the budget before doing its work."""
+        self._phase = phase
+        self.check()
+
+    def check(self) -> None:
+        elapsed = self.elapsed()
+        if elapsed > self._bound:
+            raise EvaluationBoundExceeded(
+                phase=self._phase,
+                elapsed=elapsed,
+                bound=self._bound,
+                source=self._source,
+            )
+
+
+def _resolve_evaluation_budget(root: Path) -> _EvaluationBudget:
+    """Resolve the configured bound through the single timer-config path.
+
+    Fails closed: an unreadable or invariant-violating timer configuration is a
+    gate error, never an unbounded evaluation.
+    """
+    package_src = root / "groundtruth-kb" / "src"
+    if str(package_src) not in sys.path:
+        sys.path.insert(0, str(package_src))
+    try:
+        from groundtruth_kb.project.timer_config import resolve_protected_commit_timers
+
+        timers = resolve_protected_commit_timers(root)
+    except Exception as exc:  # noqa: BLE001 - commit authority fails closed
+        raise GateError(f"protected-commit timer configuration is unusable: {exc}") from exc
+    return _EvaluationBudget(timers.evaluation_bound_seconds, source=timers.source)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1331,10 +1468,35 @@ def _verified_bridge_finalization_finding(
     }
 
 
-def _load_live_go_evidence(root: Path) -> tuple[list[dict[str, Any]], list[str], int]:
+def _load_live_go_evidence(
+    root: Path, candidate_paths: list[str] | None = None
+) -> tuple[list[dict[str, Any]], list[str], int]:
+    """Load live GO packet evidence.
+
+    WI-5742 Layer B2: ``candidate_paths`` is the protected-path set actually
+    being evaluated. Passing it lets the packet enumerator skip full bridge-chain
+    validation for packets that provably cannot authorize any of those paths.
+    The returned ``valid_packets`` -- the only field that decides clearance -- is
+    unchanged, because every skipped packet fails a necessary condition for
+    clearance. Skipped packets still produce a row and a populated error, so the
+    fail-closed reporting surface stays populated.
+    """
     errors: list[str] = []
     try:
-        packets = list_named_packets(root)
+        if candidate_paths is None:
+            packets = list_named_packets(root)
+        else:
+            try:
+                packets = list_named_packets(root, candidate_paths=candidate_paths)
+            except TypeError:
+                # A caller or test double still bound to the pre-WI-5742
+                # single-argument signature. Degrade to the exhaustive
+                # enumeration -- slower, but identical evidence. Without this
+                # the arity mismatch would be swallowed by the fail-closed
+                # handler below and silently DENY a path that a live GO packet
+                # should have cleared, which is an authorization regression
+                # rather than a performance one.
+                packets = list_named_packets(root)
     except Exception as exc:  # noqa: BLE001 - fail closed on authorization subsystem errors.
         return [], [f"could not list implementation authorization packets: {exc}"], 0
 
@@ -2127,9 +2289,12 @@ def _registry_commit_assessment(
             )
         return [], []
     try:
-        from groundtruth_kb.project.registry_control_plane import load_registry_snapshot
+        # WI-5742 Layer B1: inside an active cache scope this reuses the single
+        # snapshot already loaded for path classification instead of taking the
+        # exclusive control-plane lock a second time.
+        from scripts.controlled_artifact_paths import load_registry_snapshot_cached
 
-        registry = load_registry_snapshot(project_root=root)
+        registry = load_registry_snapshot_cached(project_root=root)
     except Exception as exc:  # noqa: BLE001 - commit authority fails closed
         return (
             [
@@ -2292,14 +2457,31 @@ def _evaluate_selected(
     selected_paths: list[str],
     snapshot: _IndexSnapshot | None,
     head_oid: str | None,
+    budget: _EvaluationBudget | None = None,
 ) -> dict[str, Any]:
-    protected_paths = [path for path in selected_paths if is_protected_path(path, project_root=root)]
-    skipped_unprotected = [path for path in selected_paths if path not in protected_paths]
+    # WI-5742 Layer B3: classify each selected path exactly once and derive both
+    # partitions from that single pass. The previous form evaluated
+    # ``is_protected_path`` once per path and then re-scanned the protected list
+    # with an O(n) membership test per path to build the complement.
+    if budget is not None:
+        budget.enter("classification")
+    protected_paths: list[str] = []
+    skipped_unprotected: list[str] = []
+    for path in selected_paths:
+        if is_protected_path(path, project_root=root):
+            protected_paths.append(path)
+        else:
+            skipped_unprotected.append(path)
+        if budget is not None:
+            budget.check()
+
     bridge_findings = [
         finding
         for path in selected_paths
         if (finding := _verified_bridge_finalization_finding(root, path, snapshot)) is not None
     ]
+    if budget is not None:
+        budget.enter("registry_assessment")
     registry_findings, registry_audit_gaps = _registry_commit_assessment(root, selected_paths, snapshot)
     bridge_findings.extend(registry_findings)
 
@@ -2329,11 +2511,19 @@ def _evaluate_selected(
     transaction_errors: list[str] = []
     transaction_candidate_path: str | None = None
     if protected_paths:
-        live_go_packets, live_go_errors, live_go_count = _load_live_go_evidence(root)
+        if budget is not None:
+            budget.enter("live_go_evidence")
+        # WI-5742 Layer B2: only protected paths can be cleared by a live GO
+        # packet, so they are the exact candidate set for the pre-filter.
+        live_go_packets, live_go_errors, live_go_count = _load_live_go_evidence(root, candidate_paths=protected_paths)
+        if budget is not None:
+            budget.enter("verified_evidence")
         verified_evidence, verified_errors, verified_packet_count = _load_verified_evidence(
             root, head_oid=head_oid, protected_paths=protected_paths
         )
         if snapshot is not None:
+            if budget is not None:
+                budget.enter("transaction_evidence")
             transaction_evidence, transaction_errors, transaction_candidate_path = _load_transaction_verified_evidence(
                 root,
                 protected_paths,
@@ -2350,7 +2540,11 @@ def _evaluate_selected(
             }
         )
     cleared: list[dict[str, Any]] = []
+    if budget is not None:
+        budget.enter("per_path")
     for rel_path in protected_paths:
+        if budget is not None:
+            budget.check()
         result = _evaluate_protected_path(
             rel_path,
             live_go_packets=live_go_packets,
@@ -2382,14 +2576,39 @@ def _evaluate_selected(
     }
 
 
-def evaluate(root: Path, *, paths: list[str] | None = None) -> dict[str, Any]:
+def evaluate(
+    root: Path,
+    *,
+    paths: list[str] | None = None,
+    budget: _EvaluationBudget | None = None,
+) -> dict[str, Any]:
+    """Evaluate protected-commit authorization for a staged or explicit path set.
+
+    WI-5742: the whole evaluation runs inside a fail-closed wall-clock budget
+    (Layer A) and one invocation-scoped registry snapshot cache (Layer B1). On
+    budget exhaustion this returns a deterministic deny verdict carrying phase
+    evidence -- it never passes on timeout and never hangs.
+
+    ``budget`` is injectable so tests can drive the bound with a fake clock
+    without depending on real elapsed time.
+    """
     root = root.resolve()
-    head_oid = _resolve_head_oid(root)
-    if paths is not None:
-        selected_paths = [_normalize_rel(path) for path in paths]
-        return _evaluate_selected(root, selected_paths, None, head_oid)
-    with _index_snapshot(root, head_oid) as snapshot:
-        return _evaluate_selected(root, list(snapshot.selected_paths), snapshot, head_oid)
+    if budget is None:
+        budget = _resolve_evaluation_budget(root)
+    try:
+        # The cache scope is strictly this invocation: it collapses the N+1
+        # exclusive-lock snapshot loads to 1 and is discarded on exit, so no
+        # stale-authority window is created for any mutating caller.
+        with registry_snapshot_cache_scope():
+            head_oid = _resolve_head_oid(root)
+            if paths is not None:
+                selected_paths = [_normalize_rel(path) for path in paths]
+                return _evaluate_selected(root, selected_paths, None, head_oid, budget=budget)
+            budget.enter("index_snapshot")
+            with _index_snapshot(root, head_oid) as snapshot:
+                return _evaluate_selected(root, list(snapshot.selected_paths), snapshot, head_oid, budget=budget)
+    except EvaluationBoundExceeded as exc:
+        return exc.as_result()
 
 
 def _format_human(result: dict[str, Any], *, transaction_available: bool = False) -> str:
