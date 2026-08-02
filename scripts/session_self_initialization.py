@@ -365,25 +365,16 @@ def _role_metadata(
         metadata["role_assignment"] = (
             f"active AI harness assigned by owner through single role map entry for harness `{resolved_id}`"
         )
-    durable_profile = discover_role_profile(
-        project_root,
-        harness_name=harness_name,
-        harness_id=harness_id,
-        role_record_path=role_record_path,
-    )
-    durable_label = ROLE_PROFILES.get(durable_profile, {}).get("assumed_role", durable_profile)
     metadata["interactive_role_profile"] = role_profile
     metadata["interactive_resolved_role"] = metadata["assumed_role"]
+    # DCL-SESSION-ROLE-RESOLUTION-001 v7: worker startup surfaces MUST NOT
+    # reference the durable registry role. The interactive role source records
+    # only the transcript/startup evidence; it never describes a durable-registry
+    # fallback (which is itself forbidden by the DCL).
     metadata["interactive_role_source"] = interactive_role_source or (
-        "explicit transcript/startup role profile; overrides durable registry for interactive surfaces only"
+        "explicit transcript/startup role profile"
         if role_profile_explicit
-        else "durable registry fallback; no transcript-defined interactive role was provided to startup"
-    )
-    metadata["durable_registry_role_profile"] = durable_profile
-    metadata["durable_registry_role"] = durable_label
-    metadata["durable_registry_authority"] = (
-        "headless dispatch routing and interactive fallback only; non-overriding when a transcript-defined "
-        "interactive role is present"
+        else "no transcript-defined interactive role was provided to startup"
     )
     return metadata
 
@@ -5183,8 +5174,6 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             f"- Role being assumed: {role['assumed_role']}",
             f"- Interactive resolved role: {role.get('interactive_resolved_role', role['assumed_role'])}",
             f"- Interactive role source: {role.get('interactive_role_source', 'unidentified')}",
-            f"- Durable registry role: {role.get('durable_registry_role', 'unidentified')}",
-            f"- Durable registry role authority: {role.get('durable_registry_authority', 'unidentified')}",
             f"- Role assignment: {role['role_assignment']}",
             f"- Bridge: {role['bridge']}",
             f"- Bridge dispatch: {role['bridge_dispatch']}",
@@ -7035,8 +7024,6 @@ def _startup_service_context(result: dict[str, Any]) -> str:
             f"- Role being assumed: {role.get('assumed_role', 'unidentified')}",
             f"- Interactive resolved role: {role.get('interactive_resolved_role', role.get('assumed_role', 'unidentified'))}.",
             f"- Interactive role source: {role.get('interactive_role_source', 'unidentified')}.",
-            f"- Durable registry role: {role.get('durable_registry_role', 'unidentified')}.",
-            f"- Durable registry role authority: {role.get('durable_registry_authority', 'unidentified')}.",
             f"- Role mapping source: {role.get('role_mapping_source', 'unidentified')}.",
             f"- Harness self-identification: {role.get('harness_id', 'unidentified')}",
             f"- Harness identity source: {role.get('harness_identity_source', 'unidentified')}",
@@ -7107,8 +7094,6 @@ def _minimized_startup_disclosure(result: dict[str, Any]) -> str:
             f"- Role being assumed: {role.get('assumed_role', 'unidentified')}",
             f"- Interactive resolved role: {role.get('interactive_resolved_role', role.get('assumed_role', 'unidentified'))}",
             f"- Interactive role source: {role.get('interactive_role_source', 'unidentified')}",
-            f"- Durable registry role: {role.get('durable_registry_role', 'unidentified')}",
-            f"- Durable registry role authority: {role.get('durable_registry_authority', 'unidentified')}",
             f"- Role mapping source: {role.get('role_mapping_source', 'unidentified')}",
             f"- Harness self-identification: {role.get('harness_id', 'unidentified')}",
             "",

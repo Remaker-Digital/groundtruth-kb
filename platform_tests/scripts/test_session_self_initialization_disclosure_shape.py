@@ -95,8 +95,8 @@ def test_open_disclosure_includes_role_declaration() -> None:
     assert "Role being assumed: Prime Builder" in report
     assert "Interactive resolved role: Prime Builder" in report
     assert "Interactive role source:" in report
-    assert "Durable registry role:" in report
-    assert "Durable registry role authority:" in report
+    # DCL-SESSION-ROLE-RESOLUTION-001 v7: worker disclosure MUST NOT surface the durable registry role.
+    assert "Durable registry role" not in report
 
 
 def test_open_disclosure_includes_bridge_actionable_summary() -> None:
