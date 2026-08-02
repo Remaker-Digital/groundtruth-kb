@@ -108,6 +108,8 @@ from groundtruth_kb.project.registry_control_plane import (
     preview_registry_registration,
     recover_registry,
     register_artifacts,
+    transition_apply,
+    transition_request,
 )
 from groundtruth_kb.project.registry_control_plane import (
     validate_registry as validate_registry_control_plane,
@@ -5656,6 +5658,124 @@ def registry_amend(
         receipt = amend_artifact(
             entry_id,
             changes,
+            actor_session=session_id,
+            changed_by=changed_by,
+            change_reason=change_reason,
+            start_packet_hash=start_packet_hash,
+            pauth_id=pauth_id,
+            bridge_id=bridge_id,
+            **_registry_control_kwargs(ctx),
+        )
+    except (RegistryControlPlaneError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps(vars(receipt), indent=2, sort_keys=True))
+
+
+@registry_cmd.group("transition")
+def registry_transition() -> None:
+    """Registry identity-transition surface (DCL-ARTIFACT-REGISTRY-MUTATION-AUTHORIZATION-001; WI-5928 Slice 1)."""
+
+
+@registry_transition.command("request")
+@click.argument("entry_id")
+@click.option(
+    "--operation",
+    required=True,
+    help="Transition operation: membership_set, coverage_mode, or coverage_and_membership.",
+)
+@click.option(
+    "--owner-evidence-json",
+    required=True,
+    help="Owner-authorization evidence as a JSON object (bridge/pauth/owner-decision).",
+)
+@click.option("--coverage-changes-json", default=None, help="JSON object mapping registry id to target coverage_mode.")
+@click.option("--removal", "removals", multiple=True, help="Registry id to remove (repeatable).")
+@click.option("--destination-json", default=None, help="Optional JSON object summarizing the transition destination.")
+@click.option("--expiry-seconds", type=int, default=900, show_default=True, help="Request time-to-live in seconds.")
+@_registry_authority_options
+@click.pass_context
+def registry_transition_request(
+    ctx: click.Context,
+    entry_id: str,
+    operation: str,
+    owner_evidence_json: str,
+    coverage_changes_json: str | None,
+    removals: tuple[str, ...],
+    destination_json: str | None,
+    expiry_seconds: int,
+    bridge_id: str,
+    session_id: str,
+    start_packet_hash: str,
+    pauth_id: str,
+    changed_by: str,
+    change_reason: str,
+) -> None:
+    """Record a digest-bound registry identity-transition request."""
+    try:
+        owner_evidence = json.loads(owner_evidence_json)
+        if not isinstance(owner_evidence, dict):
+            raise ValueError("--owner-evidence-json must be a JSON object")
+        coverage_changes = json.loads(coverage_changes_json) if coverage_changes_json else None
+        if coverage_changes is not None and not isinstance(coverage_changes, dict):
+            raise ValueError("--coverage-changes-json must be a JSON object")
+        destination = json.loads(destination_json) if destination_json else None
+        if destination is not None and not isinstance(destination, dict):
+            raise ValueError("--destination-json must be a JSON object")
+        handle = transition_request(
+            entry_id=entry_id,
+            operation=operation,
+            owner_evidence=owner_evidence,
+            coverage_changes=coverage_changes,
+            removals=list(removals),
+            destination=destination,
+            expiry_seconds=expiry_seconds,
+            actor_session=session_id,
+            changed_by=changed_by,
+            change_reason=change_reason,
+            start_packet_hash=start_packet_hash,
+            pauth_id=pauth_id,
+            bridge_id=bridge_id,
+            **_registry_control_kwargs(ctx),
+        )
+    except (RegistryControlPlaneError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps(handle, indent=2, sort_keys=True))
+
+
+@registry_transition.command("apply")
+@click.argument("request_id")
+@click.option("--ops-envelope-json", required=True, help="OPS envelope evidence as a JSON object.")
+@click.option(
+    "--apply-authorization-json",
+    required=True,
+    help="Independent apply-GO evidence as a JSON object (status/bridge_id/author_session_context_id).",
+)
+@_registry_authority_options
+@click.pass_context
+def registry_transition_apply(
+    ctx: click.Context,
+    request_id: str,
+    ops_envelope_json: str,
+    apply_authorization_json: str,
+    bridge_id: str,
+    session_id: str,
+    start_packet_hash: str,
+    pauth_id: str,
+    changed_by: str,
+    change_reason: str,
+) -> None:
+    """Consume an active transition request and commit the identity transition."""
+    try:
+        ops_envelope = json.loads(ops_envelope_json)
+        if not isinstance(ops_envelope, dict):
+            raise ValueError("--ops-envelope-json must be a JSON object")
+        apply_authorization = json.loads(apply_authorization_json)
+        if not isinstance(apply_authorization, dict):
+            raise ValueError("--apply-authorization-json must be a JSON object")
+        receipt = transition_apply(
+            request_id=request_id,
+            ops_envelope=ops_envelope,
+            apply_authorization=apply_authorization,
             actor_session=session_id,
             changed_by=changed_by,
             change_reason=change_reason,

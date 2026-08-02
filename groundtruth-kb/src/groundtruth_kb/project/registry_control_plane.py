@@ -745,6 +745,33 @@ def ensure_control_plane_schema(conn: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_sot_registry_bridge_publication_state
             ON sot_registry_bridge_publication_capabilities(capability_state, expires_at);
+        CREATE TABLE IF NOT EXISTS sot_registry_transition_requests (
+            rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+            request_id TEXT NOT NULL,
+            request_digest TEXT NOT NULL,
+            entry_id TEXT NOT NULL,
+            source_locator TEXT NOT NULL,
+            current_revision_digest TEXT NOT NULL,
+            operation TEXT NOT NULL,
+            destination TEXT NOT NULL,
+            owner_evidence TEXT NOT NULL,
+            intended_membership_result TEXT NOT NULL,
+            request_state TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            consumed_at TEXT,
+            result_digest TEXT,
+            actor_session TEXT NOT NULL,
+            changed_by TEXT NOT NULL,
+            changed_at TEXT NOT NULL,
+            change_reason TEXT NOT NULL,
+            bridge_id TEXT NOT NULL,
+            pauth_id TEXT NOT NULL,
+            start_packet_hash TEXT NOT NULL,
+            UNIQUE(request_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_sot_registry_transition_request_state
+            ON sot_registry_transition_requests(request_state, expires_at);
         """
     )
     journal_columns = {
@@ -1195,6 +1222,7 @@ def _append_projection_versions(
     changed_by: str,
     changed_at: str,
     change_reason: str,
+    allow_removal: bool = False,
 ) -> tuple[str, ...]:
     existing = {record.id: record for record in _projection_records_from_connection(conn)}
     changed: list[str] = []
@@ -1240,8 +1268,16 @@ def _append_projection_versions(
         changed.append(record.id)
     current_ids = set(existing)
     desired_ids = {record.id for record in records}
-    if current_ids - desired_ids:
+    removed_ids = current_ids - desired_ids
+    if removed_ids and not allow_removal:
         raise RegistryAuthorizationError("ordinary registry transaction cannot remove declaration identities")
+    # WI-5928 Slice 1: membership removal drops the record from the derived projection
+    # mirror so `current_sot_artifacts` (MAX(version) per id, no tombstone filter) no
+    # longer surfaces it, matching the post-transition declaration. The removal stays
+    # audited by the transaction journal (old/new digests + full desired payload) and by
+    # the git-tracked canonical TOML; only the derived current-state mirror rows are dropped.
+    for removed_id in sorted(removed_ids):
+        conn.execute("DELETE FROM sot_artifacts WHERE id = ?", (removed_id,))
     return tuple(changed)
 
 
@@ -1606,6 +1642,7 @@ def _commit_prepared_generation(
             changed_by=row["changed_by"],
             changed_at=now,
             change_reason=row["change_reason"],
+            allow_removal=(row["operation"] == "transition"),
         )
         projection = _projection_records_from_connection(conn)
         projection_digest = _projection_digest(projection)
@@ -1728,7 +1765,7 @@ def apply_registry_transaction(
                 raise RegistryTransactionInProgress(
                     f"registry journal {incomplete['journal_id']} is {incomplete['journal_state']}"
                 )
-            if operation == "amend" and expected_prior_generation_digest is not None:
+            if operation in {"amend", "transition"} and expected_prior_generation_digest is not None:
                 current_canonical = paths.registry_path.read_bytes()
                 current_packaged = paths.packaged_registry_path.read_bytes()
                 if current_canonical != current_packaged:
@@ -1804,14 +1841,19 @@ def apply_registry_transaction(
                 expected_prior_generation_digest is not None
                 and prior_generation_digest != expected_prior_generation_digest
             ):
-                error_type = RegistryGenerationConflict if operation == "amend" else RegistryAuthorizationError
+                error_type = (
+                    RegistryGenerationConflict if operation in {"amend", "transition"} else RegistryAuthorizationError
+                )
                 raise error_type(
                     "registry generation changed after dry-run: "
                     f"expected {expected_prior_generation_digest}, observed {prior_generation_digest}"
                 )
             old_ids = {record.id for record in old_records}
             desired_ids = {record.id for record in desired}
-            if old_ids - desired_ids:
+            # WI-5928 Slice 1: the authorized `transition` operation is the sole lawful
+            # path that may drop a registry identity (membership removal). register/amend/
+            # legacy_bootstrap remain add-or-change-only.
+            if operation != "transition" and (old_ids - desired_ids):
                 raise RegistryAuthorizationError("register/amend cannot remove a registry identity")
 
             journal_id = f"SOTTXN-{uuid.uuid4().hex.upper()}"
@@ -2381,6 +2423,309 @@ def amend_artifact(
                 raise
 
     raise AssertionError("unreachable amend retry state")
+
+
+# WI-5928 Slice 1: registry identity-transition surface
+# (DCL-ARTIFACT-REGISTRY-MUTATION-AUTHORIZATION-001). Slice 1 delivers the
+# membership-set and in-place coverage-mode transition path only; move, rename,
+# and delete-to-quarantine transitions are deferred to a later slice.
+_SLICE1_TRANSITION_OPERATIONS: frozenset[str] = frozenset(
+    {"membership_set", "coverage_mode", "coverage_and_membership"}
+)
+_DEFERRED_TRANSITION_OPERATIONS: frozenset[str] = frozenset({"move", "rename", "delete", "delete_to_quarantine"})
+_VALID_TRANSITION_COVERAGE_MODES: frozenset[str] = frozenset({"exact", "recursive", "glob", "opaque_container"})
+_TRANSITION_REQUEST_MAX_TTL_SECONDS = 86_400
+
+
+def transition_request(
+    *,
+    entry_id: str,
+    operation: str,
+    owner_evidence: Mapping[str, Any],
+    actor_session: str,
+    changed_by: str,
+    change_reason: str,
+    start_packet_hash: str,
+    pauth_id: str,
+    bridge_id: str,
+    coverage_changes: Mapping[str, str] | None = None,
+    removals: Sequence[str] = (),
+    destination: Mapping[str, Any] | None = None,
+    expiry_seconds: int = 900,
+    project_root: Path | None = None,
+    registry_path: Path | None = None,
+    packaged_registry_path: Path | None = None,
+    db_path: Path | None = None,
+) -> dict[str, Any]:
+    """Record a digest-bound registry identity-transition request (Slice 1).
+
+    Binds ``entry_id``, ``source_locator``, the current generation digest, the
+    transition ``operation``, the ``destination`` summary, ``owner_evidence``,
+    the ``intended_membership_result`` (coverage changes plus membership
+    removals), and an expiry into the dedicated
+    ``sot_registry_transition_requests`` capability table. That table (an
+    active/consumed/expiry lifecycle mirroring the observation- and
+    publication-capability tables) is used INSTEAD of the transaction journal so
+    a pending request never leaves ``sot_registry_transaction_journal`` in a
+    non-terminal state that would trip ``apply_registry_transaction``'s
+    incomplete-journal gate.
+
+    Slice 1 supports membership removals and in-place coverage-mode changes only;
+    move/rename/delete-to-quarantine operations are rejected pending a later
+    slice.
+    """
+
+    if operation in _DEFERRED_TRANSITION_OPERATIONS:
+        raise RegistryAuthorizationError(
+            f"transition operation {operation!r} (move/rename/delete) is deferred to a later slice"
+        )
+    if operation not in _SLICE1_TRANSITION_OPERATIONS:
+        raise RegistryAuthorizationError(
+            f"unsupported transition operation {operation!r}; expected one of {sorted(_SLICE1_TRANSITION_OPERATIONS)}"
+        )
+    if not all((actor_session, start_packet_hash, pauth_id, bridge_id)):
+        raise RegistryAuthorizationError("actor session, bridge, start packet, and PAUTH evidence are required")
+    if not owner_evidence:
+        raise RegistryAuthorizationError("transition request requires non-empty owner evidence")
+    if expiry_seconds <= 0 or expiry_seconds > _TRANSITION_REQUEST_MAX_TTL_SECONDS:
+        raise RegistryAuthorizationError(
+            f"transition request TTL must be between 1 and {_TRANSITION_REQUEST_MAX_TTL_SECONDS} seconds"
+        )
+    normalized_coverage_changes = dict(coverage_changes or {})
+    removal_ids = tuple(dict.fromkeys(removals))
+    if not normalized_coverage_changes and not removal_ids:
+        raise RegistryAuthorizationError("transition request must change coverage or remove at least one member")
+    for target_id, target_mode in normalized_coverage_changes.items():
+        if target_mode not in _VALID_TRANSITION_COVERAGE_MODES:
+            raise RegistryCoverageError(f"unsupported target coverage_mode {target_mode!r} for {target_id!r}")
+
+    paths = RegistryPaths.resolve(
+        project_root=project_root,
+        registry_path=registry_path,
+        packaged_registry_path=packaged_registry_path,
+        db_path=db_path,
+    )
+    with _RegistryFileLock(paths.lock_path):
+        _ensure_no_nonterminal_journal(paths.db_path)
+        snapshot = _load_snapshot_unlocked(paths)
+        by_id = {record.id: record for record in snapshot.records}
+        if entry_id not in by_id:
+            raise RegistryCoverageError(f"transition entry id not found in registry: {entry_id}")
+        unknown = sorted(rid for rid in (*normalized_coverage_changes, *removal_ids) if rid not in by_id)
+        if unknown:
+            raise RegistryCoverageError(f"transition targets are not registered: {unknown}")
+        source_locator = by_id[entry_id].storage_path
+        intended_membership_result = {
+            "coverage_changes": dict(sorted(normalized_coverage_changes.items())),
+            "removals": sorted(removal_ids),
+        }
+        resolved_destination = dict(destination or {})
+        if "coverage_mode" not in resolved_destination and entry_id in normalized_coverage_changes:
+            resolved_destination["coverage_mode"] = normalized_coverage_changes[entry_id]
+        current_revision_digest = snapshot.generation_digest
+        request_digest = _json_digest(
+            {
+                "entry_id": entry_id,
+                "operation": operation,
+                "source_locator": source_locator,
+                "current_revision_digest": current_revision_digest,
+                "destination": resolved_destination,
+                "intended_membership_result": intended_membership_result,
+            }
+        )
+        request_id = f"REGTXNREQ-{uuid.uuid4().hex.upper()}"
+        created = datetime.now(UTC)
+        created_at = created.strftime("%Y-%m-%dT%H:%M:%SZ")
+        expires_at = (created + timedelta(seconds=expiry_seconds)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        conn = sqlite3.connect(str(paths.db_path))
+        try:
+            ensure_control_plane_schema(conn)
+            conn.execute(
+                """
+                INSERT INTO sot_registry_transition_requests (
+                    request_id, request_digest, entry_id, source_locator,
+                    current_revision_digest, operation, destination, owner_evidence,
+                    intended_membership_result, request_state, expires_at, created_at,
+                    actor_session, changed_by, changed_at, change_reason,
+                    bridge_id, pauth_id, start_packet_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    request_id,
+                    request_digest,
+                    entry_id,
+                    source_locator,
+                    current_revision_digest,
+                    operation,
+                    json.dumps(resolved_destination, sort_keys=True, separators=(",", ":")),
+                    json.dumps(dict(owner_evidence), sort_keys=True, separators=(",", ":")),
+                    json.dumps(intended_membership_result, sort_keys=True, separators=(",", ":")),
+                    expires_at,
+                    created_at,
+                    actor_session,
+                    changed_by,
+                    created_at,
+                    change_reason,
+                    bridge_id,
+                    pauth_id,
+                    start_packet_hash,
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return {
+        "request_id": request_id,
+        "request_digest": request_digest,
+        "entry_id": entry_id,
+        "operation": operation,
+        "source_locator": source_locator,
+        "current_revision_digest": current_revision_digest,
+        "intended_membership_result": intended_membership_result,
+        "destination": resolved_destination,
+        "expires_at": expires_at,
+        "request_state": "active",
+    }
+
+
+def transition_apply(
+    *,
+    request_id: str,
+    ops_envelope: Mapping[str, Any],
+    apply_authorization: Mapping[str, Any],
+    actor_session: str,
+    changed_by: str,
+    change_reason: str,
+    start_packet_hash: str,
+    pauth_id: str,
+    bridge_id: str,
+    project_root: Path | None = None,
+    registry_path: Path | None = None,
+    packaged_registry_path: Path | None = None,
+    db_path: Path | None = None,
+) -> RegistryTransactionReceipt:
+    """Consume an active transition request and commit the identity transition.
+
+    Enforces the four DCL-ARTIFACT-REGISTRY-MUTATION-AUTHORIZATION-001 apply
+    gates and fails closed on any of them:
+
+    1. OPS envelope -- ``ops_envelope`` must be present and declare an ops
+       context (``envelope_id`` or ``activity == "ops"``).
+    2. Matching active request -- ``request_id`` must resolve to an ``active``,
+       unexpired row in ``sot_registry_transition_requests``.
+    3. Matching independent bridge GO -- ``apply_authorization`` must carry
+       ``status == "GO"`` from an ``author_session_context_id`` that differs
+       from ``actor_session`` (self-review is invalid). This is a distinct
+       authorization from the proposal GO that built the surface: each live
+       apply requires its own independent GO.
+    4. Fresh operation-time revalidation -- the live registry generation digest
+       must still equal the digest bound at request time; otherwise the request
+       is stale and the apply is rejected.
+
+    The desired record set (membership removals plus coverage-mode changes) is
+    then committed through the existing ``apply_registry_transaction`` with
+    ``operation="transition"`` -- reusing the lock, journal, digest,
+    projection-parity, and RegistryResolver overlap validation with no new
+    transaction machinery. Runtime hook / shared identity-authorization wiring
+    is deferred to a later slice; this function is the library surface those
+    call sites will bind to.
+    """
+
+    if not all((actor_session, start_packet_hash, pauth_id, bridge_id)):
+        raise RegistryAuthorizationError("actor session, bridge, start packet, and PAUTH evidence are required")
+    # Gate 1: OPS envelope.
+    if not ops_envelope or not (ops_envelope.get("envelope_id") or ops_envelope.get("activity") == "ops"):
+        raise RegistryAuthorizationError("transition apply requires an ops envelope")
+    # Gate 3: matching independent bridge GO (self-review is invalid).
+    authorization = dict(apply_authorization or {})
+    if str(authorization.get("status") or "") != "GO" or not str(authorization.get("bridge_id") or ""):
+        raise RegistryAuthorizationError("transition apply requires a matching independent bridge GO")
+    go_author_session = str(authorization.get("author_session_context_id") or "")
+    if not go_author_session or go_author_session == actor_session:
+        raise RegistryAuthorizationError(
+            "transition apply GO must come from an independent session context (self-review is invalid)"
+        )
+
+    paths = RegistryPaths.resolve(
+        project_root=project_root,
+        registry_path=registry_path,
+        packaged_registry_path=packaged_registry_path,
+        db_path=db_path,
+    )
+    # Gate 2: matching active request.
+    conn = sqlite3.connect(str(paths.db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        ensure_control_plane_schema(conn)
+        conn.commit()
+        request_row = conn.execute(
+            "SELECT * FROM sot_registry_transition_requests WHERE request_id = ?",
+            (request_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if request_row is None or request_row["request_state"] != "active":
+        raise RegistryAuthorizationError(f"no matching active transition request: {request_id}")
+    if _utc_now() > str(request_row["expires_at"]):
+        raise RegistryAuthorizationError(f"transition request expired: {request_id}")
+
+    bound_digest = str(request_row["current_revision_digest"])
+    intended = json.loads(request_row["intended_membership_result"])
+    coverage_changes = dict(intended.get("coverage_changes") or {})
+    removal_ids = set(intended.get("removals") or ())
+
+    # Gate 4: fresh operation-time revalidation of the source generation digest.
+    snapshot = load_registry_snapshot(
+        project_root=project_root,
+        registry_path=registry_path,
+        packaged_registry_path=packaged_registry_path,
+        db_path=db_path,
+    )
+    if snapshot.generation_digest != bound_digest:
+        raise RegistryGenerationConflict(
+            "transition source revision digest is stale: "
+            f"expected {bound_digest}, observed {snapshot.generation_digest}"
+        )
+
+    desired: list[SoTArtifact] = []
+    for record in snapshot.records:
+        if record.id in removal_ids:
+            continue
+        if record.id in coverage_changes:
+            desired.append(replace(record, coverage_mode=coverage_changes[record.id]))
+        else:
+            desired.append(record)
+
+    receipt = apply_registry_transaction(
+        desired,
+        operation="transition",
+        actor_session=actor_session,
+        changed_by=changed_by,
+        change_reason=change_reason,
+        start_packet_hash=start_packet_hash,
+        pauth_id=pauth_id,
+        bridge_id=bridge_id,
+        project_root=project_root,
+        registry_path=registry_path,
+        packaged_registry_path=packaged_registry_path,
+        db_path=db_path,
+        expected_prior_generation_digest=bound_digest,
+    )
+
+    consumed_at = _utc_now()
+    conn = sqlite3.connect(str(paths.db_path))
+    try:
+        ensure_control_plane_schema(conn)
+        conn.execute(
+            "UPDATE sot_registry_transition_requests "
+            "SET request_state = 'consumed', consumed_at = ?, changed_at = ?, result_digest = ? "
+            "WHERE request_id = ? AND request_state = 'active'",
+            (consumed_at, consumed_at, receipt.receipt_digest, request_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return receipt
 
 
 def _normalize_event_paths(project_root: Path, values: Sequence[str | Path]) -> tuple[str, ...]:
