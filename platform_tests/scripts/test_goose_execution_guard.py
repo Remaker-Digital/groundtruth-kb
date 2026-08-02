@@ -10,11 +10,17 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import sys
 import time
 from pathlib import Path
 
 import pytest
-from goose_execution_guard import (
+
+SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "scripts"
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from goose_execution_guard import (  # noqa: E402
     ExecutionFloorConfig,
     check_provenance_drift,
     detect_terminal_stall,

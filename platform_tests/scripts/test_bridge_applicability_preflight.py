@@ -1211,6 +1211,113 @@ def test_schema_v3_hash_tracks_source_and_rules_bytes_with_lf_normalization(tmp_
     assert rules_changed["packet_hash"] != baseline["packet_hash"]
 
 
+def _verdict_preparation_fixture(tmp_path: Path) -> tuple[Path, Path, Path, str]:
+    bridge = tmp_path / "bridge"
+    config = tmp_path / "config" / "governance" / "spec-applicability.toml"
+    bridge.mkdir(parents=True)
+    config.parent.mkdir(parents=True)
+    config.write_text("rules = []\n", encoding="utf-8")
+    source = bridge / "prepare-topic-001.md"
+    source.write_text(
+        "NEW\nbridge_kind: prime_proposal\nDocument: prepare-topic\nVersion: 001\n"
+        'target_paths: ["scripts/example.py"]\n',
+        encoding="utf-8",
+    )
+    draft = tmp_path / "candidate.md"
+    content = (
+        "GO\nbridge_kind: lo_verdict\nDocument: prepare-topic\nVersion: 002\n"
+        "Responds to: bridge/prepare-topic-001.md\n\n"
+        "## Applicability Preflight\n\n"
+        "- packet_hash: `sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`\n"
+        "- missing_required_specs: []\n\n"
+        "## Findings\n\nFresh review.\n"
+    )
+    draft.write_text(content, encoding="utf-8")
+    return source, config, draft, content
+
+
+def test_prepare_verdict_candidate_rebuilds_exact_source_and_final_byte_hash(tmp_path: Path) -> None:
+    _source, config, _draft, content = _verdict_preparation_fixture(tmp_path)
+
+    prepared = preflight.prepare_verdict_candidate(
+        candidate_path="bridge/prepare-topic-002.md",
+        content=content,
+        project_root=tmp_path,
+        config_path=config,
+        db_path=tmp_path / "absent.db",
+    )
+
+    assert "sha256:aaaaaaaa" not in prepared
+    assert "- content_file: `bridge/prepare-topic-001.md`" in prepared
+    assert "## Findings\n\nFresh review." in prepared
+    assert prepared.count("## Applicability Preflight") == 1
+    assert preflight.CANDIDATE_EVIDENCE_HASH_SENTINEL not in prepared
+    embedded = preflight.CANDIDATE_EVIDENCE_HASH_LINE_RE.search(prepared)
+    assert embedded is not None
+    assert embedded.group("value") == preflight.candidate_evidence_hash(
+        "bridge/prepare-topic-002.md",
+        prepared,
+        tmp_path,
+    )
+    assert preflight.candidate_evidence_hash(
+        "bridge/prepare-topic-002.md",
+        prepared + "x",
+        tmp_path,
+    ) != embedded.group("value")
+
+
+def test_prepare_verdict_candidate_fails_closed_on_wrong_thread_or_duplicate_section(tmp_path: Path) -> None:
+    _source, config, _draft, content = _verdict_preparation_fixture(tmp_path)
+
+    with pytest.raises(preflight.VerdictCandidatePreparationError, match="same.*thread"):
+        preflight.prepare_verdict_candidate(
+            candidate_path="bridge/other-topic-002.md",
+            content=content,
+            project_root=tmp_path,
+            config_path=config,
+            db_path=tmp_path / "absent.db",
+        )
+
+    with pytest.raises(preflight.VerdictCandidatePreparationError, match="exactly one Applicability"):
+        preflight.prepare_verdict_candidate(
+            candidate_path="bridge/prepare-topic-002.md",
+            content=content + "\n## Applicability Preflight\n",
+            project_root=tmp_path,
+            config_path=config,
+            db_path=tmp_path / "absent.db",
+        )
+
+
+def test_prepare_verdict_candidate_cli_writes_only_final_bytes_to_stdout(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _source, config, draft, _content = _verdict_preparation_fixture(tmp_path)
+
+    result = preflight.main(
+        [
+            "--prepare-verdict-candidate",
+            "--content-file",
+            str(draft),
+            "--candidate-path",
+            "bridge/prepare-topic-002.md",
+            "--bridge-dir",
+            str(tmp_path / "bridge"),
+            "--config",
+            str(config),
+            "--db",
+            str(tmp_path / "absent.db"),
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.out.startswith("GO\n")
+    assert "candidate_evidence_hash" in captured.out
+    assert "prepared verdict candidate bytes" in captured.err
+    assert not (tmp_path / "bridge" / "prepare-topic-002.md").exists()
+
+
 def _operation_time_envelope(*, allow_bridge: bool = True, forbidden: list[str] | None = None) -> dict[str, object]:
     allowed = ["source", "test_addition"]
     if allow_bridge:

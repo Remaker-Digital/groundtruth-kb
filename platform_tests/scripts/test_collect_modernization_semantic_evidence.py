@@ -93,7 +93,7 @@ def collector(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> collector_modu
         evidence_dir=tmp_path / ".gtkb-state" / "modernization-release-candidate" / "semantic-evidence",
         environ={
             "GTKB_AUTHOR_SESSION_CONTEXT_ID": SESSION,
-            "GTKB_HARNESS_NAME": "forged-harness-is-ignored",
+            "CODEX_THREAD_ID": SESSION,
             "GTKB_ROLE": "loyal-opposition",
         },
     )
@@ -154,6 +154,67 @@ def test_successful_executable_measurement_binds_output_scope_head_and_runtime_p
     closed["status"] = "closed"
     _write(live_path, closed)
     assert collector.validate_receipt(plan) == []
+
+
+def test_acting_codex_envelope_ignores_and_reports_foreign_same_session_documents(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _seed_harness_state(tmp_path, names=("codex", "claude", "cursor"))
+    paths = [
+        _seed_session(tmp_path, harness_name="codex", harness_id="A", role="prime-builder"),
+        _seed_session(tmp_path, harness_name="claude", harness_id="B", role="loyal-opposition"),
+        _seed_session(tmp_path, harness_name="cursor", harness_id="C", role="loyal-opposition"),
+    ]
+    before = {path: path.read_bytes() for path in paths}
+    evidence_dir = tmp_path / ".gtkb-state" / "modernization-release-candidate" / "semantic-evidence"
+
+    authority = collector_module.resolve_session_authority(
+        tmp_path,
+        SESSION,
+        evidence_dir=evidence_dir,
+        environ={"CODEX_THREAD_ID": SESSION, "GTKB_ROLE": "loyal-opposition"},
+    )
+
+    assert authority["session"]["harness_name"] == "codex"
+    assert authority["session"]["role"] == "prime-builder"
+    assert authority["session_envelope"]["ignored_same_session_collisions"] == [
+        f"harness-state/claude/session-envelopes/{SESSION}.json",
+        f"harness-state/cursor/session-envelopes/{SESSION}.json",
+    ]
+    assert {path: path.read_bytes() for path in paths} == before
+
+
+def test_conflicting_runtime_host_markers_fail_before_evidence_mutation(tmp_path: Path) -> None:
+    _seed_harness_state(tmp_path, names=("codex", "claude"))
+    _seed_session(tmp_path, harness_name="codex", harness_id="A")
+    evidence_dir = tmp_path / ".gtkb-state" / "modernization-release-candidate" / "semantic-evidence"
+
+    with pytest.raises(collector_module.CollectionError, match="Conflicting runtime-specific"):
+        collector_module.resolve_session_authority(
+            tmp_path,
+            SESSION,
+            evidence_dir=evidence_dir,
+            environ={"CODEX_THREAD_ID": SESSION, "CLAUDE_CODE_SESSION_ID": SESSION},
+        )
+
+    assert not evidence_dir.exists()
+
+
+def test_selected_envelope_must_match_durable_harness_identity(tmp_path: Path) -> None:
+    _seed_harness_state(tmp_path)
+    _seed_session(tmp_path, harness_id="not-A")
+    evidence_dir = tmp_path / ".gtkb-state" / "modernization-release-candidate" / "semantic-evidence"
+
+    with pytest.raises(collector_module.CollectionError, match="does not match durable identity"):
+        collector_module.resolve_session_authority(
+            tmp_path,
+            SESSION,
+            evidence_dir=evidence_dir,
+            environ={"CODEX_THREAD_ID": SESSION},
+        )
+
+    assert not evidence_dir.exists()
 
 
 def test_failed_measurement_never_mints_a_pass_receipt(collector: collector_module.Collector) -> None:
@@ -261,7 +322,7 @@ def test_live_harness_requires_matching_successful_invocation_and_canonical_enve
         project_root=tmp_path,
         manifest=semantic_checker.load_manifest(),
         evidence_dir=tmp_path / ".gtkb-state" / "modernization-release-candidate" / "semantic-evidence",
-        environ={"GTKB_AUTHOR_SESSION_CONTEXT_ID": SESSION, "GTKB_HARNESS_NAME": "codex"},
+        environ={"GTKB_AUTHOR_SESSION_CONTEXT_ID": SESSION, "CODEX_THREAD_ID": SESSION},
     )
     plan = collector_module.Plan(
         "MOD-HP04",
@@ -337,7 +398,7 @@ def test_live_harness_parity_failure_is_blocked_without_minting_a_receipt(
         project_root=tmp_path,
         manifest=semantic_checker.load_manifest(),
         evidence_dir=tmp_path / ".gtkb-state" / "modernization-release-candidate" / "semantic-evidence",
-        environ={"GTKB_AUTHOR_SESSION_CONTEXT_ID": SESSION, "GTKB_HARNESS_NAME": "codex"},
+        environ={"GTKB_AUTHOR_SESSION_CONTEXT_ID": SESSION, "CODEX_THREAD_ID": SESSION},
     )
     plan = collector_module.Plan(
         "MOD-HP04",
@@ -508,6 +569,7 @@ def test_content_addressed_session_snapshot_rejects_conflicting_existing_bytes(
         collector.project_root,
         SESSION,
         evidence_dir=collector.evidence_dir,
+        environ={"CODEX_THREAD_ID": SESSION},
     )
     snapshot_path = collector.project_root / authority["session_envelope"]["snapshot_path"]
     with open(collector_module._native_io_path(snapshot_path), "w", encoding="utf-8", newline="\n") as stream:
@@ -518,6 +580,7 @@ def test_content_addressed_session_snapshot_rejects_conflicting_existing_bytes(
             collector.project_root,
             SESSION,
             evidence_dir=collector.evidence_dir,
+            environ={"CODEX_THREAD_ID": SESSION},
         )
 
 

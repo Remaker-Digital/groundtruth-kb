@@ -30,8 +30,8 @@ _PACKAGE_SRC = _SCRIPTS_DIR.parent / "groundtruth-kb" / "src"
 if _PACKAGE_SRC.is_dir() and str(_PACKAGE_SRC) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_SRC))
 
-from groundtruth_kb.bridge_dispatch_config import clear_operator_quiesce, set_operator_quiesce  # noqa: E402
 import dispatcher_generation_admission as admission  # noqa: E402
+from groundtruth_kb.bridge_dispatch_config import clear_operator_quiesce, set_operator_quiesce  # noqa: E402
 
 DAEMON_STATE_SUBDIR = (".gtkb-state", "dispatcher-daemon")
 BRIDGE_POLLER_STATE_SUBDIR = (".gtkb-state", "bridge-poller")
@@ -1464,7 +1464,7 @@ def _execute_live_spawns(
                 continue
             acquired_work_intent_slugs = list(acquire_result["acquired_slugs"])
 
-        spawn_items = list(reversed(selected))
+        spawn_items = list(selected)
         result = runtime._spawn_harness(
             target=target,
             items=spawn_items,

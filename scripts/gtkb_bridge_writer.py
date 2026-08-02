@@ -1178,6 +1178,20 @@ def write_bridge_file(
     )
     content_to_write = normalize_bridge_envelope_head(content_to_write)
     _reject_synthetic_session_context_id(content_to_write)
+    try:
+        from scripts.bridge_applicability_preflight import (
+            prepare_verdict_candidate,
+            verdict_candidate_needs_preparation,
+        )
+
+        if verdict_candidate_needs_preparation(content_to_write):
+            content_to_write = prepare_verdict_candidate(
+                candidate_path=target,
+                content=content_to_write,
+                project_root=project_root,
+            )
+    except (OSError, SystemExit, ValueError) as exc:
+        raise BridgeComplianceError(f"verdict candidate preparation failed closed: {exc}") from exc
     audit = run_bridge_compliance_audit(
         file_path=target,
         content=content_to_write,

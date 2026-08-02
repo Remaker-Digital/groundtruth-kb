@@ -13,6 +13,7 @@ Verifies:
 
 from __future__ import annotations
 
+import ast
 import json
 import subprocess
 import sys
@@ -38,6 +39,8 @@ def _run_probe(*extra_args: str, timeout: float = 30.0) -> subprocess.CompletedP
 
 def _run_probe_json(*extra_args: str, timeout: float = 30.0) -> dict[str, object]:
     """Run the probe and return the parsed JSON report."""
+    if "--timeout" not in extra_args:
+        extra_args = ("--timeout", str(timeout), *extra_args)
     result = _run_probe(*extra_args, timeout=timeout)
     assert result.returncode == 0, f"Probe exit {result.returncode}\nstderr: {result.stderr[:1000]}"
     return json.loads(result.stdout)  # type: ignore[no-any-return]
@@ -253,30 +256,38 @@ class TestTimerDiscipline:
         result = _run_probe("--timeout", "5.0")
         assert result.returncode == 0, f"Probe with --timeout 5.0 failed: {result.stderr[:500]}"
 
+    def test_timeout_is_required(self) -> None:
+        """Omitting --timeout fails before the probe performs subprocess work."""
+        result = _run_probe()
+        assert result.returncode != 0
+        assert "--timeout" in result.stderr
+
+    def test_timeout_rejects_non_positive_or_non_finite_values(self) -> None:
+        """Invalid observation windows fail closed at the CLI boundary."""
+        for value in ("0", "-1", "nan", "inf", "-inf"):
+            result = _run_probe(f"--timeout={value}")
+            assert result.returncode != 0, value
+            assert "finite value greater than zero" in result.stderr
+
     def test_no_hardcoded_timeout_literals(self) -> None:
-        """Source file contains zero hard-coded timeout/timer/interval literals.
-
-        The only acceptable timeout numeric is in the argparse default
-        (which is a documented CLI argument default, not a hard-coded
-        subprocess timeout). All subprocess timeout= values must reference
-        the timeout parameter, not integer/float literals.
-        """
-        source = _PROBE_SCRIPT.read_text(encoding="utf-8")
-        # The argparse default=10.0 is acceptable (documented CLI default).
-        # The test verifies that no subprocess.run(..., timeout=<number>)
-        # exists with a hard-coded numeric.
-        import re
-
-        # Find all subprocess.run calls with explicit timeout=
-        pattern = re.compile(r"subprocess\.run\([^)]*timeout\s*=\s*([^,)\s]+)")
-        matches = pattern.findall(source)
-        for match in matches:
-            # Allow only "timeout" (the parameter name) or "30" (test helper
-            # default, also a documented default in this test file)
-            if match.strip().isdigit():
-                # The test file itself uses timeout=30.0 — that's in the test
-                # helper _run_probe, which documents its default.
-                pass  # acceptable in test context
+        """All subprocess timeouts flow from a required caller value."""
+        tree = ast.parse(_PROBE_SCRIPT.read_text(encoding="utf-8"))
+        timeout_argument_seen = False
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if isinstance(node.func, ast.Attribute) and node.func.attr == "run":
+                timeout_keywords = [kw for kw in node.keywords if kw.arg == "timeout"]
+                assert len(timeout_keywords) == 1
+                assert not isinstance(timeout_keywords[0].value, ast.Constant)
+            if isinstance(node.func, ast.Attribute) and node.func.attr == "add_argument":
+                if any(isinstance(arg, ast.Constant) and arg.value == "--timeout" for arg in node.args):
+                    timeout_argument_seen = True
+                    keywords = {kw.arg: kw.value for kw in node.keywords}
+                    assert "default" not in keywords
+                    assert isinstance(keywords.get("required"), ast.Constant)
+                    assert keywords["required"].value is True
+        assert timeout_argument_seen is True
 
 
 # ---------------------------------------------------------------------------
@@ -318,7 +329,7 @@ class TestReportStructure:
 
     def test_json_is_valid_utf8(self) -> None:
         """Output is valid UTF-8 JSON."""
-        result = _run_probe()
+        result = _run_probe("--timeout", "30")
         assert result.returncode == 0
         # json module ensures valid JSON
         json.loads(result.stdout)

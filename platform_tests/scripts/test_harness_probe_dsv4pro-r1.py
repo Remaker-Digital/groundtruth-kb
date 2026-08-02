@@ -9,10 +9,13 @@ success and failure paths where applicable.
 
 from __future__ import annotations
 
+import ast
 import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Ensure the scripts dir is importable (hyphenated module; use importlib)
 _SCRIPTS = Path(__file__).resolve().parent.parent.parent / "scripts"
@@ -25,8 +28,10 @@ check_project_root_containment = _probe.check_project_root_containment
 check_venv_resolution = _probe.check_venv_resolution
 check_git_read_health = _probe.check_git_read_health
 check_gt_cli_reachability = _probe.check_gt_cli_reachability
+check_report_determinism = _probe.check_report_determinism
 check_session_envelope_presence = _probe.check_session_envelope_presence
 run_all_checks = _probe.run_all_checks
+_PROBE_PATH = Path(_probe.__file__)
 
 
 # ---------------------------------------------------------------------------
@@ -44,14 +49,14 @@ class TestProjectRootContainment:
         subdir = root / "sub"
         subdir.mkdir()
         with patch("pathlib.Path.cwd", return_value=subdir):
-            result = check_project_root_containment(root)
+            result = check_project_root_containment(root, expected_root=root)
         assert result["passed"] is True
         assert result["check"] == "project_root_containment"
 
     def test_cwd_equals_root(self, tmp_path: Path):
         """CWD exactly equal to the project root passes."""
         with patch("pathlib.Path.cwd", return_value=tmp_path):
-            result = check_project_root_containment(tmp_path)
+            result = check_project_root_containment(tmp_path, expected_root=tmp_path)
         assert result["passed"] is True
 
     def test_cwd_outside_root(self, tmp_path: Path):
@@ -61,9 +66,20 @@ class TestProjectRootContainment:
         outside = tmp_path / "other"
         outside.mkdir()
         with patch("pathlib.Path.cwd", return_value=outside):
-            result = check_project_root_containment(root)
+            result = check_project_root_containment(root, expected_root=root)
         assert result["passed"] is False
         assert "outside" in result["detail"].lower()
+
+    def test_arbitrary_root_cannot_self_certify(self, tmp_path: Path):
+        """An arbitrary supplied root fails even when cwd is inside it."""
+        canonical = tmp_path / "gtkb"
+        supplied = tmp_path / "other"
+        canonical.mkdir()
+        supplied.mkdir()
+        with patch("pathlib.Path.cwd", return_value=supplied):
+            result = check_project_root_containment(supplied, expected_root=canonical)
+        assert result["passed"] is False
+        assert result["project_root"] != result["expected_project_root"]
 
 
 # ---------------------------------------------------------------------------
@@ -175,28 +191,46 @@ class TestGitReadHealth:
 class TestGtCliReachability:
     """Tests for check 4: gt CLI reachability."""
 
-    def test_gt_help_exit_zero(self):
+    def test_gt_help_exit_zero(self, tmp_path: Path):
         """gt --help returns exit 0."""
+        gt_exe = tmp_path / "groundtruth-kb" / ".venv" / "Scripts" / "gt.exe"
+        gt_exe.parent.mkdir(parents=True)
+        gt_exe.write_text("fake")
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="help text", stderr="")
-            result = check_gt_cli_reachability(timeout=30)
+            result = check_gt_cli_reachability(tmp_path, timeout=30)
         assert result["passed"] is True
         assert result["exit_code"] == 0
+        assert mock_run.call_args[0][0] == [str(gt_exe), "--help"]
 
-    def test_gt_help_exit_nonzero(self):
+    def test_gt_help_exit_nonzero(self, tmp_path: Path):
         """gt --help returning non-zero exit code fails."""
+        gt_exe = tmp_path / "groundtruth-kb" / ".venv" / "Scripts" / "gt.exe"
+        gt_exe.parent.mkdir(parents=True)
+        gt_exe.write_text("fake")
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="error")
-            result = check_gt_cli_reachability(timeout=30)
+            result = check_gt_cli_reachability(tmp_path, timeout=30)
         assert result["passed"] is False
         assert result["exit_code"] == 1
 
-    def test_gt_not_found(self):
+    def test_gt_not_found(self, tmp_path: Path):
         """gt not found raises OSError, captured as failure."""
+        gt_exe = tmp_path / "groundtruth-kb" / ".venv" / "Scripts" / "gt.exe"
+        gt_exe.parent.mkdir(parents=True)
+        gt_exe.write_text("fake")
         with patch("subprocess.run", side_effect=OSError("not found")):
-            result = check_gt_cli_reachability(timeout=30)
+            result = check_gt_cli_reachability(tmp_path, timeout=30)
         assert result["passed"] is False
         assert "not found" in result["detail"]
+
+    def test_canonical_gt_executable_missing(self, tmp_path: Path):
+        """The probe does not fall back to PATH when canonical gt.exe is absent."""
+        with patch("subprocess.run") as mock_run:
+            result = check_gt_cli_reachability(tmp_path, timeout=30)
+        assert result["passed"] is False
+        assert "not found" in result["detail"]
+        mock_run.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +266,7 @@ class TestRunAllChecks:
     """Integration tests for run_all_checks."""
 
     def test_output_structure(self, tmp_path: Path):
-        """Report has expected top-level keys and five results."""
+        """Report has expected top-level keys and six results."""
         with patch("subprocess.run") as mock_run:
             # run_all_checks calls: git rev-parse, git status, gt --help
             # plus potentially venv python subprocess
@@ -243,7 +277,7 @@ class TestRunAllChecks:
         assert "project_root" in report
         assert "overall_passed" in report
         assert isinstance(report["overall_passed"], bool)
-        assert len(report["results"]) == 5
+        assert len(report["results"]) == 6
         checks = [r["check"] for r in report["results"]]
         assert checks == [
             "project_root_containment",
@@ -251,6 +285,7 @@ class TestRunAllChecks:
             "git_read_health",
             "gt_cli_reachability",
             "session_envelope_presence",
+            "report_determinism",
         ]
         for r in report["results"]:
             assert "passed" in r
@@ -291,7 +326,16 @@ class TestReportDeterminism:
 
         r1 = {k: v for k, v in report1.items() if k != "generated_at"}
         r2 = {k: v for k, v in report2.items() if k != "generated_at"}
-        assert r1 == r2
+        bytes1 = _probe.json.dumps(r1, sort_keys=True, separators=(",", ":")).encode()
+        bytes2 = _probe.json.dumps(r2, sort_keys=True, separators=(",", ":")).encode()
+        assert bytes1 == bytes2
+
+    def test_internal_determinism_check_detects_changed_snapshot(self, tmp_path: Path):
+        """The sixth check compares serialized snapshot bytes, not dict identity."""
+        first = [{"check": "one", "passed": True, "detail": "stable"}]
+        second = [{"check": "one", "passed": False, "detail": "changed"}]
+        result = check_report_determinism(tmp_path, first, second)
+        assert result["passed"] is False
 
     def test_generated_at_differs(self, tmp_path: Path):
         """generated_at field exists and is an ISO timestamp."""
@@ -317,21 +361,63 @@ class TestCliInterface:
         mod = importlib.import_module("harness_probe_dsv4pro-r1")  # noqa: E402
 
         with (
-            patch("sys.argv", ["probe", "--timeout", "15"]),
+            patch("sys.argv", ["probe", "--timeout", "15.5"]),
             patch.object(mod, "run_all_checks", return_value={"probe": "test"}) as mock_run,
         ):
             mod.main()
             call_args = mock_run.call_args
-            assert call_args[0][1] == 15
+            assert call_args[0][1] == 15.5
 
     def test_project_root_flag(self, tmp_path: Path):
         """--project-root overrides auto-detection."""
         mod = importlib.import_module("harness_probe_dsv4pro-r1")  # noqa: E402
 
         with (
-            patch("sys.argv", ["probe", "--project-root", str(tmp_path)]),
+            patch("sys.argv", ["probe", "--timeout", "60", "--project-root", str(tmp_path)]),
             patch.object(mod, "run_all_checks", return_value={"probe": "test"}) as mock_run,
         ):
             mod.main()
             call_args = mock_run.call_args
             assert call_args[0][0] == tmp_path
+
+    def test_timeout_is_required(self):
+        """No hard-coded fallback is used when the caller omits --timeout."""
+        mod = importlib.import_module("harness_probe_dsv4pro-r1")  # noqa: E402
+        with (
+            patch("sys.argv", ["probe"]),
+            patch.object(mod, "run_all_checks") as mock_run,
+            pytest.raises(SystemExit),
+        ):
+            mod.main()
+        mock_run.assert_not_called()
+
+    def test_timeout_must_be_positive(self):
+        """Zero and negative observation windows fail before subprocess work."""
+        mod = importlib.import_module("harness_probe_dsv4pro-r1")  # noqa: E402
+        with (
+            patch("sys.argv", ["probe", "--timeout", "0"]),
+            patch.object(mod, "run_all_checks") as mock_run,
+            pytest.raises(SystemExit),
+        ):
+            mod.main()
+        mock_run.assert_not_called()
+
+    def test_no_hardcoded_subprocess_timeout_or_cli_default(self):
+        """All subprocess timeouts flow from the required caller value."""
+        tree = ast.parse(_PROBE_PATH.read_text(encoding="utf-8"))
+        timeout_argument_seen = False
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if isinstance(node.func, ast.Attribute) and node.func.attr == "run":
+                timeout_keywords = [kw for kw in node.keywords if kw.arg == "timeout"]
+                assert len(timeout_keywords) == 1
+                assert not isinstance(timeout_keywords[0].value, ast.Constant)
+            if isinstance(node.func, ast.Attribute) and node.func.attr == "add_argument":
+                if any(isinstance(arg, ast.Constant) and arg.value == "--timeout" for arg in node.args):
+                    timeout_argument_seen = True
+                    keywords = {kw.arg: kw.value for kw in node.keywords}
+                    assert "default" not in keywords
+                    assert isinstance(keywords.get("required"), ast.Constant)
+                    assert keywords["required"].value is True
+        assert timeout_argument_seen is True

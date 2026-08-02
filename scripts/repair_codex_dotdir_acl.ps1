@@ -46,17 +46,48 @@ function Get-AccessOnlyAcl {
     # CREATE_NO_WINDOW; use .NET ACL statics there and fall back for PowerShell 7,
     # where those statics were removed.
     try {
+        $sections = [System.Security.AccessControl.AccessControlSections]::All
         if (Test-Path -LiteralPath $Path -PathType Container) {
-            return [System.IO.Directory]::GetAccessControl($Path)
+            $acl = [System.IO.Directory]::GetAccessControl($Path, $sections)
         }
-        return [System.IO.File]::GetAccessControl($Path)
+        else {
+            $acl = [System.IO.File]::GetAccessControl($Path, $sections)
+        }
+        $acl | Add-Member -NotePropertyName GtkbAuditReadable -NotePropertyValue $true -Force
+        return $acl
     }
     catch {
-        if ($_.Exception.Message -notmatch "does not contain a method named 'GetAccessControl'") {
+        $methodUnavailable = $_.Exception.Message -match "does not contain a method named 'GetAccessControl'"
+        $auditUnavailable = (
+            $_.Exception -is [System.Security.AccessControl.PrivilegeNotHeldException] -or
+            $_.Exception -is [System.UnauthorizedAccessException] -or
+            $_.Exception.InnerException -is [System.Security.AccessControl.PrivilegeNotHeldException] -or
+            $_.Exception.Message -match "SeSecurityPrivilege"
+        )
+        if (-not $methodUnavailable -and -not $auditUnavailable) {
             throw
         }
+        if ($auditUnavailable) {
+            if (Test-Path -LiteralPath $Path -PathType Container) {
+                $acl = [System.IO.Directory]::GetAccessControl($Path)
+            }
+            else {
+                $acl = [System.IO.File]::GetAccessControl($Path)
+            }
+            $acl | Add-Member -NotePropertyName GtkbAuditReadable -NotePropertyValue $false -Force
+            return $acl
+        }
     }
-    return Get-Acl -LiteralPath $Path
+    try {
+        $acl = Get-Acl -LiteralPath $Path -Audit
+        $acl | Add-Member -NotePropertyName GtkbAuditReadable -NotePropertyValue $true -Force
+        return $acl
+    }
+    catch [System.Security.AccessControl.PrivilegeNotHeldException] {
+        $acl = Get-Acl -LiteralPath $Path
+        $acl | Add-Member -NotePropertyName GtkbAuditReadable -NotePropertyValue $false -Force
+        return $acl
+    }
 }
 
 function Set-AccessOnlyAcl {
@@ -65,11 +96,7 @@ function Set-AccessOnlyAcl {
         [Parameter(Mandatory = $true)] $Acl
     )
     try {
-        if (Test-Path -LiteralPath $Path -PathType Container) {
-            [System.IO.Directory]::SetAccessControl($Path, $Acl)
-            return
-        }
-        [System.IO.File]::SetAccessControl($Path, $Acl)
+        [System.IO.Directory]::SetAccessControl($Path, $Acl)
         return
     }
     catch {
@@ -78,17 +105,6 @@ function Set-AccessOnlyAcl {
         }
     }
     Set-Acl -LiteralPath $Path -AclObject $Acl
-}
-
-function Invoke-Icacls {
-    param(
-        [Parameter(Mandatory = $true)] [string] $Path,
-        [Parameter(Mandatory = $true)] [string[]] $Arguments
-    )
-    $output = & icacls $Path @Arguments 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw "icacls failed for '$Path' with arguments '$($Arguments -join ' ')': $($output -join '; ')"
-    }
 }
 
 function Get-RepairableDenyRules {
@@ -119,64 +135,6 @@ function Get-RepairableDenyRules {
     }
 }
 
-function Remove-RepairableDenyRules {
-    param(
-        [Parameter(Mandatory = $true)] [string] $Path,
-        [Parameter(Mandatory = $true)] $Acl,
-        [Parameter(Mandatory = $true)] [System.Security.AccessControl.FileSystemAccessRule[]] $Rules
-    )
-    $changed = $false
-    $handledIdentities = @{}
-    foreach ($rule in $Rules) {
-        $identity = $rule.IdentityReference.Value
-        if ($handledIdentities.ContainsKey($identity)) {
-            continue
-        }
-        $handledIdentities[$identity] = $true
-        $preservedRules = @()
-        foreach ($existing in $Acl.Access) {
-            if (
-                $existing -is [System.Security.AccessControl.FileSystemAccessRule] -and
-                (-not $existing.IsInherited) -and
-                $existing.IdentityReference.Value -eq $identity -and
-                (-not (Test-RiskyDenyRule -Rule $existing))
-            ) {
-                $preservedRules += $existing
-            }
-        }
-        $Acl.PurgeAccessRules($rule.IdentityReference)
-        foreach ($preservedRule in $preservedRules) {
-            $Acl.AddAccessRule($preservedRule)
-        }
-        $changed = $true
-    }
-    if ($changed) {
-        Set-AccessOnlyAcl -Path $Path -Acl $Acl
-        # Re-enable inherited allows after Deny removal without depending on
-        # icacls to resolve raw SID identities.
-        if (Test-Path -LiteralPath $Path -PathType Container) {
-            Enable-AccessInheritance -Path $Path
-        }
-        $postCheck = Get-RepairableDenyRules -Path $Path
-        if ($postCheck.Error) {
-            throw "post-removal ACL check failed: $($postCheck.Error)"
-        }
-        if ($postCheck.Rules.Count -gt 0) {
-            $remaining = @()
-            foreach ($remainingRule in $postCheck.Rules) {
-                $remaining += "$($remainingRule.IdentityReference.Value):$($remainingRule.FileSystemRights)"
-            }
-            throw "deny removal did not persist; remaining risky Deny ACE(s): $($remaining -join '; ')"
-        }
-    }
-    return $changed
-}
-
-function Enable-AccessInheritance {
-    param([Parameter(Mandatory = $true)] [string] $Path)
-    Invoke-Icacls -Path $Path -Arguments @("/inheritance:e")
-}
-
 function Get-RuleIdentitySid {
     param([Parameter(Mandatory = $true)] $Rule)
     try {
@@ -187,19 +145,174 @@ function Get-RuleIdentitySid {
     }
 }
 
+function Get-RuleFingerprint {
+    param([Parameter(Mandatory = $true)] $Rule)
+    return "{0}|{1}|{2}|{3}|{4}|{5}" -f @(
+        (Get-RuleIdentitySid -Rule $Rule),
+        [int] $Rule.AccessControlType,
+        [int64] $Rule.FileSystemRights,
+        [int] $Rule.InheritanceFlags,
+        [int] $Rule.PropagationFlags,
+        [bool] $Rule.IsInherited
+    )
+}
+
+function Get-AclPrincipal {
+    param(
+        [Parameter(Mandatory = $true)] $Acl,
+        [Parameter(Mandatory = $true)] [ValidateSet("Owner", "Group")] [string] $Kind
+    )
+    try {
+        if ($Kind -eq "Owner") {
+            return $Acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value
+        }
+        return $Acl.GetGroup([System.Security.Principal.SecurityIdentifier]).Value
+    }
+    catch {
+        if ($Kind -eq "Owner") {
+            return $Acl.Owner
+        }
+        return $Acl.Group
+    }
+}
+
+function Get-StringSha256 {
+    param([Parameter(Mandatory = $true)] [AllowEmptyString()] [string] $Value)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
+        return ([System.BitConverter]::ToString($sha.ComputeHash($bytes))).Replace("-", "").ToLowerInvariant()
+    }
+    finally {
+        $sha.Dispose()
+    }
+}
+
+function Get-ByteArraySha256 {
+    param([Parameter(Mandatory = $true)] [byte[]] $Value)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return ([System.BitConverter]::ToString($sha.ComputeHash($Value))).Replace("-", "").ToLowerInvariant()
+    }
+    finally {
+        $sha.Dispose()
+    }
+}
+
+function Get-AclSnapshot {
+    param([Parameter(Mandatory = $true)] $Acl)
+    $auditReadable = (
+        $Acl.PSObject.Properties.Name -contains "GtkbAuditReadable" -and
+        [bool] $Acl.GtkbAuditReadable
+    )
+    $fingerprints = @(
+        foreach ($rule in $Acl.Access) {
+            if ($rule -is [System.Security.AccessControl.FileSystemAccessRule]) {
+                Get-RuleFingerprint -Rule $rule
+            }
+        }
+    ) | Sort-Object
+    return @{
+        fingerprints = @($fingerprints)
+        fingerprint_count = $fingerprints.Count
+        fingerprint_sha256 = Get-StringSha256 -Value ($fingerprints -join "`n")
+        owner = Get-AclPrincipal -Acl $Acl -Kind Owner
+        group = Get-AclPrincipal -Acl $Acl -Kind Group
+        access_rules_protected = [bool] $Acl.AreAccessRulesProtected
+        audit_readable = $auditReadable
+        audit_sddl_sha256 = if ($auditReadable) {
+            Get-StringSha256 -Value $Acl.GetSecurityDescriptorSddlForm(
+                [System.Security.AccessControl.AccessControlSections]::Audit
+            )
+        } else { $null }
+        descriptor_binary_sha256 = Get-ByteArraySha256 -Value $Acl.GetSecurityDescriptorBinaryForm()
+    }
+}
+
+function Test-StringArrayEqual {
+    param(
+        [Parameter(Mandatory = $true)] [string[]] $Left,
+        [Parameter(Mandatory = $true)] [string[]] $Right
+    )
+    if ($Left.Count -ne $Right.Count) {
+        return $false
+    }
+    for ($index = 0; $index -lt $Left.Count; $index += 1) {
+        if ($Left[$index] -cne $Right[$index]) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Test-AclSnapshotEqual {
+    param(
+        [Parameter(Mandatory = $true)] $Left,
+        [Parameter(Mandatory = $true)] $Right
+    )
+    return (
+        (Test-StringArrayEqual -Left $Left.fingerprints -Right $Right.fingerprints) -and
+        $Left.owner -eq $Right.owner -and
+        $Left.group -eq $Right.group -and
+        $Left.access_rules_protected -eq $Right.access_rules_protected -and
+        $Left.audit_readable -eq $Right.audit_readable -and
+        $Left.audit_sddl_sha256 -eq $Right.audit_sddl_sha256 -and
+        $Left.descriptor_binary_sha256 -eq $Right.descriptor_binary_sha256
+    )
+}
+
+function Copy-AccessAcl {
+    param([Parameter(Mandatory = $true)] $Acl)
+    $copy = New-Object System.Security.AccessControl.DirectorySecurity
+    $sections =
+        [System.Security.AccessControl.AccessControlSections]::Access -bor
+        [System.Security.AccessControl.AccessControlSections]::Owner -bor
+        [System.Security.AccessControl.AccessControlSections]::Group
+    $auditReadable = (
+        $Acl.PSObject.Properties.Name -contains "GtkbAuditReadable" -and
+        [bool] $Acl.GtkbAuditReadable
+    )
+    if ($auditReadable) {
+        $sections = $sections -bor [System.Security.AccessControl.AccessControlSections]::Audit
+    }
+    $copy.SetSecurityDescriptorBinaryForm($Acl.GetSecurityDescriptorBinaryForm(), $sections)
+    $copy | Add-Member -NotePropertyName GtkbAuditReadable -NotePropertyValue $auditReadable -Force
+    return $copy
+}
+
+function Remove-FingerprintOccurrences {
+    param(
+        [Parameter(Mandatory = $true)] [string[]] $Fingerprints,
+        [Parameter(Mandatory = $true)] [string[]] $RemovedFingerprints
+    )
+    $remaining = New-Object System.Collections.ArrayList
+    foreach ($fingerprint in $Fingerprints) {
+        [void] $remaining.Add($fingerprint)
+    }
+    foreach ($fingerprint in $RemovedFingerprints) {
+        $index = $remaining.IndexOf($fingerprint)
+        if ($index -lt 0) {
+            throw "selected ACL fingerprint is absent from the authoritative preimage: $fingerprint"
+        }
+        $remaining.RemoveAt($index)
+    }
+    return @($remaining | Sort-Object)
+}
+
 function Test-ModifyAllow {
     param(
-        [Parameter(Mandatory = $true)] [string] $Path,
+        [Parameter(Mandatory = $true)] $Acl,
         [Parameter(Mandatory = $true)] [System.Security.Principal.SecurityIdentifier] $IdentitySid,
         [Parameter(Mandatory = $true)] [string] $IdentityName
     )
-    $acl = Get-AccessOnlyAcl -Path $Path
     $hasAllow = $false
     foreach ($existing in $acl.Access) {
         if (
             (Get-RuleIdentitySid -Rule $existing) -eq $IdentitySid.Value -and
             $existing.AccessControlType -eq [System.Security.AccessControl.AccessControlType]::Allow -and
-            (($existing.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::Modify) -ne 0)
+            (($existing.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::Modify) -eq
+                [System.Security.AccessControl.FileSystemRights]::Modify) -and
+            (($existing.PropagationFlags -band [System.Security.AccessControl.PropagationFlags]::InheritOnly) -eq 0)
         ) {
             $hasAllow = $true
             break
@@ -239,35 +352,8 @@ function Get-LocalPrincipalSid {
     return $null
 }
 
-function Ensure-ModifyAllow {
-    param(
-        [Parameter(Mandatory = $true)] [string] $Path,
-        [Parameter(Mandatory = $true)] [System.Security.Principal.SecurityIdentifier] $IdentitySid,
-        [Parameter(Mandatory = $true)] [string] $IdentityName
-    )
-    $status = Test-ModifyAllow -Path $Path -IdentitySid $IdentitySid -IdentityName $IdentityName
-    if ($status.allow_present) {
-        return $status
-    }
-
-    $acl = Get-AccessOnlyAcl -Path $Path
-    $flags = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
-    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
-        $IdentitySid,
-        [System.Security.AccessControl.FileSystemRights]::Modify,
-        $flags,
-        [System.Security.AccessControl.PropagationFlags]::None,
-        [System.Security.AccessControl.AccessControlType]::Allow
-    )
-    $acl.AddAccessRule($rule)
-    Set-AccessOnlyAcl -Path $Path -Acl $acl
-    $status.allow_present = $true
-    $status.changed = $true
-    return $status
-}
-
 function Get-CodexSandboxAllowStatus {
-    param([Parameter(Mandatory = $true)] [string] $Path)
+    param([Parameter(Mandatory = $true)] $Acl)
     $sid = Get-LocalPrincipalSid -IdentityName "CodexSandboxUsers"
     if ($null -eq $sid) {
         return @{
@@ -278,34 +364,161 @@ function Get-CodexSandboxAllowStatus {
             sid = $null
         }
     }
-    return Test-ModifyAllow -Path $Path -IdentitySid $sid -IdentityName "CodexSandboxUsers"
-}
-
-function Ensure-CodexSandboxAllow {
-    param([Parameter(Mandatory = $true)] [string] $Path)
-    $sid = Get-LocalPrincipalSid -IdentityName "CodexSandboxUsers"
-    if ($null -eq $sid) {
-        return @{
-            present = $false
-            allow_present = $false
-            changed = $false
-            identity = "CodexSandboxUsers"
-            sid = $null
-        }
-    }
-    return Ensure-ModifyAllow -Path $Path -IdentitySid $sid -IdentityName "CodexSandboxUsers"
+    return Test-ModifyAllow -Acl $Acl -IdentitySid $sid -IdentityName "CodexSandboxUsers"
 }
 
 function Get-CurrentIdentityAllowStatus {
-    param([Parameter(Mandatory = $true)] [string] $Path)
+    param([Parameter(Mandatory = $true)] $Acl)
     $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
-    return Test-ModifyAllow -Path $Path -IdentitySid $identity.User -IdentityName $identity.Name
+    return Test-ModifyAllow -Acl $Acl -IdentitySid $identity.User -IdentityName $identity.Name
 }
 
-function Ensure-CurrentIdentityAllow {
-    param([Parameter(Mandatory = $true)] [string] $Path)
-    $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
-    return Ensure-ModifyAllow -Path $Path -IdentitySid $identity.User -IdentityName $identity.Name
+function Test-AllowStatusEqual {
+    param(
+        [Parameter(Mandatory = $true)] $Left,
+        [Parameter(Mandatory = $true)] $Right
+    )
+    return (
+        $Left.present -eq $Right.present -and
+        $Left.allow_present -eq $Right.allow_present -and
+        $Left.sid -eq $Right.sid
+    )
+}
+
+function New-ExactAclTransform {
+    param(
+        [Parameter(Mandatory = $true)] $Acl,
+        [Parameter(Mandatory = $true)] [System.Security.AccessControl.FileSystemAccessRule[]] $Rules,
+        [Parameter(Mandatory = $true)] $CurrentIdentity,
+        [Parameter(Mandatory = $true)] $SandboxGroup
+    )
+    $preSnapshot = Get-AclSnapshot -Acl $Acl
+    $workingAcl = Copy-AccessAcl -Acl $Acl
+    $targetFingerprints = @($Rules | ForEach-Object { Get-RuleFingerprint -Rule $_ })
+    $expectedFingerprints = Remove-FingerprintOccurrences `
+        -Fingerprints $preSnapshot.fingerprints `
+        -RemovedFingerprints $targetFingerprints
+    foreach ($rule in $Rules) {
+        $workingAcl.RemoveAccessRuleSpecific($rule)
+    }
+    $transformedSnapshot = Get-AclSnapshot -Acl $workingAcl
+    if (-not (Test-StringArrayEqual -Left $expectedFingerprints -Right $transformedSnapshot.fingerprints)) {
+        throw "prewrite_invariant_mismatch: transformed ACE multiset differs from exact selected-rule removal"
+    }
+    if (
+        $preSnapshot.owner -ne $transformedSnapshot.owner -or
+        $preSnapshot.group -ne $transformedSnapshot.group -or
+        $preSnapshot.access_rules_protected -ne $transformedSnapshot.access_rules_protected -or
+        $preSnapshot.audit_readable -ne $transformedSnapshot.audit_readable -or
+        $preSnapshot.audit_sddl_sha256 -ne $transformedSnapshot.audit_sddl_sha256
+    ) {
+        throw "prewrite_invariant_mismatch: owner, group, or access-rule protection changed"
+    }
+    $currentSid = New-Object System.Security.Principal.SecurityIdentifier($CurrentIdentity.sid)
+    $sandboxSid = New-Object System.Security.Principal.SecurityIdentifier($SandboxGroup.sid)
+    $transformedCurrent = Test-ModifyAllow `
+        -Acl $workingAcl -IdentitySid $currentSid -IdentityName $CurrentIdentity.identity
+    $transformedSandbox = Test-ModifyAllow `
+        -Acl $workingAcl -IdentitySid $sandboxSid -IdentityName $SandboxGroup.identity
+    if (
+        -not (Test-AllowStatusEqual -Left $CurrentIdentity -Right $transformedCurrent) -or
+        -not (Test-AllowStatusEqual -Left $SandboxGroup -Right $transformedSandbox)
+    ) {
+        throw "prewrite_invariant_mismatch: required Modify allow state changed"
+    }
+    return @{
+        acl = $workingAcl
+        expected_snapshot = $transformedSnapshot
+        pre_snapshot = $preSnapshot
+        target_fingerprints = @($targetFingerprints)
+    }
+}
+
+function Invoke-ExactRootAclApply {
+    param(
+        [Parameter(Mandatory = $true)] [string] $Path,
+        [Parameter(Mandatory = $true)] $Acl,
+        [Parameter(Mandatory = $true)] [System.Security.AccessControl.FileSystemAccessRule[]] $Rules,
+        [Parameter(Mandatory = $true)] $CurrentIdentity,
+        [Parameter(Mandatory = $true)] $SandboxGroup
+    )
+    $outcome = [ordered]@{
+        success = $false
+        error = $null
+        target_fingerprints = @()
+        pre_snapshot = Get-AclSnapshot -Acl $Acl
+        expected_snapshot = $null
+        post_snapshot = $null
+        apply_write_count = 0
+        rollback_write_count = 0
+        descendant_write_count = 0
+        rollback = [ordered]@{
+            attempted = $false
+            proven = $false
+            error = $null
+            expected_fingerprint_sha256 = $null
+            observed_fingerprint_sha256 = $null
+            expected_descriptor_sha256 = $null
+            observed_descriptor_sha256 = $null
+            owner_equal = $false
+            group_equal = $false
+            protection_equal = $false
+        }
+    }
+    try {
+        $transform = New-ExactAclTransform `
+            -Acl $Acl -Rules $Rules `
+            -CurrentIdentity $CurrentIdentity -SandboxGroup $SandboxGroup
+        $outcome.target_fingerprints = $transform.target_fingerprints
+        $outcome.expected_snapshot = $transform.expected_snapshot
+    }
+    catch {
+        $outcome.error = $_.Exception.Message
+        return $outcome
+    }
+    try {
+        Set-AccessOnlyAcl -Path $Path -Acl $transform.acl
+        $outcome.apply_write_count = 1
+        $postAcl = Get-AccessOnlyAcl -Path $Path
+        $outcome.post_snapshot = Get-AclSnapshot -Acl $postAcl
+        if (-not (Test-AclSnapshotEqual -Left $transform.expected_snapshot -Right $outcome.post_snapshot)) {
+            throw "postwrite_invariant_mismatch: root descriptor readback differs from the proven candidate"
+        }
+        $outcome.success = $true
+        return $outcome
+    }
+    catch {
+        $outcome.error = $_.Exception.Message
+        if ($outcome.apply_write_count -eq 0) {
+            return $outcome
+        }
+        $outcome.rollback.attempted = $true
+        try {
+            $rollbackAclObject = Copy-AccessAcl -Acl $Acl
+            Set-AccessOnlyAcl -Path $Path -Acl $rollbackAclObject
+            $outcome.rollback_write_count = 1
+            $rollbackAcl = Get-AccessOnlyAcl -Path $Path
+            $rollbackSnapshot = Get-AclSnapshot -Acl $rollbackAcl
+            $outcome.rollback.expected_fingerprint_sha256 = $outcome.pre_snapshot.fingerprint_sha256
+            $outcome.rollback.observed_fingerprint_sha256 = $rollbackSnapshot.fingerprint_sha256
+            $outcome.rollback.expected_descriptor_sha256 = $outcome.pre_snapshot.descriptor_binary_sha256
+            $outcome.rollback.observed_descriptor_sha256 = $rollbackSnapshot.descriptor_binary_sha256
+            $outcome.rollback.owner_equal = $outcome.pre_snapshot.owner -eq $rollbackSnapshot.owner
+            $outcome.rollback.group_equal = $outcome.pre_snapshot.group -eq $rollbackSnapshot.group
+            $outcome.rollback.protection_equal = (
+                $outcome.pre_snapshot.access_rules_protected -eq $rollbackSnapshot.access_rules_protected
+            )
+            $outcome.rollback.proven = Test-AclSnapshotEqual `
+                -Left $outcome.pre_snapshot -Right $rollbackSnapshot
+            if (-not $outcome.rollback.proven) {
+                $outcome.rollback.error = "rollback_invariant_mismatch"
+            }
+        }
+        catch {
+            $outcome.rollback.error = $_.Exception.Message
+        }
+        return $outcome
+    }
 }
 
 $resolvedRoot = [System.IO.Path]::GetFullPath($ProjectRoot)
@@ -325,6 +538,42 @@ $checked = @()
 $removed = @()
 $errors = @()
 $rootCheck = Get-RepairableDenyRules -Path $target
+$applyOutcome = [ordered]@{
+    success = $false
+    error = $null
+    target_fingerprints = @()
+    pre_snapshot = $null
+    post_snapshot = $null
+    apply_write_count = 0
+    rollback_write_count = 0
+    descendant_write_count = 0
+    rollback = [ordered]@{
+        attempted = $false
+        proven = $false
+        error = $null
+        expected_fingerprint_sha256 = $null
+        observed_fingerprint_sha256 = $null
+        expected_descriptor_sha256 = $null
+        observed_descriptor_sha256 = $null
+        owner_equal = $false
+        group_equal = $false
+        protection_equal = $false
+    }
+}
+$sandboxGroup = @{
+    present = $false
+    allow_present = $false
+    changed = $false
+    identity = "CodexSandboxUsers"
+    sid = $null
+}
+$currentIdentity = @{
+    present = $true
+    allow_present = $false
+    changed = $false
+    identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+}
 $checked += $target
 if ($rootCheck.Error) {
     $errors += @{
@@ -340,67 +589,43 @@ elseif ($rootCheck.Rules.Count -gt 0) {
             rights = $rule.FileSystemRights.ToString()
             inheritance = $rule.InheritanceFlags.ToString()
             propagation = $rule.PropagationFlags.ToString()
+            fingerprint = Get-RuleFingerprint -Rule $rule
             applied = $false
         }
     }
-    if ($Mode -eq "Apply") {
-        try {
-            [void](Remove-RepairableDenyRules -Path $target -Acl $rootCheck.Acl -Rules $rootCheck.Rules)
+}
+
+if (-not $rootCheck.Error) {
+    $currentIdentity = Get-CurrentIdentityAllowStatus -Acl $rootCheck.Acl
+    $sandboxGroup = Get-CodexSandboxAllowStatus -Acl $rootCheck.Acl
+}
+
+if ($Mode -eq "Apply" -and (-not $rootCheck.Error)) {
+    if (-not $currentIdentity.allow_present -or -not $sandboxGroup.present -or -not $sandboxGroup.allow_present) {
+        $errors += @{
+            path = Convert-ToRelativePath -BasePath $resolvedRoot -TargetPath $target
+            error = "required_modify_allow_missing: Apply requires unchanged current-user and CodexSandboxUsers Modify allows"
+        }
+    }
+    elseif ($rootCheck.Rules.Count -gt 0) {
+        $applyOutcome = Invoke-ExactRootAclApply `
+            -Path $target -Acl $rootCheck.Acl -Rules $rootCheck.Rules `
+            -CurrentIdentity $currentIdentity -SandboxGroup $sandboxGroup
+        if ($applyOutcome.success) {
             foreach ($entry in $removed) {
                 $entry.applied = $true
             }
         }
-        catch {
+        else {
             $errors += @{
                 path = Convert-ToRelativePath -BasePath $resolvedRoot -TargetPath $target
-                error = "deny removal failed: $($_.Exception.Message)"
+                error = "exact root deny removal failed: $($applyOutcome.error)"
             }
         }
     }
 }
 
-$sandboxGroup = @{
-    present = $false
-    allow_present = $false
-    changed = $false
-    identity = "CodexSandboxUsers"
-    sid = $null
-}
-$currentIdentity = @{
-    present = $true
-    allow_present = $false
-    changed = $false
-    identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-    sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-}
-if (-not $rootCheck.Error) {
-    if ($Mode -eq "Apply") {
-        try {
-            $currentIdentity = Ensure-CurrentIdentityAllow -Path $target
-        }
-        catch {
-            $errors += @{
-                path = Convert-ToRelativePath -BasePath $resolvedRoot -TargetPath $target
-                error = "current identity allow update failed: $($_.Exception.Message)"
-            }
-        }
-        try {
-            $sandboxGroup = Ensure-CodexSandboxAllow -Path $target
-        }
-        catch {
-            $errors += @{
-                path = Convert-ToRelativePath -BasePath $resolvedRoot -TargetPath $target
-                error = "CodexSandboxUsers allow update failed: $($_.Exception.Message)"
-            }
-        }
-    }
-    else {
-        $currentIdentity = Get-CurrentIdentityAllowStatus -Path $target
-        $sandboxGroup = Get-CodexSandboxAllowStatus -Path $target
-    }
-}
-
-if (-not $rootCheck.Error) {
+if (-not $rootCheck.Error -and $Mode -eq "Check") {
     # After repairing the root, recursive child access may become available.
     # Check descendants for explicit Deny ACEs too; if root ACL access itself
     # fails, avoid emitting the same launcher/capability error for every child.
@@ -436,24 +661,11 @@ if (-not $rootCheck.Error) {
                 rights = $rule.FileSystemRights.ToString()
                 inheritance = $rule.InheritanceFlags.ToString()
                 propagation = $rule.PropagationFlags.ToString()
+                fingerprint = Get-RuleFingerprint -Rule $rule
                 applied = $false
             }
             $childEntries += $entry
             $removed += $entry
-        }
-        if ($Mode -eq "Apply") {
-            try {
-                [void](Remove-RepairableDenyRules -Path $child.FullName -Acl $childCheck.Acl -Rules $childCheck.Rules)
-                foreach ($entry in $childEntries) {
-                    $entry.applied = $true
-                }
-            }
-            catch {
-                $errors += @{
-                    path = Convert-ToRelativePath -BasePath $resolvedRoot -TargetPath $child.FullName
-                    error = "deny removal failed: $($_.Exception.Message)"
-                }
-            }
         }
     }
 }
@@ -467,6 +679,28 @@ $result = [ordered]@{
     removed = $removed
     sandbox_group = $sandboxGroup
     current_identity = $currentIdentity
+    target_fingerprints = $applyOutcome.target_fingerprints
+    pre_non_target_fingerprint_sha256 = if ($applyOutcome.expected_snapshot) { $applyOutcome.expected_snapshot.fingerprint_sha256 } else { $null }
+    post_non_target_fingerprint_sha256 = if ($applyOutcome.post_snapshot) { $applyOutcome.post_snapshot.fingerprint_sha256 } else { $null }
+    pre_non_target_fingerprint_count = if ($applyOutcome.expected_snapshot) { $applyOutcome.expected_snapshot.fingerprint_count } else { $null }
+    post_non_target_fingerprint_count = if ($applyOutcome.post_snapshot) { $applyOutcome.post_snapshot.fingerprint_count } else { $null }
+    owner_equal = [bool] $applyOutcome.success
+    group_equal = [bool] $applyOutcome.success
+    protection_equal = [bool] $applyOutcome.success
+    required_allows_equal = [bool] $applyOutcome.success
+    sacl_readable = if ($applyOutcome.pre_snapshot) { $applyOutcome.pre_snapshot.audit_readable } else { $null }
+    sacl_equal = if ($applyOutcome.success -and $applyOutcome.pre_snapshot.audit_readable) {
+        $applyOutcome.pre_snapshot.audit_readable -eq $applyOutcome.post_snapshot.audit_readable -and
+        $applyOutcome.pre_snapshot.audit_sddl_sha256 -eq $applyOutcome.post_snapshot.audit_sddl_sha256
+    } elseif ($applyOutcome.success) { $null } else { $false }
+    pre_descriptor_sha256 = if ($applyOutcome.pre_snapshot) { $applyOutcome.pre_snapshot.descriptor_binary_sha256 } else { $null }
+    expected_descriptor_sha256 = if ($applyOutcome.expected_snapshot) { $applyOutcome.expected_snapshot.descriptor_binary_sha256 } else { $null }
+    post_descriptor_sha256 = if ($applyOutcome.post_snapshot) { $applyOutcome.post_snapshot.descriptor_binary_sha256 } else { $null }
+    apply_write_count = $applyOutcome.apply_write_count
+    rollback_write_count = $applyOutcome.rollback_write_count
+    root_write_count = $applyOutcome.apply_write_count + $applyOutcome.rollback_write_count
+    descendant_write_count = 0
+    rollback = $applyOutcome.rollback
     errors = $errors
     needs_repair = (($removed.Count -gt 0) -or ($errors.Count -gt 0))
     repaired = (($Mode -eq "Apply") -and ($removed.Count -gt 0) -and ($errors.Count -eq 0))

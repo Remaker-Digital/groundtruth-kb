@@ -15,6 +15,7 @@ import json
 import os
 import re
 import subprocess
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,11 @@ TOPIC_TYPES = ("ops", "deliberation", "build", "test", "spec", "project")
 GIT_STATUS_SHORT_LINE_LIMIT = 80
 GIT_PROBE_TIMEOUT_SECONDS = 5
 WORKER_ROLES = frozenset({"prime-builder", "loyal-opposition"})
+RUNTIME_HARNESS_MARKERS = {
+    "antigravity": ("ANTIGRAVITY_SESSION_ID",),
+    "claude": ("CLAUDE_CODE_SESSION_ID", "CLAUDECODE"),
+    "codex": ("CODEX_THREAD_ID",),
+}
 _SAFE_SESSION_DOCUMENT_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 _CANONICAL_INIT_KEYWORD = re.compile(r"::init (gtkb|application)(?: (pb|lo))?")
 _CANONICAL_ROLE_BY_TOKEN = {
@@ -204,6 +210,65 @@ def resolve_harness_identity(
     if harness_id:
         return name, harness_id
     raise EnvelopeError(f"Could not resolve harness identity for {name!r}.")
+
+
+def resolve_acting_harness_identity(
+    project_root: Path,
+    *,
+    environ: Mapping[str, str] | None = None,
+    harness_name: str | None = None,
+    harness_id: str | None = None,
+) -> tuple[str, str]:
+    """Resolve the acting harness from host markers and durable identity.
+
+    Runtime markers and explicit producer identity select a document only. They
+    never supply role authority, which remains inside the selected envelope.
+    """
+    env = dict(environ or os.environ)
+    marked_families = {
+        name
+        for name, markers in RUNTIME_HARNESS_MARKERS.items()
+        if any(str(env.get(marker) or "").strip() for marker in markers)
+    }
+    if len(marked_families) > 1:
+        raise EnvelopeError("Conflicting runtime-specific harness markers are present.")
+
+    explicit_name = str(harness_name or env.get("GTKB_HARNESS_NAME") or "").strip().lower()
+    explicit_id = str(harness_id or env.get("GTKB_HARNESS_ID") or "").strip()
+    marked_name = next(iter(marked_families), "")
+    if marked_name and explicit_name and marked_name != explicit_name:
+        raise EnvelopeError(
+            f"Runtime marker selects harness {marked_name!r}, but explicit identity selects {explicit_name!r}."
+        )
+    selected_name = marked_name or explicit_name
+    if not selected_name:
+        raise EnvelopeError("Acting harness identity is unavailable from runtime markers or an explicit producer.")
+    if not marked_name and not explicit_id:
+        raise EnvelopeError("An explicit producer must supply both harness name and harness id.")
+
+    # Resolve without the caller-supplied id first so a missing durable record
+    # cannot be converted into identity authority by an ambient override.
+    resolved_name, durable_id = resolve_harness_identity(project_root, harness_name=selected_name)
+    if explicit_id and explicit_id != durable_id:
+        raise EnvelopeError(f"Harness id {explicit_id!r} does not match persisted id {durable_id!r}.")
+    return resolved_name, durable_id
+
+
+def same_session_envelope_collisions(
+    project_root: Path,
+    *,
+    current_session_id: str,
+    selected_harness_name: str,
+) -> list[str]:
+    """List foreign exact-session documents without reading or mutating them."""
+    document_name = _worker_session_document_filename(current_session_id)
+    selected = _require_nonempty_string(selected_harness_name, "selected_harness_name")
+    state_root = project_root.resolve() / "harness-state"
+    collisions: list[str] = []
+    for path in sorted(state_root.glob(f"*/session-envelopes/{document_name}")):
+        if path.is_file() and path.parent.parent.name != selected:
+            collisions.append(path.relative_to(project_root.resolve()).as_posix())
+    return collisions
 
 
 def _resolve_role(project_root: Path, harness_id: str) -> str | None:

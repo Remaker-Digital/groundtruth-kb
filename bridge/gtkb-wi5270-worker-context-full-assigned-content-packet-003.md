@@ -5,7 +5,7 @@ NEW
 bridge_kind: implementation_report
 Document: gtkb-wi5270-worker-context-full-assigned-content-packet
 Version: 003
-Responds to GO: bridge/gtkb-wi5270-worker-context-full-assigned-content-packet-002.md
+Responds to: bridge/gtkb-wi5270-worker-context-full-assigned-content-packet-002.md
 Approved proposal: bridge/gtkb-wi5270-worker-context-full-assigned-content-packet-001.md
 Project Authorization: PAUTH-DISPATCHER-BLACK-BOX-WI5270-WORKER-CONTEXT-PACKET-20260717
 Project: PROJECT-GTKB-OPS-DISPATCHER-MODERNIZATION-DISPATCHER-BLACK-BOX-HARDENING

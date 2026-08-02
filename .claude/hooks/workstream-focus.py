@@ -43,7 +43,12 @@ def _persist_interactive_session_envelope(payload: dict, project_root: Path) -> 
         return False
 
     _ensure_runtime_import_paths()
-    from groundtruth_kb.session.envelope import ensure_worker_session, parse_canonical_init_keyword  # noqa: PLC0415
+    from groundtruth_kb.session.envelope import (  # noqa: PLC0415
+        EnvelopeError,
+        ensure_worker_session,
+        parse_canonical_init_keyword,
+        resolve_harness_identity,
+    )
     from gtkb_session_id import MARKER_CONTINUITY_ORDER, resolve_session_id  # noqa: PLC0415
 
     parsed = parse_canonical_init_keyword(prompt)
@@ -59,8 +64,15 @@ def _persist_interactive_session_envelope(payload: dict, project_root: Path) -> 
     if not session_id:
         return False
 
-    harness_name = (os.environ.get("GTKB_HARNESS_NAME") or "claude").strip().lower() or "claude"
-    harness_id = os.environ.get("GTKB_HARNESS_ID") or None
+    harness_name = "claude"
+    try:
+        _, harness_id = resolve_harness_identity(project_root, harness_name=harness_name)
+    except EnvelopeError:
+        return False
+    inherited_name = (os.environ.get("GTKB_HARNESS_NAME") or harness_name).strip().lower() or harness_name
+    inherited_id = (os.environ.get("GTKB_HARNESS_ID") or harness_id).strip()
+    if inherited_name != harness_name or inherited_id != harness_id:
+        return False
     ensure_worker_session(
         project_root,
         harness_name=harness_name,

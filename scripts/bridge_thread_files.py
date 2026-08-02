@@ -160,3 +160,43 @@ def find_bridge_verdict_after(
         return None
     candidates.sort(key=lambda item: (item.mtime, item.version, item.path.name))
     return candidates[0]
+
+
+def index_bridge_thread_files_archive_aware(
+    project_root: Path,
+) -> dict[str, list[VersionedBridgeFile]]:
+    """Index all exact versioned bridge files, suppressing slugs with a trusted
+    committed terminal archive verdict that is strictly newer than the latest
+    live bridge version.
+
+    Historical exact-thread readers (``versioned_bridge_files`` and callers)
+    remain unsuppressed.  Use this function when building current-queue
+    surfaces (LO-actionable lists, dispatcher selection input, state reports).
+    """
+    index = index_bridge_thread_files(project_root)
+
+    # Lazy import to avoid circular dependencies at module load.
+    from groundtruth_kb.bridge.versioned_files import (  # noqa: PLC0415
+        classify_committed_archive_verdicts,
+    )
+
+    try:
+        archive_verdicts = classify_committed_archive_verdicts(project_root)
+    except (OSError, RuntimeError, ValueError):
+        return index  # fail closed — suppress nothing
+
+    suppressed: set[str] = set()
+    for slug, verdict in archive_verdicts.items():
+        live = index.get(slug)
+        if live is None:
+            continue
+        # Only suppress when the archive version is strictly newer than the
+        # latest live version.
+        latest_live = max(f.version for f in live)
+        if verdict.version > latest_live:
+            suppressed.add(slug)
+
+    if not suppressed:
+        return index
+
+    return {slug: files for slug, files in index.items() if slug not in suppressed}

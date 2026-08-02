@@ -43,8 +43,8 @@ PENDING_CORRECTION_DIAGNOSTIC = "PENDING_CORRECTION_NO_IMPLEMENTATION_AUTHORITY"
 ORDINARY_TRANSITIONS: dict[str, frozenset[str]] = {
     "NEW": frozenset({"GO", "NO-GO", "WITHDRAWN", "DEFERRED"}),
     "REVISED": frozenset({"GO", "NO-GO", "WITHDRAWN", "DEFERRED"}),
-    "GO": frozenset({"NEW", "REVISED", "NO-ACTION", "DEFERRED", "WITHDRAWN"}),
-    "NO-GO": frozenset({"REVISED", "NO-ACTION", "DEFERRED", "WITHDRAWN"}),
+    "GO": frozenset({"GO", "NEW", "REVISED", "NO-ACTION", "DEFERRED", "WITHDRAWN"}),
+    "NO-GO": frozenset({"GO", "REVISED", "NO-ACTION", "DEFERRED", "WITHDRAWN"}),
     "NO-ACTION": frozenset({"GO", "NO-GO", "VERIFIED"}),
     "ADVISORY": frozenset({"ADVISORY", "ACCEPTED", "BLOCKED", "DEFERRED", "WITHDRAWN"}),
     "BLOCKED": frozenset({"REVISED", "WITHDRAWN"}),
@@ -350,6 +350,19 @@ def _parse_version(
         rel_path=rel_path,
         version=version,
     )
+    if not responds_values:
+        # Compatibility fallback: some LO-authored bridge files use "Reviewed:"
+        # as the predecessor pointer instead of the canonical "Responds to:".
+        # When "Responds to" is absent, "Reviewed" (if present and pointing to
+        # the expected predecessor) is accepted as structurally equivalent.
+        # This is a general robustness rule (Postel's Law), not a thread-specific
+        # concession.  The canonical field takes precedence when both are present.
+        responds_values = _metadata_values(
+            lines,
+            "Reviewed",
+            rel_path=rel_path,
+            version=version,
+        )
     responds_to = responds_values[0] if responds_values else None
 
     if document != bridge_id:

@@ -955,6 +955,75 @@ def test_wi5627_daemon_claims_exact_lo_batch_after_authority_before_spawn(
     assert result["trusted_worker_context"]["session_id"] == result["dispatch_id"]
 
 
+def test_wi5627_daemon_preserves_selected_order_across_authority_and_spawn(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    target, selected, decision = _wi5627_lo_decision(runtime, "first-review", "second-review")
+    selected_slugs = [item.document_name for item in selected]
+    observed: dict[str, list[str]] = {}
+
+    def _acquire_leases(items, **_kwargs):
+        slugs = [item.document_name for item in items]
+        observed["document_lease_slugs"] = slugs
+        return items, [{"doc_slug": slug} for slug in slugs], []
+
+    def _acquire_claims(items, **kwargs):
+        slugs = [item.document_name for item in items]
+        observed["verdict_claim_slugs"] = slugs
+        return {
+            "ok": True,
+            "reason": None,
+            "acquired_slugs": slugs,
+            "ttl_seconds": kwargs["ttl_seconds"],
+        }
+
+    def _spawn(**kwargs):
+        slugs = [item.document_name for item in kwargs["items"]]
+        observed["spawn_slugs"] = slugs
+        return {
+            "dispatch_id": kwargs["dispatch_id"],
+            "recipient": kwargs["target"].dispatch_state_key,
+            "launched": True,
+            "reason": "launched",
+            "selected_documents": slugs,
+            "primary_bridge_id": slugs[0],
+        }
+
+    monkeypatch.setattr(runtime, "_acquire_dispatch_document_leases", _acquire_leases)
+    monkeypatch.setattr(
+        runtime,
+        "_ensure_dispatch_worker_session",
+        lambda **kwargs: {
+            "ok": True,
+            "reason": None,
+            "trusted_worker_context": {
+                "session_id": kwargs["session_id"],
+                "harness_id": target.harness_id,
+                "harness_name": target.command_handle,
+                "role": "loyal-opposition",
+            },
+        },
+    )
+    monkeypatch.setattr(runtime, "_acquire_lo_verdict_work_intent_batch", _acquire_claims)
+    monkeypatch.setattr(runtime, "_spawn_harness", _spawn)
+    monkeypatch.setattr(runtime, "worker_lifetime_profile", lambda *_args, **_kwargs: {"seconds": 4200})
+
+    result = daemon._execute_live_spawns(root, [decision], max_items=2, dry_run=False)[0]
+
+    assert selected_slugs == ["first-review", "second-review"]
+    assert observed["document_lease_slugs"] == selected_slugs
+    assert observed["verdict_claim_slugs"] == selected_slugs
+    assert observed["spawn_slugs"] == selected_slugs
+    assert result["document_lease_slugs"] == selected_slugs
+    assert result["verdict_claim_slugs"] == selected_slugs
+    assert result["selected_documents"] == selected_slugs
+    assert result["primary_bridge_id"] == selected_slugs[0]
+
+
 def test_wi5627_daemon_peer_held_claim_suppresses_spawn_and_releases_leases(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

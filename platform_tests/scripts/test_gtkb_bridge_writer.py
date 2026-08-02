@@ -110,6 +110,12 @@ def _applicability_preflight_section() -> str:
     )
 
 
+def _write_applicability_config(root: Path) -> None:
+    config = root / "config" / "governance" / "spec-applicability.toml"
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.write_text("rules = []\n", encoding="utf-8")
+
+
 def _valid_go_verdict() -> str:
     return (
         "GO\n\n"
@@ -144,6 +150,7 @@ def _valid_verified_verdict() -> str:
         "bridge_kind: lo_verdict\n"
         "Document: verifiedthing\n"
         "Version: 004\n"
+        "Responds to: bridge/verifiedthing-003.md\n"
         "Reviewed report: bridge/verifiedthing-003.md\n"
         "Recommended commit type: `fix:`\n\n"
         "## Verdict\n\n"
@@ -168,6 +175,7 @@ def _valid_verified_verdict() -> str:
 
 
 def _stage_reviewed_file(tmp_path: Path, slug: str, version: int = 1, status: str = "NEW") -> None:
+    _write_applicability_config(tmp_path)
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir(exist_ok=True)
     (bridge_dir / f"{slug}-{version:03d}.md").write_text(
@@ -988,6 +996,7 @@ PROVIDER_METADATA = {
 
 
 def _provider_thread(tmp_path: Path, *, bridge_kind: str = "prime_proposal") -> None:
+    _write_applicability_config(tmp_path)
     bridge = tmp_path / "bridge"
     bridge.mkdir(exist_ok=True)
     (bridge / "provider-thread-001.md").write_text(
@@ -1037,6 +1046,7 @@ def test_write_bridge_file_exclusive_create_closes_exists_check_race(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     target = tmp_path / "bridge/race-002.md"
+    _stage_reviewed_file(tmp_path, "race")
 
     def create_racing_target(_target: Path, _root: Path) -> bool:
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -1051,7 +1061,7 @@ def test_write_bridge_file_exclusive_create_closes_exists_check_race(
         write_bridge_file(
             "race",
             2,
-            _provider_go_content(),
+            _provider_go_content().replace("provider-thread", "race"),
             tmp_path,
             require_author_metadata=False,
         )

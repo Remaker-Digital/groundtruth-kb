@@ -94,6 +94,24 @@ def _load_module():
     return module
 
 
+def _load_hook_module():
+    spec = importlib.util.spec_from_file_location("workstream_focus_hook_wi5580", HOOK_PATH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _seed_harness_identities(root: Path, identities: dict[str, str]) -> None:
+    path = root / "harness-state" / "harness-identities.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"schema_version": 1, "harnesses": {name: {"id": value} for name, value in identities.items()}})
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def _run_hook(payload: dict, state_path: Path, *, guard_path: Path | None = None) -> dict:
     env = {
         **dict(os.environ),
@@ -2268,3 +2286,39 @@ def test_fresh_armed_gate_still_blocks_within_window(tmp_path, monkeypatch) -> N
 
     assert response["decision"] == "block"
     assert "GTKB-STARTUP-INPUT-GATE" in response["reason"]
+
+
+def test_claude_adapter_refuses_foreign_harness_override_without_writing(tmp_path, monkeypatch) -> None:
+    hook = _load_hook_module()
+    _seed_harness_identities(tmp_path, {"codex": "A", "claude": "B"})
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "A")
+
+    persisted = hook._persist_interactive_session_envelope(
+        {"prompt": "::init gtkb pb", "session_id": "session-wi5580-foreign"},
+        tmp_path,
+    )
+
+    assert persisted is False
+    assert not (tmp_path / "harness-state" / "codex" / "session-envelopes").exists()
+    assert not (tmp_path / "harness-state" / "claude" / "session-envelopes").exists()
+
+
+def test_claude_adapter_writes_only_its_durable_exact_session_document(tmp_path, monkeypatch) -> None:
+    hook = _load_hook_module()
+    _seed_harness_identities(tmp_path, {"codex": "A", "claude": "B"})
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "B")
+
+    persisted = hook._persist_interactive_session_envelope(
+        {"prompt": "::init gtkb lo", "session_id": "session-wi5580-claude"},
+        tmp_path,
+    )
+
+    assert persisted is True
+    path = tmp_path / "harness-state" / "claude" / "session-envelopes" / "session-wi5580-claude.json"
+    envelope = json.loads(path.read_text(encoding="utf-8"))
+    assert envelope["harness_name"] == "claude"
+    assert envelope["harness_id"] == "B"
+    assert envelope["worker_role_provenance"]["role"] == "loyal-opposition"
+    assert not (tmp_path / "harness-state" / "codex" / "session-envelopes").exists()

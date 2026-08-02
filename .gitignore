@@ -676,3 +676,8 @@ work_area/
 .claude/skills/gtkb-verify/helpers/write_bridge_*.py
 .codex/skills/gtkb-verify/helpers/tmp_gtkb-wi*-draft.md
 .codex/skills/gtkb-verify/helpers/gtkb-wi*-draft-body.md
+# Owner-supplied harness evaluation transcripts. Owner-captured evidence, not a
+# governed artifact: raw harness stdout/env dumps that no sweep-commit may
+# capture. Credential spans purged 2026-08-01 per GOV-ENV-LOCAL-AUTHORITY-001
+# (credentials belong in env.local, never in an artifact).
+/harness-test-transcripts/

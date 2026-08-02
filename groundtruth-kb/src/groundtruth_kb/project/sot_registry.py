@@ -325,20 +325,10 @@ def _parse_record(record: dict[str, Any], *, allow_missing_coverage: bool = Fals
     )
 
 
-def _load_toml_unlocked(path: Path, *, allow_missing_coverage: bool = False) -> list[SoTArtifact]:
-    """Load and validate the SoT artifact registry from a TOML file.
+def _load_toml_bytes(payload: bytes, *, allow_missing_coverage: bool = False) -> list[SoTArtifact]:
+    """Parse one exact TOML byte payload into validated registry records."""
 
-    Raises :class:`InvalidSoTRecord` or :class:`UnknownDomain` on schema
-    violations. Raises :class:`FileNotFoundError` if path does not exist.
-    Duplicate ids cause :class:`InvalidSoTRecord`.
-    """
-
-    if not path.exists():
-        raise FileNotFoundError(f"sot-artifacts.toml not found at {path}")
-
-    with path.open("rb") as fh:
-        data = tomllib.load(fh)
-
+    data = tomllib.loads(payload.decode("utf-8"))
     raw_records = data.get("artifacts", [])
     if not isinstance(raw_records, list):
         raise InvalidSoTRecord(f"top-level 'artifacts' must be a list of tables, got {type(raw_records).__name__}")
@@ -357,13 +347,37 @@ def _load_toml_unlocked(path: Path, *, allow_missing_coverage: bool = False) -> 
     return records
 
 
+def _load_toml_unlocked(path: Path, *, allow_missing_coverage: bool = False) -> list[SoTArtifact]:
+    """Load and validate the SoT artifact registry from a TOML file.
+
+    Raises :class:`InvalidSoTRecord` or :class:`UnknownDomain` on schema
+    violations. Raises :class:`FileNotFoundError` if path does not exist.
+    Duplicate ids cause :class:`InvalidSoTRecord`.
+    """
+
+    if not path.exists():
+        raise FileNotFoundError(f"sot-artifacts.toml not found at {path}")
+    return _load_toml_bytes(path.read_bytes(), allow_missing_coverage=allow_missing_coverage)
+
+
 def load_toml(path: Path) -> list[SoTArtifact]:
     """Load one coherent declaration generation through the registry barrier."""
 
-    from groundtruth_kb.project.registry_control_plane import registry_read_barrier
+    from groundtruth_kb.project.registry_control_plane import (
+        _exclusive_registry_read_barrier,
+        _RegistryOptimisticConflict,
+        registry_read_barrier,
+    )
 
-    with registry_read_barrier(registry_path=path):
-        return _load_toml_unlocked(path)
+    try:
+        with registry_read_barrier(registry_path=path) as lease:
+            payload = path.read_bytes()
+            records = _load_toml_bytes(payload)
+            lease.bind_toml(payload, records)
+            return records
+    except _RegistryOptimisticConflict:
+        with _exclusive_registry_read_barrier(registry_path=path):
+            return _load_toml_unlocked(path)
 
 
 # ---------------------------------------------------------------------------
@@ -469,39 +483,32 @@ def validate_projection_parity(
 # ---------------------------------------------------------------------------
 
 
-def _load_projection_unlocked(
-    db_path: Path | str,
+def _load_projection_from_connection(
+    conn: Any,
     *,
     allow_missing_coverage: bool = False,
 ) -> list[SoTArtifact]:
-    """Load all ``current_sot_artifacts`` rows from MemBase as SoTArtifact records.
-
-    Returns an empty list if the table or view doesn't exist yet (fresh DB).
-    """
+    """Load projection rows from the caller's exact SQLite read snapshot."""
     import json
     import sqlite3
 
-    conn = sqlite3.connect(str(db_path))
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(sot_artifacts)")
+    columns = {row[1] for row in cur.fetchall()}
+    restore_expr = "restore_action" if "restore_action" in columns else "NULL"
+    coverage_expr = "coverage_mode" if "coverage_mode" in columns else "NULL"
+    # Tolerate fresh DBs where the view doesn't yet exist.
     try:
-        cur = conn.cursor()
-        cur.execute("PRAGMA table_info(sot_artifacts)")
-        columns = {row[1] for row in cur.fetchall()}
-        restore_expr = "restore_action" if "restore_action" in columns else "NULL"
-        coverage_expr = "coverage_mode" if "coverage_mode" in columns else "NULL"
-        # Tolerate fresh DBs where the view doesn't yet exist.
-        try:
-            cur.execute(
-                "SELECT id, domain, lifecycle, storage_path, authority_spec_id, "
-                "mutation_api, versioning_policy, backup_policy, "
-                f"health_check_function, owner_role, {restore_expr}, depends_on, "
-                f"forbidden_substitutes, notes, {coverage_expr} "
-                "FROM current_sot_artifacts ORDER BY id"
-            )
-        except sqlite3.OperationalError:
-            return []
-        rows = cur.fetchall()
-    finally:
-        conn.close()
+        cur.execute(
+            "SELECT id, domain, lifecycle, storage_path, authority_spec_id, "
+            "mutation_api, versioning_policy, backup_policy, "
+            f"health_check_function, owner_role, {restore_expr}, depends_on, "
+            f"forbidden_substitutes, notes, {coverage_expr} "
+            "FROM current_sot_artifacts ORDER BY id"
+        )
+    except sqlite3.OperationalError:
+        return []
+    rows = cur.fetchall()
     records: list[SoTArtifact] = []
     for row in rows:
         depends_on = tuple(json.loads(row[11])) if row[11] else ()
@@ -541,13 +548,43 @@ def _load_projection_unlocked(
     return records
 
 
+def _load_projection_unlocked(
+    db_path: Path | str,
+    *,
+    allow_missing_coverage: bool = False,
+) -> list[SoTArtifact]:
+    """Load all ``current_sot_artifacts`` rows from MemBase as SoTArtifact records.
+
+    Returns an empty list if the table or view doesn't exist yet (fresh DB).
+    """
+    import sqlite3
+
+    conn = sqlite3.connect(str(db_path))
+    try:
+        return _load_projection_from_connection(conn, allow_missing_coverage=allow_missing_coverage)
+    finally:
+        conn.close()
+
+
 def load_projection(db_path: Path | str) -> list[SoTArtifact]:
     """Load one coherent projection generation through the registry barrier."""
 
-    from groundtruth_kb.project.registry_control_plane import registry_read_barrier
+    from groundtruth_kb.project.registry_control_plane import (
+        _exclusive_registry_read_barrier,
+        _open_registry_read_only_connection,
+        _RegistryOptimisticConflict,
+        registry_read_barrier,
+    )
 
-    with registry_read_barrier(db_path=Path(db_path)):
-        return _load_projection_unlocked(db_path)
+    try:
+        with registry_read_barrier(db_path=Path(db_path)) as lease:
+            with _open_registry_read_only_connection(Path(db_path)) as conn:
+                records = _load_projection_from_connection(conn)
+            lease.bind_projection(records)
+            return records
+    except _RegistryOptimisticConflict:
+        with _exclusive_registry_read_barrier(db_path=Path(db_path)):
+            return _load_projection_unlocked(db_path)
 
 
 def _ensure_restore_action_column(cur: Any) -> None:

@@ -17,7 +17,26 @@ from typing import Any
 
 EVENT_SCHEMA_ID = "gtkb.dispatch_default_metric_event.v1"
 SNAPSHOT_SCHEMA_ID = "gtkb.dispatch_default_metrics_snapshot.v1"
+LEDGER_SCHEMA_ID = "gtkb.dispatch_success_ledger.v1"
 DEFAULT_MAX_RECORDS = 50
+LEDGER_DEFAULT_THRESHOLD = 60
+
+_SUCCESS_OUTCOMES: frozenset[str] = frozenset({"reviewed", "implemented", "completed", "verified"})
+_CLEAN_STOP_REASONS: frozenset[str | None] = frozenset({"completed", "turn_limit", "end_turn", None})
+
+_ERROR_CLASSES: frozenset[str] = frozenset(
+    {
+        "provider_failure",
+        "process_failure",
+        "timeout",
+        "publication_failure",
+        "attribution_failure",
+        "duplicate_dispatch",
+        "partial_batch",
+        "malformed_provenance",
+        "dispatch_error",
+    }
+)
 
 _COVERAGE_FAMILIES = ("turns", "tools", "usage", "cost", "quality", "adaptation")
 _COUNT_FIELDS = {
@@ -412,11 +431,188 @@ record_metric_event = persist_metric_event
 generate_metrics_snapshot = build_metrics_snapshot
 
 
+def _event_is_terminal_success(event: Mapping[str, Any]) -> bool:
+    """Return True when the canonical event represents terminal dispatch success."""
+    outcome = _text(event.get("queue_outcome"))
+    if outcome is None or outcome not in _SUCCESS_OUTCOMES:
+        return False
+    failure_class = _text(event.get("failure_class"))
+    if failure_class is not None and failure_class in _ERROR_CLASSES:
+        return False
+    exit_status = event.get("exit_status")
+    if exit_status is not None and exit_status != 0:
+        return False
+    stop_reason = _text(event.get("stop_reason"))
+    return not (stop_reason is not None and stop_reason not in _CLEAN_STOP_REASONS)
+
+
+def _event_binds_provenance(event: Mapping[str, Any]) -> bool:
+    """Return True when the event binds all required provenance fields."""
+    dispatch_id = _text(event.get("dispatch_id"))
+    harness_id = _text(event.get("harness_id"))
+    role_field = _text(event.get("role"))
+    bridge_document_id = _text(event.get("bridge_document_id"))
+    return all((dispatch_id, harness_id, role_field, bridge_document_id))
+
+
+def _event_reset_reason(event: Mapping[str, Any]) -> str:
+    """Return a canonical reset-reason label for the event."""
+    failure_class = _text(event.get("failure_class"))
+    if failure_class is not None and failure_class in _ERROR_CLASSES:
+        return f"failure_class:{failure_class}"
+    outcome = _text(event.get("queue_outcome"))
+    if outcome is not None and outcome not in _SUCCESS_OUTCOMES:
+        return f"non_success_outcome:{outcome}"
+    exit_status = event.get("exit_status")
+    if exit_status is not None and exit_status != 0:
+        return f"exit_status:{exit_status}"
+    stop_reason = _text(event.get("stop_reason"))
+    if stop_reason is not None and stop_reason not in _CLEAN_STOP_REASONS:
+        return f"stop_reason:{stop_reason}"
+    prov_ok = _event_binds_provenance(event)
+    if not prov_ok:
+        return "missing_provenance_binding"
+    return "unknown_reset"
+
+
+def build_success_ledger(
+    db: Any,
+    *,
+    threshold: int = LEDGER_DEFAULT_THRESHOLD,
+    max_scan: int = 500,
+) -> dict[str, Any]:
+    """Derive the canonical consecutive dispatcher-item success ledger.
+
+    Reads canonical persisted metric events from *db* (a :class:`KnowledgeDB`),
+    orders them deterministically, and computes the consecutive success streak.
+    The ledger is observational only — never reads or mutates dispatcher runtime
+    state, logs, claims, leases, or scratch artifacts.
+
+    Returns a dict with ``schema_id``, ``streak``, ``threshold_met``, ``sequence``
+    bounds, ``reset_reason``, ``distribution``, and ``generated_at``.
+    """
+    if threshold <= 0:
+        raise ValueError("threshold must be positive")
+    events = list(db.list_dispatch_default_metric_events(limit=max(max_scan, threshold * 4)))
+    normalized = [normalize_metric_event(event) for event in events]
+    normalized.sort(key=lambda e: (e["event_at"] or "", e["id"] or ""))
+
+    streak_count = 0
+    first_reset_reason: str | None = None
+    sequence_start: dict[str, str] | None = None
+    last_success_event: dict[str, Any] | None = None
+    harness_count: Counter[str] = Counter()
+    role_count: Counter[str] = Counter()
+    seen: set[str] = set()
+
+    for event in normalized:
+        seen_key = event["id"] or ""
+        if not seen_key:
+            continue
+        if seen_key in seen:
+            continue
+        seen.add(seen_key)
+
+        if not _event_binds_provenance(event):
+            if first_reset_reason is None:
+                first_reset_reason = "missing_provenance_binding"
+            streak_count = 0
+            harness_count.clear()
+            role_count.clear()
+            sequence_start = None
+            last_success_event = None
+            continue
+
+        if not _event_is_terminal_success(event):
+            if first_reset_reason is None:
+                first_reset_reason = _event_reset_reason(event)
+            streak_count = 0
+            harness_count.clear()
+            role_count.clear()
+            sequence_start = None
+            last_success_event = None
+            continue
+
+        streak_count += 1
+        hid = _text(event.get("harness_id")) or "unknown"
+        rid = _text(event.get("role")) or "unknown"
+        harness_count[hid] += 1
+        role_count[rid] += 1
+        last_success_event = event
+        if sequence_start is None:
+            sequence_start = {
+                "dispatch_id": _text(event.get("dispatch_id")) or "",
+                "event_at": _text(event.get("event_at")) or "",
+            }
+
+    sequence_end = None
+    if last_success_event is not None:
+        sequence_end = {
+            "dispatch_id": _text(last_success_event.get("dispatch_id")) or "",
+            "event_at": _text(last_success_event.get("event_at")) or "",
+        }
+
+    return {
+        "schema_id": LEDGER_SCHEMA_ID,
+        "schema_version": 1,
+        "streak": streak_count,
+        "threshold": threshold,
+        "threshold_met": streak_count >= threshold,
+        "sequence": {
+            "start": sequence_start,
+            "end": sequence_end,
+        },
+        "first_reset_reason": first_reset_reason,
+        "distribution": {
+            "by_harness": dict(sorted(harness_count.items())),
+            "by_role": dict(sorted(role_count.items())),
+        },
+        "generated_at": _now(),
+    }
+
+
+def build_success_ledger_from_root(
+    project_root_str: str,
+    *,
+    threshold: int = LEDGER_DEFAULT_THRESHOLD,
+    max_scan: int = 500,
+) -> dict[str, Any]:
+    """Build the success ledger from a project root path string.
+
+    Opens a read-only connection to ``groundtruth.db`` under the root,
+    wraps it in a :class:`KnowledgeDB`, and delegates to
+    :func:`build_success_ledger`.
+    """
+    from pathlib import Path as _Path
+
+    from groundtruth_kb.db import KnowledgeDB
+
+    db_path = _Path(project_root_str) / "groundtruth.db"
+    if not db_path.is_file():
+        return {
+            "schema_id": LEDGER_SCHEMA_ID,
+            "schema_version": 1,
+            "streak": 0,
+            "threshold": threshold,
+            "threshold_met": False,
+            "sequence": {"start": None, "end": None},
+            "first_reset_reason": "canonical_event_store_unavailable",
+            "distribution": {"by_harness": {}, "by_role": {}},
+            "generated_at": _now(),
+        }
+    db = KnowledgeDB(db_path)
+    return build_success_ledger(db, threshold=threshold, max_scan=max_scan)
+
+
 __all__ = [
     "DEFAULT_MAX_RECORDS",
     "EVENT_SCHEMA_ID",
     "SNAPSHOT_SCHEMA_ID",
+    "LEDGER_SCHEMA_ID",
+    "LEDGER_DEFAULT_THRESHOLD",
     "build_metrics_snapshot",
+    "build_success_ledger",
+    "build_success_ledger_from_root",
     "generate_metrics_snapshot",
     "normalize_metric_event",
     "persist_metric_event",

@@ -12,12 +12,14 @@ bytes equals the stamped value.
 from __future__ import annotations
 
 import importlib.util
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
 
 import pytest
+from groundtruth_kb.db import KnowledgeDB
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -26,6 +28,11 @@ CODEX_HELPER = REPO_ROOT / ".codex" / "skills" / "gtkb-verify" / "helpers" / "wr
 LIVE_GATE = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
 
 SLUG = "restamp-fixture"
+PROJECT_ID = "PROJECT-RESTAMP-FIXTURE"
+WORK_ITEM_ID = "WI-RESTAMP-FIXTURE"
+AUTHORIZATION_ID = "PAUTH-RESTAMP-FIXTURE"
+OWNER_DECISION_ID = "DELIB-RESTAMP-FIXTURE"
+SPEC_ID = "GOV-FILE-BRIDGE-AUTHORITY-001"
 _THIS_TEST = "platform_tests/skills/test_verified_finalization_candidate_evidence_hash_restamp.py"
 
 
@@ -71,7 +78,7 @@ def _write(path: Path, text: str) -> None:
 
 
 def _implementation_report_body() -> str:
-    return """NEW
+    return f"""NEW
 author_identity: prime-builder/test
 author_harness_id: P
 author_session_context_id: 11111111-1111-4111-8111-111111111111
@@ -82,9 +89,69 @@ author_model_configuration: test-config
 bridge_kind: implementation_report
 Document: restamp-fixture
 Version: 003
+Responds to: bridge/restamp-fixture-002.md
+Approved proposal: bridge/restamp-fixture-001.md
+Project Authorization: {AUTHORIZATION_ID}
+Project: {PROJECT_ID}
+Work Item: {WORK_ITEM_ID}
+target_paths: ["scripts/feature.py"]
 
 # Implementation report
+
+## Specification Links
+
+- `{SPEC_ID}`
 """
+
+
+def _seed_project_authorization(repo: Path) -> None:
+    """Create a real list-free project authorization for the fixture chain."""
+    db = KnowledgeDB(repo / "groundtruth.db")
+    try:
+        db.insert_project("Restamp fixture", "test", "seed fixture", id=PROJECT_ID, status="active")
+        db.insert_work_item(
+            WORK_ITEM_ID,
+            "Restamp fixture work item",
+            "new",
+            "backlog",
+            "open",
+            "test",
+            "seed fixture",
+        )
+        db.link_project_work_item(PROJECT_ID, WORK_ITEM_ID, "test", "seed fixture membership")
+        db.insert_deliberation(
+            OWNER_DECISION_ID,
+            "owner_conversation",
+            "Fixture authorization",
+            "Owner approved the isolated finalizer fixture.",
+            "{}",
+            "test",
+            "seed fixture",
+            outcome="owner_decision",
+        )
+        db.insert_spec(
+            id=SPEC_ID,
+            title="Fixture bridge authority",
+            status="verified",
+            changed_by="test",
+            change_reason="seed fixture",
+        )
+        db.insert_project_authorization(
+            PROJECT_ID,
+            "Restamp fixture authorization",
+            OWNER_DECISION_ID,
+            "List-free fixture authorization for bridge and source finalization.",
+            "test",
+            "seed fixture",
+            id=AUTHORIZATION_ID,
+            status="active",
+            allowed_mutation_classes=["bridge", "source"],
+            forbidden_operations=[],
+            included_work_item_ids=[],
+            included_spec_ids=[SPEC_ID],
+        )
+    finally:
+        db.close()
 
 
 def _init_repo(tmp_path: Path) -> Path:
@@ -98,20 +165,37 @@ def _init_repo(tmp_path: Path) -> Path:
     _git(repo, "config", "core.autocrlf", "false")
     _write(repo / "groundtruth.toml", "# test project root marker\n")
     _write(repo / "config" / "governance" / "spec-applicability.toml", "rules = []\n")
+    taxonomy = repo / "config" / "governance" / "project-authorization-operation-taxonomy.toml"
+    taxonomy.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(
+        REPO_ROOT / "config" / "governance" / "project-authorization-operation-taxonomy.toml",
+        taxonomy,
+    )
+    _seed_project_authorization(repo)
     _write(
         repo / "bridge" / f"{SLUG}-001.md",
         "NEW\n::init gtkb pb\n::open build\n\nbridge_kind: prime_proposal\n"
         f"Document: {SLUG}\nVersion: 001\n"
-        'target_paths: ["scripts/feature.py"]\n',
+        f"Project Authorization: {AUTHORIZATION_ID}\n"
+        f"Project: {PROJECT_ID}\n"
+        f"Work Item: {WORK_ITEM_ID}\n"
+        'target_paths: ["scripts/feature.py"]\n\n'
+        "## Specification Links\n\n"
+        f"- `{SPEC_ID}`\n",
     )
-    _write(repo / "bridge" / f"{SLUG}-002.md", f"GO\n\nDocument: {SLUG}\nVersion: 002\n\n# GO\n")
+    _write(
+        repo / "bridge" / f"{SLUG}-002.md",
+        f"GO\n\nDocument: {SLUG}\nVersion: 002\nResponds to: bridge/{SLUG}-001.md\n\n# GO\n",
+    )
     _write(repo / "scripts" / "feature.py", "VALUE = 1\n")
     _git(
         repo,
         "add",
         "--",
         "groundtruth.toml",
+        "groundtruth.db",
         "config/governance/spec-applicability.toml",
+        "config/governance/project-authorization-operation-taxonomy.toml",
         f"bridge/{SLUG}-001.md",
         f"bridge/{SLUG}-002.md",
         "scripts/feature.py",
@@ -133,6 +217,8 @@ def _packet_hash(repo: Path) -> str:
         db_path=repo / "groundtruth.db",
         content_file=repo / "bridge" / f"{SLUG}-003.md",
     )
+    assert packet["preflight_passed"] is True, packet["blocking_errors"]
+    assert packet["blocking_errors"] == []
     return str(packet["packet_hash"])
 
 

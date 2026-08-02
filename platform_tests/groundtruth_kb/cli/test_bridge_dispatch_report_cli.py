@@ -788,3 +788,174 @@ def test_wi5181_stale_snapshot_is_not_silently_substituted(tmp_path: Path) -> No
     assert metrics["availability"] == "stale"
     assert metrics["reason"] == "canonical_snapshot_stale"
     assert "stale: canonical_snapshot_stale" in human.output
+
+
+# ---------------------------------------------------------------------------
+# Success ledger CLI tests (WI-5549)
+# ---------------------------------------------------------------------------
+
+
+def _write_events_to_db(root: Path, events: list[dict[str, object]]) -> None:
+    """Persist metric events into the project's groundtruth.db."""
+    import sys as _sys
+
+    _sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "groundtruth-kb" / "src"))
+    from groundtruth_kb.db import KnowledgeDB  # noqa: E402
+    from groundtruth_kb.dispatch_default_metrics import persist_metric_event  # noqa: E402
+
+    db = KnowledgeDB(root / "groundtruth.db")
+    for event in events:
+        persist_metric_event(db, event, "test", "WI-5549 CLI test")
+
+
+def _success_ledger_event(
+    event_id: str,
+    event_at: str,
+    *,
+    harness_id: str = "A",
+    role: str = "prime-builder",
+    dispatch_id: str | None = None,
+    bridge_document_id: str = "test-doc",
+    **overrides: object,
+) -> dict[str, object]:
+    dispatch = dispatch_id or event_id
+    base: dict[str, object] = {
+        "id": event_id,
+        "event_at": event_at,
+        "dispatch_id": dispatch,
+        "bridge_document_id": bridge_document_id,
+        "work_item_id": "WI-7001",
+        "harness_session_id": f"session-{event_id}",
+        "harness_id": harness_id,
+        "harness_name": harness_id,
+        "role": role,
+        "queue_outcome": "reviewed",
+        "selection_outcome": "selected",
+        "started_at": event_at,
+        "ended_at": event_at,
+        "elapsed_ms": 1000,
+        "exit_status": 0,
+        "stop_reason": "completed",
+        "turns_used": 5,
+        "tool_calls_total": 3,
+        "input_tokens": 50,
+        "output_tokens": 25,
+        "total_tokens": 75,
+    }
+    base.update(overrides)
+    return base
+
+
+def test_success_ledger_appears_in_compact_json_when_events_exist(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_runtime(root)
+    # Seed 65 success events
+    events = [
+        _success_ledger_event(
+            f"ev-{i:04d}",
+            f"2026-07-11T{i // 3600:02d}:{i % 3600 // 60:02d}:{i % 60:02d}Z",
+            harness_id=["A", "D", "F"][i % 3],
+            role="prime-builder" if i % 3 == 0 else "loyal-opposition",
+            bridge_document_id=f"doc-{i:04d}",
+        )
+        for i in range(65)
+    ]
+    _write_events_to_db(root, events)
+
+    result = CliRunner().invoke(
+        main,
+        ["--config", str(config), "bridge", "dispatch", "report", "--compact", "--json"],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert "success_ledger" in payload
+    ledger = payload["success_ledger"]
+    assert ledger["availability"] == "available"
+    assert ledger["streak"] == 65
+    assert ledger["threshold_met"] is True
+    assert ledger["distribution"]["by_harness"]["A"] >= 21
+    assert ledger["distribution"]["by_harness"]["D"] >= 21
+    assert ledger["distribution"]["by_harness"]["F"] >= 21
+
+
+def test_success_ledger_human_output_shows_streak(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_runtime(root)
+    events = [
+        _success_ledger_event(
+            f"ev-{i:04d}",
+            f"2026-07-11T{i // 3600:02d}:{i % 3600 // 60:02d}:{i % 60:02d}Z",
+            harness_id=["A", "D", "F"][i % 3],
+            role="prime-builder" if i % 3 == 0 else "loyal-opposition",
+            bridge_document_id=f"doc-{i:04d}",
+        )
+        for i in range(62)
+    ]
+    _write_events_to_db(root, events)
+
+    result = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "report"])
+    assert result.exit_code == 0, result.output
+    assert "Success ledger:" in result.output
+    assert "threshold met: True" in result.output
+    assert "By harness:" in result.output
+
+
+def test_success_ledger_with_failure_shows_reset_reason(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_runtime(root)
+    events = [
+        _success_ledger_event(
+            f"ev-{i:04d}",
+            f"2026-07-11T00:{i:02d}:00Z",
+            harness_id="A",
+            bridge_document_id=f"doc-{i:04d}",
+        )
+        for i in range(10)
+    ]
+    # Add a failure — unambiguous time 00:10:00 (between events 00:09:00 and 00:11:00)
+    events.append(
+        _success_ledger_event(
+            "ev-fail",
+            "2026-07-11T00:10:00Z",
+            harness_id="A",
+            bridge_document_id="doc-fail",
+            queue_outcome="failed",
+            failure_class="provider_failure",
+            exit_status=1,
+            stop_reason="error",
+        )
+    )
+    # 24 more clean successes at times 00:11 through 00:34
+    events.extend(
+        _success_ledger_event(
+            f"ev-r{i:04d}",
+            f"2026-07-11T00:{i:02d}:00Z",
+            harness_id="A",
+            bridge_document_id=f"doc-r{i:04d}",
+        )
+        for i in range(11, 35)
+    )
+    _write_events_to_db(root, events)
+
+    result = CliRunner().invoke(
+        main,
+        ["--config", str(config), "bridge", "dispatch", "report", "--compact", "--json"],
+    )
+    assert result.exit_code == 0, result.output
+    ledger = json.loads(result.output)["success_ledger"]
+    assert ledger["streak"] == 24
+    assert ledger["threshold_met"] is False
+    assert "provider_failure" in str(ledger["first_reset_reason"])
+
+
+def test_success_ledger_unavailable_when_no_events(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_runtime(root)
+
+    result = CliRunner().invoke(
+        main,
+        ["--config", str(config), "bridge", "dispatch", "report", "--compact", "--json"],
+    )
+    assert result.exit_code == 0, result.output
+    ledger = json.loads(result.output)["success_ledger"]
+    assert ledger["availability"] == "unavailable"

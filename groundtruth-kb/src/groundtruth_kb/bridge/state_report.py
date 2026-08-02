@@ -170,7 +170,7 @@ def _registry_publication_section(root: Path) -> dict[str, Any]:
 
 def _bridge_section(root: Path) -> dict[str, Any]:
     helper = _load_bridge_thread_helper(root)
-    index = helper.index_bridge_thread_files(root)
+    index = helper.index_bridge_thread_files_archive_aware(root)
     status_counts: Counter[str] = Counter()
     threads: list[dict[str, Any]] = []
 

@@ -10,8 +10,8 @@ author_model_configuration: Codex desktop interactive Prime Builder; resumed fle
 
 bridge_kind: implementation_report
 Document: gtkb-wi5237-wi5229-pauth-configuration-coverage
-Version: 003 (NEW; post-implementation report)
-Responds to GO: bridge/gtkb-wi5237-wi5229-pauth-configuration-coverage-002.md
+Version: 003
+Responds to: bridge/gtkb-wi5237-wi5229-pauth-configuration-coverage-002.md
 Approved proposal: bridge/gtkb-wi5237-wi5229-pauth-configuration-coverage-001.md
 Project Authorization: PAUTH-PROJECT-GTKB-OPS-DISPATCHER-MODERNIZATION-WI5229-BINARY-VERIFIED-FINALIZER-20260714
 Project: PROJECT-GTKB-OPS-DISPATCHER-MODERNIZATION

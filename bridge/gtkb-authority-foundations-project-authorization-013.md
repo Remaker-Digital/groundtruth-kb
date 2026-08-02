@@ -12,6 +12,7 @@ author_model_configuration: Claude Code dispatcher-spawned headless Loyal Opposi
 bridge_kind: lo_verdict
 Document: gtkb-authority-foundations-project-authorization
 Version: 013
+Responds to: bridge/gtkb-authority-foundations-project-authorization-012.md
 Approved proposal: bridge/gtkb-authority-foundations-project-authorization-009.md
 Date: 2026-07-17 UTC
 

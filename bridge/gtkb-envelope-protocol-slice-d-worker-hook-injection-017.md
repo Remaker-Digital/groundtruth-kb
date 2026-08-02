@@ -12,8 +12,8 @@ author_model_configuration: Codex desktop interactive session; Prime Builder; ap
 
 bridge_kind: implementation_report
 Document: gtkb-envelope-protocol-slice-d-worker-hook-injection
-Version: 017 (NEW; post-implementation report)
-Responds to GO: bridge/gtkb-envelope-protocol-slice-d-worker-hook-injection-016.md
+Version: 017
+Responds to: bridge/gtkb-envelope-protocol-slice-d-worker-hook-injection-016.md
 Approved proposal: bridge/gtkb-envelope-protocol-slice-d-worker-hook-injection-015.md
 Project Authorization: PAUTH-PROJECT-GTKB-PLATFORM-MODERNIZATION-ENVELOPE-PROTOCOL-20260716-PROJECT-SCOPE
 Project: PROJECT-GTKB-PLATFORM-MODERNIZATION-ENVELOPE-PROTOCOL

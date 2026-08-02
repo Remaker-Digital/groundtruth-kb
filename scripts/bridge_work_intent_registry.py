@@ -746,7 +746,7 @@ def _worker_harness_selector() -> str | None:
         return None
     if os.environ.get("CLAUDE_CODE_SESSION_ID") or os.environ.get("CLAUDECODE"):
         return "claude"
-    if os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_HOME"):
+    if os.environ.get("CODEX_THREAD_ID"):
         return "codex"
     return None
 

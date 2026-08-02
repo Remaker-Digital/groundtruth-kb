@@ -23,7 +23,7 @@ transcript).
 
 Usage::
 
-    python scripts/harness_probe_dsv4pro_r3.py [--timeout SECONDS]
+    python scripts/harness_probe_dsv4pro_r3.py --timeout SECONDS
 
 Output: JSON report to stdout.
 """
@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import subprocess
 import sys
 from datetime import datetime, timezone  # noqa: UP017
@@ -294,10 +295,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--timeout",
         type=float,
-        default=10.0,
-        help=("Subprocess timeout in seconds for git and gt CLI checks (default: 10.0)."),
+        required=True,
+        help="Positive subprocess timeout in seconds supplied by the caller",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if not math.isfinite(args.timeout) or args.timeout <= 0:
+        parser.error("--timeout must be a finite value greater than zero")
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -6,6 +6,9 @@ from __future__ import annotations
 import json
 import multiprocessing
 import sqlite3
+import threading
+import time
+from contextlib import contextmanager
 from dataclasses import asdict, replace
 from pathlib import Path
 
@@ -16,7 +19,7 @@ from scripts.bridge_work_intent_registry import release as release_claim
 
 from groundtruth_kb.cli import main
 from groundtruth_kb.db import KnowledgeDB
-from groundtruth_kb.project import registry_control_plane
+from groundtruth_kb.project import registry_control_plane, sot_registry
 from groundtruth_kb.project.registry_control_plane import (
     IMPLEMENTATION_ARTIFACTS,
     LEGACY_COVERAGE_MODES,
@@ -49,6 +52,7 @@ from groundtruth_kb.project.registry_control_plane import (
 from groundtruth_kb.project.sot_registry import (
     SoTArtifact,
     _load_toml_unlocked,
+    load_projection,
     load_toml,
     sync_projection,
 )
@@ -152,6 +156,67 @@ def _spawned_amend_worker(
         results.put(("ok", artifact_id))  # type: ignore[attr-defined]
     except BaseException as exc:
         results.put(("error", artifact_id, type(exc).__name__, str(exc)))  # type: ignore[attr-defined]
+
+
+def _spawned_snapshot_reader(
+    ordinal: int,
+    project_root: str,
+    registry_path: str,
+    packaged_registry_path: str,
+    db_path: str,
+    start_barrier: object,
+    inside_read_barrier: object,
+    results: object,
+) -> None:
+    """Prove every spawned reader is simultaneously inside the optimistic path."""
+
+    real_marker = registry_control_plane._read_terminal_generation_marker
+    marker_reads = 0
+
+    def synchronized_first_marker(path: Path) -> object:
+        nonlocal marker_reads
+        marker = real_marker(path)
+        marker_reads += 1
+        if marker_reads == 1:
+            inside_read_barrier.wait(timeout=300)  # type: ignore[attr-defined]
+        return marker
+
+    registry_control_plane._read_terminal_generation_marker = synchronized_first_marker  # type: ignore[assignment]
+    try:
+        start_barrier.wait(timeout=300)  # type: ignore[attr-defined]
+        started = time.monotonic()
+        snapshot = load_registry_snapshot(
+            project_root=Path(project_root),
+            registry_path=Path(registry_path),
+            packaged_registry_path=Path(packaged_registry_path),
+            db_path=Path(db_path),
+        )
+        results.put(  # type: ignore[attr-defined]
+            (
+                "ok",
+                ordinal,
+                started,
+                time.monotonic(),
+                snapshot.generation_digest,
+                len(snapshot.records),
+                marker_reads,
+            )
+        )
+    except BaseException as exc:
+        results.put(("error", ordinal, type(exc).__name__, str(exc)))  # type: ignore[attr-defined]
+
+
+def _terminal_generation_fixture(
+    tmp_path: Path,
+    records: list[SoTArtifact],
+) -> tuple[Path, Path, Path]:
+    registry, packaged, db_path = _fixture_generation(tmp_path, records)
+    apply_registry_transaction(
+        records,
+        operation="amend",
+        **_transaction_kwargs(tmp_path, registry, packaged, db_path),
+    )
+    return registry, packaged, db_path
 
 
 def test_reviewed_legacy_map_is_exactly_fifty_and_explicit() -> None:
@@ -258,6 +323,394 @@ def test_snapshot_reports_projection_drift_as_typed_failure(tmp_path: Path) -> N
             packaged_registry_path=packaged,
             db_path=db_path,
         )
+
+
+def test_terminal_marker_binds_committed_new_and_aborted_old_digests(tmp_path: Path) -> None:
+    records = [_record("member", "member.txt")]
+    (tmp_path / "member.txt").write_text("one", encoding="utf-8")
+    registry, packaged, db_path = _terminal_generation_fixture(tmp_path, records)
+
+    committed = registry_control_plane._read_terminal_generation_marker(db_path)
+    assert committed is not None
+    with sqlite3.connect(db_path) as conn:
+        committed_row = conn.execute(
+            "SELECT new_canonical_digest, new_packaged_digest, new_projection_digest "
+            "FROM sot_registry_transaction_journal ORDER BY rowid DESC LIMIT 1"
+        ).fetchone()
+    assert committed.journal_state == "committed"
+    assert (committed.canonical_digest, committed.packaged_digest, committed.projection_digest) == committed_row
+
+    changed = [replace(records[0], notes="candidate")]
+
+    def fail_after_prepare(phase: str) -> None:
+        if phase == "after_prepare":
+            raise RuntimeError(phase)
+
+    with pytest.raises(RuntimeError, match="after_prepare"):
+        apply_registry_transaction(
+            changed,
+            operation="amend",
+            failure_injector=fail_after_prepare,
+            **_transaction_kwargs(tmp_path, registry, packaged, db_path),
+        )
+    recover_registry(
+        project_root=tmp_path,
+        registry_path=registry,
+        packaged_registry_path=packaged,
+        db_path=db_path,
+    )
+
+    aborted = registry_control_plane._read_terminal_generation_marker(db_path)
+    assert aborted is not None
+    with sqlite3.connect(db_path) as conn:
+        aborted_row = conn.execute(
+            "SELECT old_canonical_digest, old_packaged_digest, old_projection_digest "
+            "FROM sot_registry_transaction_journal ORDER BY rowid DESC LIMIT 1"
+        ).fetchone()
+    assert aborted.journal_state == "aborted"
+    assert (aborted.canonical_digest, aborted.packaged_digest, aborted.projection_digest) == aborted_row
+
+
+def test_stable_snapshot_reads_two_markers_without_exclusive_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    records = [_record("member", "member.txt")]
+    (tmp_path / "member.txt").write_text("one", encoding="utf-8")
+    registry, packaged, db_path = _terminal_generation_fixture(tmp_path, records)
+    real_marker = registry_control_plane._read_terminal_generation_marker
+    marker_reads = 0
+
+    def counted_marker(path: Path) -> object:
+        nonlocal marker_reads
+        marker_reads += 1
+        return real_marker(path)
+
+    class ForbiddenExclusiveLock:
+        def __init__(self, path: Path, timeout: float = 30.0) -> None:
+            del path, timeout
+
+        def __enter__(self) -> object:
+            raise AssertionError("stable optimistic reader acquired the exclusive lock")
+
+        def __exit__(self, *args: object) -> None:
+            del args
+
+    monkeypatch.setattr(registry_control_plane, "_read_terminal_generation_marker", counted_marker)
+    monkeypatch.setattr(registry_control_plane, "_RegistryFileLock", ForbiddenExclusiveLock)
+    snapshot = load_registry_snapshot(
+        project_root=tmp_path,
+        registry_path=registry,
+        packaged_registry_path=packaged,
+        db_path=db_path,
+    )
+    assert [record.id for record in snapshot.records] == ["member"]
+    assert marker_reads == 2
+
+
+def test_changed_marker_replays_snapshot_exclusive_exactly_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    records = [_record("member", "member.txt")]
+    (tmp_path / "member.txt").write_text("one", encoding="utf-8")
+    registry, packaged, db_path = _terminal_generation_fixture(tmp_path, records)
+    marker = registry_control_plane._read_terminal_generation_marker(db_path)
+    assert marker is not None
+    markers = iter((marker, replace(marker, row_digest=marker.row_digest + "-changed")))
+    real_exclusive = registry_control_plane._load_registry_snapshot_exclusive
+    fallback_calls = 0
+
+    def changed_marker(path: Path) -> object:
+        del path
+        return next(markers)
+
+    def counted_exclusive(paths: object) -> object:
+        nonlocal fallback_calls
+        fallback_calls += 1
+        return real_exclusive(paths)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(registry_control_plane, "_read_terminal_generation_marker", changed_marker)
+    monkeypatch.setattr(registry_control_plane, "_load_registry_snapshot_exclusive", counted_exclusive)
+    snapshot = load_registry_snapshot(
+        project_root=tmp_path,
+        registry_path=registry,
+        packaged_registry_path=packaged,
+        db_path=db_path,
+    )
+    assert [record.id for record in snapshot.records] == ["member"]
+    assert fallback_calls == 1
+
+
+def test_second_marker_read_failure_replays_snapshot_exclusive_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    records = [_record("member", "member.txt")]
+    (tmp_path / "member.txt").write_text("one", encoding="utf-8")
+    registry, packaged, db_path = _terminal_generation_fixture(tmp_path, records)
+    marker = registry_control_plane._read_terminal_generation_marker(db_path)
+    assert marker is not None
+    marker_reads = 0
+    real_exclusive = registry_control_plane._load_registry_snapshot_exclusive
+    fallback_calls = 0
+
+    def failing_second_marker(path: Path) -> object:
+        nonlocal marker_reads
+        del path
+        marker_reads += 1
+        if marker_reads == 1:
+            return marker
+        raise sqlite3.OperationalError("marker read failed")
+
+    def counted_exclusive(paths: object) -> object:
+        nonlocal fallback_calls
+        fallback_calls += 1
+        return real_exclusive(paths)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(registry_control_plane, "_read_terminal_generation_marker", failing_second_marker)
+    monkeypatch.setattr(registry_control_plane, "_load_registry_snapshot_exclusive", counted_exclusive)
+    assert load_registry_snapshot(project_root=tmp_path).records == tuple(records)
+    assert fallback_calls == 1
+
+
+def test_stable_toml_body_error_preserves_exact_exception_object(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    records = [_record("member", "member.txt")]
+    (tmp_path / "member.txt").write_text("one", encoding="utf-8")
+    registry, _, _ = _terminal_generation_fixture(tmp_path, records)
+    sentinel = RuntimeError("exact body error")
+
+    def fail_parse(*args: object, **kwargs: object) -> list[SoTArtifact]:
+        del args, kwargs
+        raise sentinel
+
+    monkeypatch.setattr(sot_registry, "_load_toml_bytes", fail_parse)
+    with pytest.raises(RuntimeError, match="exact body error") as captured:
+        load_toml(registry)
+    assert captured.value is sentinel
+
+
+def test_changed_marker_replays_toml_body_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    records = [_record("member", "member.txt")]
+    (tmp_path / "member.txt").write_text("one", encoding="utf-8")
+    registry, _, db_path = _terminal_generation_fixture(tmp_path, records)
+    marker = registry_control_plane._read_terminal_generation_marker(db_path)
+    assert marker is not None
+    markers = iter((marker, replace(marker, row_digest=marker.row_digest + "-changed")))
+    real_parse = sot_registry._load_toml_bytes
+    parse_calls = 0
+    real_barrier = registry_control_plane._exclusive_registry_read_barrier
+    fallback_calls = 0
+
+    def changed_marker(path: Path) -> object:
+        del path
+        return next(markers)
+
+    def fail_once(payload: bytes, *, allow_missing_coverage: bool = False) -> list[SoTArtifact]:
+        nonlocal parse_calls
+        parse_calls += 1
+        if parse_calls == 1:
+            raise RuntimeError("interposed body error")
+        return real_parse(payload, allow_missing_coverage=allow_missing_coverage)
+
+    @contextmanager
+    def counted_barrier(**kwargs: object):
+        nonlocal fallback_calls
+        fallback_calls += 1
+        with real_barrier(**kwargs) as paths:
+            yield paths
+
+    monkeypatch.setattr(registry_control_plane, "_read_terminal_generation_marker", changed_marker)
+    monkeypatch.setattr(sot_registry, "_load_toml_bytes", fail_once)
+    monkeypatch.setattr(registry_control_plane, "_exclusive_registry_read_barrier", counted_barrier)
+    assert load_toml(registry) == records
+    assert parse_calls == 2
+    assert fallback_calls == 1
+
+
+def test_missing_and_incomplete_markers_use_exclusive_compatibility(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    records = [_record("member", "member.txt")]
+    missing_root = tmp_path / "missing"
+    missing_root.mkdir()
+    (missing_root / "member.txt").write_text("one", encoding="utf-8")
+    registry, packaged, db_path = _fixture_generation(missing_root, records)
+    real_lock = registry_control_plane._RegistryFileLock
+    lock_entries = 0
+
+    class CountedLock(real_lock):
+        def __enter__(self) -> object:
+            nonlocal lock_entries
+            lock_entries += 1
+            return super().__enter__()
+
+    monkeypatch.setattr(registry_control_plane, "_RegistryFileLock", CountedLock)
+    assert load_registry_snapshot(project_root=missing_root).records == tuple(records)
+    missing_lock_entries = lock_entries
+
+    incomplete_root = tmp_path / "incomplete"
+    incomplete_root.mkdir()
+    (incomplete_root / "member.txt").write_text("one", encoding="utf-8")
+    registry, packaged, db_path = _terminal_generation_fixture(incomplete_root, records)
+    lock_entries = missing_lock_entries
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "UPDATE sot_registry_transaction_journal SET new_projection_digest = NULL "
+            "WHERE rowid = (SELECT MAX(rowid) FROM sot_registry_transaction_journal)"
+        )
+    assert load_registry_snapshot(project_root=incomplete_root).records == tuple(records)
+    assert lock_entries == 2
+
+
+def test_standalone_loaders_fall_back_when_generation_companions_are_missing(tmp_path: Path) -> None:
+    records = [_record("member", "member.txt")]
+
+    toml_root = tmp_path / "toml"
+    toml_root.mkdir()
+    (toml_root / "member.txt").write_text("one", encoding="utf-8")
+    registry, packaged, _ = _terminal_generation_fixture(toml_root, records)
+    packaged.unlink()
+    assert load_toml(registry) == records
+
+    projection_root = tmp_path / "projection"
+    projection_root.mkdir()
+    (projection_root / "member.txt").write_text("one", encoding="utf-8")
+    registry, packaged, db_path = _terminal_generation_fixture(projection_root, records)
+    registry.unlink()
+    packaged.unlink()
+    assert load_projection(db_path) == records
+
+
+def test_optimistic_sqlite_connection_is_query_only_and_never_creates(tmp_path: Path) -> None:
+    db_path = tmp_path / "groundtruth.db"
+    KnowledgeDB(db_path=db_path)
+    with registry_control_plane._open_registry_read_only_connection(db_path) as conn:
+        assert conn.execute("PRAGMA query_only").fetchone()[0] == 1
+        with pytest.raises(sqlite3.OperationalError, match="readonly"):
+            conn.execute("CREATE TABLE forbidden_write (id INTEGER)")
+
+    missing = tmp_path / "missing.db"
+    with pytest.raises(sqlite3.OperationalError), registry_control_plane._open_registry_read_only_connection(missing):
+        pass
+    assert not missing.exists()
+
+
+def test_public_loaders_use_query_only_generation_reads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    records = [_record("member", "member.txt")]
+    (tmp_path / "member.txt").write_text("one", encoding="utf-8")
+    registry, _, db_path = _terminal_generation_fixture(tmp_path, records)
+    real_open = registry_control_plane._open_registry_read_only_connection
+    query_only_values: list[int] = []
+
+    @contextmanager
+    def observed_open(path: Path):
+        with real_open(path) as conn:
+            query_only_values.append(conn.execute("PRAGMA query_only").fetchone()[0])
+            yield conn
+
+    monkeypatch.setattr(registry_control_plane, "_open_registry_read_only_connection", observed_open)
+    assert load_toml(registry) == records
+    assert load_projection(db_path) == records
+    assert query_only_values and set(query_only_values) == {1}
+
+
+def test_writer_interposition_returns_one_complete_new_generation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    records = [_record("member", "member.txt")]
+    desired = [replace(records[0], notes="writer committed")]
+    (tmp_path / "member.txt").write_text("one", encoding="utf-8")
+    registry, packaged, db_path = _terminal_generation_fixture(tmp_path, records)
+    reader_entered = threading.Event()
+    writer_done = threading.Event()
+    writer_errors: list[BaseException] = []
+    real_projection_load = registry_control_plane._load_projection_from_connection
+    projection_calls = 0
+
+    def interposed_projection(conn: object, **kwargs: object) -> list[SoTArtifact]:
+        nonlocal projection_calls
+        projection_calls += 1
+        if projection_calls == 1:
+            reader_entered.set()
+            if not writer_done.wait(300):
+                raise TimeoutError("writer did not complete during optimistic read")
+        return real_projection_load(conn, **kwargs)  # type: ignore[arg-type]
+
+    def writer() -> None:
+        if not reader_entered.wait(300):
+            writer_errors.append(TimeoutError("reader never entered optimistic projection read"))
+            writer_done.set()
+            return
+        try:
+            apply_registry_transaction(
+                desired,
+                operation="amend",
+                **_transaction_kwargs(tmp_path, registry, packaged, db_path),
+            )
+        except BaseException as exc:
+            writer_errors.append(exc)
+        finally:
+            writer_done.set()
+
+    monkeypatch.setattr(registry_control_plane, "_load_projection_from_connection", interposed_projection)
+    writer_thread = threading.Thread(target=writer, daemon=True)
+    writer_thread.start()
+    snapshot = load_registry_snapshot(project_root=tmp_path)
+    writer_thread.join(timeout=300)
+    assert not writer_thread.is_alive()
+    assert writer_errors == []
+    assert snapshot.records == tuple(desired)
+
+
+def test_four_spawned_readers_overlap_while_writer_lock_is_held(tmp_path: Path) -> None:
+    records = [_record("member", "member.txt")]
+    (tmp_path / "member.txt").write_text("one", encoding="utf-8")
+    registry, packaged, db_path = _terminal_generation_fixture(tmp_path, records)
+    paths = registry_control_plane.RegistryPaths.resolve(project_root=tmp_path)
+    context = multiprocessing.get_context("spawn")
+    start_barrier = context.Barrier(5)
+    inside_read_barrier = context.Barrier(4)
+    results = context.Queue()
+    processes = [
+        context.Process(
+            target=_spawned_snapshot_reader,
+            args=(
+                ordinal,
+                str(tmp_path),
+                str(registry),
+                str(packaged),
+                str(db_path),
+                start_barrier,
+                inside_read_barrier,
+                results,
+            ),
+        )
+        for ordinal in range(4)
+    ]
+    deadline = time.monotonic() + 300
+    outcomes: list[tuple[object, ...]] = []
+    try:
+        with registry_control_plane._RegistryFileLock(paths.lock_path):
+            for process in processes:
+                process.start()
+            start_barrier.wait(timeout=max(0.1, deadline - time.monotonic()))
+            for _ in processes:
+                outcomes.append(results.get(timeout=max(0.1, deadline - time.monotonic())))
+    finally:
+        for process in processes:
+            process.join(timeout=max(0.0, deadline - time.monotonic()))
+            if process.is_alive():
+                process.terminate()
+                process.join(timeout=30)
+        results.close()
+        results.join_thread()
+
+    assert all(process.exitcode == 0 for process in processes), outcomes
+    assert len(outcomes) == 4 and all(outcome[0] == "ok" for outcome in outcomes), outcomes
+    assert len({outcome[4] for outcome in outcomes}) == 1
+    assert {outcome[5] for outcome in outcomes} == {1}
+    assert {outcome[6] for outcome in outcomes} == {2}
+    assert max(float(outcome[2]) for outcome in outcomes) < min(float(outcome[3]) for outcome in outcomes)
 
 
 @pytest.mark.parametrize(

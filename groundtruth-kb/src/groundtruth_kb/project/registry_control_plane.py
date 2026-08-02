@@ -31,7 +31,9 @@ from typing import Any, Literal
 
 from groundtruth_kb.project.sot_registry import (
     SoTArtifact,
+    _load_projection_from_connection,
     _load_projection_unlocked,
+    _load_toml_bytes,
     _load_toml_unlocked,
     validate_projection_parity,
 )
@@ -804,19 +806,227 @@ def _ensure_no_nonterminal_journal(db_path: Path) -> None:
         )
 
 
+class _RegistryOptimisticConflict(RuntimeError):
+    """Signal that one optimistic read must replay under the exclusive lock."""
+
+
+@dataclass(frozen=True)
+class _TerminalRegistryGeneration:
+    row_digest: str
+    rowid: int
+    journal_id: str
+    journal_state: str
+    canonical_digest: str
+    packaged_digest: str
+    projection_digest: str
+
+
+@contextmanager
+def _open_registry_read_only_connection(db_path: Path) -> Iterator[sqlite3.Connection]:
+    """Open an existing registry database without write or create authority."""
+
+    uri = db_path.resolve().as_uri() + "?mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
+    try:
+        conn.execute("PRAGMA query_only=ON")
+        if conn.execute("PRAGMA query_only").fetchone()[0] != 1:
+            raise RegistryControlPlaneError(f"registry read connection is not query-only: {db_path}")
+        yield conn
+    finally:
+        conn.close()
+
+
+def _read_terminal_generation_marker(db_path: Path) -> _TerminalRegistryGeneration | None:
+    """Return one complete terminal journal head from a read-only snapshot."""
+
+    if not db_path.exists():
+        return None
+    with _open_registry_read_only_connection(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN")
+        if not _table_exists(conn, "sot_registry_transaction_journal"):
+            return None
+        if conn.execute(
+            "SELECT 1 FROM sot_registry_transaction_journal WHERE journal_state NOT IN ('committed', 'aborted') LIMIT 1"
+        ).fetchone():
+            return None
+        row = conn.execute(
+            "SELECT * FROM sot_registry_transaction_journal "
+            "WHERE journal_state IN ('committed', 'aborted') ORDER BY rowid DESC LIMIT 1"
+        ).fetchone()
+        if row is None:
+            return None
+        state = str(row["journal_state"])
+        prefix = "new" if state == "committed" else "old"
+        canonical_digest = row[f"{prefix}_canonical_digest"]
+        packaged_digest = row[f"{prefix}_packaged_digest"]
+        projection_digest = row[f"{prefix}_projection_digest"]
+        digest_values = (canonical_digest, packaged_digest, projection_digest)
+        if not all(isinstance(value, str) and value for value in digest_values):
+            return None
+        row_payload = dict(row)
+        return _TerminalRegistryGeneration(
+            row_digest=_json_digest(row_payload),
+            rowid=int(row["rowid"]),
+            journal_id=str(row["journal_id"]),
+            journal_state=state,
+            canonical_digest=canonical_digest,
+            packaged_digest=packaged_digest,
+            projection_digest=projection_digest,
+        )
+
+
+class _RegistryReadLease:
+    """Bind caller-returned data to one unchanged terminal generation."""
+
+    def __init__(self, paths: RegistryPaths, marker: _TerminalRegistryGeneration | None) -> None:
+        self.paths = paths
+        self.marker = marker
+        self._canonical_payload: bytes | None = None
+        self._canonical_records: tuple[SoTArtifact, ...] | None = None
+        self._projection_records: tuple[SoTArtifact, ...] | None = None
+
+    @property
+    def optimistic(self) -> bool:
+        return self.marker is not None
+
+    def bind_toml(self, payload: bytes, records: Sequence[SoTArtifact]) -> None:
+        self._canonical_payload = payload
+        self._canonical_records = tuple(records)
+
+    def bind_projection(self, records: Sequence[SoTArtifact]) -> None:
+        self._projection_records = tuple(records)
+
+    def _prove_generation(self) -> None:
+        marker = self.marker
+        if marker is None:
+            return
+        canonical_payload = self._canonical_payload
+        canonical_records = self._canonical_records
+        if canonical_payload is None:
+            try:
+                canonical_payload = self.paths.registry_path.read_bytes()
+            except OSError as exc:
+                raise _RegistryOptimisticConflict("canonical registry bytes are not provable") from exc
+        if canonical_records is None:
+            canonical_records = tuple(_load_toml_bytes(canonical_payload))
+        try:
+            packaged_payload = self.paths.packaged_registry_path.read_bytes()
+        except OSError as exc:
+            raise _RegistryOptimisticConflict("packaged registry bytes are not provable") from exc
+        if canonical_payload != packaged_payload:
+            raise RegistryControlPlaneError("canonical and packaged registry declarations are not byte-identical")
+        projection_records = self._projection_records
+        if projection_records is None:
+            with _open_registry_read_only_connection(self.paths.db_path) as conn:
+                projection_records = tuple(_load_projection_from_connection(conn))
+        parity = validate_projection_parity(list(canonical_records), list(projection_records))
+        if not parity.in_sync:
+            raise RegistryProjectionMismatch(
+                "registry declaration/projection parity failure: "
+                f"missing_projection={parity.missing_in_projection}, "
+                f"missing_declaration={parity.missing_in_toml}, divergences={parity.field_divergences}"
+            )
+        RegistryResolver(canonical_records)
+        observed = (
+            _sha256_bytes(canonical_payload),
+            _sha256_bytes(packaged_payload),
+            _projection_digest(projection_records),
+        )
+        expected = (marker.canonical_digest, marker.packaged_digest, marker.projection_digest)
+        if observed != expected:
+            raise _RegistryOptimisticConflict("live registry bytes do not match the terminal journal generation")
+
+
+def _is_canonical_registry_layout(paths: RegistryPaths) -> bool:
+    """Return whether all three paths are the root's authoritative generation."""
+
+    canonical = RegistryPaths.resolve(project_root=paths.project_root)
+    return (
+        paths.registry_path == canonical.registry_path
+        and paths.packaged_registry_path == canonical.packaged_registry_path
+        and paths.db_path == canonical.db_path
+    )
+
+
+@contextmanager
+def _exclusive_registry_read_barrier(
+    *,
+    project_root: Path | None = None,
+    registry_path: Path | None = None,
+    packaged_registry_path: Path | None = None,
+    db_path: Path | None = None,
+) -> Iterator[RegistryPaths]:
+    """Preserve the original exclusive reader as the sole fallback path."""
+
+    paths = RegistryPaths.resolve(
+        project_root=project_root,
+        registry_path=registry_path,
+        packaged_registry_path=packaged_registry_path,
+        db_path=db_path,
+    )
+    with _RegistryFileLock(paths.lock_path):
+        _ensure_no_nonterminal_journal(paths.db_path)
+        yield paths
+
+
 @contextmanager
 def registry_read_barrier(
     *,
     project_root: Path | None = None,
     registry_path: Path | None = None,
+    packaged_registry_path: Path | None = None,
     db_path: Path | None = None,
-) -> Iterator[RegistryPaths]:
-    """Linearize an authority read and reject every incomplete generation."""
+) -> Iterator[_RegistryReadLease]:
+    """Prove one stable terminal generation or use the exclusive fallback."""
 
-    paths = RegistryPaths.resolve(project_root=project_root, registry_path=registry_path, db_path=db_path)
-    with _RegistryFileLock(paths.lock_path):
-        _ensure_no_nonterminal_journal(paths.db_path)
-        yield paths
+    paths = RegistryPaths.resolve(
+        project_root=project_root,
+        registry_path=registry_path,
+        packaged_registry_path=packaged_registry_path,
+        db_path=db_path,
+    )
+    if not _is_canonical_registry_layout(paths):
+        with _exclusive_registry_read_barrier(
+            project_root=paths.project_root,
+            registry_path=paths.registry_path,
+            packaged_registry_path=paths.packaged_registry_path,
+            db_path=paths.db_path,
+        ):
+            yield _RegistryReadLease(paths, None)
+        return
+    try:
+        marker = _read_terminal_generation_marker(paths.db_path)
+    except Exception:
+        marker = None
+    if marker is None:
+        with _exclusive_registry_read_barrier(
+            project_root=paths.project_root,
+            registry_path=paths.registry_path,
+            packaged_registry_path=paths.packaged_registry_path,
+            db_path=paths.db_path,
+        ):
+            yield _RegistryReadLease(paths, None)
+        return
+
+    lease = _RegistryReadLease(paths, marker)
+    try:
+        yield lease
+        lease._prove_generation()
+    except Exception:
+        try:
+            post_marker = _read_terminal_generation_marker(paths.db_path)
+        except Exception as exc:
+            raise _RegistryOptimisticConflict("registry generation became unreadable") from exc
+        if post_marker != marker:
+            raise _RegistryOptimisticConflict("registry generation changed during the read") from None
+        raise
+    try:
+        post_marker = _read_terminal_generation_marker(paths.db_path)
+    except Exception as exc:
+        raise _RegistryOptimisticConflict("registry generation became unreadable") from exc
+    if post_marker != marker:
+        raise _RegistryOptimisticConflict("registry generation changed during the read")
 
 
 def _load_snapshot_unlocked(paths: RegistryPaths) -> RegistrySnapshot:
@@ -824,7 +1034,7 @@ def _load_snapshot_unlocked(paths: RegistryPaths) -> RegistrySnapshot:
     packaged_bytes = paths.packaged_registry_path.read_bytes()
     if canonical_bytes != packaged_bytes:
         raise RegistryControlPlaneError("canonical and packaged registry declarations are not byte-identical")
-    records = _load_toml_unlocked(paths.registry_path)
+    records = _load_toml_bytes(canonical_bytes)
     projection = _load_projection_unlocked(paths.db_path)
     parity = validate_projection_parity(records, projection)
     if not parity.in_sync:
@@ -853,6 +1063,81 @@ def _load_snapshot_unlocked(paths: RegistryPaths) -> RegistrySnapshot:
     )
 
 
+def _try_load_registry_snapshot_optimistically(paths: RegistryPaths) -> RegistrySnapshot:
+    if not _is_canonical_registry_layout(paths):
+        raise _RegistryOptimisticConflict("registry paths are outside the canonical generation layout")
+    try:
+        marker = _read_terminal_generation_marker(paths.db_path)
+    except Exception as exc:
+        raise _RegistryOptimisticConflict("registry generation is not optimistically readable") from exc
+    if marker is None:
+        raise _RegistryOptimisticConflict("registry generation has no complete terminal marker")
+    try:
+        canonical_bytes = paths.registry_path.read_bytes()
+        packaged_bytes = paths.packaged_registry_path.read_bytes()
+        if canonical_bytes != packaged_bytes:
+            raise RegistryControlPlaneError("canonical and packaged registry declarations are not byte-identical")
+        records = _load_toml_bytes(canonical_bytes)
+        with _open_registry_read_only_connection(paths.db_path) as conn:
+            projection = _load_projection_from_connection(conn)
+        parity = validate_projection_parity(records, projection)
+        if not parity.in_sync:
+            raise RegistryProjectionMismatch(
+                "registry declaration/projection parity failure: "
+                f"missing_projection={parity.missing_in_projection}, "
+                f"missing_declaration={parity.missing_in_toml}, divergences={parity.field_divergences}"
+            )
+        resolver = RegistryResolver(records)
+        declaration_digest = _sha256_bytes(canonical_bytes)
+        packaged_digest = _sha256_bytes(packaged_bytes)
+        projection_digest = _projection_digest(projection)
+        snapshot = RegistrySnapshot(
+            records=tuple(records),
+            declaration_digest=declaration_digest,
+            packaged_digest=packaged_digest,
+            projection_digest=projection_digest,
+            generation_digest=_json_digest(
+                {
+                    "declaration": declaration_digest,
+                    "packaged": packaged_digest,
+                    "projection": projection_digest,
+                }
+            ),
+            resolver=resolver,
+        )
+    except Exception:
+        try:
+            post_marker = _read_terminal_generation_marker(paths.db_path)
+        except Exception as exc:
+            raise _RegistryOptimisticConflict("registry generation became unreadable") from exc
+        if post_marker != marker:
+            raise _RegistryOptimisticConflict("registry generation changed during the snapshot") from None
+        raise
+    try:
+        post_marker = _read_terminal_generation_marker(paths.db_path)
+    except Exception as exc:
+        raise _RegistryOptimisticConflict("registry generation became unreadable") from exc
+    if post_marker != marker:
+        raise _RegistryOptimisticConflict("registry generation changed during the snapshot")
+    if (
+        snapshot.declaration_digest,
+        snapshot.packaged_digest,
+        snapshot.projection_digest,
+    ) != (marker.canonical_digest, marker.packaged_digest, marker.projection_digest):
+        raise _RegistryOptimisticConflict("snapshot does not match the terminal journal generation")
+    return snapshot
+
+
+def _load_registry_snapshot_exclusive(paths: RegistryPaths) -> RegistrySnapshot:
+    with _exclusive_registry_read_barrier(
+        project_root=paths.project_root,
+        registry_path=paths.registry_path,
+        packaged_registry_path=paths.packaged_registry_path,
+        db_path=paths.db_path,
+    ):
+        return _load_snapshot_unlocked(paths)
+
+
 def load_registry_snapshot(
     *,
     project_root: Path | None = None,
@@ -866,9 +1151,10 @@ def load_registry_snapshot(
         packaged_registry_path=packaged_registry_path,
         db_path=db_path,
     )
-    with _RegistryFileLock(paths.lock_path):
-        _ensure_no_nonterminal_journal(paths.db_path)
-        return _load_snapshot_unlocked(paths)
+    try:
+        return _try_load_registry_snapshot_optimistically(paths)
+    except _RegistryOptimisticConflict:
+        return _load_registry_snapshot_exclusive(paths)
 
 
 def _projection_records_from_connection(conn: sqlite3.Connection) -> list[SoTArtifact]:

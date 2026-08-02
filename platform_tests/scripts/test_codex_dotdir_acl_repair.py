@@ -33,6 +33,32 @@ def test_driveignore_excludes_codex_dir():
     assert ".codex/" in lines
 
 
+def test_repair_script_apply_contract_is_exact_root_only():
+    source = (ROOT / "scripts" / "repair_codex_dotdir_acl.ps1").read_text(encoding="utf-8")
+    assert "RemoveAccessRuleSpecific" in source
+    for forbidden in (
+        "PurgeAccessRules",
+        "RemoveAccessRuleAll",
+        "SetAccessRule",
+        "ResetAccessRule",
+        "AddAccessRule",
+        "Enable-AccessInheritance",
+        "/inheritance:e",
+        "Ensure-ModifyAllow",
+        "Ensure-CodexSandboxAllow",
+        "Ensure-CurrentIdentityAllow",
+    ):
+        assert forbidden not in source
+    assert source.count("Set-Acl -LiteralPath") == 1
+    assert "Set-AccessOnlyAcl -Path $child" not in source
+    assert "descendant_write_count = 0" in source
+    assert "AccessControlSections]::All" in source
+    assert "GtkbAuditReadable" in source
+    assert "AccessControlSections]::Audit" in source
+    assert 'if ($Mode -eq "Apply" -and (-not $rootCheck.Error))' in source
+    assert 'if (-not $rootCheck.Error -and $Mode -eq "Check")' in source
+
+
 def _fake_powershell(_name: str) -> str:
     # A name ending in powershell.exe exercises the ExecutionPolicy branch too.
     return r"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"

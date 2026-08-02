@@ -12,7 +12,7 @@ author_model_configuration: Codex Desktop interactive Prime Builder; transcript 
 bridge_kind: implementation_report
 Document: gtkb-wi5257-compact-live-dispatch-attribution
 Version: 003
-Responds to GO: bridge/gtkb-wi5257-compact-live-dispatch-attribution-002.md
+Responds to: bridge/gtkb-wi5257-compact-live-dispatch-attribution-002.md
 Approved proposal: bridge/gtkb-wi5257-compact-live-dispatch-attribution-001.md
 Project Authorization: PAUTH-PROJECT-GTKB-GOOSE-HARNESS-ADOPTION-WI5257-COMPACT-ATTRIBUTION-20260715
 Project Authorization Version: 1

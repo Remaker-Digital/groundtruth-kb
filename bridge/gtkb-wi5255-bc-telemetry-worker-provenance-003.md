@@ -11,8 +11,8 @@ author_model_configuration: Codex Desktop interactive Prime Builder; danger-full
 
 bridge_kind: implementation_report
 Document: gtkb-wi5255-bc-telemetry-worker-provenance
-Version: 003 (NEW; post-implementation report)
-Responds to GO: bridge/gtkb-wi5255-bc-telemetry-worker-provenance-002.md
+Version: 003
+Responds to: bridge/gtkb-wi5255-bc-telemetry-worker-provenance-002.md
 Approved proposal: bridge/gtkb-wi5255-bc-telemetry-worker-provenance-001.md
 Project Authorization: PAUTH-PROJECT-GTKB-GOOSE-HARNESS-ADOPTION-WI5255-BC-TELEMETRY-PROVENANCE-20260715
 Project: PROJECT-GTKB-GOOSE-HARNESS-ADOPTION

@@ -1,0 +1,11 @@
+# Typed operational-control catalog (WI-5806 foundation).
+#
+# This checked-in file owns only non-secret definitions, relaxed defaults,
+# units, bounds, and invariant policy. The root .env.local remains the sole
+# production authority for live platform override values. No consumer is
+# migrated and no runtime control is active in this foundation slice.
+
+schema_version = 1
+live_value_authority = "root_env_local"
+controls = []
+invariants = []

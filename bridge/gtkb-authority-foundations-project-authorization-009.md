@@ -133,6 +133,20 @@ Only after exact replacement readback passes:
 python -m groundtruth_kb.cli projects revoke-authorization PAUTH-PROJECT-GTKB-PLATFORM-MODERNIZATION-AUTHORITY-FOUNDATIONS-20260715-PROJECT-SCOPE --changed-by prime-builder/codex/A --change-reason "Revoke the version-2 project-scope Authority Foundations PAUTH only after the owner-authorized replacement was created and read back under the single-use bootstrap remediation." --json
 ```
 
+## Requirement Sufficiency
+
+Existing requirements are sufficient for this revision. No new or revised
+requirements are required: this is a single-use bootstrap remediation that
+rebinds the approved proposal baseline to the current canonical authorization
+row. The owner decision at
+`DELIB-20260715-AUTHORITY-FOUNDATIONS-PROJECT-AUTHORIZATION` already
+authorizes the project envelope and quarantine boundary. The
+`DCL-PROJECT-AUTHORIZATION-OPERATION-TIME-ENFORCEMENT-001`,
+`DCL-PROJECT-AUTHORIZATION-ENVELOPE-001`, and
+`GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` specifications already govern
+the before-state, replacement-absence, and implementation-authorization gates
+used here.
+
 ## Specification Links
 
 - `DCL-CHANGE-CONTROLLED-ARTIFACT-EVALUABILITY-001`

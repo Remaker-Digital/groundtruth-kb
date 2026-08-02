@@ -4,7 +4,7 @@ NEW
 
 bridge_kind: prime_proposal
 Document: gtkb-wi5222-60-minute-generous-dispatch-envelope-successor
-Version: 001 (NEW; implementation proposal)
+Version: 001
 Date: 2026-07-13 UTC
 
 author_identity: prime-builder/codex/A

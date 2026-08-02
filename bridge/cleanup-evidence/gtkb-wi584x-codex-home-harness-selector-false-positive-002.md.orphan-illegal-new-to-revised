@@ -1,0 +1,123 @@
+REVISED
+::init gtkb pb
+
+author_identity: prime-builder/goose/G
+author_harness_id: G
+author_session_context_id: G-2026-07-31T19-46-49Z
+author_model: unknown
+author_model_version: unknown
+author_model_configuration: Goose Desktop harness; resolved role prime-builder per ::init gtkb pb transcript keyword
+
+bridge_kind: prime_proposal
+Document: gtkb-wi584x-codex-home-harness-selector-false-positive
+Version: 002
+Date: 2026-07-31 UTC
+Author: Prime Builder (Goose, harness G)
+Replaces: bridge/gtkb-wi584x-codex-home-harness-selector-false-positive-001.md
+
+Project Authorization: PAUTH-PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY-WHOLE-PROJECT-20260730
+Project: PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY
+Work Item: WI-5842 (to be created)
+
+target_paths: ["scripts/bridge_work_intent_registry.py"]
+
+implementation_scope: bug_fix
+requires_review: true
+requires_verification: true
+kb_mutation_in_scope: false
+dispatcher_or_tafe_mutation_in_scope: false
+
+# Implementation Report — CODEX_HOME false-positive in _worker_harness_selector()
+
+## Status
+
+**IMPLEMENTED.** The fix has been applied and verified.
+
+## Change Applied
+
+**File:** `scripts/bridge_work_intent_registry.py`, line 748
+
+**Before (defective):**
+```python
+    if os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_HOME"):
+        return "codex"
+```
+
+**After (fixed):**
+```python
+    if os.environ.get("CODEX_THREAD_ID"):
+        return "codex"
+```
+
+`CODEX_HOME` (`C:\Users\micha\.codex`) is a permanent installation path, always
+set on this workstation regardless of which harness is active. It is not a
+runtime session signal and has no place in harness detection.
+
+## Verification Evidence
+
+### 1. Git diff confirms the exact change
+```
+$ git --no-optional-locks diff scripts/bridge_work_intent_registry.py
+diff --git a/scripts/bridge_work_intent_registry.py b/scripts/bridge_work_intent_registry.py
+index eb32affca..f07fc5865 100644
+--- a/scripts/bridge_work_intent_registry.py
++++ b/scripts/bridge_work_intent_registry.py
+@@ -746,7 +746,7 @@ def _worker_harness_selector() -> str | None:
+         return None
+     if os.environ.get("CLAUDE_CODE_SESSION_ID") or os.environ.get("CLAUDECODE"):
+         return "claude"
+-    if os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_HOME"):
++    if os.environ.get("CODEX_THREAD_ID"):
+         return "codex"
+     return None
+```
+
+### 2. Claim resolves without workaround (was blocked before fix)
+```
+$ set GTKB_SESSION_ID=G-2026-07-31T19-46-49Z
+$ python scripts\bridge_claim_cli.py claim gtkb-wi584x-codex-home-harness-selector-false-positive
+{
+  "acquired_at": "2026-07-31T21:27:21Z",
+  "acting_role": "prime-builder",
+  "session_id": "G-2026-07-31T19-46-49Z",
+  "thread_slug": "gtkb-wi584x-codex-home-harness-selector-false-positive",
+  ...
+}
+```
+
+**Before fix:** Same command failed with `Worker role provenance session id does
+not match the current session. (not prime-eligible)`.
+
+**After fix:** Claim resolves correctly without the `GTKB_HARNESS_NAME=goose`
+workaround. The selector returns `None` (no false-positive codex), the resolver
+scans all harness directories, and finds the Goose envelope.
+
+### 3. Environment confirms CODEX_HOME is permanently set
+```
+$ python -c "import os; print('CODEX_HOME:', repr(os.environ.get('CODEX_HOME')))"
+CODEX_HOME: 'C:\\Users\\micha\\.codex'
+
+$ python -c "import os; print('CODEX_THREAD_ID:', repr(os.environ.get('CODEX_THREAD_ID')))"
+CODEX_THREAD_ID: ''
+```
+
+`CODEX_HOME` is always present. `CODEX_THREAD_ID` is only present during active
+Codex sessions — the correct detection signal.
+
+## Backward Compatibility
+
+- `GTKB_HARNESS_NAME=goose`: highest precedence, unchanged behavior.
+- `CODEX_THREAD_ID` detection: unchanged behavior — still correctly identifies
+  active Codex sessions.
+- `CLAUDECODE` / `CLAUDE_CODE_SESSION_ID`: unchanged.
+- `GTKB_BRIDGE_POLLER_RUN_ID`: unchanged.
+
+## Specification Links
+
+- `GOV-FILE-BRIDGE-AUTHORITY-001` — claim role eligibility depends on correct
+  harness selection.
+- No spec change required; this is a pure bug fix.
+
+---
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

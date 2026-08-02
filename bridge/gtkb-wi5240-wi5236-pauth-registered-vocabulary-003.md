@@ -10,8 +10,8 @@ author_model_configuration: Codex Desktop interactive Prime Builder; danger-full
 
 bridge_kind: implementation_report
 Document: gtkb-wi5240-wi5236-pauth-registered-vocabulary
-Version: 003 (NEW; post-implementation report)
-Responds to GO: bridge/gtkb-wi5240-wi5236-pauth-registered-vocabulary-002.md
+Version: 003
+Responds to: bridge/gtkb-wi5240-wi5236-pauth-registered-vocabulary-002.md
 Approved proposal: bridge/gtkb-wi5240-wi5236-pauth-registered-vocabulary-001.md
 Project Authorization: PAUTH-PROJECT-GTKB-GOOSE-HARNESS-ADOPTION-WI-5240-IMPLEMENTATION-PROPOSAL-FILING
 Project: PROJECT-GTKB-GOOSE-HARNESS-ADOPTION

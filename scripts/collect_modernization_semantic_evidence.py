@@ -35,7 +35,9 @@ if str(PACKAGE_SRC) not in sys.path:
 from groundtruth_kb.session.envelope import (  # noqa: E402
     EnvelopeError,
     _validate_worker_role_provenance,
+    resolve_acting_harness_identity,
     resolve_worker_role_provenance,
+    same_session_envelope_collisions,
     worker_session_envelope_path,
 )
 
@@ -393,12 +395,49 @@ def _registry_rows(project_root: Path) -> tuple[dict[str, dict[str, Any]], dict[
     return rows, identity_map
 
 
-def resolve_session_authority(project_root: Path, session_id: str, *, evidence_dir: Path) -> dict[str, Any]:
+def resolve_session_authority(
+    project_root: Path,
+    session_id: str,
+    *,
+    evidence_dir: Path,
+    environ: Mapping[str, str] | None = None,
+    harness_name: str | None = None,
+    harness_id: str | None = None,
+) -> dict[str, Any]:
     if _SESSION_RE.fullmatch(session_id) is None:
         raise CollectionError("a real runtime session context id is required")
     try:
-        session = resolve_worker_role_provenance(project_root, current_session_id=session_id)
-        envelope_path = worker_session_envelope_path(project_root, str(session["harness_name"]), session_id)
+        try:
+            selected_name, selected_id = resolve_acting_harness_identity(
+                project_root,
+                environ=environ,
+                harness_name=harness_name,
+                harness_id=harness_id,
+            )
+        except EnvelopeError as exc:
+            legacy_direct_call = environ is None and harness_name is None and harness_id is None
+            selector_unavailable = str(exc) == (
+                "Acting harness identity is unavailable from runtime markers or an explicit producer."
+            )
+            legacy_identity_absent = legacy_direct_call and str(exc).startswith(
+                "Could not resolve harness identity for "
+            )
+            if not selector_unavailable and not legacy_identity_absent:
+                raise
+            # Preserve the legacy single-document path for old receipts and
+            # isolated fixtures. It remains fail-closed as soon as same-session
+            # documents are ambiguous; current runtimes use the trusted selector.
+            session = resolve_worker_role_provenance(project_root, current_session_id=session_id)
+            selected_name = str(session["harness_name"])
+        else:
+            session = resolve_worker_role_provenance(
+                project_root,
+                current_session_id=session_id,
+                harness_name=selected_name,
+            )
+            if session.get("harness_id") != selected_id:
+                raise EnvelopeError("Selected session envelope harness id does not match durable identity.")
+        envelope_path = worker_session_envelope_path(project_root, selected_name, session_id)
     except EnvelopeError as exc:
         raise CollectionError(f"canonical runtime session provenance is unavailable: {exc}") from exc
     if not envelope_path.is_file():
@@ -439,6 +478,11 @@ def resolve_session_authority(project_root: Path, session_id: str, *, evidence_d
             "path": _relative(project_root, envelope_path),
             "sha256": envelope_sha256,
             "snapshot_path": _relative(project_root, snapshot_path),
+            "ignored_same_session_collisions": same_session_envelope_collisions(
+                project_root,
+                current_session_id=session_id,
+                selected_harness_name=selected_name,
+            ),
         },
     }
 
@@ -456,7 +500,7 @@ def resolve_runtime_provenance(
         or env.get("CODEX_THREAD_ID")
         or ""
     ).strip()
-    authority = resolve_session_authority(project_root, session_id, evidence_dir=evidence_dir)
+    authority = resolve_session_authority(project_root, session_id, evidence_dir=evidence_dir, environ=env)
     return {
         "schema_version": semantic_checker.ISSUER_SCHEMA_VERSION,
         "service_id": semantic_checker.COLLECTOR_SERVICE_ID,
@@ -754,6 +798,8 @@ class Collector:
                         self.project_root,
                         session_id,
                         evidence_dir=self.evidence_dir,
+                        harness_name=harness_name,
+                        harness_id=str(registry_row.get("id") or ""),
                     )
                 except CollectionError:
                     continue
@@ -1193,11 +1239,12 @@ class Collector:
             for report in release_checker._run_reports(release_checker.DEFAULT_STATE_DIR)
             if str(report.get("run_id")) in qualifying_run_ids
         }
-        producer_sessions = [
-            reports[run_id].get("runner", {}).get("session_context_id")
+        producer_runners = [
+            reports[run_id].get("runner", {})
             for run_id in status.get("qualifying_clean_run_ids", [])
             if run_id in reports
         ]
+        producer_sessions = [runner.get("session_context_id") for runner in producer_runners]
         verifier_session = independence.get("reviewer_session_context_id")
         if (
             independence.get("reviewer_role") != "loyal-opposition"
@@ -1209,11 +1256,14 @@ class Collector:
             raise MeasurementBlocked("independent audit lacks canonical Loyal Opposition provenance")
         producer_authorities: list[dict[str, Any]] = []
         try:
-            for session_id in producer_sessions:
+            for runner in producer_runners:
+                session_id = runner.get("session_context_id")
                 authority = resolve_session_authority(
                     self.project_root,
                     str(session_id),
                     evidence_dir=self.evidence_dir,
+                    harness_name=str(runner.get("harness_name") or ""),
+                    harness_id=str(runner.get("harness_id") or ""),
                 )
                 if authority["session"].get("role") != "prime-builder":
                     raise CollectionError(f"producer session {session_id} is not canonically Prime Builder")

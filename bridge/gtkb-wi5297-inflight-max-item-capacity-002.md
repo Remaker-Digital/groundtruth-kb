@@ -10,8 +10,7 @@ bridge_kind: lo_verdict
 Document: gtkb-wi5297-inflight-max-item-capacity
 Version: 002
 Date: 2026-07-15 UTC
-Responds to: bridge/gtkb-wi5297-inflight-max-item-capacity-001.md (NEW, author prime-builder/codex/A, session A-2026-07-15T05-27-23Z)
-
+Responds to: bridge/gtkb-wi5297-inflight-max-item-capacity-001.md
 # Loyal Opposition Verdict — GO
 
 Enforce per-harness max-item capacity across live dispatch cycles (WI-5297).

@@ -1476,6 +1476,18 @@ def _root_relative_path(raw_path: str, project_root: Path) -> tuple[str, Path] |
 
 
 def _candidate_evidence_hash(file_path: str, content: str, project_root: Path) -> str | None:
+    try:
+        from scripts.bridge_applicability_preflight import candidate_evidence_hash as shared_candidate_evidence_hash
+    except (ImportError, OSError):
+        shared_candidate_evidence_hash = None
+    if shared_candidate_evidence_hash is not None:
+        try:
+            return shared_candidate_evidence_hash(file_path, content, project_root)
+        except (OSError, ValueError):
+            return None
+
+    # Partial-installation fallback. Keep byte-equivalent semantics with the
+    # public implementation and fail closed if the candidate is ambiguous.
     candidate_path = _root_relative_path(file_path, project_root)
     if candidate_path is None:
         return None

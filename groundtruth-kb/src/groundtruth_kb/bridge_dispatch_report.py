@@ -186,6 +186,7 @@ def build_compact_dispatch_workflow(
     )
     selected_targets, targets_truncated = _workflow_selected_targets(full_report, limit)
     recent_work_metrics = _recent_work_metrics(root, limit)
+    success_ledger = _success_ledger_section(root)
 
     return {
         "schema_version": WORKFLOW_SCHEMA_VERSION,
@@ -201,6 +202,7 @@ def build_compact_dispatch_workflow(
             "loyal_opposition": loyal_queues,
         },
         "recent_work_metrics": recent_work_metrics,
+        "success_ledger": success_ledger,
         "bounds": {
             "per_section_limit": limit,
             "truncated": {
@@ -252,7 +254,76 @@ def format_compact_dispatch_workflow(workflow: dict[str, Any]) -> str:
                 f"- Coverage: {json.dumps(metrics['coverage'], sort_keys=True, separators=(',', ':'))}",
             ]
         )
+    ledger = workflow.get("success_ledger") if isinstance(workflow.get("success_ledger"), dict) else {}
+    if ledger:
+        lines.append("")
+        lines.append("Success ledger:")
+        availability = str(ledger.get("availability", "unavailable"))
+        if availability != "available":
+            reason = ledger.get("reason", "ledger_unavailable")
+            lines.append(f"- {availability}: {reason}")
+        else:
+            streak = ledger.get("streak")
+            threshold = ledger.get("threshold")
+            threshold_met = ledger.get("threshold_met")
+            reset = ledger.get("first_reset_reason")
+            by_harness = ledger.get("distribution", {}).get("by_harness", {})
+            lines.append(f"- Streak: {streak}/{threshold} (threshold met: {threshold_met})")
+            if reset:
+                lines.append(f"- First reset: {reset}")
+            if by_harness:
+                hdist = ", ".join(f"{h}: {c}" for h, c in sorted(by_harness.items()))
+                lines.append(f"- By harness: {hdist}")
     return "\n".join(lines).rstrip()
+
+
+def _success_ledger_section(root: Path) -> dict[str, Any]:
+    """Build the bounded success-ledger section for the compact workflow."""
+    try:
+        from groundtruth_kb.dispatch_default_metrics import build_success_ledger_from_root
+
+        ledger = build_success_ledger_from_root(str(root.resolve()))
+    except (OSError, ImportError, RuntimeError):
+        return {
+            "availability": "unavailable",
+            "reason": "ledger_construction_failed",
+            "streak": None,
+            "threshold": None,
+            "threshold_met": None,
+            "sequence": {"start": None, "end": None},
+            "first_reset_reason": None,
+            "distribution": {"by_harness": {}, "by_role": {}},
+            "generated_at": None,
+        }
+
+    streak = ledger.get("streak")
+    threshold = ledger.get("threshold")
+    reason = ledger.get("first_reset_reason")
+    # Empty or unavailable event store
+    if streak is None or reason == "canonical_event_store_unavailable" or (streak == 0 and reason is None):
+        return {
+            "availability": "unavailable",
+            "reason": reason or "no_canonical_events",
+            "streak": streak,
+            "threshold": threshold,
+            "threshold_met": ledger.get("threshold_met"),
+            "sequence": ledger.get("sequence"),
+            "first_reset_reason": reason,
+            "distribution": ledger.get("distribution"),
+            "generated_at": ledger.get("generated_at"),
+        }
+
+    return {
+        "availability": "available",
+        "reason": None,
+        "streak": streak,
+        "threshold": threshold,
+        "threshold_met": ledger.get("threshold_met"),
+        "sequence": ledger.get("sequence"),
+        "first_reset_reason": ledger.get("first_reset_reason"),
+        "distribution": ledger.get("distribution"),
+        "generated_at": ledger.get("generated_at"),
+    }
 
 
 def _unavailable_recent_work_metrics(reason: str) -> dict[str, Any]:

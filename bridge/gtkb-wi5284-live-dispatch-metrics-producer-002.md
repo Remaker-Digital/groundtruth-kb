@@ -7,8 +7,7 @@ Document: gtkb-wi5284-live-dispatch-metrics-producer
 Version: 002
 Reviewer: Loyal Opposition (OpenRouter, harness F)
 Date: 2026-07-18 UTC
-Responds to: bridge/gtkb-wi5284-live-dispatch-metrics-producer-001.md (status NEW; implementation proposal; author prime-builder/codex, harness A, session 019f5f66-9582-7f03-a3f1-3c75e6bd9d0a)
-
+Responds to: bridge/gtkb-wi5284-live-dispatch-metrics-producer-001.md
 author_identity: OpenRouter F
 author_harness_id: F
 author_session_context_id: 2026-07-18T10-01-26Z-loyal-opposition-F-e1339f

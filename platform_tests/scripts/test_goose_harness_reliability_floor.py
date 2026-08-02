@@ -7,10 +7,15 @@ configuration, records the run window, loads config, and calls evaluate_run.
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
-from goose_execution_guard import ExecutionFloorConfig, export_model_configuration
-from goose_harness import (
+SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "scripts"
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from goose_execution_guard import ExecutionFloorConfig, export_model_configuration  # noqa: E402
+from goose_harness import (  # noqa: E402
     _load_floor_config,
     build_arg_parser,
     build_system_prompt,

@@ -135,6 +135,23 @@ PAUTH_PHASE_OPERATIONS: Final[dict[str, tuple[str, ...]]] = {
     "proposal": ("implementation_packet_create", "implementation_start"),
     "finalization": ("git_commit", "protected_mutation"),
 }
+VERDICT_CANDIDATE_STATUSES: Final[frozenset[str]] = frozenset({"GO", "NO-GO", "VERIFIED"})
+RESPONDS_TO_BRIDGE_PATH_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?im)^\s*Responds\s+to\s*:\s*`?(?P<path>[^`\r\n]+?\.md)`?\s*$"
+)
+APPLICABILITY_PREFLIGHT_HEADING_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?im)^(?P<marks>#{1,6})\s*applicability\s+preflight\s*$"
+)
+CANDIDATE_EVIDENCE_HASH_SENTINEL: Final[str] = "<CANDIDATE_EVIDENCE_HASH>"
+CANDIDATE_EVIDENCE_HASH_LINE_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?im)^(?P<prefix>\s*[-*]?\s*candidate_evidence_hash\s*:\s*`?)"
+    r"(?P<value>sha256:[0-9a-f]{64}|<CANDIDATE_EVIDENCE_HASH>)"
+    r"(?P<suffix>`?\s*)$"
+)
+
+
+class VerdictCandidatePreparationError(ValueError):
+    """Raised when exact verdict-candidate evidence cannot be rebuilt safely."""
 
 
 @dataclass(frozen=True)
@@ -650,6 +667,101 @@ def _normalize_lf(content: str) -> str:
     return content.replace("\r\n", "\n").replace("\r", "\n")
 
 
+def normalize_verdict_candidate_path(candidate_path: str | Path, project_root: Path) -> tuple[str, Path]:
+    """Return one canonical root-relative numbered bridge-candidate path."""
+
+    cleaned = str(candidate_path).strip().strip("`").replace("\\", "/")
+    if not cleaned:
+        raise VerdictCandidatePreparationError("candidate path is empty")
+    root = project_root.resolve()
+    raw = Path(cleaned)
+    resolved = (raw if raw.is_absolute() else root / raw).resolve(strict=False)
+    try:
+        relative = resolved.relative_to(root).as_posix()
+    except ValueError as exc:
+        raise VerdictCandidatePreparationError("candidate path escapes the project root") from exc
+    if resolved.parent != (root / "bridge").resolve():
+        raise VerdictCandidatePreparationError(
+            "candidate path must be a direct child of the canonical bridge directory"
+        )
+    if re.fullmatch(r".+-\d{3}\.md", resolved.name) is None:
+        raise VerdictCandidatePreparationError("candidate path must name an exact three-digit numbered bridge file")
+    return relative, resolved
+
+
+def _candidate_bridge_identity(candidate_relative: str) -> tuple[str, int]:
+    match = re.fullmatch(r"bridge/(?P<document>.+)-(?P<version>\d{3})\.md", candidate_relative)
+    if match is None:  # pragma: no cover - guarded by normalize_verdict_candidate_path
+        raise VerdictCandidatePreparationError("candidate path is not a canonical numbered bridge file")
+    return match.group("document"), int(match.group("version"))
+
+
+def resolve_verdict_responds_to_source(
+    *,
+    candidate_path: str | Path,
+    content: str,
+    project_root: Path,
+) -> tuple[str, Path, str]:
+    """Resolve the exact existing same-thread source named by ``Responds to``."""
+
+    candidate_relative, _ = normalize_verdict_candidate_path(candidate_path, project_root)
+    candidate_document, candidate_version = _candidate_bridge_identity(candidate_relative)
+    matches = list(RESPONDS_TO_BRIDGE_PATH_RE.finditer(content))
+    if len(matches) != 1:
+        raise VerdictCandidatePreparationError(
+            "verdict candidate must contain exactly one canonical `Responds to:` bridge path"
+        )
+    source_relative, source_path = normalize_verdict_candidate_path(
+        matches[0].group("path"),
+        project_root,
+    )
+    source_document, source_version = _candidate_bridge_identity(source_relative)
+    if source_document != candidate_document:
+        raise VerdictCandidatePreparationError("Responds to source must belong to the candidate bridge thread")
+    if source_version >= candidate_version:
+        raise VerdictCandidatePreparationError("Responds to source must be an earlier bridge version")
+    if not source_path.is_file():
+        raise VerdictCandidatePreparationError("Responds to source does not exist as a canonical bridge file")
+    return source_relative, source_path, candidate_document
+
+
+def candidate_evidence_hash(candidate_path: str | Path, content: str, project_root: Path) -> str:
+    """Bind normalized candidate bytes to their exact root-relative path."""
+
+    candidate_relative, _ = normalize_verdict_candidate_path(candidate_path, project_root)
+    normalized = _normalize_lf(content)
+    normalized, replacements = CANDIDATE_EVIDENCE_HASH_LINE_RE.subn(
+        lambda match: match.group("prefix") + CANDIDATE_EVIDENCE_HASH_SENTINEL + match.group("suffix"),
+        normalized,
+    )
+    if replacements != 1:
+        raise VerdictCandidatePreparationError(
+            "candidate content must contain exactly one candidate_evidence_hash field"
+        )
+    payload = candidate_relative + "\n" + normalized
+    return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _applicability_preflight_span(content: str) -> tuple[int, int]:
+    matches = list(APPLICABILITY_PREFLIGHT_HEADING_RE.finditer(content))
+    if len(matches) != 1:
+        raise VerdictCandidatePreparationError(
+            "verdict candidate must contain exactly one Applicability Preflight section"
+        )
+    match = matches[0]
+    heading_level = len(match.group("marks"))
+    next_heading = re.compile(rf"(?m)^#{{1,{heading_level}}}\s+").search(content, match.end())
+    end = next_heading.start() if next_heading is not None else len(content)
+    return match.start(), end
+
+
+def verdict_candidate_needs_preparation(content: str) -> bool:
+    """Return whether the writer should rebuild an existing verdict section."""
+
+    status = next((line.strip().upper() for line in _normalize_lf(content).splitlines() if line.strip()), "")
+    return status in VERDICT_CANDIDATE_STATUSES and APPLICABILITY_PREFLIGHT_HEADING_RE.search(content) is not None
+
+
 def _text_sha256(content: str) -> str:
     normalized = _normalize_lf(content).encode("utf-8")
     return "sha256:" + hashlib.sha256(normalized).hexdigest()
@@ -1014,7 +1126,7 @@ def build_packet(
         operative = explicit_version or scanned_operative
         content_source = {
             "mode": "pending_content",
-            "path": _display_path(content_file),
+            "path": _display_path(content_file, bridge_dir.parent),
         }
     elif scanned_operative is not None:
         operative = scanned_operative
@@ -1135,10 +1247,10 @@ def build_packet(
     return packet
 
 
-def _display_path(path: Path) -> str:
+def _display_path(path: Path, project_root: Path = PROJECT_ROOT) -> str:
     resolved = path.resolve()
     try:
-        return resolved.relative_to(PROJECT_ROOT).as_posix()
+        return resolved.relative_to(project_root.resolve()).as_posix()
     except ValueError:
         return str(path)
 
@@ -1229,6 +1341,63 @@ def format_markdown(packet: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def prepare_verdict_candidate(
+    *,
+    candidate_path: str | Path,
+    content: str,
+    project_root: Path = PROJECT_ROOT,
+    config_path: Path | None = None,
+    db_path: Path | None = None,
+) -> str:
+    """Rebuild exact-source applicability evidence for final verdict bytes."""
+
+    normalized = _normalize_lf(content)
+    status = next((line.strip().upper() for line in normalized.splitlines() if line.strip()), "")
+    if status not in VERDICT_CANDIDATE_STATUSES:
+        raise VerdictCandidatePreparationError("candidate preparation is limited to GO, NO-GO, and VERIFIED verdicts")
+    candidate_relative, _ = normalize_verdict_candidate_path(candidate_path, project_root)
+    source_relative, source_path, bridge_id = resolve_verdict_responds_to_source(
+        candidate_path=candidate_relative,
+        content=normalized,
+        project_root=project_root,
+    )
+    section_start, section_end = _applicability_preflight_span(normalized)
+    packet = build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=project_root / "bridge",
+        config_path=config_path or project_root / "config" / "governance" / "spec-applicability.toml",
+        db_path=db_path or project_root / "groundtruth.db",
+        content_file=source_path,
+    )
+    rebuilt_section = format_markdown(packet)
+    content_anchor = f"- content_file: `{source_relative}`"
+    if content_anchor not in rebuilt_section:
+        raise VerdictCandidatePreparationError("rebuilt applicability packet did not bind the exact Responds to source")
+    packet_hash_line = f"- packet_hash: `{packet['packet_hash']}`\n"
+    if rebuilt_section.count(packet_hash_line) != 1:
+        raise VerdictCandidatePreparationError("rebuilt applicability packet has an ambiguous packet_hash field")
+    rebuilt_section = rebuilt_section.replace(
+        packet_hash_line,
+        packet_hash_line + f"- candidate_evidence_hash: `{CANDIDATE_EVIDENCE_HASH_SENTINEL}`\n",
+        1,
+    )
+    prefix = normalized[:section_start]
+    suffix = normalized[section_end:]
+    if prefix and not prefix.endswith("\n"):
+        prefix += "\n"
+    prepared = prefix + rebuilt_section.rstrip("\n") + "\n"
+    if suffix:
+        prepared += ("\n" if not suffix.startswith("\n") else "") + suffix.lstrip("\n")
+    evidence_hash = candidate_evidence_hash(candidate_relative, prepared, project_root)
+    prepared, replacements = CANDIDATE_EVIDENCE_HASH_LINE_RE.subn(
+        lambda match: match.group("prefix") + evidence_hash + match.group("suffix"),
+        prepared,
+    )
+    if replacements != 1:  # pragma: no cover - construction invariant
+        raise VerdictCandidatePreparationError("candidate evidence insertion was not singular")
+    return prepared
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -1237,6 +1406,17 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--content-file", type=Path, default=None, help="Evaluate pending Markdown content from a file."
+    )
+    parser.add_argument(
+        "--prepare-verdict-candidate",
+        action="store_true",
+        help="Write final prepared verdict bytes to stdout without publishing them.",
+    )
+    parser.add_argument(
+        "--candidate-path",
+        type=Path,
+        default=None,
+        help="Exact intended bridge/<document>-<NNN>.md path for verdict candidate preparation.",
     )
     parser.add_argument("--bridge-dir", type=Path, default=DEFAULT_BRIDGE_DIR)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
@@ -1248,6 +1428,30 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = _build_arg_parser()
     args = parser.parse_args(argv)
+    if args.prepare_verdict_candidate:
+        if args.content_file is None or args.candidate_path is None:
+            parser.error("--prepare-verdict-candidate requires --content-file and --candidate-path")
+        if args.json:
+            parser.error("--prepare-verdict-candidate is incompatible with --json report output")
+        try:
+            prepared = prepare_verdict_candidate(
+                candidate_path=args.candidate_path,
+                content=args.content_file.read_text(encoding="utf-8"),
+                project_root=args.bridge_dir.parent,
+                config_path=args.config,
+                db_path=args.db,
+            )
+        except (OSError, VerdictCandidatePreparationError, SystemExit) as exc:
+            sys.stderr.write(f"verdict candidate preparation failed: {exc}\n")
+            return 7
+        sys.stdout.write(prepared)
+        sys.stderr.write(
+            "prepared verdict candidate bytes for "
+            f"{normalize_verdict_candidate_path(args.candidate_path, args.bridge_dir.parent)[0]}\n"
+        )
+        return 0
+    if args.candidate_path is not None:
+        parser.error("--candidate-path is valid only with --prepare-verdict-candidate")
     if args.bridge_id is None:
         if args.content_file is None:
             parser.error("--bridge-id is required unless --content-file is supplied")
