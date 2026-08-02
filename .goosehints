@@ -1,0 +1,50 @@
+# GroundTruth-KB — Goose Manual Session Guide (.goosehints)
+
+Goose is a first-class GroundTruth-KB (GT-KB) coding harness (harness identity G),
+a manual peer to Codex, Claude Code, Cursor, and Antigravity for Prime Builder and
+Loyal Opposition work. This file orients a manual Goose Desktop / goose CLI session;
+the authoritative governance lives in the files it points to.
+
+## Project root boundary
+All active GT-KB work stays within E:\GT-KB. GT-KB application files stay within
+E:\GT-KB\applications\ (Agent Red at E:\GT-KB\applications\Agent_Red\). No exceptions.
+
+## Session role — start here
+Declare your role on the FIRST line of your first message, then open an activity:
+- `::init gtkb pb`  → Prime Builder (proposes changes, writes code + spec-derived tests, files implementation reports)
+- `::init gtkb lo`  → Loyal Opposition (reviews: writes GO / NO-GO / VERIFIED verdicts)
+- then: `::open build` | `::open test` | `::open project` | `::open deliberation` | `::open spec` | `::open ops`
+Your session role comes ONLY from this explicit declaration — NEVER from the
+TAFE/dispatcher registry configuration (DCL-SESSION-ROLE-RESOLUTION-001 v7).
+
+## Load this governance at session start
+- `AGENTS.md` (root) — GT-KB operating contract (Goose reads this hierarchically).
+- `.claude/rules/canonical-terminology.md` — glossary.
+- `.claude/rules/file-bridge-protocol.md` — Prime Builder ↔ Loyal Opposition bridge.
+- `.claude/rules/operating-model.md` — operating model.
+- `.claude/rules/prime-builder-role.md`, `.claude/rules/loyal-opposition.md` — role contracts.
+
+## Skills
+GT-KB workflow guides live in `.goose/skills/gtkb-*/SKILL.md` (bridge, propose, verify,
+work-item, spec, decision-capture, projects, harness-parity-review, session-wrap, and
+~30 more). Read the relevant SKILL.md before running the corresponding workflow.
+
+## Bridge protocol — the core workflow
+No implementation lands without Loyal Opposition review:
+propose → GO → implement → report → VERIFIED, recorded as versioned files under `bridge/`.
+Prime Builder acts on GO / NO-GO; Loyal Opposition acts on NEW / REVISED / NO-ACTION.
+Read `.goose/skills/gtkb-bridge/SKILL.md` for the mechanics.
+
+## CLI + Python
+- `gt` CLI: `gt backlog list`, `gt bridge state-report`, `gt deliberations search "<q>"`,
+  `gt projects list`, `gt harness roles`.
+- Project Python (imports `groundtruth_kb` without PYTHONPATH):
+  `groundtruth-kb/.venv/Scripts/python.exe`
+- Canonical knowledge lives in MemBase (`groundtruth.db`) via the `gt` CLI /
+  `groundtruth_kb` API — never hand-edit the SQLite file.
+
+## Owner decisions
+Collect owner decisions explicitly and record them (see `.goose/skills/gtkb-decision-capture`).
+Do not infer approval from context.
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
