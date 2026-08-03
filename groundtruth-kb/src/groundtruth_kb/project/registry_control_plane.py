@@ -3344,16 +3344,16 @@ def mint_bridge_publication_capability(
         _ensure_no_nonterminal_journal(paths.db_path)
         snapshot = _load_snapshot_unlocked(paths)
         aggregate_record = _bridge_aggregate_record(snapshot, relative)
-        currentness = registry_currentness(
-            snapshot,
-            project_root=paths.project_root,
-            db_path=paths.db_path,
-            record_ids={aggregate_record.id},
-        )
-        if not currentness["current"]:
-            raise RegistryAuthorizationError(
-                f"bridge publication requires a current registry generation: {currentness}"
-            )
+        # WI-5933 concurrency fix (emergency-bootstrap; DELIB-202668164): the prior
+        # global-generation currentness gate (registry_currentness over the
+        # bridge/*-NNN.md glob) is removed. registry_currentness is audit state, not
+        # publication authority -- its own docstring says "Hot mutation/publication
+        # paths should ... use registry_identity_state." Gating on it required a
+        # caller-recorded observation (taken OUTSIDE this serialized lock) to equal
+        # freshly-computed content; under concurrent governed publishers the recorded
+        # observation always lagged actual content, so the check never converged
+        # (optimistic-CAS livelock). The aggregate preimage is now established by a
+        # self-observe under this lock + one-active-capability boundary (see below).
         if target.exists() or target.is_symlink():
             raise RegistryAuthorizationError(f"bridge publication target already exists: {relative}")
         author_session = _bridge_publication_author_session(content)
@@ -3393,6 +3393,31 @@ def mint_bridge_publication_capability(
                 raise RegistryAuthorizationError(
                     f"another bridge publication capability is active for {active['target_path']}"
                 )
+            # WI-5933 concurrency fix (emergency-bootstrap; DELIB-202668164): establish
+            # the aggregate preimage by observing current content INSIDE this
+            # publication's serialized boundary (the _RegistryFileLock held since the
+            # top of this function + the one-active-capability guard above), rather than
+            # requiring a pre-matched external observation. Recording a fresh observation
+            # here makes `latest` == current content by construction, so concurrent
+            # governed publishers serialize correctly instead of livelocking on a stale
+            # preimage. The lock + one-active-capability guard guarantee no other governed
+            # publisher mutates the bridge glob between this observation and the capability
+            # consume, so the preimage stays valid through the transition. (Follow-on:
+            # make the aggregate generation hash incremental so this serialized critical
+            # section is cheap under high publication concurrency.)
+            _append_revision(
+                conn,
+                project_root=paths.project_root,
+                record=aggregate_record,
+                actor_session=session_id,
+                operation="direct_in_place_content_change",
+                changed_by="bridge-publication-writer",
+                changed_at=_utc_now(),
+                change_reason=(
+                    "self-observe bridge aggregate under publication serialization (WI-5933 concurrency fix)"
+                ),
+                evidence_view="working_tree",
+            )
             latest = _latest_artifact_revision(conn, aggregate_record.id)
             if latest is None:
                 raise RegistryAuthorizationError("bridge aggregate lacks current revision evidence")
