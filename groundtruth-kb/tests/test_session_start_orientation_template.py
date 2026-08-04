@@ -1,4 +1,4 @@
-# Ac 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Focused contract tests for the session-start ORIENT template (WI-5575).
 
 WI-5575 governs the pre-existing one-line ORIENT template change that replaces
