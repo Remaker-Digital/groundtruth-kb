@@ -30,7 +30,13 @@ from groundtruth_kb.runtime_recovery import ClaimOutcome, RecoveryStore
 from groundtruth_kb.session import envelope as session_envelope
 
 PROJECT_ID = "PROJECT-E2E-001"
-SPEC_ID = "SPEC-E2E-001"
+# Rehearsal-only synthetic specification identity, used exclusively inside the
+# disposable isolated rehearsal database. It is NOT production authority.
+REHEARSAL_SPEC_ID = "SPEC-E2E-001"
+# Production release-candidate authority: the exact canonical governance
+# specifications the workflow may cite as production authority. These resolve
+# through the canonical platform MemBase, never the disposable rehearsal DB.
+WORKFLOW_AUTHORITY_SPEC_IDS = ("GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001",)
 WORK_ITEM_ID = "WI-9001"
 PAUTH_ID = "PAUTH-E2E-001"
 DELIBERATION_ID = "DELIB-E2E-OWNER-001"
@@ -517,7 +523,7 @@ class ModernizationWorkflow:
         db = KnowledgeDB(self.workspace / "groundtruth.db")
         try:
             db.insert_spec(
-                id=SPEC_ID,
+                id=REHEARSAL_SPEC_ID,
                 title="Approved end-to-end behavior",
                 description="One bounded source change must traverse the production modernization workflow.",
                 status="verified",
@@ -541,7 +547,7 @@ class ModernizationWorkflow:
                 "open",
                 "modernization-owner",
                 "initialize deterministic modernization rehearsal",
-                source_spec_id=SPEC_ID,
+                source_spec_id=REHEARSAL_SPEC_ID,
                 stage="backlogged",
                 approval_state="approved",
             )
@@ -598,7 +604,7 @@ class ModernizationWorkflow:
         try:
             return {
                 "project_selected": db.get_project(PROJECT_ID) is not None,
-                "spec_selected": db.get_spec(SPEC_ID) is not None,
+                "spec_selected": db.get_spec(REHEARSAL_SPEC_ID) is not None,
                 "work_item_selected": db.get_work_item(WORK_ITEM_ID) is not None,
             }
         finally:
@@ -651,7 +657,7 @@ class ModernizationWorkflow:
                 allowed_mutation_classes=["source"],
                 forbidden_operations=[],
                 included_work_item_ids=[WORK_ITEM_ID],
-                included_spec_ids=[SPEC_ID],
+                included_spec_ids=[REHEARSAL_SPEC_ID],
             )
         finally:
             db.close()
@@ -685,7 +691,7 @@ class ModernizationWorkflow:
             )
         return packet
 
-    def _proposal_body(self, spec_links: tuple[str, ...] = (SPEC_ID,)) -> str:
+    def _proposal_body(self, spec_links: tuple[str, ...] = (REHEARSAL_SPEC_ID,)) -> str:
         return "\n".join(
             [
                 "NEW",
@@ -716,7 +722,7 @@ class ModernizationWorkflow:
                 "",
                 "| Test ID | Requirement | Verification |",
                 "| --- | --- | --- |",
-                f"| E2E-A1 | {SPEC_ID} | Verify exact content, recovery, and independent verdict. |",
+                f"| E2E-A1 | {REHEARSAL_SPEC_ID} | Verify exact content, recovery, and independent verdict. |",
                 "",
                 "## Acceptance Criteria",
                 "",
@@ -728,7 +734,7 @@ class ModernizationWorkflow:
         )
 
     def _closed_proposal_body(self) -> tuple[str, tuple[str, ...]]:
-        spec_links = {SPEC_ID}
+        spec_links = {REHEARSAL_SPEC_ID}
         for _ in range(3):
             body = self._proposal_body(tuple(sorted(spec_links)))
             packet = self._pending_applicability_packet(body, draft_name="proposal.md")
@@ -1158,7 +1164,7 @@ class ModernizationWorkflow:
                 "",
                 "| Spec | Executed evidence |",
                 "| --- | --- |",
-                f"| {SPEC_ID} | Exact target bytes and preserved commit {commit_sha}. |",
+                f"| {REHEARSAL_SPEC_ID} | Exact target bytes and preserved commit {commit_sha}. |",
                 "",
                 "## Commands Run",
                 "",
@@ -1254,7 +1260,7 @@ class ModernizationWorkflow:
                 "",
                 "| Spec | Test | Executed | Result |",
                 "| --- | --- | --- | --- |",
-                f"| {SPEC_ID} | E2E-A1 | yes | PASS at subject commit {commit_sha} |",
+                f"| {REHEARSAL_SPEC_ID} | E2E-A1 | yes | PASS at subject commit {commit_sha} |",
                 "",
                 "## Commands Executed",
                 "",
@@ -1544,6 +1550,35 @@ class ModernizationWorkflow:
             state_dir=self.workspace / ".gtkb-state" / "release-candidate-assessment",
         )
         acceptance = next(item for item in manifest["acceptance_tests"] if item["id"] == "AT-END-TO-END-WORKFLOW")
+        # WI-5553 Slice C: bind production authority. The manifest row must
+        # declare exactly the canonical authority set and every ID must resolve
+        # through the canonical platform MemBase (not the disposable rehearsal DB).
+        declared = list(acceptance.get("spec_ids") or [])
+        authority_set = tuple(sorted(declared))
+        if authority_set != tuple(sorted(WORKFLOW_AUTHORITY_SPEC_IDS)):
+            raise ModernizationWorkflowError(
+                "release-candidate workflow authority mismatch: "
+                f"manifest declared {declared!r}, expected {WORKFLOW_AUTHORITY_SPEC_IDS!r}"
+            )
+        resolved_authority = []
+        try:
+            canonical_db = KnowledgeDB(str(self.platform_root / "groundtruth.db"))
+            for spec_id in WORKFLOW_AUTHORITY_SPEC_IDS:
+                resolved_authority.append(
+                    {
+                        "spec_id": spec_id,
+                        "resolved": canonical_db.get_spec(spec_id) is not None,
+                    }
+                )
+        except Exception as exc:  # noqa: BLE001 - fail closed on lookup failure
+            raise ModernizationWorkflowError(
+                f"release-candidate authority could not be resolved canonically: {exc}"
+            ) from exc
+        if not all(record["resolved"] for record in resolved_authority):
+            raise ModernizationWorkflowError(
+                "release-candidate workflow authority does not resolve in canonical MemBase: "
+                + ", ".join(record["spec_id"] for record in resolved_authority if not record["resolved"])
+            )
         return {
             "scope_digest_sha256": assessment["scope_digest_sha256"],
             "manifest_valid": not self.rc_checker.validate_manifest(
@@ -1555,6 +1590,8 @@ class ModernizationWorkflow:
             "ready": assessment["ready"],
             "blockers": assessment["blockers"],
             "production_deployment_separate": manifest["program"]["production_deployment_separate"],
+            "workflow_authority_spec_ids": list(WORKFLOW_AUTHORITY_SPEC_IDS),
+            "workflow_authority_resolution": resolved_authority,
         }
 
     def _release_claim(self) -> None:
@@ -1643,7 +1680,7 @@ class ModernizationWorkflow:
             _canonical_json(
                 {
                     "project_id": PROJECT_ID,
-                    "spec_id": SPEC_ID,
+                    "spec_id": REHEARSAL_SPEC_ID,
                     "work_item_id": WORK_ITEM_ID,
                     "pauth_id": PAUTH_ID,
                     "target_path": TARGET_PATH,

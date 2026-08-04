@@ -14,6 +14,7 @@ Verifies:
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -58,16 +59,38 @@ class TestProjectRootContainment:
             f"Expected true, got {report['project_root_containment']}\ndetails: {report.get('details')}"
         )
 
-    def test_project_root_containment_fail(self) -> None:
-        """Probe cwd check detects non-contained working directory."""
+    def test_project_root_containment_fail_outside_root(self) -> None:
+        """A probe launched from a temporary outside-root CWD reports false.
+
+        Preserves access to the canonical probe source while running from a
+        temporary directory outside the GT-KB root.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            result = subprocess.run(
+                [sys.executable, str(_PROBE_SCRIPT)],
+                cwd=tmp,
+                capture_output=True,
+                text=True,
+                timeout=30.0,
+            )
+            assert result.returncode == 0, (
+                f"Outside-root probe exit {result.returncode}\nstderr: {result.stderr[:1000]}"
+            )
+            report = json.loads(result.stdout)
+            assert report["project_root_containment"] is False, (
+                f"Expected containment=false outside root, got {report['project_root_containment']}"
+                f"\ndetails: {report.get('details')}"
+            )
+
+    def test_project_root_containment_fail_unresolvable(self) -> None:
+        """An unresolvable project root (None) reports containment=false."""
         from scripts.harness_probe_q37flash_r3 import _check_project_root_containment
 
-        fake_root = Path("E:/GT-KB")
-        report = _check_project_root_containment(fake_root)
-        assert isinstance(report["project_root_containment"], bool)
+        report = _check_project_root_containment(None)
+        assert report["project_root_containment"] is False
         assert "details" in report
         assert "cwd" in report["details"]
-        assert "project_root" in report["details"]
+        assert report["details"]["project_root"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -230,6 +253,49 @@ class TestReportDeterminism:
         assert ts.endswith("Z") or "+00:00" in ts, f"Expected ISO-8601 UTC, got: {ts}"
         datetime.fromisoformat(ts.replace("Z", "+00:00"))
 
+    def test_report_determinism_observed_true(self) -> None:
+        """report_determinism reflects an actual observed comparison."""
+        report = _run_probe_json()
+        assert report["report_determinism"] is True, (
+            f"Expected observed determinism=true, got {report['report_determinism']}\ndetails: {report.get('details')}"
+        )
+
+    def test_report_determinism_negative_path(self) -> None:
+        """An injected difference between payloads reports determinism=false."""
+        from unittest import mock
+
+        from scripts.harness_probe_q37flash_r3 import _build_core_checks
+
+        project_root = Path(__file__).resolve().parent.parent.parent
+
+        calls = {"n": 0}
+
+        def _flip_venv(*args, **kwargs):
+            # First build (reference_core) returns the real variant; every
+            # subsequent build returns an injected-difference variant so the
+            # observed comparison flags the mismatch persistently.
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return {
+                    "venv_resolution": True,
+                    "details": {"injected": False},
+                }
+            return {"venv_resolution": False, "details": {"injected": True}}
+
+        with mock.patch(
+            "scripts.harness_probe_q37flash_r3._check_venv_resolution",
+            side_effect=_flip_venv,
+        ):
+            first = _build_core_checks(project_root, timeout=5.0)
+            second = _build_core_checks(project_root, timeout=5.0)
+            assert first != second
+            # The full probe determinism check compares reference_core to a
+            # freshly built payload; verify the runtime gate flags the mismatch.
+            from scripts.harness_probe_q37flash_r3 import _check_report_determinism
+
+            result = _check_report_determinism(project_root, timeout=5.0, reference_core=first)
+            assert result["report_determinism"] is False
+
 
 # ---------------------------------------------------------------------------
 # Timer discipline (DELIB-202667722)
@@ -243,6 +309,49 @@ class TestTimerDiscipline:
         """--timeout CLI argument is accepted and applied."""
         result = _run_probe("--timeout", "5.0")
         assert result.returncode == 0, f"Probe with --timeout 5.0 failed: {result.stderr[:500]}"
+
+    def test_cli_timeout_overrides_environment(self) -> None:
+        """CLI --timeout overrides the environment variable."""
+        from unittest import mock
+
+        from scripts.harness_probe_q37flash_r3 import _resolve_timeout
+
+        with mock.patch.dict(os.environ, {"GTKB_HARNESS_PROBE_TIMEOUT": "7.5"}):
+            value, source = _resolve_timeout(cli_value=3.0, env_value=os.environ.get("GTKB_HARNESS_PROBE_TIMEOUT"))
+        assert value == 3.0
+        assert source == "cli"
+
+    def test_environment_timeout_fallback(self) -> None:
+        """Environment supplies the timeout when CLI input is absent."""
+        from scripts.harness_probe_q37flash_r3 import _resolve_timeout
+
+        value, source = _resolve_timeout(cli_value=None, env_value="7.5")
+        assert value == 7.5
+        assert source == "env"
+
+    def test_no_timeout_when_both_absent(self) -> None:
+        """When both CLI and env are absent, no explicit timeout is applied."""
+        from scripts.harness_probe_q37flash_r3 import _resolve_timeout
+
+        value, source = _resolve_timeout(cli_value=None, env_value=None)
+        assert value is None
+        assert source == "none"
+
+    def test_invalid_timeout_values_fail_closed(self) -> None:
+        """Zero, negative, and non-finite timeout values fail deterministically."""
+        import pytest
+
+        from scripts.harness_probe_q37flash_r3 import _resolve_timeout
+
+        for bad in (0, -1, -0.5):
+            with pytest.raises(ValueError):
+                _resolve_timeout(cli_value=bad, env_value=None)
+        with pytest.raises(ValueError):
+            _resolve_timeout(cli_value=float("inf"), env_value=None)
+        with pytest.raises(ValueError):
+            _resolve_timeout(cli_value=float("nan"), env_value=None)
+        with pytest.raises(ValueError):
+            _resolve_timeout(cli_value=None, env_value="not-a-number")
 
     def test_no_hardcoded_timeout_literals(self) -> None:
         """Source file contains zero hard-coded subprocess timeout literals.

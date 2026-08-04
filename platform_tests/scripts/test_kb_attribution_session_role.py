@@ -135,6 +135,30 @@ def test_acting_harness_selector_uses_host_family_and_durable_identity(tmp_path:
         )
 
 
+def test_empty_environ_does_not_fall_back_to_ambient_markers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # WI-5580 IP-R1/R2: an explicit empty environ must fail closed, never inherit
+    # the process ambient host-family markers (here a live Codex marker).
+    _write_identities(tmp_path, codex="A", claude="B")
+    monkeypatch.setenv("CODEX_THREAD_ID", "ambient-codex-session")
+
+    with pytest.raises(EnvelopeError, match="Acting harness identity is unavailable"):
+        resolve_acting_harness_identity(tmp_path, environ={})
+
+
+def test_explicit_producer_beats_ambient_marker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # WI-5580 IP-R1/R2: an explicit harness name/id resolves to the explicit producer
+    # even when an ambient host-family marker (Codex) is present in os.environ.
+    _write_identities(tmp_path, codex="A", claude="B")
+    monkeypatch.setenv("CODEX_THREAD_ID", "ambient-codex-session")
+
+    assert resolve_acting_harness_identity(
+        tmp_path,
+        environ={},
+        harness_name="claude",
+        harness_id="B",
+    ) == ("claude", "B")
+
+
 def test_same_session_collision_diagnostics_are_sorted_and_non_mutating(tmp_path: Path) -> None:
     _write_envelope(tmp_path, harness_name="codex")
     _write_envelope(tmp_path, harness_name="claude")

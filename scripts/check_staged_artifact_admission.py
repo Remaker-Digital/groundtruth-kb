@@ -130,10 +130,51 @@ def load_exclusion_rules(project_root: Path) -> tuple[list[ExclusionRule], list[
     return rules, errors
 
 
+# Statuses that confer admission authority. Per NO-GO-008 and the approved
+# WI-5699 plan, only a latest-`GO` thread carries an independently accepted
+# authorization. Review-pending (`NEW`, `REVISED`), rejected (`NO-GO`),
+# terminal (`VERIFIED`, `WITHDRAWN`, `DEFERRED`), and `NO-ACTION` threads confer
+# none. An unresolvable status confers none and is reported as an error.
+_AUTHORITY_CONFERRING_STATUS = frozenset({"GO"})
+
+# Markdown / path structural characters that cannot be part of a real in-root
+# relative path. A candidate containing any of these is rejected as
+# authorization evidence (reported in errors[], never authorized).
+_MARKDOWN_STRUCTURAL = frozenset("#`|")
+
+
+def _is_path_shaped(target: str) -> str | None:
+    """Return a normalized in-root relative path, or None when not path-shaped.
+
+    A candidate is rejected (None) when it is empty/whitespace-only, contains
+    Markdown structural characters, is absolute or drive-qualified, escapes the
+    project root via ``..``, or normalizes to empty.
+    """
+    if not target or not target.strip():
+        return None
+    if any(ch in target for ch in _MARKDOWN_STRUCTURAL):
+        return None
+    normalized = normalize(target)
+    if not normalized:
+        return None
+    if ":" in normalized:
+        # drive-qualified (C:/x) or scheme-qualified
+        return None
+    if normalized.startswith("/") or normalized.startswith("\\"):
+        return None
+    if ".." in normalized.split("/"):
+        return None
+    return normalized
+
+
 def bridge_authorized_paths(project_root: Path) -> tuple[dict[str, str], list[str]]:
     """Map each declared target path to the bridge thread that declares it.
 
-    Reuses ``implementation_authorization.extract_target_paths``; this module
+    Only threads whose *latest* status confers admission authority (latest
+    ``GO``) contribute target_paths as authorization evidence. Review-pending,
+    rejected, terminal, and unresolvable threads contribute none (NO-GO-008).
+    Reuses ``implementation_authorization.extract_target_paths`` and the
+    canonical thread-lifecycle surface ``bridge_thread_files``; this module
     introduces no second parser.
     """
     try:
@@ -141,27 +182,63 @@ def bridge_authorized_paths(project_root: Path) -> tuple[dict[str, str], list[st
     except ImportError as exc:  # pragma: no cover - import wiring
         return {}, [f"target_paths parser unavailable: {exc}"]
 
+    try:
+        from bridge_thread_files import index_bridge_thread_files, latest_bridge_status_for_thread
+    except ImportError as exc:  # pragma: no cover - import wiring
+        return {}, [f"bridge thread lifecycle helper unavailable: {exc}"]
+
     declared: dict[str, str] = {}
     errors: list[str] = []
     bridge_dir = project_root / "bridge"
     if not bridge_dir.is_dir():
         return {}, ["bridge directory not found"]
-    for path in sorted(bridge_dir.glob("*.md")):
+
+    index = index_bridge_thread_files(project_root)
+    for slug, files in sorted(index.items()):
+        status = latest_bridge_status_for_thread(project_root, slug)
+        if status is None:
+            errors.append(f"bridge thread status unresolvable, excluded from authorization evidence: {slug}")
+            continue
+        if status not in _AUTHORITY_CONFERRING_STATUS:
+            # Not a live authorization: no target_paths from this thread confer
+            # admission, regardless of what its proposal declared.
+            continue
+        # Only a latest-GO thread confers authority; read the operative proposal
+        # (latest NEW/REVISED) of that thread for its declared targets.
+        operative = None
+        for vfile in reversed(files):
+            vstatus = _status_from_path(vfile.path)
+            if vstatus in {"NEW", "REVISED"}:
+                operative = vfile.path
+                break
+        if operative is None:
+            # Latest-GO thread with no readable proposal; fail safe (report, no authority).
+            errors.append(f"bridge thread latest GO has no operative proposal, excluded: {slug}")
+            continue
         try:
-            markdown = path.read_text(encoding="utf-8", errors="replace")
+            markdown = operative.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
-            errors.append(f"bridge file unreadable, excluded from authorization evidence: {path.name}: {exc}")
+            errors.append(f"bridge file unreadable, excluded from authorization evidence: {operative.name}: {exc}")
             continue
         try:
             targets = extract_target_paths(markdown)
         except Exception:  # noqa: BLE001
-            # Verdicts, advisories, and disposition entries legitimately carry no
-            # target_paths. They contribute no authorization evidence and are not
-            # an error; only unreadable files are reported above.
             continue
         for target in targets:
-            declared.setdefault(normalize(target), path.name)
+            shaped = _is_path_shaped(target)
+            if shaped is None:
+                errors.append(f"non-path target syntax rejected as authorization evidence: {target!r} (from {slug})")
+                continue
+            declared.setdefault(shaped, operative.name)
     return declared, errors
+
+
+def _status_from_path(path: Path) -> str | None:
+    try:
+        from bridge_thread_files import status_from_bridge_file
+    except ImportError:  # pragma: no cover - import wiring
+        return None
+    return status_from_bridge_file(path)
 
 
 def registry_classification(relative_path: str, project_root: Path) -> str | None:

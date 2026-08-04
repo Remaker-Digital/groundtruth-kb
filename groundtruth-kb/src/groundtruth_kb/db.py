@@ -2345,9 +2345,21 @@ class KnowledgeDB:
     def _backfill_project_artifacts_from_work_items(self) -> None:
         """Backfill project rows from compatibility work-item project strings.
 
-        This keeps ``work_items`` / ``current_work_items`` as the canonical
-        backlog authority and creates only organizing project records plus
-        memberships. The migration is idempotent and never deletes rows.
+        Concurrency-safe (WI-5292): this keeps ``work_items`` /
+        ``current_work_items`` as the canonical backlog authority and creates
+        only organizing project records plus memberships. The migration is
+        idempotent and never deletes rows.
+
+        Race safety: the first pass reads the compatibility projection without
+        a write transaction and returns immediately when every required
+        project/subproject/membership row already exists (the common lock-free
+        path). When a gap is observed, one short ``BEGIN IMMEDIATE``
+        transaction re-reads the complete current input after lock acquisition,
+        repeats every existence decision on the same connection, appends only
+        rows still missing, commits once, and rolls back the whole transaction
+        on any exception before re-raising. This resolves concurrent backfill
+        races without a global leader, ``INSERT OR IGNORE`` laundering, or a
+        blanket ``IntegrityError`` suppression.
         """
         conn = self._get_conn()
         rows = conn.execute(
@@ -2356,15 +2368,73 @@ class KnowledgeDB:
                WHERE project_name IS NOT NULL AND TRIM(project_name) <> ''
                ORDER BY project_name, subproject_name, implementation_order IS NULL, implementation_order, id"""
         ).fetchall()
-        changed = False
         now = _now()
+
+        def _needs_backfill(conn: sqlite3.Connection) -> bool:
+            for row in rows:
+                project_name = str(row["project_name"]).strip()
+                subproject_name = str(row["subproject_name"]).strip() if row["subproject_name"] else None
+                project_id = _project_id_from_names(project_name)
+                if not self._project_exists_on(conn, project_id):
+                    return True
+                membership_id = _stable_project_link_id("PWM", project_id, str(row["id"]))
+                if not self._project_membership_exists_on(conn, membership_id):
+                    return True
+                if subproject_name:
+                    subproject_id = _project_id_from_names(project_name, subproject_name)
+                    if not self._project_exists_on(conn, subproject_id):
+                        return True
+                    sub_membership_id = _stable_project_link_id("PWM", subproject_id, str(row["id"]))
+                    if not self._project_membership_exists_on(conn, sub_membership_id):
+                        return True
+            return False
+
+        if not _needs_backfill(conn):
+            return
+
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                changed = self._backfill_project_artifacts_on(conn, rows, now)
+                if changed:
+                    conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        except Exception:
+            conn.rollback()
+            raise
+
+    def _project_exists_on(self, conn: sqlite3.Connection, project_id: str) -> bool:
+        row = conn.execute("SELECT 1 FROM current_projects WHERE id = ?", (project_id,)).fetchone()
+        return row is not None
+
+    def _project_membership_exists_on(self, conn: sqlite3.Connection, membership_id: str) -> bool:
+        row = conn.execute(
+            "SELECT 1 FROM current_project_work_item_memberships WHERE id = ?", (membership_id,)
+        ).fetchone()
+        return row is not None
+
+    def _backfill_project_artifacts_on(
+        self,
+        conn: sqlite3.Connection,
+        rows: Any,
+        now: str,
+    ) -> bool:
+        """Append only missing project/subproject/membership rows on ``conn``.
+
+        Repeats every existence decision against the same connection after the
+        caller acquired ``BEGIN IMMEDIATE``, so concurrent backfills append at
+        most one version-1 row per logical identity and leave no partial rows.
+        """
+        changed = False
         for row in rows:
             project_name = str(row["project_name"]).strip()
             subproject_name = str(row["subproject_name"]).strip() if row["subproject_name"] else None
             work_item_id = str(row["id"])
             order = row["implementation_order"]
             project_id = _project_id_from_names(project_name)
-            if not self._project_exists(project_id):
+            if not self._project_exists_on(conn, project_id):
                 conn.execute(
                     """INSERT INTO projects
                        (id, version, name, status, rank, parent_project_id, purpose, target_outcome,
@@ -2384,7 +2454,8 @@ class KnowledgeDB:
                 )
                 changed = True
             changed = (
-                self._insert_project_membership_if_missing(
+                self._insert_project_membership_if_missing_on(
+                    conn=conn,
                     project_id=project_id,
                     work_item_id=work_item_id,
                     membership_role="member",
@@ -2399,7 +2470,7 @@ class KnowledgeDB:
 
             if subproject_name:
                 subproject_id = _project_id_from_names(project_name, subproject_name)
-                if not self._project_exists(subproject_id):
+                if not self._project_exists_on(conn, subproject_id):
                     conn.execute(
                         """INSERT INTO projects
                            (id, version, name, status, rank, parent_project_id, purpose, target_outcome,
@@ -2421,7 +2492,8 @@ class KnowledgeDB:
                     )
                     changed = True
                 changed = (
-                    self._insert_project_membership_if_missing(
+                    self._insert_project_membership_if_missing_on(
+                        conn=conn,
                         project_id=subproject_id,
                         work_item_id=work_item_id,
                         membership_role="subproject_member",
@@ -2433,8 +2505,42 @@ class KnowledgeDB:
                     )
                     or changed
                 )
-        if changed:
-            conn.commit()
+        return changed
+
+    def _insert_project_membership_if_missing_on(
+        self,
+        *,
+        conn: sqlite3.Connection,
+        project_id: str,
+        work_item_id: str,
+        membership_role: str,
+        membership_order: int | None,
+        source: str,
+        changed_by: str,
+        change_reason: str,
+        changed_at: str | None = None,
+    ) -> bool:
+        membership_id = _stable_project_link_id("PWM", project_id, work_item_id)
+        if self._project_membership_exists_on(conn, membership_id):
+            return False
+        conn.execute(
+            """INSERT INTO project_work_item_memberships
+               (id, version, project_id, work_item_id, membership_role, membership_order, status,
+                source, changed_by, changed_at, change_reason)
+               VALUES (?, 1, ?, ?, ?, ?, 'active', ?, ?, ?, ?)""",
+            (
+                membership_id,
+                project_id,
+                work_item_id,
+                membership_role,
+                membership_order,
+                source,
+                changed_by,
+                changed_at or _now(),
+                change_reason,
+            ),
+        )
+        return True
 
     def _project_exists(self, project_id: str) -> bool:
         row = self._get_conn().execute("SELECT 1 FROM current_projects WHERE id = ?", (project_id,)).fetchone()

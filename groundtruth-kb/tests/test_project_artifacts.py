@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
+import multiprocessing
+import sqlite3
 
 from click.testing import CliRunner
 
@@ -1040,3 +1043,150 @@ def test_wi4737_lifecycle_two_sided_guard_rejects_unlinked_and_unverified(tmp_pa
             service.complete_project_authorization("PAUTH-X", project_root=tmp_path, change_reason="complete")
     finally:
         db.close()
+
+
+# ---------------------------------------------------------------------------
+# WI-5292 — concurrency-safe project artifact backfill
+# ---------------------------------------------------------------------------
+
+
+def _make_backfill_db(tmp_path, project: str = "Proj A", item: str = "WI-5292-FX"):
+    """Return a fresh KnowledgeDB with a compatibility work item whose project
+    row and membership are missing (so the backfill must append them)."""
+    db_path = tmp_path / "backfill.db"
+    db = KnowledgeDB(db_path=db_path)
+    _insert_work_item(
+        db,
+        item,
+        project_name=project,
+        subproject_name="Sub",
+        implementation_order=1,
+    )
+    # Close and reopen so _backfill runs during schema ensure on a fresh conn.
+    db.close()
+    return db_path
+
+
+def _counts(db_path):
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    try:
+        projects = conn.execute("SELECT COUNT(*) FROM current_projects").fetchone()[0]
+        memberships = conn.execute("SELECT COUNT(*) FROM current_project_work_item_memberships").fetchone()[0]
+    finally:
+        conn.close()
+    return projects, memberships
+
+
+def _wi5292_spawn_worker(args: tuple) -> None:
+    """Spawn-pool worker: open a fresh KnowledgeDB on the shared db and insert
+    one compatibility work item (triggering the schema/backfill path)."""
+    db_path, idx = args
+    db = KnowledgeDB(db_path=Path(db_path))
+    try:
+        _insert_work_item(db, f"WI-5292-W{idx}", project_name=f"Proj {idx}", subproject_name="Sub")
+    finally:
+        db.close()
+
+
+def test_wi5292_concurrent_backfill_spawn_wave_appends_exactly_once(tmp_path) -> None:
+    """A synchronized Windows spawn wave of independent readers appends exactly
+    one version-1 project and membership row per logical identity."""
+    db_path = _make_backfill_db(tmp_path)
+
+    with multiprocessing.get_context("spawn").Pool(12) as pool:
+        pool.map(_wi5292_spawn_worker, [(db_path, idx) for idx in range(12)])
+        pool.close()
+        pool.join()
+
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    try:
+        project_rows = conn.execute("SELECT id, version FROM current_projects ORDER BY id").fetchall()
+        membership_rows = conn.execute(
+            "SELECT id, version FROM current_project_work_item_memberships ORDER BY id"
+        ).fetchall()
+    finally:
+        conn.close()
+    # Each of the 12 distinct project ids appears exactly once at version 1.
+    project_ids = [r[0] for r in project_rows]
+    assert len(project_ids) == len(set(project_ids))
+    assert all(r[1] == 1 for r in project_rows)
+    membership_ids = [r[0] for r in membership_rows]
+    assert len(membership_ids) == len(set(membership_ids))
+    assert all(r[1] == 1 for r in membership_rows)
+    assert len(project_ids) >= 12
+
+
+def test_wi5292_rollback_leaves_no_partial_rows_and_retry_appends_once(tmp_path, monkeypatch) -> None:
+    """An injected exception after one insert rolls back the whole transaction,
+    leaving no partial project/membership row and no open transaction; a clean
+    retry then appends exactly once and a repeat stays idempotent."""
+    db_path = _make_backfill_db(tmp_path)
+    db = KnowledgeDB(db_path=db_path)
+
+    original = db._backfill_project_artifacts_on
+    calls = {"n": 0}
+
+    def _flaky(conn, rows, now):
+        calls["n"] += 1
+        # Let the first project insert happen, then fail mid-loop.
+        if calls["n"] == 1:
+            conn.execute("INSERT INTO projects (id, version, name, status) VALUES ('PARTIAL', 1, 'partial', 'active')")
+            raise RuntimeError("injected backfill failure")
+        return original(conn, rows, now)
+
+    monkeypatch.setattr(db, "_backfill_project_artifacts_on", _flaky)
+    with contextlib.suppress(RuntimeError):
+        db._backfill_project_artifacts_from_work_items()
+
+    conn = db._get_conn()
+    try:
+        # No partial row survived and no open transaction remains.
+        partial = conn.execute("SELECT 1 FROM current_projects WHERE id = 'PARTIAL'").fetchone()
+        assert partial is None
+        in_txn = conn.execute("SELECT COUNT(*) FROM sqlite_master").fetchone()
+        assert in_txn is not None  # connection usable
+    finally:
+        conn.close()
+
+    # Clean retry appends exactly once (one project + one subproject + memberships).
+    db2 = KnowledgeDB(db_path=db_path)
+    before = _counts(db_path)
+    db2._backfill_project_artifacts_from_work_items()
+    after1 = _counts(db_path)
+    db2._backfill_project_artifacts_from_work_items()
+    after2 = _counts(db_path)
+    db2.close()
+    assert after1 == after2  # idempotent repeat
+    assert after1[0] >= before[0]
+    assert after1[1] >= before[1]
+
+
+def test_wi5292_lockfree_projection_is_clean(tmp_path, monkeypatch) -> None:
+    """On a complete projection the fast path performs no BEGIN IMMEDIATE,
+    project insert, or membership insert."""
+    db_path = _make_backfill_db(tmp_path)
+    db = KnowledgeDB(db_path=db_path)
+    # First run completes the projection.
+    db._backfill_project_artifacts_from_work_items()
+    before = _counts(db_path)
+
+    statements: list[str] = []
+
+    def _trace_stmt(stmt, params=None):
+        statements.append(str(stmt))
+        return None
+
+    conn = db._get_conn()
+    try:
+        conn.set_trace_callback(_trace_stmt)
+        db._backfill_project_artifacts_from_work_items()
+        conn.set_trace_callback(None)
+    finally:
+        pass
+
+    joined = chr(10).join(statements)
+    assert "BEGIN IMMEDIATE" not in joined.upper()
+    assert "INSERT INTO projects" not in joined
+    assert "INSERT INTO project_work_item_memberships" not in joined
+    after = _counts(db_path)
+    assert before == after

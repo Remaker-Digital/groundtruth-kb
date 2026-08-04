@@ -39,8 +39,15 @@ def _run_probe(*extra_args: str, timeout: float = 30.0) -> subprocess.CompletedP
 
 
 def _run_probe_json(*extra_args: str, timeout: float = 30.0) -> dict[str, object]:
-    """Run the probe and return the parsed JSON report."""
-    result = _run_probe(*extra_args, timeout=timeout)
+    """Run the probe and return the parsed JSON report.
+
+    ``--timeout`` is a required CLI argument; this helper supplies a default
+    positive value unless the caller already passed one.
+    """
+    args = list(extra_args)
+    if "--timeout" not in args:
+        args.extend(["--timeout", "5.0"])
+    result = _run_probe(*args, timeout=timeout)
     assert result.returncode == 0, f"Probe exit {result.returncode}\nstderr: {result.stderr[:1000]}"
     return json.loads(result.stdout)  # type: ignore[no-any-return]
 
@@ -61,18 +68,30 @@ class TestProjectRootContainment:
         )
 
     def test_project_root_containment_fail(self) -> None:
-        """Probe cwd check detects non-contained working directory."""
-        # Simulate by patching the containment check directly
+        """A synthetic non-descendant observed CWD reports containment=false.
+
+        Uses the observed-CWD seam with a pure absolute path value; touches no
+        live path outside the GT-KB root.
+        """
         from scripts.harness_probe_dsv4pro_r2 import _check_project_root_containment
 
-        fake_root = Path("E:/GT-KB")
-        report = _check_project_root_containment(fake_root)
-        # If actual cwd IS inside E:\GT-KB, this may return true;
-        # the test validates the function shape, not the actual containment.
-        assert isinstance(report["project_root_containment"], bool)
+        project_root = Path(__file__).resolve().parent.parent.parent
+        synthetic_cwd = Path("Z:/definitely/not/under/gtkb")
+        report = _check_project_root_containment(project_root, observed_cwd=synthetic_cwd)
+        assert report["project_root_containment"] is False, (
+            f"Expected false for synthetic non-descendant, got {report['project_root_containment']}"
+        )
         assert "details" in report
         assert "cwd" in report["details"]
         assert "project_root" in report["details"]
+
+    def test_project_root_containment_marker_invalid_root_fails_closed(self) -> None:
+        """A marker-invalid derived root reports containment=false (no CWD fallback)."""
+        from scripts.harness_probe_dsv4pro_r2 import _check_project_root_containment
+
+        report = _check_project_root_containment(None)
+        assert report["project_root_containment"] is False
+        assert report["details"]["project_root"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -253,25 +272,29 @@ class TestTimerDiscipline:
         result = _run_probe("--timeout", "5.0")
         assert result.returncode == 0, f"Probe with --timeout 5.0 failed: {result.stderr[:500]}"
 
-    def test_no_hardcoded_timeout_literals(self) -> None:
-        """Source file contains zero hard-coded timeout/timer/interval literals.
+    def test_timeout_omission_fails_before_execution(self) -> None:
+        """Omitting the required --timeout exits nonzero without running checks."""
+        result = _run_probe()
+        assert result.returncode != 0, "Expected nonzero exit when --timeout is omitted"
 
-        The only acceptable timeout numeric is in the argparse default
-        (which is a documented CLI argument default, not a hard-coded
-        subprocess timeout). All subprocess timeout= values must reference
-        the timeout parameter, not integer/float literals.
+    def test_no_hardcoded_timeout_literals(self) -> None:
+        """Production source contains zero timeout/timer/interval literals.
+
+        Every numeric timeout value must come from the required ``--timeout``
+        argument; no argparse default, call-site literal, retry delay, polling
+        interval, or local fallback is permitted (per DELIB-202667722).
         """
         source = _PROBE_SCRIPT.read_text(encoding="utf-8")
         # Find all subprocess.run calls with explicit timeout=
         pattern = re.compile(r"subprocess\.run\([^)]*timeout\s*=\s*([^,)\s]+)")
         matches = pattern.findall(source)
         for match in matches:
-            # If the match is a numeric literal, flag it.
-            # The only allowed numeric defaults are the argparse default and
-            # test helper defaults, which are in test files, not source.
             if match.strip().isdigit():
-                # Numeric literal in subprocess.run(..., timeout=N) — fail
                 raise AssertionError(f"Hard-coded timeout literal found in source: timeout={match.strip()}")
+        # Reject any argparse default= numeric in the probe source.
+        default_pattern = re.compile(r"default\s*=\s*(\d+(?:\.\d+)?)")
+        default_matches = default_pattern.findall(source)
+        assert not default_matches, f"Hard-coded argparse default found in source: {default_matches}"
 
 
 # ---------------------------------------------------------------------------
@@ -313,7 +336,7 @@ class TestReportStructure:
 
     def test_json_is_valid_utf8(self) -> None:
         """Output is valid UTF-8 JSON."""
-        result = _run_probe()
+        result = _run_probe("--timeout", "5.0")
         assert result.returncode == 0
         # json module ensures valid JSON
         json.loads(result.stdout)

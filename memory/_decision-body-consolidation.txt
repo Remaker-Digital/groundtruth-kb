@@ -1,0 +1,38 @@
+# Consolidate + Serialize the Session-Role-Resolution Purge; Run Cursor Parity in Parallel
+
+Owner directive (interactive Prime Builder session, 2026-08-02), two AskUserQuestion answers forming one coherent decision. Context: the owner's durable-registry-role leak directive (workers must never reference TAFE/dispatcher config; the "Durable registry role" startup line must be removed) is specified by `DCL-SESSION-ROLE-RESOLUTION-001 v7` + owner decisions `DELIB-202667530` and `DELIB-202667524`, and has work items — but the fix is DEADLOCKED across ~8 bridge threads contending over `scripts/session_self_initialization.py` and `groundtruth-kb/src/groundtruth_kb/session/envelope.py`. No lane can GO due to mutual target overlaps and circular gating; ~25+ review rounds, zero convergence. This is a concurrency/parallelism failure at the governance layer (cf. WI-5836).
+
+## Decisions
+
+| Source | Decision | Rationale |
+| --- | --- | --- |
+| AUQ-1 (Leak deadlock) | Break the deadlock by SERIALIZING: author ONE consolidated session-role-resolution purge lane that takes exclusive ownership of the contested role-resolution surfaces, implements `DCL-SESSION-ROLE-RESOLUTION-001 v7` (remove durable-registry-role reads/rendering, remove `session_resolver_fallback`, remove worker-facing directives to consult TAFE/dispatcher config across `session_self_initialization.py` and all canonical artifacts), and drives to VERIFIED. Owner authorizes withdrawing/subsuming the overlapping threads (WI-5679, WI-5723, WI-5718, WI-5586, and related) so one lane owns those files, coordinated so the concurrent Codex session yields them. | Per the owner's standing concurrency directive: concurrency/parallelism issues get a durable platform-wide fix, not another competing parallel thread. Serialization is the durable fix for the parallel-thread target-overlap deadlock. |
+| AUQ-2 (Parity track) | Run Cursor manual-parity (WI-5916) in parallel. It touches separate surfaces (`.cursor/`) with no overlap with the session-file deadlock. | Progresses the original harness-parity goal (DELIB-202668161) without colliding with the serialized session-role work. |
+
+## Composed Implications
+
+- This decision AUTHORIZES withdrawing/subsuming the overlapping session-role bridge threads (WI-5679, WI-5723, WI-5718, WI-5586, and related) as the mechanism to clear the target-overlap deadlock, with the consolidated lane assuming their DCL-v7 obligations. It is owner-approval evidence for those withdrawals.
+- Scope of the consolidated lane is the ROLE-RESOLUTION SURFACES: `scripts/session_self_initialization.py`, `scripts/session_role_resolution.py`, `scripts/session_start_dispatch_core.py`, `scripts/_bootstrap_cursor_startup_cache.py`, and the canonical artifacts that carry worker-facing durable-registry/TAFE-config role language (rule files, `config/agent-control` startup index/overlays, CLAUDE.md role-precedence block, operating-role.md fallback clause, DCL citations, and the startup-disclosure caches).
+- EXCLUDED from this lane: `groundtruth-kb/src/groundtruth_kb/session/envelope.py`. It carries its own tangle (WI-5580 foreign-dirty; WI-5234/WI-5603 GO heads) and is left to the WI-5580 cohort. Excluding it avoids the F3 foreign-dirty blocker that has been NO-GO'ing WI-5723.
+- The active governing authority is `DCL-SESSION-ROLE-RESOLUTION-001 v7` + `DELIB-202667530` + `DELIB-202667524`. The retired `GOV-SESSION-ROLE-AUTHORITY-001` MUST NOT be cited as active authority (a repeated NO-GO cause).
+- Concurrency coordination: only ONE session touches the contested role-resolution files at a time. The consolidated lane acquires a work-intent claim; the overlapping threads are withdrawn so they leave the actionable queue; the live Codex LO session yields those files.
+- Review independence still applies: the consolidated proposal is authored by this Prime Builder session and must receive an independent Loyal Opposition GO/VERIFIED from a different session context.
+- This is the durable application of the owner's standing concurrency/parallelism directive (2026-08-01): "the solution should be a durable, platform-wide fix; temporary quiescence is only acceptable while the concurrency issue is being repaired, and during quiescence the only work done should be focused on that repair."
+
+## Linked Artifacts
+
+- `DELIB-202667530` (explicit init direction is canonical; TAFE/dispatcher config is not worker reference)
+- `DELIB-202667524` / CF-01 (unresolved identity fails closed; no durable-registry fallback)
+- `DCL-SESSION-ROLE-RESOLUTION-001` v7 (active role-resolution authority)
+- `DELIB-202668161` (parent harness-manual-parity program decision)
+- Deadlocked threads: WI-5679 (session-role-keying-continuity, active self_init.py gate), WI-5723 (resolver-fallback removal, v008 NO-GO), WI-5718 (retire GOV-SESSION-ROLE-AUTHORITY-001, v017), WI-5586 (retired-carrier purge, v004 NO-GO, GO withdrawn), WI-5580 (envelope-collision), WI-5834 (downgrade-guard, WITHDRAWN), WI-5836 (concurrent bridge threads collide on shared target paths), WI-5653 (WI-5723 dependency)
+- Leak surfaces: `scripts/session_self_initialization.py` (render sites + durable-role metadata + session_resolver_fallback), `scripts/session_role_resolution.py`, `scripts/session_start_dispatch_core.py`, `scripts/_bootstrap_cursor_startup_cache.py`
+- Cursor parity: WI-5916, `.cursor/skills/`, `.cursor/rules/`, `scripts/_bootstrap_cursor_harness.py`
+
+## First Concrete Actions Authorized
+
+1. Capture this decision (this record).
+2. Investigate the exact leak surfaces in `session_self_initialization.py` and `session_role_resolution.py` to scope the consolidated purge precisely.
+3. Draft the consolidated session-role-resolution purge bridge proposal: DCL-v7-derived scope, explicit withdrawal of the overlapping threads (citing this decision), exclusion of `envelope.py`, spec-derived tests, and a collision-ledger disposition. File as NEW.
+4. In parallel: draft and file the Cursor manual-parity proposal (WI-5916) — materialize all skill adapters + MANIFEST + registry status + Prime Builder rule + role switching.
+5. Coordinate concurrency: acquire work-intent claims; withdraw overlapping threads; ensure the Codex session yields the contested files.

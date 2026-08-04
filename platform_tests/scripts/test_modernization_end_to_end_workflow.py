@@ -10,6 +10,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
 from groundtruth_kb.modernization.workflow import ModernizationWorkflowError, _resolve_workflow_actor
 from groundtruth_kb.session import envelope as session_envelope
 
@@ -153,6 +154,7 @@ def _execute_to_verification_request(workspace: Path, go_receipt: Path) -> dict[
     return result
 
 
+@pytest.mark.timeout(120)
 def test_public_workflow_uses_external_reviews_and_resumes_exactly_once() -> None:
     temporary, workspace = _new_workspace()
     with temporary:

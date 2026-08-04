@@ -72,6 +72,30 @@ _PRIME_AUTHORED_STATUSES = PRIME_STATUSES | {"DEFERRED", "WITHDRAWN"}
 _LOYAL_AUTHORED_STATUSES = LOYAL_OPPOSITION_STATUSES | {"ADVISORY"}
 _OWNER_AUTHORED_STATUSES = frozenset({"ACCEPTED", "BLOCKED"})
 _METADATA_FIELDS = ("author_identity", "Document", "Version", "Responds to")
+
+# WI-5827 N1 - enumerated key-synonym resolution. A closed, enumerated
+# allowlist (not a pattern). `_metadata_values` consults the canonical key
+# first; only when it yields no value does it try each synonym in declared
+# order, returning the first hit. Any key outside the canonical set and this
+# table continues to fail closed. Adding a synonym requires a governed change
+# to this table, not a parser behavior change (reconciliation with WI-5636's
+# retain-fail-closed-for-arbitrary-metadata stance).
+_METADATA_KEY_SYNONYMS: dict[str, tuple[str, ...]] = {
+    "Responds to": (
+        "Reviewed",
+        "Responds-To",
+        "Responds to GO",
+        "Responds to NO-GO",
+        "revised_document",
+    ),
+}
+
+# WI-5827 N2 - trailing-parenthetical value normalization. Applied once (not
+# repeatedly) to `Version` and `Responds to` values to strip a single trailing
+# parenthetical annotation before the exact equality comparison. The raw
+# pre-normalization value is preserved on `BridgeVersion` for audit.
+_TRAILING_ANNOTATION_RE = re.compile(r"\s*\([^()]*\)\s*$")
+
 _OBSERVED_STATUS_RE = re.compile(
     r"^(?P<status>NO-ACTION|NO-GO|WITHDRAWN|VERIFIED|REVISED|DEFERRED|ADVISORY|ACCEPTED|BLOCKED|NEW|GO)"
     r"(?=$|[^A-Z0-9-])"
@@ -92,6 +116,10 @@ class BridgeVersion:
     author_identity: str | None = None
     author_role: str | None = None
     observed_status: str | None = None
+    # WI-5827 N2: raw pre-normalization metadata values, preserved for audit
+    # when a single trailing parenthetical annotation is stripped.
+    raw_version: str | None = None
+    raw_responds_to: str | None = None
 
     @property
     def is_strict(self) -> bool:
@@ -236,8 +264,19 @@ def _metadata_values(
     rel_path: str,
     version: int,
 ) -> list[str]:
-    prefix = f"{field}:"
-    values = [line[len(prefix) :].strip() for line in lines[1:] if line.startswith(prefix)]
+    # WI-5827 N1: consults the canonical key first, then each enumerated
+    # synonym in declared order. Only when the canonical key yields no value
+    # are synonyms consulted. A duplicate value against any of the consulted
+    # keys remains a hard failure.
+    candidates = (field,) + _METADATA_KEY_SYNONYMS.get(field, ())
+    values: list[str] = []
+    for candidate in candidates:
+        prefix = f"{candidate}:"
+        for line in lines[1:]:
+            if line.startswith(prefix):
+                values.append(line[len(prefix) :].strip())
+        if values:
+            break
     if len(values) > 1:
         _fail(
             "DUPLICATE_BRIDGE_METADATA",
@@ -264,6 +303,16 @@ def _required_metadata(
             version=version,
         )
     return values[0]
+
+
+def _strip_trailing_annotation(value: str) -> str:
+    """WI-5827 N2: strip a single trailing parenthetical annotation.
+
+    Applied once (not repeatedly) to a metadata value before the exact
+    equality comparison. Values with no trailing parenthetical are returned
+    unchanged. The raw value is preserved by the caller for audit.
+    """
+    return _TRAILING_ANNOTATION_RE.sub("", value, count=1)
 
 
 def _author_role(author_identity: str) -> str | None:
@@ -338,12 +387,15 @@ def _parse_version(
         rel_path=rel_path,
         version=version,
     )
-    version_text = _required_metadata(
+    raw_version = _required_metadata(
         lines,
         "Version",
         rel_path=rel_path,
         version=version,
     )
+    # WI-5827 N2: normalize a single trailing parenthetical annotation on the
+    # Version value before the exact comparison; preserve the raw value.
+    version_text = _strip_trailing_annotation(raw_version)
     responds_values = _metadata_values(
         lines,
         "Responds to",
@@ -363,7 +415,10 @@ def _parse_version(
             rel_path=rel_path,
             version=version,
         )
-    responds_to = responds_values[0] if responds_values else None
+    raw_responds_to = responds_values[0] if responds_values else None
+    # WI-5827 N2: normalize a single trailing parenthetical annotation on the
+    # Responds to value before the exact comparison; preserve the raw value.
+    responds_to = _strip_trailing_annotation(raw_responds_to) if raw_responds_to else None
 
     if document != bridge_id:
         _fail(
@@ -413,6 +468,8 @@ def _parse_version(
             author_identity=None,
             author_role=None,
             observed_status=line_one,
+            raw_version=raw_version,
+            raw_responds_to=raw_responds_to,
         )
 
     role = _author_role(author_identity)
@@ -427,6 +484,8 @@ def _parse_version(
             author_identity=author_identity,
             author_role=None,
             observed_status=line_one,
+            raw_version=raw_version,
+            raw_responds_to=raw_responds_to,
         )
     _validate_author_role(line_one, role, rel_path=rel_path, version=version)
     return BridgeVersion(
@@ -439,6 +498,8 @@ def _parse_version(
         author_identity=author_identity,
         author_role=role,
         observed_status=line_one,
+        raw_version=raw_version,
+        raw_responds_to=raw_responds_to,
     )
 
 

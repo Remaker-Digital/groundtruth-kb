@@ -359,9 +359,12 @@ def test_corrected_tail_does_not_accept_responds_to_go_alias(tmp_path: Path) -> 
         encoding="utf-8-sig",
     )
 
-    with pytest.raises(BridgeLifecycleResolutionError) as caught:
-        resolve_bridge_lifecycle(tmp_path, slug)
-    assert caught.value.code == "WRONG_RESPONDS_TO_LINK"
+    # WI-5827 N1: "Responds to GO:" is an enumerated synonym for the canonical
+    # "Responds to:" key, so the corrected chain now RESOLVES instead of
+    # failing closed. This reverses the pre-WI-5827 wedged behavior.
+    result = resolve_bridge_lifecycle(tmp_path, slug)
+    report = result.audit_versions[-1]
+    assert report.responds_to == f"bridge/{slug}-004.md"
 
 
 def test_corrected_tail_does_not_accept_decorated_version_metadata(
@@ -375,6 +378,123 @@ def test_corrected_tail_does_not_accept_decorated_version_metadata(
         5,
         "NEW",
         metadata_version="005 (NEW; implementation report)",
+    )
+
+    # WI-5827 N2: a single trailing parenthetical annotation on the Version
+    # value is normalized before the exact comparison, so the corrected chain
+    # now RESOLVES instead of failing closed. The raw value is preserved for
+    # audit.
+    result = resolve_bridge_lifecycle(tmp_path, slug)
+    report = result.audit_versions[-1]
+    assert report.version == 5
+    assert report.raw_version == "005 (NEW; implementation report)"
+
+
+@pytest.mark.parametrize(
+    "alias_key",
+    ["Reviewed", "Responds-To", "Responds to GO", "Responds to NO-GO", "revised_document"],
+)
+def test_wi5827_enumerated_responds_to_synonyms_resolve(
+    tmp_path: Path,
+    alias_key: str,
+) -> None:
+    """WI-5827 N1: each enumerated synonym key resolves to the canonical value."""
+    slug = f"synonym-{len(alias_key)}"
+    _corrected_go(tmp_path, slug)
+    report = _write_version(tmp_path, slug, 5, "NEW")
+    content = report.read_text(encoding="utf-8-sig")
+    report.write_text(
+        content.replace("Responds to:", f"{alias_key}:"),
+        encoding="utf-8-sig",
+    )
+
+    result = resolve_bridge_lifecycle(tmp_path, slug)
+    final = result.audit_versions[-1]
+    assert final.responds_to == f"bridge/{slug}-004.md"
+
+
+@pytest.mark.parametrize("unknown_key", ["Answers", "Responds toward"])
+def test_wi5827_unknown_responds_to_key_still_fails_closed(
+    tmp_path: Path,
+    unknown_key: str,
+) -> None:
+    """WI-5827 N1 reconciliation with WI-5636: unrecognized keys still fail closed."""
+    slug = f"unknown-key-{len(unknown_key)}"
+    _corrected_go(tmp_path, slug)
+    report = _write_version(tmp_path, slug, 5, "NEW")
+    content = report.read_text(encoding="utf-8-sig")
+    report.write_text(
+        content.replace("Responds to:", f"{unknown_key}:"),
+        encoding="utf-8-sig",
+    )
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "WRONG_RESPONDS_TO_LINK"
+
+
+def test_wi5827_canonical_key_takes_precedence_over_synonym(tmp_path: Path) -> None:
+    """WI-5827 N1: the canonical key wins when both canonical and a synonym appear."""
+    slug = "canonical-precedence"
+    _corrected_go(tmp_path, slug)
+    report = _write_version(tmp_path, slug, 5, "NEW")
+    content = report.read_text(encoding="utf-8-sig")
+    # The write already carries the canonical "Responds to:" with the correct
+    # predecessor. Add a synonym "Reviewed:" with a wrong value; the canonical
+    # key must win and there must be no duplicate-metadata failure.
+    report.write_text(
+        content + f"\nReviewed: bridge/{slug}-999.md\n",
+        encoding="utf-8-sig",
+    )
+
+    result = resolve_bridge_lifecycle(tmp_path, slug)
+    final = result.audit_versions[-1]
+    assert final.responds_to == f"bridge/{slug}-004.md"
+
+
+def test_wi5827_strips_trailing_annotation_on_responds_to(tmp_path: Path) -> None:
+    """WI-5827 N2: a trailing parenthetical on Responds to is normalized."""
+    slug = "decorated-responds"
+    _corrected_go(tmp_path, slug)
+    report = _write_version(tmp_path, slug, 5, "NEW")
+    content = report.read_text(encoding="utf-8-sig")
+    report.write_text(
+        content.replace(f"Responds to: bridge/{slug}-004.md", f"Responds to: bridge/{slug}-004.md (NO-ACTION)"),
+        encoding="utf-8-sig",
+    )
+
+    result = resolve_bridge_lifecycle(tmp_path, slug)
+    final = result.audit_versions[-1]
+    assert final.responds_to == f"bridge/{slug}-004.md"
+    assert final.raw_responds_to == f"bridge/{slug}-004.md (NO-ACTION)"
+
+
+def test_wi5827_does_not_mask_wrong_responds_to_predecessor(tmp_path: Path) -> None:
+    """WI-5827 N2: a wrong predecessor path still fails closed."""
+    slug = "wrong-predecessor"
+    _corrected_go(tmp_path, slug)
+    report = _write_version(tmp_path, slug, 5, "NEW")
+    content = report.read_text(encoding="utf-8-sig")
+    report.write_text(
+        content.replace(f"Responds to: bridge/{slug}-004.md", "Responds to: bridge/wrong-003.md"),
+        encoding="utf-8-sig",
+    )
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "WRONG_RESPONDS_TO_LINK"
+
+
+def test_wi5827_does_not_mask_wrong_version(tmp_path: Path) -> None:
+    """WI-5827 N2: a wrong version number still fails closed."""
+    slug = "wrong-version"
+    _corrected_go(tmp_path, slug)
+    _write_version(
+        tmp_path,
+        slug,
+        5,
+        "NEW",
+        metadata_version="004 (REVISED)",
     )
 
     with pytest.raises(BridgeLifecycleResolutionError) as caught:

@@ -28,12 +28,14 @@ try:
         PATH_TOKEN_RE,
         AuthorizationError,
         extract_and_validate_project_authorization,
+        validate_structured_pauth_spec_amendment,
     )
 except ImportError:  # pragma: no cover - direct script execution path
     from implementation_authorization import (  # type: ignore[no-redef]
         PATH_TOKEN_RE,
         AuthorizationError,
         extract_and_validate_project_authorization,
+        validate_structured_pauth_spec_amendment,
     )
 
 try:
@@ -118,9 +120,6 @@ OPERATIVE_REFERENCE_RE: Final[re.Pattern[str]] = re.compile(
     r"(?im)^\s*(?:Responds\s+to|Corrects|Approved\s+proposal|Reviewed|Verified):\s*"
     r"(?:bridge/)?([^\s`]+)-(\d+)\.md\s*$"
 )
-PAUTH_AMENDMENT_SPEC_ID: Final[str] = "DCL-PROJECT-SPECIFICATION-AMENDMENT-APPROVAL-REQUIRED-001"
-OWNER_EVIDENCE_RE: Final[re.Pattern[str]] = re.compile(r"Owner evidence:\s*([^\s`)]+)", re.IGNORECASE)
-JSON_FENCE_RE: Final[re.Pattern[str]] = re.compile(r"```json\s*(.*?)```", re.IGNORECASE | re.DOTALL)
 BRIDGE_KIND_RE: Final[re.Pattern[str]] = re.compile(r"(?im)^\s*bridge_kind:\s*([a-z0-9_-]+)\s*$")
 VERSION_DECLARATION_RE: Final[re.Pattern[str]] = re.compile(r"(?im)^\s*Version:\s*(\d+)\s*$")
 PAUTH_METADATA_RE: Final[re.Pattern[str]] = re.compile(r"(?im)^\s*Project Authorization(?: ID)?:\s*\S+")
@@ -545,96 +544,22 @@ def enrich_from_membase(applicable: dict[str, ApplicableSpec], db_path: Path) ->
         conn.close()
 
 
-def _load_json_fence(content: str) -> dict[str, Any] | None:
-    for match in JSON_FENCE_RE.finditer(content):
-        try:
-            parsed = json.loads(match.group(1))
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict):
-            return parsed
-    return None
-
-
-def _current_pauth_specs(db_path: Path, authorization_id: str) -> set[str]:
-    if not db_path.is_file():
-        return set()
-    try:
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2.0)
-    except sqlite3.Error:
-        return set()
-    try:
-        row = conn.execute(
-            "SELECT included_spec_ids FROM current_project_authorizations WHERE id = ? LIMIT 1",
-            (authorization_id,),
-        ).fetchone()
-    except sqlite3.Error:
-        return set()
-    finally:
-        conn.close()
-    if not row or not row[0]:
-        return set()
-    try:
-        parsed = json.loads(row[0])
-    except json.JSONDecodeError:
-        return set()
-    if not isinstance(parsed, list):
-        return set()
-    return {str(item) for item in parsed}
-
-
 def _pauth_amendment_blocking_errors(content: str, project_root: Path, db_path: Path) -> list[str]:
-    if PAUTH_AMENDMENT_SPEC_ID not in content:
-        return []
-    envelope = _load_json_fence(content)
-    if envelope is None:
-        return ["PAUTH amendment approval check failed: no structured amendment envelope found."]
-    project_id = str(envelope.get("project_id") or "")
-    authorization_id = str(envelope.get("id") or "")
-    included_specs = {str(item) for item in envelope.get("included_spec_ids", []) if str(item)}
-    previous_specs = _current_pauth_specs(db_path, authorization_id)
-    added_specs = included_specs - previous_specs or included_specs
+    """Thin adapter over the canonical structured PAUTH-amendment validator.
 
-    evidence_match = OWNER_EVIDENCE_RE.search(content)
-    if evidence_match is None:
-        return ["PAUTH amendment approval check failed: No packet path detected in owner evidence."]
-    raw_path = evidence_match.group(1).strip().rstrip("\"',;}")
-    approval_root = (project_root / ".groundtruth" / "formal-artifact-approvals").resolve(strict=False)
-    candidate = (project_root / raw_path).resolve(strict=False)
+    Delegates real structured-replacement-envelope validation to
+    ``validate_structured_pauth_spec_amendment`` so the applicability preflight
+    does not maintain a second, divergent parser/validator. Content with no
+    actual structured replacement envelope (even when it cites the governing
+    amendment constraint and carries unrelated JSON evidence) is treated as
+    non-applicable. A real malformed, identity-conflicting, owner-evidence-
+    missing, out-of-root, non-owner, or non-covering amendment is reported as
+    one deterministic blocking error with fail-closed formatting.
+    """
     try:
-        candidate.relative_to(approval_root)
-    except ValueError:
-        return [
-            "PAUTH amendment approval check failed: approval packet path is outside the in-root approval directory."
-        ]
-    try:
-        approval_packet = json.loads(candidate.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return ["PAUTH amendment approval check failed: approval packet is not readable JSON."]
-    if not isinstance(approval_packet, dict) or not all(
-        approval_packet.get(field)
-        for field in (
-            "artifact_type",
-            "artifact_id",
-            "action",
-            "approval_mode",
-            "approved_by",
-            "full_content",
-            "explicit_change_request",
-        )
-    ):
-        return ["PAUTH amendment approval check failed: approval packet fails schema validation."]
-    if approval_packet.get("approval_mode") != "approve" or approval_packet.get("approved_by") != "owner":
-        return ["PAUTH amendment approval check failed: approval packet is not owner-approved."]
-
-    approval_text = " ".join(
-        str(approval_packet.get(field, ""))
-        for field in ("artifact_id", "full_content", "explicit_change_request", "change_reason", "source_ref")
-    )
-    if project_id not in approval_text or authorization_id not in approval_text:
-        return ["PAUTH amendment approval check failed: approval packet does not mention project authorization."]
-    if added_specs and not any(spec_id in approval_text for spec_id in added_specs):
-        return ["PAUTH amendment approval check failed: approval packet does not cover the amendment."]
+        validate_structured_pauth_spec_amendment(project_root, content)
+    except AuthorizationError as exc:
+        return [f"PAUTH amendment approval check failed: {exc}"]
     return []
 
 

@@ -356,3 +356,58 @@ def test_hook_deny_reason_for_content_blocks_fabricated_nogo(tmp_path: Path) -> 
     )
     assert reason is not None
     assert "evidence anchors" in reason
+
+
+# --- WI-5437: unsupported exact-path removal claims ------------------------
+
+
+def test_unsupported_removal_claim_fails(tmp_path: Path) -> None:
+    """A verdict asserting report removal of a path with no such statement fails."""
+    _mark_project_root(tmp_path)
+    _write_op(
+        tmp_path,
+        "bridge/foo-001.md",
+        [
+            "REVISED",
+            "## Files Changed",
+            "- `scripts/helper.py` (modified)",
+            "No bridge files were removed.",
+        ],
+    )
+    verdict = _verdict(
+        "F1: the report promised removal of `scripts/per_thread_finalization_repair.py`.",
+        reviewed="bridge/foo-001.md",
+    )
+    violations = validate_verdict_evidence_anchors(verdict, project_root=tmp_path)
+    assert "unsupported_removal_claim" in _kinds(violations)
+
+
+def test_supported_removal_claim_passes(tmp_path: Path) -> None:
+    """A verdict grounded in a real positive same-path removal statement passes."""
+    _mark_project_root(tmp_path)
+    _write_op(
+        tmp_path,
+        "bridge/foo-001.md",
+        [
+            "REVISED",
+            "## Files Changed",
+            "- `scripts/per_thread_finalization_repair.py` (removed)",
+        ],
+    )
+    verdict = _verdict(
+        "F1: the report claimed removal of `scripts/per_thread_finalization_repair.py`.",
+        reviewed="bridge/foo-001.md",
+    )
+    violations = validate_verdict_evidence_anchors(verdict, project_root=tmp_path)
+    assert "unsupported_removal_claim" not in _kinds(violations)
+
+
+def test_removal_assertion_without_operative_header_is_not_flagged(tmp_path: Path) -> None:
+    """No operative document header means no WI-5437 removal-claim check."""
+    _mark_project_root(tmp_path)
+    verdict = _verdict(
+        "F1: the report promised removal of `scripts/helper.py`.",
+        reviewed=None,
+    )
+    violations = validate_verdict_evidence_anchors(verdict, project_root=tmp_path)
+    assert "unsupported_removal_claim" not in _kinds(violations)

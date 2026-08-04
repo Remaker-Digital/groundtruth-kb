@@ -29,6 +29,8 @@ def _clear_harness_signals(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in (
         "GTKB_HARNESS_NAME",
         "GTKB_BRIDGE_POLLER_RUN_ID",
+        "GTKB_HARNESS_ID",
+        "GTKB_AUTHOR_HARNESS_ID",
         "CLAUDE_CODE_SESSION_ID",
         "CLAUDECODE",
         "CODEX_THREAD_ID",
@@ -181,3 +183,62 @@ def test_selector_precedence_and_headless_ambiguity(auth_module, monkeypatch: py
 
     monkeypatch.delenv("CLAUDE_CODE_SESSION_ID")
     assert auth_module._worker_harness_selector() == "codex"
+
+
+def _write_identities(root: Path, mapping: dict[str, str]) -> None:
+    """Write a minimal harness identities SoT: harness name -> durable id."""
+    harness_state = root / "harness-state"
+    harness_state.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": 1,
+        "harnesses": {name: {"id": harness_id, "status": "active"} for name, harness_id in mapping.items()},
+    }
+    (harness_state / "harness-identities.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_selector_maps_durable_id_through_registry(auth_module, tmp_path, monkeypatch) -> None:
+    """A generic durable harness id resolves to the canonical harness name."""
+    _write_identities(tmp_path, {"goose": "G", "codex": "A", "cursor": "E"})
+    monkeypatch.setenv("GTKB_HARNESS_ID", "G")
+    assert auth_module._worker_harness_selector(tmp_path) == "goose"
+    monkeypatch.delenv("GTKB_HARNESS_ID")
+    monkeypatch.setenv("GTKB_AUTHOR_HARNESS_ID", "E")
+    assert auth_module._worker_harness_selector(tmp_path) == "cursor"
+
+
+def test_selector_conflicting_durable_ids_fail_closed(auth_module, tmp_path, monkeypatch) -> None:
+    """Disagreeing durable-id variables fail closed instead of guessing."""
+    _write_identities(tmp_path, {"goose": "G", "codex": "A"})
+    monkeypatch.setenv("GTKB_HARNESS_ID", "G")
+    monkeypatch.setenv("GTKB_AUTHOR_HARNESS_ID", "A")
+    with pytest.raises(ValueError, match="disagree"):
+        auth_module._worker_harness_selector(tmp_path)
+
+
+def test_selector_unknown_durable_id_fails_closed(auth_module, tmp_path, monkeypatch) -> None:
+    """An unregistered durable id fails closed (no harness selected)."""
+    _write_identities(tmp_path, {"goose": "G"})
+    monkeypatch.setenv("GTKB_HARNESS_ID", "ZZZ")
+    with pytest.raises(ValueError, match="no registered harness"):
+        auth_module._worker_harness_selector(tmp_path)
+
+
+def test_selector_explicit_name_still_highest_precedence(auth_module, tmp_path, monkeypatch) -> None:
+    """GTKB_HARNESS_NAME remains highest precedence over durable-id mapping."""
+    _write_identities(tmp_path, {"goose": "G", "codex": "A"})
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "cursor")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "G")
+    assert auth_module._worker_harness_selector(tmp_path) == "cursor"
+
+
+def test_selector_legacy_markers_and_codex_home_unchanged(auth_module, tmp_path, monkeypatch) -> None:
+    """Legacy live markers still select; CODEX_HOME alone selects nothing."""
+    _write_identities(tmp_path, {"goose": "G"})
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-session")
+    assert auth_module._worker_harness_selector(tmp_path) == "claude"
+    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID")
+    monkeypatch.setenv("CODEX_THREAD_ID", "codex-session")
+    assert auth_module._worker_harness_selector(tmp_path) == "codex"
+    monkeypatch.delenv("CODEX_THREAD_ID")
+    monkeypatch.setenv("CODEX_HOME", "C:/Users/test/.codex")
+    assert auth_module._worker_harness_selector(tmp_path) is None

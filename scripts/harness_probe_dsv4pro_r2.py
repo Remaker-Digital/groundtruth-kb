@@ -39,46 +39,71 @@ from pathlib import Path
 
 _PROBE_VERSION = "1.0.0"
 _RUN_IDENTIFIER = "dsv4pro-r2"
-# Paths checked relative to project root (determined at runtime from cwd).
+# Paths checked relative to project root (determined from the installed probe
+# path, independent of the invoking CWD).
 _VENV_PYTHON_PARTS = ("groundtruth-kb", ".venv", "Scripts", "python.exe")
 _ENVELOPE_PATH_PARTS = (".claude", "session", "envelope.json")
+_PROJECT_MARKER_PARTS = ("groundtruth-kb", ".claude", "rules")
 
 
-def _resolve_project_root(cwd: Path) -> Path:
-    """Resolve the GT-KB project root from the current working directory."""
-    candidate = cwd.resolve()
-    while True:
-        gt_kb_marker = candidate / "groundtruth-kb"
-        claude_rules = candidate / ".claude" / "rules"
-        if gt_kb_marker.is_dir() and claude_rules.is_dir():
-            return candidate
-        parent = candidate.parent
-        if parent == candidate:
-            # Reached filesystem root without finding the project.
-            return cwd.resolve()
-        candidate = parent
+def _resolve_project_root(probe_path: Path | None = None) -> Path | None:
+    """Resolve the canonical GT-KB project root from the installed probe path.
+
+    Derives the root from the probe's own installed location (not the invoking
+    CWD) so root authority is independent of where the probe was launched. The
+    root candidate must contain the ``groundtruth-kb/`` and ``.claude/rules/``
+    markers to be treated as authoritative. Returns ``None`` when the markers
+    are absent (fail closed); it never falls back to the invoking CWD.
+    """
+    source = probe_path if probe_path is not None else Path(__file__)
+    candidate = source.resolve().parent.parent
+    gt_kb_marker = candidate / "groundtruth-kb"
+    claude_rules = candidate / ".claude" / "rules"
+    if gt_kb_marker.is_dir() and claude_rules.is_dir():
+        return candidate
+    return None
 
 
-def _check_project_root_containment(project_root: Path) -> dict[str, object]:
-    """Check (1): process cwd resolves inside the GT-KB root."""
-    cwd = Path.cwd().resolve()
+def _check_project_root_containment(
+    project_root: Path | None,
+    observed_cwd: Path | None = None,
+) -> dict[str, object]:
+    """Check (1): the observed working directory resolves inside the GT-KB root.
+
+    ``observed_cwd`` is an optional seam: production supplies ``Path.cwd()``;
+    tests may supply a synthetic absolute non-descendant path as data only.
+    Fails closed: an unresolvable root (``None``) or a non-descendant observed
+    CWD reports containment ``False``.
+    """
+    cwd = (observed_cwd if observed_cwd is not None else Path.cwd()).resolve()
     contained = False
-    try:
-        cwd.relative_to(project_root.resolve())
-        contained = True
-    except ValueError:
-        pass
+    if project_root is not None:
+        try:
+            cwd.relative_to(project_root.resolve())
+            contained = True
+        except ValueError:
+            pass
     return {
         "project_root_containment": contained,
         "details": {
             "cwd": str(cwd),
-            "project_root": str(project_root.resolve()),
+            "project_root": str(project_root.resolve()) if project_root is not None else None,
         },
     }
 
 
-def _check_venv_resolution(project_root: Path, timeout: float) -> dict[str, object]:
+def _check_venv_resolution(project_root: Path | None, timeout: float) -> dict[str, object]:
     """Check (2): venv python.exe exists and imports groundtruth_kb."""
+    if project_root is None:
+        return {
+            "venv_resolution": False,
+            "details": {
+                "venv_python_path": None,
+                "exists": False,
+                "imports_groundtruth_kb": False,
+                "import_error": "project root unresolved",
+            },
+        }
     venv_python = project_root.joinpath(*_VENV_PYTHON_PARTS)
     exists = venv_python.is_file()
     imports_ok = False
@@ -108,53 +133,56 @@ def _check_venv_resolution(project_root: Path, timeout: float) -> dict[str, obje
     }
 
 
-def _check_git_read_health(project_root: Path, timeout: float) -> dict[str, object]:
+def _check_git_read_health(project_root: Path | None, timeout: float) -> dict[str, object]:
     """Check (3): git read health via --no-optional-locks."""
     head_sha: str | None = None
     dirty_count: int | None = None
     git_error: str | None = None
     git_ok = False
-    try:
-        sha_result = subprocess.run(
-            [
-                "git",
-                "--no-optional-locks",
-                "-C",
-                str(project_root),
-                "rev-parse",
-                "HEAD",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        if sha_result.returncode == 0:
-            head_sha = sha_result.stdout.strip()
-        else:
-            git_error = sha_result.stderr.strip() or sha_result.stdout.strip()
-    except (subprocess.TimeoutExpired, OSError) as exc:
-        git_error = str(exc)
-    try:
-        dirty_result = subprocess.run(
-            [
-                "git",
-                "--no-optional-locks",
-                "-C",
-                str(project_root),
-                "status",
-                "--porcelain",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        if dirty_result.returncode == 0:
-            dirty_count = len([l for l in dirty_result.stdout.splitlines() if l.strip()])
-        elif git_error is None:
-            git_error = dirty_result.stderr.strip() or dirty_result.stdout.strip()
-    except (subprocess.TimeoutExpired, OSError) as exc:
-        if git_error is None:
+    if project_root is None:
+        git_error = "project root unresolved"
+    else:
+        try:
+            sha_result = subprocess.run(
+                [
+                    "git",
+                    "--no-optional-locks",
+                    "-C",
+                    str(project_root),
+                    "rev-parse",
+                    "HEAD",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            if sha_result.returncode == 0:
+                head_sha = sha_result.stdout.strip()
+            else:
+                git_error = sha_result.stderr.strip() or sha_result.stdout.strip()
+        except (subprocess.TimeoutExpired, OSError) as exc:
             git_error = str(exc)
+        try:
+            dirty_result = subprocess.run(
+                [
+                    "git",
+                    "--no-optional-locks",
+                    "-C",
+                    str(project_root),
+                    "status",
+                    "--porcelain",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            if dirty_result.returncode == 0:
+                dirty_count = len([l for l in dirty_result.stdout.splitlines() if l.strip()])
+            elif git_error is None:
+                git_error = dirty_result.stderr.strip() or dirty_result.stdout.strip()
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            if git_error is None:
+                git_error = str(exc)
     git_ok = head_sha is not None and dirty_count is not None
     return {
         "git_read_health": {
@@ -168,28 +196,18 @@ def _check_git_read_health(project_root: Path, timeout: float) -> dict[str, obje
     }
 
 
-def _check_gt_cli_reachability(project_root: Path, timeout: float) -> dict[str, object]:
+def _check_gt_cli_reachability(project_root: Path | None, timeout: float) -> dict[str, object]:
     """Check (4): gt CLI exit-0 help probe."""
     reachable = False
     exit_code: int | None = None
     stderr_snippet: str | None = None
-    try:
-        venv_python = str(project_root.joinpath(*_VENV_PYTHON_PARTS))
-        result = subprocess.run(
-            [venv_python, "-m", "groundtruth_kb.cli", "--help"],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        exit_code = result.returncode
-        reachable = exit_code == 0
-        if not reachable:
-            stderr_snippet = (result.stderr or result.stdout)[:500]
-    except FileNotFoundError:
-        # Fall back to system python -m if venv python doesn't exist
+    if project_root is None:
+        stderr_snippet = "project root unresolved"
+    else:
         try:
+            venv_python = str(project_root.joinpath(*_VENV_PYTHON_PARTS))
             result = subprocess.run(
-                [sys.executable, "-m", "groundtruth_kb.cli", "--help"],
+                [venv_python, "-m", "groundtruth_kb.cli", "--help"],
                 capture_output=True,
                 text=True,
                 timeout=timeout,
@@ -198,12 +216,25 @@ def _check_gt_cli_reachability(project_root: Path, timeout: float) -> dict[str, 
             reachable = exit_code == 0
             if not reachable:
                 stderr_snippet = (result.stderr or result.stdout)[:500]
+        except FileNotFoundError:
+            # Fall back to system python -m if venv python doesn't exist
+            try:
+                result = subprocess.run(
+                    [sys.executable, "-m", "groundtruth_kb.cli", "--help"],
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
+                exit_code = result.returncode
+                reachable = exit_code == 0
+                if not reachable:
+                    stderr_snippet = (result.stderr or result.stdout)[:500]
+            except (subprocess.TimeoutExpired, OSError) as exc:
+                reachable = False
+                stderr_snippet = str(exc)[:500]
         except (subprocess.TimeoutExpired, OSError) as exc:
             reachable = False
             stderr_snippet = str(exc)[:500]
-    except (subprocess.TimeoutExpired, OSError) as exc:
-        reachable = False
-        stderr_snippet = str(exc)[:500]
     return {
         "gt_cli_reachability": reachable,
         "details": {
@@ -214,9 +245,16 @@ def _check_gt_cli_reachability(project_root: Path, timeout: float) -> dict[str, 
 
 
 def _check_session_envelope_presence(
-    project_root: Path,
+    project_root: Path | None,
 ) -> dict[str, object]:
     """Check (5): session-envelope surface read-only existence check."""
+    if project_root is None:
+        return {
+            "session_envelope_presence": False,
+            "details": {
+                "envelope_path": None,
+            },
+        }
     envelope_path = project_root.joinpath(*_ENVELOPE_PATH_PARTS)
     present = envelope_path.is_file()
     return {
@@ -227,29 +265,43 @@ def _check_session_envelope_presence(
     }
 
 
-def _check_report_determinism(project_root: Path) -> dict[str, object]:
-    """Check (6): report determinism — always true for a single-run probe.
+def _build_core_checks(project_root: Path | None, timeout: float) -> dict[str, object]:
+    """Build the deterministic core checks (1)-(5) used for determinism."""
+    core: dict[str, object] = {}
+    core.update(_check_project_root_containment(project_root))
+    core.update(_check_venv_resolution(project_root, timeout))
+    core.update(_check_git_read_health(project_root, timeout))
+    core.update(_check_gt_cli_reachability(project_root, timeout))
+    core.update(_check_session_envelope_presence(project_root))
+    return core
 
-    The determinism contract states that two consecutive runs produce
-    byte-identical JSON apart from ``generated_at``. This check is validated
-    by the unit tests (``test_report_determinism``) which execute the probe
-    twice and compare output. In the probe itself, this always reports true
-    because a single run cannot compare against a prior run.
+
+def _check_report_determinism(
+    project_root: Path | None,
+    timeout: float,
+    reference_core: dict[str, object],
+) -> dict[str, object]:
+    """Check (6): report determinism — observed comparison of two payloads.
+
+    Two independently built canonical payloads are compared; ``True`` only when
+    they are equal, so the runtime value reflects an actual measurement rather
+    than self-attesting success.
     """
+    second_core = _build_core_checks(project_root, timeout)
+    deterministic = second_core == reference_core
     return {
-        "report_determinism": True,
+        "report_determinism": deterministic,
         "details": {
             "note": (
-                "Determinism validated externally by test_report_determinism "
-                "which runs the probe twice and compares output excluding "
-                "generated_at."
+                "Observed by comparing two independently built canonical payloads (checks 1-5) in the current worktree."
             ),
+            "measurement": "observed",
         },
     }
 
 
 def build_report(
-    project_root: Path,
+    project_root: Path | None,
     timeout: float,
 ) -> dict[str, object]:
     """Build the complete probe report."""
@@ -261,23 +313,12 @@ def build_report(
         "run_identifier": _RUN_IDENTIFIER,
     }
 
-    # Check (1): project-root containment
-    report.update(_check_project_root_containment(project_root))
+    # Checks (1)-(5): deterministic core
+    core = _build_core_checks(project_root, timeout)
+    report.update(core)
 
-    # Check (2): venv resolution
-    report.update(_check_venv_resolution(project_root, timeout))
-
-    # Check (3): git read health
-    report.update(_check_git_read_health(project_root, timeout))
-
-    # Check (4): gt CLI reachability
-    report.update(_check_gt_cli_reachability(project_root, timeout))
-
-    # Check (5): session-envelope surface presence
-    report.update(_check_session_envelope_presence(project_root))
-
-    # Check (6): report determinism
-    report.update(_check_report_determinism(project_root))
+    # Check (6): report determinism (observed comparison)
+    report.update(_check_report_determinism(project_root, timeout, reference_core=core))
 
     return report
 
@@ -285,8 +326,9 @@ def build_report(
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse CLI arguments.
 
-    The ``--timeout`` argument is the sole source of subprocess timeout values.
-    No hard-coded timer literals exist in this module (per DELIB-202667722).
+    The ``--timeout`` argument is a required, documented, positive float input.
+    No default or fallback exists in this module; omission fails before any
+    probe subprocess starts (per DELIB-202667722 timer discipline).
     """
     parser = argparse.ArgumentParser(
         description="Harness capability probe — DeepSeek V4 Pro Run 2",
@@ -294,8 +336,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--timeout",
         type=float,
-        default=10.0,
-        help=("Subprocess timeout in seconds for git and gt CLI checks (default: 10.0)."),
+        required=True,
+        help=("Subprocess timeout in seconds for git and gt CLI checks (required)."),
     )
     return parser.parse_args(argv)
 
@@ -303,7 +345,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     """Entry point: run all checks and emit JSON report to stdout."""
     args = _parse_args(argv)
-    project_root = _resolve_project_root(Path.cwd())
+    if args.timeout <= 0:
+        print("error: --timeout must be a positive number", file=sys.stderr)
+        return 2
+    project_root = _resolve_project_root()
     report = build_report(project_root, timeout=args.timeout)
     json.dump(report, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")

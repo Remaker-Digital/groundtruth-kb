@@ -65,7 +65,7 @@ def _parser() -> argparse.ArgumentParser:
     publish.add_argument("--remote", default="origin")
     publish.add_argument("--expected-remote-url")
     publish.add_argument("--exclude-path", action="append", default=[])
-    publish.add_argument("--max-blob-bytes", type=int, default=10_000_000)
+    publish.add_argument("--max-blob-bytes", type=int, required=True)
     publish.add_argument(
         "--no-push",
         action="store_true",

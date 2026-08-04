@@ -321,6 +321,10 @@ DEFAULT_DISPATCH_SUPPRESSIONS_MAX_BYTES = DEFAULT_JSONL_MAX_BYTES
 WORK_SUBJECT_APPLICATION_SUSPENDED_REASON = "work_subject_application_suspended"
 TARGET_PATH_OVERLAP_SELECTED_REASON = "target_path_overlap_selected"
 TARGET_PATH_OVERLAP_INFLIGHT_REASON = "target_path_overlap_inflight"
+# WI-5297: stable non-failure capacity-held result when all configured item
+# capacity for a recipient is already consumed by unresolved in-flight
+# launch-ledger documents.
+DISPATCH_CAPACITY_HELD_RESULT = "dispatch_capacity_held"
 THREAD_REOFFER_BACKOFF_RESULT = "thread_reoffer_backoff_active"
 LO_VERDICT_CLAIM_HELD_RESULT = "lo_verdict_claim_held"
 LO_VERDICT_CLAIM_ACQUIRE_FAILED_RESULT = "lo_verdict_claim_acquire_failed"
@@ -5877,6 +5881,48 @@ def _refresh_launch_ledger_counts(recipient_state: dict[str, Any], ledger: dict[
     recipient_state["launch_ledger_completed_count"] = len(ledger) - active_count
 
 
+def _active_inflight_document_count(ledger: dict[str, dict[str, Any]]) -> int:
+    """Return the count of unresolved selected documents across active launches (WI-5297).
+
+    Counts unresolved documents, not processes. Prefers per-document outcome
+    fields when present; falls back to normalized unique ``selected_documents``
+    entries for legacy records. A malformed or unparseable launch record fails
+    bounded and conservatively (counted as one unresolved document) rather than
+    creating extra capacity.
+    """
+    if not isinstance(ledger, dict):
+        return 0
+    total = 0
+    for dispatch_id, launch in ledger.items():
+        if not isinstance(dispatch_id, str) or not dispatch_id or not isinstance(launch, dict):
+            # Malformed launch record: conservative bound of one, never extra capacity.
+            total += 1
+            continue
+        if launch.get("exit_code_processed"):
+            continue
+        outcomes = launch.get("selected_document_outcomes")
+        if isinstance(outcomes, dict) and outcomes:
+            unresolved = [
+                bridge_id
+                for bridge_id, outcome in outcomes.items()
+                if not (isinstance(outcome, dict) and outcome.get("completed") is True)
+            ]
+            total += len(unresolved)
+            continue
+        incomplete = launch.get("incomplete_documents")
+        if isinstance(incomplete, list) and incomplete:
+            total += len([doc for doc in incomplete if isinstance(doc, str) and doc.strip()])
+            continue
+        selected = launch.get("selected_documents")
+        if isinstance(selected, list) and selected:
+            unique = {str(doc).strip() for doc in selected if isinstance(doc, str) and doc.strip()}
+            total += len(unique)
+            continue
+        # Active launch with no enumerable documents: conservative bound of one.
+        total += 1
+    return total
+
+
 def _prune_launch_ledger(recipient_state: dict[str, Any]) -> dict[str, dict[str, Any]]:
     raw_ledger = recipient_state.get(LAUNCH_LEDGER_KEY)
     ledger = (
@@ -6968,14 +7014,58 @@ def run_dispatch_cycle(
             # Terminal-kind GO entries are not dispatched.
             filtered = [it for it in items if getattr(it, "dispatchable", True)]
 
+            # WI-5297: derive active in-flight item usage from the prior launch
+            # ledger and subtract it from configured capacity. This prevents a
+            # max-one harness from receiving a second unresolved document before
+            # the first launch reaches processed terminal state. The prior
+            # recipient state is read here (fresh) so the accounting reflects the
+            # reconciled ledger loaded from durable dispatch state.
+            _capacity_prior = (
+                recipients_state.get(recipient) if isinstance(recipients_state.get(recipient), dict) else {}
+            )
+            _capacity_ledger = _capacity_prior.get(LAUNCH_LEDGER_KEY)
+            if not isinstance(_capacity_ledger, dict):
+                _capacity_ledger = {}
+            active_inflight_items = _active_inflight_document_count(_capacity_ledger)
+            available_items = max(0, target_max_items - active_inflight_items)
+
             # Per Codex F1 on -008: sign the SELECTED dispatch batch (post-cap,
             # post-reverse-for-oldest-first), NOT the full filtered list. This
             # matches ``bridge_poller_runner._pending_signature(_selected_items_
             # for_prompt(filtered, max_items))`` byte-for-byte. Signing the full
             # list would let entries outside the cap flip the signature without
             # changing the dispatch payload, causing redundant dispatches.
-            selected = _selected_oldest_first(filtered, target_max_items)
+            selected = _selected_oldest_first(filtered, available_items)
             signature = _signature(selected)
+
+            # WI-5297: capacity fully consumed by unresolved in-flight documents.
+            # Hold the target: acquire no new lease and spawn no worker, and
+            # record stable non-failure capacity-held evidence. Continue ordered
+            # target evaluation so a later eligible target with capacity can
+            # receive the pending item.
+            # A target with no configured capacity (max_items=0) and no in-flight
+            # usage is NOT capacity-held; it falls through to the existing
+            # empty-selected handling below.
+            if active_inflight_items > 0 and available_items <= 0 and filtered:
+                _held_recipient_state = dict(_capacity_prior)
+                _held_recipient_state["last_result"] = DISPATCH_CAPACITY_HELD_RESULT
+                _held_recipient_state["dispatch_capacity_held"] = {
+                    "configured_items": target_max_items,
+                    "active_inflight_items": active_inflight_items,
+                    "available_items": 0,
+                }
+                _held_recipient_state["updated_at"] = _now_iso()
+                recipients_state[recipient] = _held_recipient_state
+                results[recipient] = {
+                    "launched": False,
+                    "reason": DISPATCH_CAPACITY_HELD_RESULT,
+                    "dispatch_capacity_held": {
+                        "configured_items": target_max_items,
+                        "active_inflight_items": active_inflight_items,
+                        "available_items": 0,
+                    },
+                }
+                continue
 
             # WI-4480 Slice A: observational dispatch-starvation telemetry. Reads
             # the already-computed (and signed) ``filtered``/``selected`` lists and

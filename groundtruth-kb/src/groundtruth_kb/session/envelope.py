@@ -224,7 +224,7 @@ def resolve_acting_harness_identity(
     Runtime markers and explicit producer identity select a document only. They
     never supply role authority, which remains inside the selected envelope.
     """
-    env = dict(environ or os.environ)
+    env = dict(os.environ if environ is None else environ)
     marked_families = {
         name
         for name, markers in RUNTIME_HARNESS_MARKERS.items()

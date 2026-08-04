@@ -3915,9 +3915,7 @@ def validate_spec_coherence(
     "--content-file",
     type=click.Path(),
     default=None,
-    help="Content file. Required for --kind formal. Optional for --kind narrative: "
-    "when given, supplies the packet's full_content in place of reading --target, "
-    "while --target still supplies the packet's real path identity.",
+    help="Formal artifact content file.",
 )
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
 @click.pass_context

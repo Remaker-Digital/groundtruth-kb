@@ -11,7 +11,6 @@ import argparse
 import fnmatch
 import hashlib
 import json
-import os
 import re
 import sqlite3
 import subprocess
@@ -2208,18 +2207,16 @@ def write_named_packet(project_root: Path, packet: dict[str, Any], bridge_id: st
     return path
 
 
-def _worker_harness_selector() -> str | None:
-    """Return the acting harness only as a worker-document selector."""
-    configured = os.environ.get("GTKB_HARNESS_NAME", "").strip()
-    if configured:
-        return configured
-    if os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID"):
-        return None
-    if os.environ.get("CLAUDE_CODE_SESSION_ID") or os.environ.get("CLAUDECODE"):
-        return "claude"
-    if os.environ.get("CODEX_THREAD_ID"):
-        return "codex"
-    return None
+def _worker_harness_selector(project_root: Path | None = None) -> str | None:
+    """Delegate to the single canonical registry-derived harness selector.
+
+    WI-5841 removes the second behavioral copy: implementation-start packet
+    finalization uses the exact selector implemented in
+    ``bridge_work_intent_registry._worker_harness_selector`` so the two
+    operational consumers cannot drift. Precedence, durable-id mapping, and
+    fail-closed behavior are owned by that registry implementation.
+    """
+    return bridge_work_intent_registry._worker_harness_selector(project_root)
 
 
 def finalize_implementation_start_packet(
@@ -2271,7 +2268,7 @@ def finalize_implementation_start_packet(
         provenance = resolve_worker_role_provenance(
             project_root,
             current_session_id=session_id,
-            harness_name=_worker_harness_selector(),
+            harness_name=_worker_harness_selector(project_root),
         )
     except (EnvelopeError, OSError, ValueError) as exc:
         raise AuthorizationError(f"Could not validate worker-session provenance for {session_id!r}: {exc}") from exc

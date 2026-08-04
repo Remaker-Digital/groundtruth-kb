@@ -731,24 +731,81 @@ def _normalize_claim_role(role: str | None) -> str | None:
     return normalized or None
 
 
-def _worker_harness_selector() -> str | None:
+def _worker_harness_selector(project_root: Path | None = None) -> str | None:
     """Return a harness name only as a worker-document selector.
 
     The selector narrows the canonical envelope lookup; it never supplies a
     role. A headless dispatch must not inherit the parent harness selector, so
     it falls back to the resolver's ambiguity check unless the dispatcher
-    explicitly supplies ``GTKB_HARNESS_NAME``.
+    explicitly supplies ``GTKB_HARNESS_NAME`` or a durable harness id.
+
+    Precedence:
+    1. Nonblank ``GTKB_HARNESS_NAME`` (explicit document selector).
+    2. ``GTKB_BRIDGE_POLLER_RUN_ID`` returns ``None`` so dispatched work
+       cannot inherit the parent harness identity.
+    3. ``GTKB_HARNESS_ID`` or ``GTKB_AUTHOR_HARNESS_ID`` maps the unique
+       durable id through the canonical identity reader
+       (``groundtruth_kb.harness_projection.read_identity``). If both are
+       present and disagree, the id is unknown or non-unique, or the canonical
+       projection is unavailable or malformed, this fails closed (raises
+       ``ValueError``) rather than choosing a harness by guess or registration
+       order.
+    4. No generic id: legacy live markers — ``CLAUDE_CODE_SESSION_ID`` or
+       ``CLAUDECODE`` selects Claude, ``CODEX_THREAD_ID`` selects Codex.
+    5. Otherwise ``None`` (no justified selector; the canonical envelope
+       resolver's exact-match/ambiguity checks govern).
     """
     configured = os.environ.get("GTKB_HARNESS_NAME", "").strip()
     if configured:
         return configured
     if os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID"):
         return None
+
+    durable_a = os.environ.get("GTKB_HARNESS_ID", "").strip()
+    durable_b = os.environ.get("GTKB_AUTHOR_HARNESS_ID", "").strip()
+    if durable_a or durable_b:
+        if durable_a and durable_b and durable_a != durable_b:
+            raise ValueError("harness selector conflict: GTKB_HARNESS_ID and GTKB_AUTHOR_HARNESS_ID disagree")
+        supplied = durable_a or durable_b
+        name = _harness_name_for_durable_id(supplied, project_root)
+        if name is not None:
+            return name
+        raise ValueError(f"harness selector: no registered harness with durable id {supplied!r}")
+
     if os.environ.get("CLAUDE_CODE_SESSION_ID") or os.environ.get("CLAUDECODE"):
         return "claude"
     if os.environ.get("CODEX_THREAD_ID"):
         return "codex"
     return None
+
+
+def _harness_name_for_durable_id(harness_id: str, project_root: Path | None) -> str | None:
+    """Map a durable harness id to its canonical harness name via the identity SoT.
+
+    Returns ``None`` when the id is not registered. Raises ``ValueError`` when
+    the canonical identity projection is unavailable, malformed, or the id maps
+    to more than one harness (non-unique), per WI-5841 fail-closed contract.
+    """
+    try:
+        from groundtruth_kb.harness_projection import read_identity
+    except ImportError as exc:  # pragma: no cover - install failure is fail-closed
+        raise ValueError(f"harness selector: identity projection unavailable: {exc}") from exc
+    try:
+        identities = read_identity(project_root)
+    except Exception as exc:  # noqa: BLE001 - fail closed on any projection error
+        raise ValueError(f"harness selector: identity SoT unreadable: {exc}") from exc
+    harnesses = identities.get("harnesses")
+    if not isinstance(harnesses, dict):
+        raise ValueError("harness selector: identity SoT is missing a harness mapping")
+    matches: list[str] = []
+    for name, record in harnesses.items():
+        if isinstance(record, dict) and str(record.get("id") or "") == harness_id:
+            matches.append(str(name))
+    if not matches:
+        return None
+    if len(matches) > 1:
+        raise ValueError(f"harness selector: durable id {harness_id!r} is not unique")
+    return matches[0]
 
 
 def _resolve_worker_role(session_id: str, *, project_root: Path | None) -> tuple[str | None, str]:
@@ -768,7 +825,7 @@ def _resolve_worker_role(session_id: str, *, project_root: Path | None) -> tuple
         provenance = resolve_worker_role_provenance(
             _root(project_root),
             current_session_id=session_id,
-            harness_name=_worker_harness_selector(),
+            harness_name=_worker_harness_selector(project_root),
         )
     except EnvelopeError as exc:
         return None, f"worker session document rejected: {exc}"

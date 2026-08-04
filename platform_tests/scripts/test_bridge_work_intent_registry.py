@@ -1123,3 +1123,89 @@ def test_narrow_schema_setup_does_not_initialize_global_groundtruth_schema(tmp_p
 
     assert "work_intent_claims" in tables
     assert "work_items" not in tables
+
+
+def _fresh_registry_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Return a clean registry module with harness-signal env cleared."""
+    for name in (
+        "GTKB_HARNESS_NAME",
+        "GTKB_BRIDGE_POLLER_RUN_ID",
+        "GTKB_HARNESS_ID",
+        "GTKB_AUTHOR_HARNESS_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "CLAUDECODE",
+        "CODEX_THREAD_ID",
+        "CODEX_HOME",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    return _registry()
+
+
+def _write_identities(root: Path, mapping: dict[str, str]) -> None:
+    harness_state = root / "harness-state"
+    harness_state.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": 1,
+        "harnesses": {name: {"id": harness_id, "status": "active"} for name, harness_id in mapping.items()},
+    }
+    (harness_state / "harness-identities.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_wi5841_full_registry_durable_ids_resolve(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """All eight canonical harness identities resolve through both generic-ID routes."""
+    registry = _fresh_registry_env(tmp_path, monkeypatch)
+    mapping = {
+        "alibaba-cloud-studio": "H",
+        "antigravity": "C",
+        "claude": "B",
+        "codex": "A",
+        "cursor": "E",
+        "goose": "G",
+        "ollama": "D",
+        "openrouter": "F",
+    }
+    _write_identities(tmp_path, mapping)
+    for harness_name, harness_id in mapping.items():
+        monkeypatch.setenv("GTKB_HARNESS_ID", harness_id)
+        assert registry._worker_harness_selector(tmp_path) == harness_name, harness_id
+        monkeypatch.delenv("GTKB_HARNESS_ID")
+        monkeypatch.setenv("GTKB_AUTHOR_HARNESS_ID", harness_id)
+        assert registry._worker_harness_selector(tmp_path) == harness_name, harness_id
+        monkeypatch.delenv("GTKB_AUTHOR_HARNESS_ID")
+
+
+def test_wi5841_selector_conflict_and_unknown_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    registry = _fresh_registry_env(tmp_path, monkeypatch)
+    _write_identities(tmp_path, {"goose": "G", "codex": "A"})
+    monkeypatch.setenv("GTKB_HARNESS_ID", "G")
+    monkeypatch.setenv("GTKB_AUTHOR_HARNESS_ID", "A")
+    with pytest.raises(ValueError, match="disagree"):
+        registry._worker_harness_selector(tmp_path)
+    monkeypatch.delenv("GTKB_AUTHOR_HARNESS_ID")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "ZZZ")
+    with pytest.raises(ValueError, match="no registered harness"):
+        registry._worker_harness_selector(tmp_path)
+
+
+def test_wi5841_selector_legacy_and_codex_home_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    registry = _fresh_registry_env(tmp_path, monkeypatch)
+    _write_identities(tmp_path, {"goose": "G"})
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-session")
+    assert registry._worker_harness_selector(tmp_path) == "claude"
+    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID")
+    monkeypatch.setenv("CODEX_THREAD_ID", "codex-session")
+    assert registry._worker_harness_selector(tmp_path) == "codex"
+    monkeypatch.delenv("CODEX_THREAD_ID")
+    monkeypatch.setenv("CODEX_HOME", "C:/Users/test/.codex")
+    assert registry._worker_harness_selector(tmp_path) is None
+
+
+def test_wi5841_selector_explicit_and_poller_precedence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    registry = _fresh_registry_env(tmp_path, monkeypatch)
+    _write_identities(tmp_path, {"goose": "G"})
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "cursor")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "G")
+    assert registry._worker_harness_selector(tmp_path) == "cursor"
+    monkeypatch.delenv("GTKB_HARNESS_NAME")
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-run")
+    assert registry._worker_harness_selector(tmp_path) is None

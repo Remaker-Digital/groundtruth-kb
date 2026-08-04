@@ -259,6 +259,43 @@ def test_go_impl_harness_selector_only_selects_document(tmp_path: Path, env, mon
     assert holder["acting_role"] == "prime-builder"
 
 
+def test_go_impl_codex_home_alone_does_not_select_codex(tmp_path: Path, env, monkeypatch) -> None:
+    """WI-5877: a permanent CODEX_HOME installation path is not a live selector.
+
+    CODEX_HOME alone must not force the worker-document lookup into the Codex
+    envelope directory, so a valid non-Codex Prime Builder session envelope is
+    found and its validated role controls claim eligibility. CODEX_THREAD_ID
+    remains the live Codex selector.
+    """
+    _write_registry(tmp_path, {"B": "prime-builder", "C": "loyal-opposition"})
+    _write_index(tmp_path, {"go-thread": "GO"})
+    session_id = "26c2349e-1cd0-4024-acef-f934b35fea4e"
+    _write_worker_session(tmp_path, "prime-builder", session_id, harness_name="claude", harness_id="B")
+
+    # Only CODEX_HOME present (no GTKB_HARNESS_NAME, no CODEX_THREAD_ID).
+    monkeypatch.setenv("CODEX_HOME", "C:/Users/test/.codex")
+
+    assert env.acquire("go-thread", session_id, project_root=tmp_path) is True
+    holder = env.current_holder("go-thread", project_root=tmp_path)
+    assert holder is not None
+    assert holder["acting_role"] == "prime-builder"
+
+
+def test_go_impl_codex_thread_id_still_selects_codex(tmp_path: Path, env, monkeypatch) -> None:
+    """WI-5877: CODEX_THREAD_ID remains the live Codex selector."""
+    _write_registry(tmp_path, {"B": "prime-builder", "C": "loyal-opposition"})
+    _write_index(tmp_path, {"go-thread": "GO"})
+    session_id = "26c2349e-1cd0-4024-acef-f934b35fea4e"
+    _write_worker_session(tmp_path, "prime-builder", session_id, harness_name="codex", harness_id="B")
+
+    monkeypatch.setenv("CODEX_THREAD_ID", "thread-1")
+
+    assert env.acquire("go-thread", session_id, project_root=tmp_path) is True
+    holder = env.current_holder("go-thread", project_root=tmp_path)
+    assert holder is not None
+    assert holder["acting_role"] == "prime-builder"
+
+
 def test_go_impl_ignores_shared_and_per_session_markers(tmp_path: Path, env) -> None:
     """Marker changes cannot authorize or revoke a document-authorized claim."""
     _write_registry(tmp_path, {"B": "prime-builder", "D": "loyal-opposition"})

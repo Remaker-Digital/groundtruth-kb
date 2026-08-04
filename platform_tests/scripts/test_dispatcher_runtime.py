@@ -8660,3 +8660,81 @@ def test_wi5221_dispatcher_claim_context_ignores_and_restores_parent_selector(
 
     assert os.environ["GTKB_HARNESS_NAME"] == "codex"
     assert os.environ["GTKB_BRIDGE_POLLER_RUN_ID"] == "parent-dispatch"
+
+
+def test_wi5297_active_inflight_document_count_counts_unresolved_documents() -> None:
+    """WI-5297: capacity accounting counts unresolved selected documents, not processes."""
+    trigger = _load_trigger()
+
+    # Legacy launch with selected_documents and no per-document outcomes -> counts unique docs.
+    ledger = {"d1": {"exit_code_processed": False, "selected_documents": ["bridge-a", "bridge-b"]}}
+    assert trigger._active_inflight_document_count(ledger) == 2
+
+    # exit_code_processed releases capacity entirely.
+    ledger_processed = {"d1": {"exit_code_processed": True, "selected_documents": ["bridge-a", "bridge-b"]}}
+    assert trigger._active_inflight_document_count(ledger_processed) == 0
+
+    # Per-document outcomes prefer completed flags: only unresolved count.
+    ledger_outcomes = {
+        "d1": {
+            "exit_code_processed": False,
+            "selected_document_outcomes": {
+                "bridge-a": {"completed": True},
+                "bridge-b": {"completed": False},
+            },
+        }
+    }
+    assert trigger._active_inflight_document_count(ledger_outcomes) == 1
+
+    # incomplete_documents list preferred when present.
+    ledger_incomplete = {"d1": {"exit_code_processed": False, "incomplete_documents": ["bridge-b"]}}
+    assert trigger._active_inflight_document_count(ledger_incomplete) == 1
+
+    # Malformed launch record -> conservative bound of one (never extra capacity).
+    ledger_malformed = {"d1": "not-a-dict"}
+    assert trigger._active_inflight_document_count(ledger_malformed) == 1
+
+    # Non-dict / empty ledger -> zero.
+    assert trigger._active_inflight_document_count({}) == 0
+    assert trigger._active_inflight_document_count(None) == 0
+
+
+def test_wi5297_capacity_held_when_inflight_consumes_max_one(tmp_path: Path) -> None:
+    """WI-5297: a max-one recipient with one unresolved in-flight document cannot receive a second."""
+    trigger = _load_trigger()
+    root = tmp_path / "project"
+    root.mkdir()
+    _make_synthetic_project(root)
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+
+    # Seed an unresolved launch-ledger document for the prime-builder recipient.
+    ledger_key = trigger.LAUNCH_LEDGER_KEY
+    recipients = {
+        "prime-builder": {
+            "updated_at": "2026-08-04T00:00:00Z",
+            "last_result": "launched",
+            ledger_key: {
+                "seed-launch": {
+                    "exit_code_processed": False,
+                    "selected_documents": ["in-flight-doc"],
+                }
+            },
+            "launch_ledger_schema_version": trigger.LAUNCH_LEDGER_SCHEMA_VERSION,
+        }
+    }
+    state = {"schema_version": 1, "recipients": recipients}
+    (state_dir / trigger.DISPATCH_STATE_FILENAME).write_text(json.dumps(state), encoding="utf-8")
+
+    # A GO-dispatchable document is present so there is pending work to hold.
+    _index_with_one_go(root, doc="second-doc")
+
+    result = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, max_items=1, dry_run=True)
+
+    pb = result["results"].get("prime-builder", {})
+    assert pb.get("reason") == trigger.DISPATCH_CAPACITY_HELD_RESULT
+    held = pb.get("dispatch_capacity_held", {})
+    assert held.get("configured_items") == 1
+    assert held.get("active_inflight_items") == 1
+    assert held.get("available_items") == 0
+    assert pb.get("launched") is False

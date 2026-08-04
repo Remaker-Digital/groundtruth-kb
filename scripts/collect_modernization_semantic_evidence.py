@@ -493,7 +493,7 @@ def resolve_runtime_provenance(
     evidence_dir: Path,
     environ: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
-    env = dict(environ or os.environ)
+    env = dict(os.environ if environ is None else environ)
     session_id = (
         env.get("GTKB_AUTHOR_SESSION_CONTEXT_ID")
         or env.get("GTKB_BRIDGE_POLLER_RUN_ID")
@@ -521,7 +521,7 @@ class Collector:
         self.manifest = manifest or semantic_checker.load_manifest(DEFAULT_MANIFEST)
         self.evidence_dir = evidence_dir.resolve()
         _relative(self.project_root, self.evidence_dir)
-        self.environ = dict(environ or os.environ)
+        self.environ = dict(os.environ if environ is None else environ)
         self.scope_digest = semantic_checker.scope_digest(self.manifest)
         self.git_head = _git_head(self.project_root)
         self.invocation_id = _new_issue_id()

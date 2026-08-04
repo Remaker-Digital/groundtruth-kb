@@ -407,7 +407,7 @@ class GitLifecycleService:
         remote: str = "origin",
         expected_remote_url: str | None = None,
         exclude_paths: Sequence[str] = (),
-        max_blob_bytes: int = 10_000_000,
+        max_blob_bytes: int,
         message: str,
         push: bool = True,
     ) -> OperationResult:
@@ -417,6 +417,12 @@ class GitLifecycleService:
         The operation never forces, never deletes, never rewrites history, and
         never updates a ref that already exists.
         """
+        if max_blob_bytes < 1:
+            raise OperationDenied(
+                "invalid_max_blob_bytes",
+                "max_blob_bytes must be a positive integer",
+                max_blob_bytes=max_blob_bytes,
+            )
         excluded = tuple(sorted({str(path).strip().replace("\\", "/") for path in exclude_paths if str(path).strip()}))
         base_branch = self._validate_branch_name(base_ref)
         target_branch = self._validate_branch_name(target_ref)

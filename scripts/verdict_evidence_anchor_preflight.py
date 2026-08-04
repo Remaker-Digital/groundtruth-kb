@@ -128,6 +128,37 @@ _CITATION_CUE_RE: Final[re.Pattern[str]] = re.compile(
     re.IGNORECASE,
 )
 
+# WI-5437: unsupported exact-path removal claims.
+# A gated verdict asserting that its operative report claims removal of an exact
+# backtick-delimited in-root path must be grounded in an unambiguous positive
+# same-path removal statement in that report. Without it, the assertion is an
+# unsupported_removal_claim.
+#
+# Verdict-side assertion cue: removal language ("remov(ed|al|ing)", "promised to
+# remove", "deletes") on the same line as an exact backtick path.
+_VERDICT_REMOVAL_ASSERT_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?:"
+    r"(?P<path>`[^`\n]+`)\b[^.\n]{0,120}\b(?:remov(?:ed|ing|al)|remove|deletes?|deleted|deletion|"
+    r"promis(?:e|es|ed|ing)[^.\n]{0,40}remove)\b"
+    r"|"
+    r"\b(?:remov(?:ed|ing|al)|remove|deletes?|deleted|deletion|"
+    r"promis(?:e|es|ed|ing)[^.\n]{0,40}remove)\b[^.\n]{0,120}(?P<path4>`[^`\n]+`)"
+    r")",
+    re.IGNORECASE,
+)
+# Report-side positive removal statement: removal language directly adjacent to
+# the same exact backtick path in the operative report.
+_REPORT_REMOVAL_POSITIVE_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?P<path>`[^`\n]+`)[^.\n]{0,60}\b(?:removed|deleted|deletion|removes?|deletes?)\b"
+    r"|(?P<path2>removed|deleted|deletion|removes?|deletes?)\b[^.\n]{0,60}(?P<path3>`[^`\n]+`)",
+    re.IGNORECASE,
+)
+# Report-side explicit negation (the report explicitly says it did NOT remove).
+_REPORT_REMOVAL_NEGATION_RE: Final[re.Pattern[str]] = re.compile(
+    r"\b(?:did\s+not|does\s+not|no|not|without)\b[^.\n]{0,60}\b(?:remove|removed|delete|deleted|deletion)\b",
+    re.IGNORECASE,
+)
+
 
 @dataclass(frozen=True)
 class AnchorViolation:
@@ -194,6 +225,65 @@ def _operative_files(content: str) -> list[str]:
 
 def _line_is_exempt(line: str) -> bool:
     return bool(_OPT_OUT_RE.search(line) or _ABSENCE_RE.search(line))
+
+
+def _unsupported_removal_claims(
+    content: str,
+    *,
+    project_root: Path,
+    operative_paths: list[str],
+) -> list[AnchorViolation]:
+    """Return unsupported exact-path removal-claim violations (WI-5437).
+
+    When a gated verdict asserts that its operative report claims removal of an
+    exact backtick-delimited in-root path, require an unambiguous positive
+    same-path removal statement in that report. Without one, emit an
+    ``unsupported_removal_claim`` violation.
+    """
+    violations: list[AnchorViolation] = []
+    if not operative_paths:
+        return violations
+    single_op = operative_paths[0] if len(operative_paths) == 1 else None
+    if single_op is None:
+        return violations
+    report_lines = _read_lines(_resolve_path(project_root, single_op))
+    if report_lines is None:
+        return violations
+    report_text = _norm_ws(" ".join(report_lines))
+
+    for raw_line in content.splitlines():
+        if _line_is_exempt(raw_line):
+            continue
+        for match in _VERDICT_REMOVAL_ASSERT_RE.finditer(raw_line):
+            raw_path = (match.group("path") or match.group("path4") or "").strip("`")
+            if not _norm_path(raw_path):
+                continue
+            norm = _norm_path(raw_path)
+            # Locate a positive removal statement for the same normalized path
+            # in the operative report.
+            positive_found = False
+            for pm in _REPORT_REMOVAL_POSITIVE_RE.finditer(report_text):
+                cand = (pm.group("path") or pm.group("path3") or "").strip("`")
+                if cand and _norm_path(cand) == norm:
+                    # Ensure this positive statement is not negated.
+                    window_start = max(0, pm.start() - 80)
+                    window = report_text[window_start : pm.end() + 80]
+                    if not _REPORT_REMOVAL_NEGATION_RE.search(window):
+                        positive_found = True
+                        break
+            if not positive_found:
+                violations.append(
+                    AnchorViolation(
+                        kind="unsupported_removal_claim",
+                        cited_file=single_op,
+                        detail=(
+                            f"verdict asserts operative report claims removal of `{raw_path}`, "
+                            "but no unambiguous positive same-path removal statement exists in that report"
+                        ),
+                        evidence_line=_norm_ws(raw_line)[:200],
+                    )
+                )
+    return violations
 
 
 def _quote_spans(line: str) -> list[tuple[int, int, str]]:
@@ -340,6 +430,10 @@ def validate_verdict_evidence_anchors(
                         evidence_line=evidence,
                     )
                 )
+
+    # WI-5437: reject unsupported exact-path removal claims.
+    for removal_violation in _unsupported_removal_claims(content, project_root=root, operative_paths=operative_paths):
+        _record(removal_violation)
 
     return violations
 

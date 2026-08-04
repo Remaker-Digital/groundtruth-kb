@@ -64,3 +64,54 @@ def test_autodiscover_none_for_contentless_edit(tmp_path):
 
 def test_autodiscover_none_when_no_approvals_dir(tmp_path):
     assert gate._autodiscover_packet(tmp_path, ".claude/rules/foo.md", "x\n") is None
+
+
+# --- WI-5509: _reconstruct_edit_content unit coverage ----------------------
+
+
+def test_reconstruct_edit_content_unique_replacement(tmp_path):
+    """A unique old_string is replaced once to reconstruct post-edit content."""
+    target = tmp_path / "rule.md"
+    target.write_text("hello world\n", encoding="utf-8")
+    result = gate._reconstruct_edit_content(str(target), {"old_string": "world", "new_string": "there"})
+    assert result == "hello there\n"
+
+
+def test_reconstruct_edit_content_replace_all(tmp_path):
+    """replace_all replaces every occurrence of old_string."""
+    target = tmp_path / "rule.md"
+    target.write_text("a b a b\n", encoding="utf-8")
+    result = gate._reconstruct_edit_content(str(target), {"old_string": "a", "new_string": "X", "replace_all": True})
+    assert result == "X b X b\n"
+
+
+def test_reconstruct_edit_content_absent_old_text_returns_none(tmp_path):
+    """old_string absent from the file fails closed (None)."""
+    target = tmp_path / "rule.md"
+    target.write_text("hello\n", encoding="utf-8")
+    result = gate._reconstruct_edit_content(str(target), {"old_string": "nope", "new_string": "x"})
+    assert result is None
+
+
+def test_reconstruct_edit_content_ambiguous_without_replace_all_returns_none(tmp_path):
+    """Repeated old_string without replace_all is ambiguous -> None."""
+    target = tmp_path / "rule.md"
+    target.write_text("dup dup\n", encoding="utf-8")
+    result = gate._reconstruct_edit_content(str(target), {"old_string": "dup", "new_string": "x"})
+    assert result is None
+
+
+def test_reconstruct_edit_content_missing_or_nonstring_operands_returns_none(tmp_path):
+    """Missing / non-string old_string or new_string fails closed (None)."""
+    target = tmp_path / "rule.md"
+    target.write_text("hello\n", encoding="utf-8")
+    assert gate._reconstruct_edit_content(str(target), {"old_string": "", "new_string": "x"}) is None
+    assert gate._reconstruct_edit_content(str(target), {"old_string": "hello", "new_string": 5}) is None
+    assert gate._reconstruct_edit_content(str(target), {"new_string": "x"}) is None
+
+
+def test_reconstruct_edit_content_missing_target_returns_none(tmp_path):
+    """An unreadable / missing target file fails closed (None)."""
+    missing = tmp_path / "does-not-exist.md"
+    result = gate._reconstruct_edit_content(str(missing), {"old_string": "x", "new_string": "y"})
+    assert result is None

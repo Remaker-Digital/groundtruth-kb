@@ -1,5 +1,11 @@
 GO
 
+author_identity: loyal-opposition/cursor/E
+author_harness_id: E
+author_session_context_id: 6c8b300-ddc8-4f79-b47c-e0da3ca6a55f
+author_model: Fireworks kimi-k2p7-code
+author_model_configuration: Cursor interactive Loyal Opposition; transcript-defined LO role
+author_metadata_source: bridge_function_provenance_repair_from_legacy_reviewer_identity
 reviewer_identity: loyal-opposition/cursor/E
 reviewer_harness_id: E
 reviewer_session_context_id: 6c8b300-ddc8-4f79-b47c-e0da3ca6a55f

@@ -238,6 +238,42 @@ def test_preflight_rejects_invalid_nonowner_or_noncovering_pauth_packet(tmp_path
         assert expected in packet["blocking_errors"][0]
 
 
+def test_preflight_treats_unrelated_json_with_amendment_constraint_as_non_applicable(
+    tmp_path: Path,
+) -> None:
+    """Citing the PAUTH-amendment constraint with unrelated JSON is non-blocking.
+
+    WI-5408 regression: the prior duplicate validator treated any JSON object
+    alongside a literal mention of the governing amendment DCL as a structured
+    replacement envelope, falsely requiring owner evidence and blocking the
+    proposal. The canonical validator returns None for content with no actual
+    structured replacement envelope, so the thin adapter must report no
+    blocking error even when unrelated JSON evidence is present.
+    """
+    bridge_id = "pauth-amendment-unrelated-json"
+    content = (
+        "# Proposal\n\n"
+        'target_paths: ["scripts/bridge_applicability_preflight.py"]\n\n'
+        "## Specification Links\n\n"
+        "- DCL-PROJECT-SPECIFICATION-AMENDMENT-APPROVAL-REQUIRED-001\n\n"
+        '```json\n{"unrelated": "evidence", "foo": 1}\n```\n'
+    )
+    _write_bridge(tmp_path, bridge_id, content)
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    db_path = _write_pauth_db(tmp_path)
+
+    packet = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=db_path,
+    )
+
+    assert packet["blocking_errors"] == []
+    assert packet["preflight_passed"] is True
+
+
 def test_preflight_flags_missing_required_cross_cutting_spec(tmp_path: Path) -> None:
     bridge_id = "application-move"
     _write_bridge(
@@ -1269,7 +1305,7 @@ def test_prepare_verdict_candidate_rebuilds_exact_source_and_final_byte_hash(tmp
 def test_prepare_verdict_candidate_fails_closed_on_wrong_thread_or_duplicate_section(tmp_path: Path) -> None:
     _source, config, _draft, content = _verdict_preparation_fixture(tmp_path)
 
-    with pytest.raises(preflight.VerdictCandidatePreparationError, match="same.*thread"):
+    with pytest.raises(preflight.VerdictCandidatePreparationError, match="must belong to the candidate bridge thread"):
         preflight.prepare_verdict_candidate(
             candidate_path="bridge/other-topic-002.md",
             content=content,

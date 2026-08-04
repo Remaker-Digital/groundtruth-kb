@@ -201,6 +201,50 @@ def test_conflicting_runtime_host_markers_fail_before_evidence_mutation(tmp_path
     assert not evidence_dir.exists()
 
 
+def test_empty_environ_does_not_consume_ambient_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # WI-5580 IP-R1/R2: an explicit empty environ must not consume the ambient
+    # runtime session marker (here Codex); the lookup must fail closed.
+    _seed_harness_state(tmp_path)
+    _seed_session(tmp_path, harness_name="codex", harness_id="A")
+    evidence_dir = tmp_path / ".gtkb-state" / "modernization-release-candidate" / "semantic-evidence"
+    monkeypatch.setenv("CODEX_THREAD_ID", SESSION)
+    monkeypatch.setenv("GTKB_AUTHOR_SESSION_CONTEXT_ID", SESSION)
+
+    with pytest.raises(collector_module.CollectionError):
+        collector_module.resolve_runtime_provenance(
+            tmp_path,
+            evidence_dir=evidence_dir,
+            environ={},
+        )
+
+    assert not evidence_dir.exists()
+
+
+def test_collector_empty_environ_stays_empty_and_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # WI-5580 IP-R1/R2: Collector(environ={}) must store an exactly-empty env and
+    # fail closed on issuer resolution; it must not inherit ambient host markers
+    # and must not mutate evidence state.
+    _seed_harness_state(tmp_path)
+    _seed_session(tmp_path, harness_name="codex", harness_id="A")
+    evidence_dir = tmp_path / ".gtkb-state" / "modernization-release-candidate" / "semantic-evidence"
+    monkeypatch.setenv("CODEX_THREAD_ID", SESSION)
+    monkeypatch.setenv("GTKB_AUTHOR_SESSION_CONTEXT_ID", SESSION)
+    monkeypatch.setattr(collector_module, "_git_head", lambda _root: HEAD)
+    monkeypatch.setattr(semantic_checker, "_git_head", lambda _root: HEAD)
+
+    instance = collector_module.Collector(
+        project_root=tmp_path,
+        manifest=semantic_checker.load_manifest(),
+        evidence_dir=evidence_dir,
+        environ={},
+    )
+
+    assert instance.environ == {}
+    assert instance.issuer is None
+    assert instance.issuer_error is not None
+    assert not evidence_dir.exists()
+
+
 def test_selected_envelope_must_match_durable_harness_identity(tmp_path: Path) -> None:
     _seed_harness_state(tmp_path)
     _seed_session(tmp_path, harness_id="not-A")
