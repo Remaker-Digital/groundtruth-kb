@@ -50,6 +50,17 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+try:
+    from scripts.bridge_lifecycle_resolver import (
+        BridgeLifecycleResolutionError,
+        resolve_bridge_lifecycle,
+    )
+except ImportError:  # pragma: no cover - direct execution without package context
+    import bridge_lifecycle_resolver as _blr
+
+    resolve_bridge_lifecycle = _blr.resolve_bridge_lifecycle
+    BridgeLifecycleResolutionError = _blr.BridgeLifecycleResolutionError
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CLAUSES_CONFIG = PROJECT_ROOT / "config" / "governance" / "adr-dcl-clauses.toml"
 DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
@@ -150,6 +161,25 @@ def find_operative_file(bridge_id: str, bridge_dir: Path) -> Path | None:
     """
     matches = sorted(bridge_dir.glob(f"{bridge_id}-[0-9][0-9][0-9].md"))
     return matches[-1] if matches else None
+
+
+def resolve_operative_file_lifecycle_aware(bridge_id: str, bridge_dir: Path) -> Path | None:
+    """Select the operative bridge file using the WI-5629 lifecycle resolver.
+
+    In bridge-id mode the clause preflight consumes the shared
+    ``resolve_bridge_lifecycle`` contract (independent of any numbered-status
+    reparse). The operative file is the implementation artifact when present,
+    otherwise the review artifact, otherwise the latest strict state. Any
+    resolver error (structural ambiguity, malformed history, stale fallback,
+    incomplete correction) raises ``BridgeLifecycleResolutionError`` which the
+    caller maps to mandatory exit 5 - the clause preflight never parses
+    numbered files itself.
+    """
+    resolution = resolve_bridge_lifecycle(bridge_dir.parent, bridge_id)
+    operative = resolution.implementation_artifact or resolution.review_artifact or resolution.latest_strict_state
+    if operative is None:
+        return None
+    return bridge_dir.parent / operative.path
 
 
 def evaluate_applicability(clause: Clause, content: str, doc_name: str, paths: list[str]) -> tuple[str, list[str]]:
@@ -509,11 +539,18 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_CANNOT_EVALUATE
 
     clauses = load_clauses(args.clauses_config)
-    operative_file = (
-        args.content_file if args.content_file is not None else find_operative_file(args.bridge_id, args.bridge_dir)
-    )
     content = ""
     blocking_gaps_count = 0
+    lifecycle_error: BridgeLifecycleResolutionError | None = None
+    operative_file: Path | None = None
+    if args.content_file is not None:
+        operative_file = args.content_file
+    else:
+        try:
+            operative_file = resolve_operative_file_lifecycle_aware(args.bridge_id, args.bridge_dir)
+        except BridgeLifecycleResolutionError as exc:
+            lifecycle_error = exc
+            blocking_gaps_count = 1
     if operative_file is None:
         blocking_gaps_count = 1
         title = (
@@ -522,12 +559,21 @@ def main(argv: list[str] | None = None) -> int:
             else "## Clause Applicability (Slice 2; --report-only diagnostic)"
         )
         prefix = _REPORT_ONLY_BANNER if args.report_only else ""
-        report = (
-            f"{prefix}{title}\n\n"
-            f"- Bridge id: `{args.bridge_id}`\n"
-            f"- Operative file: (not found - no matching numbered bridge file for `{args.bridge_id}`)\n"
-            f"- Mode: cannot evaluate without an operative file; gate fails closed with exit {EXIT_CANNOT_EVALUATE}.\n"
-        )
+        if lifecycle_error is not None:
+            report = (
+                f"{prefix}{title}\n\n"
+                f"- Bridge id: `{args.bridge_id}`\n"
+                f"- Operative file: (lifecycle resolution failed - cannot evaluate)\n"
+                f"- Lifecycle resolver error: `{lifecycle_error.code}` - {lifecycle_error}\n"
+                f"- Mode: shared resolver raised a fail-closed error; gate fails closed with exit {EXIT_CANNOT_EVALUATE}.\n"
+            )
+        else:
+            report = (
+                f"{prefix}{title}\n\n"
+                f"- Bridge id: `{args.bridge_id}`\n"
+                f"- Operative file: (not found - no matching numbered bridge file for `{args.bridge_id}`)\n"
+                f"- Mode: cannot evaluate without an operative file; gate fails closed with exit {EXIT_CANNOT_EVALUATE}.\n"
+            )
     else:
         content = operative_file.read_text(encoding="utf-8")
         doc_name = args.bridge_id

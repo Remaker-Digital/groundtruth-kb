@@ -74,10 +74,29 @@ def preflight():
 
 
 def _stage_bridge(tmp_path: Path, bridge_id: str, content: str) -> tuple[Path, Path, Path]:
+    """Stage a strict-valid single-version bridge fixture.
+
+    WI-5626 makes bridge-id mode consume the shared WI-5629 lifecycle
+    resolver, which requires strict metadata (canonical status line,
+    ``Document``, ``Version``, and ``author_identity``) on the operative file.
+    The fixture therefore carries the strict header so the resolver can select
+    it as the implementation/review artifact; the clause-bearing body under
+    test follows the header.
+    """
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     bridge_file = bridge_dir / f"{bridge_id}-001.md"
-    bridge_file.write_text(content, encoding="utf-8")
+    header = (
+        "NEW\n"
+        "::init gtkb pb\n"
+        f"author_identity: prime-builder/goose\n"
+        f"author_harness_id: G\n"
+        f"author_session_context_id: G-test-fixture\n"
+        f"Document: {bridge_id}\n"
+        "Version: 001\n"
+        "\n"
+    )
+    bridge_file.write_text(header + content, encoding="utf-8")
     index = bridge_dir / "INDEX.md"
     index.write_text(
         f"# Bridge Index\n\nDocument: {bridge_id}\nNEW: bridge/{bridge_id}-001.md\n",
@@ -461,7 +480,10 @@ def test_missing_operative_file_fails_closed(preflight, tmp_path):
 
     assert rc == preflight.EXIT_CANNOT_EVALUATE
     report = out.read_text(encoding="utf-8")
-    assert "Operative file: (not found" in report
+    # WI-5626: bridge-id mode consumes the shared lifecycle resolver, so a
+    # missing thread fails closed via the resolver rather than the legacy
+    # "not found" scan path. Both are fail-closed (exit 5).
+    assert ("Operative file: (not found" in report) or ("lifecycle resolution failed" in report)
     assert "gate fails closed" in report
 
 
@@ -823,3 +845,78 @@ def test_clause_in_root_still_flags_out_of_root_path(preflight):
         f"got found={found}; reasons={reasons}"
     )
     assert gap is not None and len(gap) > 0, f"expected non-empty gap_summary; got {gap}"
+
+
+def test_wi5626_bridge_id_mode_consumes_lifecycle_resolver(preflight, tmp_path):
+    """WI-5626: bridge-id mode selects the strict-valid operative file via the
+    shared lifecycle resolver (implementation/review artifact), not a raw
+    numbered-status scan.
+    """
+    content = (
+        "# Test bridge\n\n"
+        "## Specification Links\n\n"
+        "- ADR-ISOLATION-APPLICATION-PLACEMENT-001 \u2014 in-root boundary\n\n"
+        "Implementation stays inside the project root.\n"
+    )
+    _bridge_file, index, bridge_dir = _stage_bridge(tmp_path, "test-resolver-consumer", content)
+    out = tmp_path / "report.md"
+    rc = preflight.main(
+        [
+            "--bridge-id",
+            "test-resolver-consumer",
+            "--clauses-config",
+            str(CLAUSES_CONFIG),
+            "--bridge-dir",
+            str(bridge_dir),
+            "--index",
+            str(index),
+            "--out",
+            str(out),
+        ]
+    )
+    report = out.read_text(encoding="utf-8")
+    assert rc == preflight.EXIT_BLOCKING_GAP or rc == 0  # strict-valid fixture resolves
+    assert "test-resolver-consumer-001.md" in report  # resolver-selected operative file
+    assert "lifecycle resolution failed" not in report
+
+
+def test_wi5626_malformed_history_fails_closed(preflight, tmp_path):
+    """WI-5626: a lifecycle-resolver error (malformed / unresolvable history)
+    maps to mandatory exit 5 and cannot reactivate stale Prime input.
+    """
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    index = bridge_dir / "INDEX.md"
+    index.write_text("# Bridge Index\n", encoding="utf-8")
+    # Create a version-002 that breaks the strict chain (no Responds-to link).
+    bad = bridge_dir / "test-malformed-chain-002.md"
+    bad.write_text(
+        "NEW\n"
+        "author_identity: prime-builder/goose\n"
+        "author_harness_id: G\n"
+        "author_session_context_id: G-test\n"
+        "Document: test-malformed-chain\n"
+        "Version: 002\n"
+        "\n"
+        "# Test\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "report.md"
+    rc = preflight.main(
+        [
+            "--bridge-id",
+            "test-malformed-chain",
+            "--clauses-config",
+            str(CLAUSES_CONFIG),
+            "--bridge-dir",
+            str(bridge_dir),
+            "--index",
+            str(index),
+            "--out",
+            str(out),
+        ]
+    )
+    assert rc == preflight.EXIT_CANNOT_EVALUATE
+    report = out.read_text(encoding="utf-8")
+    assert "lifecycle resolution failed" in report
+    assert rc == preflight.EXIT_CANNOT_EVALUATE  # keep rc referenced for lint
