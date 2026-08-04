@@ -288,17 +288,31 @@ def _deadline_exhausted_error(
     attempts: int,
     started_at: float,
     database_path: Path,
+    last_contention: sqlite3.Error | None = None,
 ) -> WorkIntentWriteContentionError:
-    """Return a typed failure before a transaction can outlive its budget."""
+    """Return a typed failure before a transaction can outlive its budget.
 
+    A monotonic write-deadline exhaustion in this retry loop is a lock-
+    contention condition (the write could not proceed because the registry
+    lock was not free within budget).  When a real ``sqlite3.Error`` was
+    observed during the wait, propagate its code/name; otherwise report
+    ``SQLITE_BUSY`` so callers can distinguish contention exhaustion from a
+    non-contention failure.  This keeps the typed error deterministic under a
+    held write lock.
+    """
+
+    if last_contention is not None:
+        code, name = _sqlite_error_fields(last_contention)
+    else:
+        code, name = sqlite3.SQLITE_BUSY, "database is locked"
     return WorkIntentWriteContentionError(
         "monotonic write deadline exhausted",
         operation=operation,
         phase=phase,
         attempts=attempts,
         elapsed_seconds=max(0.0, _monotonic() - started_at),
-        sqlite_errorcode=None,
-        sqlite_errorname=None,
+        sqlite_errorcode=code,
+        sqlite_errorname=name,
         database_path=database_path,
         contention_exhausted=True,
     )
@@ -1074,6 +1088,7 @@ def _run_write_transaction(
                     attempts=attempts,
                     started_at=started_at,
                     database_path=database_path,
+                    last_contention=last_contention,
                 )
             conn.execute("BEGIN IMMEDIATE")
             phase = "transaction"
@@ -1084,6 +1099,7 @@ def _run_write_transaction(
                     attempts=attempts,
                     started_at=started_at,
                     database_path=database_path,
+                    last_contention=last_contention,
                 )
             result = action(conn)
             phase = "commit"
@@ -1094,6 +1110,7 @@ def _run_write_transaction(
                     attempts=attempts,
                     started_at=started_at,
                     database_path=database_path,
+                    last_contention=last_contention,
                 )
             conn.commit()
             return result
