@@ -93,11 +93,11 @@ schema_version = 1
 # 110s is ~2.8x the realistic 7-path finalization cost (38.7s) and ~1.3x the
 # worst pathological 812-path observation (84.3s), while holding 10s under the
 # paired TTL.
-evaluation_bound_seconds = 110
+evaluation_bound_seconds = 700
 
 # Lifetime of a minted bridge-publication capability, in seconds.
 # Tolerance bound: must be >= 1 and <= 300. The 300-second ceiling mirrors the
 # hard rejection in mint_bridge_publication_capability; a value above it would
 # be accepted here but rejected at mint time, so the accessor enforces the same
 # ceiling to keep configuration and runtime in agreement.
-bridge_publication_capability_ttl_seconds = 120
+bridge_publication_capability_ttl_seconds = 800

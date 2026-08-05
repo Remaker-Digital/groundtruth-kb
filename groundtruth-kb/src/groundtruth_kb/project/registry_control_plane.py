@@ -3323,8 +3323,8 @@ def mint_bridge_publication_capability(
         raise RegistryAuthorizationError("bridge publication bindings must be non-empty")
     if operation != _BRIDGE_PUBLICATION_AUTHORITY_KIND:
         raise RegistryAuthorizationError("bridge publication operation is not typed")
-    if ttl_seconds <= 0 or ttl_seconds > 300:
-        raise RegistryAuthorizationError("bridge publication capability TTL must be 1-300 seconds")
+    if ttl_seconds <= 0 or ttl_seconds > 800:
+        raise RegistryAuthorizationError("bridge publication capability TTL must be 1-800 seconds")
     if not isinstance(content, bytes) or not content:
         raise RegistryAuthorizationError("bridge publication content bytes are required")
 

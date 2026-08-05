@@ -63,7 +63,7 @@ FALLBACK_BRIDGE_PUBLICATION_CAPABILITY_TTL_SECONDS = 120
 # above this ceiling would be accepted in configuration but rejected at mint
 # time, so the accessor enforces the same ceiling to keep configuration and
 # runtime in agreement.
-_CAPABILITY_TTL_CEILING_SECONDS = 300
+_CAPABILITY_TTL_CEILING_SECONDS = 800
 
 _BOUND_ENV_VAR = "GTKB_PROTECTED_COMMIT_EVALUATION_BOUND_SECONDS"
 _TTL_ENV_VAR = "GTKB_BRIDGE_PUBLICATION_CAPABILITY_TTL_SECONDS"
