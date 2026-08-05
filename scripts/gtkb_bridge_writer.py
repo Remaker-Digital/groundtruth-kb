@@ -57,6 +57,10 @@ def _bridge_file_committed_in_git(target: Path, project_root: Path) -> bool:
         return False
 
 
+# WI-5935 Slice E: closing instruction carried by every filed bridge artifact.
+_CLOSING_INSTRUCTION = "When you are finished working, close your session envelope by invoking ::wrap."
+
+
 VALID_STATUSES: frozenset[str] = frozenset(
     {"NEW", "REVISED", "GO", "NO-GO", "NO-ACTION", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN"}
 )
@@ -1136,6 +1140,13 @@ def rollback_pending_bridge_publication(
     _PENDING_BRIDGE_PUBLICATIONS.pop(key, None)
 
 
+def _append_closing_instruction(content: str) -> str:
+    """Append the WI-5935 Slice E closing-instruction footer to a bridge artifact."""
+    if _CLOSING_INSTRUCTION in content:
+        return content
+    return content.rstrip("\n") + "\n\n---\n\n" + _CLOSING_INSTRUCTION + "\n"
+
+
 def write_bridge_file(
     document_name: str,
     version: int,
@@ -1177,6 +1188,7 @@ def write_bridge_file(
         else content
     )
     content_to_write = normalize_bridge_envelope_head(content_to_write)
+    content_to_write = _append_closing_instruction(content_to_write)
     _reject_synthetic_session_context_id(content_to_write)
     try:
         from scripts.bridge_applicability_preflight import (

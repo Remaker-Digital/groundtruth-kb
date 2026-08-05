@@ -55,6 +55,10 @@ Behavior contract: `.claude/rules/loyal-opposition.md` and `AGENTS.md` (authorit
 
 - Outside bridge-repair scope, do not delete or modify non-self-created files
   without explicit owner approval (`.claude/rules/loyal-opposition.md`).
+## Closing instruction
+
+When you are finished working, close your session envelope by invoking `::wrap`.
+
 
 ---
 

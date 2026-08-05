@@ -7,6 +7,8 @@ from pathlib import Path
 from groundtruth_kb.session.envelope import close_session, ensure_current
 from groundtruth_kb.session.topic_router import first_non_blank_line
 
+_CLOSING_INSTRUCTION = "When you are finished working, close your session envelope by invoking ::wrap."
+
 
 def is_canonical_wrap_trigger(prompt: str) -> bool:
     return first_non_blank_line(prompt) == "::wrap"
@@ -52,5 +54,7 @@ def render_wrap_summary(envelope: dict[str, object], archive_path: Path) -> str:
             f"- wrap_outcome: `{envelope.get('wrap_outcome')}`",
             f"- archive: `{archive_path}`",
             f"- wrap_step_results: {step_count}",
+            "",
+            _CLOSING_INSTRUCTION,
         ]
     )

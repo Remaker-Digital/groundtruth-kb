@@ -68,6 +68,10 @@ python -m groundtruth_kb session envelope open --harness-name <name> --harness-i
 ```
 
 before any `gt backlog`, `gt bridge`, or `implementation_authorization.py begin` command.
+## Closing instruction
+
+When you are finished working, close your session envelope by invoking `::wrap`.
+
 
 ---
 

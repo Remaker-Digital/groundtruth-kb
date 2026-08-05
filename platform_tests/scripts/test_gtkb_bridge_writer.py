@@ -1384,3 +1384,13 @@ def test_provider_hunk_coverage_rejects_corrupt_patch(tmp_path: Path) -> None:
 
     with pytest.raises(BridgePublicationError, match="not Git-applyable"):
         writer._hunk_patch_covered_paths(tmp_path, ["corrupt.patch"])
+
+
+def test_write_bridge_file_appends_closing_instruction_footer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5935 Slice E: every filed bridge artifact carries the closing instruction."""
+    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+
+    path = write_bridge_file("closing-footer", 1, _valid_proposal_body(), tmp_path, author_metadata=AUTHOR_METADATA)
+    written = path.read_text(encoding="utf-8")
+    assert writer._CLOSING_INSTRUCTION in written
+    assert written.rstrip().endswith(writer._CLOSING_INSTRUCTION)

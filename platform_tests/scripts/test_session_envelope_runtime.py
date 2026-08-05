@@ -573,3 +573,25 @@ def test_gt_session_wrap_cli_fails_closed_on_cross_context(tmp_path: Path, monke
     wrapped = runner.invoke(main, [*cfg, "session", "wrap", "--harness-name", "codex"])
     assert wrapped.exit_code != 0
     assert "Refusing to close another context" in wrapped.output
+
+
+def test_render_wrap_summary_includes_closing_instruction(tmp_path: Path) -> None:
+    """WI-5935 Slice E: the wrap summary carries the closing-instruction footer."""
+    _seed_harness(tmp_path)
+    open_session(tmp_path, harness_name="codex", session_id="wrap-footer")
+    result = run_wrap(tmp_path, harness_name="codex", session_id="wrap-footer")
+    assert "When you are finished working, close your session envelope by invoking ::wrap." in result["summary"]
+
+
+def test_startup_disclosure_surfaces_carry_closing_instruction() -> None:
+    """WI-5935 Slice E: startup disclosure templates carry the closing instruction."""
+    closing = "When you are finished working, close your session envelope by invoking ::wrap."
+    surfaces = [
+        REPO_ROOT / "config" / "agent-control" / "PRIME-BUILDER-STARTUP-OVERLAY.md",
+        REPO_ROOT / "config" / "agent-control" / "LOYAL-OPPOSITION-STARTUP-OVERLAY.md",
+        REPO_ROOT / "config" / "agent-control" / "SESSION-STARTUP-INDEX.md",
+    ]
+    for surface in surfaces:
+        assert surface.is_file(), surface
+        content = surface.read_text(encoding="utf-8").replace("`", "")
+        assert closing in content, surface

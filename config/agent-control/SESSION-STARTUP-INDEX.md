@@ -117,6 +117,10 @@ For the session/activity envelope sharding taxonomy and the four payload classes
 that constrain startup versus opened activities, see
 `config/agent-control/activity-envelope-sharding.toml`.
 
+## Closing instruction
+
+When you are finished working, close your session envelope by invoking `::wrap`.
+
 ## Authority Note
 
 This index is a consolidation/navigation surface; it does not supersede the
