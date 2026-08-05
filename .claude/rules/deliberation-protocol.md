@@ -59,10 +59,12 @@ Both agents MUST search deliberations before starting substantive work:
   `source_type=owner_conversation` and `outcome=owner_decision`.
 - Include the question, options presented, decision, and rationale.
 
-### Loyal Opposition — Insight Reports
-- Tag all `CODEX-INSIGHT-DROPBOX/INSIGHTS-*.md` reports with SPEC/WI IDs
-  in a frontmatter-style header block for linkage coverage.
-- Format: `Specs: SPEC-NNNN, SPEC-NNNN` and `WIs: WI-NNNN` near the top.
+### Loyal Opposition — Durable Findings
+- Route durable LO findings to governed carriers (Advisory Proposal / numbered
+  bridge ADVISORY entry / Deliberation Archive / MemBase) according to lifecycle
+  purpose, not the retired insight-dropbox carrier.
+- Tag durable findings with SPEC/WI IDs in a header block for linkage coverage:
+  `Specs: SPEC-NNNN, SPEC-NNNN` and `WIs: WI-NNNN`.
 
 ### Both Agents — Rejected Alternatives
 - When a proposal is revised after NO-GO, the NO-GO rationale documents the
@@ -81,4 +83,5 @@ Both agents MUST search deliberations before starting substantive work:
 When citing deliberations in proposals or reviews:
 - Use `DELIB-NNNN` IDs when known
 - Use `bridge/{name}-NNN.md` file refs when DELIB-ID not yet assigned
-- Use `INSIGHTS-{date}-{topic}.md` for LO reports not yet harvested
+- Use the Deliberation Archive `DELIB-NNNN` / numbered bridge artifact for LO
+  findings not yet fully governed

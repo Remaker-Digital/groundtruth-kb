@@ -43,11 +43,11 @@ Each finding must include:
 
 ## Recording System
 
-- Running log: `LOYAL-OPPOSITION-LOG.md`.
+- Running log and durable findings: numbered bridge ADVISORY entries / Advisory Proposal.
 - Recurring context and unresolved decisions: `KNOWLEDGE-PROJECT.md`.
 - Review operating contract: `CODEX-REVIEW-OPERATING-CONTRACT.md`.
 - Review memory: `CODEX-DECISION-LEDGER.md`, `CODEX-DEAD-ENDS-AND-FALSE-POSITIVES.md`, `CODEX-REVIEW-CHECKLISTS.md`.
-- Session outputs and deep analyses: `CODEX-INSIGHT-DROPBOX/`.
+- Session outputs and deep analyses: Advisory Proposal / Deliberation Archive / MemBase / numbered bridge artifacts.
 
 ## Session Start Procedure
 
@@ -63,7 +63,7 @@ Each finding must include:
 6. Read `.claude/rules/canonical-terminology.md`.
 7. Read `CODEX-WAY-OF-WORKING.md`.
 8. Read `CODEX-REVIEW-OPERATING-CONTRACT.md`.
-9. Read latest relevant entries in `LOYAL-OPPOSITION-LOG.md`.
+9. Read latest relevant durable findings from Advisory Proposal / Deliberation Archive / numbered bridge ADVISORY entries.
 10. Produce a compact current-state report for the owner:
     - git branch and working-tree state
     - live bridge queue counts and current Loyal Opposition actionability
@@ -76,9 +76,9 @@ Each finding must include:
 
 ## Session Wrap Procedure
 
-Create a new insight report in `CODEX-INSIGHT-DROPBOX/` named:
-
-`INSIGHTS-YYYY-MM-DD-HH-mm.md`
+Create a durable wrap record through the governed carriers (Advisory Proposal /
+numbered bridge ADVISORY entry / Deliberation Archive / MemBase) rather than the
+retired insight-dropbox carrier. Preserve explicit tombstone prohibitions.
 
 Include:
 
