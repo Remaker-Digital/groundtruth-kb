@@ -90,7 +90,7 @@ def _write_harness_registry(root: Path) -> None:
 
 def _write_capability_registry(root: Path) -> None:
     (root / "config" / "agent-control").mkdir(parents=True, exist_ok=True)
-    (root / "config" / "agent-control" / "harness-capability-registry.toml").write_text(
+    (root / "config" / "agent-control" / "gtkb-harness-capability-registry.toml").write_text(
         """
 schema_version = 1
 registry_id = "fixture"
@@ -318,7 +318,7 @@ def test_typed_waiver_is_distinct_from_missing_projection(tmp_path: Path) -> Non
 
 def test_manifest_projection_can_supply_missing_harness_subtable(tmp_path: Path) -> None:
     _write_fixture(tmp_path)
-    registry = tmp_path / "config" / "agent-control" / "harness-capability-registry.toml"
+    registry = tmp_path / "config" / "agent-control" / "gtkb-harness-capability-registry.toml"
     text = registry.read_text(encoding="utf-8")
     text = text.replace(
         """
