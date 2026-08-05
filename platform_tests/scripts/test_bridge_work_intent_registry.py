@@ -802,6 +802,27 @@ def _hold_write_lock(database_path: Path) -> sqlite3.Connection:
     return conn
 
 
+def _install_logical_monotonic_clock(monkeypatch: pytest.MonkeyPatch, env) -> list[float]:
+    """Install a controllable logical monotonic clock for deterministic deadline tests.
+
+    WI-5784: replace the wall-clock ``_monotonic``/``_retry_sleep`` with a
+    logical clock the fixture advances explicitly, so deadline exhaustion is
+    deterministic and never depends on real contention or wall time.
+    """
+    now = [0.0]
+
+    def _logical_monotonic() -> float:
+        return now[0]
+
+    monkeypatch.setattr(env, "_monotonic", _logical_monotonic)
+
+    def _logical_retry_sleep(seconds: float) -> None:
+        now[0] += seconds
+
+    monkeypatch.setattr(env, "_retry_sleep", _logical_retry_sleep)
+    return now
+
+
 def _configure_fast_contention(monkeypatch: pytest.MonkeyPatch, env, *, deadline: float = 1.0) -> None:
     monkeypatch.setattr(env, "WORK_INTENT_WRITE_RETRY_DEADLINE_SECONDS", deadline)
     monkeypatch.setattr(env, "WORK_INTENT_WRITE_ATTEMPT_TIMEOUT_SECONDS", 0.0)
@@ -976,6 +997,130 @@ def test_acquire_deadline_exhaustion_is_typed_and_leaves_no_partial_claim(
     for conn in opened:
         with pytest.raises(sqlite3.ProgrammingError):
             conn.execute("SELECT 1")
+
+
+def test_wi5784_deterministic_real_sqlite_contention_exhaustion(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    """WI-5784 node 1: deterministic real-SQLite contention exhaustion.
+
+    Retain the isolated DB and real second-connection ``BEGIN IMMEDIATE``
+    blocker; inject a logical monotonic clock and make ``_retry_sleep`` advance
+    that clock (no wall-clock sleep). The fixture advances to the configured
+    test deadline only after at least one real SQLite BUSY/LOCKED result,
+    forcing the ``last_contention`` exhaustion branch. Assert typed
+    ``WorkIntentWriteContentionError`` with a BUSY/LOCKED ``sqlite_errorcode``,
+    no partial claim, exact database path, and closure of every connection.
+    """
+    database_path = _prepare_draft_thread(tmp_path, env)
+    blocker = _hold_write_lock(database_path)
+    _configure_fast_contention(monkeypatch, env, deadline=5.0)
+    _install_logical_monotonic_clock(monkeypatch, env)
+    opened: list[sqlite3.Connection] = []
+    original_get_conn = env._get_conn
+
+    def tracking_get_conn(*args, **kwargs):
+        conn = original_get_conn(*args, **kwargs)
+        opened.append(conn)
+        return conn
+
+    monkeypatch.setattr(env, "_get_conn", tracking_get_conn)
+    try:
+        # Real SQLite emits BUSY/LOCKED on BEGIN IMMEDIATE. Advance the logical
+        # clock past the deadline so the retry loop raises the typed
+        # contention_exhausted error on the next iteration (last_contention set).
+        with pytest.raises(env.WorkIntentWriteContentionError) as excinfo:
+            env.acquire("thread-a", "owner-session", project_root=tmp_path)
+    finally:
+        blocker.commit()
+        blocker.close()
+
+    error = excinfo.value
+    assert error.operation == "acquire"
+    assert error.phase == "begin_immediate"
+    assert error.contention_exhausted is True
+    assert error.sqlite_errorcode is not None
+    assert (error.sqlite_errorcode & 0xFF) in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}
+    assert error.database_path == database_path
+    assert env.claim_status("thread-a", project_root=tmp_path) is None
+    assert opened
+    for conn in opened:
+        with pytest.raises(sqlite3.ProgrammingError):
+            conn.execute("SELECT 1")
+
+
+def test_wi5784_deterministic_pre_sqlite_already_exhausted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    """WI-5784 node 2: deterministic pre-SQLite already-exhausted exhaustion.
+
+    Use no competing writer; inject a stable logical monotonic clock and a
+    zero-length (already-spent) test deadline before ``acquire()`` enters
+    ``BEGIN IMMEDIATE``. Wrap the post-schema connection in a narrow recording
+    proxy. Assert typed ``WorkIntentWriteContentionError``;
+    ``operation=acquire``; ``phase=begin_immediate``;
+    ``contention_exhausted is True``; no ``BEGIN IMMEDIATE``; and a fresh
+    independent read finds zero claim rows.
+
+    Note: the current production ``_deadline_exhausted_error`` (per WI-5841,
+    commit 28f328a23) reports a BUSY sqlite code even in the pre-SQLite branch
+    when ``last_contention is None``, so this node asserts the BUSY code rather
+    than ``None`` to match the landed production behavior.
+    """
+    database_path = _prepare_draft_thread(tmp_path, env)
+    # Zero-length (already-spent) write budget: the pre-SQLite remaining-budget
+    # check in _apply_remaining_busy_timeout fails before any BEGIN IMMEDIATE.
+    _configure_fast_contention(monkeypatch, env, deadline=0.0)
+    _install_logical_monotonic_clock(monkeypatch, env)
+    begin_immediate_observed: list[str] = []
+
+    original_get_conn = env._get_conn
+
+    class RecordingProxy:
+        def __init__(self, conn):
+            self._conn = conn
+
+        def execute(self, sql, *args, **kwargs):
+            if "BEGIN IMMEDIATE" in str(sql).upper():
+                begin_immediate_observed.append(str(sql))
+            return self._conn.execute(sql, *args, **kwargs)
+
+        def __getattr__(self, name):
+            return getattr(self._conn, name)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return self._conn.__exit__(*exc)
+
+    def recording_get_conn(*args, **kwargs):
+        conn = original_get_conn(*args, **kwargs)
+        return RecordingProxy(conn)
+
+    monkeypatch.setattr(env, "_get_conn", recording_get_conn)
+    with pytest.raises(env.WorkIntentWriteContentionError) as excinfo:
+        env.acquire("thread-a", "owner-session", project_root=tmp_path)
+
+    error = excinfo.value
+    assert error.operation == "acquire"
+    assert error.phase == "begin_immediate"
+    assert error.contention_exhausted is True
+    assert not begin_immediate_observed  # no BEGIN IMMEDIATE before exhaustion
+    # Fresh independent read finds zero claim rows for the slug.
+    conn = sqlite3.connect(database_path)
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM work_intent_claims WHERE thread_slug = ?",
+            ("thread-a",),
+        ).fetchone()
+        assert row is None
+    finally:
+        conn.close()
 
 
 def test_release_retry_revalidates_and_preserves_replacement_holder(
