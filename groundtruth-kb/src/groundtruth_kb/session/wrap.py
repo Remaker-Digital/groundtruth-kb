@@ -18,13 +18,20 @@ def run_wrap(
     harness_name: str = "codex",
     harness_id: str | None = None,
     wrap_outcome: str = "manual_wrap",
+    session_id: str | None = None,
 ) -> dict[str, object]:
-    ensure_current(project_root, harness_name=harness_name, harness_id=harness_id)
+    ensure_current(
+        project_root,
+        harness_name=harness_name,
+        harness_id=harness_id,
+        session_id=session_id,
+    )
     envelope, archive_path = close_session(
         project_root,
         harness_name=harness_name,
         harness_id=harness_id,
         wrap_outcome=wrap_outcome,
+        session_id=session_id,
     )
     return {
         "session_id": envelope.get("session_id"),

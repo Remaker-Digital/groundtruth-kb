@@ -66,6 +66,7 @@ SESSION_ID_ENV_VARS: frozenset[str] = frozenset(
         "CODEX_THREAD_ID",
         "CURSOR_CONVERSATION_ID",
         "ANTIGRAVITY_SESSION_ID",
+        "GOOSE_SESSION_ID",
         "GTKB_SESSION_ID",
     }
 )
@@ -84,6 +85,7 @@ BRIDGE_WORK_INTENT_ORDER: tuple[str, ...] = (
     "CODEX_THREAD_ID",
     "CURSOR_CONVERSATION_ID",
     "ANTIGRAVITY_SESSION_ID",
+    "GOOSE_SESSION_ID",
     "GTKB_SESSION_ID",
 )
 
@@ -92,6 +94,7 @@ BRIDGE_WORK_INTENT_ORDER: tuple[str, ...] = (
 # SESSION_ID_ENV_VARS (drift-lock T2).
 MARKER_CONTINUITY_ORDER: tuple[str, ...] = (
     "GTKB_SESSION_ID",
+    "GOOSE_SESSION_ID",
     "CURSOR_CONVERSATION_ID",
     "CODEX_SESSION_ID",
     "CODEX_THREAD_ID",

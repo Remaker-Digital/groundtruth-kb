@@ -37,6 +37,8 @@ RUNTIME_HARNESS_MARKERS = {
     "antigravity": ("ANTIGRAVITY_SESSION_ID",),
     "claude": ("CLAUDE_CODE_SESSION_ID", "CLAUDECODE"),
     "codex": ("CODEX_THREAD_ID",),
+    "cursor": ("CURSOR_CONVERSATION_ID",),
+    "goose": ("GOOSE_SESSION_ID",),
 }
 _SAFE_SESSION_DOCUMENT_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 _CANONICAL_INIT_KEYWORD = re.compile(r"::init (gtkb|application)(?: (pb|lo))?")
@@ -927,21 +929,80 @@ def ensure_worker_session(
     return current
 
 
+def _resolve_invoking_session_id(
+    session_id: str | None,
+    *,
+    environ: Mapping[str, str] | None = None,
+) -> str:
+    """Resolve the invoking session-context id, or ``""`` when unavailable.
+
+    An explicit ``session_id`` wins; otherwise the uniform
+    ``resolve_session_id`` (marker-continuity order) is consulted so the
+    fail-closed single-context rule (DCL-SESSION-ENVELOPE-SINGLE-CONTEXT-001)
+    is consistent across harnesses.
+    """
+    explicit_value = str(session_id or "").strip()
+    if explicit_value:
+        return explicit_value
+    try:
+        from scripts.gtkb_session_id import MARKER_CONTINUITY_ORDER, resolve_session_id  # noqa: PLC0415
+    except ImportError:  # pragma: no cover - direct-script sys.path shape
+        try:
+            from gtkb_session_id import (  # type: ignore[no-redef]  # noqa: PLC0415
+                MARKER_CONTINUITY_ORDER,
+                resolve_session_id,
+            )
+        except ImportError:
+            return ""
+    return resolve_session_id(order=MARKER_CONTINUITY_ORDER, environ=environ)
+
+
+def _assert_fail_closed_single_context(
+    *,
+    invoking_session_id: str,
+    live_envelope: dict[str, Any],
+) -> None:
+    """Fail closed when the live envelope belongs to a different session-context.
+
+    DCL-SESSION-ENVELOPE-SINGLE-CONTEXT-001: ``::wrap`` (and any session-close
+    path) MUST fail closed when the live envelope session_id does not equal the
+    invoking session-context id. When the invoking id is unavailable (empty),
+    the legacy no-marker path proceeds unchanged.
+    """
+    if not invoking_session_id:
+        return
+    live_id = live_envelope.get("session_id")
+    if live_id and str(live_id) != invoking_session_id:
+        raise EnvelopeError(
+            "Cannot wrap/close: the live session envelope belongs to session-context "
+            f"{live_id!r}, but the invoking session-context is {invoking_session_id!r}. "
+            "Refusing to close another context's session envelope."
+        )
+
+
 def ensure_current(
     project_root: Path,
     *,
     harness_name: str = "codex",
     harness_id: str | None = None,
+    session_id: str | None = None,
 ) -> dict[str, Any]:
     resolved_name, resolved_id = resolve_harness_identity(
         project_root,
         harness_name=harness_name,
         harness_id=harness_id,
     )
+    invoking_id = _resolve_invoking_session_id(session_id)
     current = load_current(project_root, resolved_name)
     if current and current.get("status") == "open":
+        _assert_fail_closed_single_context(invoking_session_id=invoking_id, live_envelope=current)
         return current
-    return open_session(project_root, harness_name=resolved_name, harness_id=resolved_id)
+    return open_session(
+        project_root,
+        harness_name=resolved_name,
+        harness_id=resolved_id,
+        session_id=invoking_id or None,
+    )
 
 
 def route_prompt_resources(
@@ -1113,15 +1174,24 @@ def close_session(
     harness_id: str | None = None,
     wrap_outcome: str = "manual_wrap",
     wrap_step_results: list[dict[str, Any]] | None = None,
+    session_id: str | None = None,
 ) -> tuple[dict[str, Any], Path]:
     resolved_name, resolved_id = resolve_harness_identity(
         project_root,
         harness_name=harness_name,
         harness_id=harness_id,
     )
+    invoking_id = _resolve_invoking_session_id(session_id)
     envelope = load_current(project_root, resolved_name)
     if not envelope:
-        envelope = open_session(project_root, harness_name=resolved_name, harness_id=resolved_id)
+        envelope = open_session(
+            project_root,
+            harness_name=resolved_name,
+            harness_id=resolved_id,
+            session_id=invoking_id or None,
+        )
+    else:
+        _assert_fail_closed_single_context(invoking_session_id=invoking_id, live_envelope=envelope)
     closed_at = utc_now_iso()
     open_topic_count = sum(1 for topic in envelope.get("topics", []) if topic.get("closed_at") is None)
     for topic in envelope.get("topics", []):

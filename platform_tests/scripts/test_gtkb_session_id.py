@@ -154,3 +154,27 @@ def test_dispatch_run_id_is_bridge_only_marker_excluded() -> None:
     assert "GTKB_BRIDGE_POLLER_RUN_ID" in SESSION_ID_ENV_VARS
     assert BRIDGE_WORK_INTENT_ORDER[0] == "GTKB_BRIDGE_POLLER_RUN_ID"
     assert "GTKB_BRIDGE_POLLER_RUN_ID" not in MARKER_CONTINUITY_ORDER
+
+
+def test_goose_session_id_locked_into_all_surfaces() -> None:
+    """WI-5935 Slice C: Goose is an active harness; its session id must be a first-class member."""
+    assert "GOOSE_SESSION_ID" in SESSION_ID_ENV_VARS
+    assert "GOOSE_SESSION_ID" in BRIDGE_WORK_INTENT_ORDER
+    assert "GOOSE_SESSION_ID" in MARKER_CONTINUITY_ORDER
+
+
+def test_goose_session_id_resolves_when_sole() -> None:
+    """WI-5935 Slice C: GOOSE_SESSION_ID resolves through the uniform resolver."""
+    env = {"GOOSE_SESSION_ID": "goose-session-123"}
+    assert resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=env) == "goose-session-123"
+    assert resolve_session_id(None, order=MARKER_CONTINUITY_ORDER, environ=env) == "goose-session-123"
+
+
+def test_runtime_harness_markers_cover_goose_and_cursor() -> None:
+    """WI-5935 Slice C: active identity-file harnesses goose and cursor carry marker entries."""
+    from groundtruth_kb.session.envelope import RUNTIME_HARNESS_MARKERS  # noqa: PLC0415
+
+    assert "goose" in RUNTIME_HARNESS_MARKERS
+    assert "GOOSE_SESSION_ID" in RUNTIME_HARNESS_MARKERS["goose"]
+    assert "cursor" in RUNTIME_HARNESS_MARKERS
+    assert "CURSOR_CONVERSATION_ID" in RUNTIME_HARNESS_MARKERS["cursor"]

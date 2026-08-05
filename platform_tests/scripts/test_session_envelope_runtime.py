@@ -509,3 +509,31 @@ def test_worker_sessions_keep_distinct_document_role_authority(tmp_path: Path) -
         == "loyal-opposition"
     )
     assert load_current(tmp_path, "codex")["session_id"] == "session-two"
+
+
+def test_run_wrap_fails_closed_on_cross_context_mismatch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5935 Slice C: a wrap from a different session-context fails closed
+    and leaves the other context's envelope open."""
+    _seed_harness(tmp_path)
+    monkeypatch.setenv("GTKB_SESSION_ID", "context-a")
+    open_session(tmp_path, harness_name="codex", session_id="context-a")
+
+    monkeypatch.setenv("GTKB_SESSION_ID", "context-b")
+    with pytest.raises(EnvelopeError, match="Refusing to close another context"):
+        run_wrap(tmp_path, harness_name="codex")
+
+    live = load_current(tmp_path, "codex")
+    assert live["session_id"] == "context-a"
+    assert live["status"] == "open"
+
+
+def test_run_wrap_operates_on_per_session_authoritative_document(tmp_path: Path) -> None:
+    """WI-5935 Slice C: wrap mutates the per-session document, not the projection."""
+    _seed_harness(tmp_path)
+    open_session(tmp_path, harness_name="codex", session_id="ctx-wrapped")
+    result = run_wrap(tmp_path, harness_name="codex", session_id="ctx-wrapped")
+    sid = result["session_id"]
+    worker_doc = worker_session_envelope_path(tmp_path, "codex", sid)
+    assert worker_doc.is_file()
+    assert json.loads(worker_doc.read_text(encoding="utf-8"))["status"] == "closed"
+    assert not current_envelope_path(tmp_path, "codex").exists()
