@@ -9127,6 +9127,62 @@ def tests_list_cmd(
         )
 
 
+@tests_cmd.command("normalize-phase-membership")
+@click.option("--phase-id", "phase_id", required=True, help="Test-plan phase id to normalize (e.g. PHASE-003).")
+@click.option("--expected-version", "expected_version", required=True, type=int, help="Expected current phase version.")
+@click.option(
+    "--expected-raw-sha256",
+    "expected_raw_sha256",
+    required=True,
+    help="Expected raw SHA-256 of the current test_ids column.",
+)
+@click.option("--dry-run", "dry_run", is_flag=True, default=False, help="Validate without appending a version.")
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def tests_normalize_phase_membership_cmd(
+    ctx: click.Context,
+    phase_id: str,
+    expected_version: int,
+    expected_raw_sha256: str,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Normalize a malformed comma-delimited test_ids to a canonical JSON array (WI-5615)."""
+    from groundtruth_kb.cli_test_plan_phase import (
+        PhaseMembershipNormalizeError,
+        PhaseMembershipNormalizeRequest,
+        normalize_phase_membership,
+    )
+
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(db_path=config.db_path)
+    try:
+        request = PhaseMembershipNormalizeRequest(
+            phase_id=phase_id,
+            expected_version=expected_version,
+            expected_raw_sha256=expected_raw_sha256,
+            dry_run=dry_run,
+        )
+        result = normalize_phase_membership(db, request)
+    except PhaseMembershipNormalizeError as exc:
+        click.echo(f"Error: {exc}")
+        raise SystemExit(1) from None
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+        return
+    mode = "DRY-RUN" if dry_run else "APPLY"
+    click.echo(f"[{mode}] {result.phase_id} (source v{result.source_version}): {result.member_count} members")
+    click.echo(f"  source raw sha256: {result.source_raw_sha256}")
+    click.echo(f"  proposed json sha256: {result.proposed_json_sha256}")
+    if result.applied:
+        click.echo(f"  applied as version {result.new_version}; new raw sha256: {result.new_raw_sha256}")
+    else:
+        click.echo("  not applied (dry-run or no-op)")
+
+
 # ── gt deliberations ──────────────────────────────────────────────
 
 
