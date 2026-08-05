@@ -322,3 +322,97 @@ def test_headless_worker_authority_is_isolated_by_session_and_harness(
             harness_name=str(row["harness_name"]),
         )
         assert provenance["harness_id"] == row["id"]
+
+
+# ---------------------------------------------------------------------------
+# WI-5935 Slice F: cross-harness wrap fail-closed parity + marker-coverage guard.
+# Marker scope is the identity-active population that carries a RUNTIME_HARNESS_MARKERS
+# entry after Slice C GO-006: codex, claude, antigravity, cursor, goose. The three
+# identity-active but unmarked harnesses (ollama, openrouter, alibaba-cloud-studio) are
+# an explicit scoped deliberate-deferral (tracked under WI-5936 Slice 2), guarded here.
+# ---------------------------------------------------------------------------
+MARKER_SCOPE = {"codex", "claude", "antigravity", "cursor", "goose"}
+DEFERRED_UNMARKED_HARNESSES = {"ollama", "openrouter", "alibaba-cloud-studio"}
+
+
+def _identity_harness_names(project_root: Path = REPO_ROOT) -> set[str]:
+    data = json.loads((project_root / "harness-state" / "harness-identities.json").read_text(encoding="utf-8"))
+    return set(data.get("harnesses", {}).keys())
+
+
+def _marker_scope_harness_ids(project_root: Path = REPO_ROOT) -> dict[str, str]:
+    data = json.loads((project_root / "harness-state" / "harness-identities.json").read_text(encoding="utf-8"))
+    harnesses = data.get("harnesses", {})
+    return {n: str(r["id"]) for n, r in harnesses.items() if n in MARKER_SCOPE}
+
+
+def test_marker_coverage_guard_covers_every_identity_harness() -> None:
+    """WI-5935 Slice F: every identity harness is in the marker matrix or the typed deferral list."""
+    from groundtruth_kb.session.envelope import RUNTIME_HARNESS_MARKERS
+
+    identity = _identity_harness_names()
+    marker_scope = set(RUNTIME_HARNESS_MARKERS)
+    assert marker_scope >= MARKER_SCOPE
+    silent_gap = identity - marker_scope - DEFERRED_UNMARKED_HARNESSES
+    assert not silent_gap, f"silent marker gap: {sorted(silent_gap)}"
+    assert not (DEFERRED_UNMARKED_HARNESSES & marker_scope), "deferred harnesses must be genuinely unmarked"
+
+
+def test_marker_scope_session_ids_resolve_via_uniform_resolver() -> None:
+    """WI-5935 Slice F: each marker-scope harness session-id marker resolves via the uniform resolver."""
+    from groundtruth_kb.session.envelope import RUNTIME_HARNESS_MARKERS
+
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+
+    for name in sorted(MARKER_SCOPE):
+        marker = RUNTIME_HARNESS_MARKERS[name][0]
+        env = {marker: f"{name}-marker-id"}
+        assert resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=env) == f"{name}-marker-id"
+
+
+def test_wrap_fail_closed_parity_across_marker_scope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5935 Slice F: identical fail-closed wrap parity across every marker-scope harness.
+
+    For each harness a concurrent same-harness two-context wrap fails closed and leaves the
+    other context's envelope open, and the per-harness projection is never the mutation target.
+    """
+    from groundtruth_kb.session.envelope import (
+        EnvelopeError,
+        current_envelope_path,
+        load_current,
+        open_session,
+        worker_session_envelope_path,
+    )
+    from groundtruth_kb.session.wrap import run_wrap
+
+    scope = _marker_scope_harness_ids()
+    assert set(scope) == MARKER_SCOPE
+    rows = [
+        {
+            "harness_name": n,
+            "id": i,
+            "status": "active",
+            "role": ["prime-builder"],
+            "invocation_surfaces": {"headless": {"argv": ["python"]}},
+        }
+        for n, i in scope.items()
+    ]
+    _seed_harness_state(tmp_path, rows)
+
+    for name in sorted(MARKER_SCOPE):
+        open_session(tmp_path, harness_name=name, session_id=f"{name}-ctx-a")
+        monkeypatch.setenv("GTKB_SESSION_ID", f"{name}-ctx-b")
+        with pytest.raises(EnvelopeError, match="Refusing to close another context"):
+            run_wrap(tmp_path, harness_name=name)
+        live = load_current(tmp_path, name)
+        assert live["session_id"] == f"{name}-ctx-a"
+        assert live["status"] == "open"
+        # per-harness projection is not the wrap mutation target on any covered harness
+        assert current_envelope_path(tmp_path, name).exists()
+        assert (
+            json.loads(worker_session_envelope_path(tmp_path, name, f"{name}-ctx-a").read_text(encoding="utf-8"))[
+                "status"
+            ]
+            == "open"
+        )
+        monkeypatch.delenv("GTKB_SESSION_ID", raising=False)
