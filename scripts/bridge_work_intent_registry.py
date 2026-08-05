@@ -144,6 +144,11 @@ class VersionState:
     next_file_exists: bool
 
 
+def _iso_now() -> str:
+    """Return an ISO-8601 UTC timestamp for event rows."""
+    return now_utc().isoformat()
+
+
 def now_utc() -> datetime:
     return datetime.now(UTC).replace(microsecond=0)
 
@@ -232,6 +237,164 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         "CREATE INDEX IF NOT EXISTS idx_work_intent_claims_role_project ON work_intent_claims(acting_role, project_id);"
     )
     conn.commit()
+
+
+class ReservationClaimFenceError(WorkIntentWriteContentionError):
+    """Typed claim-fence CAS exhaustion for the WI-5881 reservation path.
+
+    Distinct from ordinary acquire/release contention: this is raised by
+    ``recovery_claim_fence_install`` when the pre-SQLite monotonic write
+    deadline is already exhausted before any ``BEGIN IMMEDIATE``, so the sqlite
+    code/name are ``None`` (no SQLite statement has run yet).
+    """
+
+
+def _ensure_reservation_schema(conn: sqlite3.Connection) -> None:
+    """Create the WI-5881 reservation tables (Route A lazy init).
+
+    These tables are created only by an explicit reservation operation, never
+    by ordinary proposal/report/verdict/capability/receipt publication paths
+    (F9 Route A). They are created on the passed connection (tests use isolated
+    temporary DBs; live canonical DB remains untouched unless a reservation op
+    is actually invoked).
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS recovery_reservations (
+            rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+            reservation_id TEXT NOT NULL,
+            bridge_id TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            fence_epoch INTEGER NOT NULL DEFAULT 0,
+            prepared_at TEXT,
+            armed_at TEXT,
+            UNIQUE(reservation_id)
+        );
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS recovery_reservation_events (
+            rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+            reservation_id TEXT NOT NULL,
+            event TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_recovery_reservations_bridge ON recovery_reservations(bridge_id, version);"
+    )
+    conn.commit()
+
+
+def recovery_claim_fence_install(
+    bridge_id: str,
+    *,
+    version: int,
+    reservation_id: str | None = None,
+    project_root: Path | None = None,
+) -> str:
+    """CAS-install a WI-5881 reservation claim fence under a bounded deadline.
+
+    This is a NEW reservation-only primitive (not ordinary ``acquire``). It
+    creates the reservation schema lazily (Route A), then CAS-installs a
+    ``recovery_reservations`` row / advances the fence epoch within the bounded
+    write-deadline machinery. On pre-SQLite monotonic deadline exhaustion it
+    raises ``ReservationClaimFenceError`` (typed, retryable) with
+    ``sqlite_errorcode is None``.
+
+    The fixture that drives the TEST-11809 node supplies an already-exhausted
+    injected monotonic deadline and no competing writer; this function must
+    never leave a partial fence row or append a ``claim_fenced`` event when the
+    deadline is exhausted before ``BEGIN IMMEDIATE``.
+    """
+    db_path = _database_path(project_root)
+    rid = reservation_id or f"res-{bridge_id}-{version:03d}"
+    started_at = _monotonic()
+    deadline = started_at + WORK_INTENT_WRITE_RETRY_DEADLINE_SECONDS
+    attempts = 0
+    while True:
+        if deadline - _monotonic() <= 0:
+            raise ReservationClaimFenceError(
+                "monotonic write deadline exhausted",
+                operation="recovery_claim_fence_install",
+                phase="begin_immediate",
+                attempts=attempts,
+                elapsed_seconds=max(0.0, _monotonic() - started_at),
+                sqlite_errorcode=None,
+                sqlite_errorname=None,
+                database_path=db_path,
+                contention_exhausted=True,
+            )
+        attempts += 1
+        conn: sqlite3.Connection | None = None
+        try:
+            conn = _get_conn(project_root)
+            _ensure_reservation_schema(conn)
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT fence_epoch, prepared_at FROM recovery_reservations WHERE reservation_id = ?",
+                (rid,),
+            ).fetchone()
+            if row is None:
+                conn.execute(
+                    "INSERT INTO recovery_reservations "
+                    "(reservation_id, bridge_id, version, fence_epoch) VALUES (?, ?, ?, 1)",
+                    (rid, bridge_id, version),
+                )
+            else:
+                conn.execute(
+                    "UPDATE recovery_reservations SET fence_epoch = fence_epoch + 1 WHERE reservation_id = ?",
+                    (rid,),
+                )
+            conn.execute(
+                "INSERT INTO recovery_reservation_events (reservation_id, event, created_at) "
+                "VALUES (?, 'claim_fenced', ?)",
+                (rid, _iso_now()),
+            )
+            conn.commit()
+            return rid
+        except sqlite3.Error as exc:
+            try:
+                if conn is not None:
+                    conn.rollback()
+            except sqlite3.Error:
+                pass
+            if not _is_retryable_write_contention(exc):
+                raise WorkIntentDatabaseError(
+                    str(exc),
+                    operation="recovery_claim_fence_install",
+                    phase="transaction",
+                    attempts=attempts,
+                    elapsed_seconds=max(0.0, _monotonic() - started_at),
+                    sqlite_errorcode=getattr(exc, "sqlite_errorcode", None),
+                    sqlite_errorname=getattr(exc, "sqlite_errorname", None),
+                    database_path=db_path,
+                ) from exc
+            remaining = deadline - _monotonic()
+            if remaining <= 0:
+                raise ReservationClaimFenceError(
+                    "monotonic write deadline exhausted",
+                    operation="recovery_claim_fence_install",
+                    phase="transaction",
+                    attempts=attempts,
+                    elapsed_seconds=max(0.0, _monotonic() - started_at),
+                    sqlite_errorcode=getattr(exc, "sqlite_errorcode", None),
+                    sqlite_errorname=getattr(exc, "sqlite_errorname", None),
+                    database_path=db_path,
+                    contention_exhausted=True,
+                ) from exc
+            sleep_seconds = min(0.001, remaining)
+            if sleep_seconds <= 0:
+                continue
+            _retry_sleep(sleep_seconds)
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except sqlite3.Error:
+                    pass
 
 
 def _monotonic() -> float:

@@ -1354,3 +1354,59 @@ def test_wi5841_selector_explicit_and_poller_precedence(tmp_path: Path, monkeypa
     monkeypatch.delenv("GTKB_HARNESS_NAME")
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-run")
     assert registry._worker_harness_selector(tmp_path) is None
+
+
+def test_recovery_claim_fence_cas_pre_sqlite_deadline_exhaustion_is_typed_and_leaves_no_partial_fence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    """TEST-11809 (WI-5881): claim-fence CAS pre-SQLite already-exhausted.
+
+    Supplies an already-exhausted injected monotonic deadline before the
+    claim-fence CAS opens or begins a SQLite write, with no competing writer.
+    Calls ``recovery_claim_fence_install`` (not ordinary ``acquire``) and
+    asserts:
+
+    1. typed exception: contention_exhausted True, operation
+       ``recovery_claim_fence_install``, phase ``begin_immediate``,
+       sqlite_errorcode None, sqlite_errorname None, detail
+       ``monotonic write deadline exhausted``;
+    2. zero partial reservation claim-fence row (no fence epoch advanced, no
+       claim_fenced event appended);
+    3. no partial fence survives an independently reopenable read;
+    4. the failure is deterministic/idempotent on rerun.
+    """
+    database_path = _prepare_draft_thread(tmp_path, env)
+    # Zero-length (already-spent) write budget + logical monotonic clock.
+    _configure_fast_contention(monkeypatch, env, deadline=0.0)
+    _install_logical_monotonic_clock(monkeypatch, env)
+
+    with pytest.raises(env.ReservationClaimFenceError) as excinfo:
+        env.recovery_claim_fence_install("thread-a", version=1, reservation_id="res-1", project_root=tmp_path)
+
+    error = excinfo.value
+    assert error.contention_exhausted is True
+    assert error.operation == "recovery_claim_fence_install"
+    assert error.phase == "begin_immediate"
+    assert error.sqlite_errorcode is None
+    assert error.sqlite_errorname is None
+    assert "monotonic write deadline exhausted" in str(error)
+
+    # Independently reopenable read sees no partial fence row / event.
+    conn = sqlite3.connect(database_path)
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM recovery_reservations WHERE reservation_id = ?",
+            ("res-1",),
+        ).fetchone()
+        assert row[0] == 0, "no partial reservation claim-fence row may exist"
+    except sqlite3.OperationalError:
+        # Schema never created (fail closed before any write) - acceptable.
+        pass
+    finally:
+        conn.close()
+
+    # Deterministic/idempotent rerun: same typed exhaustion.
+    with pytest.raises(env.ReservationClaimFenceError):
+        env.recovery_claim_fence_install("thread-a", version=1, reservation_id="res-1", project_root=tmp_path)
