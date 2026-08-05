@@ -405,16 +405,57 @@ def topic_close_cmd(ctx: click.Context, topic_type: str, harness_name: str, harn
 
 
 @session_group.command("wrap")
-@click.option("--harness-name", default="codex", show_default=True)
+@click.option("--harness-name", default=None, help="Harness name; auto-resolved from runtime markers when omitted.")
 @click.option("--harness-id", default=None)
+@click.option("--session-id", default=None, help="Invoking session-context id; auto-resolved when omitted.")
 @click.option("--json", "json_output", is_flag=True, default=False)
 @click.pass_context
-def wrap_cmd(ctx: click.Context, harness_name: str, harness_id: str | None, json_output: bool) -> None:
-    """Run the deterministic wrap service used by the canonical ::wrap trigger."""
+def wrap_cmd(
+    ctx: click.Context,
+    harness_name: str | None,
+    harness_id: str | None,
+    session_id: str | None,
+    json_output: bool,
+) -> None:
+    """Run the deterministic wrap service used by the canonical ::wrap trigger.
+
+    The invoking session-context id is auto-resolved from runtime markers /
+    GTKB_SESSION_ID via the uniform resolver (marker-continuity order); a
+    cross-context wrap fails closed with a clear diagnostic.
+    """
+    from groundtruth_kb.session.envelope import EnvelopeError, resolve_acting_harness_identity
     from groundtruth_kb.session.wrap import run_wrap
 
+    try:
+        from scripts.gtkb_session_id import MARKER_CONTINUITY_ORDER, resolve_session_id  # noqa: PLC0415
+    except ImportError:  # pragma: no cover - direct-script sys.path shape
+        from gtkb_session_id import (  # type: ignore[no-redef]  # noqa: PLC0415
+            MARKER_CONTINUITY_ORDER,
+            resolve_session_id,
+        )
+
     config = _resolve_config(ctx)
-    result = run_wrap(Path(config.project_root), harness_name=harness_name, harness_id=harness_id)
+    project_root = Path(config.project_root)
+
+    if not harness_name:
+        harness_name, resolved_id = resolve_acting_harness_identity(
+            project_root,
+            harness_name=None,
+            harness_id=harness_id,
+        )
+        harness_id = harness_id or resolved_id
+
+    resolved_session_id = resolve_session_id(explicit=session_id, order=MARKER_CONTINUITY_ORDER)
+
+    try:
+        result = run_wrap(
+            project_root,
+            harness_name=harness_name,
+            harness_id=harness_id,
+            session_id=resolved_session_id,
+        )
+    except EnvelopeError as exc:
+        raise click.ClickException(str(exc)) from exc
     if json_output:
         payload = {**result, "archive_path": str(result["archive_path"])}
         click.echo(json.dumps(payload, indent=2, sort_keys=True, default=str))

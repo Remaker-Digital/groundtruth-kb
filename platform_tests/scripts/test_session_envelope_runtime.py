@@ -537,3 +537,39 @@ def test_run_wrap_operates_on_per_session_authoritative_document(tmp_path: Path)
     assert worker_doc.is_file()
     assert json.loads(worker_doc.read_text(encoding="utf-8"))["status"] == "closed"
     assert not current_envelope_path(tmp_path, "codex").exists()
+
+
+def test_gt_session_wrap_cli_fails_closed_on_cross_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5935 Slice D: `gt session wrap` auto-resolves the invoking session-context id
+    and fails closed (non-zero exit + diagnostic) on a cross-context wrap."""
+    from click.testing import CliRunner
+    from groundtruth_kb.cli import main
+
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / "groundtruth.toml").write_text(
+        '[groundtruth]\ndb_path = "./groundtruth.db"\nproject_root = "."\n',
+        encoding="utf-8",
+    )
+    (root / "harness-state").mkdir()
+    (root / "harness-state" / "harness-identities.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": {"codex": {"id": "A"}}}),
+        encoding="utf-8",
+    )
+
+    runner = CliRunner()
+    cfg = ["--config", str(root / "groundtruth.toml")]
+
+    monkeypatch.setenv("CODEX_THREAD_ID", "context-a")
+    opened = runner.invoke(
+        main,
+        [*cfg, "session", "envelope", "open", "--harness-name", "codex", "--init-keyword", "::init gtkb pb"],
+    )
+    assert opened.exit_code == 0
+    assert opened.output.strip() == "context-a"
+
+    monkeypatch.setenv("GTKB_SESSION_ID", "context-b")
+    monkeypatch.delenv("CODEX_THREAD_ID", raising=False)
+    wrapped = runner.invoke(main, [*cfg, "session", "wrap", "--harness-name", "codex"])
+    assert wrapped.exit_code != 0
+    assert "Refusing to close another context" in wrapped.output
