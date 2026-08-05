@@ -12,6 +12,7 @@ import fnmatch
 import hashlib
 import json
 import os
+import random
 import re
 import secrets
 import sqlite3
@@ -184,6 +185,16 @@ class RegistryControlPlaneError(RuntimeError):
     """Base error for coherent registry operations."""
 
 
+class RegistryFileLockAcquisitionTimeout(RegistryControlPlaneError):
+    """Typed caller-retryable transient for control-plane lock acquisition timeout.
+
+    WI-5869: replaces the bare ``TimeoutError`` raised when the
+    ``_RegistryFileLock`` acquisition deadline is exhausted. The typed subclass
+    lets callers classify and retry the transient rather than treating it as a
+    hard failure.
+    """
+
+
 class RegistryProjectionMismatch(RegistryControlPlaneError):
     """Raised when the declaration and MemBase projection are not coherent."""
 
@@ -255,6 +266,13 @@ class RegistryPaths:
 
 _DEFAULT_REGISTRY_LOCK_TIMEOUT_SECONDS = 300.0
 _REGISTRY_LOCK_TIMEOUT_ENV = "GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS"
+# WI-5869: bounded exponential backoff + jitter for the acquisition polling
+# loop. These are in-memory module constants (no timer/config TOML mutation);
+# they are tuned per DELIB-202667722 and capped so a sleep never exceeds the
+# remaining acquisition deadline.
+_REGISTRY_LOCK_INITIAL_BACKOFF_SECONDS = 0.05
+_REGISTRY_LOCK_MAX_BACKOFF_SECONDS = 1.0
+_REGISTRY_LOCK_BACKOFF_FACTOR = 2.0
 
 
 def _resolve_registry_lock_timeout(explicit: float | None) -> float:
@@ -299,6 +317,8 @@ class _RegistryFileLock:
             self._handle.write(b"0")
             self._handle.flush()
         deadline = time.monotonic() + self.timeout
+        backoff = _REGISTRY_LOCK_INITIAL_BACKOFF_SECONDS
+        attempt = 0
         while True:
             try:
                 self._handle.seek(0)
@@ -312,10 +332,19 @@ class _RegistryFileLock:
                     fcntl.flock(self._handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 return self
             except OSError:
-                if time.monotonic() >= deadline:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
                     self._handle.close()
-                    raise TimeoutError(f"timed out acquiring registry lock {self.path}") from None
-                time.sleep(0.05)
+                    raise RegistryFileLockAcquisitionTimeout(f"timed out acquiring registry lock {self.path}") from None
+                attempt += 1
+                # Bounded exponential backoff with jitter so contending waiters
+                # stagger instead of hammering the lock at a fixed rate
+                # (WI-5869). The sleep never exceeds the remaining budget.
+                backoff = min(backoff * _REGISTRY_LOCK_BACKOFF_FACTOR, _REGISTRY_LOCK_MAX_BACKOFF_SECONDS)
+                jitter = backoff * random.uniform(0.5, 1.0)
+                sleep_seconds = min(jitter, max(0.0, remaining))
+                if sleep_seconds > 0:
+                    time.sleep(sleep_seconds)
 
     def __exit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
         if self._handle is None:

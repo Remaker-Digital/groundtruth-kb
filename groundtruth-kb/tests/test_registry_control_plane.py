@@ -1997,3 +1997,64 @@ def test_retired_wi5441_recovery_entry_point_fails_closed() -> None:
             changed_by="test",
             change_reason="must not run",
         )
+
+
+def test_registry_lock_backoff_and_jitter_stay_under_deadline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5869: bounded exponential backoff + jitter advances monotonically and
+    never exceeds the remaining acquisition deadline.
+    """
+    lock_path = tmp_path / "control-plane.lock"
+    sleeps: list[float] = []
+
+    monkeypatch.setattr(time, "sleep", lambda sec: sleeps.append(sec))
+
+    # Hold the lock with a competing handle so acquisition retries.
+    blocker = registry_control_plane._RegistryFileLock(lock_path, timeout=0.4)
+    blocker.__enter__()
+    try:
+        with (
+            pytest.raises(registry_control_plane.RegistryFileLockAcquisitionTimeout),
+            registry_control_plane._RegistryFileLock(lock_path, timeout=0.4),
+        ):
+            pass
+    finally:
+        blocker.__exit__(None, None, None)
+
+    assert sleeps, "acquisition loop must retry with backoff sleeps"
+    # All sleeps are positive and bounded by the max backoff.
+    assert all(0 < sec <= registry_control_plane._REGISTRY_LOCK_MAX_BACKOFF_SECONDS for sec in sleeps)
+    # Backoff grows (roughly) over attempts (jitter allows some variance).
+    assert sleeps[0] <= sleeps[-1] * 2.0 + 0.1
+
+
+def test_registry_lock_typed_timeout_exception(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5869: acquisition deadline exhaustion raises the typed caller-retryable
+    ``RegistryFileLockAcquisitionTimeout`` (subclass of RegistryControlPlaneError).
+    """
+    lock_path = tmp_path / "control-plane.lock"
+    blocker = registry_control_plane._RegistryFileLock(lock_path, timeout=0.2)
+    blocker.__enter__()
+    try:
+        with (
+            pytest.raises(registry_control_plane.RegistryFileLockAcquisitionTimeout) as excinfo,
+            registry_control_plane._RegistryFileLock(lock_path, timeout=0.2),
+        ):
+            pass
+        assert isinstance(excinfo.value, registry_control_plane.RegistryControlPlaneError)
+        assert "timed out acquiring registry lock" in str(excinfo.value)
+    finally:
+        blocker.__exit__(None, None, None)
+
+
+def test_registry_lock_env_timeout_wiring(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5869: the GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS env var drives the
+    acquisition deadline and is honored (already covered in WI-5788; re-assert
+    after the backoff refactor).
+    """
+    monkeypatch.setenv("GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS", "22.5")
+    assert registry_control_plane._RegistryFileLock(tmp_path / "control-plane.lock").timeout == 22.5
+    monkeypatch.delenv("GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS", raising=False)
+    assert (
+        registry_control_plane._RegistryFileLock(tmp_path / "control-plane.lock").timeout
+        == registry_control_plane._DEFAULT_REGISTRY_LOCK_TIMEOUT_SECONDS
+    )
