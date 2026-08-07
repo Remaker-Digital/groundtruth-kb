@@ -1,0 +1,29 @@
+# Dispatcher Next foundation-spike pinned dependencies (WI-5617).
+#
+# These pins are ASSERTED AT RUNTIME, not merely suggested. The foundation
+# module declares them as EXPECTED_DBOS_VERSION / EXPECTED_A2A_VERSION in
+# groundtruth-kb/src/groundtruth_kb/dispatcher_next/foundation.py, and
+# platform_tests/groundtruth_kb/test_dispatcher_next_foundation.py::
+# test_pinned_dependencies_import_under_python_314 fails if the installed
+# versions differ.
+#
+# This file exists so that asserted environment can be RECONSTRUCTED. Without
+# it, the spike asserts an exact environment it provides no way to rebuild: a
+# fresh checkout, a CI runner, or an independent reviewer would have to
+# discover the pins by reading source constants.
+#
+# Drift guard: platform_tests/groundtruth_kb/test_dispatcher_next_spike_manifest.py
+# asserts this file and dependency_versions() agree exactly, in both
+# directions. Changing a pin here without changing the module constant -- or
+# vice versa -- fails that test. Keep them in lockstep.
+#
+# Location note (WI-5966, WI-5972): this manifest lives under config/dispatcher/
+# rather than at the package root because GT-KB has two independent path
+# classifiers and the manifest must satisfy both. classify_target cannot
+# classify a .txt file by extension (only by directory prefix), so a
+# package-root .txt is unauthorizable by the operation-time PAUTH gate; and
+# classify_root treats config/<other>/ as application product unless the
+# subdirectory is in the WI-5100 carve-out. config/dispatcher/ satisfies both.
+
+dbos==2.27.0
+a2a-sdk==1.1.1
