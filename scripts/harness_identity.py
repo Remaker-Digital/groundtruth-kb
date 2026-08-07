@@ -25,6 +25,7 @@ DEFAULT_HARNESS_IDS = {
     "ollama": "D",
     "cursor": "E",
     "openrouter": "F",
+    "goose": "G",
 }
 
 

@@ -78,3 +78,34 @@ def test_cli_topic_close_ops_accepted(tmp_path, monkeypatch) -> None:
     runner = CliRunner()
     accepted = runner.invoke(cli.session_group, ["topic", "close", "ops"])
     assert accepted.exit_code == 0, accepted.output
+
+
+def test_goose_envelope_open_binds_preset_session_id(tmp_path, monkeypatch) -> None:
+    """W0.1 (WI-5839): a pre-set GOOSE_SESSION_ID binds that exact id at
+    envelope-open instead of being ignored (goose was absent from the host
+    session-id map). The envelope subsystem is stubbed and the project root is
+    an isolated tmp dir, so no real envelope state is mutated."""
+    import groundtruth_kb.session.envelope as env
+
+    monkeypatch.setenv("GOOSE_SESSION_ID", "goose-session-123")
+    monkeypatch.setattr(cli, "_resolve_config", lambda ctx: types.SimpleNamespace(project_root=str(tmp_path)))
+    monkeypatch.setattr(env, "resolve_harness_identity", lambda *a, **k: ("goose", "G"))
+    monkeypatch.setattr(
+        env,
+        "load_worker_session",
+        lambda *a, **k: {
+            "session_id": "goose-session-123",
+            "status": "open",
+            "harness_name": "goose",
+            "harness_id": "G",
+        },
+    )
+    monkeypatch.setattr(
+        env,
+        "resolve_worker_role_provenance",
+        lambda *a, **k: {"role": "prime-builder", "session_id": "goose-session-123"},
+    )
+    runner = CliRunner()
+    result = runner.invoke(cli.session_group, ["envelope", "open", "--harness-name", "goose"])
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == "goose-session-123"

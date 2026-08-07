@@ -26,6 +26,7 @@ from groundtruth_kb.session.envelope import TOPIC_TYPES
 _HOST_SESSION_ID_ENV_BY_HARNESS = {
     "codex": "CODEX_THREAD_ID",
     "cursor": "CURSOR_CONVERSATION_ID",
+    "goose": "GOOSE_SESSION_ID",
 }
 _HOST_MODEL_METADATA_SOURCE_BY_HARNESS = {
     "codex": "x-codex-turn-metadata",

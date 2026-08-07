@@ -178,3 +178,10 @@ def test_runtime_harness_markers_cover_goose_and_cursor() -> None:
     assert "GOOSE_SESSION_ID" in RUNTIME_HARNESS_MARKERS["goose"]
     assert "cursor" in RUNTIME_HARNESS_MARKERS
     assert "CURSOR_CONVERSATION_ID" in RUNTIME_HARNESS_MARKERS["cursor"]
+
+
+def test_default_harness_ids_include_goose_g() -> None:
+    """W0.1 (WI-5839): goose is registered in DEFAULT_HARNESS_IDS as identity G."""
+    from scripts.harness_identity import DEFAULT_HARNESS_IDS
+
+    assert DEFAULT_HARNESS_IDS.get("goose") == "G"

@@ -38,6 +38,7 @@ from groundtruth_kb.project.sot_registry import (
     _load_toml_unlocked,
     validate_projection_parity,
 )
+from groundtruth_kb.project.timer_config import resolve_protected_commit_timers
 
 CoverageClass = Literal[
     "registered_member",
@@ -3344,7 +3345,7 @@ def mint_bridge_publication_capability(
     registry_path: Path | None = None,
     packaged_registry_path: Path | None = None,
     db_path: Path | None = None,
-    ttl_seconds: int = 120,
+    ttl_seconds: int | None = None,
 ) -> dict[str, Any]:
     """Mint an exact, single-use capability before one bridge file is created."""
 
@@ -3352,6 +3353,10 @@ def mint_bridge_publication_capability(
         raise RegistryAuthorizationError("bridge publication bindings must be non-empty")
     if operation != _BRIDGE_PUBLICATION_AUTHORITY_KIND:
         raise RegistryAuthorizationError("bridge publication operation is not typed")
+    if ttl_seconds is None:
+        ttl_seconds = resolve_protected_commit_timers(
+            project_root=project_root
+        ).bridge_publication_capability_ttl_seconds
     if ttl_seconds <= 0 or ttl_seconds > 800:
         raise RegistryAuthorizationError("bridge publication capability TTL must be 1-800 seconds")
     if not isinstance(content, bytes) or not content:

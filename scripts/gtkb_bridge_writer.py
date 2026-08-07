@@ -1228,6 +1228,11 @@ def write_bridge_file(
             from groundtruth_kb.project.registry_control_plane import (
                 mint_bridge_publication_capability,
             )
+            from groundtruth_kb.project.timer_config import (
+                resolve_protected_commit_timers,
+            )
+
+            timers = resolve_protected_commit_timers(project_root=project_root)
 
             minted = mint_bridge_publication_capability(
                 document_name=document_name,
@@ -1237,6 +1242,7 @@ def write_bridge_file(
                 content=content_to_write.encode("utf-8"),
                 session_id=session_id,
                 compliance_digest=compliance_digest,
+                ttl_seconds=timers.bridge_publication_capability_ttl_seconds,
                 project_root=project_root,
             )
         except Exception as exc:
