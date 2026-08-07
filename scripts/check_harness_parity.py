@@ -18,6 +18,21 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT_DIR = Path(__file__).resolve().parent
 REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "gtkb-harness-capability-registry.toml"
 PROJECT_SKILLS_RELATIVE_PATH = Path(".claude") / "skills"
+CANONICAL_SKILLS_HARNESS = "claude"
+# Adapter skills-tree root per harness (WI-6009). Only harnesses with a
+# present adapter tree are compared; the canonical source is exempted.
+HARNESS_ADAPTER_SKILLS_ROOT = {
+    "agent": Path(".agent") / "skills",
+    "api-harness": Path(".api-harness") / "skills",
+    "codex": Path(".codex") / "skills",
+    "cursor": Path(".cursor") / "skills",
+    "goose": Path(".goose") / "skills",
+    "claude": Path(".claude") / "skills",
+    "antigravity": Path(".antigravity") / "skills",
+    "ollama": Path(".ollama") / "skills",
+    "openrouter": Path(".openrouter") / "skills",
+    "alibaba-cloud-studio": Path(".alibaba-cloud-studio") / "skills",
+}
 
 
 def _load_sibling_script_module(module_name: str) -> Any:
@@ -759,6 +774,57 @@ def _registry_skill_dirs(capabilities: list[dict[str, Any]]) -> set[str]:
     return skill_dirs
 
 
+def _projection_drift_extras(
+    project_root: Path,
+    harnesses: list[str],
+    harnesses_config: dict[str, Any],
+) -> list[ExtraResult]:
+    """Compare the canonical skill-name set against each adapter tree.
+
+    Emits WARN rows for canonical skills missing from an adapter tree
+    (MISSING_PROJECTION) and for adapter-tree skills absent from canonical
+    (UNTRACKED_SURFACE). A projection target may not legitimately exceed its
+    source. Severity is deliberately WARN in this slice (WI-6009)."""
+    extras: list[ExtraResult] = []
+    canonical_root = project_root / PROJECT_SKILLS_RELATIVE_PATH
+    if not canonical_root.is_dir():
+        return extras
+    canonical_names = {p.parent.name for p in canonical_root.glob("*/SKILL.md")}
+    for harness in sorted(harnesses):
+        root_rel = HARNESS_ADAPTER_SKILLS_ROOT.get(harness)
+        if root_rel is None or harness == CANONICAL_SKILLS_HARNESS:
+            continue
+        adapter_root = project_root / root_rel
+        if not adapter_root.is_dir():
+            continue
+        floor = harnesses_config.get(harness, {}) if isinstance(harnesses_config, dict) else {}
+        if not isinstance(floor, dict):
+            floor = {}
+        exclusions = set(floor.get("skill_projection_exclusions") or [])
+        adapter_names = {p.parent.name for p in adapter_root.glob("*/SKILL.md")}
+        for name in sorted(canonical_names - adapter_names - exclusions):
+            extras.append(
+                ExtraResult(
+                    kind="MISSING_PROJECTION",
+                    name=name,
+                    state="WARN",
+                    evidence=str(_relative_path(project_root, canonical_root / name / "SKILL.md")),
+                    note=f"Canonical skill not present in {harness} adapter tree ({root_rel.as_posix()}/).",
+                )
+            )
+        for name in sorted(adapter_names - canonical_names - exclusions):
+            extras.append(
+                ExtraResult(
+                    kind="UNTRACKED_SURFACE",
+                    name=name,
+                    state="WARN",
+                    evidence=str(_relative_path(project_root, adapter_root / name / "SKILL.md")),
+                    note=f"Adapter tree {harness} ({root_rel.as_posix()}/) carries a skill absent from canonical.",
+                )
+            )
+    return sorted(extras, key=lambda item: (item.kind, item.name))
+
+
 def _extra_project_skills(project_root: Path, capabilities: list[dict[str, Any]]) -> list[ExtraResult]:
     registry_skill_names = _registry_skill_dirs(capabilities)
     extras: list[ExtraResult] = []
@@ -1254,7 +1320,12 @@ def check_harness_parity(
     registered_floor_harnesses: list[str] = []
     for selected_harness in selected_harnesses:
         lifecycle = _harness_lifecycle_class(selected_harness, project_root)
-        if lifecycle == "suspended":
+        # Explicit --harness scope is honored unconditionally: lifecycle is a
+        # dispatch-oriented axis, so it is a safe relevance filter only while
+        # dispatch drives the work. Under manual-only operation a suspended
+        # harness may still be the explicit subject of inspection, so an
+        # explicitly-named harness is exempted from the suspension filter (WI-6009).
+        if lifecycle == "suspended" and not explicit_harness:
             continue
         if lifecycle == "registered_no_role":
             registered_floor_harnesses.append(selected_harness)
@@ -1324,7 +1395,11 @@ def check_harness_parity(
         )
     )
 
-    extras = _extra_project_skills(project_root, capabilities) if not errors else []
+    extras = _extra_project_skills(project_root, capabilities)
+    if not errors:
+        extras = extras + _projection_drift_extras(project_root, report_selected_harnesses, harnesses_config)
+    else:
+        extras = []
     counts = _count_states(results, extras, errors)
     return ParityReport(
         overall_status=_overall_status(results, extras, errors),

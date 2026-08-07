@@ -553,6 +553,77 @@ fallback = "Read the project skill."
     assert {extra.name for extra in report.extras} == {"untracked", "untracked-alias"}
 
 
+def test_explicit_harness_scope_evaluates_suspended_harness(tmp_path: Path) -> None:
+    """Change (A): an explicitly-named suspended harness is still evaluated (WI-6009)."""
+    module = _load_module()
+    state_dir = tmp_path / "harness-state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "harness-registry.json").write_text(
+        json.dumps({"harnesses": [{"harness_name": "goose", "status": "suspended", "role": []}]}),
+        encoding="utf-8",
+    )
+    _write_skill(tmp_path, "x")
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "skill.x"
+kind = "skill"
+canonical_name = "x"
+canonical_source = ".claude/skills/x/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/x/SKILL.md"
+status = "native"
+""",
+    )
+
+    report = module.check_harness_parity(tmp_path, harness="goose", role="loyal-opposition")
+
+    assert "goose" in report.selected_harnesses
+
+
+def test_projection_drift_reports_missing_and_untracked_surfaces(tmp_path: Path) -> None:
+    """Change (B): canonical-vs-adapter tree comparison emits WARN drift rows (WI-6009)."""
+    module = _load_module()
+    state_dir = tmp_path / "harness-state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "harness-registry.json").write_text(
+        json.dumps({"harnesses": [{"harness_name": "goose", "status": "active", "role": ["loyal-opposition"]}]}),
+        encoding="utf-8",
+    )
+    _write_skill(tmp_path, "canonical-only")
+    # .goose adapter tree carries one stale dir absent from canonical.
+    goose_skills = tmp_path / ".goose" / "skills"
+    stale = goose_skills / "stale-only"
+    stale.mkdir(parents=True, exist_ok=True)
+    stale.joinpath("SKILL.md").write_text("# stale-only\n", encoding="utf-8")
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "skill.canonical-only"
+kind = "skill"
+canonical_name = "canonical-only"
+canonical_source = ".claude/skills/canonical-only/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/canonical-only/SKILL.md"
+status = "native"
+""",
+    )
+
+    report = module.check_harness_parity(tmp_path, harness="goose", role="loyal-opposition")
+
+    kinds = {(extra.kind, extra.name) for extra in report.extras}
+    assert ("MISSING_PROJECTION", "canonical-only") in kinds
+    assert ("UNTRACKED_SURFACE", "stale-only") in kinds
+
+
 def test_unsupported_harness_surface_is_warn_not_missing(tmp_path: Path) -> None:
     module = _load_module()
     _write_registry(
