@@ -146,30 +146,33 @@ def _r5_registry_mismatch_invalidation_hits(src: str) -> list[tuple[int, str]]:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_r1_marker_role_wins_over_mismatched_durable(tmp_path: Path) -> None:
-    """R1 (behavioral): the session marker overrides the registry fallback role.
+def test_r1_marker_role_wins_and_absent_marker_fails_closed(tmp_path: Path) -> None:
+    """R1 (behavioral, WI-5933 C1): a valid session marker resolves to its role,
+    and absent explicit evidence the resolver FAILS CLOSED with ``None``.
 
-    Derive the registry baseline dynamically (no marker -> registry fallback), then
-    write a marker carrying the OPPOSITE role with a matching session_id. The
-    resolver MUST return ``(opposite_role, "marker")``, proving marker-WINS
-    semantics over a mismatched registry fallback role - not mere read order.
+    WI-5933 Slice B (``DCL-SESSION-ROLE-RESOLUTION-001`` v7): the interactive
+    resolver never substitutes the dispatcher/default registry role. Without a
+    marker the baseline is ``(None, "durable_marker_absent")``; a matching
+    marker carrying a valid role still wins (``(role, "marker")``), proving
+    marker-WINS semantics without any durable-role substitution.
     """
     mod = _load_resolver()
+    # No marker -> fail closed with None (never the durable role).
     baseline_role, baseline_source = mod.resolve_interactive_session_role(
         tmp_path, current_session_id="S-1", harness_name="claude"
     )
     assert baseline_source == "durable_marker_absent"
-    assert baseline_role in (mod.ROLE_PRIME, mod.ROLE_LO)
+    assert baseline_role is None
 
-    opposite = mod.ROLE_PRIME if baseline_role == mod.ROLE_LO else mod.ROLE_LO
+    # A matching valid marker wins.
     marker_path = mod.session_role_marker_path(tmp_path)
     marker_path.parent.mkdir(parents=True, exist_ok=True)
-    marker_path.write_text(json.dumps({"role": opposite, "session_id": "S-1"}), encoding="utf-8")
+    marker_path.write_text(json.dumps({"role": mod.ROLE_LO, "session_id": "S-1"}), encoding="utf-8")
 
     role, source = mod.resolve_interactive_session_role(tmp_path, current_session_id="S-1", harness_name="claude")
-    assert (role, source) == (opposite, "marker"), (
-        f"marker role {opposite!r} must override mismatched durable {baseline_role!r}; "
-        f"got {(role, source)!r}. R1 (declared-not-detected) regressed."
+    assert (role, source) == (mod.ROLE_LO, "marker"), (
+        f"marker role {mod.ROLE_LO!r} must resolve as marker evidence; got {(role, source)!r}. "
+        f"R1 (declared-not-detected) regressed."
     )
 
 
@@ -194,29 +197,34 @@ def test_r1_resolver_reads_marker_before_durable_fallback() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_r2_registry_is_fallback_only(tmp_path: Path) -> None:
-    """R2 (behavioral): the durable registry role is returned only when no valid
-    marker hint exists — marker absent, invalid role, or stale session_id.
+def test_r2_marker_absent_invalid_or_stale_fails_closed(tmp_path: Path) -> None:
+    """R2 (behavioral, WI-5933 C1): absent, invalid, or stale marker evidence
+    FAILS CLOSED with ``role is None`` - never the durable registry role.
+
+    WI-5933 Slice B: the dispatcher/default registry role is routing authority
+    only and is not an interactive fallback. Each no-valid-hint branch returns
+    ``None`` with its preserved ``durable_*`` source string.
     """
     mod = _load_resolver()
     marker_path = mod.session_role_marker_path(tmp_path)
     marker_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Marker absent -> durable fallback.
+    # Marker absent -> fail closed (None), never the durable role.
     role, source = mod.resolve_interactive_session_role(tmp_path, current_session_id="S-1", harness_name="claude")
     assert source == "durable_marker_absent"
-    assert role in (mod.ROLE_PRIME, mod.ROLE_LO)
-    durable = role
+    assert role is None
 
-    # Invalid role -> durable fallback (assertion 7).
+    # Invalid role -> fail closed (assertion 7).
     marker_path.write_text(json.dumps({"role": "supervisor", "session_id": "S-1"}), encoding="utf-8")
     role, source = mod.resolve_interactive_session_role(tmp_path, current_session_id="S-1", harness_name="claude")
-    assert (role, source) == (durable, "durable_marker_invalid_role")
+    assert source == "durable_marker_invalid_role"
+    assert role is None
 
-    # Stale session_id -> durable fallback (assertion 6).
+    # Stale session_id -> fail closed (assertion 6).
     marker_path.write_text(json.dumps({"role": mod.ROLE_PRIME, "session_id": "OTHER"}), encoding="utf-8")
     role, source = mod.resolve_interactive_session_role(tmp_path, current_session_id="S-1", harness_name="claude")
-    assert (role, source) == (durable, "durable_marker_stale_session")
+    assert source == "durable_marker_stale_session"
+    assert role is None
 
 
 # ──────────────────────────────────────────────────────────────────────────

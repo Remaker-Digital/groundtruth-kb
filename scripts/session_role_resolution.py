@@ -14,25 +14,33 @@ MemBase attribution, and the doctor checks all resolve "what role is this
 interactive session operating as" through ``resolve_interactive_session_role``
 so the resolution table lives in exactly one place.
 
-Resolution (per-session marker/envelope > legacy marker > durable), per the
-DCL interactive rows and the interactive-persistence correction:
+Resolution (per-session marker / open envelope > legacy marker), per the
+DCL interactive rows, the interactive-persistence correction, and WI-5933
+Slice B (``DCL-SESSION-ROLE-RESOLUTION-001`` v7):
 
 - marker absent / unreadable / malformed -> (envelope_role, "session_envelope")
-  when an open envelope carries a valid role, else (durable, "durable_marker_absent")
+  when an open envelope carries a valid role, else (None, "durable_marker_absent")
 - marker role not in {prime-builder, loyal-opposition}
-                                         -> (durable, "durable_marker_invalid_role")  # assertion 7
+                                         -> (None, "durable_marker_invalid_role")  # assertion 7
 - current_session_id given and marker session_id mismatches
-                                         -> (durable, "durable_marker_stale_session")  # assertion 6
+                                         -> (None, "durable_marker_stale_session")  # assertion 6
 - current_session_id given and matches   -> (marker_role, "marker")
 - current_session_id is None (unavailable)
                                          -> (marker_role, "marker_session_id_unverified")
 
-The ``marker_session_id_unverified`` branch is a legacy transition fallback.
-Callers that have an interactive session id should pass it so the resolver can
-prefer the per-session marker and validate the stored raw id. The session
-envelope/per-session marker authority survives compaction, resume, and
-contiguous SessionStart-like boundaries; headless dispatch remains outside this
-interactive resolver and continues to use dispatcher/default registry routing.
+WI-5933 Slice B (C1/C2): the interactive resolver NEVER substitutes the
+dispatcher/default registry role. Absent valid explicit interactive evidence
+(no marker, invalid role, or stale session id, and no open envelope) it fails
+closed with ``role_profile = None`` and a ``durable_*`` / ``session_envelope*``
+source string preserved verbatim so the Loyal Opposition file-safety gate
+continues to refuse. The ``durable_registry_role`` key is no longer exposed by
+``resolve_interactive_session_role_details``. The ``marker_session_id_unverified``
+branch is a legacy transition fallback: callers that have an interactive session
+id should pass it so the resolver can prefer the per-session marker and validate
+the stored raw id. The session envelope/per-session marker authority survives
+compaction, resume, and contiguous SessionStart-like boundaries; headless
+dispatch remains outside this interactive resolver and continues to use
+dispatcher/default registry routing.
 
 The resolver is strictly READ-ONLY: it never writes the marker and never
 mutates the dispatcher/default role map. The registry fallback is composed from the
@@ -49,14 +57,6 @@ from typing import Any
 ROLE_PRIME = "prime-builder"
 ROLE_LO = "loyal-opposition"
 _VALID_ROLES = frozenset({ROLE_PRIME, ROLE_LO})
-_DURABLE_FALLBACK_SOURCES = frozenset(
-    {
-        "durable_marker_absent",
-        "durable_marker_invalid_role",
-        "durable_marker_stale_session",
-    }
-)
-
 # MUST equal scripts.workstream_focus._SESSION_ROLE_MARKER_NAME (Slice 2) and
 # the SessionStart dispatchers' _SESSION_ROLE_MARKER_NAME (Slice 3). A parity
 # test asserts the read path equals the Slice 2 write path so the deletion /
@@ -148,23 +148,40 @@ def resolve_interactive_session_role(
     *,
     current_session_id: str | None = None,
     harness_name: str = "claude",
-) -> tuple[str, str]:
+) -> tuple[str | None, str]:
     """Return ``(role_profile, source)`` for an interactive session.
 
-    ``role_profile`` is in ``{prime-builder, loyal-opposition}``. ``source`` is
-    one of ``marker``, ``marker_session_id_unverified``, ``durable_marker_absent``,
+    ``role_profile`` is in ``{prime-builder, loyal-opposition}`` when explicit
+    interactive evidence resolved, and ``None`` when it did not. ``source`` is
+    one of ``marker``, ``marker_session_id_unverified``, ``session_envelope``,
+    ``session_envelope_marker_invalid_role``,
+    ``session_envelope_marker_stale_session``, ``durable_marker_absent``,
     ``durable_marker_invalid_role``, ``durable_marker_stale_session``. See the
     module docstring for the deterministic resolution table.
+
+    WI-5933 Slice B (``DCL-SESSION-ROLE-RESOLUTION-001`` v7, assertions
+    ``ROLE-DCL-A5`` / ``ROLE-DCL-A6``): the interactive resolver NEVER returns
+    the dispatcher/default registry role. The registry role is headless-dispatch
+    routing authority; substituting it for a missing, invalid, or stale
+    interactive marker silently mislabels the session's role, which is a
+    review-integrity defect under ``.claude/rules/file-bridge-protocol.md``
+    section Review Independence Boundary. Absent valid explicit evidence this
+    function now fails closed with ``role_profile = None``; callers MUST
+    suppress rather than assume a role.
+
+    The ``durable_*`` and ``session_envelope*`` source strings are preserved
+    verbatim so the Loyal Opposition file-safety gate, which keys off those
+    exact strings to keep refusing, is behaviourally unchanged.
 
     READ-ONLY: never writes the marker or the dispatcher/default role map. Callers SHOULD
     pass the RAW UserPromptSubmit payload ``session_id`` (not a sanitized cache
     key) as ``current_session_id`` so the comparison is like-for-like with the
     Slice 2 writer's stored raw id.
     """
-    durable = _durable_role(project_root, harness_name)
-
     # WI-4663: Load per-harness session envelope and prefer its role_resolved
-    # over the registry fallback role if the envelope is status="open".
+    # when the envelope is status="open". An open envelope IS explicit
+    # interactive evidence; the dispatcher/default registry role is not, and is
+    # deliberately not read here (WI-5933 C1).
     envelope_path = project_root / "harness-state" / harness_name / "session-envelope.json"
     envelope_role = None
     if envelope_path.is_file():
@@ -177,7 +194,7 @@ def resolve_interactive_session_role(
         except Exception:
             pass
 
-    fallback = envelope_role if envelope_role is not None else durable
+    fallback = envelope_role
     fallback_absent_source = "session_envelope" if envelope_role is not None else "durable_marker_absent"
     fallback_invalid_source = (
         "session_envelope_marker_invalid_role" if envelope_role is not None else "durable_marker_invalid_role"
@@ -236,15 +253,9 @@ def resolve_interactive_session_role_details(
         current_session_id=current_session_id,
         harness_name=harness_name,
     )
-    durable = _durable_role(project_root, harness_name)
-    authority_mode = "durable_registry_fallback" if source in _DURABLE_FALLBACK_SOURCES else "interactive_transcript"
+    authority_mode = "interactive_transcript" if role is not None else "unresolved"
     return {
         "interactive_resolved_role": role,
         "interactive_role_source": source,
-        "durable_registry_role": durable,
-        "durable_registry_authority": (
-            "headless dispatch routing and interactive fallback only; non-overriding when a transcript-defined "
-            "interactive role is present"
-        ),
         "authority_mode": authority_mode,
     }

@@ -131,15 +131,21 @@ def test_resolve_failsoft_uses_resolver_role(hook: ModuleType, monkeypatch: pyte
     assert hook._resolve_session_role_failsoft({"session_id": "sess-1"}) == hook.ROLE_LO
 
 
-def test_resolve_failsoft_defaults_prime_on_resolver_error(hook: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
-    """On any resolver exception the hook degrades to the Prime default."""
+def test_resolve_failsoft_suppresses_on_resolver_error(hook: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    """On any resolver exception the hook suppresses (returns None), not Prime.
+
+    WI-5933 Slice B (C4): surfacing a Prime-filtered actionable list to a
+    session whose role is unknown is the mislabelling
+    ``DCL-SESSION-ROLE-RESOLUTION-001`` v7 forbids; the caller suppresses the
+    surface entirely on ``None``. The hook still fails soft (never crashes).
+    """
     import scripts.session_role_resolution as srr
 
     def _boom(*a: object, **k: object) -> tuple[str, str]:
         raise RuntimeError("resolver unavailable")
 
     monkeypatch.setattr(srr, "resolve_interactive_session_role", _boom)
-    assert hook._resolve_session_role_failsoft({"session_id": "sess-1"}) == hook.ROLE_PRIME
+    assert hook._resolve_session_role_failsoft({"session_id": "sess-1"}) is None
 
 
 def test_resolve_failsoft_passes_raw_session_id(hook: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:

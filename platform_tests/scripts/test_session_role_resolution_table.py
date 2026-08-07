@@ -68,26 +68,30 @@ def _write_marker(project_root: Path, body: dict[str, object]) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Assertion 4: resolved=durable when interactive and marker is absent.
+# Assertion 4: fail closed when interactive and marker is absent (WI-5933 C1).
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("harness", _HARNESSES)
-def test_assertion4_no_marker_returns_durable(
+def test_assertion4_no_marker_fails_closed(
     tmp_path: Path,
     harness: str,
     force_durable_pb: None,
 ) -> None:
-    """No marker on disk → resolver returns ``(durable, durable_marker_absent)``."""
+    """No marker on disk → resolver returns ``(None, durable_marker_absent)``.
+
+    WI-5933 Slice B (C1): the interactive resolver never substitutes the durable
+    registry role; absent explicit evidence it fails closed with role ``None``.
+    """
     role, source = srr.resolve_interactive_session_role(
         tmp_path, current_session_id=_SESSION_ID_A, harness_name=harness
     )
-    assert role == _ROLE_PB
+    assert role is None
     assert source == "durable_marker_absent"
 
 
 @pytest.mark.parametrize("harness", _HARNESSES)
-def test_assertion4_compaction_resume_falls_back_to_durable(
+def test_assertion4_compaction_resume_fails_closed(
     tmp_path: Path,
     harness: str,
     force_durable_pb: None,
@@ -99,12 +103,15 @@ def test_assertion4_compaction_resume_falls_back_to_durable(
     tested in Module 2); the resolver's defense-in-depth check on session_id
     catches the case where SessionStart invalidation silently failed and a
     marker from a previous session is still on disk.
+
+    WI-5933 Slice B (C1): stale evidence fails closed with role ``None``; the
+    resolver never substitutes the durable role.
     """
     _write_marker(tmp_path, {"role": _ROLE_LO, "session_id": _SESSION_ID_B})
     role, source = srr.resolve_interactive_session_role(
         tmp_path, current_session_id=_SESSION_ID_A, harness_name=harness
     )
-    assert role == _ROLE_PB, "stale marker must not override durable role"
+    assert role is None, "stale marker must fail closed, not fall back to durable role"
     assert source == "durable_marker_stale_session"
 
 
@@ -197,7 +204,7 @@ def test_assertion6_marker_without_session_id_field_is_stale(
     role, source = srr.resolve_interactive_session_role(
         tmp_path, current_session_id=_SESSION_ID_A, harness_name=harness
     )
-    assert role == _ROLE_PB
+    assert role is None
     assert source == "durable_marker_stale_session"
 
 
@@ -215,7 +222,7 @@ def test_assertion6_marker_session_id_wrong_type_is_stale(
     role, source = srr.resolve_interactive_session_role(
         tmp_path, current_session_id=_SESSION_ID_A, harness_name=harness
     )
-    assert role == _ROLE_PB
+    assert role is None
     assert source == "durable_marker_stale_session"
 
 
@@ -241,7 +248,7 @@ def test_assertion7_marker_with_invalid_role_token_is_ignored(
     role, source = srr.resolve_interactive_session_role(
         tmp_path, current_session_id=_SESSION_ID_A, harness_name=harness
     )
-    assert role == _ROLE_PB
+    assert role is None
     assert source == "durable_marker_invalid_role"
 
 
@@ -258,7 +265,7 @@ def test_assertion7_marker_with_missing_role_field_is_invalid(
     role, source = srr.resolve_interactive_session_role(
         tmp_path, current_session_id=_SESSION_ID_A, harness_name=harness
     )
-    assert role == _ROLE_PB
+    assert role is None
     assert source == "durable_marker_invalid_role"
 
 
@@ -284,7 +291,7 @@ def test_malformed_marker_json_treated_as_absent(
     role, source = srr.resolve_interactive_session_role(
         tmp_path, current_session_id=_SESSION_ID_A, harness_name=harness
     )
-    assert role == _ROLE_PB
+    assert role is None
     assert source == "durable_marker_absent"
 
 
@@ -303,7 +310,7 @@ def test_non_object_marker_body_treated_as_absent(
     role, source = srr.resolve_interactive_session_role(
         tmp_path, current_session_id=_SESSION_ID_A, harness_name=harness
     )
-    assert role == _ROLE_PB
+    assert role is None
     assert source == "durable_marker_absent"
 
 

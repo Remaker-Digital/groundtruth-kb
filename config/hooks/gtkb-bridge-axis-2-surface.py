@@ -304,12 +304,19 @@ def _render_surface(
     return "\n".join(lines)
 
 
-def _resolve_session_role_failsoft(payload: dict[str, Any]) -> str:
+def _resolve_session_role_failsoft(payload: dict[str, Any]) -> str | None:
     """Resolve the interactive session role via the shared resolver; fail-soft.
 
-    Passes the RAW payload ``session_id`` (Slice 2 stores the raw id). Returns
-    ``ROLE_PRIME`` on any resolver import/lookup failure so the hook never
-    crashes and degrades to today's Prime-default behavior.
+    Passes the RAW payload ``session_id`` (Slice 2 stores the raw id).
+
+    WI-5933 Slice B (C4): returns ``None`` when the resolver could not establish
+    an interactive role, instead of coercing to ``ROLE_PRIME``. Surfacing a
+    Prime-filtered actionable list to a session whose role is unknown is the
+    mislabelling ``DCL-SESSION-ROLE-RESOLUTION-001`` v7 forbids; the caller
+    suppresses the surface entirely on ``None``.
+
+    Still fail-soft: any resolver import/lookup failure returns ``None`` rather
+    than raising, so the hook never crashes the agent -- it just stays silent.
     """
     raw_session_id = str(payload.get("session_id") or "").strip() or None
     try:
@@ -320,10 +327,10 @@ def _resolve_session_role_failsoft(payload: dict[str, Any]) -> str:
             current_session_id=raw_session_id,
             harness_name="claude",
         )
-        return role_profile if role_profile in (ROLE_PRIME, ROLE_LO) else ROLE_PRIME
+        return role_profile if role_profile in (ROLE_PRIME, ROLE_LO) else None
     except Exception as exc:  # noqa: BLE001 - hook must never crash the agent.
         _log_error({"event": "session_role_resolve_failed", "error": str(exc)})
-        return ROLE_PRIME
+        return None
 
 
 def _user_prompt_handler(stdin_text: str) -> str:
@@ -340,12 +347,14 @@ def _user_prompt_handler(stdin_text: str) -> str:
     session_id = _resolve_session_id(payload)
     cache_path = PROJECT_ROOT / STATE_DIR_REL / f"{session_id}.json"
 
-    # Slice 4: resolve the session-stated role (marker > durable) and surface
-    # the matching actionable work. The RAW payload session_id (not the
-    # sanitized cache key) is passed so the resolver's session-id comparison is
-    # like-for-like with the Slice 2 writer's stored raw id. Fail-soft to the
-    # Prime profile (today's default) on any resolver failure.
+    # Slice 4: resolve the session-stated role and surface the matching
+    # actionable work. The RAW payload session_id (not the sanitized cache key)
+    # is passed so the resolver's session-id comparison is like-for-like with
+    # the Slice 2 writer's stored raw id. WI-5933 C4: unresolved role suppresses
+    # the surface rather than defaulting to a Prime-filtered list.
     role_profile = _resolve_session_role_failsoft(payload)
+    if role_profile is None:
+        return ""
 
     signature, items = _compute_actionable_for_role(role_profile)
     if not signature or not items:

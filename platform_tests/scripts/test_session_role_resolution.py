@@ -109,34 +109,37 @@ def test_per_session_marker_is_authority_over_legacy(tmp_path: Path, monkeypatch
     assert source == "marker"
 
 
-def test_per_session_invalid_role_falls_back_to_durable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_per_session_invalid_role_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5933 C1/C2: an invalid per-session role fails closed with role None and
+    a preserved durable source; details expose no durable_registry_role."""
     monkeypatch.setattr(srr, "_durable_role", lambda *a, **k: srr.ROLE_PRIME)
     _write_per_session(tmp_path, "bogus-role", "sess-1")
     resolved, source = srr.resolve_interactive_session_role(tmp_path, current_session_id="sess-1")
-    assert resolved == srr.ROLE_PRIME
+    assert resolved is None
     assert source == "durable_marker_invalid_role"
 
     details = srr.resolve_interactive_session_role_details(tmp_path, current_session_id="sess-1")
-    assert details["interactive_resolved_role"] == srr.ROLE_PRIME
+    assert details["interactive_resolved_role"] is None
     assert details["interactive_role_source"] == "durable_marker_invalid_role"
-    assert details["durable_registry_role"] == srr.ROLE_PRIME
-    assert details["authority_mode"] == "durable_registry_fallback"
+    assert "durable_registry_role" not in details
+    assert details["authority_mode"] == "unresolved"
 
 
-def test_per_session_stored_id_mismatch_falls_back(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_per_session_stored_id_mismatch_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A per-session marker whose stored raw session_id differs from the querying
-    id (sanitized-key collision) is treated as stale (assertion 6)."""
+    id (sanitized-key collision) is treated as stale (assertion 6) and fails
+    closed (WI-5933 C1/C2)."""
     monkeypatch.setattr(srr, "_durable_role", lambda *a, **k: srr.ROLE_PRIME)
     _write_per_session(tmp_path, srr.ROLE_LO, "sess-1", stored_session_id="a-different-raw-id")
     resolved, source = srr.resolve_interactive_session_role(tmp_path, current_session_id="sess-1")
-    assert resolved == srr.ROLE_PRIME
+    assert resolved is None
     assert source == "durable_marker_stale_session"
 
     details = srr.resolve_interactive_session_role_details(tmp_path, current_session_id="sess-1")
-    assert details["interactive_resolved_role"] == srr.ROLE_PRIME
+    assert details["interactive_resolved_role"] is None
     assert details["interactive_role_source"] == "durable_marker_stale_session"
-    assert details["durable_registry_role"] == srr.ROLE_PRIME
-    assert details["authority_mode"] == "durable_registry_fallback"
+    assert "durable_registry_role" not in details
+    assert details["authority_mode"] == "unresolved"
 
 
 def test_no_per_session_marker_falls_back_to_legacy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -149,10 +152,11 @@ def test_no_per_session_marker_falls_back_to_legacy(tmp_path: Path, monkeypatch:
     assert source == "marker"
 
 
-def test_no_marker_at_all_uses_durable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_no_marker_at_all_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5933 C1: absent any marker the resolver returns None, never the durable role."""
     monkeypatch.setattr(srr, "_durable_role", lambda *a, **k: srr.ROLE_LO)
     resolved, source = srr.resolve_interactive_session_role(tmp_path, current_session_id="sess-1")
-    assert resolved == srr.ROLE_LO
+    assert resolved is None
     assert source == "durable_marker_absent"
 
 
@@ -178,7 +182,7 @@ def test_open_envelope_role_beats_durable_and_reports_envelope_source(
     )
     assert details["interactive_resolved_role"] == srr.ROLE_PRIME
     assert details["interactive_role_source"] == "session_envelope"
-    assert details["durable_registry_role"] == srr.ROLE_LO
+    assert "durable_registry_role" not in details
     assert details["authority_mode"] == "interactive_transcript"
 
 

@@ -81,19 +81,21 @@ def test_resolver_marker_beats_durable(
     assert source == "marker"
 
 
-def test_resolver_invalid_role_falls_back(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolver_invalid_role_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5933 C1: an invalid marker role fails closed with None, never the durable role."""
     monkeypatch.setattr(srr, "_durable_role", lambda *a, **k: srr.ROLE_PRIME)
     _write_marker(tmp_path, "bogus-role", "sess-1")
     resolved, source = srr.resolve_interactive_session_role(tmp_path, current_session_id="sess-1")
-    assert resolved == srr.ROLE_PRIME
+    assert resolved is None
     assert source == "durable_marker_invalid_role"
 
 
-def test_resolver_stale_session_falls_back(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolver_stale_session_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5933 C1: a stale session marker fails closed with None, never the durable role."""
     monkeypatch.setattr(srr, "_durable_role", lambda *a, **k: srr.ROLE_PRIME)
     _write_marker(tmp_path, srr.ROLE_LO, "old-session")
     resolved, source = srr.resolve_interactive_session_role(tmp_path, current_session_id="new-session")
-    assert resolved == srr.ROLE_PRIME
+    assert resolved is None
     assert source == "durable_marker_stale_session"
 
 
@@ -106,20 +108,22 @@ def test_resolver_accepts_unverified_when_no_session_id(tmp_path: Path, monkeypa
 
 
 @pytest.mark.parametrize("durable", [srr.ROLE_PRIME, srr.ROLE_LO])
-def test_resolver_no_marker_uses_durable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, durable: str) -> None:
+def test_resolver_no_marker_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, durable: str) -> None:
+    """WI-5933 C1: absent a marker the resolver returns None regardless of the durable role."""
     monkeypatch.setattr(srr, "_durable_role", lambda *a, **k: durable)
     resolved, source = srr.resolve_interactive_session_role(tmp_path, current_session_id="sess-1")
-    assert resolved == durable
+    assert resolved is None
     assert source == "durable_marker_absent"
 
 
-def test_resolver_malformed_marker_uses_durable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolver_malformed_marker_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5933 C1: a malformed marker resolves as absent and fails closed with None."""
     monkeypatch.setattr(srr, "_durable_role", lambda *a, **k: srr.ROLE_PRIME)
     marker = srr.session_role_marker_path(tmp_path)
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text("{ not valid json", encoding="utf-8")
     resolved, source = srr.resolve_interactive_session_role(tmp_path, current_session_id="sess-1")
-    assert resolved == srr.ROLE_PRIME
+    assert resolved is None
     assert source == "durable_marker_absent"
 
 
@@ -160,14 +164,13 @@ def test_resolver_is_read_only(tmp_path: Path) -> None:
     assert _sha(projection) == proj_before, "resolver mutated the dispatcher/default role map"
 
 
-def test_durable_lookup_reads_seeded_role(tmp_path: Path) -> None:
-    """The durable fallback returns the seeded harness role (read path works)."""
+def test_resolver_no_marker_fails_closed_with_seeded_registry(tmp_path: Path) -> None:
+    """WI-5933 C1: no marker fails closed (None) even when a durable registry role exists."""
     _seed_registry(tmp_path, ["loyal-opposition"])
-    # No marker -> durable fallback returns the seeded role.
     resolved, source = srr.resolve_interactive_session_role(
         tmp_path, current_session_id="sess-1", harness_name="claude"
     )
-    assert resolved == srr.ROLE_LO
+    assert resolved is None
     assert source == "durable_marker_absent"
 
 
@@ -204,10 +207,9 @@ def test_resolver_uses_envelope_fallback(tmp_path: Path, monkeypatch: pytest.Mon
     assert source == "session_envelope_marker_stale_session"
 
 
-def test_resolver_envelope_closed_or_missing_falls_back_to_durable(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # durable is prime-builder
+def test_resolver_envelope_closed_or_invalid_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5933 C1: a closed envelope, or an open envelope with an invalid role,
+    fails closed with None rather than substituting the durable role."""
     monkeypatch.setattr(srr, "_durable_role", lambda *a, **k: srr.ROLE_PRIME)
 
     # 1. envelope is closed
@@ -215,7 +217,7 @@ def test_resolver_envelope_closed_or_missing_falls_back_to_durable(
     resolved, source = srr.resolve_interactive_session_role(
         tmp_path, current_session_id="sess-1", harness_name="claude"
     )
-    assert resolved == srr.ROLE_PRIME
+    assert resolved is None
     assert source == "durable_marker_absent"
 
     # 2. envelope is open but role_resolved is invalid/None
@@ -223,5 +225,5 @@ def test_resolver_envelope_closed_or_missing_falls_back_to_durable(
     resolved, source = srr.resolve_interactive_session_role(
         tmp_path, current_session_id="sess-1", harness_name="claude"
     )
-    assert resolved == srr.ROLE_PRIME
+    assert resolved is None
     assert source == "durable_marker_absent"
