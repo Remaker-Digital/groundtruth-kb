@@ -65,7 +65,7 @@ _SPEC_TO_TEST = (
 _COMMAND_EVIDENCE = "Executed: python -m pytest platform_tests/hooks/test_x.py\n"
 _COMMIT_FINALIZATION = (
     "## Commit Finalization Evidence\n\n"
-    "- Finalization helper: `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`\n"
+    "- Finalization helper: `.claude/skills/gtkb-verify/helpers/write_verdict.py --finalize-verified`\n"
     "- Same-transaction path set:\n"
     "- `scripts/foo.py`\n"
     "- `bridge/test-sample-thread-002.md`\n"

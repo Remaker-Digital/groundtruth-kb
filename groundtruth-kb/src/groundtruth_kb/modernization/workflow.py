@@ -403,7 +403,6 @@ class ModernizationWorkflow:
             _resolve_platform_helper(
                 self.platform_root,
                 ".claude/skills/gtkb-bridge-propose/helpers/write_bridge.py",
-                ".claude/skills/bridge-propose/helpers/write_bridge.py",
             ),
             "gtkb_modernization_proposal_helper",
         )
@@ -411,7 +410,6 @@ class ModernizationWorkflow:
             _resolve_platform_helper(
                 self.platform_root,
                 ".claude/skills/gtkb-bridge/helpers/impl_report_bridge.py",
-                ".claude/skills/bridge/helpers/impl_report_bridge.py",
             ),
             "gtkb_modernization_report_helper",
         )
@@ -419,7 +417,6 @@ class ModernizationWorkflow:
             _resolve_platform_helper(
                 self.platform_root,
                 ".claude/skills/gtkb-verify/helpers/write_verdict.py",
-                ".claude/skills/verify/helpers/write_verdict.py",
             ),
             "gtkb_modernization_verify_helper",
         )

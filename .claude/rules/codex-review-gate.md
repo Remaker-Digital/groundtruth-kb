@@ -127,7 +127,7 @@ If Loyal Opposition is verifying an implementation:
 7. Issue `NO-GO` instead of `VERIFIED` for any untested linked specification or
    blocking-gap clause unless an explicit owner waiver is documented.
 8. Record `VERIFIED` only through the atomic finalization helper:
-   `python .claude/skills/verify/helpers/write_verdict.py --slug <document-name> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [...]`.
+   `python .claude/skills/gtkb-verify/helpers/write_verdict.py --slug <document-name> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [...]`.
    The helper must create the local commit containing the verified paths and the
    verdict artifact. If commit creation fails, Loyal Opposition must fail closed
    and must not leave the bridge thread terminal.

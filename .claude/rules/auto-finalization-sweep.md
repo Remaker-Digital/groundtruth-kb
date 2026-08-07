@@ -59,7 +59,7 @@ On turn-end it:
      audit-logged for manual handling (the sweep never guesses source staging or
      hunk-selection).
    - **Current finalization/checker floor** — the terminal verdict body must
-     pass `.claude/skills/verify/helpers/write_verdict.py` `validate_verified_body()`
+     pass `.claude/skills/gtkb-verify/helpers/write_verdict.py` `validate_verified_body()`
      and the protected-commit authorization checker for the exact verdict path.
      A legacy file-only verdict that lacks `Recommended commit type`,
      `## Spec-to-Test Mapping`, `## Commands Executed`, or helper-generated

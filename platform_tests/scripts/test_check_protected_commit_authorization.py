@@ -886,7 +886,7 @@ def test_verified_bridge_file_with_finalization_evidence_passes(tmp_path: Path) 
 
 ## Commit Finalization Evidence
 
-- Finalization helper: `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`
+- Finalization helper: `.claude/skills/gtkb-verify/helpers/write_verdict.py --finalize-verified`
 - Same-transaction path set:
 - `scripts/foo.py`
 - `bridge/gtkb-example-003.md`

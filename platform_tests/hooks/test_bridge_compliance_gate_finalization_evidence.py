@@ -60,7 +60,7 @@ missing_required_specs: []
         body += """
 ## Commit Finalization Evidence
 
-- Finalization helper: `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`
+- Finalization helper: `.claude/skills/gtkb-verify/helpers/write_verdict.py --finalize-verified`
 - Same-transaction path set:
 - `scripts/foo.py`
 - `bridge/test-finalization-003.md`

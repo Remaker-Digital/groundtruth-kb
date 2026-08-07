@@ -1011,7 +1011,7 @@ def _append_commit_finalization_evidence(body: str, *, commit_message: str, path
     subject = commit_message.splitlines()[0].strip()
     return (
         body.rstrip() + "\n\n## Commit Finalization Evidence\n\n"
-        "- Finalization helper: `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`\n"
+        "- Finalization helper: `.claude/skills/gtkb-verify/helpers/write_verdict.py --finalize-verified`\n"
         f"- Intended commit subject: `{subject}`\n"
         "- Same-transaction path set:\n"
         f"{path_lines}\n"

@@ -166,7 +166,7 @@ def _valid_verified_verdict() -> str:
         "## Commands Executed\n\n"
         "- `pytest platform_tests/scripts/test_gtkb_bridge_writer.py -q`\n\n"
         "## Commit Finalization Evidence\n\n"
-        "- Finalization helper: `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`\n"
+        "- Finalization helper: `.claude/skills/gtkb-verify/helpers/write_verdict.py --finalize-verified`\n"
         "- Intended commit subject: `fix: fixture`\n"
         "- Same-transaction path set:\n"
         "- `scripts/example.py`\n"

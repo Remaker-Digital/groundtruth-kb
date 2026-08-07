@@ -67,7 +67,7 @@ A complete thread cycle: `NEW` → (`NO-GO` → `REVISED`)* → `GO` → (implem
 4. Run pre-filing preflights:
    - `python scripts/bridge_applicability_preflight.py --bridge-id <topic-slug>` — must report `preflight_passed: true`, no missing required/advisory specs.
    - `python scripts/adr_dcl_clause_preflight.py --bridge-id <topic-slug>` — must exit 0, no blocking gaps.
-5. Delegate the file write to the governed no-index helper-mediated path (`gtkb-bridge-propose` skill — see `.claude/skills/bridge-propose/SKILL.md`) or its CLI successor. The helper performs credential scanning per `CREDENTIAL_PATTERNS + BASH_EXTRAS`, writes `bridge/<topic-slug>-<version>.md`, and publishes dispatcher/TAFE state. It must not recreate the retired bridge-index file.
+5. Delegate the file write to the governed no-index helper-mediated path (`gtkb-bridge-propose` skill — see `.claude/skills/gtkb-bridge-propose/SKILL.md`) or its CLI successor. The helper performs credential scanning per `CREDENTIAL_PATTERNS + BASH_EXTRAS`, writes `bridge/<topic-slug>-<version>.md`, and publishes dispatcher/TAFE state. It must not recreate the retired bridge-index file.
 
 **Credential safety**: never bypass the helper for governance-content writes. Use `mode="abort"` on credential hits unless redaction is genuinely safe; `mode="redact"` replaces spans with `[REDACTED:<label>]` markers.
 
@@ -75,12 +75,12 @@ A complete thread cycle: `NEW` → (`NO-GO` → `REVISED`)* → `GO` → (implem
 
 **Purpose**: identify actionable bridge items for the current harness's role.
 
-**Helper**: `.claude/skills/bridge/helpers/scan_bridge.py`
+**Helper**: `.claude/skills/gtkb-bridge/helpers/scan_bridge.py`
 
 **Canonical invocation** (deterministic, replaces manual grep+Read+regex):
 
 ```powershell
-python .claude/skills/bridge/helpers/scan_bridge.py --role <prime-builder|loyal-opposition> [--format json|markdown]
+python .claude/skills/gtkb-bridge/helpers/scan_bridge.py --role <prime-builder|loyal-opposition> [--format json|markdown]
 ```
 
 Current scans must use dispatcher/TAFE state and the status-bearing versioned
@@ -102,7 +102,7 @@ historical or defective and must not be used for live queue authority.
 
 **Purpose**: help Prime Builder respond to a latest `NO-GO` without filing incomplete skeletons as actionable bridge state.
 
-**Helper**: `.claude/skills/bridge/helpers/revise_bridge.py`
+**Helper**: `.claude/skills/gtkb-bridge/helpers/revise_bridge.py`
 
 **Action**:
 
@@ -140,19 +140,19 @@ The helper creates drafts; it does not author the substantive correction. Prime 
 
 **Purpose**: file a post-implementation report after a GO is implemented.
 
-**Helper**: `.claude/skills/bridge/helpers/impl_report_bridge.py`
+**Helper**: `.claude/skills/gtkb-bridge/helpers/impl_report_bridge.py`
 
 **Action**:
 
 1. Implement the work per the GO d proposal scope. Run the spec-derived tests; capture the exact commands and observed results.
 2. Use the helper's `plan` mode or no-index CLI successor to require latest `GO`, load the approved proposal and GO verdict, compute the next version, carry forward linked specifications, capture dirty files via `git diff --name-only HEAD --`, and show the proposed `NEW` report metadata without mutation:
    ```powershell
-   python .claude/skills/bridge/helpers/impl_report_bridge.py plan <topic-slug>
+   python .claude/skills/gtkb-bridge/helpers/impl_report_bridge.py plan <topic-slug>
    ```
 3. Use `scaffold` mode when you need a non-dispatchable draft under `.gtkb-state/bridge-impl-reports/drafts/`; complete the implementation claim, command evidence, observed results, spec-to-test mapping, acceptance status, and risk/rollback before live filing.
 4. Use `file` mode only when the report content is ready for Loyal Opposition verification. The helper refuses non-`GO` latest status, exact-document mismatches, existing target files, and credential-shaped content. It writes `bridge/<topic-slug>-<next-version>.md` through the governed no-index bridge path:
    ```powershell
-   python .claude/skills/bridge/helpers/impl_report_bridge.py file <topic-slug> --content-file <completed-report.md>
+   python .claude/skills/gtkb-bridge/helpers/impl_report_bridge.py file <topic-slug> --content-file <completed-report.md>
    ```
 5. The helper does not bypass Loyal Opposition verification. After filing, the thread is Loyal Opposition-actionable; wait for VERIFIED or NO-GO response.
 
@@ -160,12 +160,12 @@ The helper creates drafts; it does not author the substantive correction. Prime 
 
 **Purpose**: write protected narrative-artifact files with an immediate Layer-C universal-floor evidence verdict.
 
-**Helper**: `.claude/skills/bridge/helpers/protected_write.py`
+**Helper**: `.claude/skills/gtkb-bridge/helpers/protected_write.py`
 
 **Canonical invocation**:
 
 ```powershell
-python .claude/skills/bridge/helpers/protected_write.py --target <path> --content-file <path> --packet <packet-path>
+python .claude/skills/gtkb-bridge/helpers/protected_write.py --target <path> --content-file <path> --packet <packet-path>
 ```
 
 Use this helper for protected narrative-artifact paths governed by `config/governance/narrative-artifact-approval.toml` when an approval packet already exists. The helper validates the packet against the proposed LF-normalized content, writes the target, stages only that target path, and runs `scripts/check_narrative_artifact_evidence.py --paths <target>` semantics against the staged blob. A clean exit means the same universal-floor evidence checker used by `.githooks/pre-commit` clears the staged file.
@@ -176,12 +176,12 @@ This helper is a deterministic Layer-C universal-floor evidence path. It is not 
 
 **Purpose**: read-only inspection without mutation.
 
-**Helper**: `.claude/skills/bridge/helpers/show_thread_bridge.py`
+**Helper**: `.claude/skills/gtkb-bridge/helpers/show_thread_bridge.py`
 
 **Canonical invocation** (deterministic, replaces per-version grep+Read):
 
 ```powershell
-python .claude/skills/bridge/helpers/show_thread_bridge.py <topic-slug> [--format json|markdown] [--preview-lines N]
+python .claude/skills/gtkb-bridge/helpers/show_thread_bridge.py <topic-slug> [--format json|markdown] [--preview-lines N]
 ```
 
 The helper resolves all `bridge/<slug>-NNN.md` files, sorts by version, and returns `{slug, versions, found, preview_lines_cap}` plus any legacy compatibility-view diagnostics when available. Per-version content preview is bounded (default 200 lines) so the output doesn't balloon for long bodies. Public Python API: `from show_thread_bridge import show; show("gtkb-foo")`.
@@ -235,9 +235,9 @@ For specific subactions, prefer the more focused skill:
 
 | Action | Specific skill | Path |
 |---|---|---|
-| File a proposal | `gtkb-bridge-propose` | `.claude/skills/bridge-propose/SKILL.md` |
-| Review a proposal | `gtkb-proposal-review` | `.claude/skills/proposal-review/SKILL.md` |
-| Submit for review | `gtkb-send-review` | `.claude/skills/send-review/SKILL.md` |
+| File a proposal | `gtkb-bridge-propose` | `.claude/skills/gtkb-bridge-propose/SKILL.md` |
+| Review a proposal | `gtkb-proposal-review` | `.claude/skills/gtkb-proposal-review/SKILL.md` |
+| Submit for review | `gtkb-send-review` | `.claude/skills/gtkb-send-review/SKILL.md` |
 
 This skill (`gtkb-bridge`) is the cross-cutting reference. Use it when:
 
@@ -247,7 +247,7 @@ This skill (`gtkb-bridge`) is the cross-cutting reference. Use it when:
 
 ## Cross-harness implementation notes
 
-- The skill body is identical across Claude Code and Codex via the `scripts/generate_codex_skill_adapters.py` adapter pipeline. The Codex adapter version at `.codex/skills/bridge/SKILL.md` carries a `<!-- GTKB-CODEX-SKILL-ADAPTER -->` marker; do NOT edit the adapter directly. Edit the canonical at `.claude/skills/bridge/SKILL.md` and regenerate.
+- The skill body is identical across Claude Code and Codex via the `scripts/generate_codex_skill_adapters.py` adapter pipeline. The Codex adapter version at `.codex/skills/bridge/SKILL.md` carries a `<!-- GTKB-CODEX-SKILL-ADAPTER -->` marker; do NOT edit the adapter directly. Edit the canonical at `.claude/skills/gtkb-bridge/SKILL.md` and regenerate.
 - Hook-layer behavior (PreToolUse / PostToolUse / Stop) differs between harnesses by necessity (different schemas: `.claude/settings.json` JSON vs `.codex/hooks.json` JSON). Hook handler scripts are shared regardless.
 - Underlying scripts and CLIs are harness-agnostic. A future `gt bridge` CLI subcommand (per `gtkb-bridge-skill-unified-001` Slice 3, deferred at Codex GO `-002`) will provide a uniform invocation surface; until that lands, this skill delegates to per-action helpers (`gtkb-bridge-propose`, etc.) and direct script invocations.
 

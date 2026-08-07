@@ -31,11 +31,11 @@ terminal). Parity with the canonical token set is asserted by
 ``platform_tests/scripts/test_scan_bridge.py``.
 
 The helper performs no mutations and is idempotent. It implements the manual
-Scan procedure documented in ``.claude/skills/bridge/SKILL.md``.
+Scan procedure documented in ``.claude/skills/gtkb-bridge/SKILL.md``.
 
 CLI usage:
 
-  python .claude/skills/bridge/helpers/scan_bridge.py --role prime-builder [--format json|markdown]
+  python .claude/skills/gtkb-bridge/helpers/scan_bridge.py --role prime-builder [--format json|markdown]
 
 Public API:
 

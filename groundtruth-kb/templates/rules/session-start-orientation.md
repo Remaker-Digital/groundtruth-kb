@@ -52,7 +52,7 @@ End Prime Builder sessions with a well-formed ORIENT block in the final owner-vi
 
 ## Extended baseline audit
 
-When the owner uses a documented trigger phrase, run `/baseline-audit` (`.claude/skills/baseline-audit/SKILL.md`). Prime Builder **and** Loyal Opposition may execute that skill for independent verification.
+When the owner uses a documented trigger phrase, run `/gtkb-baseline-audit` (`.claude/skills/gtkb-baseline-audit/SKILL.md`). Prime Builder **and** Loyal Opposition may execute that skill for independent verification.
 
 Trigger phrases (case-insensitive substring match):
 

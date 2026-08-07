@@ -30,12 +30,12 @@ def test_build_system_prompt_enforces_claim_first() -> None:
     prompt = oh.build_system_prompt("bridge-review", route)
     assert prompt is not None
     claim_index = prompt.index("python scripts\\bridge_claim_cli.py claim <document-slug>")
-    helper_index = prompt.index("python .claude/skills/verify/helpers/write_verdict.py")
+    helper_index = prompt.index("PublishBridgeVerdict")
     bridge_workflow_index = prompt.index("Use the GT-KB file bridge")
     assert claim_index < helper_index < bridge_workflow_index
 
 
-def test_build_system_prompt_seeds_prior_deliberations_before_verdict_write() -> None:
+def test_build_system_prompt_routes_verdict_through_publish_tool() -> None:
     route = oh.ModelRoute(
         key="fixture-route",
         model_id="fixture-model:latest",
@@ -45,12 +45,10 @@ def test_build_system_prompt_seeds_prior_deliberations_before_verdict_write() ->
     )
     prompt = oh.build_system_prompt("bridge-review", route)
     assert prompt is not None
-    assert (
-        "python .claude/skills/verify/helpers/write_verdict.py --slug <document-slug> --body-file <draft-body-file>"
-    ) in prompt
-    assert "Review and prune the helper-seeded Prior Deliberations" in prompt
-    assert "preserve its failure\noutput in the verdict evidence" in prompt
-    assert "silently omitting Prior Deliberations" in prompt
+    assert "Publish numbered GO, NO-GO, and VERIFIED artifacts only through" in prompt
+    assert "PublishBridgeVerdict" in prompt
+    assert "Never use raw Write, Edit, or Bash for a numbered bridge verdict" in prompt
+    assert "invoke PublishBridgeVerdict until the claim succeeds" in prompt
 
 
 def test_build_system_prompt_retains_preflight_commands() -> None:

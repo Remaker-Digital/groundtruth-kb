@@ -96,7 +96,7 @@ Every Codex session MUST execute these steps before any other work:
    versions loaded, any anomalies detected, ORIENT block, and readiness to proceed.
 
 When the owner uses a documented baseline-audit trigger phrase, run
-`/baseline-audit` (`.claude/skills/baseline-audit/SKILL.md`). Loyal Opposition may
+`/gtkb-baseline-audit` (`.claude/skills/gtkb-baseline-audit/SKILL.md`). Loyal Opposition may
 run the same skill for independent verification.
 
 ---

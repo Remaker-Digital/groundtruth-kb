@@ -56,8 +56,8 @@ def test_bash_parser_blocks_direct_harness_launches() -> None:
 
 def test_bash_parser_blocks_direct_gtkb_helper_script_file_association() -> None:
     blocked_commands = [
-        ".claude/skills/verify/helpers/write_verdict.py --slug demo",
-        "& .codex/skills/verify/helpers/write_verdict.py --slug demo",
+        ".claude/skills/gtkb-verify/helpers/write_verdict.py --slug demo",
+        "& .codex/skills/gtkb-verify/helpers/write_verdict.py --slug demo",
         r"Start-Process E:\GT-KB\.cursor\skills\verify\helpers\write_verdict.py",
     ]
 
@@ -70,7 +70,7 @@ def test_bash_parser_blocks_direct_gtkb_helper_script_file_association() -> None
 
 def test_bash_parser_allows_explicit_python_helper_invocation() -> None:
     allowed, reason = check_bash_command(
-        "python .claude/skills/verify/helpers/write_verdict.py --slug demo --body-file draft.md",
+        "python .claude/skills/gtkb-verify/helpers/write_verdict.py --slug demo --body-file draft.md",
         REPO_ROOT,
     )
 

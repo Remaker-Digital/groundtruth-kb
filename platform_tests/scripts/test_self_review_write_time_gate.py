@@ -40,7 +40,7 @@ def _load(name: str, rel: str):
 
 
 _GATE = _load("self_review_gate_under_test", "groundtruth-kb/templates/hooks/bridge-compliance-gate.py")
-_WRITE_VERDICT = _load("self_review_write_verdict_under_test", ".claude/skills/verify/helpers/write_verdict.py")
+_WRITE_VERDICT = _load("self_review_write_verdict_under_test", ".claude/skills/gtkb-verify/helpers/write_verdict.py")
 
 
 def _write(path: Path, content: str) -> None:

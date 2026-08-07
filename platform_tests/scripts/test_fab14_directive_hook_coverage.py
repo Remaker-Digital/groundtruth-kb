@@ -118,7 +118,7 @@ def test_codex_bash_direct_gtkb_helper_script_blocks_and_logs(tmp_path: Path) ->
     telemetry = tmp_path / "denials.jsonl"
     payload = {
         "tool_name": "Bash",
-        "tool_input": {"command": ".claude/skills/verify/helpers/write_verdict.py --slug demo"},
+        "tool_input": {"command": ".claude/skills/gtkb-verify/helpers/write_verdict.py --slug demo"},
         "cwd": str(_ROOT),
     }
 
@@ -168,7 +168,7 @@ def test_claude_powershell_direct_gtkb_helper_script_blocks(tmp_path: Path) -> N
     telemetry = tmp_path / "denials.jsonl"
     payload = {
         "tool_name": "PowerShell",
-        "tool_input": {"command": "Start-Process -FilePath .codex/skills/verify/helpers/write_verdict.py"},
+        "tool_input": {"command": "Start-Process -FilePath .codex/skills/gtkb-verify/helpers/write_verdict.py"},
         "cwd": str(_ROOT),
     }
 

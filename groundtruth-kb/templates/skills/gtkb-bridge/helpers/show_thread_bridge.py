@@ -10,7 +10,7 @@ don't have to issue N separate Read calls and reconstruct ordering manually.
 
 CLI usage:
 
-  python .claude/skills/bridge/helpers/show_thread_bridge.py <slug> [--format json|markdown]
+  python .claude/skills/gtkb-bridge/helpers/show_thread_bridge.py <slug> [--format json|markdown]
                                                                     [--preview-lines N]
 
 Public API:

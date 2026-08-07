@@ -471,8 +471,8 @@ notes = "decision-capture helper module; product-managed because Deliberation Ar
 [[artifacts]]
 class = "skill"
 id = "skill.baseline-audit.skill-md"
-template_path = "skills/baseline-audit/SKILL.md"
-target_path = ".claude/skills/baseline-audit/SKILL.md"
+template_path = "skills/gtkb-baseline-audit/SKILL.md"
+target_path = ".claude/skills/gtkb-baseline-audit/SKILL.md"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []

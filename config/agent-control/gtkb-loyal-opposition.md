@@ -157,7 +157,7 @@ Opposition uses the verification finalization helper to create the local commit
 that contains the verified work and the new `VERIFIED` verdict artifact:
 
 ```text
-python .claude/skills/verify/helpers/write_verdict.py --slug <document-name> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [--include <verified-path> ...]
+python .claude/skills/gtkb-verify/helpers/write_verdict.py --slug <document-name> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [--include <verified-path> ...]
 ```
 
 If the helper cannot create the commit, Loyal Opposition must fail closed and
