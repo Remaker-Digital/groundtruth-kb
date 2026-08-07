@@ -3128,6 +3128,23 @@ def _named_packets_authorizing_targets(project_root: Path, normalized_targets: l
     matches: list[dict[str, Any]] = []
     for path in sorted(by_bridge_dir.glob("*.json")):
         bridge_id = path.stem
+        # WI-5951: run the cheap target-glob filter on the RAW packet before the
+        # expensive load_named_packet integrity validation. A packet whose
+        # declared globs cannot authorize the requested targets is a necessary
+        # non-match (see _packet_cannot_authorize_any, WI-5742 Layer B2), so it
+        # is discarded without validation; only survivors pay the full
+        # validation cost. Unreadable, non-dict, or malformed raw JSON is skipped
+        # rather than raised, matching the prior skip-on-AuthorizationError
+        # behavior. The authoritative match decision is still made on the fully
+        # validated packet below, so the returned match set is unchanged.
+        try:
+            raw_packet = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(raw_packet, dict):
+            continue
+        if _unauthorized_targets(raw_packet, normalized_targets):
+            continue
         try:
             packet = load_named_packet(project_root, bridge_id)
         except AuthorizationError:
