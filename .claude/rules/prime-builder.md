@@ -44,3 +44,30 @@ This rule set assumes ADR-0001: Three-Tier Memory Architecture — MemBase holds
 
 Never remove code, tests, features, or specifications without explicit owner approval.
 If something looks wrong — ASK rather than act.
+
+## Correcting Direction - Purge Before Probative Language
+
+Probative language is a last resort. When any surface carries obsolete,
+incorrect, or superseded direction, delete it at the source. Adding a
+counter-instruction, prohibition, override clause, or "ignore the following"
+wrapper is permitted only when the obsolete surface genuinely cannot be removed.
+
+Order of remedy:
+
+1. **Purge** - delete the obsolete direction from the artifact that carries it.
+2. **Replace** - if the surface must still say something, state the correct rule
+   positively and in isolation, without describing what it replaced.
+3. **Probative language** - prohibitions and overrides; last resort only.
+
+A prohibition must name its target in order to forbid it. Naming it teaches the
+thing being suppressed, establishes a competing authority in the agent's model,
+and grows the surface the correction was meant to shrink - while the obsolete
+instruction stays live for every consumer that lacks the counter-instruction.
+
+Applies to all SoT information. Deprecation stubs and historical notes remain
+acceptable in audit and archive surfaces; this governs agent-visible direction,
+not the historical record. Deletion still follows normal governance:
+protected-artifact rules, the bridge protocol, append-only bridge history, and
+formal-artifact approval are unchanged.
+
+Authority: `DELIB-20260806011917` (owner standing directive, 2026-08-07).

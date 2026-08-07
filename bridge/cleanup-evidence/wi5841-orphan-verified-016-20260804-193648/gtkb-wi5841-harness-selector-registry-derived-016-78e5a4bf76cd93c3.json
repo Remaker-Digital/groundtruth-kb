@@ -1,0 +1,11 @@
+{
+  "capability_hash": "sha256:dde093faf4f783be3b3e21c2f2bcb3cfa6c58439476f55b117d372e88287ca8c",
+  "content_digest": "sha256:8e028a293a711ccd6a70416b6efdd1ca6fbbeaa52b7581ae3a89a323a9f22349",
+  "created_at": "2026-08-05T02:22:12Z",
+  "document_name": "gtkb-wi5841-harness-selector-registry-derived",
+  "schema_version": 1,
+  "session_id": "d2fcb431-f112-49dd-8a29-6e40ed67fd36",
+  "status": "VERIFIED",
+  "target_path": "bridge/gtkb-wi5841-harness-selector-registry-derived-016.md",
+  "version": 16
+}
