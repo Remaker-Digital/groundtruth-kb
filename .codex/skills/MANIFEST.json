@@ -292,7 +292,7 @@
       "canonical_name": "gtkb-verify",
       "capability_id": "skill.verify",
       "source_relative_path": ".claude/skills/gtkb-verify/SKILL.md",
-      "source_sha256": "9d54afdc92f5ad5e20650fd7f1da72187816daf8975805dedfb30e1d7d4e5f1f"
+      "source_sha256": "d0f13dc12f946f44c8a1536d3734d64e85c35c5a3bdaa5789a96cbf4c965d1e4"
     },
     {
       "adapter_relative_path": ".codex/skills/gtkb-formal-artifact-packet-helper/SKILL.md",

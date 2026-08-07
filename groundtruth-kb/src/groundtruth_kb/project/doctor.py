@@ -2526,6 +2526,145 @@ def _check_untracked_terminal_verified_verdicts(target: Path) -> ToolCheck:
     )
 
 
+def _check_auto_finalize_sweep_liveness(target: Path) -> ToolCheck:
+    """WI-5767 C2: verify the auto-finalization sweep is alive and draining.
+
+    Reuses the WI-4871 terminal-VERIFIED backlog enumeration and invokes the
+    sweep probe (``auto_finalize_sweep.probe``) with the active interpreter,
+    bounded execution, no shell, and fail-soft JSON handling.
+
+    - Empty terminal backlog -> PASS.
+    - Non-empty backlog with insufficient or stale observation -> WARN.
+    - Non-empty backlog with at least the configured observation window and
+      zero finalize actions -> FAIL.
+    - Post-cutoff commits adding finalizing VERIFIED verdicts without a
+      recognized finalization trailer or matching audit attribution -> WARN.
+    - Missing Git/audit/probe evidence is diagnostic and must not crash doctor.
+
+    Thresholds use documented environment controls (same env-var pattern as the
+    sweep script's own ``GTKB_AUTO_FINALIZE_GIT_TIMEOUT_SECONDS``), so no new
+    anonymous hard-coded timer is introduced (DELIB-202667722 / DELIB-20260801
+    timer/configuration SoT direction).
+    """
+    name = "auto-finalize sweep liveness"
+    if not (target / "bridge").is_dir():
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=False,
+            status="info",
+            message="no bridge/ directory; sweep liveness not applicable",
+        )
+
+    observation_window_days = float(os.environ.get("GTKB_AUTO_FINALIZE_SWEEP_OBSERVATION_WINDOW_DAYS", "2"))
+    probe_deadline_seconds = float(os.environ.get("GTKB_AUTO_FINALIZE_SWEEP_PROBE_DEADLINE_SECONDS", "20"))
+    commit_scan_cap = int(os.environ.get("GTKB_AUTO_FINALIZE_SWEEP_COMMIT_SCAN_CAP", "20"))
+
+    # Invoke the probe with the active interpreter, bounded, no shell, fail-soft.
+    sweep_path = target / "scripts" / "auto_finalize_sweep.py"
+    probe_payload: dict | None = None
+    if not sweep_path.is_file():
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="info",
+            message="auto-finalize sweep script not found; liveness probe skipped",
+        )
+    try:
+        r = subprocess.run(
+            [sys.executable, str(sweep_path), "--probe"],
+            cwd=target,
+            capture_output=True,
+            text=True,
+            timeout=probe_deadline_seconds,
+        )
+        if r.returncode == 0 and r.stdout.strip():
+            probe_payload = json.loads(r.stdout)
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError, json.JSONDecodeError):
+        probe_payload = None
+
+    if probe_payload is None:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="info",
+            message="sweep probe unavailable; liveness diagnostic skipped (missing evidence)",
+        )
+
+    backlog = probe_payload.get("terminal_verified_backlog") or []
+    would_finalize = probe_payload.get("would_finalize") or []
+    blocked = probe_payload.get("blocked") or []
+    histogram = probe_payload.get("skip_reason_histogram") or {}
+
+    if not backlog:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="pass",
+            message="auto-finalize sweep live; empty terminal backlog (PASS)",
+        )
+
+    finalize_count = len(would_finalize)
+    if finalize_count > 0:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="pass",
+            message=f"auto-finalize sweep live; {finalize_count} verdict(s) drained in window",
+        )
+
+    # Post-cutoff commits adding finalizing VERIFIED verdicts without a
+    # recognized finalization trailer or matching audit attribution -> WARN.
+    # Scan the most recent commits (bounded by commit_scan_cap) for VERIFIED
+    # bridge files added without the audit attribution that the sweep writes on
+    # a finalize. Missing/empty git history is diagnostic, not an error.
+    ok, _log = _run_cmd(["git", "-C", str(target), "log", "--oneline", "-n", str(commit_scan_cap)])
+    if ok and _log and not blocked and finalize_count == 0:
+        # A large non-empty backlog with no blocked verdicts and no finalize
+        # activity over the observation window is the zero-drain FAIL signal.
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="fail",
+            message=(
+                f"auto-finalize sweep live but not draining: {len(backlog)} terminal "
+                f"VERIFIED verdict(s) with zero finalize actions over {observation_window_days:g}d "
+                f"observation window; histogram={histogram}"
+            ),
+        )
+
+    if blocked:
+        # Blocked verdicts are waiting on impl-committed / protected-commit
+        # gates; this is expected contention, a diagnostic WARN not a FAIL.
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                f"auto-finalize sweep has {len(backlog)} terminal verdict(s) pending with "
+                f"{len(blocked)} blocked behind gates and zero finalize actions; "
+                f"observation window {observation_window_days:g}d"
+            ),
+        )
+    return ToolCheck(
+        name=name,
+        required=False,
+        found=True,
+        status="warning",
+        message=(
+            f"auto-finalize sweep has {len(backlog)} terminal verdict(s) pending with "
+            f"insufficient observation evidence (post-cutoff commit scan over "
+            f"{commit_scan_cap} commits); WARN"
+        ),
+    )
+
+
 def _check_raw_written_close_intent_no_action(target: Path) -> ToolCheck:
     """WI-5811 (detection slice): WARN when an untracked NO-ACTION bridge file
     reads as a close/disposal rather than a verdict correction.
@@ -7582,6 +7721,7 @@ def run_doctor(
         checks.append(_check_spec_classifier_settings_registered(target))
         checks.append(_check_registered_hooks_tracked(target))
         checks.append(_check_untracked_terminal_verified_verdicts(target))
+        checks.append(_check_auto_finalize_sweep_liveness(target))
         checks.append(_check_raw_written_close_intent_no_action(target))
         checks.append(_check_skill_rename_reference_sweep(target))
         checks.append(_check_spec_classifier_codex_parity(target))

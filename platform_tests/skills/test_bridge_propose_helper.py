@@ -602,3 +602,57 @@ def test_wi4565_db_param_docstring_matches_skip_behavior(helper_module):
     out-of-scope generated-adapter rewrite.)"""
     doc = helper_module.propose_bridge.__doc__ or ""
     assert "skips semantic search" in doc
+
+
+# --------------------------------------------------------------------------
+# WI-5767 C3 — direct helper usage contract (CLI surface)
+# --------------------------------------------------------------------------
+
+
+def _run_helper_cli(*argv: str) -> tuple[int, str, str]:
+    """Run the helper module as a script and return (rc, stdout, stderr)."""
+    import subprocess
+
+    r = subprocess.run(
+        [sys.executable, str(HELPER_PATH), *argv],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    return r.returncode, r.stdout, r.stderr
+
+
+def test_wi5767_helper_cli_help_exits_zero_stdout():
+    """--help writes usage to stdout and exits 0."""
+    rc, stdout, stderr = _run_helper_cli("--help")
+    assert rc == 0
+    assert stdout.strip(), "usage must be written to stdout"
+    assert "propose_bridge(" in stdout
+    assert "BridgeFileAlreadyExistsError" in stdout
+    assert stderr.strip() == ""
+
+
+def test_wi5767_helper_cli_bare_invocation_exits_two_stderr():
+    """Bare/direct invocation writes usage to stderr and exits 2."""
+    rc, stdout, stderr = _run_helper_cli()
+    assert rc == 2
+    assert stdout.strip() == ""
+    assert stderr.strip(), "usage must be written to stderr"
+
+
+def test_wi5767_helper_import_is_silent(helper_module):
+    """Importing the module must not print to stdout (import silence)."""
+    import contextlib
+    import io as _io
+
+    buf = _io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        _load_helper_module()
+    assert buf.getvalue().strip() == ""
+
+
+def test_wi5767_helper_codex_parity():
+    """The generated Codex helper copy is byte-identical to the canonical Claude helper."""
+    a = HELPER_PATH.read_bytes()
+    b = CODEX_HELPER_PATH.read_bytes()
+    assert a == b, "Codex helper copy must match the canonical Claude helper bytes"

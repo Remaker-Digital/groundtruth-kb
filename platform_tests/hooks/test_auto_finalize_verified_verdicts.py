@@ -320,3 +320,45 @@ def test_sweep_registered_in_both_harness_surfaces():
     assert "auto_finalize_sweep.py" in claude, "missing Claude .claude/settings.json registration"
     assert "--batch stop" in codex, "missing Codex Stop batch registration"
     assert "scripts/auto_finalize_sweep.py" in codex_batch, "missing Codex Stop batch auto-finalizer"
+
+
+# --------------------------------------------------------------------------
+# WI-5767 C1 — read-only sweep probe
+# --------------------------------------------------------------------------
+
+
+def test_wi5767_probe_emits_schema_json_no_mutation(repo, monkeypatch):
+    """Probe mode emits schema-versioned JSON and performs zero mutation."""
+    # Write an eligible verdict + report into the temp repo, then probe.
+    report = _REPORT.format(slug="probe-slug", report_session="rep-1")
+    (repo / "bridge" / "probe-slug-001.md").write_text(report, encoding="utf-8")
+    verdict = (
+        "VERIFIED\n"
+        "author_identity: loyal-opposition/cursor\n"
+        "author_session_context_id: lo-1\n"
+        "\n"
+        "Document: probe-slug\n"
+        "Version: 002\n"
+        "Responds to: bridge/probe-slug-001.md\n"
+    )
+    (repo / "bridge" / "probe-slug-002.md").write_text(verdict, encoding="utf-8")
+
+    head_before = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    audit_dir = repo / ".gtkb-state" / "auto-finalize-sweep"
+
+    monkeypatch.setattr(sweep_mod, "PROJECT_ROOT", repo)
+    # Point the audit log at the temp repo so we can observe no append.
+    monkeypatch.setattr(sweep_mod, "AUDIT_DIR", audit_dir)
+    monkeypatch.setattr(sweep_mod, "AUDIT_LOG", audit_dir / "sweep.jsonl")
+
+    payload = sweep_mod.probe()
+    assert payload.get("schema_version") == 1
+    assert isinstance(payload.get("would_finalize"), list)
+    assert isinstance(payload.get("blocked"), list)
+    assert isinstance(payload.get("skip_reason_histogram"), dict)
+
+    # Zero mutation: HEAD unchanged, no audit rows appended, no commit created.
+    head_after = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    assert head_after == head_before, "probe must not commit"
+    if audit_dir.exists():
+        assert not (audit_dir / "sweep.jsonl").exists(), "probe must not append audit rows"

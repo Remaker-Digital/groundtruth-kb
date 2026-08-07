@@ -69,8 +69,29 @@ def _now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _actor_context() -> dict:
+    """Best-effort actor attribution for audit rows (WI-5767 C1).
+
+    A stable source label, process id, and only available normalized
+    harness/session identifiers with their provenance. Missing identity
+    variables never block audit append or sweep execution.
+    """
+    context: dict = {"actor_source": "auto-finalize-sweep", "pid": os.getpid()}
+    harness = os.environ.get("GTKB_HARNESS_NAME") or os.environ.get("HARNESS_NAME")
+    if harness:
+        context["harness_name"] = harness.strip()
+        context["harness_provenance"] = "env"
+    session_id = (
+        os.environ.get("GOOSE_SESSION_ID") or os.environ.get("CLAUDE_SESSION_ID") or os.environ.get("GTKB_SESSION_ID")
+    )
+    if session_id:
+        context["session_id"] = session_id.strip()
+        context["session_provenance"] = "env"
+    return context
+
+
 def _audit(event: dict) -> None:
-    event = {"ts": _now(), **event}
+    event = {"ts": _now(), **_actor_context(), **event}
     try:
         AUDIT_DIR.mkdir(parents=True, exist_ok=True)
         with AUDIT_LOG.open("a", encoding="utf-8") as handle:
@@ -353,8 +374,54 @@ def sweep(*, dry_run: bool = False) -> dict:
     return summary
 
 
+def probe() -> dict:
+    """WI-5767 C1: read-only sweep probe.
+
+    Reuses the sweep planner in dry-run and emits a schema-versioned report of
+    the terminal backlog, would-finalize cohort, blocked cohort, and skip-reason
+    histogram. Probe mode MUST NOT commit, append audit rows, alter bridge
+    state, or change normal Stop-hook behavior.
+    """
+    # Suppress audit-row appends during the probe so it is strictly read-only:
+    # the dry-run sweep would otherwise write skip/finalize audit rows through
+    # _audit. We temporarily no-op _audit for the probe pass.
+    original_audit = _audit
+
+    def _noop_audit(event: dict) -> None:  # type: ignore[no-untyped-def]
+        return None
+
+    globals()["_audit"] = _noop_audit
+    try:
+        summary = sweep(dry_run=True)
+    finally:
+        globals()["_audit"] = original_audit
+    would_finalize = [item["slug"] for item in summary.get("finalized", [])]
+    skipped = summary.get("skipped", [])
+    blocked = [
+        {"verdict": item["verdict"], "reason": item.get("reason", "unknown")}
+        for item in skipped
+        if item.get("reason") and "impl not committed" in str(item["reason"])
+    ]
+    histogram: dict[str, int] = {}
+    for item in skipped:
+        reason = str(item.get("reason", "unknown"))
+        key = reason.split(":")[0][:80] if reason else "unknown"
+        histogram[key] = histogram.get(key, 0) + 1
+    return {
+        "schema_version": 1,
+        "terminal_verified_backlog": summary.get("finalized", []) + skipped,
+        "would_finalize": would_finalize,
+        "blocked": blocked,
+        "skip_reason_histogram": histogram,
+    }
+
+
 def main() -> int:
     if os.environ.get("GTKB_AUTO_FINALIZE_SWEEP_DISABLE") == "1":
+        return 0
+    # WI-5767 C1: opt-in read-only probe mode emits JSON to stdout and exits.
+    if "--probe" in sys.argv:
+        sys.stdout.write(json.dumps(probe(), indent=2, sort_keys=True) + "\n")
         return 0
     # Stop-hook payload arrives on stdin; we do not need it. Drain to avoid blocking.
     try:
