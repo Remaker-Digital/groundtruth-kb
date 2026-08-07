@@ -1410,3 +1410,29 @@ def test_recovery_claim_fence_cas_pre_sqlite_deadline_exhaustion_is_typed_and_le
     # Deterministic/idempotent rerun: same typed exhaustion.
     with pytest.raises(env.ReservationClaimFenceError):
         env.recovery_claim_fence_install("thread-a", version=1, reservation_id="res-1", project_root=tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# WI-5973 — work-intent write connection uses synchronous=NORMAL under WAL
+# ---------------------------------------------------------------------------
+
+
+def test_write_connection_uses_synchronous_normal_under_wal(tmp_path: Path, env) -> None:
+    """WI-5973: the work-intent write connection sets PRAGMA synchronous=NORMAL under WAL."""
+    module = _registry()
+    db_path = module._database_path(tmp_path)
+    # The real registry DB is persistently WAL; initialize the fixture DB to WAL.
+    init = sqlite3.connect(db_path)
+    try:
+        init.execute("PRAGMA journal_mode=wal")
+    finally:
+        init.close()
+
+    conn = module._get_conn(tmp_path)
+    try:
+        synchronous = conn.execute("PRAGMA synchronous").fetchone()[0]
+        journal_mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+        assert synchronous == 1, "write connection must use synchronous=NORMAL"
+        assert journal_mode == "wal", "write connection must be in WAL journal mode"
+    finally:
+        conn.close()

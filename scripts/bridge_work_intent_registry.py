@@ -504,6 +504,13 @@ def _get_conn(
     try:
         conn = sqlite3.connect(str(db_path), timeout=max(0.0, timeout_seconds))
         conn.row_factory = sqlite3.Row
+        # WI-5973: the work-intent file is WAL-persisted; synchronous=NORMAL is safe
+        # under WAL and shortens the single-writer commit, reducing contention.
+        # Apply it only when the connection is in WAL mode (the production DB);
+        # non-WAL connections keep the default synchronous setting.
+        journal_mode = conn.execute("PRAGMA journal_mode").fetchone()
+        if journal_mode is not None and str(journal_mode[0]).lower() == "wal":
+            conn.execute("PRAGMA synchronous=NORMAL")
         _ensure_schema(conn)
         return conn
     except sqlite3.Error as exc:
