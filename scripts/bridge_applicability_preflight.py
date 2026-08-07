@@ -897,6 +897,30 @@ def _approved_proposal_for_report(
         if _bridge_kind(candidate_content) in PROPOSAL_BRIDGE_KINDS and approved_by_go(version):
             candidates.append((version, candidate_content))
     if not candidates:
+        # WI-5837 Slice A: legacy bridge-kind tolerance. Pre-convention versions
+        # carry no bridge_kind marker. Recognize a legacy proposal when a later
+        # GO names it operative, it declares a non-empty target scope, and it is
+        # not report-shaped (no Approved proposal: / Controlling GO: line).
+        legacy: list[tuple[BridgeVersion, str]] = []
+        for version in versions:
+            if report_version is not None and version.version_number >= report_version:
+                continue
+            try:
+                candidate_content = version.abs_path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            if _bridge_kind(candidate_content) is not None:
+                continue  # only tolerate versions with NO marker
+            if APPROVED_PROPOSAL_RE.search(candidate_content) or "Controlling GO:" in candidate_content:
+                continue  # report-shaped legacy artifact
+            if not extract_declared_target_paths(candidate_content):
+                continue
+            if not approved_by_go(version):
+                continue
+            legacy.append((version, candidate_content))
+        if legacy:
+            proposal, proposal_content = max(legacy, key=lambda item: item[0].version_number)
+            return proposal_content, proposal.rel_path, None
         return (
             None,
             None,
