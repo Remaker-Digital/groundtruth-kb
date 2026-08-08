@@ -19,12 +19,16 @@ import unicodedata
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+PACKAGE_SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
+if str(PACKAGE_SRC) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_SRC))
 
 from scripts.bridge_author_metadata import (  # noqa: E402
     author_metadata_gaps,
@@ -42,10 +46,12 @@ from scripts.controlled_artifact_paths import (  # noqa: E402
     registry_snapshot_cache_scope,
 )
 from scripts.gtkb_bridge_writer import BridgeComplianceError  # noqa: E402
+from scripts.gtkb_session_id import resolve_session_id  # noqa: E402
 from scripts.implementation_authorization import (  # noqa: E402
     AuthorizationError,
     extract_target_paths,
     list_named_packets,
+    load_named_packet,
     packet_hash,
     packet_path_for_bridge,
     parse_iso,
@@ -55,6 +61,12 @@ from scripts.implementation_authorization import (  # noqa: E402
 from scripts.verdict_evidence_anchor_preflight import validate_verdict_evidence_anchors  # noqa: E402
 
 BY_BRIDGE_PACKETS_REL = Path(".gtkb-state/implementation-authorizations/by-bridge")
+BATCH_FINALIZATION_ENV = "GTKB_BATCH_VERIFIED_FINALIZATION_MANIFEST"
+BATCH_FINALIZATION_REL = Path(".gtkb-state/batch-verified-finalization")
+BATCH_FINALIZATION_AUTHORITY = "gtkb-wi6073-batch-verified-finalization"
+BATCH_FINALIZATION_OWNER_DECISION = "DELIB-20260808-GOVERNED-BATCH-FINALIZATION-PATH"
+BATCH_FINALIZATION_PAUTH = "PAUTH-PROJECT-GTKB-SESSION-ENVELOPE-WHOLE-PROJECT-20260808"
+BATCH_FINALIZATION_MAX_BYTES = 64 * 1024
 VERSIONED_BRIDGE_RE = re.compile(r"^bridge/.+-\d{3}\.md$")
 VERSIONED_BRIDGE_CAPTURE_RE = re.compile(r"^bridge/(?P<bridge_id>[A-Za-z0-9][A-Za-z0-9_.-]*)-(?P<version>\d{3})\.md$")
 TRANSIENT_INDEX_PATH_RE = re.compile(r"\.gtkb-index-[a-z0-9_]{8}/index")
@@ -466,6 +478,14 @@ def _resolve_head_oid(root: Path) -> str | None:
         return None
     oid = result.stdout.strip()
     return oid or None
+
+
+def _resolve_head_ref(root: Path, head_oid: str | None = None) -> str | None:
+    result = _run_git(root, "symbolic-ref", "-q", "HEAD", text=True)
+    if result.returncode == 0 and result.stdout.strip():
+        return result.stdout.strip()
+    oid = head_oid or _resolve_head_oid(root)
+    return f"DETACHED:{oid}" if oid else None
 
 
 def _resolve_object_format(root: Path) -> str:
@@ -1779,11 +1799,272 @@ def _parse_transaction_manifest(root: Path, content: str) -> tuple[list[str], li
     return paths, errors
 
 
+def _transaction_manifest_relation_errors(manifest_paths: list[str], selected_paths: list[str]) -> list[str]:
+    """Reject only staged paths that the reviewer-authored manifest did not declare.
+
+    A declared path may legitimately be unchanged.  The inverse is never true:
+    staging an undeclared path would expand the transaction beyond the verdict.
+    """
+
+    undeclared = sorted(set(selected_paths) - set(manifest_paths))
+    if not undeclared:
+        return []
+    return [f"same-transaction manifest does not equal the staged path set; missing={undeclared}"]
+
+
+def _batch_manifest_hash(payload: dict[str, Any]) -> str:
+    canonical = dict(payload)
+    canonical.pop("manifest_hash", None)
+    encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def _batch_candidate_plan_hash(payload: dict[str, Any]) -> str:
+    fields = (
+        "authority_bridge_id",
+        "authority_packet_hash",
+        "authority_session_id",
+        "owner_decision_id",
+        "project_authorization_id",
+        "head_oid",
+        "head_ref",
+        "candidate_bridge_id",
+        "candidate_path",
+        "candidate_content_digest",
+        "selected_paths",
+        "declared_paths",
+    )
+    encoded = json.dumps(
+        {field: payload.get(field) for field in fields},
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def _batch_foreign_claim_errors(root: Path, candidate_bridge_id: str, selected_paths: list[str]) -> list[str]:
+    from scripts import bridge_work_intent_registry
+
+    db_path = (root / "groundtruth.db").resolve()
+    try:
+        conn = sqlite3.connect(db_path.as_uri() + "?mode=ro", uri=True)
+        rows = conn.execute("SELECT thread_slug FROM work_intent_claims ORDER BY thread_slug").fetchall()
+    except sqlite3.Error as exc:
+        return [f"batch-finalization active claim inventory is unreadable: {exc}"]
+    finally:
+        if "conn" in locals():
+            conn.close()
+
+    errors: list[str] = []
+    for (slug,) in rows:
+        if slug in {candidate_bridge_id, BATCH_FINALIZATION_AUTHORITY}:
+            continue
+        try:
+            holder = bridge_work_intent_registry.current_holder(slug, project_root=root)
+        except bridge_work_intent_registry.WorkIntentRegistryError as exc:
+            errors.append(f"batch-finalization foreign claim {slug!r} is unreadable: {exc}")
+            continue
+        if not holder or holder.get("claim_kind") != "go_implementation":
+            continue
+        try:
+            packet = load_named_packet(root, slug)
+        except AuthorizationError as exc:
+            errors.append(f"batch-finalization foreign claim {slug!r} has unreadable target scope: {exc}")
+            continue
+        overlap = sorted(path for path in selected_paths if path_authorized(packet, path))
+        if overlap:
+            errors.append(f"batch-finalization staged paths overlap active foreign claim {slug!r}: {overlap}")
+    return errors
+
+
+def _load_batch_finalization_authority(
+    root: Path,
+    *,
+    snapshot: _IndexSnapshot,
+    candidate_path: str,
+    bridge_id: str,
+    manifest_paths: list[str],
+    protected_paths: list[str],
+) -> tuple[dict[str, Any] | None, list[str]]:
+    """Load a fail-closed WI-6073 transaction manifest, when explicitly supplied.
+
+    The manifest is evidence, not a bypass flag.  It binds the copied index,
+    candidate blob, pinned HEAD, live carrier packet, and active Prime claim.
+    """
+
+    from scripts import bridge_work_intent_registry
+
+    raw_rel = os.environ.get(BATCH_FINALIZATION_ENV)
+    if raw_rel is None:
+        return None, []
+    errors: list[str] = []
+    rel = _normalize_rel(raw_rel)
+    rel_path = Path(rel)
+    if (
+        not rel
+        or rel_path.is_absolute()
+        or re.match(r"^[A-Za-z]:", rel)
+        or ".." in rel_path.parts
+        or rel_path.suffix.lower() != ".json"
+        or rel_path.parent.as_posix() != BATCH_FINALIZATION_REL.as_posix()
+    ):
+        return None, ["batch-finalization manifest path is not a direct governed runtime manifest"]
+    path = root / rel_path
+    try:
+        resolved = path.resolve(strict=True)
+        resolved_root = root.resolve(strict=True)
+        expected_parent = (root / BATCH_FINALIZATION_REL).resolve(strict=True)
+        try:
+            resolved.relative_to(resolved_root)
+        except ValueError:
+            return None, ["batch-finalization manifest resolves outside the project root"]
+        lexical_ancestors = (path, *path.parents)
+        linked_ancestor = any(
+            _path_is_linklike(ancestor)
+            for ancestor in lexical_ancestors
+            if ancestor != root.parent and (ancestor == root or root in ancestor.parents)
+        )
+        if resolved.parent != expected_parent or linked_ancestor:
+            return None, ["batch-finalization manifest path is linked or escapes its governed runtime directory"]
+        if resolved.stat().st_size > BATCH_FINALIZATION_MAX_BYTES:
+            return None, ["batch-finalization manifest exceeds its size limit"]
+        payload = json.loads(resolved.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return None, [f"batch-finalization manifest is unreadable or invalid: {exc}"]
+    if not isinstance(payload, dict):
+        return None, ["batch-finalization manifest root is not an object"]
+
+    required = {
+        "schema_version",
+        "operation",
+        "authority_bridge_id",
+        "authority_packet_hash",
+        "authority_session_id",
+        "owner_decision_id",
+        "project_authorization_id",
+        "head_oid",
+        "head_ref",
+        "candidate_bridge_id",
+        "candidate_path",
+        "candidate_content_digest",
+        "selected_paths",
+        "declared_paths",
+        "plan_digest",
+        "candidate_plan_digest",
+        "created_at",
+        "expires_at",
+        "nonce",
+        "manifest_hash",
+    }
+    if set(payload) != required:
+        errors.append("batch-finalization manifest fields do not match schema version 1")
+    if payload.get("schema_version") != 1 or payload.get("operation") != "verified_batch_finalize":
+        errors.append("batch-finalization manifest has the wrong schema or operation")
+    if payload.get("authority_bridge_id") != BATCH_FINALIZATION_AUTHORITY:
+        errors.append("batch-finalization manifest names the wrong authority bridge")
+    if payload.get("owner_decision_id") != BATCH_FINALIZATION_OWNER_DECISION:
+        errors.append("batch-finalization manifest names the wrong owner decision")
+    if payload.get("project_authorization_id") != BATCH_FINALIZATION_PAUTH:
+        errors.append("batch-finalization manifest names the wrong project authorization")
+    if payload.get("manifest_hash") != _batch_manifest_hash(payload):
+        errors.append("batch-finalization manifest hash mismatch")
+    if payload.get("candidate_plan_digest") != _batch_candidate_plan_hash(payload):
+        errors.append("batch-finalization candidate plan digest mismatch")
+    try:
+        created_at = parse_iso(str(payload.get("created_at") or ""))
+        expires_at = parse_iso(str(payload.get("expires_at") or ""))
+    except (TypeError, ValueError):
+        created_at = None
+        expires_at = None
+        errors.append("batch-finalization manifest timestamps are invalid")
+    if created_at is not None and expires_at is not None:
+        now = datetime.now(UTC)
+        if (
+            created_at > now + timedelta(seconds=30)
+            or expires_at <= now
+            or expires_at <= created_at
+            or expires_at - created_at > timedelta(minutes=5)
+        ):
+            errors.append("batch-finalization manifest is outside its live transaction window")
+    if not isinstance(payload.get("nonce"), str) or re.fullmatch(r"[0-9a-f]{32}", payload["nonce"]) is None:
+        errors.append("batch-finalization manifest nonce is invalid")
+    if payload.get("head_oid") != snapshot.head_oid:
+        errors.append("batch-finalization manifest is not bound to the copied index HEAD")
+    if payload.get("head_ref") != _resolve_head_ref(root, snapshot.head_oid):
+        errors.append("batch-finalization manifest is not bound to the active symbolic HEAD ref")
+    if payload.get("candidate_bridge_id") != bridge_id or payload.get("candidate_path") != candidate_path:
+        errors.append("batch-finalization manifest is not bound to the VERIFIED candidate")
+    selected_manifest_paths = payload.get("selected_paths")
+    if (
+        not isinstance(selected_manifest_paths, list)
+        or any(not isinstance(path, str) for path in selected_manifest_paths)
+        or len(selected_manifest_paths) != len(set(selected_manifest_paths))
+        or set(selected_manifest_paths) != set(snapshot.selected_paths)
+    ):
+        errors.append("batch-finalization manifest selected path set differs from the copied index")
+    else:
+        errors.extend(_batch_foreign_claim_errors(root, bridge_id, selected_manifest_paths))
+    if payload.get("declared_paths") != manifest_paths:
+        errors.append("batch-finalization manifest declared path set differs from the VERIFIED candidate")
+    staged_digest, staged_error = _staged_index_content_digest(root, candidate_path, snapshot)
+    if staged_error is not None:
+        errors.append(staged_error)
+    elif payload.get("candidate_content_digest") != staged_digest:
+        errors.append("batch-finalization manifest candidate content digest mismatch")
+    plan_digest = payload.get("plan_digest")
+    if not isinstance(plan_digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", plan_digest):
+        errors.append("batch-finalization manifest plan digest is invalid")
+
+    authority_packet: dict[str, Any] | None = None
+    try:
+        authority_packet = load_named_packet(root, BATCH_FINALIZATION_AUTHORITY)
+    except AuthorizationError as exc:
+        errors.append(f"batch-finalization authority packet is invalid: {exc}")
+    if authority_packet is not None:
+        if payload.get("authority_packet_hash") != authority_packet.get("packet_hash"):
+            errors.append("batch-finalization manifest authority packet hash mismatch")
+        start = authority_packet.get("implementation_start")
+        start_session = start.get("session_id") if isinstance(start, dict) else None
+        if payload.get("authority_session_id") != start_session:
+            errors.append("batch-finalization manifest authority session differs from implementation start")
+        if resolve_session_id() != payload.get("authority_session_id"):
+            errors.append("batch-finalization invoking session does not own the authority claim")
+        project_authorization = authority_packet.get("project_authorization")
+        if not isinstance(project_authorization, dict) or project_authorization.get("id") != BATCH_FINALIZATION_PAUTH:
+            errors.append("batch-finalization authority packet is not bound to the approved PAUTH")
+        try:
+            holder = bridge_work_intent_registry.current_holder(BATCH_FINALIZATION_AUTHORITY, project_root=root)
+        except bridge_work_intent_registry.WorkIntentRegistryError as exc:
+            holder = None
+            errors.append(f"batch-finalization work-intent claim is unreadable: {exc}")
+        if not isinstance(holder, dict):
+            errors.append("batch-finalization authority has no active work-intent claim")
+        elif not (
+            holder.get("session_id") == payload.get("authority_session_id")
+            and holder.get("claim_kind") == "go_implementation"
+            and holder.get("acting_role") == "prime-builder"
+        ):
+            errors.append("batch-finalization work-intent claim does not match the Prime implementation session")
+        try:
+            validate_packet_project_authorization_operation(
+                root,
+                authority_packet,
+                requested_operations=["protected_mutation"],
+                target_paths=protected_paths,
+            )
+        except AuthorizationError as exc:
+            errors.append(f"batch-finalization current PAUTH validation failed: {exc}")
+    return (authority_packet if not errors else None), errors
+
+
 def _load_finalized_packet(
     root: Path,
     bridge_id: str,
     chain: _ApprovedChain,
     protected_paths: list[str],
+    *,
+    batch_authority_packet: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any] | None, list[str]]:
     errors: list[str] = []
     try:
@@ -1898,7 +2179,22 @@ def _load_finalized_packet(
                 target_paths=list(chain.target_paths),
             )
         except AuthorizationError as exc:
-            errors.append(f"{bridge_id}: protected-mutation PAUTH validation failed: {exc}")
+            # Ordinary current-PAUTH validation remains the first route. The
+            # WI-6073 carrier substitutes only for immutable snapshot drift on
+            # the same PAUTH identity; every other failure remains a denial.
+            drift_error = "drifted since packet creation" in str(exc)
+            carrier_pauth = (
+                batch_authority_packet.get("project_authorization")
+                if isinstance(batch_authority_packet, dict)
+                else None
+            )
+            if not (
+                drift_error
+                and isinstance(carrier_pauth, dict)
+                and carrier_pauth.get("id") == project_authorization.get("id")
+                and carrier_pauth.get("project_id") == project_authorization.get("project_id")
+            ):
+                errors.append(f"{bridge_id}: protected-mutation PAUTH validation failed: {exc}")
 
     if target_paths is not None:
         unauthorized_paths = [path for path in protected_paths if not path_authorized(packet, path)]
@@ -1967,14 +2263,17 @@ def _load_transaction_verified_evidence(
     errors.extend(manifest_errors)
     if len(selected_paths) != len(set(selected_paths)):
         errors.append("staged path set contains duplicate normalized paths")
-    if set(manifest_paths) != set(selected_paths):
-        missing = sorted(set(selected_paths) - set(manifest_paths))
-        extra = sorted(set(manifest_paths) - set(selected_paths))
-        errors.append(
-            "same-transaction manifest does not equal the staged path set"
-            + (f"; missing={missing}" if missing else "")
-            + (f"; extra={extra}" if extra else "")
-        )
+    errors.extend(_transaction_manifest_relation_errors(manifest_paths, selected_paths))
+
+    batch_authority_packet, batch_errors = _load_batch_finalization_authority(
+        root,
+        snapshot=snapshot,
+        candidate_path=candidate_path,
+        bridge_id=bridge_id,
+        manifest_paths=manifest_paths,
+        protected_paths=protected_paths,
+    )
+    errors.extend(batch_errors)
 
     chain: _ApprovedChain | None = None
     report_text: str | None = None
@@ -2053,7 +2352,13 @@ def _load_transaction_verified_evidence(
         packet = None
         errors.append(f"{bridge_id}: no resolver-approved chain exists for packet validation")
     else:
-        packet, packet_errors = _load_finalized_packet(root, bridge_id, chain, protected_paths)
+        packet, packet_errors = _load_finalized_packet(
+            root,
+            bridge_id,
+            chain,
+            protected_paths,
+            batch_authority_packet=batch_authority_packet,
+        )
         errors.extend(packet_errors)
 
     if errors or packet is None:
@@ -2485,7 +2790,8 @@ def _evaluate_selected(
     registry_findings, registry_audit_gaps = _registry_commit_assessment(root, selected_paths, snapshot)
     bridge_findings.extend(registry_findings)
 
-    if not protected_paths and not bridge_findings:
+    batch_transaction_requested = bool(os.environ.get(BATCH_FINALIZATION_ENV))
+    if not protected_paths and not bridge_findings and not batch_transaction_requested:
         return {
             "status": "pass",
             "findings": [],
@@ -2521,14 +2827,14 @@ def _evaluate_selected(
         verified_evidence, verified_errors, verified_packet_count = _load_verified_evidence(
             root, head_oid=head_oid, protected_paths=protected_paths
         )
-        if snapshot is not None:
-            if budget is not None:
-                budget.enter("transaction_evidence")
-            transaction_evidence, transaction_errors, transaction_candidate_path = _load_transaction_verified_evidence(
-                root,
-                protected_paths,
-                snapshot,
-            )
+    if snapshot is not None and (protected_paths or batch_transaction_requested):
+        if budget is not None:
+            budget.enter("transaction_evidence")
+        transaction_evidence, transaction_errors, transaction_candidate_path = _load_transaction_verified_evidence(
+            root,
+            protected_paths,
+            snapshot,
+        )
 
     findings: list[dict[str, Any]] = list(bridge_findings)
     if transaction_errors and transaction_candidate_path is not None:
