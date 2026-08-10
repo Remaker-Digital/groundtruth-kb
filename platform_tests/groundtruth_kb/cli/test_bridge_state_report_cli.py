@@ -13,9 +13,15 @@ from groundtruth_kb.cli import main  # noqa: E402
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 from groundtruth_kb.project.registry_control_plane import (  # noqa: E402
     append_passive_observation,
+    consume_bridge_publication_capability,
+    load_registry_snapshot,
+    mint_bridge_publication_capability,
+    registry_currentness,
     serialize_registry,
 )
 from groundtruth_kb.project.sot_registry import SoTArtifact, sync_projection  # noqa: E402
+
+from scripts.bridge_work_intent_registry import acquire  # noqa: E402
 
 
 def _project(tmp_path: Path) -> tuple[Path, Path]:
@@ -253,7 +259,7 @@ def test_bridge_state_report_markdown_is_four_owner_tables(tmp_path: Path) -> No
 
 def test_bridge_state_report_surfaces_current_and_stale_registry_aggregate(tmp_path: Path) -> None:
     root, config = _project(tmp_path)
-    _enable_bridge_registry(root)
+    canonical, packaged, db_path = _enable_bridge_registry(root)
 
     current_result = CliRunner().invoke(main, ["--config", str(config), "bridge", "state-report", "--json"])
     assert current_result.exit_code == 0, current_result.output
@@ -284,9 +290,70 @@ def test_bridge_state_report_surfaces_current_and_stale_registry_aggregate(tmp_p
     assert "| Aggregate current | no |" in markdown.output
     assert "| Stale count | 1 |" in markdown.output
     assert "| Stale record IDs | bridge-versioned-files |" in markdown.output
-    assert "WARNING: The bridge publication gate will refuse ALL publications" in markdown.output
-    assert "gt registry observe --artifact bridge-versioned-files" in markdown.output
-    assert '--change-reason "Re-observe bridge publication aggregate"' in markdown.output
+    assert "WARNING: The bridge publication aggregate is stale audit state." in markdown.output
+    assert "Governed publication self-observes the aggregate" in markdown.output
+    assert "this diagnostic does not mean publications are refused." in markdown.output
+    assert "will refuse ALL publications" not in markdown.output
+    assert "gt registry observe --artifact bridge-versioned-files" not in markdown.output
+
+    slug = "stale-publication"
+    session_id = "stale-publication-session"
+    content = (
+        "NEW\n"
+        "::init gtkb pb\n"
+        "::open build\n"
+        "author_identity: prime-builder/codex\n"
+        "author_harness_id: test\n"
+        f"author_session_context_id: {session_id}\n"
+        "author_model: fixture\n"
+        "author_model_version: fixture\n"
+        "author_model_configuration: unit-test\n"
+        "author_metadata_source: unit-test\n\n"
+        "# Stale aggregate publication fixture\n\n"
+        "bridge_kind: prime_proposal\n"
+        f"Document: {slug}\n"
+        "Version: 001\n"
+        "Project Authorization: PAUTH-TEST\n"
+        "Project: PROJECT-TEST\n"
+        "Work Item: WI-0001\n"
+        'target_paths: ["scripts/example.py"]\n'
+    ).encode()
+    target = root / "bridge" / f"{slug}-001.md"
+    assert acquire(slug, session_id, project_root=root)
+    minted = mint_bridge_publication_capability(
+        document_name=slug,
+        version=1,
+        status="NEW",
+        target_path=target,
+        content=content,
+        session_id=session_id,
+        compliance_digest="sha256:state-report-stale-fixture",
+        project_root=root,
+        registry_path=canonical,
+        packaged_registry_path=packaged,
+        db_path=db_path,
+    )
+    target.write_bytes(content)
+    receipt = consume_bridge_publication_capability(
+        capability=minted["capability"],
+        target_path=target,
+        content=content,
+        session_id=session_id,
+        changed_by="test",
+        change_reason="publish while aggregate audit state is stale",
+        project_root=root,
+        registry_path=canonical,
+        packaged_registry_path=packaged,
+        db_path=db_path,
+    )
+    assert receipt.capability_state == "consumed"
+    snapshot = load_registry_snapshot(
+        project_root=root,
+        registry_path=canonical,
+        packaged_registry_path=packaged,
+        db_path=db_path,
+    )
+    assert registry_currentness(snapshot, project_root=root, db_path=db_path)["current"]
 
 
 def test_bridge_state_report_disables_incomplete_registry_control_plane(tmp_path: Path) -> None:
@@ -305,6 +372,10 @@ def test_bridge_state_report_disables_incomplete_registry_control_plane(tmp_path
         "stale_count": 0,
         "stale_record_ids": [],
     }
+    markdown = CliRunner().invoke(main, ["--config", str(config), "bridge", "state-report", "--markdown"])
+    assert markdown.exit_code == 0, markdown.output
+    assert "self-observes" not in markdown.output
+    assert "publications are refused" not in markdown.output
 
 
 def test_bridge_state_report_is_read_only_for_state_inputs(tmp_path: Path) -> None:

@@ -26,9 +26,6 @@ from groundtruth_kb.project.registry_control_plane import (
 
 BRIDGE_THREAD_HELPER = Path("scripts") / "bridge_thread_files.py"
 BRIDGE_AGGREGATE_ID = "bridge-versioned-files"
-BRIDGE_AGGREGATE_REMEDY = (
-    'gt registry observe --artifact bridge-versioned-files --change-reason "Re-observe bridge publication aggregate"'
-)
 
 
 def build_state_report(project_root: Path) -> dict[str, Any]:
@@ -89,8 +86,9 @@ def render_markdown(report: dict[str, Any]) -> str:
         lines.extend(
             [
                 "",
-                "WARNING: The bridge publication gate will refuse ALL publications until the "
-                f"aggregate is re-observed. Remedy: `{BRIDGE_AGGREGATE_REMEDY}`.",
+                "WARNING: The bridge publication aggregate is stale audit state. Governed "
+                "publication self-observes the aggregate under its serialized control-plane "
+                "transaction; this diagnostic does not mean publications are refused.",
             ]
         )
 
