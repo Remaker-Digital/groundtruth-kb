@@ -270,7 +270,7 @@ def test_write_bridge_file_creates_numbered_file_with_metadata(tmp_path: Path, m
 
     assert path == tmp_path / "bridge" / "docthing-001.md"
     written = path.read_text(encoding="utf-8")
-    assert written.startswith("NEW\n::init gtkb pb\n::open build\n")
+    assert written.startswith("NEW\n::init gtkb lo\n::open build\n")
     assert "author_identity: Codex\n" in written
     assert "author_session_context_id: session-123\n" in written
     assert "## Requirement Sufficiency\n\nExisting requirements sufficient." in written
@@ -485,7 +485,7 @@ writer.write_bridge_file(
     assert crashed.returncode == 71, crashed.stderr
     target = tmp_path / "bridge" / f"{document_name}-001.md"
     written = target.read_text(encoding="utf-8")
-    assert written.startswith("NEW\n::init gtkb pb\n::open build\n")
+    assert written.startswith("NEW\n::init gtkb lo\n::open build\n")
     assert f"Document: {document_name}\n" in written
     sidecars = list((tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json"))
     assert len(sidecars) == 1
@@ -843,7 +843,7 @@ def test_write_bridge_file_accepts_pre_metadata_content_when_injection_skipped(
     path = write_bridge_file("docthing", 2, content, tmp_path, require_author_metadata=False)
 
     written = path.read_text(encoding="utf-8")
-    assert written.startswith("GO\n::init gtkb lo\n::open test\n")
+    assert written.startswith("GO\n::init gtkb pb\n::open build\n")
     assert _author_metadata_lines("reviewer-session") in written
     assert "# GO Verdict" in written
 
@@ -868,7 +868,28 @@ def test_write_bridge_file_materializes_no_action_envelope(tmp_path: Path, monke
         author_metadata=AUTHOR_METADATA,
     )
 
-    assert path.read_text(encoding="utf-8").startswith("NO-ACTION\n::init gtkb pb\n::open build\n")
+    assert path.read_text(encoding="utf-8").startswith("NO-ACTION\n::init gtkb lo\n::open build\n")
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_responder"),
+    [
+        ("NEW", "lo"),
+        ("REVISED", "lo"),
+        ("NO-ACTION", "lo"),
+        ("GO", "pb"),
+        ("NO-GO", "pb"),
+        ("VERIFIED", "pb"),
+    ],
+)
+def test_governed_status_envelope_targets_next_responder_with_build_activity(
+    status: str, expected_responder: str
+) -> None:
+    content = f"{status}\n\nbridge_kind: prime_proposal\n"
+
+    normalized = writer.normalize_bridge_envelope_head(content)
+
+    assert normalized.startswith(f"{status}\n::init gtkb {expected_responder}\n::open build\n")
 
 
 def test_write_bridge_file_rejects_mismatched_envelope_role(tmp_path: Path) -> None:
@@ -876,7 +897,7 @@ def test_write_bridge_file_rejects_mismatched_envelope_role(tmp_path: Path) -> N
         write_bridge_file(
             "bad-envelope",
             1,
-            "NEW\n::init gtkb lo\n::open build\n\nbridge_kind: prime_proposal\n",
+            "NEW\n::init gtkb pb\n::open build\n\nbridge_kind: prime_proposal\n",
             tmp_path,
             author_metadata=AUTHOR_METADATA,
         )
@@ -887,7 +908,7 @@ def test_write_bridge_file_rejects_invalid_envelope_activity(tmp_path: Path) -> 
         write_bridge_file(
             "bad-activity",
             1,
-            "NEW\n::init gtkb pb\n::open unknown\n\nbridge_kind: prime_proposal\n",
+            "NEW\n::init gtkb lo\n::open unknown\n\nbridge_kind: prime_proposal\n",
             tmp_path,
             author_metadata=AUTHOR_METADATA,
         )
@@ -1090,7 +1111,7 @@ def test_publish_lo_verdict_computes_next_path_and_releases_claim_after_success(
     assert result.verdict_path == "bridge/provider-thread-002.md"
     assert result.claim_released is True
     assert released == [("provider-thread", "dispatch-H-1")]
-    assert (tmp_path / result.verdict_path).read_text(encoding="utf-8").startswith("GO\n::init gtkb lo\n::open test\n")
+    assert (tmp_path / result.verdict_path).read_text(encoding="utf-8").startswith("GO\n::init gtkb pb\n::open build\n")
 
 
 def test_publish_lo_verdict_denies_wrong_role_before_mutation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

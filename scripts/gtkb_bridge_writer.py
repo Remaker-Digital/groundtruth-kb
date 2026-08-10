@@ -67,12 +67,13 @@ VALID_STATUSES: frozenset[str] = frozenset(
 PRIME_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "NO-ACTION"})
 LOYAL_OPPOSITION_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "VERIFIED", "ADVISORY"})
 ENVELOPE_RESPONDER_BY_STATUS: Mapping[str, str] = {
-    "NEW": "pb",
-    "REVISED": "pb",
-    "NO-ACTION": "pb",
-    "GO": "lo",
-    "NO-GO": "lo",
-    "VERIFIED": "lo",
+    # The envelope names the next responder, not the author of the artifact.
+    "NEW": "lo",
+    "REVISED": "lo",
+    "NO-ACTION": "lo",
+    "GO": "pb",
+    "NO-GO": "pb",
+    "VERIFIED": "pb",
 }
 ENVELOPE_ACTIVITY_VALUES: frozenset[str] = frozenset({"ops", "deliberation", "build", "test", "spec", "project"})
 LO_ENVELOPE_BRIDGE_KINDS: frozenset[str] = frozenset({"lo_verdict", "loyal_opposition_review", "verification_verdict"})
@@ -260,8 +261,10 @@ def default_bridge_envelope_activity(content: str, status: str) -> str:
     """Return the Slice B default activity for a status-bearing bridge artifact."""
 
     normalized_status = status.strip().upper()
+    if normalized_status in ENVELOPE_RESPONDER_BY_STATUS:
+        return "build"
     bridge_kind = _bridge_kind(content)
-    if normalized_status in {"GO", "NO-GO", "VERIFIED"} or bridge_kind in LO_ENVELOPE_BRIDGE_KINDS:
+    if bridge_kind in LO_ENVELOPE_BRIDGE_KINDS:
         return "test"
     return "build"
 
