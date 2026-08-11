@@ -17,7 +17,7 @@ import tempfile
 import time
 import unicodedata
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -48,8 +48,11 @@ from scripts.controlled_artifact_paths import (  # noqa: E402
 from scripts.gtkb_bridge_writer import BridgeComplianceError  # noqa: E402
 from scripts.gtkb_session_id import resolve_session_id  # noqa: E402
 from scripts.implementation_authorization import (  # noqa: E402
+    PROJECT_AUTHORIZATION_KEYS,
     AuthorizationError,
+    extract_metadata_value,
     extract_target_paths,
+    groundtruth_db_path,
     list_named_packets,
     load_named_packet,
     packet_hash,
@@ -79,6 +82,64 @@ AUTHOR_SESSION_RE = re.compile(r"(?mi)^author_session_context_id:\s*(\S+)\s*$")
 GIT_OBJECT_FORMATS = {"sha1": 40, "sha256": 64}
 MAX_BLOB_BYTES = 64 * 1024 * 1024
 MAX_TREE_BYTES = 512 * 1024 * 1024
+PAUTH_READ_SNAPSHOT_REL = "groundtruth.db"
+PAUTH_READ_SNAPSHOT_VERSION = 1
+PAUTH_READ_SNAPSHOT_APPLICATION_ID = 0x47544B42
+PAUTH_READ_SNAPSHOT_STATUSES = {"GO", "NO-GO", "VERIFIED"}
+PAUTH_READ_SNAPSHOT_SIDECAR_SUFFIXES = ("-journal", "-wal", "-shm")
+PAUTH_READ_SNAPSHOT_RELATIONS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
+    (
+        "current_specifications",
+        (
+            ("id", "TEXT"),
+            ("version", "INTEGER"),
+            ("title", "TEXT"),
+            ("status", "TEXT"),
+            ("type", "TEXT"),
+        ),
+    ),
+    (
+        "current_project_authorizations",
+        (
+            ("id", "TEXT"),
+            ("version", "INTEGER"),
+            ("project_id", "TEXT"),
+            ("status", "TEXT"),
+            ("authorization_name", "TEXT"),
+            ("owner_decision_deliberation_id", "TEXT"),
+            ("scope_summary", "TEXT"),
+            ("allowed_mutation_classes", "TEXT"),
+            ("forbidden_operations", "TEXT"),
+            ("included_work_item_ids", "TEXT"),
+            ("excluded_work_item_ids", "TEXT"),
+            ("included_spec_ids", "TEXT"),
+            ("excluded_spec_ids", "TEXT"),
+            ("expires_at", "TEXT"),
+            ("supersedes", "TEXT"),
+            ("superseded_by", "TEXT"),
+        ),
+    ),
+    (
+        "current_projects",
+        (
+            ("id", "TEXT"),
+            ("version", "INTEGER"),
+            ("status", "TEXT"),
+            ("parent_project_id", "TEXT"),
+        ),
+    ),
+    (
+        "current_project_work_item_memberships",
+        (
+            ("id", "TEXT"),
+            ("version", "INTEGER"),
+            ("project_id", "TEXT"),
+            ("work_item_id", "TEXT"),
+            ("status", "TEXT"),
+        ),
+    ),
+)
+PAUTH_READ_SNAPSHOT_RELATION_NAMES = tuple(name for name, _columns in PAUTH_READ_SNAPSHOT_RELATIONS)
 WINDOWS_RESERVED_NAMES = {
     "CON",
     "PRN",
@@ -262,6 +323,45 @@ class _IndexEntry:
 
 
 @dataclass(frozen=True, slots=True)
+class _PAuthSourceIdentity:
+    resolved_path: str
+    device: int
+    inode: int
+    link_count: int
+    mode: int
+
+
+@dataclass(frozen=True, slots=True)
+class _PAuthProjectionIdentity:
+    resolved_path: str
+    device: int
+    inode: int
+    link_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class _PAuthRelationObservation:
+    name: str
+    schema_sha256: str
+    row_count: int
+    rows_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class _PAuthAuthorityObservation:
+    data_version: int
+    schema_version: int
+    relations: tuple[_PAuthRelationObservation, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _PAuthReadSnapshotEvidence:
+    construction_version: int
+    source_identity: _PAuthSourceIdentity
+    relations: tuple[_PAuthRelationObservation, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class _LedgerEntry:
     mode: str
     sha256: str
@@ -280,6 +380,7 @@ class _LedgerEntry:
     # content hash.
     content_exempt: bool = False
     oid: str = ""
+    pauth_read_snapshot: _PAuthReadSnapshotEvidence | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,6 +398,7 @@ class _PathIdentity:
 class _BridgeSnapshot:
     root: Path
     ledger: dict[str, _LedgerEntry]
+    pauth_source_identity: _PAuthSourceIdentity | None = None
 
 
 def _normalize_rel(path_text: str) -> str:
@@ -632,6 +734,524 @@ def _verify_path_identity(path: Path, expected: _PathIdentity) -> None:
     actual = _path_identity(path, hash_bytes=expected.sha256 is not None)
     if actual != expected:
         raise GateError(f"guarded authority path identity or bytes drifted during evaluation: {path}")
+
+
+def _pauth_source_identity(root: Path, path: Path) -> _PAuthSourceIdentity:
+    """Bind the canonical PAUTH source without hashing unrelated database bytes."""
+
+    try:
+        canonical_root = root.resolve(strict=True)
+    except OSError as exc:
+        raise GateError(f"canonical PAUTH read snapshot root is unavailable: {exc}") from exc
+    expected = canonical_root / PAUTH_READ_SNAPSHOT_REL
+    if path != expected or path.parent != canonical_root:
+        raise GateError("PAUTH read snapshot source is not the canonical live-root groundtruth.db")
+    if _path_is_linklike(canonical_root) or _path_is_linklike(path):
+        raise GateError("PAUTH read snapshot source is symlinked, junctioned, or reparse-point redirected")
+    try:
+        info = path.stat()
+        resolved = path.resolve(strict=True)
+    except OSError as exc:
+        raise GateError(f"canonical PAUTH read snapshot source is unavailable: {exc}") from exc
+    if not path.is_file() or resolved != expected:
+        raise GateError("PAUTH read snapshot source is not the canonical regular database file")
+    return _PAuthSourceIdentity(
+        resolved_path=str(resolved),
+        device=info.st_dev,
+        inode=info.st_ino,
+        link_count=info.st_nlink,
+        mode=stat.S_IMODE(info.st_mode),
+    )
+
+
+def _verify_pauth_source_identity(root: Path, path: Path, expected: _PAuthSourceIdentity) -> None:
+    if _pauth_source_identity(root, path) != expected:
+        raise GateError("canonical PAUTH read snapshot source identity changed during evaluation")
+
+
+def _pauth_projection_identity(path: Path) -> _PAuthProjectionIdentity:
+    if _path_is_linklike(path):
+        raise GateError("PAUTH read snapshot destination is symlinked, junctioned, or reparse-point redirected")
+    try:
+        info = path.lstat()
+        resolved = path.resolve(strict=True)
+    except OSError as exc:
+        raise GateError(f"PAUTH read snapshot destination is unavailable: {exc}") from exc
+    if not stat.S_ISREG(info.st_mode) or resolved.parent != path.parent.resolve(strict=True):
+        raise GateError("PAUTH read snapshot destination is not a direct regular file")
+    return _PAuthProjectionIdentity(
+        resolved_path=str(resolved),
+        device=info.st_dev,
+        inode=info.st_ino,
+        link_count=info.st_nlink,
+    )
+
+
+def _verify_pauth_projection_identity(path: Path, expected: _PAuthProjectionIdentity) -> None:
+    if _pauth_projection_identity(path) != expected:
+        raise GateError("PAUTH read snapshot destination identity changed during evaluation")
+
+
+def _pauth_projection_sidecar_paths(destination: Path) -> tuple[Path, ...]:
+    return tuple(Path(str(destination) + suffix) for suffix in PAUTH_READ_SNAPSHOT_SIDECAR_SUFFIXES)
+
+
+def _create_pauth_projection_sidecar_guards(destination: Path) -> dict[Path, _PathIdentity]:
+    """Occupy every SQLite sidecar name with one retained, empty directory."""
+
+    identities: dict[Path, _PathIdentity] = {}
+    created: list[Path] = []
+    try:
+        for sidecar in _pauth_projection_sidecar_paths(destination):
+            if _path_is_linklike(sidecar) or sidecar.exists():
+                raise GateError(f"PAUTH read snapshot sidecar path is already occupied or redirected: {sidecar.name}")
+            sidecar.mkdir(mode=0o755)
+            created.append(sidecar)
+            identity = _path_identity(sidecar)
+            if not sidecar.is_dir():
+                raise GateError(f"PAUTH read snapshot sidecar guard is not a directory: {sidecar.name}")
+            identities[sidecar] = identity
+        return identities
+    except (GateError, OSError) as exc:
+        for sidecar in reversed(created):
+            try:
+                if _path_is_linklike(sidecar) or sidecar.is_file():
+                    sidecar.unlink()
+                elif sidecar.is_dir():
+                    sidecar.rmdir()
+            except OSError:
+                pass
+        if isinstance(exc, GateError):
+            raise
+        raise GateError(f"could not create PAUTH read snapshot sidecar guards: {exc}") from exc
+
+
+def _verify_pauth_projection_sidecar_guards(identities: dict[Path, _PathIdentity]) -> None:
+    for path, expected in identities.items():
+        if not path.is_dir() or _path_identity(path) != expected:
+            raise GateError(f"PAUTH read snapshot sidecar guard changed during evaluation: {path.name}")
+
+
+def _create_exclusive_pauth_projection_placeholder(destination: Path) -> tuple[int, _PAuthProjectionIdentity]:
+    """Create the projection path exactly once and retain its no-follow descriptor."""
+
+    if _path_is_linklike(destination):
+        raise GateError("PAUTH read snapshot destination is redirected")
+    flags = os.O_CREAT | os.O_EXCL | os.O_RDWR | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(destination, flags, 0o600)
+    except OSError as exc:
+        raise GateError(f"could not exclusively create PAUTH read snapshot destination: {exc}") from exc
+    try:
+        descriptor_info = os.fstat(descriptor)
+        identity = _pauth_projection_identity(destination)
+        if (
+            not stat.S_ISREG(descriptor_info.st_mode)
+            or descriptor_info.st_dev != identity.device
+            or descriptor_info.st_ino != identity.inode
+        ):
+            raise GateError("PAUTH read snapshot exclusive destination binding is inconsistent")
+        return descriptor, identity
+    except (GateError, OSError) as exc:
+        os.close(descriptor)
+        try:
+            destination.unlink()
+        except OSError:
+            pass
+        if isinstance(exc, GateError):
+            raise
+        raise GateError(f"could not bind PAUTH read snapshot destination: {exc}") from exc
+
+
+def _typed_sqlite_value(value: object, *, declared_type: str, relation: str, column: str) -> list[object]:
+    if value is None:
+        return ["null", None]
+    if declared_type == "INTEGER" and isinstance(value, int) and not isinstance(value, bool):
+        return ["integer", str(value)]
+    if declared_type == "TEXT" and isinstance(value, str):
+        return ["text", value]
+    raise GateError(
+        f"PAUTH read snapshot relation {relation}.{column} has unsupported value type "
+        f"{type(value).__name__!r} for declared type {declared_type}"
+    )
+
+
+def _pauth_relation_schema(
+    conn: sqlite3.Connection,
+    relation: str,
+    columns: tuple[tuple[str, str], ...],
+    *,
+    projection: bool,
+) -> str:
+    object_row = conn.execute("SELECT type FROM sqlite_master WHERE name = ?", (relation,)).fetchone()
+    allowed_types = {"table"} if projection else {"table", "view"}
+    if object_row is None or object_row[0] not in allowed_types:
+        kind = "physical table" if projection else "table or view"
+        raise GateError(f"PAUTH read snapshot relation {relation} is not a readable {kind}")
+    schema_rows = conn.execute(f'PRAGMA table_info("{relation}")').fetchall()
+    by_name = {str(row[1]): row for row in schema_rows}
+    normalized: list[tuple[str, str, int, int]] = []
+    for column, declared_type in columns:
+        row = by_name.get(column)
+        if row is None:
+            raise GateError(f"PAUTH read snapshot relation {relation} is missing required column {column}")
+        actual_type = str(row[2] or "").upper()
+        not_null = int(row[3])
+        primary_key_position = int(row[5])
+        if actual_type != declared_type or not_null != 0 or primary_key_position != 0:
+            raise GateError(
+                f"PAUTH read snapshot relation {relation}.{column} has incompatible schema "
+                f"({actual_type}, notnull={not_null}, pk={primary_key_position})"
+            )
+        normalized.append((column, declared_type, not_null, primary_key_position))
+    encoded = json.dumps(normalized, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _observe_pauth_authority(
+    conn: sqlite3.Connection,
+    *,
+    projection: bool,
+    include_rows: bool = False,
+) -> tuple[_PAuthAuthorityObservation, dict[str, tuple[tuple[object, ...], ...]]]:
+    """Observe the exact four logical relations in one coherent read transaction."""
+
+    rows_by_relation: dict[str, tuple[tuple[object, ...], ...]] = {}
+    observations: list[_PAuthRelationObservation] = []
+    try:
+        conn.execute("BEGIN")
+        data_version = int(conn.execute("PRAGMA data_version").fetchone()[0])
+        schema_version = int(conn.execute("PRAGMA schema_version").fetchone()[0])
+        for relation, columns in PAUTH_READ_SNAPSHOT_RELATIONS:
+            schema_sha256 = _pauth_relation_schema(conn, relation, columns, projection=projection)
+            column_sql = ", ".join(f'"{column}"' for column, _declared_type in columns)
+            raw_rows = [tuple(row) for row in conn.execute(f'SELECT {column_sql} FROM "{relation}"').fetchall()]
+            encoded_rows: list[tuple[bytes, tuple[object, ...]]] = []
+            seen_ids: set[str] = set()
+            for raw_row in raw_rows:
+                identity = raw_row[0]
+                if not isinstance(identity, str) or not identity:
+                    raise GateError(f"PAUTH read snapshot relation {relation} has a missing or non-text id")
+                if identity in seen_ids:
+                    raise GateError(f"PAUTH read snapshot relation {relation} has duplicate id {identity!r}")
+                seen_ids.add(identity)
+                typed = [
+                    _typed_sqlite_value(value, declared_type=declared_type, relation=relation, column=column)
+                    for value, (column, declared_type) in zip(raw_row, columns, strict=True)
+                ]
+                encoded = json.dumps(typed, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                encoded_rows.append((encoded, raw_row))
+            encoded_rows.sort(key=lambda item: item[0])
+            rows_payload = b"\n".join(encoded for encoded, _row in encoded_rows)
+            observations.append(
+                _PAuthRelationObservation(
+                    name=relation,
+                    schema_sha256=schema_sha256,
+                    row_count=len(encoded_rows),
+                    rows_sha256=hashlib.sha256(rows_payload).hexdigest(),
+                )
+            )
+            if include_rows:
+                rows_by_relation[relation] = tuple(row for _encoded, row in encoded_rows)
+        conn.execute("COMMIT")
+    except (GateError, sqlite3.Error) as exc:
+        if conn.in_transaction:
+            conn.execute("ROLLBACK")
+        if isinstance(exc, GateError):
+            raise
+        raise GateError(f"PAUTH read snapshot authority relations are unreadable: {exc}") from exc
+    return (
+        _PAuthAuthorityObservation(
+            data_version=data_version,
+            schema_version=schema_version,
+            relations=tuple(observations),
+        ),
+        rows_by_relation,
+    )
+
+
+def _verify_pauth_projection(path: Path, evidence: _PAuthReadSnapshotEvidence) -> None:
+    if evidence.construction_version != PAUTH_READ_SNAPSHOT_VERSION:
+        raise GateError("PAUTH read snapshot ledger construction version is unsupported")
+    try:
+        conn = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=5)
+        conn.execute("PRAGMA query_only=ON")
+        if int(conn.execute("PRAGMA query_only").fetchone()[0]) != 1:
+            raise GateError("PAUTH read snapshot projection connection is not query-only")
+        database_path = Path(str(conn.execute("PRAGMA database_list").fetchone()[2])).resolve(strict=True)
+        if database_path != path.resolve(strict=True):
+            raise GateError("PAUTH read snapshot consumer opened a different database path")
+        application_id = int(conn.execute("PRAGMA application_id").fetchone()[0])
+        user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        if application_id != PAUTH_READ_SNAPSHOT_APPLICATION_ID or user_version != PAUTH_READ_SNAPSHOT_VERSION:
+            raise GateError("PAUTH read snapshot producer/consumer construction identity mismatch")
+        tables = tuple(
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            ).fetchall()
+        )
+        if tables != tuple(sorted(PAUTH_READ_SNAPSHOT_RELATION_NAMES)):
+            raise GateError(f"PAUTH read snapshot relation allowlist mismatch: {tables!r}")
+        observation, _rows = _observe_pauth_authority(conn, projection=True)
+    except (OSError, sqlite3.Error) as exc:
+        raise GateError(f"PAUTH read snapshot projection is unreadable: {exc}") from exc
+    finally:
+        if "conn" in locals():
+            conn.close()
+    if observation.relations != evidence.relations:
+        raise GateError("PAUTH read snapshot projection logical contents differ from its derived ledger")
+
+
+def _create_pauth_projection(
+    destination: Path,
+    destination_identity: _PAuthProjectionIdentity,
+    rows_by_relation: dict[str, tuple[tuple[object, ...], ...]],
+) -> None:
+    _verify_pauth_projection_identity(destination, destination_identity)
+    try:
+        conn = sqlite3.connect(destination.as_uri() + "?mode=rw", uri=True)
+        opened_path = Path(str(conn.execute("PRAGMA database_list").fetchone()[2])).resolve(strict=True)
+        if opened_path != Path(destination_identity.resolved_path):
+            raise GateError("PAUTH read snapshot projection connection was redirected")
+        conn.execute("PRAGMA journal_mode=OFF")
+        conn.execute("PRAGMA synchronous=OFF")
+        conn.execute(f"PRAGMA application_id={PAUTH_READ_SNAPSHOT_APPLICATION_ID}")
+        conn.execute(f"PRAGMA user_version={PAUTH_READ_SNAPSHOT_VERSION}")
+        for relation, columns in PAUTH_READ_SNAPSHOT_RELATIONS:
+            schema_sql = ", ".join(f'"{column}" {declared_type}' for column, declared_type in columns)
+            conn.execute(f'CREATE TABLE "{relation}" ({schema_sql})')
+            rows = rows_by_relation.get(relation)
+            if rows is None:
+                raise GateError(f"PAUTH read snapshot source rows are missing for {relation}")
+            placeholders = ", ".join("?" for _column in columns)
+            conn.executemany(f'INSERT INTO "{relation}" VALUES ({placeholders})', rows)
+        conn.commit()
+        _verify_pauth_projection_identity(destination, destination_identity)
+    except (GateError, OSError, sqlite3.Error) as exc:
+        if "conn" in locals() and conn.in_transaction:
+            conn.rollback()
+        if isinstance(exc, GateError):
+            raise
+        raise GateError(f"could not construct PAUTH read snapshot projection: {exc}") from exc
+    finally:
+        if "conn" in locals():
+            conn.close()
+
+
+def _remove_pauth_projection(
+    destination: Path,
+    destination_identity: _PAuthProjectionIdentity | None = None,
+    sidecar_identities: dict[Path, _PathIdentity] | None = None,
+) -> None:
+    failures: list[str] = []
+    expected_sidecars = sidecar_identities or {}
+    for suffix in ("", *PAUTH_READ_SNAPSHOT_SIDECAR_SUFFIXES):
+        candidate = Path(str(destination) + suffix)
+        try:
+            if _path_is_linklike(candidate):
+                failures.append(f"{candidate.name}: redirected cleanup artifact")
+                candidate.unlink()
+            elif candidate.exists():
+                if suffix == "" and destination_identity is not None:
+                    try:
+                        current_identity = _pauth_projection_identity(candidate)
+                    except GateError as exc:
+                        failures.append(f"{candidate.name}: {exc}")
+                        candidate.unlink()
+                    else:
+                        if current_identity != destination_identity:
+                            failures.append(f"{candidate.name}: destination identity changed before cleanup")
+                            candidate.unlink()
+                        else:
+                            candidate.unlink()
+                elif suffix == "":
+                    failures.append(f"{candidate.name}: cleanup artifact lacks an exclusive identity binding")
+                    candidate.unlink()
+                else:
+                    expected = expected_sidecars.get(candidate)
+                    if expected is not None:
+                        try:
+                            current_identity = _path_identity(candidate)
+                        except GateError as exc:
+                            failures.append(f"{candidate.name}: {exc}")
+                            if _path_is_linklike(candidate) or candidate.is_file():
+                                candidate.unlink()
+                            elif candidate.is_dir():
+                                candidate.rmdir()
+                        else:
+                            if current_identity != expected or not candidate.is_dir():
+                                failures.append(f"{candidate.name}: sidecar guard identity changed before cleanup")
+                                if candidate.is_dir():
+                                    candidate.rmdir()
+                                else:
+                                    candidate.unlink()
+                            else:
+                                candidate.rmdir()
+                    elif candidate.is_dir():
+                        failures.append(f"{candidate.name}: unexpected sidecar directory lacks an identity binding")
+                        candidate.rmdir()
+                    else:
+                        candidate.unlink()
+        except OSError as exc:
+            failures.append(f"{candidate.name}: {exc}")
+        if candidate.exists() or _path_is_linklike(candidate):
+            failures.append(f"{candidate.name}: still exists")
+    if failures:
+        raise GateError("PAUTH read snapshot cleanup failed: " + "; ".join(failures))
+
+
+@contextmanager
+def _pauth_read_snapshot(live_root: Path, snapshot: _BridgeSnapshot) -> Iterator[_BridgeSnapshot]:
+    """Add a four-relation invocation-local PAUTH projection to one copied root."""
+
+    try:
+        _verify_snapshot_ledger(snapshot)
+        resolved_live_root = live_root.resolve(strict=True)
+    except GateError:
+        raise
+    except OSError as exc:
+        raise GateError(f"could not verify the base copied-root ledger for PAUTH projection: {exc}") from exc
+    source = resolved_live_root / PAUTH_READ_SNAPSHOT_REL
+    source_identity = _pauth_source_identity(live_root, source)
+    destination = snapshot.root / PAUTH_READ_SNAPSHOT_REL
+    existing = snapshot.ledger.get(PAUTH_READ_SNAPSHOT_REL)
+    if existing is not None and not existing.content_exempt:
+        raise GateError("copied audit root already contains non-exempt groundtruth.db authority")
+
+    source_conn: sqlite3.Connection | None = None
+    projection_descriptor: int | None = None
+    projection_identity: _PAuthProjectionIdentity | None = None
+    sidecar_identities: dict[Path, _PathIdentity] = {}
+    cleanup_error: GateError | None = None
+    try:
+        source_conn = sqlite3.connect(source.as_uri() + "?mode=ro", uri=True, timeout=5)
+        source_conn.execute("PRAGMA query_only=ON")
+        if int(source_conn.execute("PRAGMA query_only").fetchone()[0]) != 1:
+            raise GateError("canonical PAUTH read snapshot source connection is not query-only")
+        opened_path = Path(str(source_conn.execute("PRAGMA database_list").fetchone()[2])).resolve(strict=True)
+        if opened_path != source:
+            raise GateError("PAUTH read snapshot source connection was redirected")
+        before, rows_by_relation = _observe_pauth_authority(source_conn, projection=False, include_rows=True)
+        sidecar_identities = _create_pauth_projection_sidecar_guards(destination)
+        projection_descriptor, projection_identity = _create_exclusive_pauth_projection_placeholder(destination)
+        _create_pauth_projection(destination, projection_identity, rows_by_relation)
+        if destination.stat().st_size > MAX_BLOB_BYTES:
+            raise GateError("compact PAUTH read snapshot exceeds the ordinary copied-blob limit")
+        projection_observation, _rows = _observe_projection_path(destination)
+        if projection_observation.relations != before.relations:
+            raise GateError("PAUTH read snapshot projection differs from canonical source relations")
+        _verify_pauth_projection_identity(destination, projection_identity)
+        if os.name == "nt":
+            destination.chmod(0o644)
+        else:
+            os.fchmod(projection_descriptor, 0o644)
+        _verify_pauth_projection_identity(destination, projection_identity)
+        _verify_pauth_projection_sidecar_guards(sidecar_identities)
+        info = destination.stat()
+        evidence = _PAuthReadSnapshotEvidence(
+            construction_version=PAUTH_READ_SNAPSHOT_VERSION,
+            source_identity=source_identity,
+            relations=before.relations,
+        )
+        derived_entry = _LedgerEntry(
+            mode="100644",
+            sha256=hashlib.sha256(destination.read_bytes()).hexdigest(),
+            size=info.st_size,
+            device=info.st_dev,
+            inode=info.st_ino,
+            link_count=info.st_nlink,
+            pauth_read_snapshot=evidence,
+        )
+        effective_ledger = {**snapshot.ledger, PAUTH_READ_SNAPSHOT_REL: derived_entry}
+        effective_size = sum(entry.size for entry in effective_ledger.values() if not entry.content_exempt)
+        if effective_size > MAX_TREE_BYTES:
+            raise GateError(f"prospective tree exceeds {MAX_TREE_BYTES}-byte materialization limit")
+        effective = _BridgeSnapshot(
+            root=snapshot.root,
+            ledger=effective_ledger,
+            pauth_source_identity=source_identity,
+        )
+        try:
+            configured_path = groundtruth_db_path(effective.root)
+        except (OSError, ValueError) as exc:
+            raise GateError(f"copied-root PAUTH consumer configuration is unreadable: {exc}") from exc
+        if configured_path.resolve(strict=True) != destination.resolve(strict=True):
+            raise GateError("copied-root PAUTH consumer configuration resolves outside the derived projection")
+        _verify_snapshot_ledger(effective)
+        _verify_pauth_source_identity(live_root, source, source_identity)
+        after_copy, _rows = _observe_pauth_authority(source_conn, projection=False)
+        if after_copy.relations != before.relations:
+            raise GateError("canonical PAUTH authority changed while constructing the read snapshot")
+        # Construction retained the exclusive no-follow descriptor. Replace that
+        # construction handle with the normal read-only no-replace guard before
+        # any consumer opens the finished projection; identity is rechecked after
+        # the handoff and before consumer execution.
+        os.close(projection_descriptor)
+        projection_descriptor = None
+        guarded_paths = (destination, *sidecar_identities)
+        with _hold_paths_no_replace(guarded_paths):
+            _verify_pauth_projection_identity(destination, projection_identity)
+            _verify_pauth_projection_sidecar_guards(sidecar_identities)
+            yield effective
+            _verify_snapshot_ledger(effective)
+            _verify_pauth_projection_identity(destination, projection_identity)
+            _verify_pauth_projection_sidecar_guards(sidecar_identities)
+            _verify_pauth_source_identity(live_root, source, source_identity)
+            after_evaluation, _rows = _observe_pauth_authority(source_conn, projection=False)
+            if after_evaluation.relations != before.relations:
+                raise GateError("canonical PAUTH authority changed during protected-commit evaluation")
+    except (OSError, sqlite3.Error) as exc:
+        raise GateError(f"canonical PAUTH read snapshot source is unreadable: {exc}") from exc
+    finally:
+        if source_conn is not None:
+            try:
+                source_conn.close()
+            except sqlite3.Error as exc:
+                cleanup_error = GateError(f"canonical PAUTH source connection cleanup failed: {exc}")
+        if projection_descriptor is not None:
+            try:
+                os.close(projection_descriptor)
+            except OSError as exc:
+                cleanup_error = cleanup_error or GateError(f"PAUTH projection descriptor cleanup failed: {exc}")
+        try:
+            _remove_pauth_projection(destination, projection_identity, sidecar_identities)
+        except GateError as exc:
+            cleanup_error = exc
+        try:
+            _verify_snapshot_ledger(snapshot)
+        except GateError as exc:
+            cleanup_error = cleanup_error or exc
+        except OSError as exc:
+            cleanup_error = cleanup_error or GateError(
+                f"base copied-root ledger re-verification failed after PAUTH cleanup: {exc}"
+            )
+        if cleanup_error is not None:
+            raise cleanup_error
+
+
+def _observe_projection_path(
+    path: Path,
+) -> tuple[_PAuthAuthorityObservation, dict[str, tuple[tuple[object, ...], ...]]]:
+    try:
+        conn = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=5)
+        conn.execute("PRAGMA query_only=ON")
+        if int(conn.execute("PRAGMA query_only").fetchone()[0]) != 1:
+            raise GateError("PAUTH read snapshot projection connection is not query-only")
+        return _observe_pauth_authority(conn, projection=True)
+    except (OSError, sqlite3.Error) as exc:
+        raise GateError(f"PAUTH read snapshot projection is unreadable: {exc}") from exc
+    finally:
+        if "conn" in locals():
+            conn.close()
+
+
+def _requires_pauth_read_snapshot(status: str, *contents: str | None) -> bool:
+    return status in PAUTH_READ_SNAPSHOT_STATUSES and any(
+        extract_metadata_value(content, PROJECT_AUTHORIZATION_KEYS) is not None
+        for content in contents
+        if content is not None
+    )
 
 
 @contextmanager
@@ -1166,6 +1786,11 @@ def _verify_snapshot_ledger(snapshot: _BridgeSnapshot) -> None:
     # entries are recorded in the ledger but must be ABSENT from disk.
     exempt_paths = {rel for rel, entry in snapshot.ledger.items() if entry.content_exempt}
     non_exempt_paths = {rel for rel, entry in snapshot.ledger.items() if not entry.content_exempt}
+    pauth_evidence_paths = {rel for rel, entry in snapshot.ledger.items() if entry.pauth_read_snapshot is not None}
+    if snapshot.pauth_source_identity is None and pauth_evidence_paths:
+        raise GateError("PAUTH read snapshot ledger is missing its canonical source identity binding")
+    if snapshot.pauth_source_identity is not None and pauth_evidence_paths != {PAUTH_READ_SNAPSHOT_REL}:
+        raise GateError("PAUTH read snapshot source identity binding lacks canonical ledger evidence")
     actual_paths: set[str] = set()
     for candidate in snapshot.root.rglob("*"):
         rel_path = candidate.relative_to(snapshot.root).as_posix()
@@ -1186,6 +1811,8 @@ def _verify_snapshot_ledger(snapshot: _BridgeSnapshot) -> None:
         raise GateError(f"content-exempt ledger paths must not exist on disk: {exempt_on_disk}")
     for rel_path, expected in snapshot.ledger.items():
         if expected.content_exempt:
+            if expected.pauth_read_snapshot is not None:
+                raise GateError(f"content-exempt ledger entry cannot carry PAUTH authority: {rel_path}")
             if not expected.oid or expected.size < 0 or not expected.mode:
                 raise GateError(f"content-exempt ledger entry has incomplete metadata: {rel_path}")
             continue
@@ -1207,6 +1834,12 @@ def _verify_snapshot_ledger(snapshot: _BridgeSnapshot) -> None:
             actual_executable = bool(info.st_mode & stat.S_IXUSR)
             if actual_executable != (expected.mode == "100755"):
                 raise GateError(f"prospective audit authority mode drifted during audit: {rel_path}")
+        if expected.pauth_read_snapshot is not None:
+            if rel_path != PAUTH_READ_SNAPSHOT_REL:
+                raise GateError(f"PAUTH read snapshot ledger entry uses an unexpected path: {rel_path}")
+            if expected.pauth_read_snapshot.source_identity != snapshot.pauth_source_identity:
+                raise GateError("PAUTH read snapshot ledger source identity changed from canonical source binding")
+            _verify_pauth_projection(candidate, expected.pauth_read_snapshot)
 
 
 def _set_snapshot_read_only(snapshot: _BridgeSnapshot, read_only: bool) -> None:
@@ -1362,14 +1995,14 @@ def _run_snapshot_compliance_audit(
     except OSError as exc:
         raise GateError(f"could not isolate compliance candidate {candidate_path}: {exc}") from exc
     _verify_snapshot_ledger(
-        _BridgeSnapshot(
-            root=snapshot.root,
+        replace(
+            snapshot,
             ledger={path: entry for path, entry in snapshot.ledger.items() if path != candidate_path},
         )
     )
     _set_snapshot_read_only(
-        _BridgeSnapshot(
-            root=snapshot.root,
+        replace(
+            snapshot,
             ledger={path: entry for path, entry in snapshot.ledger.items() if path != candidate_path},
         ),
         True,
@@ -1382,8 +2015,8 @@ def _run_snapshot_compliance_audit(
         )
     finally:
         _set_snapshot_read_only(
-            _BridgeSnapshot(
-                root=snapshot.root,
+            replace(
+                snapshot,
                 ledger={path: entry for path, entry in snapshot.ledger.items() if path != candidate_path},
             ),
             False,
@@ -2065,6 +2698,7 @@ def _load_finalized_packet(
     protected_paths: list[str],
     *,
     batch_authority_packet: dict[str, Any] | None = None,
+    pauth_root: Path | None = None,
 ) -> tuple[dict[str, Any] | None, list[str]]:
     errors: list[str] = []
     try:
@@ -2173,7 +2807,7 @@ def _load_finalized_packet(
             errors.append(f"{bridge_id}: implementation-start claim project differs from packet PAUTH")
         try:
             validate_packet_project_authorization_operation(
-                root,
+                pauth_root or root,
                 packet,
                 requested_operations=["protected_mutation"],
                 target_paths=list(chain.target_paths),
@@ -2277,6 +2911,8 @@ def _load_transaction_verified_evidence(
 
     chain: _ApprovedChain | None = None
     report_text: str | None = None
+    proposal_text: str | None = None
+    packet: dict[str, Any] | None = None
     try:
         with _bridge_snapshot(root, bridge_id, snapshot) as bridge_snapshot:
             snapshot_root = bridge_snapshot.root
@@ -2298,6 +2934,7 @@ def _load_transaction_verified_evidence(
                 with _immutable_snapshot(bridge_snapshot):
                     try:
                         chain = _approved_chain(snapshot_root, resolution)
+                        proposal_text = (snapshot_root / chain.proposal_path).read_text(encoding="utf-8")
                         report_text = (snapshot_root / chain.report_path).read_text(encoding="utf-8")
                     except (GateError, OSError) as exc:
                         errors.append(f"{bridge_id}: VERIFIED candidate approved-chain validation failed: {exc}")
@@ -2308,16 +2945,6 @@ def _load_transaction_verified_evidence(
             if anchor_violations:
                 errors.append(f"{bridge_id}: VERIFIED candidate has invalid evidence anchors: {anchor_violations}")
             _verify_snapshot_ledger(bridge_snapshot)
-            try:
-                _run_snapshot_compliance_audit(
-                    snapshot=bridge_snapshot,
-                    candidate_path=candidate_path,
-                    content=content,
-                )
-            except (BridgeComplianceError, OSError, subprocess.SubprocessError) as exc:
-                errors.append(f"{bridge_id}: VERIFIED candidate bridge-compliance audit failed: {exc}")
-            _verify_snapshot_ledger(bridge_snapshot)
-
             candidate_session = _single_author_session(content, f"{bridge_id} VERIFIED candidate", errors)
             report_session = (
                 _single_author_session(report_text, f"{bridge_id} implementation report", errors)
@@ -2338,6 +2965,38 @@ def _load_transaction_verified_evidence(
                 if self_review_reason is not None:
                     errors.append(f"{bridge_id}: VERIFIED candidate review independence failed: {self_review_reason}")
             _verify_snapshot_ledger(bridge_snapshot)
+
+            requires_pauth_snapshot = _requires_pauth_read_snapshot(
+                _first_nonblank_line(content),
+                proposal_text,
+                report_text,
+                content,
+            )
+            effective_context = (
+                _pauth_read_snapshot(root, bridge_snapshot) if requires_pauth_snapshot else nullcontext(bridge_snapshot)
+            )
+            with effective_context as effective_snapshot:
+                try:
+                    _run_snapshot_compliance_audit(
+                        snapshot=effective_snapshot,
+                        candidate_path=candidate_path,
+                        content=content,
+                    )
+                except (BridgeComplianceError, OSError, subprocess.SubprocessError) as exc:
+                    errors.append(f"{bridge_id}: VERIFIED candidate bridge-compliance audit failed: {exc}")
+                _verify_snapshot_ledger(effective_snapshot)
+                if chain is not None:
+                    with _immutable_snapshot(effective_snapshot):
+                        packet, packet_errors = _load_finalized_packet(
+                            root,
+                            bridge_id,
+                            chain,
+                            protected_paths,
+                            batch_authority_packet=batch_authority_packet,
+                            pauth_root=effective_snapshot.root if requires_pauth_snapshot else root,
+                        )
+                    errors.extend(packet_errors)
+                _verify_snapshot_ledger(effective_snapshot)
     except GateError as exc:
         errors.append(str(exc))
 
@@ -2349,17 +3008,7 @@ def _load_transaction_verified_evidence(
         errors.append(f"{bridge_id}: VERIFIED candidate author session context is synthetic")
 
     if chain is None:
-        packet = None
         errors.append(f"{bridge_id}: no resolver-approved chain exists for packet validation")
-    else:
-        packet, packet_errors = _load_finalized_packet(
-            root,
-            bridge_id,
-            chain,
-            protected_paths,
-            batch_authority_packet=batch_authority_packet,
-        )
-        errors.extend(packet_errors)
 
     if errors or packet is None:
         return None, errors, candidate_path

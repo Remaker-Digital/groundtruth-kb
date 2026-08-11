@@ -3936,3 +3936,1222 @@ def test_transaction_local_unbound_packet_denied(
         for finding in never_live["findings"]
         for error in finding.get("evidence_errors", [])
     )
+
+
+# ---------------------------------------------------------------------------
+# WI-6183: invocation-local PAUTH read snapshot for copied-root audits.
+
+
+def _wi6183_seed_authority_db(module, root: Path, *, omit_relation: str | None = None) -> None:
+    conn = sqlite3.connect(root / "groundtruth.db")
+    try:
+        for relation, columns in module.PAUTH_READ_SNAPSHOT_RELATIONS:
+            if relation == omit_relation:
+                continue
+            schema = ", ".join(f'"{column}" {declared_type}' for column, declared_type in columns)
+            conn.execute(f'CREATE TABLE "{relation}" ({schema})')
+        if omit_relation != "current_specifications":
+            conn.execute(
+                "INSERT INTO current_specifications VALUES (?, ?, ?, ?, ?)",
+                ("SPEC-TEST", 1, "Fixture specification", "specified", "specification"),
+            )
+        if omit_relation != "current_projects":
+            conn.execute(
+                "INSERT INTO current_projects VALUES (?, ?, ?, ?)",
+                ("PROJECT-TEST", 1, "active", None),
+            )
+        if omit_relation != "current_project_work_item_memberships":
+            conn.execute(
+                "INSERT INTO current_project_work_item_memberships VALUES (?, ?, ?, ?, ?)",
+                ("PWM-TEST", 1, "PROJECT-TEST", "WI-TEST", "active"),
+            )
+        if omit_relation != "current_project_authorizations":
+            conn.execute(
+                "INSERT INTO current_project_authorizations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    "PAUTH-TEST",
+                    1,
+                    "PROJECT-TEST",
+                    "active",
+                    "Fixture authorization",
+                    "DELIB-TEST",
+                    "Authorize exact fixture paths.",
+                    json.dumps(["bridge", "source", "test"]),
+                    json.dumps([]),
+                    json.dumps([]),
+                    json.dumps([]),
+                    json.dumps([]),
+                    json.dumps([]),
+                    None,
+                    json.dumps([]),
+                    json.dumps([]),
+                ),
+            )
+        conn.execute("CREATE TABLE unrelated_runtime_state (id TEXT, value TEXT)")
+        conn.execute("INSERT INTO unrelated_runtime_state VALUES ('one', 'before')")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _wi6183_ledger_entry(module, path: Path):
+    info = path.stat()
+    return module._LedgerEntry(
+        mode="100644",
+        sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+        size=info.st_size,
+        device=info.st_dev,
+        inode=info.st_ino,
+        link_count=info.st_nlink,
+    )
+
+
+def _wi6183_bridge_snapshot(module, root: Path, *, oversized_db_entry: bool = False):
+    snapshot_root = root / ".gtkb-state" / "wi6183-snapshot"
+    snapshot_root.mkdir(parents=True)
+    config = snapshot_root / "groundtruth.toml"
+    config.write_text('[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8")
+    taxonomy_source = REPO_ROOT / "config" / "governance" / "project-authorization-operation-taxonomy.toml"
+    live_taxonomy = root / "config" / "governance" / taxonomy_source.name
+    live_taxonomy.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(taxonomy_source, live_taxonomy)
+    taxonomy = snapshot_root / "config" / "governance" / taxonomy_source.name
+    taxonomy.parent.mkdir(parents=True)
+    shutil.copy2(live_taxonomy, taxonomy)
+    ledger = {
+        "groundtruth.toml": _wi6183_ledger_entry(module, config),
+        taxonomy.relative_to(snapshot_root).as_posix(): _wi6183_ledger_entry(module, taxonomy),
+    }
+    if oversized_db_entry:
+        ledger["groundtruth.db"] = module._LedgerEntry(
+            mode="100644",
+            sha256="0" * 64,
+            size=module.MAX_BLOB_BYTES + 1,
+            device=0,
+            inode=0,
+            link_count=0,
+            content_exempt=True,
+            oid="a" * 40,
+        )
+    return module._BridgeSnapshot(root=snapshot_root, ledger=ledger)
+
+
+def _wi6183_pauth_packet(root: Path, *, target_path: str = "scripts/check_protected_commit_authorization.py"):
+    row = implementation_authorization._project_authorization_row(root, "PAUTH-TEST")
+    project_authorization = implementation_authorization.validate_project_authorization_row(
+        root,
+        row,
+        proposal_project_id="PROJECT-TEST",
+        work_item_id="WI-TEST",
+        spec_links=["SPEC-TEST"],
+        target_paths=[target_path],
+        requested_operations=["protected_mutation"],
+    )
+    return {
+        "schema_version": 3,
+        "spec_links": ["SPEC-TEST"],
+        "project_authorization": project_authorization,
+    }
+
+
+def _wi6183_assert_projection_absent(snapshot_root: Path) -> None:
+    for suffix in ("", "-journal", "-wal", "-shm"):
+        assert not Path(str(snapshot_root / "groundtruth.db") + suffix).exists()
+
+
+def _wi6183_prepare_verdict_in_snapshot(snapshot_root: Path, candidate_path: str, content: str) -> str:
+    """Prepare verdict bytes with the exact modules and PAUTH projection under audit."""
+
+    wrapper = r"""
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1]).resolve()
+sys.path.insert(0, str(root / "groundtruth-kb" / "src"))
+sys.path.insert(0, str(root))
+from scripts.bridge_applicability_preflight import prepare_verdict_candidate
+
+sys.stdout.write(
+    prepare_verdict_candidate(
+        candidate_path=sys.argv[2],
+        content=sys.stdin.read(),
+        project_root=root,
+        config_path=root / "config" / "governance" / "spec-applicability.toml",
+        db_path=root / "groundtruth.db",
+    )
+)
+"""
+    prepared = subprocess.run(
+        [sys.executable, "-I", "-B", "-S", "-c", wrapper, str(snapshot_root), candidate_path],
+        cwd=snapshot_root,
+        input=content,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert prepared.returncode == 0, prepared.stderr
+    return prepared.stdout
+
+
+def test_wi6183_pauth_snapshot_projects_exact_relations_and_real_evaluator_consumes_it(tmp_path: Path) -> None:
+    module = _load_module()
+    _wi6183_seed_authority_db(module, tmp_path)
+    snapshot = _wi6183_bridge_snapshot(module, tmp_path, oversized_db_entry=True)
+    bridge_id = "gtkb-wi6183-pauth-projection-fixture"
+    source_rel = f"bridge/{bridge_id}-001.md"
+    source_text = (
+        "NEW\n\n"
+        f"Document: {bridge_id}\n"
+        "Project Authorization: PAUTH-TEST\n"
+        "Project: PROJECT-TEST\n"
+        "Work Item: WI-TEST\n\n"
+        "## Specification Links\n\n- SPEC-TEST\n"
+    )
+    source = tmp_path / source_rel
+    source.parent.mkdir()
+    source.write_text(source_text, encoding="utf-8")
+    applicability_config = tmp_path / "config" / "governance" / "spec-applicability.toml"
+    applicability_config.write_text(
+        f'[[rules]]\nspec_id = "SPEC-TEST"\nseverity = "required"\napplies_when_doc_matches = ["{bridge_id}"]\n',
+        encoding="utf-8",
+    )
+    for live_path in (source, applicability_config):
+        rel_path = live_path.relative_to(tmp_path)
+        projected_path = snapshot.root / rel_path
+        projected_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(live_path, projected_path)
+        snapshot.ledger[rel_path.as_posix()] = _wi6183_ledger_entry(module, projected_path)
+    live_applicability = applicability_preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=applicability_config,
+        db_path=tmp_path / "groundtruth.db",
+        content_file=source,
+    )
+    target_paths = ["scripts/check_protected_commit_authorization.py"]
+    source_row = implementation_authorization._project_authorization_row(tmp_path, "PAUTH-TEST")
+    project_authorization = implementation_authorization.validate_project_authorization_row(
+        tmp_path,
+        source_row,
+        proposal_project_id="PROJECT-TEST",
+        work_item_id="WI-TEST",
+        spec_links=["SPEC-TEST"],
+        target_paths=target_paths,
+        requested_operations=["protected_mutation"],
+    )
+    packet = {
+        "schema_version": 3,
+        "spec_links": ["SPEC-TEST"],
+        "project_authorization": project_authorization,
+    }
+
+    with module._pauth_read_snapshot(tmp_path, snapshot) as effective:
+        projection = effective.root / "groundtruth.db"
+        assert projection.is_file()
+        assert effective.ledger["groundtruth.db"].content_exempt is False
+        evidence = effective.ledger["groundtruth.db"].pauth_read_snapshot
+        assert evidence is not None
+        assert effective.pauth_source_identity == evidence.source_identity
+        module._verify_snapshot_ledger(effective)
+        conn = sqlite3.connect(projection)
+        try:
+            tables = tuple(
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+                )
+            )
+        finally:
+            conn.close()
+        assert tables == tuple(sorted(module.PAUTH_READ_SNAPSHOT_RELATION_NAMES))
+        projected_applicability = applicability_preflight.build_packet(
+            bridge_id=bridge_id,
+            bridge_dir=effective.root / "bridge",
+            config_path=effective.root / "config" / "governance" / "spec-applicability.toml",
+            db_path=projection,
+            content_file=effective.root / source_rel,
+        )
+        assert projected_applicability["packet_hash"] == live_applicability["packet_hash"]
+        decision = implementation_authorization.validate_packet_project_authorization_operation(
+            effective.root,
+            packet,
+            requested_operations=["protected_mutation"],
+            target_paths=target_paths,
+        )
+        assert decision is not None
+        assert decision["id"] == "PAUTH-TEST"
+
+    _wi6183_assert_projection_absent(snapshot.root)
+    module._verify_snapshot_ledger(snapshot)
+
+
+def test_wi6183_non_pauth_route_does_not_open_or_project_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_module()
+    snapshot = _wi6183_bridge_snapshot(module, tmp_path)
+    calls: list[object] = []
+    monkeypatch.setattr(module, "_pauth_read_snapshot", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    assert module._requires_pauth_read_snapshot("VERIFIED", "Project: PROJECT-TEST") is False
+    assert module._requires_pauth_read_snapshot("NEW", "Project Authorization: PAUTH-TEST") is False
+    assert calls == []
+    _wi6183_assert_projection_absent(snapshot.root)
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        "Project Authorization: PAUTH-TEST",
+        "Project Authorization ID: PAUTH-TEST",
+        "- Project Authorization: `PAUTH-TEST`",
+        "**Project Authorization:** **PAUTH-TEST**",
+        "- **Project Authorization ID:** `PAUTH-TEST`",
+    ],
+)
+def test_wi6183_pauth_route_uses_canonical_metadata_grammar(metadata: str) -> None:
+    module = _load_module()
+
+    assert module._requires_pauth_read_snapshot("VERIFIED", metadata) is True
+
+
+@pytest.mark.parametrize(
+    ("mutation", "sql"),
+    [
+        pytest.param(
+            "revoked-authorization",
+            "UPDATE current_project_authorizations SET status = 'revoked' WHERE id = 'PAUTH-TEST'",
+            id="revoked-authorization",
+        ),
+        pytest.param(
+            "inactive-project",
+            "UPDATE current_projects SET status = 'retired' WHERE id = 'PROJECT-TEST'",
+            id="inactive-project",
+        ),
+        pytest.param(
+            "missing-membership",
+            "DELETE FROM current_project_work_item_memberships WHERE id = 'PWM-TEST'",
+            id="missing-membership",
+        ),
+    ],
+)
+def test_wi6183_operation_time_authority_state_denies(
+    tmp_path: Path,
+    mutation: str,
+    sql: str,
+) -> None:
+    module = _load_module()
+    _wi6183_seed_authority_db(module, tmp_path)
+    snapshot = _wi6183_bridge_snapshot(module, tmp_path)
+    packet = _wi6183_pauth_packet(tmp_path)
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    try:
+        conn.execute(sql)
+        conn.commit()
+    finally:
+        conn.close()
+    with (
+        module._pauth_read_snapshot(tmp_path, snapshot) as effective,
+        pytest.raises(implementation_authorization.AuthorizationError),
+    ):
+        implementation_authorization.validate_packet_project_authorization_operation(
+            effective.root,
+            packet,
+            requested_operations=["protected_mutation"],
+            target_paths=["scripts/check_protected_commit_authorization.py"],
+        )
+
+    assert mutation
+    _wi6183_assert_projection_absent(snapshot.root)
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        pytest.param(
+            "UPDATE current_project_authorizations SET status = 'revoked' WHERE id = 'PAUTH-TEST'",
+            id="authorization-revoked",
+        ),
+        pytest.param(
+            "UPDATE current_projects SET status = 'retired' WHERE id = 'PROJECT-TEST'",
+            id="project-inactive",
+        ),
+        pytest.param(
+            "DELETE FROM current_project_work_item_memberships WHERE id = 'PWM-TEST'",
+            id="membership-missing",
+        ),
+        pytest.param(
+            "DELETE FROM current_specifications WHERE id = 'SPEC-TEST'",
+            id="specification-non-current",
+        ),
+    ],
+)
+def test_wi6183_relevant_authority_drift_denies_and_cleans(tmp_path: Path, sql: str) -> None:
+    module = _load_module()
+    _wi6183_seed_authority_db(module, tmp_path)
+    snapshot = _wi6183_bridge_snapshot(module, tmp_path)
+
+    with (
+        pytest.raises(module.GateError, match="changed during protected-commit evaluation"),
+        module._pauth_read_snapshot(tmp_path, snapshot),
+    ):
+        conn = sqlite3.connect(tmp_path / "groundtruth.db")
+        try:
+            conn.execute(sql)
+            conn.commit()
+        finally:
+            conn.close()
+
+    _wi6183_assert_projection_absent(snapshot.root)
+
+
+@pytest.mark.parametrize(
+    ("source_observation", "expected"),
+    [
+        pytest.param(2, "changed while constructing", id="post-copy"),
+        pytest.param(3, "changed during protected-commit evaluation", id="post-evaluation"),
+    ],
+)
+def test_wi6183_relation_drift_at_each_snapshot_boundary_denies_and_cleans(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    source_observation: int,
+    expected: str,
+) -> None:
+    module = _load_module()
+    _wi6183_seed_authority_db(module, tmp_path)
+    snapshot = _wi6183_bridge_snapshot(module, tmp_path)
+    real_observe = module._observe_pauth_authority
+    source_calls = 0
+
+    def drifting_observation(conn, *, projection: bool, include_rows: bool = False):
+        nonlocal source_calls
+        observation, rows = real_observe(conn, projection=projection, include_rows=include_rows)
+        if not projection:
+            source_calls += 1
+            if source_calls == source_observation:
+                relations = list(observation.relations)
+                relations[0] = module.replace(relations[0], rows_sha256="f" * 64)
+                observation = module.replace(observation, relations=tuple(relations))
+        return observation, rows
+
+    monkeypatch.setattr(module, "_observe_pauth_authority", drifting_observation)
+    with (
+        pytest.raises(module.GateError, match=expected),
+        module._pauth_read_snapshot(tmp_path, snapshot),
+    ):
+        pass
+
+    _wi6183_assert_projection_absent(snapshot.root)
+
+
+def test_wi6183_unrelated_database_churn_is_not_a_false_deny(tmp_path: Path) -> None:
+    module = _load_module()
+    _wi6183_seed_authority_db(module, tmp_path)
+    snapshot = _wi6183_bridge_snapshot(module, tmp_path)
+
+    with module._pauth_read_snapshot(tmp_path, snapshot):
+        conn = sqlite3.connect(tmp_path / "groundtruth.db")
+        try:
+            conn.execute("INSERT INTO unrelated_runtime_state VALUES ('two', 'after')")
+            conn.commit()
+        finally:
+            conn.close()
+
+    _wi6183_assert_projection_absent(snapshot.root)
+
+
+def test_wi6183_source_identity_omits_whole_database_bytes_and_copying() -> None:
+    module = _load_module()
+    source = SCRIPT_PATH.read_text(encoding="utf-8")
+    identity_body = source[
+        source.index("def _pauth_source_identity(") : source.index("def _verify_pauth_source_identity(")
+    ]
+    projection_body = source[source.index("def _pauth_read_snapshot(") : source.index("def _observe_projection_path(")]
+
+    assert tuple(module._PAuthSourceIdentity.__dataclass_fields__) == (
+        "resolved_path",
+        "device",
+        "inode",
+        "link_count",
+        "mode",
+    )
+    assert "read_bytes" not in identity_body
+    assert "sha256" not in identity_body
+    assert "copyfile" not in projection_body
+    assert "copy2" not in projection_body
+    assert "shutil.copy" not in projection_body
+
+
+def test_wi6183_projection_tamper_denies_and_cleans(tmp_path: Path) -> None:
+    module = _load_module()
+    _wi6183_seed_authority_db(module, tmp_path)
+    snapshot = _wi6183_bridge_snapshot(module, tmp_path)
+
+    with (
+        pytest.raises(module.GateError, match="bytes drifted|readonly database"),
+        module._pauth_read_snapshot(tmp_path, snapshot) as effective,
+    ):
+        projection = effective.root / "groundtruth.db"
+        conn = sqlite3.connect(projection)
+        try:
+            conn.execute("UPDATE current_projects SET status = 'retired' WHERE id = 'PROJECT-TEST'")
+            conn.commit()
+        finally:
+            conn.close()
+
+    _wi6183_assert_projection_absent(snapshot.root)
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected"),
+    [
+        pytest.param("missing", "source is unavailable", id="missing"),
+        pytest.param("unreadable", "access denied", id="unreadable"),
+        pytest.param("locked", "database is locked", id="locked"),
+        pytest.param("malformed", "authority relations are unreadable|not a readable", id="malformed"),
+        pytest.param("schema-incomplete", "current_specifications", id="schema-incomplete"),
+    ],
+)
+def test_wi6183_canonical_source_failures_deny_and_clean(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+    expected: str,
+) -> None:
+    module = _load_module()
+    _wi6183_seed_authority_db(
+        module,
+        tmp_path,
+        omit_relation="current_specifications" if failure == "schema-incomplete" else None,
+    )
+    snapshot = _wi6183_bridge_snapshot(module, tmp_path)
+    source = tmp_path / "groundtruth.db"
+    if failure == "missing":
+        source.unlink()
+    elif failure == "malformed":
+        source.unlink()
+        source.write_bytes(b"not a sqlite database")
+    elif failure in {"unreadable", "locked"}:
+        real_connect = module.sqlite3.connect
+
+        def failing_source_connect(database, *args, **kwargs):
+            if str(database).startswith(source.as_uri()) and "mode=ro" in str(database):
+                message = "access denied" if failure == "unreadable" else "database is locked"
+                raise sqlite3.OperationalError(message)
+            return real_connect(database, *args, **kwargs)
+
+        monkeypatch.setattr(module.sqlite3, "connect", failing_source_connect)
+
+    with (
+        pytest.raises(module.GateError, match=expected),
+        module._pauth_read_snapshot(tmp_path, snapshot),
+    ):
+        pytest.fail("an invalid canonical PAUTH source must not yield")
+
+    _wi6183_assert_projection_absent(snapshot.root)
+
+
+@pytest.mark.parametrize(
+    ("tamper", "expected"),
+    [
+        pytest.param(
+            "path",
+            "source identity binding lacks canonical ledger evidence",
+            id="path",
+        ),
+        pytest.param("file-hash", "bytes drifted", id="file-hash"),
+        pytest.param("file-size", "identity drifted", id="file-size"),
+        pytest.param("source-identity", "source identity changed", id="source-identity"),
+        pytest.param("schema-digest", "logical contents differ", id="schema-digest"),
+        pytest.param("row-count", "logical contents differ", id="row-count"),
+        pytest.param("typed-row-digest", "logical contents differ", id="typed-row-digest"),
+        pytest.param("construction-version", "construction version is unsupported", id="construction-version"),
+    ],
+)
+def test_wi6183_derived_ledger_tamper_denies_and_cleans(
+    tmp_path: Path,
+    tamper: str,
+    expected: str,
+) -> None:
+    module = _load_module()
+    _wi6183_seed_authority_db(module, tmp_path)
+    snapshot = _wi6183_bridge_snapshot(module, tmp_path)
+
+    with (
+        pytest.raises(module.GateError, match=expected),
+        module._pauth_read_snapshot(tmp_path, snapshot) as effective,
+    ):
+        entry = effective.ledger["groundtruth.db"]
+        evidence = entry.pauth_read_snapshot
+        assert evidence is not None
+        if tamper == "path":
+            effective.ledger["redirected/groundtruth.db"] = effective.ledger.pop("groundtruth.db")
+            module._verify_snapshot_ledger(effective)
+        elif tamper == "file-hash":
+            effective.ledger["groundtruth.db"] = module.replace(entry, sha256="0" * 64)
+            module._verify_snapshot_ledger(effective)
+        elif tamper == "file-size":
+            effective.ledger["groundtruth.db"] = module.replace(entry, size=entry.size + 1)
+            module._verify_snapshot_ledger(effective)
+        elif tamper == "source-identity":
+            tampered_identity = module.replace(evidence.source_identity, inode=evidence.source_identity.inode + 1)
+            tampered_evidence = module.replace(evidence, source_identity=tampered_identity)
+            effective.ledger["groundtruth.db"] = module.replace(entry, pauth_read_snapshot=tampered_evidence)
+            module._verify_snapshot_ledger(effective)
+        elif tamper == "construction-version":
+            tampered_evidence = module.replace(evidence, construction_version=evidence.construction_version + 1)
+            effective.ledger["groundtruth.db"] = module.replace(entry, pauth_read_snapshot=tampered_evidence)
+            module._verify_snapshot_ledger(effective)
+        else:
+            relations = list(evidence.relations)
+            if tamper == "schema-digest":
+                relations[0] = module.replace(relations[0], schema_sha256="0" * 64)
+            elif tamper == "row-count":
+                relations[0] = module.replace(relations[0], row_count=relations[0].row_count + 1)
+            else:
+                relations[0] = module.replace(relations[0], rows_sha256="0" * 64)
+            tampered_evidence = module.replace(evidence, relations=tuple(relations))
+            effective.ledger["groundtruth.db"] = module.replace(entry, pauth_read_snapshot=tampered_evidence)
+            module._verify_snapshot_ledger(effective)
+
+    _wi6183_assert_projection_absent(snapshot.root)
+
+
+@pytest.mark.parametrize(
+    "attack",
+    [
+        "source-symlink",
+        "source-junction",
+        "source-reparse",
+        "source-replacement",
+        "nested-root",
+        "environment-override",
+        "configuration-override",
+        "caller-substitution",
+    ],
+)
+def test_wi6183_canonical_source_binding_attacks_cannot_redirect_projection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    attack: str,
+) -> None:
+    module = _load_module()
+    _wi6183_seed_authority_db(module, tmp_path)
+    snapshot = _wi6183_bridge_snapshot(module, tmp_path)
+    source = tmp_path / "groundtruth.db"
+
+    if attack in {"source-symlink", "source-junction", "source-reparse"}:
+        real_linklike = module._path_is_linklike
+        monkeypatch.setattr(module, "_path_is_linklike", lambda path: path == source or real_linklike(path))
+        with (
+            pytest.raises(module.GateError, match="symlinked, junctioned, or reparse-point redirected"),
+            module._pauth_read_snapshot(tmp_path, snapshot),
+        ):
+            pytest.fail("a redirected canonical source must not yield")
+    elif attack == "source-replacement":
+        real_source_identity = module._pauth_source_identity
+        identity_calls = 0
+
+        def replaced_source_identity(root: Path, path: Path):
+            nonlocal identity_calls
+            identity_calls += 1
+            identity = real_source_identity(root, path)
+            return module.replace(identity, inode=identity.inode + 1) if identity_calls > 1 else identity
+
+        monkeypatch.setattr(module, "_pauth_source_identity", replaced_source_identity)
+        with (
+            pytest.raises(module.GateError, match="source identity changed"),
+            module._pauth_read_snapshot(tmp_path, snapshot),
+        ):
+            pytest.fail("a replaced canonical source must not yield")
+    elif attack in {"nested-root", "caller-substitution"}:
+        substitute_root = tmp_path / ("nested" if attack == "nested-root" else "foreign")
+        substitute_root.mkdir()
+        substitute = substitute_root / "groundtruth.db"
+        shutil.copy2(source, substitute)
+        with pytest.raises(module.GateError, match="not the canonical live-root"):
+            module._pauth_source_identity(tmp_path, substitute)
+    elif attack == "configuration-override":
+        config = snapshot.root / "groundtruth.toml"
+        config.write_text('[groundtruth]\ndb_path = "foreign.db"\n', encoding="utf-8")
+        snapshot.ledger["groundtruth.toml"] = _wi6183_ledger_entry(module, config)
+        foreign = snapshot.root / "foreign.db"
+        foreign.write_bytes(b"not canonical authority")
+        snapshot.ledger["foreign.db"] = _wi6183_ledger_entry(module, foreign)
+        with (
+            pytest.raises(module.GateError, match="configuration resolves outside"),
+            module._pauth_read_snapshot(tmp_path, snapshot),
+        ):
+            pytest.fail("a copied-root configuration override must not yield")
+    else:
+        foreign = tmp_path / "foreign.db"
+        shutil.copy2(source, foreign)
+        foreign_hash = hashlib.sha256(foreign.read_bytes()).hexdigest()
+        monkeypatch.setenv("GT_DB_PATH", str(foreign))
+        with module._pauth_read_snapshot(tmp_path, snapshot) as effective:
+            assert implementation_authorization.groundtruth_db_path(effective.root) == effective.root / "groundtruth.db"
+        assert hashlib.sha256(foreign.read_bytes()).hexdigest() == foreign_hash
+
+    _wi6183_assert_projection_absent(snapshot.root)
+
+
+def test_wi6183_sqlite_sidecar_guards_block_injection_and_are_cleaned(tmp_path: Path) -> None:
+    module = _load_module()
+    _wi6183_seed_authority_db(module, tmp_path)
+    snapshot = _wi6183_bridge_snapshot(module, tmp_path)
+
+    with module._pauth_read_snapshot(tmp_path, snapshot) as effective:
+        destination = effective.root / "groundtruth.db"
+        for suffix in module.PAUTH_READ_SNAPSHOT_SIDECAR_SUFFIXES:
+            sidecar = Path(str(destination) + suffix)
+            assert sidecar.is_dir()
+            with pytest.raises(OSError):
+                sidecar.write_bytes(b"untrusted sidecar")
+
+    _wi6183_assert_projection_absent(snapshot.root)
+
+
+def test_wi6183_linklike_destination_and_sidecar_are_rejected_without_chmod(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_module()
+    destination = tmp_path / "groundtruth.db"
+    sidecar = Path(str(destination) + "-shm")
+    sidecar.write_bytes(b"simulated linklike sidecar")
+    real_linklike = module._path_is_linklike
+    real_chmod = Path.chmod
+    chmod_calls: list[Path] = []
+
+    linklike_paths = {destination}
+
+    def simulated_linklike(path: Path) -> bool:
+        return path in linklike_paths or real_linklike(path)
+
+    def recording_chmod(path: Path, mode: int, *args, **kwargs) -> None:
+        chmod_calls.append(path)
+        real_chmod(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(module, "_path_is_linklike", simulated_linklike)
+    monkeypatch.setattr(Path, "chmod", recording_chmod)
+    with pytest.raises(module.GateError, match="redirected"):
+        module._create_exclusive_pauth_projection_placeholder(destination)
+    linklike_paths.clear()
+    linklike_paths.add(sidecar)
+    with pytest.raises(module.GateError, match="sidecar path is already occupied or redirected"):
+        module._create_pauth_projection_sidecar_guards(destination)
+    with pytest.raises(module.GateError, match="redirected cleanup artifact"):
+        module._remove_pauth_projection(destination)
+
+    assert destination not in chmod_calls
+    assert sidecar not in chmod_calls
+    assert not sidecar.exists()
+
+
+def test_wi6183_effective_tree_limit_counts_projection_at_exact_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_module()
+    _wi6183_seed_authority_db(module, tmp_path)
+    snapshot = _wi6183_bridge_snapshot(module, tmp_path)
+
+    with module._pauth_read_snapshot(tmp_path, snapshot) as effective:
+        exact_size = sum(entry.size for entry in effective.ledger.values() if not entry.content_exempt)
+
+    monkeypatch.setattr(module, "MAX_TREE_BYTES", exact_size)
+    with module._pauth_read_snapshot(tmp_path, snapshot):
+        pass
+
+    monkeypatch.setattr(module, "MAX_TREE_BYTES", exact_size - 1)
+    with (
+        pytest.raises(module.GateError, match="prospective tree exceeds"),
+        module._pauth_read_snapshot(tmp_path, snapshot),
+    ):
+        pytest.fail("an over-limit effective tree must not yield")
+    _wi6183_assert_projection_absent(snapshot.root)
+
+
+@pytest.mark.parametrize(
+    ("mismatch", "expected"),
+    [
+        pytest.param("root", "configuration resolves outside", id="root"),
+        pytest.param("allowlist", "relation allowlist mismatch", id="relation-allowlist"),
+        pytest.param("schema", "missing required column", id="schema"),
+        pytest.param("digest", "logical contents differ", id="digest"),
+        pytest.param("version", "construction identity mismatch", id="version"),
+    ],
+)
+def test_wi6183_producer_consumer_mismatch_denies_without_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mismatch: str,
+    expected: str,
+) -> None:
+    module = _load_module()
+    _wi6183_seed_authority_db(module, tmp_path)
+    snapshot = _wi6183_bridge_snapshot(module, tmp_path)
+
+    if mismatch == "root":
+        monkeypatch.setattr(module, "groundtruth_db_path", lambda _root: tmp_path / "groundtruth.db")
+        with (
+            pytest.raises(module.GateError, match=expected),
+            module._pauth_read_snapshot(tmp_path, snapshot),
+        ):
+            pytest.fail("a live-root consumer fallback must not yield")
+    else:
+        with (
+            pytest.raises(module.GateError, match=expected),
+            module._pauth_read_snapshot(tmp_path, snapshot) as effective,
+        ):
+            projection = effective.root / "groundtruth.db"
+            evidence = effective.ledger["groundtruth.db"].pauth_read_snapshot
+            assert evidence is not None
+            probe = effective.root / ".gtkb-state" / "compliance-audit" / f"{mismatch}.db"
+            probe.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(projection, probe)
+            probe.chmod(0o600)
+            conn = sqlite3.connect(probe)
+            try:
+                if mismatch == "allowlist":
+                    conn.execute("CREATE TABLE unexpected_authority (id TEXT)")
+                elif mismatch == "schema":
+                    conn.execute("ALTER TABLE current_projects DROP COLUMN parent_project_id")
+                elif mismatch == "digest":
+                    conn.execute("UPDATE current_projects SET status = 'retired' WHERE id = 'PROJECT-TEST'")
+                else:
+                    conn.execute(f"PRAGMA user_version={module.PAUTH_READ_SNAPSHOT_VERSION + 1}")
+                conn.commit()
+            finally:
+                conn.close()
+            try:
+                module._verify_pauth_projection(probe, evidence)
+            finally:
+                probe.chmod(0o600)
+                probe.unlink()
+
+    _wi6183_assert_projection_absent(snapshot.root)
+
+
+def test_wi6183_cleanup_failure_is_terminal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = _load_module()
+    _wi6183_seed_authority_db(module, tmp_path)
+    snapshot = _wi6183_bridge_snapshot(module, tmp_path)
+    real_cleanup = module._remove_pauth_projection
+
+    def fail_after_cleanup(path: Path, identity, sidecar_identities) -> None:
+        real_cleanup(path, identity, sidecar_identities)
+        raise module.GateError("injected cleanup failure")
+
+    monkeypatch.setattr(module, "_remove_pauth_projection", fail_after_cleanup)
+    with (
+        pytest.raises(module.GateError, match="injected cleanup failure"),
+        module._pauth_read_snapshot(tmp_path, snapshot),
+    ):
+        pass
+
+    _wi6183_assert_projection_absent(snapshot.root)
+
+
+@pytest.mark.parametrize(
+    ("exit_kind", "exception"),
+    [
+        pytest.param("evaluator-denial", lambda module: module.GateError("injected evaluator denial"), id="denial"),
+        pytest.param(
+            "evaluator-exception", lambda _module: RuntimeError("injected evaluator exception"), id="exception"
+        ),
+        pytest.param(
+            "evaluator-timeout",
+            lambda _module: subprocess.TimeoutExpired("injected evaluator", 1),
+            id="timeout",
+        ),
+        pytest.param("outer-exception", lambda _module: ValueError("injected outer exception"), id="outer-exception"),
+    ],
+)
+def test_wi6183_all_consumer_exits_run_complete_cleanup(
+    tmp_path: Path,
+    exit_kind: str,
+    exception,
+) -> None:
+    module = _load_module()
+    _wi6183_seed_authority_db(module, tmp_path)
+    snapshot = _wi6183_bridge_snapshot(module, tmp_path)
+    injected = exception(module)
+
+    with (
+        pytest.raises(type(injected)),
+        module._pauth_read_snapshot(tmp_path, snapshot),
+    ):
+        raise injected
+
+    assert exit_kind
+    _wi6183_assert_projection_absent(snapshot.root)
+
+
+def _wi6183_transaction_fixture(root: Path, module) -> tuple[str, str]:
+    bridge_id = "gtkb-wi6183-transaction-fixture"
+    target_rel = "scripts/wi6183_transaction_target.py"
+    proposal_rel = f"bridge/{bridge_id}-001.md"
+    go_rel = f"bridge/{bridge_id}-002.md"
+    report_rel = f"bridge/{bridge_id}-003.md"
+    verdict_rel = f"bridge/{bridge_id}-004.md"
+    authority_paths = [
+        ".claude/hooks/bridge-compliance-gate.py",
+        "scripts/__init__.py",
+        "scripts/bridge_applicability_preflight.py",
+        "scripts/implementation_authorization.py",
+        "scripts/bridge_lifecycle_resolver.py",
+        "scripts/bridge_work_intent_registry.py",
+        "scripts/gtkb_session_id.py",
+        "scripts/bridge_author_metadata.py",
+        "groundtruth-kb/src/groundtruth_kb/__init__.py",
+        "config/governance/project-authorization-operation-taxonomy.toml",
+    ]
+    authority_paths.extend(
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in sorted((REPO_ROOT / "groundtruth-kb" / "src" / "groundtruth_kb" / "governance").glob("*.py"))
+    )
+    for rel_path in authority_paths:
+        target = root / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO_ROOT / rel_path, target)
+    (root / "groundtruth.toml").write_text('[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8")
+    (root / ".gitignore").write_text("groundtruth.db\n.gtkb-state/\n", encoding="utf-8")
+    applicability_config = root / "config" / "governance" / "spec-applicability.toml"
+    applicability_config.write_text(
+        f'[[rules]]\nspec_id = "SPEC-TEST"\nseverity = "required"\napplies_when_doc_matches = ["{bridge_id}"]\n',
+        encoding="utf-8",
+    )
+    target = root / target_rel
+    target.write_text("VALUE = 'baseline'\n", encoding="utf-8")
+    (root / "bridge").mkdir()
+    (root / proposal_rel).write_text(
+        f"""NEW
+::init gtkb pb
+::open build
+
+{_author("prime-builder", "wi6183-proposal-session")}
+bridge_kind: prime_proposal
+Document: {bridge_id}
+Version: 001
+Project Authorization ID: `PAUTH-TEST`
+Project: PROJECT-TEST
+Work Item: WI-TEST
+target_paths: ["{target_rel}"]
+
+## Specification Links
+
+- SPEC-TEST
+""",
+        encoding="utf-8",
+    )
+    (root / go_rel).write_text(
+        f"""GO
+::init gtkb lo
+::open test
+
+{_author("loyal-opposition", "wi6183-go-session")}
+bridge_kind: lo_verdict
+Document: {bridge_id}
+Version: 002
+Responds to: {proposal_rel}
+""",
+        encoding="utf-8",
+    )
+    hooks = root / "empty-hooks"
+    hooks.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    committed_paths = [
+        *authority_paths,
+        "groundtruth.toml",
+        ".gitignore",
+        applicability_config.relative_to(root).as_posix(),
+        target_rel,
+        proposal_rel,
+        go_rel,
+    ]
+    subprocess.run(["git", "add", "--", *committed_paths], cwd=root, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            f"core.hooksPath={hooks}",
+            "commit",
+            "-qm",
+            "WI-6183 transaction authority",
+        ],
+        cwd=root,
+        check=True,
+    )
+    _wi6183_seed_authority_db(module, root)
+    report = root / report_rel
+    report.write_text(
+        f"""NEW
+::init gtkb pb
+::open build
+
+{_author("prime-builder", "wi6183-report-session")}
+bridge_kind: implementation_report
+Document: {bridge_id}
+Version: 003
+Responds to: {go_rel}
+Project Authorization: PAUTH-TEST
+Project: PROJECT-TEST
+Work Item: WI-TEST
+target_paths: ["{target_rel}"]
+
+## Specification Links
+
+- SPEC-TEST
+
+## Requirement Sufficiency
+
+Existing requirements sufficient.
+""",
+        encoding="utf-8",
+    )
+    manifest_paths = [target_rel, report_rel, verdict_rel]
+    manifest = "\n".join(f"- `{path}`" for path in manifest_paths)
+    verdict = root / verdict_rel
+    candidate = f"""VERIFIED
+::init gtkb lo
+::open test
+
+{_author("loyal-opposition", "wi6183-verified-session")}
+bridge_kind: lo_verdict
+Document: {bridge_id}
+Version: 004
+Responds to: {report_rel}
+
+## Applicability Preflight
+
+- pending exact copied-root preparation
+
+## Specification Links
+
+- SPEC-TEST
+- DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001
+
+## Spec-to-Test Mapping
+
+| Specification | Evidence |
+| --- | --- |
+| SPEC-TEST | WI-6183 transaction integration test |
+
+## Verification Commands
+
+pytest platform_tests/scripts/test_check_protected_commit_authorization.py
+
+## Commit Finalization Evidence
+
+- Finalization helper: `fixture`
+- Intended commit subject: `fix: WI-6183 fixture`
+- Same-transaction path set:
+{manifest}
+- Final commit SHA is emitted after commit creation.
+"""
+    target.write_text("VALUE = 'implemented'\n", encoding="utf-8")
+    subprocess.run(["git", "add", "--", target_rel, report_rel], cwd=root, check=True)
+    with (
+        module._index_snapshot(root) as index_snapshot,
+        module._bridge_snapshot(root, bridge_id, index_snapshot) as bridge_snapshot,
+        module._pauth_read_snapshot(root, bridge_snapshot) as effective_snapshot,
+    ):
+        prepared_candidate = _wi6183_prepare_verdict_in_snapshot(
+            effective_snapshot.root,
+            verdict_rel,
+            candidate,
+        )
+    verdict.write_text(prepared_candidate, encoding="utf-8")
+
+    row = implementation_authorization._project_authorization_row(root, "PAUTH-TEST")
+    project_authorization = implementation_authorization.validate_project_authorization_row(
+        root,
+        row,
+        proposal_project_id="PROJECT-TEST",
+        work_item_id="WI-TEST",
+        spec_links=["SPEC-TEST"],
+        target_paths=[target_rel],
+        requested_operations=["protected_mutation"],
+    )
+    packet = {
+        "bridge_id": bridge_id,
+        "created_at": "2026-08-11T00:00:00Z",
+        "expires_at": "2099-08-11T00:00:00Z",
+        "go_file": go_rel,
+        "latest_status": "GO",
+        "project_authorization": project_authorization,
+        "proposal_file": proposal_rel,
+        "schema_version": 2,
+        "spec_links": ["SPEC-TEST"],
+        "target_path_globs": [target_rel],
+    }
+    packet["packet_hash"] = module.packet_hash(packet)
+    pre_start_hash = packet.pop("packet_hash")
+    packet["schema_version"] = 3
+    packet["implementation_start"] = {
+        "schema_version": 1,
+        "bridge_id": bridge_id,
+        "finalized_at": "2026-08-11T00:00:00Z",
+        "session_id": "wi6183-worker-session",
+        "pre_start_packet_hash": pre_start_hash,
+        "target_path_globs": [target_rel],
+        "work_intent_claim": {
+            "thread_slug": bridge_id,
+            "session_id": "wi6183-worker-session",
+            "claim_kind": "go_implementation",
+            "acting_role": "prime-builder",
+            "project_id": "PROJECT-TEST",
+        },
+        "worker_role_provenance": {
+            "schema_version": 1,
+            "session_id": "wi6183-worker-session",
+            "role": "prime-builder",
+            "harness_id": "A",
+        },
+        "project_authorization_decision": {"allowed": True},
+    }
+    packet["packet_hash"] = module.packet_hash(packet)
+    packet_path = root / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / f"{bridge_id}.json"
+    packet_path.parent.mkdir(parents=True, exist_ok=True)
+    packet_path.write_text(json.dumps(packet), encoding="utf-8")
+    subprocess.run(["git", "add", "--", verdict_rel], cwd=root, check=True)
+    return bridge_id, target_rel
+
+
+def test_wi6183_transaction_uses_one_effective_snapshot_for_compliance_and_pauth(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_module()
+    bridge_id, target_rel = _wi6183_transaction_fixture(tmp_path, module)
+    consumer_roots: list[tuple[str, Path]] = []
+    pauth_results = []
+    real_audit = module._run_snapshot_compliance_audit
+    real_validate = module.validate_packet_project_authorization_operation
+
+    def recording_audit(*, snapshot, candidate_path: str, content: str):
+        assert snapshot.ledger["groundtruth.db"].pauth_read_snapshot is not None
+        consumer_roots.append(("compliance", snapshot.root))
+        return real_audit(snapshot=snapshot, candidate_path=candidate_path, content=content)
+
+    def recording_validate(root: Path, packet: dict, *, requested_operations: list[str], target_paths: list[str]):
+        assert (root / "groundtruth.db").is_file()
+        consumer_roots.append(("pauth", root))
+        result = real_validate(
+            root,
+            packet,
+            requested_operations=requested_operations,
+            target_paths=target_paths,
+        )
+        pauth_results.append(result)
+        return result
+
+    monkeypatch.setattr(module, "_run_snapshot_compliance_audit", recording_audit)
+    monkeypatch.setattr(module, "validate_packet_project_authorization_operation", recording_validate)
+    monkeypatch.setattr(module, "validate_verdict_evidence_anchors", lambda *args, **kwargs: [])
+
+    with module._index_snapshot(tmp_path) as snapshot:
+        evidence, errors, candidate_path = module._load_transaction_verified_evidence(
+            tmp_path,
+            [target_rel],
+            snapshot,
+        )
+
+    assert evidence is not None
+    assert evidence[0] == bridge_id
+    assert candidate_path == f"bridge/{bridge_id}-004.md"
+    assert [kind for kind, _root in consumer_roots] == ["compliance", "pauth"]
+    assert consumer_roots[0][1] == consumer_roots[1][1]
+    assert pauth_results[0]["id"] == "PAUTH-TEST"
+    assert errors == []
+    assert not consumer_roots[0][1].exists()
+
+
+@pytest.mark.parametrize(
+    "exit_kind",
+    ["evaluator-denial", "evaluator-exception", "evaluator-timeout", "outer-exception"],
+)
+def test_wi6183_transaction_consumer_failures_clean_projection_and_sidecars(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    exit_kind: str,
+) -> None:
+    module = _load_module()
+    bridge_id, target_rel = _wi6183_transaction_fixture(tmp_path, module)
+    cleanup_paths: list[Path] = []
+    real_cleanup = module._remove_pauth_projection
+
+    def recording_cleanup(path: Path, identity, sidecar_identities) -> None:
+        cleanup_paths.append(path)
+        real_cleanup(path, identity, sidecar_identities)
+
+    monkeypatch.setattr(module, "_remove_pauth_projection", recording_cleanup)
+    monkeypatch.setattr(module, "validate_verdict_evidence_anchors", lambda *args, **kwargs: [])
+    if exit_kind != "outer-exception":
+        if exit_kind == "evaluator-denial":
+            injected = module.BridgeComplianceError("injected evaluator denial")
+        elif exit_kind == "evaluator-exception":
+            injected = OSError("injected evaluator exception")
+        else:
+            injected = subprocess.TimeoutExpired("injected evaluator", 1)
+
+        def faulting_audit(**_kwargs):
+            raise injected
+
+        monkeypatch.setattr(module, "_run_snapshot_compliance_audit", faulting_audit)
+        with module._index_snapshot(tmp_path) as snapshot:
+            evidence, errors, candidate_path = module._load_transaction_verified_evidence(
+                tmp_path,
+                [target_rel],
+                snapshot,
+            )
+        assert evidence is None
+        assert candidate_path == f"bridge/{bridge_id}-004.md"
+        assert any("VERIFIED candidate bridge-compliance audit failed" in error for error in errors)
+    else:
+        monkeypatch.setattr(
+            module,
+            "_load_finalized_packet",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("injected outer exception")),
+        )
+        with (
+            module._index_snapshot(tmp_path) as snapshot,
+            pytest.raises(RuntimeError, match="injected outer exception"),
+        ):
+            module._load_transaction_verified_evidence(tmp_path, [target_rel], snapshot)
+
+    assert cleanup_paths
+    for destination in cleanup_paths:
+        for suffix in ("", "-journal", "-wal", "-shm"):
+            assert not Path(str(destination) + suffix).exists()
+
+
+def test_wi6183_non_pauth_transaction_does_not_open_projection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_module()
+    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    _stage_transaction(tmp_path, selected_paths, report, verdict)
+
+    def unexpected_pauth_snapshot(*args, **kwargs):
+        raise AssertionError("non-PAUTH transaction must not open a PAUTH read snapshot")
+
+    monkeypatch.setattr(module, "_pauth_read_snapshot", unexpected_pauth_snapshot)
+    monkeypatch.setattr(module, "validate_verdict_evidence_anchors", lambda *args, **kwargs: [])
+
+    with module._index_snapshot(tmp_path) as snapshot:
+        _evidence, _errors, candidate_path = module._load_transaction_verified_evidence(
+            tmp_path,
+            selected_paths,
+            snapshot,
+        )
+
+    assert candidate_path == verdict
