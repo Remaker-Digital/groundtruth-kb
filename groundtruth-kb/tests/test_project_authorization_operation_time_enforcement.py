@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import tempfile
 from datetime import UTC, datetime
+from pathlib import Path
+
+import pytest
 
 from groundtruth_kb.governance.project_authorization_operation_time import (
+    TaxonomyError,
     classify_target,
     evaluate_envelope,
     load_operation_taxonomy,
@@ -12,6 +16,14 @@ from groundtruth_kb.governance.project_authorization_operation_time import (
 )
 
 NOW = datetime(2026, 7, 13, tzinfo=UTC)
+
+
+def _taxonomy_with_suffix(tmp_path: Path, suffix: str):
+    current = load_operation_taxonomy()
+    target = tmp_path / "config/governance/project-authorization-operation-taxonomy.toml"
+    target.parent.mkdir(parents=True)
+    target.write_text(Path(current.source_path).read_text(encoding="utf-8") + suffix, encoding="utf-8")
+    return load_operation_taxonomy(tmp_path)
 
 
 def _authorization(
@@ -45,6 +57,54 @@ def test_target_taxonomy_assigns_one_stable_class() -> None:
     assert classify_target("config/example.toml").mutation_class == "configuration"
     assert classify_target(".gitattributes").mutation_class == "repository_metadata"
     assert classify_target("bridge/example-001.md").mutation_class == "bridge"
+
+
+def test_governed_githooks_rule_classifies_slash_forms_and_authorizes_configuration() -> None:
+    taxonomy = load_operation_taxonomy()
+    assert taxonomy.taxonomy_version == "2"
+    assert [(rule.pattern, rule.mutation_class) for rule in taxonomy.path_rules] == [(".githooks/**", "configuration")]
+    assert classify_target(".githooks/pre-commit", taxonomy).mutation_class == "configuration"
+    assert classify_target(r".githooks\pre-commit", taxonomy).mutation_class == "configuration"
+    assert classify_target("nested/.githooks/pre-commit", taxonomy).mutation_class == "unclassified"
+
+    allowed = evaluate_envelope(
+        _authorization(allowed=["configuration"]),
+        requested_operation="protected_mutation",
+        target_paths=[".githooks/pre-commit"],
+        decision_time=NOW,
+        taxonomy=taxonomy,
+    )
+    denied = evaluate_envelope(
+        _authorization(allowed=["source"]),
+        requested_operation="protected_mutation",
+        target_paths=[".githooks/pre-commit"],
+        decision_time=NOW,
+        taxonomy=taxonomy,
+    )
+    assert allowed.allowed is True
+    assert denied.allowed is False
+    assert denied.reason_code == "target_mutation_class_not_allowed"
+
+
+@pytest.mark.parametrize(
+    "suffix",
+    [
+        '\n[[path_rule]]\npattern = ".other/**"\nmutation_class = "unknown"\n',
+        '\n[[path_rule]]\npattern = ".githooks/**"\nmutation_class = "source"\n',
+        '\n[[path_rule]]\npattern = "../.other/**"\nmutation_class = "source"\n',
+    ],
+)
+def test_path_rule_loader_rejects_unknown_duplicate_or_non_root_rule(tmp_path: Path, suffix: str) -> None:
+    with pytest.raises(TaxonomyError):
+        _taxonomy_with_suffix(tmp_path, suffix)
+
+
+def test_overlapping_governed_path_rule_classes_fail_closed(tmp_path: Path) -> None:
+    taxonomy = _taxonomy_with_suffix(
+        tmp_path,
+        '\n[[path_rule]]\npattern = ".githooks/pre-*"\nmutation_class = "source"\n',
+    )
+    assert classify_target(".githooks/pre-commit", taxonomy).mutation_class == "unclassified"
 
 
 def test_transient_index_target_classification_is_exact_and_case_preserving() -> None:

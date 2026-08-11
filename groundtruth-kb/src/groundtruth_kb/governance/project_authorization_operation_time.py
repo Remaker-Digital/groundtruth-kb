@@ -10,6 +10,7 @@ import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,12 @@ class TaxonomyError(ValueError):
 
 
 @dataclass(frozen=True)
+class TaxonomyPathRule:
+    pattern: str
+    mutation_class: str
+
+
+@dataclass(frozen=True)
 class OperationTaxonomy:
     evaluator_id: str
     evaluator_version: str
@@ -28,6 +35,7 @@ class OperationTaxonomy:
     mutation_class_aliases: Mapping[str, str]
     operation_aliases: Mapping[str, str]
     canonical_mutation_classes: frozenset[str]
+    path_rules: tuple[TaxonomyPathRule, ...]
     source_path: str
     source_sha256: str
 
@@ -63,6 +71,48 @@ def _registered_aliases(entries: object, *, entry_kind: str) -> tuple[dict[str, 
     return aliases, frozenset(canonical)
 
 
+def _registered_path_rules(
+    entries: object,
+    *,
+    canonical_classes: frozenset[str],
+) -> tuple[TaxonomyPathRule, ...]:
+    if entries is None:
+        return ()
+    if not isinstance(entries, list):
+        raise TaxonomyError("Taxonomy path-rule entries must be a list")
+
+    rules: list[TaxonomyPathRule] = []
+    seen_patterns: set[str] = set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise TaxonomyError("Taxonomy path-rule entry must be a table")
+        raw_pattern = entry.get("pattern")
+        raw_class = entry.get("mutation_class")
+        if not isinstance(raw_pattern, str) or not isinstance(raw_class, str):
+            raise TaxonomyError("Taxonomy path-rule entry requires pattern and mutation_class strings")
+
+        pattern = raw_pattern.strip().lower()
+        mutation_class = normalize_token(raw_class)
+        path_parts = pattern.split("/")
+        if (
+            not pattern
+            or pattern.startswith(("/", "./"))
+            or "\\" in pattern
+            or any(part in {"", ".", ".."} for part in path_parts)
+        ):
+            raise TaxonomyError(
+                f"Taxonomy path-rule pattern must be canonical root-relative POSIX syntax: {raw_pattern!r}"
+            )
+        if mutation_class not in canonical_classes:
+            raise TaxonomyError(f"Taxonomy path-rule mutation class is not canonical: {raw_class!r}")
+        if pattern in seen_patterns:
+            raise TaxonomyError(f"Taxonomy path-rule pattern is registered more than once: {pattern!r}")
+        seen_patterns.add(pattern)
+        rules.append(TaxonomyPathRule(pattern=pattern, mutation_class=mutation_class))
+
+    return tuple(sorted(rules, key=lambda rule: (rule.pattern, rule.mutation_class)))
+
+
 def _load_operation_taxonomy(path: Path) -> OperationTaxonomy:
     try:
         source_bytes = path.read_bytes()
@@ -75,6 +125,7 @@ def _load_operation_taxonomy(path: Path) -> OperationTaxonomy:
         payload.get("mutation_class"), entry_kind="mutation-class"
     )
     operation_aliases, _ = _registered_aliases(payload.get("operation"), entry_kind="operation")
+    path_rules = _registered_path_rules(payload.get("path_rule"), canonical_classes=canonical_classes)
     evaluator_id = str(payload.get("evaluator_id") or "")
     evaluator_version = str(payload.get("evaluator_version") or "")
     taxonomy_version = str(payload.get("taxonomy_version") or "")
@@ -87,6 +138,7 @@ def _load_operation_taxonomy(path: Path) -> OperationTaxonomy:
         mutation_class_aliases=mutation_aliases,
         operation_aliases=operation_aliases,
         canonical_mutation_classes=canonical_classes,
+        path_rules=path_rules,
         source_path=str(path),
         source_sha256=hashlib.sha256(source_bytes).hexdigest().upper(),
     )
@@ -159,8 +211,13 @@ def classify_target(path_text: str, taxonomy: OperationTaxonomy | None = None) -
     path = path.lstrip("/")
     lowered = path.lower()
     first = lowered.split("/", 1)[0]
+    governed_classes = {rule.mutation_class for rule in active.path_rules if fnmatchcase(lowered, rule.pattern)}
 
-    if re.fullmatch(r"\.gtkb-index-[a-z0-9_]{8}/index", path):
+    if len(governed_classes) == 1:
+        mutation_class = next(iter(governed_classes))
+    elif len(governed_classes) > 1:
+        mutation_class = "unclassified"
+    elif re.fullmatch(r"\.gtkb-index-[a-z0-9_]{8}/index", path):
         mutation_class = "repository_metadata"
     elif first == "bridge":
         mutation_class = "bridge"
@@ -345,6 +402,7 @@ __all__ = [
     "EnvelopeDecision",
     "OperationTaxonomy",
     "TAXONOMY_RELATIVE_PATH",
+    "TaxonomyPathRule",
     "TaxonomyError",
     "classify_target",
     "evaluate_envelope",

@@ -1,7 +1,11 @@
 schema_version = 1
 evaluator_id = "project-authorization-operation-time-enforcement"
 evaluator_version = "1"
-taxonomy_version = "1"
+taxonomy_version = "2"
+
+[[path_rule]]
+pattern = ".githooks/**"
+mutation_class = "configuration"
 
 [[mutation_class]]
 name = "bridge"
