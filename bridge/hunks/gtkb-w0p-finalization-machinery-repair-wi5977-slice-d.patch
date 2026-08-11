@@ -1,0 +1,194 @@
+diff --git a/groundtruth-kb/src/groundtruth_kb/project/registry_control_plane.py b/groundtruth-kb/src/groundtruth_kb/project/registry_control_plane.py
+index 03cb0a5d51e885fa2ed5906a37ecf5d61805f7c8..d0ef9f186b36ba0bbef38e6600c5c602f104ab50 100644
+--- a/groundtruth-kb/src/groundtruth_kb/project/registry_control_plane.py
++++ b/groundtruth-kb/src/groundtruth_kb/project/registry_control_plane.py
+@@ -3168,6 +3168,8 @@ def _bridge_publication_transition_digest(
+     validation_parent = project_root / ".gtkb-state" / "bridge-candidate-validation"
+     validation_parent.mkdir(parents=True, exist_ok=True)
+     exact_name = re.compile(rf"^{re.escape(document_name)}-(?P<version>[0-9]{{3}})\.md$")
++    candidate_name = f"{document_name}-{version:03d}.md"
++    thread_files: list[dict[str, str | int]] = []
+     try:
+         with tempfile.TemporaryDirectory(
+             prefix=f"{document_name}-{version:03d}-",
+@@ -3181,8 +3183,16 @@ def _bridge_publication_transition_digest(
+                 for source in live_bridge.iterdir():
+                     if not source.is_file() or exact_name.fullmatch(source.name) is None:
+                         continue
++                    # The transition digest is the publishing thread's preimage
++                    # plus the exact candidate bytes.  Ignoring the live target
++                    # slot makes the same derivation usable both before initial
++                    # publication and while validating compensation of that
++                    # publication.  Mint still rejects an existing target before
++                    # reaching this helper.
++                    if source.name == candidate_name:
++                        continue
+                     (candidate_bridge / source.name).write_bytes(source.read_bytes())
+-            candidate = candidate_bridge / f"{document_name}-{version:03d}.md"
++            candidate = candidate_bridge / candidate_name
+             if candidate.exists():
+                 raise RegistryAuthorizationError("candidate bridge version already exists")
+             candidate.write_bytes(content)
+@@ -3190,6 +3200,17 @@ def _bridge_publication_transition_digest(
+                 resolution = resolve_bridge_lifecycle(candidate_root, document_name)
+             except BridgeLifecycleResolutionError as exc:
+                 raise RegistryAuthorizationError(f"invalid candidate bridge lifecycle: {exc.code}: {exc}") from exc
++            for path in sorted(candidate_bridge.iterdir(), key=lambda item: item.name.casefold()):
++                if not path.is_file() or exact_name.fullmatch(path.name) is None:
++                    continue
++                payload = path.read_bytes()
++                thread_files.append(
++                    {
++                        "path": f"bridge/{path.name}",
++                        "size": len(payload),
++                        "sha256": _sha256_bytes(payload),
++                    }
++                )
+     finally:
+         with suppress(OSError):
+             validation_parent.rmdir()
+@@ -3204,9 +3225,11 @@ def _bridge_publication_transition_digest(
+     ):
+         raise RegistryAuthorizationError("candidate lifecycle did not resolve to the exact requested terminal state")
+     evidence = {
++        "evidence_schema_version": 2,
+         "document_name": document_name,
+         "version": version,
+         "status": status,
++        "thread_files": thread_files,
+         "latest": asdict(latest),
+         "audit_versions": [asdict(item) for item in resolution.audit_versions],
+         "quarantined_paths": list(resolution.quarantined_paths),
+@@ -4198,13 +4439,8 @@ def compensate_bridge_publication(
+                         reason=failure,
+                     )
+                     raise RegistryRecoveryRequired(failure)
+-            predicted = _bridge_aggregate_digest_without_target(
+-                paths.project_root,
+-                aggregate_record,
+-                target,
+-            )
+-            if predicted != row["aggregate_preimage_digest"]:
+-                failure = "bridge publication aggregate preimage cannot be restored exactly"
++            elif row["capability_state"] == "consumed":
++                failure = "consumed bridge publication compensation target is missing"
+                 _mark_bridge_publication_recovery_required_with_observation(
+                     conn,
+                     project_root=paths.project_root,
+@@ -4216,9 +4452,32 @@ def compensate_bridge_publication(
+                     reason=failure,
+                 )
+                 raise RegistryRecoveryRequired(failure)
+-            if row["capability_state"] == "minted":
+-                if latest["content_digest"] != row["aggregate_preimage_digest"]:
+-                    failure = "minted bridge publication no longer has its aggregate preimage"
++
++            validated_transition_digest: str | None = None
++            if candidate_bytes is not None:
++                try:
++                    validated_transition_digest = _bridge_publication_transition_digest(
++                        paths.project_root,
++                        document_name=row["document_name"],
++                        version=int(row["version"]),
++                        status=row["status"],
++                        content=candidate_bytes,
++                    )
++                except Exception as exc:
++                    failure = f"bridge publication thread preimage cannot be derived: {exc}"
++                    _mark_bridge_publication_recovery_required_with_observation(
++                        conn,
++                        project_root=paths.project_root,
++                        aggregate_record=aggregate_record,
++                        capability_hash=capability_hash,
++                        document_name=row["document_name"],
++                        session_id=session_id,
++                        changed_by=changed_by,
++                        reason=failure,
++                    )
++                    raise RegistryRecoveryRequired(failure) from exc
++                if validated_transition_digest != row["transition_digest"]:
++                    failure = "bridge publication thread preimage changed before compensation"
+                     _mark_bridge_publication_recovery_required_with_observation(
+                         conn,
+                         project_root=paths.project_root,
+@@ -4230,27 +4489,56 @@ def compensate_bridge_publication(
+                         reason=failure,
+                     )
+                     raise RegistryRecoveryRequired(failure)
+-            elif latest["revision_id"] != row["revision_id"]:
+-                failure = "another bridge aggregate revision followed the publication"
+-                _mark_bridge_publication_recovery_required_with_observation(
+-                    conn,
+-                    project_root=paths.project_root,
+-                    aggregate_record=aggregate_record,
+-                    capability_hash=capability_hash,
+-                    document_name=row["document_name"],
+-                    session_id=session_id,
+-                    changed_by=changed_by,
+-                    reason=failure,
++            else:
++                # A minted capability may legitimately be compensated before
++                # its target file is created.  No candidate bytes exist from
++                # which to reconstruct the thread transition, and the global
++                # one-active-capability boundary prevents another governed
++                # publication in that interval.  Preserve the existing exact
++                # aggregate preimage check for this no-file case only.
++                predicted = _bridge_aggregate_digest_without_target(
++                    paths.project_root,
++                    aggregate_record,
++                    target,
+                 )
+-                raise RegistryRecoveryRequired(failure)
++                if (
++                    predicted != row["aggregate_preimage_digest"]
++                    or latest["content_digest"] != row["aggregate_preimage_digest"]
++                ):
++                    failure = "minted bridge publication no longer has its aggregate preimage"
++                    _mark_bridge_publication_recovery_required_with_observation(
++                        conn,
++                        project_root=paths.project_root,
++                        aggregate_record=aggregate_record,
++                        capability_hash=capability_hash,
++                        document_name=row["document_name"],
++                        session_id=session_id,
++                        changed_by=changed_by,
++                        reason=failure,
++                    )
++                    raise RegistryRecoveryRequired(failure)
+
+             deleted_bytes = candidate_bytes
+             now = _utc_now()
+             conn.execute("BEGIN IMMEDIATE")
+             if deleted_bytes is not None:
+                 target.unlink()
++                try:
++                    observed_transition_digest = _bridge_publication_transition_digest(
++                        paths.project_root,
++                        document_name=row["document_name"],
++                        version=int(row["version"]),
++                        status=row["status"],
++                        content=deleted_bytes,
++                    )
++                except Exception as exc:
++                    raise RegistryRecoveryRequired(
++                        f"bridge publication thread changed during compensation: {exc}"
++                    ) from exc
++                if observed_transition_digest != row["transition_digest"]:
++                    raise RegistryRecoveryRequired("bridge publication thread changed during compensation")
+             observed, _, _ = artifact_content_state(paths.project_root, aggregate_record)
+-            if observed != row["aggregate_preimage_digest"]:
++            if deleted_bytes is None and observed != row["aggregate_preimage_digest"]:
+                 raise RegistryRecoveryRequired("bridge aggregate changed during compensation")
+             compensation_revision_id: str | None = None
+             if latest["content_digest"] != observed:
+@@ -4271,7 +4559,9 @@ def compensate_bridge_publication(
+             compensation_digest = _json_digest(
+                 {
+                     "target_path": relative,
+-                    "restored_aggregate_digest": observed,
++                    "aggregate_preimage_digest": row["aggregate_preimage_digest"],
++                    "observed_aggregate_digest": observed,
++                    "thread_transition_digest": (validated_transition_digest or row["transition_digest"]),
+                     "reason": reason,
+                     "compensation_revision_id": compensation_revision_id,
+                 }
