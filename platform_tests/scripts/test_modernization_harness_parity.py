@@ -16,6 +16,7 @@ from groundtruth_kb.session.envelope import (
     open_session,
     open_topic,
     resolve_worker_role_provenance,
+    worker_session_envelope_path,
 )
 
 from scripts.check_harness_parity import check_harness_parity
@@ -141,6 +142,7 @@ def test_required_target_set_tracks_every_enabled_registry_harness(tmp_path: Pat
 def test_explicit_roles_context_and_routes_are_equivalent_across_harnesses(
     harness_root: Path,
     active_harness_rows: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An explicit role outranks durable fallback without changing topic semantics."""
     baseline_routes: dict[str, tuple[str, str]] | None = None
@@ -149,10 +151,12 @@ def test_explicit_roles_context_and_routes_are_equivalent_across_harnesses(
         harness_name = str(row["harness_name"])
         durable_role = _durable_role(row)
         explicit_role = _opposite_role(durable_role)
+        session_id = f"interactive-{row['id']}"
+        monkeypatch.setenv("GTKB_SESSION_ID", session_id)
         envelope = open_session(
             harness_root,
             harness_name=harness_name,
-            session_id=f"interactive-{row['id']}",
+            session_id=session_id,
             init_keyword=f"::init gtkb {'pb' if explicit_role == ROLE_PRIME else 'lo'}",
             role=explicit_role,
             subject="gtkb",
@@ -197,7 +201,7 @@ def test_role_resolution_orders_marker_then_envelope_then_durable_fallback(
         open_session(
             harness_root,
             harness_name=harness_name,
-            session_id=f"envelope-{row['id']}",
+            session_id=query_session_id,
             init_keyword=f"::init gtkb {'pb' if envelope_role == ROLE_PRIME else 'lo'}",
             role=envelope_role,
         )
@@ -236,15 +240,15 @@ def test_role_resolution_orders_marker_then_envelope_then_durable_fallback(
         assert marker_details["authority_mode"] == "interactive_transcript"
 
         marker_path.unlink()
-        close_session(harness_root, harness_name=harness_name)
+        close_session(harness_root, harness_name=harness_name, session_id=query_session_id)
         fallback_details = resolve_interactive_session_role_details(
             harness_root,
             current_session_id=query_session_id,
             harness_name=harness_name,
         )
-        assert fallback_details["interactive_resolved_role"] == durable_role
+        assert fallback_details["interactive_resolved_role"] is None
         assert fallback_details["interactive_role_source"] == "durable_marker_absent"
-        assert fallback_details["authority_mode"] == "durable_registry_fallback"
+        assert fallback_details["authority_mode"] == "unresolved"
 
 
 def test_headless_worker_authority_is_isolated_by_session_and_harness(
@@ -289,7 +293,10 @@ def test_headless_worker_authority_is_isolated_by_session_and_harness(
         assert first["role"] == first_role
         assert first["dispatch_run_id"] == f"run-{first_session}"
         assert second["role"] == durable_role
-        assert load_current(harness_root, harness_name)["session_id"] == second_session
+        worker_document = json.loads(
+            worker_session_envelope_path(harness_root, harness_name, second_session).read_text(encoding="utf-8")
+        )
+        assert worker_document["session_id"] == second_session
         assert (
             resolve_worker_role_provenance(
                 harness_root,
@@ -373,12 +380,11 @@ def test_marker_scope_session_ids_resolve_via_uniform_resolver() -> None:
 def test_wrap_fail_closed_parity_across_marker_scope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """WI-5935 Slice F: identical fail-closed wrap parity across every marker-scope harness.
 
-    For each harness a concurrent same-harness two-context wrap fails closed and leaves the
-    other context's envelope open, and the per-harness projection is never the mutation target.
+    For each harness a concurrent same-harness two-context wrap fails closed without
+    reaching the other context's document.
     """
     from groundtruth_kb.session.envelope import (
         EnvelopeError,
-        current_envelope_path,
         load_current,
         open_session,
         worker_session_envelope_path,
@@ -402,13 +408,11 @@ def test_wrap_fail_closed_parity_across_marker_scope(tmp_path: Path, monkeypatch
     for name in sorted(MARKER_SCOPE):
         open_session(tmp_path, harness_name=name, session_id=f"{name}-ctx-a")
         monkeypatch.setenv("GTKB_SESSION_ID", f"{name}-ctx-b")
-        with pytest.raises(EnvelopeError, match="Refusing to close another context"):
+        with pytest.raises(EnvelopeError, match="no open session envelope exists"):
             run_wrap(tmp_path, harness_name=name)
         live = load_current(tmp_path, name)
-        assert live["session_id"] == f"{name}-ctx-a"
-        assert live["status"] == "open"
-        # per-harness projection is not the wrap mutation target on any covered harness
-        assert current_envelope_path(tmp_path, name).exists()
+        assert live is None
+        assert not (tmp_path / "harness-state" / name / "session-envelope.json").exists()
         assert (
             json.loads(worker_session_envelope_path(tmp_path, name, f"{name}-ctx-a").read_text(encoding="utf-8"))[
                 "status"

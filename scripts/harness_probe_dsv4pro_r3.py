@@ -9,8 +9,8 @@ report covering six checks:
     groundtruth_kb.
 (3) Git read health — HEAD sha and dirty count via ``--no-optional-locks``.
 (4) gt CLI reachability — exit-0 help probe.
-(5) Session-envelope surface presence — read-only existence check of
-    .claude/session/envelope.json.
+(5) Session-envelope surface presence — read-only discovery of an authoritative
+    per-session document.
 (6) Report determinism — two consecutive runs in an unchanged worktree produce
     byte-identical JSON apart from an explicitly labeled ``generated_at`` field.
 
@@ -42,7 +42,6 @@ _PROBE_VERSION = "1.0.0"
 _RUN_IDENTIFIER = "dsv4pro-r3"
 # Paths checked relative to project root (determined at runtime from cwd).
 _VENV_PYTHON_PARTS = ("groundtruth-kb", ".venv", "Scripts", "python.exe")
-_ENVELOPE_PATH_PARTS = (".claude", "session", "envelope.json")
 
 
 def _resolve_project_root(cwd: Path) -> Path:
@@ -217,13 +216,15 @@ def _check_gt_cli_reachability(project_root: Path, timeout: float) -> dict[str, 
 def _check_session_envelope_presence(
     project_root: Path,
 ) -> dict[str, object]:
-    """Check (5): session-envelope surface read-only existence check."""
-    envelope_path = project_root.joinpath(*_ENVELOPE_PATH_PARTS)
-    present = envelope_path.is_file()
+    """Check (5): authoritative per-session-envelope presence."""
+    state_root = project_root / "harness-state"
+    envelope_paths = sorted(state_root.glob("*/session-envelopes/*.json")) if state_root.is_dir() else []
+    present = bool(envelope_paths)
     return {
         "session_envelope_presence": present,
         "details": {
-            "envelope_path": str(envelope_path),
+            "envelope_path": str(envelope_paths[0]) if envelope_paths else None,
+            "checked_glob": str(state_root / "*/session-envelopes/*.json"),
         },
     }
 

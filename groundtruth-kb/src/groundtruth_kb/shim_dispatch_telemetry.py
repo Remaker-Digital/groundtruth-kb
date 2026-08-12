@@ -357,10 +357,11 @@ def _role_provenance(
     role = _nonempty_string(provenance.get("role"))
     if role is None:
         return None, None, False
+    # WI-6067: the shared per-harness pointer is no longer written, so there is no
+    # legacy document to fall back to. Telemetry reports the authoritative
+    # per-session document; absent-document behavior is handled by the caller.
     session_document = Path("harness-state") / harness_name / "session-envelopes" / f"{session_id}.json"
-    legacy_document = Path("harness-state") / harness_name / "session-envelope.json"
-    document_id = session_document if (project_root / session_document).is_file() else legacy_document
-    return role, document_id.as_posix(), True
+    return role, session_document.as_posix(), True
 
 
 def _trusted_worker_context_details(
@@ -407,9 +408,8 @@ def _trusted_worker_context_details(
     session_document = (
         Path("harness-state") / str(trusted["harness_name"]) / "session-envelopes" / f"{trusted['session_id']}.json"
     )
-    legacy_document = Path("harness-state") / str(trusted["harness_name"]) / "session-envelope.json"
-    document_id = session_document if (project_root / session_document).is_file() else legacy_document
-    return trusted, str(trusted["role"]), document_id.as_posix(), None
+    # WI-6067: no shared-pointer fallback; the per-session document is the authority.
+    return trusted, str(trusted["role"]), session_document.as_posix(), None
 
 
 def _fill_missing_worker_context(

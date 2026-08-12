@@ -174,14 +174,17 @@ def test_resolver_no_marker_fails_closed_with_seeded_registry(tmp_path: Path) ->
     assert source == "durable_marker_absent"
 
 
-def _write_envelope(root: Path, harness_name: str, status: str, role_resolved: str | None) -> Path:
-    env_dir = root / "harness-state" / harness_name
+def _write_envelope(
+    root: Path, harness_name: str, status: str, role_resolved: str | None, session_id: str = "sess-1"
+) -> Path:
+    env_dir = root / "harness-state" / harness_name / "session-envelopes"
     env_dir.mkdir(parents=True, exist_ok=True)
     envelope = {
         "status": status,
+        "session_id": session_id,
         "role_resolved": role_resolved,
     }
-    p = env_dir / "session-envelope.json"
+    p = env_dir / f"{session_id}.json"
     p.write_text(json.dumps(envelope), encoding="utf-8")
     return p
 
@@ -200,6 +203,7 @@ def test_resolver_uses_envelope_fallback(tmp_path: Path, monkeypatch: pytest.Mon
 
     # marker is stale -> fallback to envelope role (loyal-opposition)
     _write_marker(tmp_path, srr.ROLE_PRIME, "old-sess")
+    _write_envelope(tmp_path, "claude", "open", srr.ROLE_LO, session_id="new-sess")
     resolved, source = srr.resolve_interactive_session_role(
         tmp_path, current_session_id="new-sess", harness_name="claude"
     )

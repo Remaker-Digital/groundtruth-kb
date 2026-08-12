@@ -67,13 +67,14 @@ def _write_legacy(root: Path, role: str, session_id: str | None) -> Path:
     return marker
 
 
-def _write_envelope(root: Path, harness_name: str, role: str) -> Path:
-    envelope = root / "harness-state" / harness_name / "session-envelope.json"
+def _write_envelope(root: Path, harness_name: str, role: str, session_id: str = "sess-1") -> Path:
+    envelope = root / "harness-state" / harness_name / "session-envelopes" / f"{session_id}.json"
     envelope.parent.mkdir(parents=True, exist_ok=True)
     envelope.write_text(
         json.dumps(
             {
                 "status": "open",
+                "session_id": session_id,
                 "role_resolved": role,
                 "role_asserted": role,
                 "init_keyword": "::init gtkb pb" if role == srr.ROLE_PRIME else "::init gtkb lo",

@@ -243,9 +243,9 @@ class TestSessionEnvelopePresence:
 
     def test_envelope_found(self, tmp_path: Path):
         """Envelope file exists -> passes."""
-        session_dir = tmp_path / ".claude" / "session"
+        session_dir = tmp_path / "harness-state" / "codex" / "session-envelopes"
         session_dir.mkdir(parents=True)
-        (session_dir / "envelope.json").write_text("{}")
+        (session_dir / "fixture-session.json").write_text("{}")
         result = check_session_envelope_presence(tmp_path)
         assert result["passed"] is True
         assert len(result["found"]) > 0

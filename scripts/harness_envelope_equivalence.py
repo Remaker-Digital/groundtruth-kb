@@ -121,8 +121,12 @@ def _active_waivers_by_harness(waivers_payload: dict[str, Any]) -> dict[str, lis
 
 def _latest_session_envelope(root: Path, harness_name: str) -> dict[str, Any]:
     harness_dir = root / "harness-state" / harness_name
-    current = harness_dir / "session-envelope.json"
-    if current.is_file():
+    # WI-6067: the shared per-harness pointer is no longer written. "Latest" for a
+    # harness is now the most recently written authoritative per-session document.
+    session_dir = harness_dir / "session-envelopes"
+    live = sorted(session_dir.glob("*.json"), key=lambda p: p.stat().st_mtime) if session_dir.is_dir() else []
+    if live:
+        current = live[-1]
         payload = _read_json(current)
         return {
             "status": STATUS_EQUIVALENT if _valid_session_envelope(payload) else STATUS_MISSING,
@@ -133,7 +137,8 @@ def _latest_session_envelope(root: Path, harness_name: str) -> dict[str, Any]:
         }
 
     archive_dir = harness_dir / "session-envelope-archive"
-    archived = sorted(archive_dir.glob("*session-envelope.json")) if archive_dir.is_dir() else []
+    # Narrowed so the glob cannot match a bare pointer filename, only dated archives.
+    archived = sorted(archive_dir.glob("*-session-envelope.json")) if archive_dir.is_dir() else []
     if archived:
         latest = archived[-1]
         payload = _read_json(latest)

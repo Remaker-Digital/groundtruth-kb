@@ -61,10 +61,9 @@ def _registry_record(project_root: Path, harness_id: str) -> dict[str, Any] | No
 
 def _worker_document(project_root: Path, harness_name: str) -> tuple[Path | None, dict[str, Any] | None]:
     root = project_root / "harness-state" / harness_name
+    # WI-6067: the shared per-harness pointer is no longer written or read. The
+    # authoritative per-session documents are the only candidates.
     candidates = list((root / "session-envelopes").glob("*.json"))
-    legacy = root / "session-envelope.json"
-    if legacy.is_file():
-        candidates.append(legacy)
     loaded: list[tuple[str, Path, dict[str, Any]]] = []
     for path in candidates:
         try:

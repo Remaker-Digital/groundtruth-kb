@@ -53,7 +53,7 @@ def _seed_registry(root: Path) -> None:
         },
     )
     _write_json(
-        root / "harness-state" / "codex" / "session-envelope.json",
+        root / "harness-state" / "codex" / "session-envelopes" / "A-fixture.json",
         {
             "envelope_schema_version": 1,
             "harness_id": "A",

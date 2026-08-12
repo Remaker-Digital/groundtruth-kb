@@ -13,7 +13,6 @@ from groundtruth_kb.session.envelope import (
     archive_dir,
     close_current_topic,
     close_topic,
-    current_envelope_path,
     ensure_worker_session,
     load_current,
     open_session,
@@ -106,7 +105,9 @@ def test_role_dcl_a6_explicit_role_is_preserved_against_registry_fallback(tmp_pa
         active_work_item_id="WI-4301",
     )
 
-    current = current_envelope_path(tmp_path, "codex")
+    # WI-6067: the envelope is read from the authoritative per-session document;
+    # the shared per-harness pointer is no longer written.
+    current = worker_session_envelope_path(tmp_path, "codex", envelope["session_id"])
     assert current.is_file()
     saved = json.loads(current.read_text(encoding="utf-8"))
     assert saved["session_id"] == envelope["session_id"]
@@ -124,9 +125,11 @@ def test_role_dcl_a6_explicit_role_is_preserved_against_registry_fallback(tmp_pa
 def test_role_dcl_a7_subject_only_startup_uses_source_classified_fallback(tmp_path: Path) -> None:
     _seed_harness(tmp_path)
 
-    open_session(tmp_path, harness_name="codex", init_keyword="::init gtkb", subject="gtkb")
+    envelope = open_session(tmp_path, harness_name="codex", init_keyword="::init gtkb", subject="gtkb")
 
-    saved = json.loads(current_envelope_path(tmp_path, "codex").read_text(encoding="utf-8"))
+    saved = json.loads(
+        worker_session_envelope_path(tmp_path, "codex", envelope["session_id"]).read_text(encoding="utf-8")
+    )
     assert saved["subject_asserted"] == "gtkb"
     assert saved["role_resolved"] == "loyal-opposition"
     assert saved["role_resolution"]["interactive_role_source"] is None
@@ -145,9 +148,10 @@ def test_role_dcl_a4_worker_bootstrap_precedes_marker_and_lifecycle_loading() ->
     assert worker_bootstrap < marker_persistence < lifecycle_loading
 
 
-def test_topic_open_close_is_strict_and_single_active(tmp_path: Path) -> None:
+def test_topic_open_close_is_strict_and_single_active(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _seed_harness(tmp_path)
-    open_session(tmp_path, harness_name="codex")
+    opened = open_session(tmp_path, harness_name="codex")
+    monkeypatch.setenv("GTKB_SESSION_ID", opened["session_id"])
 
     assert set(TOPIC_TYPES) == {"ops", "deliberation", "build", "test", "spec", "project"}
 
@@ -185,9 +189,10 @@ def test_open_topic_closes_current_topic_of_other_type(tmp_path: Path) -> None:
     assert spec_topic["close_outcome"] == "auto_closed_by_open_supplant"
 
 
-def test_bare_close_closes_current_topic(tmp_path: Path) -> None:
+def test_bare_close_closes_current_topic(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _seed_harness(tmp_path)
-    open_session(tmp_path, harness_name="codex")
+    opened = open_session(tmp_path, harness_name="codex")
+    monkeypatch.setenv("GTKB_SESSION_ID", opened["session_id"])
 
     open_topic(tmp_path, "build", harness_name="codex")
     closed = close_current_topic(tmp_path, harness_name="codex")
@@ -239,9 +244,13 @@ def test_ops_topic_route_and_preload_are_available(tmp_path: Path) -> None:
     assert len([t for t in envelope["topics"] if t["closed_at"] is None]) == 1
 
 
-def test_run_wrap_archives_envelope_with_mandatory_step_results(tmp_path: Path) -> None:
+def test_run_wrap_archives_envelope_with_mandatory_step_results(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _seed_harness(tmp_path)
-    open_session(tmp_path, harness_name="codex")
+    opened = open_session(tmp_path, harness_name="codex")
+    monkeypatch.setenv("GTKB_SESSION_ID", opened["session_id"])
     open_topic(tmp_path, "test", harness_name="codex")
 
     result = run_wrap(tmp_path, harness_name="codex", wrap_outcome="canonical_wrap")
@@ -249,7 +258,7 @@ def test_run_wrap_archives_envelope_with_mandatory_step_results(tmp_path: Path) 
     archive_path = result["archive_path"]
     assert archive_path.parent == archive_dir(tmp_path, "codex")
     assert archive_path.is_file()
-    assert not current_envelope_path(tmp_path, "codex").exists()
+    assert not (tmp_path / "harness-state" / "codex" / "session-envelope.json").exists()
     archived = json.loads(archive_path.read_text(encoding="utf-8"))
     assert archived["status"] == "closed"
     assert archived["wrap_outcome"] == "canonical_wrap"
@@ -508,23 +517,44 @@ def test_worker_sessions_keep_distinct_document_role_authority(tmp_path: Path) -
         )["role"]
         == "loyal-opposition"
     )
-    assert load_current(tmp_path, "codex")["session_id"] == "session-two"
+    # WI-6067: there is no shared "current" designation for a last writer to win.
+    # Without an invoking session id no envelope can be proven to belong to the
+    # caller, so nothing resolves.
+    assert load_current(tmp_path, "codex") is None
 
 
-def test_run_wrap_fails_closed_on_cross_context_mismatch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """WI-5935 Slice C: a wrap from a different session-context fails closed
-    and leaves the other context's envelope open."""
+def test_wrap_cannot_reach_another_context_envelope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-6067 (supersedes WI-5935 Slice C): cross-context closure is structurally
+    impossible rather than merely refused.
+
+    Before the shared-pointer purge, a second context reached the first context's
+    envelope through the pointer and ``_assert_fail_closed_single_context`` refused
+    the close. The pointer is gone, so context-b cannot observe context-a's envelope
+    at all. The guard is retained in code as defense against any future path that
+    reintroduces a shared read; this test asserts the structure that now makes it
+    unreachable, and additionally that a context with no envelope of its own does not
+    silently succeed — per DELIB-20260808-WI6067-GUARD-CONTRACT-READING.
+    """
     _seed_harness(tmp_path)
     monkeypatch.setenv("GTKB_SESSION_ID", "context-a")
     open_session(tmp_path, harness_name="codex", session_id="context-a")
 
     monkeypatch.setenv("GTKB_SESSION_ID", "context-b")
-    with pytest.raises(EnvelopeError, match="Refusing to close another context"):
-        run_wrap(tmp_path, harness_name="codex")
+    # context-b cannot observe context-a's envelope through any shared designation
+    assert load_current(tmp_path, "codex") is None
 
-    live = load_current(tmp_path, "codex")
-    assert live["session_id"] == "context-a"
-    assert live["status"] == "open"
+    # context-a's document is untouched and still open
+    a_doc = json.loads(worker_session_envelope_path(tmp_path, "codex", "context-a").read_text(encoding="utf-8"))
+    assert a_doc["session_id"] == "context-a"
+    assert a_doc["status"] == "open"
+
+    before = worker_session_envelope_path(tmp_path, "codex", "context-a").read_bytes()
+    archives_before = list(archive_dir(tmp_path, "codex").glob("*.json"))
+    with pytest.raises(EnvelopeError, match="no open session envelope exists"):
+        run_wrap(tmp_path, harness_name="codex")
+    assert not worker_session_envelope_path(tmp_path, "codex", "context-b").exists()
+    assert list(archive_dir(tmp_path, "codex").glob("*.json")) == archives_before
+    assert worker_session_envelope_path(tmp_path, "codex", "context-a").read_bytes() == before
 
 
 def test_run_wrap_operates_on_per_session_authoritative_document(tmp_path: Path) -> None:
@@ -536,7 +566,7 @@ def test_run_wrap_operates_on_per_session_authoritative_document(tmp_path: Path)
     worker_doc = worker_session_envelope_path(tmp_path, "codex", sid)
     assert worker_doc.is_file()
     assert json.loads(worker_doc.read_text(encoding="utf-8"))["status"] == "closed"
-    assert not current_envelope_path(tmp_path, "codex").exists()
+    assert not (tmp_path / "harness-state" / "codex" / "session-envelope.json").exists()
 
 
 def test_gt_session_wrap_cli_fails_closed_on_cross_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -572,7 +602,7 @@ def test_gt_session_wrap_cli_fails_closed_on_cross_context(tmp_path: Path, monke
     monkeypatch.delenv("CODEX_THREAD_ID", raising=False)
     wrapped = runner.invoke(main, [*cfg, "session", "wrap", "--harness-name", "codex"])
     assert wrapped.exit_code != 0
-    assert "Refusing to close another context" in wrapped.output
+    assert "no open session envelope exists" in wrapped.output
 
 
 def test_render_wrap_summary_includes_closing_instruction(tmp_path: Path) -> None:

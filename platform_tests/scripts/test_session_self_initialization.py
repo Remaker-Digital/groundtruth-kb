@@ -225,10 +225,8 @@ def test_wi5328_workstream_focus_init_keyword_writes_authoritative_session_envel
 
     envelope_path = tmp_path / "harness-state" / "claude" / "session-envelopes" / f"session-{mode}.json"
     envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
-    projection = json.loads((tmp_path / ".claude" / "session" / "envelope.json").read_text(encoding="utf-8"))
-
-    assert projection["session_id"] == f"session-{mode}"
-    assert projection["role_resolved"] == expected_role
+    assert not (tmp_path / ".claude" / "session" / "envelope.json").exists()
+    assert not (tmp_path / "harness-state" / "claude" / "session-envelope.json").exists()
     assert envelope["init_keyword"] == f"::init gtkb {mode}"
     assert envelope["role"] == expected_role
     assert envelope["role_asserted"] == expected_role
@@ -266,12 +264,10 @@ def test_wi5328_interactive_envelope_writeback_is_session_isolated(
     second = json.loads(
         (tmp_path / "harness-state" / "claude" / "session-envelopes" / "session-two.json").read_text(encoding="utf-8")
     )
-    projection = json.loads((tmp_path / ".claude" / "session" / "envelope.json").read_text(encoding="utf-8"))
-
     assert first["role_resolved"] == "prime-builder"
     assert second["role_resolved"] == "loyal-opposition"
-    assert projection["session_id"] == "session-two"
-    assert projection["role_resolved"] == "loyal-opposition"
+    assert not (tmp_path / ".claude" / "session" / "envelope.json").exists()
+    assert not (tmp_path / "harness-state" / "claude" / "session-envelope.json").exists()
 
 
 def test_wi5328_subject_only_or_headless_init_keyword_does_not_write_worker_envelope(

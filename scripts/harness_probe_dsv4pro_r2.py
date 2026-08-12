@@ -9,8 +9,8 @@ report covering six checks:
     groundtruth_kb.
 (3) Git read health — HEAD sha and dirty count via ``--no-optional-locks``.
 (4) gt CLI reachability — exit-0 help probe.
-(5) Session-envelope surface presence — read-only existence check of
-    .claude/session/envelope.json.
+(5) Session-envelope surface presence — read-only discovery of an authoritative
+    per-session document.
 (6) Report determinism — two consecutive runs in an unchanged worktree produce
     byte-identical JSON apart from an explicitly labeled ``generated_at`` field.
 
@@ -42,7 +42,6 @@ _RUN_IDENTIFIER = "dsv4pro-r2"
 # Paths checked relative to project root (determined from the installed probe
 # path, independent of the invoking CWD).
 _VENV_PYTHON_PARTS = ("groundtruth-kb", ".venv", "Scripts", "python.exe")
-_ENVELOPE_PATH_PARTS = (".claude", "session", "envelope.json")
 _PROJECT_MARKER_PARTS = ("groundtruth-kb", ".claude", "rules")
 
 
@@ -247,7 +246,7 @@ def _check_gt_cli_reachability(project_root: Path | None, timeout: float) -> dic
 def _check_session_envelope_presence(
     project_root: Path | None,
 ) -> dict[str, object]:
-    """Check (5): session-envelope surface read-only existence check."""
+    """Check (5): authoritative per-session-envelope presence."""
     if project_root is None:
         return {
             "session_envelope_presence": False,
@@ -255,12 +254,14 @@ def _check_session_envelope_presence(
                 "envelope_path": None,
             },
         }
-    envelope_path = project_root.joinpath(*_ENVELOPE_PATH_PARTS)
-    present = envelope_path.is_file()
+    state_root = project_root / "harness-state"
+    envelope_paths = sorted(state_root.glob("*/session-envelopes/*.json")) if state_root.is_dir() else []
+    present = bool(envelope_paths)
     return {
         "session_envelope_presence": present,
         "details": {
-            "envelope_path": str(envelope_path),
+            "envelope_path": str(envelope_paths[0]) if envelope_paths else None,
+            "checked_glob": str(state_root / "*/session-envelopes/*.json"),
         },
     }
 

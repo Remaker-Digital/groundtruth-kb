@@ -182,17 +182,24 @@ def resolve_interactive_session_role(
     # when the envelope is status="open". An open envelope IS explicit
     # interactive evidence; the dispatcher/default registry role is not, and is
     # deliberately not read here (WI-5933 C1).
-    envelope_path = project_root / "harness-state" / harness_name / "session-envelope.json"
+    # WI-6067: the shared per-harness pointer is no longer written or read. The
+    # envelope is resolved from the authoritative per-session document keyed by the
+    # invoking session id. Without that id no envelope can be proven to belong to
+    # this context, so no envelope role is derived and the durable fallback applies.
     envelope_role = None
-    if envelope_path.is_file():
-        try:
-            envelope_data = json.loads(envelope_path.read_text(encoding="utf-8"))
-            if isinstance(envelope_data, dict) and envelope_data.get("status") == "open":
-                role_resolved = envelope_data.get("role_resolved")
-                if role_resolved in _VALID_ROLES:
-                    envelope_role = role_resolved
-        except Exception:
-            pass
+    if current_session_id is not None:
+        envelope_path = (
+            project_root / "harness-state" / harness_name / "session-envelopes" / f"{current_session_id}.json"
+        )
+        if envelope_path.is_file():
+            try:
+                envelope_data = json.loads(envelope_path.read_text(encoding="utf-8"))
+                if isinstance(envelope_data, dict) and envelope_data.get("status") == "open":
+                    role_resolved = envelope_data.get("role_resolved")
+                    if role_resolved in _VALID_ROLES:
+                        envelope_role = role_resolved
+            except Exception:
+                pass
 
     fallback = envelope_role
     fallback_absent_source = "session_envelope" if envelope_role is not None else "durable_marker_absent"

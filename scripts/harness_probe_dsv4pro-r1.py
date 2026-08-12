@@ -175,17 +175,16 @@ def check_gt_cli_reachability(project_root: Path, timeout: float) -> dict:
 
 
 def check_session_envelope_presence(project_root: Path) -> dict:
-    """Check 5: session-envelope surface presence (read-only existence check)."""
-    envelope_paths = [
-        project_root / ".claude" / "session" / "envelope.json",
-    ]
+    """Check 5: authoritative per-session-envelope presence."""
+    state_root = project_root / "harness-state"
+    envelope_paths = sorted(state_root.glob("*/session-envelopes/*.json")) if state_root.is_dir() else []
     found = [str(p) for p in envelope_paths if p.is_file()]
     return {
         "check": "session_envelope_presence",
         "passed": len(found) > 0,
         "checked_paths": [str(p) for p in envelope_paths],
         "found": found,
-        "detail": "envelope found" if found else "envelope not found at any checked path",
+        "detail": "per-session envelope found" if found else "no authoritative per-session envelope found",
     }
 
 

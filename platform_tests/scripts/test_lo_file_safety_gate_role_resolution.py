@@ -111,15 +111,18 @@ def _write_durable_role(
     ident.write_text(json.dumps(ident_doc), encoding="utf-8")
 
 
-def _write_envelope(project_root: Path, role: str, harness_name: str = "claude") -> None:
+def _write_envelope(
+    project_root: Path, role: str, harness_name: str = "claude", session_id: str = "session-envelope"
+) -> None:
     """Write an open session envelope with an explicit resolved role."""
-    envelope_dir = project_root / "harness-state" / harness_name
+    envelope_dir = project_root / "harness-state" / harness_name / "session-envelopes"
     envelope_dir.mkdir(parents=True, exist_ok=True)
-    envelope = envelope_dir / "session-envelope.json"
+    envelope = envelope_dir / f"{session_id}.json"
     envelope.write_text(
         json.dumps(
             {
                 "status": "open",
+                "session_id": session_id,
                 "role_resolved": role,
             }
         ),
@@ -406,7 +409,7 @@ def test_is_lo_enforced_true_when_no_marker_session_envelope_lo(
 ) -> None:
     """No marker exists, but an open session envelope resolves LO -> True."""
     _write_durable_role(project_root, "B", "prime-builder", "claude")
-    _write_envelope(project_root, "loyal-opposition", "claude")
+    _write_envelope(project_root, "loyal-opposition", "claude", "session-envelope-lo")
 
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project_root))
     monkeypatch.delenv("GTKB_HARNESS_NAME", raising=False)
@@ -423,7 +426,7 @@ def test_is_lo_enforced_true_when_no_marker_session_envelope_lo(
     ):
         monkeypatch.delenv(var, raising=False)
 
-    payload: dict = {}
+    payload: dict = {"session_id": "session-envelope-lo"}
     result = _is_lo_enforced(project_root, payload)
     assert result is True, "No marker + open session envelope LO -> writes blocked (True)"
 
@@ -439,7 +442,7 @@ def test_is_lo_enforced_false_when_durable_lo_session_envelope_pb(
 ) -> None:
     """An explicit open PB session envelope takes precedence over durable LO."""
     _write_durable_role(project_root, "B", "loyal-opposition", "claude")
-    _write_envelope(project_root, "prime-builder", "claude")
+    _write_envelope(project_root, "prime-builder", "claude", "session-envelope-pb")
 
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project_root))
     monkeypatch.delenv("GTKB_HARNESS_NAME", raising=False)
@@ -456,7 +459,7 @@ def test_is_lo_enforced_false_when_durable_lo_session_envelope_pb(
     ):
         monkeypatch.delenv(var, raising=False)
 
-    payload: dict = {}
+    payload: dict = {"session_id": "session-envelope-pb"}
     result = _is_lo_enforced(project_root, payload)
     assert result is False, "Durable LO + open session envelope PB -> writes allowed (False)"
 

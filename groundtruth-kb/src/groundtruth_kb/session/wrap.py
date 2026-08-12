@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from groundtruth_kb.session.envelope import close_session, ensure_current
+from groundtruth_kb.session.envelope import close_session
 from groundtruth_kb.session.topic_router import first_non_blank_line
 
 _CLOSING_INSTRUCTION = "When you are finished working, close your session envelope by invoking ::wrap."
@@ -22,12 +22,6 @@ def run_wrap(
     wrap_outcome: str = "manual_wrap",
     session_id: str | None = None,
 ) -> dict[str, object]:
-    ensure_current(
-        project_root,
-        harness_name=harness_name,
-        harness_id=harness_id,
-        session_id=session_id,
-    )
     envelope, archive_path = close_session(
         project_root,
         harness_name=harness_name,

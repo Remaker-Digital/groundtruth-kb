@@ -148,10 +148,6 @@ def harness_state_dir(project_root: Path, harness_name: str) -> Path:
     return project_root / "harness-state" / harness_name
 
 
-def current_envelope_path(project_root: Path, harness_name: str) -> Path:
-    return harness_state_dir(project_root, harness_name) / "session-envelope.json"
-
-
 def worker_session_envelope_dir(project_root: Path, harness_name: str) -> Path:
     """Return the directory containing authoritative per-session documents."""
     return harness_state_dir(project_root, harness_name) / "session-envelopes"
@@ -171,10 +167,6 @@ def worker_session_envelope_path(project_root: Path, harness_name: str, session_
 
 def archive_dir(project_root: Path, harness_name: str) -> Path:
     return harness_state_dir(project_root, harness_name) / "session-envelope-archive"
-
-
-def projection_path(project_root: Path) -> Path:
-    return project_root / ".claude" / "session" / "envelope.json"
 
 
 def _read_json(path: Path, default: Any) -> Any:
@@ -601,11 +593,9 @@ def resolve_worker_role_provenance(
     if harness_name is not None:
         expected_harness_name = _require_nonempty_string(harness_name, "harness_name")
         path = worker_session_envelope_path(project_root, expected_harness_name, current_session_id)
-        if not path.is_file():
-            # Existing installations may still have exactly one session document
-            # in the legacy projection path. It is acceptable only when its own
-            # session id validates; it can never authorize another session.
-            path = current_envelope_path(project_root, expected_harness_name)
+        # WI-6067: the legacy fallback to the shared pointer is removed. Provenance
+        # resolves from the authoritative per-session document keyed by session id,
+        # which is the only document that can validate its own session.
         if not path.is_file():
             if any(worker_session_envelope_dir(project_root, expected_harness_name).glob("*.json")):
                 raise EnvelopeError("Worker role provenance session id does not match the current session.")
@@ -620,26 +610,11 @@ def resolve_worker_role_provenance(
     state_root = project_root / "harness-state"
     document_name = _worker_session_document_filename(current_session_id)
     matched: list[tuple[dict[str, Any], str]] = []
-    session_document_harnesses: set[str] = set()
     for path in sorted(state_root.glob(f"*/session-envelopes/{document_name}")):
         if not path.is_file():
             continue
         harness = path.parent.parent.name
-        session_document_harnesses.add(harness)
         matched.append((_load_worker_document(path), harness))
-
-    # Retain a narrow read-only migration path for a legacy document, but never
-    # let a shared per-harness projection compete with an exact session document.
-    for path in sorted(state_root.glob("*/session-envelope.json")):
-        harness = path.parent.name
-        if harness in session_document_harnesses or not path.is_file():
-            continue
-        envelope = _read_json(path, None)
-        if not isinstance(envelope, dict):
-            continue
-        provenance = envelope.get("worker_role_provenance")
-        if isinstance(provenance, dict) and provenance.get("session_id") == current_session_id:
-            matched.append((envelope, harness))
 
     if not matched:
         raise EnvelopeError("Worker role provenance is missing for the current session.")
@@ -654,47 +629,31 @@ def resolve_worker_role_provenance(
 
 
 def write_current(project_root: Path, harness_name: str, envelope: dict[str, Any]) -> Path:
+    """Write the authoritative per-session document and return its path.
+
+    WI-6067: the shared per-harness pointer and the shared projection are no
+    longer written. Both designated whichever context wrote last, which carries
+    no meaning once contexts run concurrently. The return value is now the
+    authoritative document path rather than the pointer path.
+    """
     session_id = _require_nonempty_string(envelope.get("session_id"), "session_id")
     authoritative_path = worker_session_envelope_path(project_root, harness_name, session_id)
     _write_envelope_document(authoritative_path, envelope)
-    path = current_envelope_path(project_root, harness_name)
-    _write_envelope_document(path, envelope)
-    _write_projection(
-        project_root,
-        harness_name,
-        envelope,
-        authoritative=True,
-        authoritative_path=authoritative_path,
-    )
-    return path
-
-
-def _write_projection(
-    project_root: Path,
-    harness_name: str,
-    envelope: dict[str, Any],
-    *,
-    authoritative: bool,
-    authoritative_path: Path | None = None,
-) -> None:
-    projection = dict(envelope)
-    projection["projection_authoritative"] = authoritative
-    projection["authoritative_path"] = (
-        authoritative_path or current_envelope_path(project_root, harness_name)
-    ).as_posix()
-    path = projection_path(project_root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(projection, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return authoritative_path
 
 
 def load_current(project_root: Path, harness_name: str) -> dict[str, Any] | None:
-    path = current_envelope_path(project_root, harness_name)
-    if not path.is_file():
+    """Return the invoking session-context's own envelope document.
+
+    WI-6067: resolution is keyed by session id, never by harness name. The
+    two-argument signature is retained so every existing caller resolves
+    correctly without change; only the resolution target moves from the shared
+    pointer to the authoritative per-session document.
+    """
+    session_id = _resolve_invoking_session_id(None)
+    if not session_id:
         return None
-    data = _read_json(path, None)
-    if not isinstance(data, dict):
-        raise EnvelopeError(f"Session envelope is not a JSON object: {path}")
-    return data
+    return load_worker_session(project_root, harness_name, session_id)
 
 
 def load_worker_session(project_root: Path, harness_name: str, session_id: str) -> dict[str, Any] | None:
@@ -706,6 +665,45 @@ def load_worker_session(project_root: Path, harness_name: str, session_id: str) 
     if not isinstance(data, dict):
         raise EnvelopeError(f"Session envelope is not a JSON object: {path}")
     return data
+
+
+def _guard_session_id_collision(
+    project_root: Path,
+    harness_name: str,
+    envelope: dict[str, Any],
+) -> None:
+    """Fail closed when this open would reuse a distinct session's id.
+
+    ``author_session_context_id`` is the review-independence boundary under
+    ``GOV-FILE-BRIDGE-AUTHORITY-001``: a reviewer session context equal to the
+    reviewed artifact's author session context is self-review and must fail
+    closed. That guarantee holds only while a session id names exactly one
+    session.
+
+    Re-opening the same session stays idempotent (same ``opened_at``), so resume
+    and benign duplicate opens are unaffected. Opening a *different* session
+    under an id that is already held is refused, because silently overwriting the
+    prior envelope would corrupt the identity that independence checks, claim
+    records, and bridge artifact headers all key on.
+    """
+    session_id = str(envelope.get("session_id") or "").strip()
+    if not session_id:
+        return
+    existing = load_worker_session(project_root, harness_name, session_id)
+    if existing is None:
+        return
+    stored_opened_at = str(existing.get("opened_at") or "").strip()
+    incoming_opened_at = str(envelope.get("opened_at") or "").strip()
+    if stored_opened_at == incoming_opened_at:
+        return
+    raise EnvelopeError(
+        f"Session id {session_id!r} is already held by a different {harness_name} session "
+        f"(stored opened_at={stored_opened_at or 'unknown'}, "
+        f"incoming opened_at={incoming_opened_at or 'unknown'}). "
+        "Session ids must name exactly one session because author_session_context_id is "
+        "the review-independence boundary. Close or archive the prior session envelope, "
+        "or open with a session id unique to this session."
+    )
 
 
 def open_session(
@@ -758,6 +756,7 @@ def open_session(
     dispatch_selection = dispatch_resource_selection(dispatch_run_id)
     if dispatch_selection["selected_resources"]:
         envelope["resource_selection"] = dispatch_selection
+    _guard_session_id_collision(project_root, resolved_name, envelope)
     write_current(project_root, resolved_name, envelope)
     return envelope
 
@@ -1176,22 +1175,20 @@ def close_session(
     wrap_step_results: list[dict[str, Any]] | None = None,
     session_id: str | None = None,
 ) -> tuple[dict[str, Any], Path]:
-    resolved_name, resolved_id = resolve_harness_identity(
+    resolved_name, _ = resolve_harness_identity(
         project_root,
         harness_name=harness_name,
         harness_id=harness_id,
     )
     invoking_id = _resolve_invoking_session_id(session_id)
-    envelope = load_current(project_root, resolved_name)
-    if not envelope:
-        envelope = open_session(
-            project_root,
-            harness_name=resolved_name,
-            harness_id=resolved_id,
-            session_id=invoking_id or None,
-        )
-    else:
-        _assert_fail_closed_single_context(invoking_session_id=invoking_id, live_envelope=envelope)
+    if not invoking_id:
+        raise EnvelopeError("Cannot wrap/close without an invoking session-context id.")
+    envelope = load_worker_session(project_root, resolved_name, invoking_id)
+    if envelope is None:
+        raise EnvelopeError("Cannot wrap/close: no open session envelope exists for the invoking session-context.")
+    _assert_fail_closed_single_context(invoking_session_id=invoking_id, live_envelope=envelope)
+    if envelope.get("status") != "open":
+        raise EnvelopeError("Cannot wrap/close: the invoking session envelope is not open.")
     closed_at = utc_now_iso()
     open_topic_count = sum(1 for topic in envelope.get("topics", []) if topic.get("closed_at") is None)
     for topic in envelope.get("topics", []):
@@ -1219,14 +1216,8 @@ def close_session(
     archive_path.write_text(json.dumps(envelope, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     worker_path = worker_session_envelope_path(project_root, resolved_name, str(envelope["session_id"]))
     _write_envelope_document(worker_path, envelope)
-    current_path = current_envelope_path(project_root, resolved_name)
-    if current_path.exists():
-        current_path.unlink()
-    _write_projection(
-        project_root,
-        resolved_name,
-        envelope,
-        authoritative=False,
-        authoritative_path=worker_path,
-    )
+    # WI-6067: the shared pointer and projection are no longer written, so close
+    # has nothing to unlink or re-project. Removal of any legacy artifact left by
+    # a pre-purge session belongs to the deferred artifact tranche, which needs
+    # runtime_state and configuration mutation classes this authorization lacks.
     return envelope, archive_path
