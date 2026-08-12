@@ -3357,7 +3357,7 @@ def test_near_match_publication_path_never_authorizes_exact_staged_path(tmp_path
     ]
 
 
-def test_schema_v2_verdict_hash_passes_live_and_real_index_only_audits(tmp_path: Path) -> None:
+def test_report_verdict_hash_passes_before_and_after_candidate_materialization(tmp_path: Path) -> None:
     module = _load_module()
     root = tmp_path
     bridge_id = "gtkb-schema-v2-index-fixture"
@@ -3390,17 +3390,44 @@ applies_when_doc_matches = ["gtkb-schema-v2-index-fixture"]
 """,
         encoding="utf-8",
     )
-    source_rel = f"bridge/{bridge_id}-001.md"
+    proposal_rel = f"bridge/{bridge_id}-001.md"
+    go_rel = f"bridge/{bridge_id}-002.md"
+    source_rel = f"bridge/{bridge_id}-003.md"
     source = root / source_rel
     source.parent.mkdir()
+    proposal_content = (
+        "NEW\n"
+        "::init gtkb pb\n"
+        "::open build\n\n"
+        f"{_author('prime-builder', 'pb-proposal-session')}"
+        "bridge_kind: prime_proposal\n"
+        f"Document: {bridge_id}\n"
+        "Version: 001\n"
+        'target_paths: ["scripts/example.py"]\n'
+        "\n## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
+    )
+    (root / proposal_rel).write_text(proposal_content, encoding="utf-8")
+    (root / go_rel).write_text(
+        "GO\n"
+        "::init gtkb lo\n"
+        "::open test\n\n"
+        f"{_author('loyal-opposition', 'lo-go-session')}"
+        "bridge_kind: lo_verdict\n"
+        f"Document: {bridge_id}\n"
+        "Version: 002\n"
+        f"Responds to: {proposal_rel}\n",
+        encoding="utf-8",
+    )
     source_content = (
         "NEW\n"
         "::init gtkb pb\n"
         "::open build\n\n"
         f"{_author('prime-builder', 'pb-source-session')}"
-        "bridge_kind: prime_proposal\n"
+        "bridge_kind: implementation_report\n"
         f"Document: {bridge_id}\n"
-        "Version: 001\n"
+        "Version: 003\n"
+        f"Approved proposal: {proposal_rel}\n"
+        f"Controlling GO: {go_rel}\n"
         'target_paths: ["scripts/example.py"]\n'
         "\n## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
     )
@@ -3412,6 +3439,8 @@ applies_when_doc_matches = ["gtkb-schema-v2-index-fixture"]
         "groundtruth.toml",
         ".gitignore",
         config.relative_to(root).as_posix(),
+        proposal_rel,
+        go_rel,
         source_rel,
     ]
     subprocess.run(["git", "add", "--", *committed_paths], cwd=root, check=True)
@@ -3466,7 +3495,7 @@ applies_when_doc_matches = ["gtkb-schema-v2-index-fixture"]
     gate = importlib.util.module_from_spec(gate_spec)
     gate_spec.loader.exec_module(gate)
 
-    candidate_rel = f"bridge/{bridge_id}-002.md"
+    candidate_rel = f"bridge/{bridge_id}-004.md"
     candidate_path = root / candidate_rel
     tick = chr(96)
     candidate = (
@@ -3476,7 +3505,7 @@ applies_when_doc_matches = ["gtkb-schema-v2-index-fixture"]
         f"{_author('loyal-opposition', 'lo-review-session')}"
         "bridge_kind: lo_verdict\n"
         f"Document: {bridge_id}\n"
-        "Version: 002\n"
+        "Version: 004\n"
         f"Responds to: {source_rel}\n\n"
         "## Applicability Preflight\n\n"
         f"- packet_hash: {packet['packet_hash']}\n"

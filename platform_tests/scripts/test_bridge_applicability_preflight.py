@@ -1460,7 +1460,6 @@ def test_pauth_proposal_allowed_finalization_denied_when_bridge_class_missing(tm
         "bridge/pauth-phase-001.md",
         "bridge/pauth-phase-002.md",
         "bridge/pauth-phase-003.md",
-        "bridge/pauth-phase-004.md",
         "platform_tests/test_tool.py",
         "scripts/tool.py",
     ]
@@ -1518,6 +1517,115 @@ def test_pauth_phase_cohort_allowed_and_reported(tmp_path: Path, monkeypatch) ->
     assert pauth["taxonomy_sha256"]
     assert first["packet_hash"] == second["packet_hash"]
     assert "Project Authorization Operation-Time Evaluation" in preflight.format_markdown(first)
+
+
+def test_finalization_exact_source_horizon_is_invariant_after_successor_materializes(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        1,
+        "REVISED",
+        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+    )
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        2,
+        "GO",
+        "Responds to: bridge/pauth-phase-001.md\n\n# Reviewed proposal\n",
+    )
+    report = tmp_path / "bridge" / "pauth-phase-003.md"
+    report.write_text(
+        _implementation_content(
+            kind="implementation_report",
+            version=3,
+            targets=["platform_tests/test_tool.py"],
+            approved=1,
+        ),
+        encoding="utf-8",
+    )
+    _install_operation_time_fixture(monkeypatch, _operation_time_envelope())
+
+    before = preflight.build_packet(
+        bridge_id="pauth-phase",
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=report,
+    )
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        4,
+        "VERIFIED",
+        "Responds to: bridge/pauth-phase-003.md\n\n# Terminal verdict\n",
+    )
+    after = preflight.build_packet(
+        bridge_id="pauth-phase",
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=report,
+    )
+
+    cohort = after["project_authorization_operation_time"]["cohort"]
+    assert before["packet_hash_material"] == after["packet_hash_material"]
+    assert before["packet_hash"] == after["packet_hash"]
+    assert "bridge/pauth-phase-004.md" in cohort
+    assert "bridge/pauth-phase-005.md" not in cohort
+
+
+def test_finalization_noncanonical_source_ignores_stale_declared_version_for_observed_fallback(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        1,
+        "REVISED",
+        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+    )
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        2,
+        "GO",
+        "Responds to: bridge/pauth-phase-001.md\n\n# Reviewed proposal\n",
+    )
+    _write_bridge_version(tmp_path, "pauth-phase", 3, "NO-GO", "# Existing sibling\n")
+    _write_bridge_version(tmp_path, "pauth-phase", 4, "REVISED", "# Later sibling\n")
+    _write_bridge_version(tmp_path, "pauth-phase", 5, "NO-GO", "# Latest sibling\n")
+    report = tmp_path / "noncanonical-report-with-stale-version.md"
+    report.write_text(
+        _implementation_content(
+            kind="implementation_report",
+            version=3,
+            targets=["platform_tests/test_tool.py"],
+            approved=1,
+        ),
+        encoding="utf-8",
+    )
+    _install_operation_time_fixture(monkeypatch, _operation_time_envelope())
+
+    packet = preflight.build_packet(
+        bridge_id="pauth-phase",
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=report,
+    )
+
+    cohort = packet["project_authorization_operation_time"]["cohort"]
+    assert "bridge/pauth-phase-006.md" in cohort
+    assert "bridge/pauth-phase-007.md" not in cohort
 
 
 def test_finalization_binds_cohort_to_go_approved_proposal(tmp_path: Path, monkeypatch) -> None:

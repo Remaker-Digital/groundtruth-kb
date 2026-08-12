@@ -938,6 +938,7 @@ def _pauth_phase_cohort(
     declared_target_paths: set[str],
     versions: list[BridgeVersion],
     approved_proposal_content: str | None = None,
+    source_horizon_version: int | None = None,
 ) -> list[str]:
     cohort = set(declared_target_paths)
     if phase != "finalization":
@@ -946,11 +947,19 @@ def _pauth_phase_cohort(
     if approved_proposal_content is not None:
         cohort.update(extract_declared_target_paths(approved_proposal_content))
 
-    declared_version = _declared_version(content)
-    observed_versions = [version.version_number for version in versions]
-    if declared_version is not None:
-        observed_versions.append(declared_version)
-    next_version = max(observed_versions, default=0) + 1
+    if source_horizon_version is not None:
+        # WI-6140: only an explicitly resolved canonical numbered source is the
+        # packet's observation horizon. Its prospective verdict is exactly the
+        # immediate successor; newer siblings must not make unchanged
+        # responded-to bytes synthesize a later cohort member and invalidate
+        # their own packet hash.
+        next_version = source_horizon_version + 1
+    else:
+        # Legacy, scanned, and noncanonical draft content retains the
+        # observed-chain fallback even when its body contains stale Version
+        # metadata, because no exact canonical source horizon was resolved.
+        observed_versions = [version.version_number for version in versions]
+        next_version = max(observed_versions, default=0) + 1
     cohort.update(f"bridge/{bridge_id}-{version:03d}.md" for version in range(1, next_version + 1))
     return sorted(cohort)
 
@@ -1064,6 +1073,7 @@ def build_packet(
         )
     if scanned_operative is not None and not scanned_operative.abs_path.is_file():
         raise SystemExit(f"ERR_BRIDGE_FILE_MISSING: {scanned_operative.rel_path}")
+    explicit_version: BridgeVersion | None = None
     if content_file is not None:
         content = content_file.read_text(encoding="utf-8")
         explicit_version = _canonical_explicit_version(
@@ -1131,6 +1141,7 @@ def build_packet(
         declared_target_paths=declared_target_paths,
         versions=versions,
         approved_proposal_content=approved_content,
+        source_horizon_version=explicit_version.version_number if explicit_version is not None else None,
     )
     if proposal_error is not None:
         pauth_operation_time = {
