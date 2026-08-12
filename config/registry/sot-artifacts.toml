@@ -1365,40 +1365,6 @@ forbidden_substitutes = []
 notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
 
 [[artifacts]]
-id = "wi5441-groundtruth-kb-templates-skills-bridge-helpers-impl-report-bridge-py"
-domain = "bridge_protocol"
-lifecycle = "active"
-storage_path = "groundtruth-kb/templates/skills/bridge/helpers/impl_report_bridge.py"
-coverage_mode = "exact"
-authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
-mutation_api = "Governed bridge-authorized source edit"
-versioning_policy = "git_tracked"
-backup_policy = "git_tracked"
-restore_action = "git_restore"
-health_check_function = ""
-owner_role = "shared"
-depends_on = []
-forbidden_substitutes = []
-notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
-
-[[artifacts]]
-id = "wi5441-groundtruth-kb-templates-skills-bridge-helpers-revise-bridge-py"
-domain = "bridge_protocol"
-lifecycle = "active"
-storage_path = "groundtruth-kb/templates/skills/bridge/helpers/revise_bridge.py"
-coverage_mode = "exact"
-authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
-mutation_api = "Governed bridge-authorized source edit"
-versioning_policy = "git_tracked"
-backup_policy = "git_tracked"
-restore_action = "git_restore"
-health_check_function = ""
-owner_role = "shared"
-depends_on = []
-forbidden_substitutes = []
-notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
-
-[[artifacts]]
 id = "wi5441-groundtruth-kb-templates-skills-gtkb-bridge-propose-helpers-write-bridge-py"
 domain = "bridge_protocol"
 lifecycle = "active"
@@ -16903,23 +16869,6 @@ forbidden_substitutes = []
 notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint."
 
 [[artifacts]]
-id = "wi5441-member-groundtruth-kb-templates-skills-baseline-audit-s-cc59361240"
-domain = "control_surface"
-lifecycle = "active"
-storage_path = "groundtruth-kb/templates/skills/baseline-audit/SKILL.md"
-coverage_mode = "exact"
-authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
-mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
-versioning_policy = "git_tracked"
-backup_policy = "git_tracked"
-restore_action = "git_restore"
-health_check_function = ""
-owner_role = "shared"
-depends_on = []
-forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint."
-
-[[artifacts]]
 id = "wi5441-member-groundtruth-kb-templates-skills-bridge-propose-s-83caa9f0ae"
 domain = "control_surface"
 lifecycle = "active"
@@ -16935,57 +16884,6 @@ owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
 notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint, registered_dependency_closure."
-
-[[artifacts]]
-id = "wi5441-member-groundtruth-kb-templates-skills-bridge-helpers-s-7c1442288e"
-domain = "control_surface"
-lifecycle = "active"
-storage_path = "groundtruth-kb/templates/skills/bridge/helpers/scan_bridge.py"
-coverage_mode = "exact"
-authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
-mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
-versioning_policy = "git_tracked"
-backup_policy = "git_tracked"
-restore_action = "git_restore"
-health_check_function = ""
-owner_role = "shared"
-depends_on = []
-forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint."
-
-[[artifacts]]
-id = "wi5441-member-groundtruth-kb-templates-skills-bridge-helpers-s-9ddc7316a2"
-domain = "control_surface"
-lifecycle = "active"
-storage_path = "groundtruth-kb/templates/skills/bridge/helpers/show_thread_bridge.py"
-coverage_mode = "exact"
-authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
-mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
-versioning_policy = "git_tracked"
-backup_policy = "git_tracked"
-restore_action = "git_restore"
-health_check_function = ""
-owner_role = "shared"
-depends_on = []
-forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint."
-
-[[artifacts]]
-id = "wi5441-member-groundtruth-kb-templates-skills-bridge-skill-md-0424b16bb6"
-domain = "control_surface"
-lifecycle = "active"
-storage_path = "groundtruth-kb/templates/skills/bridge/SKILL.md"
-coverage_mode = "exact"
-authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
-mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
-versioning_policy = "git_tracked"
-backup_policy = "git_tracked"
-restore_action = "git_restore"
-health_check_function = ""
-owner_role = "shared"
-depends_on = []
-forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint."
 
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-templates-skills-decision-capture-be1f86e070"
@@ -23435,6 +23333,1264 @@ id = "wi5441-member-scripts-goose-execution-guard-py-7ebe606ae0"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = "scripts/goose_execution_guard.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-claude-skills-gtkb-verify-helpers-writer-script--101a71ea24"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/skills/gtkb-verify/helpers/writer_script.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "overwrite_single_writer"
+backup_policy = "gitignored_runtime"
+restore_action = "regenerate_from_source"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-codex-skills-gtkb-verify-helpers-writer-script-p-10aef912c5"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".codex/skills/gtkb-verify/helpers/writer_script.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "overwrite_single_writer"
+backup_policy = "gitignored_runtime"
+restore_action = "regenerate_from_source"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-config-harness-parity-phase2-waivers-toml-b08074a759"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/harness-parity/phase2-waivers.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-config-project-templates-scope-transition-toml-cb1dcbbc80"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/project-templates/scope-transition.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-adr-skill-md-aeb135a8de"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-adr/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-alternatives-investigation-sk-d0e020e7d7"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-alternatives-investigation/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-arch-audit-skill-md-de188bda01"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-arch-audit/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-assert-skill-md-4fb2a064ce"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-assert/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-assertion-triage-skill-md-c2f8a84b2b"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-assertion-triage/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-batch-skill-md-daaccd2522"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-batch/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-bridge-config-skill-md-a36591036f"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-bridge-config/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-bridge-propose-helpers-write--c06648b6b0"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-bridge-propose/helpers/write_bridge.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-bridge-propose-skill-md-73ede95c49"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-bridge-propose/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-bridge-reconciliation-skill-m-b56b9839fc"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-bridge-reconciliation/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-bridge-skill-md-5360c06278"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-bridge/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-check-deliberations-skill-md-4691362a4f"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-check-deliberations/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-code-review-audit-skill-md-ef65cbd7b2"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-code-review-audit/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-decision-capture-skill-md-2a4f7a57dc"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-decision-capture/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-dispatcher-control-skill-md-e0a044f5de"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-dispatcher-control/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-grill-me-for-clarification-sk-11c097fe37"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-grill-me-for-clarification/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-harness-parity-review-skill-m-9956996e36"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-harness-parity-review/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-lo-hygiene-assessment-skill-m-07544a0941"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-lo-hygiene-assessment/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-lo-opportunity-radar-skill-md-7ba64241e4"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-lo-opportunity-radar/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-loyal-opposition-report-skill-2b19a1432c"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-loyal-opposition-report/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-projects-skill-md-4a9c33e3ee"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-projects/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-promote-skill-md-365b099ef0"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-promote/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-proposal-review-skill-md-136a9bcf24"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-proposal-review/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-query-skill-md-4ac7c66eec"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-query/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-release-candidate-gate-skill--b68b51536f"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-release-candidate-gate/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-send-review-skill-md-858b4410b8"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-send-review/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-session-wrap-scan-skill-md-f69952ab11"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-session-wrap-scan/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-session-wrap-skill-md-a6b8454243"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-session-wrap/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-spec-intake-skill-md-46c74c4b92"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-spec-intake/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-spec-skill-md-d7b453317c"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-spec/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-structural-hygiene-review-ski-eb7b7034ad"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-structural-hygiene-review/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-verify-helpers-write-verdict--1ad5c03453"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-verify/helpers/write_verdict.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-verify-skill-md-163ad9908d"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-verify/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-gtkb-work-item-skill-md-24f90f1acf"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/gtkb-work-item/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-cursor-skills-manifest-json-546887fe6f"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".cursor/skills/MANIFEST.json"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: capability_inventory, registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-docs-gtkb-dashboard-grafana-dashboards-gtkb-dash-df6b8a98cc"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "docs/gtkb-dashboard/grafana/dashboards/gtkb-dashboard.json"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-docs-harness-parity-phase-2-matrix-md-2ee4fd4692"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = "docs/harness-parity-phase-2-matrix.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-docs-procedures-per-thread-finalization-repair-m-1c16eec20e"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = "docs/procedures/per-thread-finalization-repair.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-goose-skills-gtkb-bridge-propose-helpers-write-b-9ea9413f01"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".goose/skills/gtkb-bridge-propose/helpers/write_bridge.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-groundtruth-kb-docs-bootstrap-md-079ee64377"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/docs/bootstrap.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-groundtruth-kb-mkdocs-yml-0af12b71d7"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/mkdocs.yml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-groundtruth-kb-src-groundtruth-kb-bridge-verdict-aec77dd418"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/bridge/verdict_filing.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint, registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-groundtruth-kb-src-groundtruth-kb-cli-test-plan--75d219cc4c"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/cli_test_plan_phase.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint."
+
+[[artifacts]]
+id = "wi5441-member-groundtruth-kb-templates-skills-gtkb-baseline-au-74ebba7dfd"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/templates/skills/gtkb-baseline-audit/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint."
+
+[[artifacts]]
+id = "wi5441-member-scripts-api-harness-stewardship-monitor-py-48b2b0e5a0"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/api_harness_stewardship_monitor.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-bootstrap-cursor-startup-cache-py-c3baa7ce24"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/_bootstrap_cursor_startup_cache.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-build-dcl-single-harness-dispatcher-desk-d24cb3d5a8"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/_build_dcl_single_harness_dispatcher_desktop_task_packet.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-check-code-quality-baseline-source-scan--e711c3c9b4"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/check_code_quality_baseline_source_scan.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-check-file-bridge-authority-py-9f35293702"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/check_file_bridge_authority.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: governed_knowledge, registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-check-modernization-invariant-registry-p-cdaaefd7ba"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/check_modernization_invariant_registry.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-check-superseded-sot-leakage-py-609d2bf284"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/check_superseded_sot_leakage.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: governed_knowledge."
+
+[[artifacts]]
+id = "wi5441-member-scripts-codex-no-window-smoke-probe-py-ff3cbdc3b4"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/codex_no_window_smoke_probe.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-dispatch-wi5307-018-verdict-py-ab73f35493"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/_dispatch_wi5307_018_verdict.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-dispatcher-generation-admission-py-d26e96e282"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/dispatcher_generation_admission.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-gtkb-dashboard-install-local-grafana-ps1-37a7078027"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/gtkb_dashboard/install_local_grafana.ps1"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-gtkb-dashboard-refresh-service-py-5b01292c20"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/gtkb_dashboard/refresh_service.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-gtkb-dashboard-start-local-dashboard-ps1-ec7e202a8b"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/gtkb_dashboard/start_local_dashboard.ps1"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-harness-envelope-equivalence-py-d5f35b3b62"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/harness_envelope_equivalence.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-ops-codex-snapshot-window-hider-py-fda6b6b48b"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/ops/codex_snapshot_window_hider.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-ops-dispatch-chaos-harness-py-6877c54392"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/ops/dispatch_chaos_harness.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-ops-dispatch-monitor-py-92013dde13"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/ops/dispatch_monitor.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-ops-dispatch-parity-py-5622060602"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/ops/dispatch_parity.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-per-thread-finalization-repair-py-b0a4480425"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/per_thread_finalization_repair.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-pre-verdict-executability-check-py-b0529564be"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/pre_verdict_executability_check.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-resolve-orphan-wi-memberships-py-27315e9f1d"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/resolve_orphan_wi_memberships.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-scope-transition-project-py-ca9110609e"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/scope_transition_project.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-timer-inventory-py-0be11869bb"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/timer_inventory.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-wrap-scan-cross-artifact-drift-py-5c9d71d9e3"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/wrap_scan_cross_artifact_drift.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-groundtruth-kb-src-groundtruth-kb-project-regist-6038d4298f"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/project/registry_publication_diagnostics.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint, registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-scripts-batch-finalize-verified-py-e706bcfa32"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/batch_finalize_verified.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
