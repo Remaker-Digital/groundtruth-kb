@@ -3673,6 +3673,224 @@ def consume_bridge_publication_capability(
     )
 
 
+def recover_missing_bridge_publication_capability(
+    *,
+    document_name: str,
+    version: int,
+    target_path: str | Path,
+    content: bytes,
+    session_id: str,
+    owner_authorization: str,
+    project_root: Path | None = None,
+    registry_path: Path | None = None,
+    packaged_registry_path: Path | None = None,
+    db_path: Path | None = None,
+) -> BridgePublicationReceipt:
+    """Back-fill one consumed receipt for an existing pre-capability bridge file.
+
+    Unlike :func:`mint_bridge_publication_capability`, this recovery path never
+    creates, changes, or removes a bridge file. It is available only to an
+    explicit owner-authorized recovery and records that provenance in the
+    resulting registry revision and receipt digest.
+    """
+
+    authorization = owner_authorization.strip() if isinstance(owner_authorization, str) else ""
+    if not authorization:
+        raise RegistryAuthorizationError("bridge publication recovery requires owner authorization")
+    if not session_id:
+        raise RegistryAuthorizationError("bridge publication recovery requires a session id")
+    if not isinstance(content, bytes) or not content:
+        raise RegistryAuthorizationError("bridge publication recovery content bytes are required")
+
+    paths = RegistryPaths.resolve(
+        project_root=project_root,
+        registry_path=registry_path,
+        packaged_registry_path=packaged_registry_path,
+        db_path=db_path,
+    )
+    relative, target = _bridge_publication_target(
+        paths.project_root,
+        document_name=document_name,
+        version=version,
+        target_path=target_path,
+    )
+    # Fast-fail before taking the global registry lock. The target and bytes are
+    # checked again inside the lock to preserve the exact binding.
+    if target.is_symlink() or not target.is_file():
+        raise RegistryRecoveryRequired("bridge publication recovery target is missing")
+    if _hash_file(target) != _sha256_bytes(content):
+        raise RegistryAuthorizationError("bridge publication recovery target bytes do not match content")
+
+    try:
+        from scripts.bridge_lifecycle_resolver import (
+            BridgeLifecycleResolutionError,
+            resolve_bridge_lifecycle,
+        )
+    except ImportError as exc:
+        raise RegistryAuthorizationError("strict bridge lifecycle resolver is unavailable") from exc
+
+    with _RegistryFileLock(paths.lock_path):
+        _ensure_no_nonterminal_journal(paths.db_path)
+        if target.is_symlink() or not target.is_file():
+            raise RegistryRecoveryRequired("bridge publication recovery target is missing")
+        content_digest = _sha256_bytes(content)
+        if _hash_file(target) != content_digest:
+            raise RegistryAuthorizationError("bridge publication recovery target bytes do not match content")
+
+        try:
+            resolution = resolve_bridge_lifecycle(paths.project_root, document_name)
+        except BridgeLifecycleResolutionError as exc:
+            raise RegistryRecoveryRequired(
+                f"bridge publication recovery lifecycle is invalid: {exc.code}: {exc}"
+            ) from exc
+        matching_states = [
+            state for state in resolution.audit_versions if state.version == version and state.path == relative
+        ]
+        if len(matching_states) != 1 or resolution.blocking_diagnostics:
+            raise RegistryRecoveryRequired("bridge publication recovery cannot prove the exact bridge lifecycle")
+        state = matching_states[0]
+        status = state.status
+        transition_digest = _json_digest(
+            {
+                "document_name": document_name,
+                "version": version,
+                "status": status,
+                "target_path": relative,
+                "state": asdict(state),
+                "audit_versions": [asdict(item) for item in resolution.audit_versions],
+                "quarantined_paths": list(resolution.quarantined_paths),
+                "blocking_diagnostics": [asdict(item) for item in resolution.blocking_diagnostics],
+            }
+        )
+        author_session = _bridge_publication_author_session(content)
+        snapshot = _load_snapshot_unlocked(paths)
+        aggregate_record = _bridge_aggregate_record(snapshot, relative)
+        aggregate_digest, _, _ = artifact_content_state(paths.project_root, aggregate_record)
+        now = _utc_now()
+        capability_hash = _sha256_bytes(secrets.token_urlsafe(32).encode("utf-8"))
+        compliance_digest = _json_digest(
+            {
+                "owner_authorization": authorization,
+                "target_path": relative,
+                "content_digest": content_digest,
+            }
+        )
+
+        conn = sqlite3.connect(str(paths.db_path))
+        conn.row_factory = sqlite3.Row
+        try:
+            ensure_control_plane_schema(conn)
+            conn.commit()
+            existing = conn.execute(
+                """
+                SELECT capability_state FROM sot_registry_bridge_publication_capabilities
+                WHERE document_name = ? AND version = ? AND target_path = ?
+                ORDER BY rowid DESC LIMIT 1
+                """,
+                (document_name, version, relative),
+            ).fetchone()
+            if existing is not None:
+                raise RegistryAuthorizationError(
+                    "bridge publication recovery target already holds a publication capability receipt"
+                )
+
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                """
+                INSERT INTO sot_registry_bridge_publication_capabilities (
+                    capability_hash, authority_kind, document_name, version, status,
+                    target_path, content_digest, compliance_digest, transition_digest,
+                    claim_session, author_session_context_id, aggregate_entry_id,
+                    aggregate_preimage_digest, operation, expires_at, capability_state,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'minted', ?)
+                """,
+                (
+                    capability_hash,
+                    _BRIDGE_PUBLICATION_AUTHORITY_KIND,
+                    document_name,
+                    version,
+                    status,
+                    relative,
+                    content_digest,
+                    compliance_digest,
+                    transition_digest,
+                    session_id,
+                    author_session,
+                    aggregate_record.id,
+                    aggregate_digest,
+                    _BRIDGE_PUBLICATION_AUTHORITY_KIND,
+                    now,
+                    now,
+                ),
+            )
+            revision_id = _append_revision(
+                conn,
+                project_root=paths.project_root,
+                record=aggregate_record,
+                actor_session=session_id,
+                operation=_BRIDGE_PUBLICATION_AUTHORITY_KIND,
+                changed_by="bridge-publication-recovery",
+                changed_at=now,
+                change_reason=f"owner-authorized bridge publication receipt backfill: {authorization}",
+                capability_hash=capability_hash,
+                bridge_id=document_name,
+                evidence_view="recovery",
+                evidence_source_reference=capability_hash,
+            )
+            revision = conn.execute(
+                "SELECT content_digest FROM sot_artifact_revisions WHERE revision_id = ?",
+                (revision_id,),
+            ).fetchone()
+            if revision is None or revision["content_digest"] != aggregate_digest:
+                raise RegistryRecoveryRequired("bridge publication recovery revision did not bind exact aggregate")
+            result_digest = _json_digest(
+                {
+                    "recovered": True,
+                    "owner_authorization": authorization,
+                    "target_path": relative,
+                    "content_digest": content_digest,
+                    "aggregate_digest": aggregate_digest,
+                    "transition_digest": transition_digest,
+                    "revision_id": revision_id,
+                }
+            )
+            updated = conn.execute(
+                """
+                UPDATE sot_registry_bridge_publication_capabilities
+                SET capability_state = 'consumed', consumed_at = ?, result_digest = ?, revision_id = ?
+                WHERE capability_hash = ? AND capability_state = 'minted'
+                """,
+                (now, result_digest, revision_id, capability_hash),
+            )
+            if updated.rowcount != 1:
+                raise RegistryAuthorizationError("bridge publication recovery lost its single-use receipt")
+            conn.commit()
+        except Exception:
+            if conn.in_transaction:
+                conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+        final_currentness = registry_currentness(
+            snapshot,
+            project_root=paths.project_root,
+            db_path=paths.db_path,
+            record_ids={aggregate_record.id},
+        )
+        if not final_currentness["current"]:
+            raise RegistryRecoveryRequired(f"bridge publication recovery receipt remains stale: {final_currentness}")
+
+    return BridgePublicationReceipt(
+        capability_hash=capability_hash,
+        revision_id=revision_id,
+        target_path=relative,
+        aggregate_digest=aggregate_digest,
+        capability_state="consumed",
+    )
+
+
 def recover_bridge_publication(
     *,
     target_path: str | Path,
