@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import tomllib
 from dataclasses import dataclass
@@ -112,6 +113,15 @@ def render_adapter(source_text: str, adapter: SkillAdapter, *, generated_at: str
     """
 
     body = _strip_generated_block(source_text)
+    # Helper routes are a per-harness runtime fact: Antigravity invokes the Claude
+    # helper copies, so baseline helper references are rewritten to that route.
+    # Before the baseline moved to .agents this happened implicitly, because the
+    # baseline was .claude. References are documentation and stay on the baseline.
+    body = re.sub(
+        r"\.agents(/skills/[A-Za-z0-9._-]+/helpers/)",
+        r".claude\1",
+        body,
+    )
     if body.startswith(BOM):
         body = body[len(BOM) :]
     body = body.rstrip() + "\n"

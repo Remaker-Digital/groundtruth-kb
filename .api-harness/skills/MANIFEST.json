@@ -6,7 +6,7 @@
       "canonical_name": "gtkb-alternatives-investigation",
       "capability_id": "skill.alternatives-investigation",
       "description": "Investigate technical alternatives and recommend the least-regret option with evidence, tradeoffs, reversibility, and implementation impact. Use for architecture choices, tool selection, and solution comparison.",
-      "source_relative_path": ".claude/skills/gtkb-alternatives-investigation/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-alternatives-investigation/SKILL.md",
       "source_sha256": "44b7fd37bc51973b7f045c492fb71064f64678a9f3fbd487cf76a5fef0d1f706"
     },
     {
@@ -14,7 +14,7 @@
       "canonical_name": "gtkb-arch-audit",
       "capability_id": "skill.arch-audit",
       "description": "Run horizontal architecture compliance audit. Classifies all ADR/DCL as ENFORCED/SPECIFIED/UNASSESSED grouped by family. Optionally records as KB document.",
-      "source_relative_path": ".claude/skills/gtkb-arch-audit/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-arch-audit/SKILL.md",
       "source_sha256": "0c933f48c14c2f068a8fadca6a8b2727a489265c916a372338676772c1bd7453"
     },
     {
@@ -22,7 +22,7 @@
       "canonical_name": "gtkb-assertion-triage",
       "capability_id": "skill.assertion-triage",
       "description": "Categorize currently-failing GT-KB assertions into genuine_drift / chronic_noise / flaky / healthy, then surface chronic_noise retirement candidates with one-at-a-time owner AUQ.",
-      "source_relative_path": ".claude/skills/gtkb-assertion-triage/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-assertion-triage/SKILL.md",
       "source_sha256": "d43e7a58978173c7b877652ba31b7e5a4be4d7f2c1d5973fddca19e31739b5df"
     },
     {
@@ -30,15 +30,15 @@
       "canonical_name": "gtkb-bridge",
       "capability_id": "skill.bridge",
       "description": "Operate the bridge protocol \u2014 file proposals, route actionable bridge work, write governance-compliant verdicts, file post-implementation reports, navigate lifecycle states. Use when proposing implementation work that needs Loyal Opposition review, when responding to a NEW/REVISED/NO-ACTION entry as the reviewing harness, or when checking bridge thread state. The companion skills `gtkb-bridge-propose`, `gtkb-proposal-review`, and `gtkb-send-review` cover specific subactions; use this skill when working across the protocol or when an action's fit isn't obvious.",
-      "source_relative_path": ".claude/skills/gtkb-bridge/SKILL.md",
-      "source_sha256": "50b9ee0163011e412f02e7ceb71e0eb1b5fe02a151a0ffd0046aaa859862b143"
+      "source_relative_path": ".agents/skills/gtkb-bridge/SKILL.md",
+      "source_sha256": "0512dceaeb581ce261a3b008f660ae7de5211dc09696fb1a583ee7e39a423f41"
     },
     {
       "adapter_relative_path": ".api-harness/skills/gtkb-bridge-config/SKILL.md",
       "canonical_name": "gtkb-bridge-config",
       "capability_id": "skill.bridge-config",
       "description": "Inspect and verify GT-KB bridge dispatch configuration, dispatchability, selected targets, rule eligibility, and last dispatch state through the gt bridge dispatch config/status/health CLI.",
-      "source_relative_path": ".claude/skills/gtkb-bridge-config/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-bridge-config/SKILL.md",
       "source_sha256": "3e87f3b153c970444157317520d93279c195b9566b9e011aa7965e38e54245fb"
     },
     {
@@ -46,7 +46,7 @@
       "canonical_name": "gtkb-dispatcher-control",
       "capability_id": "skill.dispatcher-control",
       "description": "Use the governed GT-KB bridge dispatcher control surface for reporting and configuration. Trigger when Codex needs to inspect dispatcher health, status, report data, selected targets, live workers, dispatch history, or change dispatcher eligibility, ranking weights, caps, rules, or harness overlays through gt bridge dispatch commands instead of editing config/dispatcher/rules.toml or runtime JSON.",
-      "source_relative_path": ".claude/skills/gtkb-dispatcher-control/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-dispatcher-control/SKILL.md",
       "source_sha256": "3ba260c4f6698a1d46c0031699984f5d8464549d74252cc675830c2dac30d6c2"
     },
     {
@@ -54,7 +54,7 @@
       "canonical_name": "gtkb-bridge-propose",
       "capability_id": "skill.bridge-propose",
       "description": "Write a bridge proposal to ``bridge/<topic>-001.md`` through the governed no-index bridge path under governance-safe credential-scan and concurrency controls. Use when drafting a new NEW or REVISED proposal through the helper path (non-Claude-Write).",
-      "source_relative_path": ".claude/skills/gtkb-bridge-propose/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-bridge-propose/SKILL.md",
       "source_sha256": "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
     },
     {
@@ -62,7 +62,7 @@
       "canonical_name": "gtkb-bridge-reconciliation",
       "capability_id": "skill.bridge-reconciliation",
       "description": "Operate the GT-KB bridge/backlog reconciliation workflow in the no-index era \u2014 run the read-only assessment, classify findings, correct one triage class at a time, and present exactly one owner decision before any mutation while preserving the bridge, project-authorization, and implementation-start gates. Use when reconciling bridge thread state against the MemBase backlog, investigating bridge/backlog drift, or resolving open work items whose bridge threads are VERIFIED.",
-      "source_relative_path": ".claude/skills/gtkb-bridge-reconciliation/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-bridge-reconciliation/SKILL.md",
       "source_sha256": "04150ef93b4c545eb5a41310e03593b8fdd564d0bf13bf4db425661cb0b6808b"
     },
     {
@@ -70,7 +70,7 @@
       "canonical_name": "gtkb-propose",
       "capability_id": "skill.gtkb-propose",
       "description": "Scaffold a structurally compliant bridge proposal body (status token, project-linkage metadata, inline-JSON target_paths, seeded Prior Deliberations, spec-derived verification heading, required sections) and run a self-review checklist BEFORE filing, then hand off to gtkb-bridge-propose for the write. Use when starting a NEW bridge implementation proposal and you want it to clear the bridge-compliance gates on the first review instead of in a revise loop.",
-      "source_relative_path": ".claude/skills/gtkb-propose/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-propose/SKILL.md",
       "source_sha256": "ed037162b4091af7814529100eb84aa3f902e8904038bdf884a2f74eb0f028a2"
     },
     {
@@ -78,7 +78,7 @@
       "canonical_name": "gtkb-check-deliberations",
       "capability_id": "skill.check-deliberations",
       "description": "Run deliberation archive health check. Reports 5 metrics (population, linkage, conflict quarantine, redaction, duplicates) with PASS/WARN/FAIL thresholds.",
-      "source_relative_path": ".claude/skills/gtkb-check-deliberations/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-check-deliberations/SKILL.md",
       "source_sha256": "c0366f647fb36d34171c336bade6157dcf4c8ba33bb3a8ad82f6e0ef778526e2"
     },
     {
@@ -86,7 +86,7 @@
       "canonical_name": "gtkb-code-review-audit",
       "capability_id": "skill.code-review-audit",
       "description": "Review code and tests for bugs, regressions, unsafe assumptions, missing verification, and configuration drift. Use for PR review, change audit, and remediation re-audit.",
-      "source_relative_path": ".claude/skills/gtkb-code-review-audit/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-code-review-audit/SKILL.md",
       "source_sha256": "5e16702bbb66c6667fcc69505d254b07912288ec5538a9d932f4039a9a87be54"
     },
     {
@@ -94,7 +94,7 @@
       "canonical_name": "gtkb-lo-opportunity-radar",
       "capability_id": "skill.lo-opportunity-radar",
       "description": "Bias Loyal Opposition review toward finding token-savings opportunities and deterministic-service / automation candidates alongside defects. Use during Loyal Opposition review, evaluation, advisory, bridge-verdict, or wrap-up work, or when asked to scan for automation or efficiency opportunities.",
-      "source_relative_path": ".claude/skills/gtkb-lo-opportunity-radar/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-lo-opportunity-radar/SKILL.md",
       "source_sha256": "a47bfabea763756f69c20d4b4536f98eef0e408a6db115f616272d2099839d1f"
     },
     {
@@ -102,7 +102,7 @@
       "canonical_name": "gtkb-loyal-opposition-report",
       "capability_id": "skill.codex-report",
       "description": "Generate a Loyal Opposition report with required evidence structure. Files as an Advisory Proposal bridge entry or Deliberation Archive record.",
-      "source_relative_path": ".claude/skills/gtkb-loyal-opposition-report/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-loyal-opposition-report/SKILL.md",
       "source_sha256": "b30bff47d12c25c1ee2d684d95920562c47d03d2695b96efa0236b77b10054f7"
     },
     {
@@ -110,7 +110,7 @@
       "canonical_name": "gtkb-decision-capture",
       "capability_id": "skill.decision-capture",
       "description": "Capture an owner decision as a governed Deliberation Archive record. Use when the owner makes a yes/no/tradeoff decision worth preserving for future sessions \u2014 policy choices, scope calls, design selections, rejected alternatives.",
-      "source_relative_path": ".claude/skills/gtkb-decision-capture/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-decision-capture/SKILL.md",
       "source_sha256": "24d8335416edce0e9a7676250a868fed7373f79d7d6eb20fbbdc2c0397f2777b"
     },
     {
@@ -118,7 +118,7 @@
       "canonical_name": "gtkb-harness-parity-review",
       "capability_id": "skill.harness-parity-review",
       "description": "Use when reviewing or correcting parity across GT-KB harnesses (Claude, Codex, Cursor, Antigravity, Ollama, OpenRouter), including skills, hooks, roles, commands, plugins, MCP tools, startup context, permissions, role-specific capabilities, or harness capability drift.",
-      "source_relative_path": ".claude/skills/gtkb-harness-parity-review/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-harness-parity-review/SKILL.md",
       "source_sha256": "609a37f9545de53b3f65e1566e1e7509a0d0bd55ddab59e4c2bf563de7f295d1"
     },
     {
@@ -126,7 +126,7 @@
       "canonical_name": "gtkb-skill-governance-lifecycle",
       "capability_id": "skill.skill-governance-lifecycle",
       "description": "Standardize GT-KB managed-skill creation and projection across canonical .claude skills, generated Codex adapters, registry declarations, manifests, tests, and bridge evidence.",
-      "source_relative_path": ".claude/skills/gtkb-skill-governance-lifecycle/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-skill-governance-lifecycle/SKILL.md",
       "source_sha256": "e30a2541f4042ca28c8f582743e380ecfda0a71cc7d3ceb58de6fd418bf1e550"
     },
     {
@@ -134,7 +134,7 @@
       "canonical_name": "gtkb-advisory-disposition",
       "capability_id": "skill.advisory-disposition",
       "description": "Convert Loyal Opposition advisory findings into the correct governed next artifact path without treating advisory capture as implementation approval.",
-      "source_relative_path": ".claude/skills/gtkb-advisory-disposition/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-advisory-disposition/SKILL.md",
       "source_sha256": "43a1e728f208d9ba1e484b9c715924aa47dd0b6670ef57e0814c5ad43b06a22e"
     },
     {
@@ -142,7 +142,7 @@
       "canonical_name": "gtkb-advisory-proposal",
       "capability_id": "skill.advisory-proposal",
       "description": "Draft Loyal Opposition ADVISORY bridge entries from reusable external or peer solutions while preserving owner confirmation and non-approval semantics.",
-      "source_relative_path": ".claude/skills/gtkb-advisory-proposal/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-advisory-proposal/SKILL.md",
       "source_sha256": "a1985ec2b71ab6a2aab6914854ae82194e3fe7930e17a458cbcc02c853931805"
     },
     {
@@ -150,7 +150,7 @@
       "canonical_name": "gtkb-advisory-intake",
       "capability_id": "skill.advisory-intake",
       "description": "Consume live ADVISORY entries through Prime Builder owner-grilling, explicit project/work-item approval, and child proposal filing without treating advisories as implementation approval.",
-      "source_relative_path": ".claude/skills/gtkb-advisory-intake/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-advisory-intake/SKILL.md",
       "source_sha256": "25e4f360c5fb6bef91601c183e8df217b4eebf4008e7555d6527f1f2a8ab870e"
     },
     {
@@ -158,7 +158,7 @@
       "canonical_name": "gtkb-adr",
       "capability_id": "skill.kb-adr",
       "description": "Create an Architecture Decision Record (ADR) in the Knowledge Database as a spec with type='architecture_decision'. Records the decision, rationale, consequences, failed approaches, and rejected alternatives so architectural choices are never revisited without context. Part of GOV-20 governance.",
-      "source_relative_path": ".claude/skills/gtkb-adr/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-adr/SKILL.md",
       "source_sha256": "4b1ec3c66407daa82cd66a84eefe1e2ed6e8d83cc4a4d7e0f7383bb7dd03b969"
     },
     {
@@ -166,7 +166,7 @@
       "canonical_name": "gtkb-assert",
       "capability_id": "skill.kb-assert",
       "description": "Run architecture-layer assertions (ADR/DCL) and optionally record results in assertion_runs. Displays compliance dashboard grouped by family.",
-      "source_relative_path": ".claude/skills/gtkb-assert/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-assert/SKILL.md",
       "source_sha256": "21efa5bb54ede144061770a326b29632a6139d935c85e0fa3d6d4aefb85cbcdf"
     },
     {
@@ -174,7 +174,7 @@
       "canonical_name": "gtkb-batch",
       "capability_id": "skill.kb-batch",
       "description": "Batch KB operations with mandatory dry-run, GOV-15 gate, and 50-item maximum. Operations: resolve-wis, promote-specs, retire-specs.",
-      "source_relative_path": ".claude/skills/gtkb-batch/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-batch/SKILL.md",
       "source_sha256": "e3269505c142a81126c6615619d06b9f1156253b1cf88bbb71d272e42fd2df7c"
     },
     {
@@ -182,7 +182,7 @@
       "canonical_name": "gtkb-promote",
       "capability_id": "skill.kb-promote",
       "description": "Promote a specification's status (specified -> implemented -> verified) with assertion validation. Prevents premature promotion by running assertions before status change.",
-      "source_relative_path": ".claude/skills/gtkb-promote/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-promote/SKILL.md",
       "source_sha256": "5dab12bd288a3ce3d126c30d2670322617121432fcd7d0a38b7fdc93bed2e7cb"
     },
     {
@@ -190,7 +190,7 @@
       "canonical_name": "gtkb-query",
       "capability_id": "skill.kb-query",
       "description": "Query the Knowledge Database for specs, tests, work items, procedures, and documents. Use when looking up project knowledge, checking spec status, finding open work items, or reviewing test coverage.",
-      "source_relative_path": ".claude/skills/gtkb-query/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-query/SKILL.md",
       "source_sha256": "f694720b346a85a5c239cb5aa03c01b18f819b33aa10a43aaff76eb46b8d1ca5"
     },
     {
@@ -198,7 +198,7 @@
       "canonical_name": "gtkb-session-wrap",
       "capability_id": "skill.kb-session-wrap",
       "description": "Execute the GT-KB knowledge-first session wrap-up procedure. Collects durable session knowledge, updates governed memory surfaces, records blockers, syncs the current branch, and generates the next-session handoff prompt.",
-      "source_relative_path": ".claude/skills/gtkb-session-wrap/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-session-wrap/SKILL.md",
       "source_sha256": "6680210122f77b617608d543ebc53e0674a89dc418f552bbe09976d893166575"
     },
     {
@@ -206,7 +206,7 @@
       "canonical_name": "gtkb-session-wrap-scan",
       "capability_id": "skill.kb-session-wrap-scan",
       "description": "Run the wrap-up scanner suite (W0 transcript-snapshot precursor + W1 hygiene scan + W2 cross-artifact consistency check). Read-only; non-mutating. Owner reviews findings before invoking the mutating /kb-session-wrap procedure.",
-      "source_relative_path": ".claude/skills/gtkb-session-wrap-scan/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-session-wrap-scan/SKILL.md",
       "source_sha256": "9468768273e151445af117755950d0467a8bd19d1e0357e61639cf41c2dfd83e"
     },
     {
@@ -214,7 +214,7 @@
       "canonical_name": "gtkb-spec",
       "capability_id": "skill.kb-spec",
       "description": "Create or update a specification in the Knowledge Database. Enforces GOV-01 (spec-first), validates ID format, checks for duplicates, and ensures all required fields are present.",
-      "source_relative_path": ".claude/skills/gtkb-spec/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-spec/SKILL.md",
       "source_sha256": "7430be6a9e5c424a3f27a71fe2b9f7580085f59858bcb1176252a095b67755ac"
     },
     {
@@ -222,7 +222,7 @@
       "canonical_name": "gtkb-work-item",
       "capability_id": "skill.kb-work-item",
       "description": "Create a work item with automatic test creation and backlog assignment. Enforces GOV-12 (WI triggers tests) and GOV-13 (phase assignment) in a single invocation.",
-      "source_relative_path": ".claude/skills/gtkb-work-item/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-work-item/SKILL.md",
       "source_sha256": "b3b4a36c21530da6cc31470583a8baf3a9d1f4da19c579941d6df76085cee015"
     },
     {
@@ -230,7 +230,7 @@
       "canonical_name": "gtkb-projects",
       "capability_id": "skill.projects",
       "description": "Use GT-KB MemBase-backed project lifecycle commands to create, inspect, order, dependency-link, authorize, and retire first-class project records without creating a second backlog authority.",
-      "source_relative_path": ".claude/skills/gtkb-projects/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-projects/SKILL.md",
       "source_sha256": "17a2b01dd84becb7fe48487ef8ddff092f7b4897a16092406fb9b956f1394c2e"
     },
     {
@@ -238,15 +238,15 @@
       "canonical_name": "gtkb-proposal-review",
       "capability_id": "skill.proposal-review",
       "description": "Review proposals, plans, and technical approaches for correctness, missing assumptions, risk, and decision quality. Use for design reviews, plan critiques, and proposal stress tests.",
-      "source_relative_path": ".claude/skills/gtkb-proposal-review/SKILL.md",
-      "source_sha256": "2fa418d270b95d5c03995720375bacba6a6d3250475298c39918c30db95b9ec8"
+      "source_relative_path": ".agents/skills/gtkb-proposal-review/SKILL.md",
+      "source_sha256": "127b55f6e266ba9b92eff6ca71a9c669566957cf1de37c3da65a6d9a978a1367"
     },
     {
       "adapter_relative_path": ".api-harness/skills/gtkb-release-candidate-gate/SKILL.md",
       "canonical_name": "gtkb-release-candidate-gate",
       "capability_id": "skill.release-candidate-gate",
       "description": "Run the non-deploying Agent Red release-candidate gate before treating a build as production deployable. Covers Python security checks, targeted regression tests, frontend builds, and GroundTruth governance adoption checks.",
-      "source_relative_path": ".claude/skills/gtkb-release-candidate-gate/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-release-candidate-gate/SKILL.md",
       "source_sha256": "dc064edf4e9d291b640d0261bbd2293b24f37093f7bbc59127ed90ac997287b9"
     },
     {
@@ -254,7 +254,7 @@
       "canonical_name": "gtkb-send-review",
       "capability_id": "skill.send-review",
       "description": "Create an implementation proposal through the governed bridge-propose helper for Loyal Opposition review.",
-      "source_relative_path": ".claude/skills/gtkb-send-review/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-send-review/SKILL.md",
       "source_sha256": "aa6437097d9fdcbb5b2368367e48b93b805b7082703edcc0fe4f720ae98eb7b2"
     },
     {
@@ -262,7 +262,7 @@
       "canonical_name": "gtkb-spec-intake",
       "capability_id": "skill.spec-intake",
       "description": "Capture an owner requirement as a requirement-candidate deliberation at outcome='deferred', then confirm it into a KB spec or reject it with a reason. Use when the owner states a requirement that should become (or might become) a tracked specification.",
-      "source_relative_path": ".claude/skills/gtkb-spec-intake/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-spec-intake/SKILL.md",
       "source_sha256": "aa9090907a86ca0c1a05844ce51e509c66bdfe013ffa95b4ba4d5a3cf48ca111"
     },
     {
@@ -270,7 +270,7 @@
       "canonical_name": "gtkb-structural-hygiene-review",
       "capability_id": "skill.structural-hygiene-review",
       "description": "Use when reviewing or correcting project structure, naming, artifact authority, glossary alignment, stale or historical artifacts, source-of-truth confusion, generated-vs-authoritative surfaces, or agent-behavior drift caused by directories, filenames, schemas, CLI names, docs, tests, or generated outputs.",
-      "source_relative_path": ".claude/skills/gtkb-structural-hygiene-review/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-structural-hygiene-review/SKILL.md",
       "source_sha256": "13de9e2f85addc7faa602baf9312bf00538d5bb33e4270036146052da0b1309b"
     },
     {
@@ -278,7 +278,7 @@
       "canonical_name": "gtkb-benchmarks",
       "capability_id": "skill.gtkb-benchmarks",
       "description": "Run GT-KB read-only measurement benchmarks and advisory effectiveness summaries. Outputs JSON plus markdown summary.",
-      "source_relative_path": ".claude/skills/gtkb-benchmarks/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-benchmarks/SKILL.md",
       "source_sha256": "31a83117293b282f51310b01c097559e0c6d4b91c91d90b6ca19aa8a1b837d79"
     },
     {
@@ -286,7 +286,7 @@
       "canonical_name": "gtkb-grill-me-for-clarification",
       "capability_id": "skill.grill-me-for-clarification",
       "description": "Interview the owner relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. Use when user wants to stress-test a plan, get grilled on their requirements specifications and directives, or mentions \"grill me for clarification\".",
-      "source_relative_path": ".claude/skills/gtkb-grill-me-for-clarification/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-grill-me-for-clarification/SKILL.md",
       "source_sha256": "781e7752a6cdd0332b99971534b64b36cad4d10652926d520b54e83c02678c08"
     },
     {
@@ -294,7 +294,7 @@
       "canonical_name": "gtkb-hygiene-investigation",
       "capability_id": "skill.gtkb-hygiene-investigation",
       "description": "Run a repeatable, full-coverage GT-KB architecture/hygiene investigation using the proven 4-round probe method (parallel focus-area probes -> gap probe -> completeness critic -> adversarial skeptic) with loop-until-dry and explicit decay disclosure. Emits findings against a structured schema, renders a chunked report via the deterministic report generator, and uses the frozen HYG-001..068 baseline registry for lookup and reporting; baseline diff/delta mode is deferred to a follow-on bridge. Use when the owner asks for a hygiene/architecture investigation, a drift/debt census, or a repeat of the GT-KB self-investigation that produced HYG-001..068.",
-      "source_relative_path": ".claude/skills/gtkb-hygiene-investigation/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-hygiene-investigation/SKILL.md",
       "source_sha256": "4474b3c97a78fd01896fc2c02dec4a36b1d3d158f43e8f1d97a97ea14b832e94"
     },
     {
@@ -302,7 +302,7 @@
       "canonical_name": "gtkb-hygiene-sweep",
       "capability_id": "skill.gtkb-hygiene-sweep",
       "description": "Orchestrate the deterministic `gt hygiene sweep` CLI and route deterministic inventory-backed string scans to `gt admin inventory refresh` plus `gt admin inventory scan-strings` instead of ad hoc grep loops. Use when investigating config-drift class observations, inventory-wide string checks, repeated config defects, or session-start hygiene thresholds; classify findings by artifact lifecycle trigger category per DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001 and guide owner-gated remediation child-bridge filing.",
-      "source_relative_path": ".claude/skills/gtkb-hygiene-sweep/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-hygiene-sweep/SKILL.md",
       "source_sha256": "52e9283f1525d9a1f7a8a42f710b2e1542cd3763b5312041a1734c097fafbde3"
     },
     {
@@ -310,7 +310,7 @@
       "canonical_name": "gtkb-hygiene-reclaim",
       "capability_id": "skill.gtkb-hygiene-reclaim",
       "description": "Use when planning, deep-cleaning, reviewing, trashing, purging, restoring, or auditing GT-KB hygiene-reclaim candidates through the production gt hygiene reclaim plan/history/deep-clean/trash/purge/restore CLI with registry, Git-root, ops-evidence, and quiescence gates.",
-      "source_relative_path": ".claude/skills/gtkb-hygiene-reclaim/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-hygiene-reclaim/SKILL.md",
       "source_sha256": "0b928d4c238f7ad893bc194569f0be4c175ff71c32910d26baebb11d4b7cc152"
     },
     {
@@ -318,7 +318,7 @@
       "canonical_name": "gtkb-sweep-commit",
       "capability_id": "skill.gtkb-sweep-commit",
       "description": "Sweep and locally commit all current non-ignored GroundTruth-KB worktree changes after owner authorization. Use when the owner says to \"sweep commit\", \"commit everything\", \"commit all changes\", consolidate verified bridge work, or perform the regular GT-KB full-worktree cleanup commit. Handles GT-KB governance hooks, inventory drift, narrative-artifact approval evidence, staged credential scans, and verification before committing. Does not push unless the owner explicitly asks.",
-      "source_relative_path": ".claude/skills/gtkb-sweep-commit/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-sweep-commit/SKILL.md",
       "source_sha256": "fc4b1626c9eeeb2eee79565165160453668a6236f91f9582828873283ac679ef"
     },
     {
@@ -326,7 +326,7 @@
       "canonical_name": "gtkb-lo-hygiene-assessment",
       "capability_id": "skill.loyal-opposition-hygiene-assessment",
       "description": "Use when Loyal Opposition should assess GT-KB project hygiene, classify drift, and prepare a Prime Builder action plan without mutating project files.",
-      "source_relative_path": ".claude/skills/gtkb-lo-hygiene-assessment/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-lo-hygiene-assessment/SKILL.md",
       "source_sha256": "69d66578cd14cbe3e807cd6a6a93c973e08dc8566a3734cfd773568bc7feaa9c"
     },
     {
@@ -334,15 +334,15 @@
       "canonical_name": "gtkb-verify",
       "capability_id": "skill.verify",
       "description": "Author a Loyal Opposition post-implementation VERIFIED or NO-GO verdict file that satisfies the Mandatory Specification-Derived Verification Gate. Use when a post-implementation report enters the Loyal Opposition actionable queue, when asked to verify a post-implementation report, when authoring a VERIFIED/NO-GO verdict, or when reviewing an implementation report for spec-derived testing.",
-      "source_relative_path": ".claude/skills/gtkb-verify/SKILL.md",
-      "source_sha256": "d0f13dc12f946f44c8a1536d3734d64e85c35c5a3bdaa5789a96cbf4c965d1e4"
+      "source_relative_path": ".agents/skills/gtkb-verify/SKILL.md",
+      "source_sha256": "4472d09d17bed20105c5c862d86e6d73541d01c60d66707d24fee29bf0fc9eeb"
     },
     {
       "adapter_relative_path": ".api-harness/skills/gtkb-formal-artifact-packet-helper/SKILL.md",
       "canonical_name": "gtkb-formal-artifact-packet-helper",
       "capability_id": "skill.formal-artifact-packet-helper",
       "description": "Generate and validate formal-artifact approval packets with stable LF normalization and the canonical required fields, referencing the live gate as sole authority.",
-      "source_relative_path": ".claude/skills/gtkb-formal-artifact-packet-helper/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-formal-artifact-packet-helper/SKILL.md",
       "source_sha256": "8fba2488531fb05a5e07dc07bfcd94eb62fc7fa891072ee8e57ffdb6949fff0f"
     },
     {
@@ -350,11 +350,11 @@
       "canonical_name": "gtkb-managed-skill-adoption-review",
       "capability_id": "skill.managed-skill-adoption-review",
       "description": "Structural review of managed-artifact proposals (skill, template, or adopter). Use when a bridge thread proposes a new or revised managed-artifact so a Prime Builder structural review is required before proposal filing or as part of the bridge review checklist.",
-      "source_relative_path": ".claude/skills/gtkb-managed-skill-adoption-review/SKILL.md",
+      "source_relative_path": ".agents/skills/gtkb-managed-skill-adoption-review/SKILL.md",
       "source_sha256": "ab7cfdd90ddbeeee51b48dc546b3b092823736802c7bcc87c3cf368f3039e6b3"
     }
   ],
   "generated_by": "scripts/generate_api_skill_adapters.py",
   "schema_version": 1,
-  "source_of_truth": ".claude/skills/*/SKILL.md"
+  "source_of_truth": ".agents/skills/*/SKILL.md"
 }

@@ -37,7 +37,7 @@ id = "skill.alternatives-investigation"
 kind = "skill"
 canonical_name = "gtkb-alternatives-investigation"
 canonical_purpose = "Investigate alternatives and solution options."
-canonical_source = ".claude/skills/gtkb-alternatives-investigation/SKILL.md"
+canonical_source = ".agents/skills/gtkb-alternatives-investigation/SKILL.md"
 required_for_roles = ["loyal-opposition"]
 parity_class = "baseline"
 
@@ -48,13 +48,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-alternatives-investigation/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-alternatives-investigation/SKILL.md"
+adapter_source = ".agents/skills/gtkb-alternatives-investigation/SKILL.md"
 source_sha256 = "44b7fd37bc51973b7f045c492fb71064f64678a9f3fbd487cf76a5fef0d1f706"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-alternatives-investigation/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-alternatives-investigation/SKILL.md"
+adapter_source = ".agents/skills/gtkb-alternatives-investigation/SKILL.md"
 source_sha256 = "44b7fd37bc51973b7f045c492fb71064f64678a9f3fbd487cf76a5fef0d1f706"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-alternatives-investigation/SKILL.md"
@@ -64,14 +64,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-alternatives-investigation/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-alternatives-investigation/SKILL.md"
+adapter_source = ".agents/skills/gtkb-alternatives-investigation/SKILL.md"
 source_sha256 = "44b7fd37bc51973b7f045c492fb71064f64678a9f3fbd487cf76a5fef0d1f706"
 [[capabilities]]
 id = "skill.arch-audit"
 kind = "skill"
 canonical_name = "gtkb-arch-audit"
 canonical_purpose = "Review architecture and structural concerns."
-canonical_source = ".claude/skills/gtkb-arch-audit/SKILL.md"
+canonical_source = ".agents/skills/gtkb-arch-audit/SKILL.md"
 required_for_roles = ["loyal-opposition", "prime-builder"]
 parity_class = "baseline"
 
@@ -82,13 +82,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-arch-audit/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-arch-audit/SKILL.md"
+adapter_source = ".agents/skills/gtkb-arch-audit/SKILL.md"
 source_sha256 = "0c933f48c14c2f068a8fadca6a8b2727a489265c916a372338676772c1bd7453"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-arch-audit/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-arch-audit/SKILL.md"
+adapter_source = ".agents/skills/gtkb-arch-audit/SKILL.md"
 source_sha256 = "0c933f48c14c2f068a8fadca6a8b2727a489265c916a372338676772c1bd7453"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-arch-audit/SKILL.md"
@@ -98,14 +98,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-arch-audit/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-arch-audit/SKILL.md"
+adapter_source = ".agents/skills/gtkb-arch-audit/SKILL.md"
 source_sha256 = "0c933f48c14c2f068a8fadca6a8b2727a489265c916a372338676772c1bd7453"
 [[capabilities]]
 id = "skill.assertion-triage"
 kind = "skill"
 canonical_name = "gtkb-assertion-triage"
 canonical_purpose = "Categorize currently-failing assertions into genuine_drift/chronic_noise/flaky/healthy and route chronic_noise candidates through one-at-a-time owner AUQ."
-canonical_source = ".claude/skills/gtkb-assertion-triage/SKILL.md"
+canonical_source = ".agents/skills/gtkb-assertion-triage/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "baseline"
 
@@ -116,13 +116,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-assertion-triage/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-assertion-triage/SKILL.md"
+adapter_source = ".agents/skills/gtkb-assertion-triage/SKILL.md"
 source_sha256 = "d43e7a58978173c7b877652ba31b7e5a4be4d7f2c1d5973fddca19e31739b5df"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-assertion-triage/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-assertion-triage/SKILL.md"
+adapter_source = ".agents/skills/gtkb-assertion-triage/SKILL.md"
 source_sha256 = "d43e7a58978173c7b877652ba31b7e5a4be4d7f2c1d5973fddca19e31739b5df"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-assertion-triage/SKILL.md"
@@ -132,14 +132,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-assertion-triage/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-assertion-triage/SKILL.md"
+adapter_source = ".agents/skills/gtkb-assertion-triage/SKILL.md"
 source_sha256 = "d43e7a58978173c7b877652ba31b7e5a4be4d7f2c1d5973fddca19e31739b5df"
 [[capabilities]]
 id = "skill.bridge"
 kind = "skill"
 canonical_name = "gtkb-bridge"
 canonical_purpose = "Operate the full bridge protocol â€” propose, scan, respond, verify, lifecycle, status â€” as a single canonical entry point spanning the per-action helper skills."
-canonical_source = ".claude/skills/gtkb-bridge/SKILL.md"
+canonical_source = ".agents/skills/gtkb-bridge/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "baseline"
 
@@ -150,14 +150,14 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-bridge/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-bridge/SKILL.md"
-source_sha256 = "2748c05afa97d733bf9e9d0b3adbdff248a374d275cfd8407eb4ff01d15ae426"
+adapter_source = ".agents/skills/gtkb-bridge/SKILL.md"
+source_sha256 = "c046c9ce665251909efad7999265eb0032efcc6b610b9aaf3c45275407db5810"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-bridge/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-bridge/SKILL.md"
-source_sha256 = "2748c05afa97d733bf9e9d0b3adbdff248a374d275cfd8407eb4ff01d15ae426"
+adapter_source = ".agents/skills/gtkb-bridge/SKILL.md"
+source_sha256 = "c046c9ce665251909efad7999265eb0032efcc6b610b9aaf3c45275407db5810"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-bridge/SKILL.md"
 status = "fallback"
@@ -166,14 +166,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-bridge/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-bridge/SKILL.md"
-source_sha256 = "2748c05afa97d733bf9e9d0b3adbdff248a374d275cfd8407eb4ff01d15ae426"
+adapter_source = ".agents/skills/gtkb-bridge/SKILL.md"
+source_sha256 = "c046c9ce665251909efad7999265eb0032efcc6b610b9aaf3c45275407db5810"
 [[capabilities]]
 id = "skill.bridge-config"
 kind = "skill"
 canonical_name = "gtkb-bridge-config"
 canonical_purpose = "Inspect and verify GT-KB bridge dispatch configuration, status, and health."
-canonical_source = ".claude/skills/gtkb-bridge-config/SKILL.md"
+canonical_source = ".agents/skills/gtkb-bridge-config/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "baseline"
 
@@ -184,13 +184,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-bridge-config/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-bridge-config/SKILL.md"
+adapter_source = ".agents/skills/gtkb-bridge-config/SKILL.md"
 source_sha256 = "3e87f3b153c970444157317520d93279c195b9566b9e011aa7965e38e54245fb"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-bridge-config/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-bridge-config/SKILL.md"
+adapter_source = ".agents/skills/gtkb-bridge-config/SKILL.md"
 source_sha256 = "3e87f3b153c970444157317520d93279c195b9566b9e011aa7965e38e54245fb"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-bridge-config/SKILL.md"
@@ -200,14 +200,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-bridge-config/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-bridge-config/SKILL.md"
+adapter_source = ".agents/skills/gtkb-bridge-config/SKILL.md"
 source_sha256 = "3e87f3b153c970444157317520d93279c195b9566b9e011aa7965e38e54245fb"
 [[capabilities]]
 id = "skill.dispatcher-control"
 kind = "skill"
 canonical_name = "gtkb-dispatcher-control"
 canonical_purpose = "Operate the governed GT-KB bridge dispatcher reporting and configuration control surface."
-canonical_source = ".claude/skills/gtkb-dispatcher-control/SKILL.md"
+canonical_source = ".agents/skills/gtkb-dispatcher-control/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "baseline"
 
@@ -218,13 +218,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-dispatcher-control/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-dispatcher-control/SKILL.md"
+adapter_source = ".agents/skills/gtkb-dispatcher-control/SKILL.md"
 source_sha256 = "3ba260c4f6698a1d46c0031699984f5d8464549d74252cc675830c2dac30d6c2"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-dispatcher-control/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-dispatcher-control/SKILL.md"
+adapter_source = ".agents/skills/gtkb-dispatcher-control/SKILL.md"
 source_sha256 = "3ba260c4f6698a1d46c0031699984f5d8464549d74252cc675830c2dac30d6c2"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-dispatcher-control/SKILL.md"
@@ -234,14 +234,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-dispatcher-control/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-dispatcher-control/SKILL.md"
+adapter_source = ".agents/skills/gtkb-dispatcher-control/SKILL.md"
 source_sha256 = "3ba260c4f6698a1d46c0031699984f5d8464549d74252cc675830c2dac30d6c2"
 [[capabilities]]
 id = "skill.bridge-propose"
 kind = "skill"
 canonical_name = "gtkb-bridge-propose"
 canonical_purpose = "Create bridge proposal files and bridge INDEX entries through the governed helper path."
-canonical_source = ".claude/skills/gtkb-bridge-propose/SKILL.md"
+canonical_source = ".agents/skills/gtkb-bridge-propose/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "required"
 
@@ -252,13 +252,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-bridge-propose/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-bridge-propose/SKILL.md"
+adapter_source = ".agents/skills/gtkb-bridge-propose/SKILL.md"
 source_sha256 = "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-bridge-propose/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-bridge-propose/SKILL.md"
+adapter_source = ".agents/skills/gtkb-bridge-propose/SKILL.md"
 source_sha256 = "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-bridge-propose/SKILL.md"
@@ -268,14 +268,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-bridge-propose/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-bridge-propose/SKILL.md"
+adapter_source = ".agents/skills/gtkb-bridge-propose/SKILL.md"
 source_sha256 = "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
 [[capabilities]]
 id = "skill.bridge-reconciliation"
 kind = "skill"
 canonical_name = "gtkb-bridge-reconciliation"
 canonical_purpose = "Operate the no-index bridge/backlog reconciliation workflow: read-only assess, classify, correct one class at a time, and present exactly one owner decision before any mutation."
-canonical_source = ".claude/skills/gtkb-bridge-reconciliation/SKILL.md"
+canonical_source = ".agents/skills/gtkb-bridge-reconciliation/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "baseline"
 
@@ -286,13 +286,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-bridge-reconciliation/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-bridge-reconciliation/SKILL.md"
+adapter_source = ".agents/skills/gtkb-bridge-reconciliation/SKILL.md"
 source_sha256 = "04150ef93b4c545eb5a41310e03593b8fdd564d0bf13bf4db425661cb0b6808b"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-bridge-reconciliation/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-bridge-reconciliation/SKILL.md"
+adapter_source = ".agents/skills/gtkb-bridge-reconciliation/SKILL.md"
 source_sha256 = "04150ef93b4c545eb5a41310e03593b8fdd564d0bf13bf4db425661cb0b6808b"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-bridge-reconciliation/SKILL.md"
@@ -302,14 +302,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-bridge-reconciliation/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-bridge-reconciliation/SKILL.md"
+adapter_source = ".agents/skills/gtkb-bridge-reconciliation/SKILL.md"
 source_sha256 = "04150ef93b4c545eb5a41310e03593b8fdd564d0bf13bf4db425661cb0b6808b"
 [[capabilities]]
 id = "skill.gtkb-propose"
 kind = "skill"
 canonical_name = "gtkb-propose"
 canonical_purpose = "Scaffold a structurally compliant bridge proposal body and run a self-review checklist before filing."
-canonical_source = ".claude/skills/gtkb-propose/SKILL.md"
+canonical_source = ".agents/skills/gtkb-propose/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "baseline"
 
@@ -320,13 +320,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-propose/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-propose/SKILL.md"
+adapter_source = ".agents/skills/gtkb-propose/SKILL.md"
 source_sha256 = "ed037162b4091af7814529100eb84aa3f902e8904038bdf884a2f74eb0f028a2"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-propose/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-propose/SKILL.md"
+adapter_source = ".agents/skills/gtkb-propose/SKILL.md"
 source_sha256 = "ed037162b4091af7814529100eb84aa3f902e8904038bdf884a2f74eb0f028a2"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-propose/SKILL.md"
@@ -336,14 +336,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-propose/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-propose/SKILL.md"
+adapter_source = ".agents/skills/gtkb-propose/SKILL.md"
 source_sha256 = "ed037162b4091af7814529100eb84aa3f902e8904038bdf884a2f74eb0f028a2"
 [[capabilities]]
 id = "skill.check-deliberations"
 kind = "skill"
 canonical_name = "gtkb-check-deliberations"
 canonical_purpose = "Search and cite Deliberation Archive context."
-canonical_source = ".claude/skills/gtkb-check-deliberations/SKILL.md"
+canonical_source = ".agents/skills/gtkb-check-deliberations/SKILL.md"
 required_for_roles = ["loyal-opposition", "prime-builder"]
 parity_class = "required"
 
@@ -354,13 +354,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-check-deliberations/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-check-deliberations/SKILL.md"
+adapter_source = ".agents/skills/gtkb-check-deliberations/SKILL.md"
 source_sha256 = "c0366f647fb36d34171c336bade6157dcf4c8ba33bb3a8ad82f6e0ef778526e2"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-check-deliberations/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-check-deliberations/SKILL.md"
+adapter_source = ".agents/skills/gtkb-check-deliberations/SKILL.md"
 source_sha256 = "c0366f647fb36d34171c336bade6157dcf4c8ba33bb3a8ad82f6e0ef778526e2"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-check-deliberations/SKILL.md"
@@ -370,14 +370,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-check-deliberations/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-check-deliberations/SKILL.md"
+adapter_source = ".agents/skills/gtkb-check-deliberations/SKILL.md"
 source_sha256 = "c0366f647fb36d34171c336bade6157dcf4c8ba33bb3a8ad82f6e0ef778526e2"
 [[capabilities]]
 id = "skill.code-review-audit"
 kind = "skill"
 canonical_name = "gtkb-code-review-audit"
 canonical_purpose = "Perform evidence-based implementation/code review."
-canonical_source = ".claude/skills/gtkb-code-review-audit/SKILL.md"
+canonical_source = ".agents/skills/gtkb-code-review-audit/SKILL.md"
 required_for_roles = ["loyal-opposition"]
 parity_class = "required"
 
@@ -388,13 +388,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-code-review-audit/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-code-review-audit/SKILL.md"
+adapter_source = ".agents/skills/gtkb-code-review-audit/SKILL.md"
 source_sha256 = "5e16702bbb66c6667fcc69505d254b07912288ec5538a9d932f4039a9a87be54"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-code-review-audit/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-code-review-audit/SKILL.md"
+adapter_source = ".agents/skills/gtkb-code-review-audit/SKILL.md"
 source_sha256 = "5e16702bbb66c6667fcc69505d254b07912288ec5538a9d932f4039a9a87be54"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-code-review-audit/SKILL.md"
@@ -404,14 +404,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-code-review-audit/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-code-review-audit/SKILL.md"
+adapter_source = ".agents/skills/gtkb-code-review-audit/SKILL.md"
 source_sha256 = "5e16702bbb66c6667fcc69505d254b07912288ec5538a9d932f4039a9a87be54"
 [[capabilities]]
 id = "skill.lo-opportunity-radar"
 kind = "skill"
 canonical_name = "gtkb-lo-opportunity-radar"
 canonical_purpose = "Bias Loyal Opposition review toward token-savings and deterministic-service / automation opportunities alongside defects."
-canonical_source = ".claude/skills/gtkb-lo-opportunity-radar/SKILL.md"
+canonical_source = ".agents/skills/gtkb-lo-opportunity-radar/SKILL.md"
 required_for_roles = ["loyal-opposition"]
 parity_class = "baseline"
 
@@ -422,13 +422,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-lo-opportunity-radar/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-lo-opportunity-radar/SKILL.md"
+adapter_source = ".agents/skills/gtkb-lo-opportunity-radar/SKILL.md"
 source_sha256 = "a47bfabea763756f69c20d4b4536f98eef0e408a6db115f616272d2099839d1f"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-lo-opportunity-radar/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-lo-opportunity-radar/SKILL.md"
+adapter_source = ".agents/skills/gtkb-lo-opportunity-radar/SKILL.md"
 source_sha256 = "a47bfabea763756f69c20d4b4536f98eef0e408a6db115f616272d2099839d1f"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-lo-opportunity-radar/SKILL.md"
@@ -438,14 +438,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-lo-opportunity-radar/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-lo-opportunity-radar/SKILL.md"
+adapter_source = ".agents/skills/gtkb-lo-opportunity-radar/SKILL.md"
 source_sha256 = "a47bfabea763756f69c20d4b4536f98eef0e408a6db115f616272d2099839d1f"
 [[capabilities]]
 id = "skill.codex-report"
 kind = "skill"
 canonical_name = "gtkb-loyal-opposition-report"
 canonical_purpose = "Create Codex/Loyal Opposition reports in the expected format."
-canonical_source = ".claude/skills/gtkb-loyal-opposition-report/SKILL.md"
+canonical_source = ".agents/skills/gtkb-loyal-opposition-report/SKILL.md"
 required_for_roles = ["loyal-opposition"]
 parity_class = "baseline"
 
@@ -456,13 +456,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-loyal-opposition-report/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-loyal-opposition-report/SKILL.md"
+adapter_source = ".agents/skills/gtkb-loyal-opposition-report/SKILL.md"
 source_sha256 = "b30bff47d12c25c1ee2d684d95920562c47d03d2695b96efa0236b77b10054f7"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-loyal-opposition-report/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-loyal-opposition-report/SKILL.md"
+adapter_source = ".agents/skills/gtkb-loyal-opposition-report/SKILL.md"
 source_sha256 = "b30bff47d12c25c1ee2d684d95920562c47d03d2695b96efa0236b77b10054f7"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-loyal-opposition-report/SKILL.md"
@@ -472,14 +472,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-loyal-opposition-report/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-loyal-opposition-report/SKILL.md"
+adapter_source = ".agents/skills/gtkb-loyal-opposition-report/SKILL.md"
 source_sha256 = "b30bff47d12c25c1ee2d684d95920562c47d03d2695b96efa0236b77b10054f7"
 [[capabilities]]
 id = "skill.decision-capture"
 kind = "skill"
 canonical_name = "gtkb-decision-capture"
 canonical_purpose = "Capture owner decisions and durable decision evidence."
-canonical_source = ".claude/skills/gtkb-decision-capture/SKILL.md"
+canonical_source = ".agents/skills/gtkb-decision-capture/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "required"
 
@@ -490,13 +490,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-decision-capture/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-decision-capture/SKILL.md"
+adapter_source = ".agents/skills/gtkb-decision-capture/SKILL.md"
 source_sha256 = "24d8335416edce0e9a7676250a868fed7373f79d7d6eb20fbbdc2c0397f2777b"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-decision-capture/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-decision-capture/SKILL.md"
+adapter_source = ".agents/skills/gtkb-decision-capture/SKILL.md"
 source_sha256 = "24d8335416edce0e9a7676250a868fed7373f79d7d6eb20fbbdc2c0397f2777b"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-decision-capture/SKILL.md"
@@ -506,14 +506,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-decision-capture/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-decision-capture/SKILL.md"
+adapter_source = ".agents/skills/gtkb-decision-capture/SKILL.md"
 source_sha256 = "24d8335416edce0e9a7676250a868fed7373f79d7d6eb20fbbdc2c0397f2777b"
 [[capabilities]]
 id = "skill.harness-parity-review"
 kind = "skill"
 canonical_name = "gtkb-harness-parity-review"
 canonical_purpose = "Review and correct parity across GT-KB harness capabilities, roles, skills, hooks, commands, and readiness surfaces."
-canonical_source = ".claude/skills/gtkb-harness-parity-review/SKILL.md"
+canonical_source = ".agents/skills/gtkb-harness-parity-review/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "required"
 
@@ -524,13 +524,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-harness-parity-review/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-harness-parity-review/SKILL.md"
+adapter_source = ".agents/skills/gtkb-harness-parity-review/SKILL.md"
 source_sha256 = "609a37f9545de53b3f65e1566e1e7509a0d0bd55ddab59e4c2bf563de7f295d1"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-harness-parity-review/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-harness-parity-review/SKILL.md"
+adapter_source = ".agents/skills/gtkb-harness-parity-review/SKILL.md"
 source_sha256 = "609a37f9545de53b3f65e1566e1e7509a0d0bd55ddab59e4c2bf563de7f295d1"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-harness-parity-review/SKILL.md"
@@ -540,14 +540,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-harness-parity-review/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-harness-parity-review/SKILL.md"
+adapter_source = ".agents/skills/gtkb-harness-parity-review/SKILL.md"
 source_sha256 = "609a37f9545de53b3f65e1566e1e7509a0d0bd55ddab59e4c2bf563de7f295d1"
 [[capabilities]]
 id = "skill.skill-governance-lifecycle"
 kind = "skill"
 canonical_name = "gtkb-skill-governance-lifecycle"
 canonical_purpose = "Standardize GT-KB managed-skill creation and projection across canonical skills, Codex adapters, registry declarations, manifests, tests, and bridge evidence."
-canonical_source = ".claude/skills/gtkb-skill-governance-lifecycle/SKILL.md"
+canonical_source = ".agents/skills/gtkb-skill-governance-lifecycle/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "baseline"
 
@@ -558,7 +558,7 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-skill-governance-lifecycle/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-skill-governance-lifecycle/SKILL.md"
+adapter_source = ".agents/skills/gtkb-skill-governance-lifecycle/SKILL.md"
 source_sha256 = "e30a2541f4042ca28c8f582743e380ecfda0a71cc7d3ceb58de6fd418bf1e550"
 
 [capabilities.antigravity]
@@ -572,14 +572,14 @@ reason = "WI-4839 authorizes only the canonical Claude source and generated Code
 [capabilities.goose]
 surface = ".goose/skills/gtkb-skill-governance-lifecycle/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-skill-governance-lifecycle/SKILL.md"
+adapter_source = ".agents/skills/gtkb-skill-governance-lifecycle/SKILL.md"
 source_sha256 = "e30a2541f4042ca28c8f582743e380ecfda0a71cc7d3ceb58de6fd418bf1e550"
 [[capabilities]]
 id = "skill.advisory-disposition"
 kind = "skill"
 canonical_name = "gtkb-advisory-disposition"
 canonical_purpose = "Convert Loyal Opposition advisory findings into the correct governed next artifact path without treating advisory capture as implementation approval."
-canonical_source = ".claude/skills/gtkb-advisory-disposition/SKILL.md"
+canonical_source = ".agents/skills/gtkb-advisory-disposition/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "baseline"
 
@@ -590,7 +590,7 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-advisory-disposition/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-advisory-disposition/SKILL.md"
+adapter_source = ".agents/skills/gtkb-advisory-disposition/SKILL.md"
 source_sha256 = "43a1e728f208d9ba1e484b9c715924aa47dd0b6670ef57e0814c5ad43b06a22e"
 
 [capabilities.antigravity]
@@ -604,7 +604,7 @@ reason = "WI-4840 authorizes only the canonical Claude source and generated Code
 [capabilities.goose]
 surface = ".goose/skills/gtkb-advisory-disposition/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-advisory-disposition/SKILL.md"
+adapter_source = ".agents/skills/gtkb-advisory-disposition/SKILL.md"
 source_sha256 = "43a1e728f208d9ba1e484b9c715924aa47dd0b6670ef57e0814c5ad43b06a22e"
 
 [[capabilities]]
@@ -612,7 +612,7 @@ id = "skill.advisory-proposal"
 kind = "skill"
 canonical_name = "gtkb-advisory-proposal"
 canonical_purpose = "Draft Loyal Opposition ADVISORY bridge entries from reusable external or peer solutions while preserving owner confirmation and non-approval semantics."
-canonical_source = ".claude/skills/gtkb-advisory-proposal/SKILL.md"
+canonical_source = ".agents/skills/gtkb-advisory-proposal/SKILL.md"
 required_for_roles = ["loyal-opposition"]
 parity_class = "baseline"
 
@@ -623,7 +623,7 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-advisory-proposal/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-advisory-proposal/SKILL.md"
+adapter_source = ".agents/skills/gtkb-advisory-proposal/SKILL.md"
 source_sha256 = "a1985ec2b71ab6a2aab6914854ae82194e3fe7930e17a458cbcc02c853931805"
 
 [capabilities.antigravity]
@@ -645,7 +645,7 @@ reason = "WI-5055 authorizes only the canonical Claude source and generated Code
 [capabilities.goose]
 surface = ".goose/skills/gtkb-advisory-proposal/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-advisory-proposal/SKILL.md"
+adapter_source = ".agents/skills/gtkb-advisory-proposal/SKILL.md"
 source_sha256 = "a1985ec2b71ab6a2aab6914854ae82194e3fe7930e17a458cbcc02c853931805"
 
 [[capabilities]]
@@ -653,7 +653,7 @@ id = "skill.advisory-intake"
 kind = "skill"
 canonical_name = "gtkb-advisory-intake"
 canonical_purpose = "Consume live ADVISORY entries through Prime Builder owner-grilling, explicit project/work-item approval, and child proposal filing without treating advisories as implementation approval."
-canonical_source = ".claude/skills/gtkb-advisory-intake/SKILL.md"
+canonical_source = ".agents/skills/gtkb-advisory-intake/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "baseline"
 
@@ -664,7 +664,7 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-advisory-intake/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-advisory-intake/SKILL.md"
+adapter_source = ".agents/skills/gtkb-advisory-intake/SKILL.md"
 source_sha256 = "25e4f360c5fb6bef91601c183e8df217b4eebf4008e7555d6527f1f2a8ab870e"
 
 [capabilities.antigravity]
@@ -686,7 +686,7 @@ reason = "WI-5056 authorizes only the canonical Claude source and generated Code
 [capabilities.goose]
 surface = ".goose/skills/gtkb-advisory-intake/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-advisory-intake/SKILL.md"
+adapter_source = ".agents/skills/gtkb-advisory-intake/SKILL.md"
 source_sha256 = "25e4f360c5fb6bef91601c183e8df217b4eebf4008e7555d6527f1f2a8ab870e"
 
 [[capabilities]]
@@ -694,7 +694,7 @@ id = "skill.kb-adr"
 kind = "skill"
 canonical_name = "gtkb-adr"
 canonical_purpose = "Create or update ADR-related KB artifacts."
-canonical_source = ".claude/skills/gtkb-adr/SKILL.md"
+canonical_source = ".agents/skills/gtkb-adr/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "baseline"
 
@@ -705,13 +705,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-adr/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-adr/SKILL.md"
+adapter_source = ".agents/skills/gtkb-adr/SKILL.md"
 source_sha256 = "4b1ec3c66407daa82cd66a84eefe1e2ed6e8d83cc4a4d7e0f7383bb7dd03b969"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-adr/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-adr/SKILL.md"
+adapter_source = ".agents/skills/gtkb-adr/SKILL.md"
 source_sha256 = "4b1ec3c66407daa82cd66a84eefe1e2ed6e8d83cc4a4d7e0f7383bb7dd03b969"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-adr/SKILL.md"
@@ -721,14 +721,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-adr/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-adr/SKILL.md"
+adapter_source = ".agents/skills/gtkb-adr/SKILL.md"
 source_sha256 = "4b1ec3c66407daa82cd66a84eefe1e2ed6e8d83cc4a4d7e0f7383bb7dd03b969"
 [[capabilities]]
 id = "skill.kb-assert"
 kind = "skill"
 canonical_name = "gtkb-assert"
 canonical_purpose = "Run or reason about KB assertion workflows."
-canonical_source = ".claude/skills/gtkb-assert/SKILL.md"
+canonical_source = ".agents/skills/gtkb-assert/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "baseline"
 
@@ -739,13 +739,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-assert/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-assert/SKILL.md"
+adapter_source = ".agents/skills/gtkb-assert/SKILL.md"
 source_sha256 = "21efa5bb54ede144061770a326b29632a6139d935c85e0fa3d6d4aefb85cbcdf"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-assert/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-assert/SKILL.md"
+adapter_source = ".agents/skills/gtkb-assert/SKILL.md"
 source_sha256 = "21efa5bb54ede144061770a326b29632a6139d935c85e0fa3d6d4aefb85cbcdf"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-assert/SKILL.md"
@@ -755,14 +755,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-assert/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-assert/SKILL.md"
+adapter_source = ".agents/skills/gtkb-assert/SKILL.md"
 source_sha256 = "21efa5bb54ede144061770a326b29632a6139d935c85e0fa3d6d4aefb85cbcdf"
 [[capabilities]]
 id = "skill.kb-batch"
 kind = "skill"
 canonical_name = "gtkb-batch"
 canonical_purpose = "Perform batch KB operations."
-canonical_source = ".claude/skills/gtkb-batch/SKILL.md"
+canonical_source = ".agents/skills/gtkb-batch/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "baseline"
 
@@ -773,13 +773,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-batch/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-batch/SKILL.md"
+adapter_source = ".agents/skills/gtkb-batch/SKILL.md"
 source_sha256 = "e3269505c142a81126c6615619d06b9f1156253b1cf88bbb71d272e42fd2df7c"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-batch/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-batch/SKILL.md"
+adapter_source = ".agents/skills/gtkb-batch/SKILL.md"
 source_sha256 = "e3269505c142a81126c6615619d06b9f1156253b1cf88bbb71d272e42fd2df7c"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-batch/SKILL.md"
@@ -789,14 +789,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-batch/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-batch/SKILL.md"
+adapter_source = ".agents/skills/gtkb-batch/SKILL.md"
 source_sha256 = "e3269505c142a81126c6615619d06b9f1156253b1cf88bbb71d272e42fd2df7c"
 [[capabilities]]
 id = "skill.kb-promote"
 kind = "skill"
 canonical_name = "gtkb-promote"
 canonical_purpose = "Promote KB artifacts through governed lifecycle steps."
-canonical_source = ".claude/skills/gtkb-promote/SKILL.md"
+canonical_source = ".agents/skills/gtkb-promote/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "baseline"
 
@@ -807,13 +807,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-promote/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-promote/SKILL.md"
+adapter_source = ".agents/skills/gtkb-promote/SKILL.md"
 source_sha256 = "5dab12bd288a3ce3d126c30d2670322617121432fcd7d0a38b7fdc93bed2e7cb"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-promote/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-promote/SKILL.md"
+adapter_source = ".agents/skills/gtkb-promote/SKILL.md"
 source_sha256 = "5dab12bd288a3ce3d126c30d2670322617121432fcd7d0a38b7fdc93bed2e7cb"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-promote/SKILL.md"
@@ -823,14 +823,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-promote/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-promote/SKILL.md"
+adapter_source = ".agents/skills/gtkb-promote/SKILL.md"
 source_sha256 = "5dab12bd288a3ce3d126c30d2670322617121432fcd7d0a38b7fdc93bed2e7cb"
 [[capabilities]]
 id = "skill.kb-query"
 kind = "skill"
 canonical_name = "gtkb-query"
 canonical_purpose = "Query KB/MemBase state."
-canonical_source = ".claude/skills/gtkb-query/SKILL.md"
+canonical_source = ".agents/skills/gtkb-query/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "required"
 
@@ -841,13 +841,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-query/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-query/SKILL.md"
+adapter_source = ".agents/skills/gtkb-query/SKILL.md"
 source_sha256 = "f694720b346a85a5c239cb5aa03c01b18f819b33aa10a43aaff76eb46b8d1ca5"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-query/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-query/SKILL.md"
+adapter_source = ".agents/skills/gtkb-query/SKILL.md"
 source_sha256 = "f694720b346a85a5c239cb5aa03c01b18f819b33aa10a43aaff76eb46b8d1ca5"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-query/SKILL.md"
@@ -857,14 +857,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-query/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-query/SKILL.md"
+adapter_source = ".agents/skills/gtkb-query/SKILL.md"
 source_sha256 = "f694720b346a85a5c239cb5aa03c01b18f819b33aa10a43aaff76eb46b8d1ca5"
 [[capabilities]]
 id = "skill.kb-session-wrap"
 kind = "skill"
 canonical_name = "gtkb-session-wrap"
 canonical_purpose = "Perform governed session wrap-up."
-canonical_source = ".claude/skills/gtkb-session-wrap/SKILL.md"
+canonical_source = ".agents/skills/gtkb-session-wrap/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "baseline"
 
@@ -875,13 +875,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-session-wrap/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-session-wrap/SKILL.md"
+adapter_source = ".agents/skills/gtkb-session-wrap/SKILL.md"
 source_sha256 = "6680210122f77b617608d543ebc53e0674a89dc418f552bbe09976d893166575"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-session-wrap/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-session-wrap/SKILL.md"
+adapter_source = ".agents/skills/gtkb-session-wrap/SKILL.md"
 source_sha256 = "6680210122f77b617608d543ebc53e0674a89dc418f552bbe09976d893166575"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-session-wrap/SKILL.md"
@@ -891,14 +891,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-session-wrap/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-session-wrap/SKILL.md"
+adapter_source = ".agents/skills/gtkb-session-wrap/SKILL.md"
 source_sha256 = "6680210122f77b617608d543ebc53e0674a89dc418f552bbe09976d893166575"
 [[capabilities]]
 id = "skill.kb-session-wrap-scan"
 kind = "skill"
 canonical_name = "gtkb-session-wrap-scan"
 canonical_purpose = "Scan for session wrap-up hygiene and carryover."
-canonical_source = ".claude/skills/gtkb-session-wrap-scan/SKILL.md"
+canonical_source = ".agents/skills/gtkb-session-wrap-scan/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "baseline"
 
@@ -909,13 +909,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-session-wrap-scan/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-session-wrap-scan/SKILL.md"
+adapter_source = ".agents/skills/gtkb-session-wrap-scan/SKILL.md"
 source_sha256 = "9468768273e151445af117755950d0467a8bd19d1e0357e61639cf41c2dfd83e"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-session-wrap-scan/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-session-wrap-scan/SKILL.md"
+adapter_source = ".agents/skills/gtkb-session-wrap-scan/SKILL.md"
 source_sha256 = "9468768273e151445af117755950d0467a8bd19d1e0357e61639cf41c2dfd83e"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-session-wrap-scan/SKILL.md"
@@ -925,14 +925,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-session-wrap-scan/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-session-wrap-scan/SKILL.md"
+adapter_source = ".agents/skills/gtkb-session-wrap-scan/SKILL.md"
 source_sha256 = "9468768273e151445af117755950d0467a8bd19d1e0357e61639cf41c2dfd83e"
 [[capabilities]]
 id = "skill.kb-spec"
 kind = "skill"
 canonical_name = "gtkb-spec"
 canonical_purpose = "Create or update specification artifacts."
-canonical_source = ".claude/skills/gtkb-spec/SKILL.md"
+canonical_source = ".agents/skills/gtkb-spec/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "required"
 
@@ -943,13 +943,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-spec/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-spec/SKILL.md"
+adapter_source = ".agents/skills/gtkb-spec/SKILL.md"
 source_sha256 = "7430be6a9e5c424a3f27a71fe2b9f7580085f59858bcb1176252a095b67755ac"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-spec/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-spec/SKILL.md"
+adapter_source = ".agents/skills/gtkb-spec/SKILL.md"
 source_sha256 = "7430be6a9e5c424a3f27a71fe2b9f7580085f59858bcb1176252a095b67755ac"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-spec/SKILL.md"
@@ -959,14 +959,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-spec/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-spec/SKILL.md"
+adapter_source = ".agents/skills/gtkb-spec/SKILL.md"
 source_sha256 = "7430be6a9e5c424a3f27a71fe2b9f7580085f59858bcb1176252a095b67755ac"
 [[capabilities]]
 id = "skill.kb-work-item"
 kind = "skill"
 canonical_name = "gtkb-work-item"
 canonical_purpose = "Create and update MemBase work items."
-canonical_source = ".claude/skills/gtkb-work-item/SKILL.md"
+canonical_source = ".agents/skills/gtkb-work-item/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "required"
 
@@ -977,13 +977,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-work-item/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-work-item/SKILL.md"
+adapter_source = ".agents/skills/gtkb-work-item/SKILL.md"
 source_sha256 = "b3b4a36c21530da6cc31470583a8baf3a9d1f4da19c579941d6df76085cee015"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-work-item/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-work-item/SKILL.md"
+adapter_source = ".agents/skills/gtkb-work-item/SKILL.md"
 source_sha256 = "b3b4a36c21530da6cc31470583a8baf3a9d1f4da19c579941d6df76085cee015"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-work-item/SKILL.md"
@@ -993,14 +993,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-work-item/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-work-item/SKILL.md"
+adapter_source = ".agents/skills/gtkb-work-item/SKILL.md"
 source_sha256 = "b3b4a36c21530da6cc31470583a8baf3a9d1f4da19c579941d6df76085cee015"
 [[capabilities]]
 id = "skill.projects"
 kind = "skill"
 canonical_name = "gtkb-projects"
 canonical_purpose = "Operate MemBase-backed first-class project lifecycle commands without creating a second backlog authority."
-canonical_source = ".claude/skills/gtkb-projects/SKILL.md"
+canonical_source = ".agents/skills/gtkb-projects/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "required"
 
@@ -1011,13 +1011,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-projects/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-projects/SKILL.md"
+adapter_source = ".agents/skills/gtkb-projects/SKILL.md"
 source_sha256 = "17a2b01dd84becb7fe48487ef8ddff092f7b4897a16092406fb9b956f1394c2e"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-projects/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-projects/SKILL.md"
+adapter_source = ".agents/skills/gtkb-projects/SKILL.md"
 source_sha256 = "17a2b01dd84becb7fe48487ef8ddff092f7b4897a16092406fb9b956f1394c2e"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-projects/SKILL.md"
@@ -1027,14 +1027,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-projects/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-projects/SKILL.md"
+adapter_source = ".agents/skills/gtkb-projects/SKILL.md"
 source_sha256 = "17a2b01dd84becb7fe48487ef8ddff092f7b4897a16092406fb9b956f1394c2e"
 [[capabilities]]
 id = "skill.proposal-review"
 kind = "skill"
 canonical_name = "gtkb-proposal-review"
 canonical_purpose = "Review implementation proposals."
-canonical_source = ".claude/skills/gtkb-proposal-review/SKILL.md"
+canonical_source = ".agents/skills/gtkb-proposal-review/SKILL.md"
 required_for_roles = ["loyal-opposition"]
 parity_class = "required"
 
@@ -1045,14 +1045,14 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-proposal-review/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-proposal-review/SKILL.md"
-source_sha256 = "2fa418d270b95d5c03995720375bacba6a6d3250475298c39918c30db95b9ec8"
+adapter_source = ".agents/skills/gtkb-proposal-review/SKILL.md"
+source_sha256 = "127b55f6e266ba9b92eff6ca71a9c669566957cf1de37c3da65a6d9a978a1367"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-proposal-review/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-proposal-review/SKILL.md"
-source_sha256 = "2fa418d270b95d5c03995720375bacba6a6d3250475298c39918c30db95b9ec8"
+adapter_source = ".agents/skills/gtkb-proposal-review/SKILL.md"
+source_sha256 = "127b55f6e266ba9b92eff6ca71a9c669566957cf1de37c3da65a6d9a978a1367"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-proposal-review/SKILL.md"
 status = "fallback"
@@ -1061,14 +1061,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-proposal-review/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-proposal-review/SKILL.md"
-source_sha256 = "2fa418d270b95d5c03995720375bacba6a6d3250475298c39918c30db95b9ec8"
+adapter_source = ".agents/skills/gtkb-proposal-review/SKILL.md"
+source_sha256 = "127b55f6e266ba9b92eff6ca71a9c669566957cf1de37c3da65a6d9a978a1367"
 [[capabilities]]
 id = "skill.release-candidate-gate"
 kind = "skill"
 canonical_name = "gtkb-release-candidate-gate"
 canonical_purpose = "Run and interpret release-candidate gate evidence."
-canonical_source = ".claude/skills/gtkb-release-candidate-gate/SKILL.md"
+canonical_source = ".agents/skills/gtkb-release-candidate-gate/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "required"
 
@@ -1079,13 +1079,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-release-candidate-gate/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-release-candidate-gate/SKILL.md"
+adapter_source = ".agents/skills/gtkb-release-candidate-gate/SKILL.md"
 source_sha256 = "dc064edf4e9d291b640d0261bbd2293b24f37093f7bbc59127ed90ac997287b9"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-release-candidate-gate/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-release-candidate-gate/SKILL.md"
+adapter_source = ".agents/skills/gtkb-release-candidate-gate/SKILL.md"
 source_sha256 = "dc064edf4e9d291b640d0261bbd2293b24f37093f7bbc59127ed90ac997287b9"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-release-candidate-gate/SKILL.md"
@@ -1095,14 +1095,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-release-candidate-gate/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-release-candidate-gate/SKILL.md"
+adapter_source = ".agents/skills/gtkb-release-candidate-gate/SKILL.md"
 source_sha256 = "dc064edf4e9d291b640d0261bbd2293b24f37093f7bbc59127ed90ac997287b9"
 [[capabilities]]
 id = "skill.send-review"
 kind = "skill"
 canonical_name = "gtkb-send-review"
 canonical_purpose = "Send or format review outputs for counterpart handoff."
-canonical_source = ".claude/skills/gtkb-send-review/SKILL.md"
+canonical_source = ".agents/skills/gtkb-send-review/SKILL.md"
 required_for_roles = ["loyal-opposition"]
 parity_class = "baseline"
 
@@ -1113,13 +1113,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-send-review/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-send-review/SKILL.md"
+adapter_source = ".agents/skills/gtkb-send-review/SKILL.md"
 source_sha256 = "aa6437097d9fdcbb5b2368367e48b93b805b7082703edcc0fe4f720ae98eb7b2"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-send-review/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-send-review/SKILL.md"
+adapter_source = ".agents/skills/gtkb-send-review/SKILL.md"
 source_sha256 = "aa6437097d9fdcbb5b2368367e48b93b805b7082703edcc0fe4f720ae98eb7b2"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-send-review/SKILL.md"
@@ -1129,14 +1129,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-send-review/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-send-review/SKILL.md"
+adapter_source = ".agents/skills/gtkb-send-review/SKILL.md"
 source_sha256 = "aa6437097d9fdcbb5b2368367e48b93b805b7082703edcc0fe4f720ae98eb7b2"
 [[capabilities]]
 id = "skill.spec-intake"
 kind = "skill"
 canonical_name = "gtkb-spec-intake"
 canonical_purpose = "Capture owner requirement/specification intake."
-canonical_source = ".claude/skills/gtkb-spec-intake/SKILL.md"
+canonical_source = ".agents/skills/gtkb-spec-intake/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "required"
 
@@ -1147,13 +1147,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-spec-intake/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-spec-intake/SKILL.md"
+adapter_source = ".agents/skills/gtkb-spec-intake/SKILL.md"
 source_sha256 = "aa9090907a86ca0c1a05844ce51e509c66bdfe013ffa95b4ba4d5a3cf48ca111"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-spec-intake/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-spec-intake/SKILL.md"
+adapter_source = ".agents/skills/gtkb-spec-intake/SKILL.md"
 source_sha256 = "aa9090907a86ca0c1a05844ce51e509c66bdfe013ffa95b4ba4d5a3cf48ca111"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-spec-intake/SKILL.md"
@@ -1163,14 +1163,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-spec-intake/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-spec-intake/SKILL.md"
+adapter_source = ".agents/skills/gtkb-spec-intake/SKILL.md"
 source_sha256 = "aa9090907a86ca0c1a05844ce51e509c66bdfe013ffa95b4ba4d5a3cf48ca111"
 [[capabilities]]
 id = "skill.structural-hygiene-review"
 kind = "skill"
 canonical_name = "gtkb-structural-hygiene-review"
 canonical_purpose = "Review and correct structural/naming/source-of-truth cues that can mislead agents."
-canonical_source = ".claude/skills/gtkb-structural-hygiene-review/SKILL.md"
+canonical_source = ".agents/skills/gtkb-structural-hygiene-review/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "required"
 
@@ -1181,13 +1181,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-structural-hygiene-review/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-structural-hygiene-review/SKILL.md"
+adapter_source = ".agents/skills/gtkb-structural-hygiene-review/SKILL.md"
 source_sha256 = "13de9e2f85addc7faa602baf9312bf00538d5bb33e4270036146052da0b1309b"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-structural-hygiene-review/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-structural-hygiene-review/SKILL.md"
+adapter_source = ".agents/skills/gtkb-structural-hygiene-review/SKILL.md"
 source_sha256 = "13de9e2f85addc7faa602baf9312bf00538d5bb33e4270036146052da0b1309b"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-structural-hygiene-review/SKILL.md"
@@ -1197,7 +1197,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-structural-hygiene-review/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-structural-hygiene-review/SKILL.md"
+adapter_source = ".agents/skills/gtkb-structural-hygiene-review/SKILL.md"
 source_sha256 = "13de9e2f85addc7faa602baf9312bf00538d5bb33e4270036146052da0b1309b"
 [[capabilities]]
 id = "hook.advisory-router-scan"
@@ -1264,7 +1264,7 @@ id = "skill.gtkb-benchmarks"
 kind = "skill"
 canonical_name = "gtkb-benchmarks"
 canonical_purpose = "Run GT-KB read-only measurement benchmarks (assertion signal/noise, advisory latency, deliberation recall, linkage heat map, recall coverage, tool identification). Outputs JSON plus markdown summary."
-canonical_source = ".claude/skills/gtkb-benchmarks/SKILL.md"
+canonical_source = ".agents/skills/gtkb-benchmarks/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "baseline"
 
@@ -1275,13 +1275,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-benchmarks/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-benchmarks/SKILL.md"
+adapter_source = ".agents/skills/gtkb-benchmarks/SKILL.md"
 source_sha256 = "31a83117293b282f51310b01c097559e0c6d4b91c91d90b6ca19aa8a1b837d79"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-benchmarks/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-benchmarks/SKILL.md"
+adapter_source = ".agents/skills/gtkb-benchmarks/SKILL.md"
 source_sha256 = "31a83117293b282f51310b01c097559e0c6d4b91c91d90b6ca19aa8a1b837d79"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-benchmarks/SKILL.md"
@@ -1291,14 +1291,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-benchmarks/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-benchmarks/SKILL.md"
+adapter_source = ".agents/skills/gtkb-benchmarks/SKILL.md"
 source_sha256 = "31a83117293b282f51310b01c097559e0c6d4b91c91d90b6ca19aa8a1b837d79"
 [[capabilities]]
 id = "skill.grill-me-for-clarification"
 kind = "skill"
 canonical_name = "gtkb-grill-me-for-clarification"
 canonical_purpose = "Interview the owner one question at a time down a dependency-ordered decision tree until shared understanding, resolving codebase-answerable questions by exploration and persisting each resolved branch via gtkb-decision-capture or gtkb-spec-intake."
-canonical_source = ".claude/skills/gtkb-grill-me-for-clarification/SKILL.md"
+canonical_source = ".agents/skills/gtkb-grill-me-for-clarification/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "baseline"
 
@@ -1309,13 +1309,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-grill-me-for-clarification/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-grill-me-for-clarification/SKILL.md"
+adapter_source = ".agents/skills/gtkb-grill-me-for-clarification/SKILL.md"
 source_sha256 = "781e7752a6cdd0332b99971534b64b36cad4d10652926d520b54e83c02678c08"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-grill-me-for-clarification/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-grill-me-for-clarification/SKILL.md"
+adapter_source = ".agents/skills/gtkb-grill-me-for-clarification/SKILL.md"
 source_sha256 = "781e7752a6cdd0332b99971534b64b36cad4d10652926d520b54e83c02678c08"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-grill-me-for-clarification/SKILL.md"
@@ -1325,14 +1325,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-grill-me-for-clarification/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-grill-me-for-clarification/SKILL.md"
+adapter_source = ".agents/skills/gtkb-grill-me-for-clarification/SKILL.md"
 source_sha256 = "781e7752a6cdd0332b99971534b64b36cad4d10652926d520b54e83c02678c08"
 [[capabilities]]
 id = "skill.gtkb-hygiene-investigation"
 kind = "skill"
 canonical_name = "gtkb-hygiene-investigation"
 canonical_purpose = "Run a repeatable full-coverage GT-KB hygiene/architecture investigation via the 4-round probe method with loop-until-dry; render a chunked report and diff against the HYG-001..068 baseline registry."
-canonical_source = ".claude/skills/gtkb-hygiene-investigation/SKILL.md"
+canonical_source = ".agents/skills/gtkb-hygiene-investigation/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "baseline"
 
@@ -1343,13 +1343,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-hygiene-investigation/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-hygiene-investigation/SKILL.md"
+adapter_source = ".agents/skills/gtkb-hygiene-investigation/SKILL.md"
 source_sha256 = "4474b3c97a78fd01896fc2c02dec4a36b1d3d158f43e8f1d97a97ea14b832e94"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-hygiene-investigation/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-hygiene-investigation/SKILL.md"
+adapter_source = ".agents/skills/gtkb-hygiene-investigation/SKILL.md"
 source_sha256 = "4474b3c97a78fd01896fc2c02dec4a36b1d3d158f43e8f1d97a97ea14b832e94"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-hygiene-investigation/SKILL.md"
@@ -1359,14 +1359,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-hygiene-investigation/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-hygiene-investigation/SKILL.md"
+adapter_source = ".agents/skills/gtkb-hygiene-investigation/SKILL.md"
 source_sha256 = "4474b3c97a78fd01896fc2c02dec4a36b1d3d158f43e8f1d97a97ea14b832e94"
 [[capabilities]]
 id = "skill.gtkb-hygiene-sweep"
 kind = "skill"
 canonical_name = "gtkb-hygiene-sweep"
 canonical_purpose = "Orchestrate gt hygiene sweep CLI; classify findings; guide owner-gated remediation child-bridge filing."
-canonical_source = ".claude/skills/gtkb-hygiene-sweep/SKILL.md"
+canonical_source = ".agents/skills/gtkb-hygiene-sweep/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "baseline"
 
@@ -1377,13 +1377,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-hygiene-sweep/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-hygiene-sweep/SKILL.md"
+adapter_source = ".agents/skills/gtkb-hygiene-sweep/SKILL.md"
 source_sha256 = "97ccc96744186df7ddb9a7548d15b64dc413c42cbde5909d99f87ab9ceb7465c"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-hygiene-sweep/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-hygiene-sweep/SKILL.md"
+adapter_source = ".agents/skills/gtkb-hygiene-sweep/SKILL.md"
 source_sha256 = "97ccc96744186df7ddb9a7548d15b64dc413c42cbde5909d99f87ab9ceb7465c"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-hygiene-sweep/SKILL.md"
@@ -1393,7 +1393,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-hygiene-sweep/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-hygiene-sweep/SKILL.md"
+adapter_source = ".agents/skills/gtkb-hygiene-sweep/SKILL.md"
 source_sha256 = "97ccc96744186df7ddb9a7548d15b64dc413c42cbde5909d99f87ab9ceb7465c"
 
 [[capabilities]]
@@ -1401,7 +1401,7 @@ id = "skill.gtkb-hygiene-reclaim"
 kind = "skill"
 canonical_name = "gtkb-hygiene-reclaim"
 canonical_purpose = "Ops-envelope-only deep cleaning: plan deterministic hygiene candidates, inspect immutable history, and autonomously trash/purge receipted payloads through the production gt CLI until GT-KB is clean."
-canonical_source = ".claude/skills/gtkb-hygiene-reclaim/SKILL.md"
+canonical_source = ".agents/skills/gtkb-hygiene-reclaim/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "baseline"
 
@@ -1412,7 +1412,7 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-hygiene-reclaim/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-hygiene-reclaim/SKILL.md"
+adapter_source = ".agents/skills/gtkb-hygiene-reclaim/SKILL.md"
 source_sha256 = "0b928d4c238f7ad893bc194569f0be4c175ff71c32910d26baebb11d4b7cc152"
 
 [capabilities.antigravity]
@@ -1434,7 +1434,7 @@ reason = "WI-5142 phase 1 authorizes only the canonical Claude source and genera
 [capabilities.goose]
 surface = ".goose/skills/gtkb-hygiene-reclaim/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-hygiene-reclaim/SKILL.md"
+adapter_source = ".agents/skills/gtkb-hygiene-reclaim/SKILL.md"
 source_sha256 = "0b928d4c238f7ad893bc194569f0be4c175ff71c32910d26baebb11d4b7cc152"
 
 [[capabilities]]
@@ -1442,7 +1442,7 @@ id = "skill.gtkb-sweep-commit"
 kind = "skill"
 canonical_name = "gtkb-sweep-commit"
 canonical_purpose = "Sweep and locally commit all current non-ignored GroundTruth-KB worktree changes after owner authorization, satisfying repo governance hooks and verification before committing."
-canonical_source = ".claude/skills/gtkb-sweep-commit/SKILL.md"
+canonical_source = ".agents/skills/gtkb-sweep-commit/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "baseline"
 
@@ -1453,13 +1453,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-sweep-commit/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-sweep-commit/SKILL.md"
+adapter_source = ".agents/skills/gtkb-sweep-commit/SKILL.md"
 source_sha256 = "fc4b1626c9eeeb2eee79565165160453668a6236f91f9582828873283ac679ef"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-sweep-commit/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-sweep-commit/SKILL.md"
+adapter_source = ".agents/skills/gtkb-sweep-commit/SKILL.md"
 source_sha256 = "fc4b1626c9eeeb2eee79565165160453668a6236f91f9582828873283ac679ef"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-sweep-commit/SKILL.md"
@@ -1469,14 +1469,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-sweep-commit/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-sweep-commit/SKILL.md"
+adapter_source = ".agents/skills/gtkb-sweep-commit/SKILL.md"
 source_sha256 = "fc4b1626c9eeeb2eee79565165160453668a6236f91f9582828873283ac679ef"
 [[capabilities]]
 id = "skill.loyal-opposition-hygiene-assessment"
 kind = "skill"
 canonical_name = "gtkb-lo-hygiene-assessment"
 canonical_purpose = "Assess GT-KB project hygiene as Loyal Opposition, classify drift, and prepare a Prime Builder action plan without mutating project files."
-canonical_source = ".claude/skills/gtkb-lo-hygiene-assessment/SKILL.md"
+canonical_source = ".agents/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 required_for_roles = ["loyal-opposition"]
 parity_class = "baseline"
 
@@ -1487,13 +1487,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-lo-hygiene-assessment/SKILL.md"
+adapter_source = ".agents/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 source_sha256 = "69d66578cd14cbe3e807cd6a6a93c973e08dc8566a3734cfd773568bc7feaa9c"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-lo-hygiene-assessment/SKILL.md"
+adapter_source = ".agents/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 source_sha256 = "69d66578cd14cbe3e807cd6a6a93c973e08dc8566a3734cfd773568bc7feaa9c"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-lo-hygiene-assessment/SKILL.md"
@@ -1503,14 +1503,14 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-lo-hygiene-assessment/SKILL.md"
+adapter_source = ".agents/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 source_sha256 = "69d66578cd14cbe3e807cd6a6a93c973e08dc8566a3734cfd773568bc7feaa9c"
 [[capabilities]]
 id = "skill.verify"
 kind = "skill"
 canonical_name = "gtkb-verify"
 canonical_purpose = "Author a Loyal Opposition post-implementation VERIFIED/NO-GO verdict file that satisfies the Mandatory Specification-Derived Verification Gate."
-canonical_source = ".claude/skills/gtkb-verify/SKILL.md"
+canonical_source = ".agents/skills/gtkb-verify/SKILL.md"
 required_for_roles = ["loyal-opposition"]
 parity_class = "baseline"
 
@@ -1521,14 +1521,14 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-verify/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-verify/SKILL.md"
-source_sha256 = "d0f13dc12f946f44c8a1536d3734d64e85c35c5a3bdaa5789a96cbf4c965d1e4"
+adapter_source = ".agents/skills/gtkb-verify/SKILL.md"
+source_sha256 = "4472d09d17bed20105c5c862d86e6d73541d01c60d66707d24fee29bf0fc9eeb"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-verify/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-verify/SKILL.md"
-source_sha256 = "d0f13dc12f946f44c8a1536d3734d64e85c35c5a3bdaa5789a96cbf4c965d1e4"
+adapter_source = ".agents/skills/gtkb-verify/SKILL.md"
+source_sha256 = "4472d09d17bed20105c5c862d86e6d73541d01c60d66707d24fee29bf0fc9eeb"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-verify/SKILL.md"
 status = "fallback"
@@ -1537,8 +1537,8 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [capabilities.goose]
 surface = ".goose/skills/gtkb-verify/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-verify/SKILL.md"
-source_sha256 = "d0f13dc12f946f44c8a1536d3734d64e85c35c5a3bdaa5789a96cbf4c965d1e4"
+adapter_source = ".agents/skills/gtkb-verify/SKILL.md"
+source_sha256 = "4472d09d17bed20105c5c862d86e6d73541d01c60d66707d24fee29bf0fc9eeb"
 [[capabilities]]
 id = "hook.directive-enforcement"
 kind = "hook"
@@ -2393,7 +2393,7 @@ id = "skill.formal-artifact-packet-helper"
 kind = "skill"
 canonical_name = "gtkb-formal-artifact-packet-helper"
 canonical_purpose = "Generate and validate formal-artifact approval packets with stable LF normalization and the canonical required fields, referencing the live gate as sole authority."
-canonical_source = ".claude/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
+canonical_source = ".agents/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "baseline"
 
@@ -2404,7 +2404,7 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
+adapter_source = ".agents/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
 source_sha256 = "8fba2488531fb05a5e07dc07bfcd94eb62fc7fa891072ee8e57ffdb6949fff0f"
 
 [capabilities.antigravity]
@@ -2426,7 +2426,7 @@ reason = "OpenRouter is a provider harness and does not execute repo-local manag
 [capabilities.goose]
 surface = ".goose/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
+adapter_source = ".agents/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
 source_sha256 = "8fba2488531fb05a5e07dc07bfcd94eb62fc7fa891072ee8e57ffdb6949fff0f"
 
 [[capabilities]]
@@ -2434,7 +2434,7 @@ id = "skill.managed-skill-adoption-review"
 kind = "skill"
 canonical_name = "gtkb-managed-skill-adoption-review"
 canonical_purpose = "Structural review of managed-artifact proposals (skill, template, or adopter) for registry authority, target-path completeness, and stale-assumption detection before proposal filing."
-canonical_source = ".claude/skills/gtkb-managed-skill-adoption-review/SKILL.md"
+canonical_source = ".agents/skills/gtkb-managed-skill-adoption-review/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "baseline"
 
@@ -2445,13 +2445,13 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/skills/gtkb-managed-skill-adoption-review/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-managed-skill-adoption-review/SKILL.md"
+adapter_source = ".agents/skills/gtkb-managed-skill-adoption-review/SKILL.md"
 source_sha256 = "ab7cfdd90ddbeeee51b48dc546b3b092823736802c7bcc87c3cf368f3039e6b3"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-managed-skill-adoption-review/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-managed-skill-adoption-review/SKILL.md"
+adapter_source = ".agents/skills/gtkb-managed-skill-adoption-review/SKILL.md"
 source_sha256 = "ab7cfdd90ddbeeee51b48dc546b3b092823736802c7bcc87c3cf368f3039e6b3"
 
 [capabilities.cursor]
@@ -2473,5 +2473,5 @@ reason = "Alibaba Cloud Studio is a provider harness and does not execute repo-l
 [capabilities.goose]
 surface = ".goose/skills/gtkb-managed-skill-adoption-review/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/gtkb-managed-skill-adoption-review/SKILL.md"
+adapter_source = ".agents/skills/gtkb-managed-skill-adoption-review/SKILL.md"
 source_sha256 = "ab7cfdd90ddbeeee51b48dc546b3b092823736802c7bcc87c3cf368f3039e6b3"

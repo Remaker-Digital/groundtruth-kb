@@ -30,7 +30,7 @@ RESOURCE_DIRECTORY_NAMES = ("references", "helpers")
 RESOURCE_EXCLUDED_DIRECTORY_NAMES = frozenset({"__pycache__"})
 RESOURCE_EXCLUDED_PREFIXES = ("_temp_", "tmp_", "draft-", "draft_")
 RESOURCE_EXCLUDED_SUFFIXES = frozenset({".pyc", ".pyo"})
-SLASH_CANONICAL_HELPER_PATH_RE = re.compile(r"\.claude/skills/([^/\s`\"')]+)/helpers/")
+SLASH_CANONICAL_HELPER_PATH_RE = re.compile(r"\.agents/skills/([^/\s`\"')]+)/helpers/")
 BACKSLASH_CANONICAL_HELPER_PATH_RE = re.compile(r"\.claude\\skills\\([^\\\s`\"')]+)\\helpers\\")
 
 
