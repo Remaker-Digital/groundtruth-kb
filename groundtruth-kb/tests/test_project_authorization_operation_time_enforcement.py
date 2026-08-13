@@ -62,7 +62,14 @@ def test_target_taxonomy_assigns_one_stable_class() -> None:
 def test_governed_githooks_rule_classifies_slash_forms_and_authorizes_configuration() -> None:
     taxonomy = load_operation_taxonomy()
     assert taxonomy.taxonomy_version == "2"
-    assert [(rule.pattern, rule.mutation_class) for rule in taxonomy.path_rules] == [(".githooks/**", "configuration")]
+    # Exact-equality pin on the COMPLETE registered rule set: any rule added to the
+    # taxonomy must consciously update this list. WI-6196 added the .goosehints rule,
+    # which classifies the Goose harness hint file as configuration so proposals may
+    # declare it in target_paths.
+    assert [(rule.pattern, rule.mutation_class) for rule in taxonomy.path_rules] == [
+        (".githooks/**", "configuration"),
+        (".goosehints", "configuration"),
+    ]
     assert classify_target(".githooks/pre-commit", taxonomy).mutation_class == "configuration"
     assert classify_target(r".githooks\pre-commit", taxonomy).mutation_class == "configuration"
     assert classify_target("nested/.githooks/pre-commit", taxonomy).mutation_class == "unclassified"
