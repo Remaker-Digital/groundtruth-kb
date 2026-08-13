@@ -26,7 +26,7 @@
       "canonical_name": "gtkb-bridge",
       "capability_id": "skill.bridge",
       "source_relative_path": ".claude/skills/gtkb-bridge/SKILL.md",
-      "source_sha256": "ffe3ebbd15425d20abdf07e7bae961aad5d9a00247f49dd96164f5bc242614ce"
+      "source_sha256": "2748c05afa97d733bf9e9d0b3adbdff248a374d275cfd8407eb4ff01d15ae426"
     },
     {
       "adapter_relative_path": ".agent/skills/gtkb-bridge-config/SKILL.md",
@@ -103,7 +103,7 @@
       "canonical_name": "gtkb-harness-parity-review",
       "capability_id": "skill.harness-parity-review",
       "source_relative_path": ".claude/skills/gtkb-harness-parity-review/SKILL.md",
-      "source_sha256": "8d8962fda56a0e1bb352c5bce6399ae4df9e6c538affec1bd29a2ed48445996e"
+      "source_sha256": "609a37f9545de53b3f65e1566e1e7509a0d0bd55ddab59e4c2bf563de7f295d1"
     },
     {
       "adapter_relative_path": ".agent/skills/gtkb-skill-governance-lifecycle/SKILL.md",
@@ -208,7 +208,7 @@
       "canonical_name": "gtkb-proposal-review",
       "capability_id": "skill.proposal-review",
       "source_relative_path": ".claude/skills/gtkb-proposal-review/SKILL.md",
-      "source_sha256": "af5b84ee08bd1c54707ddba54b57cedcfc39288a95874b01cdf54056c98d7eed"
+      "source_sha256": "2fa418d270b95d5c03995720375bacba6a6d3250475298c39918c30db95b9ec8"
     },
     {
       "adapter_relative_path": ".agent/skills/gtkb-release-candidate-gate/SKILL.md",
@@ -222,7 +222,7 @@
       "canonical_name": "gtkb-send-review",
       "capability_id": "skill.send-review",
       "source_relative_path": ".claude/skills/gtkb-send-review/SKILL.md",
-      "source_sha256": "0dd7b431ddeb0df8e7379b50ad0593d029b605dc3f96f0001411b92edcb197d9"
+      "source_sha256": "aa6437097d9fdcbb5b2368367e48b93b805b7082703edcc0fe4f720ae98eb7b2"
     },
     {
       "adapter_relative_path": ".agent/skills/gtkb-spec-intake/SKILL.md",
@@ -292,7 +292,7 @@
       "canonical_name": "gtkb-verify",
       "capability_id": "skill.verify",
       "source_relative_path": ".claude/skills/gtkb-verify/SKILL.md",
-      "source_sha256": "57b1863c131f81676f84fd497695e7f4333f9481473e58abc9f827ea351c0271"
+      "source_sha256": "d0f13dc12f946f44c8a1536d3734d64e85c35c5a3bdaa5789a96cbf4c965d1e4"
     },
     {
       "adapter_relative_path": ".agent/skills/gtkb-formal-artifact-packet-helper/SKILL.md",

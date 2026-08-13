@@ -31,7 +31,7 @@
       "capability_id": "skill.bridge",
       "description": "Operate the bridge protocol \u2014 file proposals, route actionable bridge work, write governance-compliant verdicts, file post-implementation reports, navigate lifecycle states. Use when proposing implementation work that needs Loyal Opposition review, when responding to a NEW/REVISED/NO-ACTION entry as the reviewing harness, or when checking bridge thread state. The companion skills `gtkb-bridge-propose`, `gtkb-proposal-review`, and `gtkb-send-review` cover specific subactions; use this skill when working across the protocol or when an action's fit isn't obvious.",
       "source_relative_path": ".claude/skills/gtkb-bridge/SKILL.md",
-      "source_sha256": "4e6b7494cc4e587d4759680b3aec07a646ddc6b21b3f9b0cc6ecae5d7699b7a5"
+      "source_sha256": "50b9ee0163011e412f02e7ceb71e0eb1b5fe02a151a0ffd0046aaa859862b143"
     },
     {
       "adapter_relative_path": ".api-harness/skills/gtkb-bridge-config/SKILL.md",
@@ -119,7 +119,7 @@
       "capability_id": "skill.harness-parity-review",
       "description": "Use when reviewing or correcting parity across GT-KB harnesses (Claude, Codex, Cursor, Antigravity, Ollama, OpenRouter), including skills, hooks, roles, commands, plugins, MCP tools, startup context, permissions, role-specific capabilities, or harness capability drift.",
       "source_relative_path": ".claude/skills/gtkb-harness-parity-review/SKILL.md",
-      "source_sha256": "8d8962fda56a0e1bb352c5bce6399ae4df9e6c538affec1bd29a2ed48445996e"
+      "source_sha256": "609a37f9545de53b3f65e1566e1e7509a0d0bd55ddab59e4c2bf563de7f295d1"
     },
     {
       "adapter_relative_path": ".api-harness/skills/gtkb-skill-governance-lifecycle/SKILL.md",
@@ -239,7 +239,7 @@
       "capability_id": "skill.proposal-review",
       "description": "Review proposals, plans, and technical approaches for correctness, missing assumptions, risk, and decision quality. Use for design reviews, plan critiques, and proposal stress tests.",
       "source_relative_path": ".claude/skills/gtkb-proposal-review/SKILL.md",
-      "source_sha256": "af5b84ee08bd1c54707ddba54b57cedcfc39288a95874b01cdf54056c98d7eed"
+      "source_sha256": "2fa418d270b95d5c03995720375bacba6a6d3250475298c39918c30db95b9ec8"
     },
     {
       "adapter_relative_path": ".api-harness/skills/gtkb-release-candidate-gate/SKILL.md",
@@ -255,7 +255,7 @@
       "capability_id": "skill.send-review",
       "description": "Create an implementation proposal through the governed bridge-propose helper for Loyal Opposition review.",
       "source_relative_path": ".claude/skills/gtkb-send-review/SKILL.md",
-      "source_sha256": "0dd7b431ddeb0df8e7379b50ad0593d029b605dc3f96f0001411b92edcb197d9"
+      "source_sha256": "aa6437097d9fdcbb5b2368367e48b93b805b7082703edcc0fe4f720ae98eb7b2"
     },
     {
       "adapter_relative_path": ".api-harness/skills/gtkb-spec-intake/SKILL.md",
@@ -335,7 +335,7 @@
       "capability_id": "skill.verify",
       "description": "Author a Loyal Opposition post-implementation VERIFIED or NO-GO verdict file that satisfies the Mandatory Specification-Derived Verification Gate. Use when a post-implementation report enters the Loyal Opposition actionable queue, when asked to verify a post-implementation report, when authoring a VERIFIED/NO-GO verdict, or when reviewing an implementation report for spec-derived testing.",
       "source_relative_path": ".claude/skills/gtkb-verify/SKILL.md",
-      "source_sha256": "57b1863c131f81676f84fd497695e7f4333f9481473e58abc9f827ea351c0271"
+      "source_sha256": "d0f13dc12f946f44c8a1536d3734d64e85c35c5a3bdaa5789a96cbf4c965d1e4"
     },
     {
       "adapter_relative_path": ".api-harness/skills/gtkb-formal-artifact-packet-helper/SKILL.md",
