@@ -282,7 +282,7 @@ Retired terms remain historical only; new narrative MUST use **activity envelope
 **Source:** `DELIB-20260637`; `DELIB-20265287`; `SPEC-TOPIC-ENVELOPE-ROUTER-001`;
 WI-4482.
 
-**Implementation pointer:** `.claude/session/envelope.json` `topics` array;
+**Implementation pointer:** `.gtkb-state/session-envelopes/<session_id>.json` `topics` array;
 `groundtruth_kb.session.envelope`; `groundtruth_kb.session.topic_router`.
 
 ### adopter
@@ -906,10 +906,12 @@ session, opened by an init-keyword family explicit hint (typically `::init gtkb 
 zero or more nested activity envelopes. Conforms to the three-part anatomy
 (invocation, intent_hint, payload) per `ADR-ENVELOPE-META-MODEL-001`.
 
-**Source:** `ADR-ENVELOPE-META-MODEL-001`; `DCL-SESSION-ENVELOPE-DURABILITY-001`.
+**Source:** `ADR-ENVELOPE-META-MODEL-001`; `DCL-SESSION-ENVELOPE-SINGLE-CONTEXT-001`.
 
-**Implementation pointer:** `.claude/session/envelope.json`; archive under
-`.claude/session/archive/`.
+**Implementation pointer:** `groundtruth_kb.session.envelope`; live document at
+`.gtkb-state/session-envelopes/<session_id>.json`; archive at
+`.gtkb-state/session-envelopes/archive/<session_id>.json`; handoff generation through
+`groundtruth_kb.session.handoff`.
 
 ### smart poller
 
