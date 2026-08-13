@@ -1,6 +1,6 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-08-01T06:59:12Z",
+  "generated_at": "2026-08-13T07:10:32Z",
   "harnesses": [
     {
       "activity_envelope_projection_mode": "native",
@@ -112,10 +112,10 @@
       },
       "reviewer_precedence": 20,
       "role": [
-        "loyal-opposition"
+        "prime-builder"
       ],
       "status": "active",
-      "version": 110
+      "version": 111
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -226,8 +226,8 @@
       "role": [
         "loyal-opposition"
       ],
-      "status": "active",
-      "version": 82
+      "status": "suspended",
+      "version": 83
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -292,6 +292,7 @@
       "compact_session_envelope_mode": "compact-provider",
       "dispatch_availability": 90.0,
       "dispatch_cost": 60.0,
+      "dispatch_max_items": 1,
       "dispatch_quality": 90.0,
       "dispatch_tags": [
         "low-cost",
@@ -322,7 +323,7 @@
             "-p",
             "{{PROMPT}}",
             "--model",
-            "openrouter-cloud-default",
+            "gtkb-v4f-openrouter",
             "--skill",
             "bridge-review",
             "--max-turns",
@@ -331,7 +332,8 @@
             "60",
             "--session-timeout",
             "5400"
-          ]
+          ],
+          "max_items": 1
         }
       },
       "reviewer_precedence": 20,
@@ -339,7 +341,7 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 52
+      "version": 53
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -384,7 +386,7 @@
             "--skill",
             "bridge-review",
             "--model",
-            "goose-deepseek-v4-pro"
+            "gtkb-v4f-goose"
           ],
           "max_items": 1
         },
@@ -397,8 +399,8 @@
       "role": [
         "prime-builder"
       ],
-      "status": "suspended",
-      "version": 16
+      "status": "active",
+      "version": 18
     },
     {
       "activity_envelope_projection_mode": "compact-provider",
@@ -458,8 +460,8 @@
       "role": [
         "loyal-opposition"
       ],
-      "status": "active",
-      "version": 59
+      "status": "suspended",
+      "version": 60
     }
   ],
   "schema_version": 1,
