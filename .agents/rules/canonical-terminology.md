@@ -255,21 +255,16 @@ When the canonical migration completes, the migration-target URL becomes the sol
 
 **Source:** `GOV-AGENT-RED-GTKB-CONFORMANCE-001`; `DELIB-0834`; owner directive 2026-05-04 (tooling-reference narrowing); owner-decision capture S347 (2026-05-24, reference-adopter framing restoration); dual-repo clarification per S333 audit FINDING-P1-002 (downgraded to P3) and `bridge/gtkb-governance-hygiene-bundle-001.md` Change E.
 
-### activity envelope
+### `::open` activity marker
 
-**Canonical alias:** activity envelope (replaces retired **topic envelope** term in
-narrative surfaces; spec IDs `SPEC-TOPIC-*` persist append-only).
+**Definition:** A first-line marker caught by a hook. It triggers pre-loading of the
+skills, tools, and reference information an agent needs to perform that activity and
+to locate further tools. The activity vocabulary is closed:
+`{ops, deliberation, build, test, spec, project}`.
 
-**Definition:** The inner-tier envelope opened by `::open <activity>` and closed by
-`::close` or `::close <activity>`. It is keyed by **activity TYPE** (closed vocabulary
-`{ops, deliberation, build, test, spec, project}`), not by free-form subject text.
-At most one activity envelope is open at a time (single-active invariant). Opening an
-activity envelope triggers injection of that activity's context-load bundle (disposition
-profile terminology/skills and routing context) per
-`DCL-ACTIVITY-DISPOSITION-PROFILE-001` and `DCL-ACTIVITY-ENVELOPE-INTERCEPTION-001`.
-
-**Lineage (retired terms):** work envelope â†’ topic envelope â†’ **activity envelope**.
-Retired terms remain historical only; new narrative MUST use **activity envelope**.
+**Paired marker:** `::close`, also caught by a hook, triggers harvest of the durable
+information produced during that activity before the session context is lost.
+Harvested information updates canonical source-of-truth artifacts.
 
 **Three-axis disambiguation (do not conflate):**
 
@@ -279,11 +274,7 @@ Retired terms remain historical only; new narrative MUST use **activity envelope
 | **TARGET / subject** | Optional payload on typed open (per-type specs) | project/spec target fields |
 | **AREA / scope** | `::init` subject token `{gtkb, application}` | `::init gtkb pb` |
 
-**Source:** `DELIB-20260637`; `DELIB-20265287`; `SPEC-TOPIC-ENVELOPE-ROUTER-001`;
-WI-4482.
-
-**Implementation pointer:** `.gtkb-state/session-envelopes/<session_id>.json` `topics` array;
-`groundtruth_kb.session.envelope`; `groundtruth_kb.session.topic_router`.
+**Source:** owner directive, 2026-08-13.
 
 ### adopter
 
@@ -898,20 +889,18 @@ interactive role persists through the per-session marker/envelope authority.
 
 *Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#session-stated-role).*
 
-### session envelope
+### `::init` session marker
 
-**Definition:** The outer runtime envelope for an interactive or dispatched GT-KB
-session, opened by an init-keyword family explicit hint (typically `::init gtkb â€¦` or
-`::init application â€¦`) and closed by the wrap-keyword family (`::wrap`). It contains
-zero or more nested activity envelopes. Conforms to the three-part anatomy
-(invocation, intent_hint, payload) per `ADR-ENVELOPE-META-MODEL-001`.
+**Definition:** A first-line marker caught by a hook. It triggers pre-loading of the
+role-related and process-related skills, tools, and reference information a GT-KB
+session needs to execute foundational tasks and to locate further tools. Subject
+vocabulary `{gtkb, application}` is mandatory; role vocabulary `{pb, lo}` is optional.
 
-**Source:** `ADR-ENVELOPE-META-MODEL-001`; `DCL-SESSION-ENVELOPE-SINGLE-CONTEXT-001`.
+**Paired marker:** `::wrap`, also caught by a hook, triggers harvest of the durable
+information produced during the session before its context is lost. Harvested
+information updates canonical source-of-truth artifacts.
 
-**Implementation pointer:** `groundtruth_kb.session.envelope`; live document at
-`.gtkb-state/session-envelopes/<session_id>.json`; archive at
-`.gtkb-state/session-envelopes/archive/<session_id>.json`; handoff generation through
-`groundtruth_kb.session.handoff`.
+**Source:** owner directive, 2026-08-13.
 
 ### smart poller
 
