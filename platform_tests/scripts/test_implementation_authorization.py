@@ -26,6 +26,7 @@ from typing import Any
 
 import pytest
 from groundtruth_kb.governance.approval_packet import construct_approval_packet
+from groundtruth_kb.governance.project_authorization_operation_time import classify_target
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "implementation_authorization.py"
@@ -3081,3 +3082,52 @@ def test_gate_rejects_orphaned_packet_via_work_intent_claim_check(auth_module, t
     cross = auth_module.work_intent_claim_block_reason(tmp_path, other, "session-1")
     assert cross is not None
     assert "session-2" in cross
+
+
+# WI-6196: `.goosehints` mutation-class classifier rule.
+# Per bridge/gtkb-wi6196-goosehints-mutation-class-classifier-rule-001.md (GO at -002).
+# Before the taxonomy path_rule landed, `.goosehints` classified `unclassified`, so the
+# PAUTH operation-time gate denied both `implementation_packet_create` and
+# `implementation_start` for any proposal declaring it -- making the WI-5918 Goose
+# governance-hook parity proposal unfileable. These assertions run against the LIVE
+# taxonomy, as the proposal's verification mapping commits to.
+
+# The eight WI-5918 target paths regression-checked by the proposal, with the classes
+# they resolved to BEFORE the `.goosehints` rule was added. Adding a path_rule must not
+# reclassify any of them.
+WI5918_UNCHANGED_CLASSIFICATIONS = {
+    ".agents/plugins/gtkb/hooks/hooks.json": "governance_evidence",
+    "config/agent-control/gtkb-harness-capability-registry.toml": "configuration",
+    "config/registry/sot-artifacts.toml": "configuration",
+    "platform_tests/scripts/test_goose_hook_parity.py": "test",
+    "platform_tests/scripts/test_harness_parity.py": "test",
+    "scripts/check_harness_parity.py": "source",
+    "scripts/goose_hook_adapter.py": "source",
+    "scripts/lo_file_safety_payloads.py": "source",
+}
+
+
+def test_goosehints_classifies_configuration_and_wi5918_targets_unchanged():
+    """`.goosehints` resolves to `configuration`; the other WI-5918 targets are untouched.
+
+    The first assertion is the WI-6196 fix itself: it is what makes a `target_paths`
+    entry of `.goosehints` survive the PAUTH operation-time mutation-class gate. The
+    second is the non-regression half -- a taxonomy `path_rule` is a global override,
+    so the change must narrow the unrecognized set by exactly one path and leave every
+    other WI-5918 target on its pre-change class.
+    """
+    assert classify_target(".goosehints").mutation_class == "configuration"
+
+    observed = {path: classify_target(path).mutation_class for path in WI5918_UNCHANGED_CLASSIFICATIONS}
+    assert observed == WI5918_UNCHANGED_CLASSIFICATIONS
+
+
+def test_unrecognized_root_dotfile_still_classifies_unclassified():
+    """Fail-closed fallthrough survives: an unrelated root dotfile stays `unclassified`.
+
+    `.cursorrules` is the fixture named in the GO (-002 condition 2). It is a root-level
+    extensionless dotfile structurally identical to `.goosehints`, so if the fix had
+    widened the rule into a pattern rather than an exact path, this would flip to
+    `configuration` and the gate would silently stop failing closed on unknown paths.
+    """
+    assert classify_target(".cursorrules").mutation_class == "unclassified"

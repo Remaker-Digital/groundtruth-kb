@@ -7,6 +7,10 @@ taxonomy_version = "2"
 pattern = ".githooks/**"
 mutation_class = "configuration"
 
+[[path_rule]]
+pattern = ".goosehints"
+mutation_class = "configuration"
+
 [[mutation_class]]
 name = "bridge"
 aliases = ["bridge_proposal", "bridge_proposal_authoring", "bridge_report_write"]
