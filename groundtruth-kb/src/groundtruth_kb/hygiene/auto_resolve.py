@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import os
 import re
 import subprocess
 import sys
@@ -162,6 +163,22 @@ def _now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _no_window_kwargs() -> dict[str, object]:
+    """Return subprocess kwargs that suppress a console window on Windows.
+
+    auto_resolve shells out to git once per candidate path, so on Windows an
+    unsuppressed call flashes a console window per file. Mirrors
+    ``windows_no_window_creationflags`` in ``scripts/windows_subprocess.py``;
+    that helper is not imported because it lives in repo tooling rather than in
+    this installable package.
+    """
+
+    if os.name != "nt":
+        return {}
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    return {"creationflags": int(flags)}
+
+
 def _run_git(root: Path, args: list[str]) -> str:
     result = subprocess.run(
         ["git", *args],
@@ -171,6 +188,7 @@ def _run_git(root: Path, args: list[str]) -> str:
         encoding="utf-8",
         errors="replace",
         check=False,
+        **_no_window_kwargs(),
     )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
@@ -234,6 +252,7 @@ def _head_first_nonblank_token(root: Path, rel_path: str) -> str | None:
         encoding="utf-8",
         errors="replace",
         check=False,
+        **_no_window_kwargs(),
     )
     if result.returncode != 0:
         return None
