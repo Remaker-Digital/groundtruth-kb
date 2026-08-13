@@ -3238,6 +3238,94 @@ def _bridge_publication_transition_digest(
     return _json_digest(evidence)
 
 
+def _historical_bridge_publication_transition_digest(
+    project_root: Path,
+    *,
+    document_name: str,
+    version: int,
+    status: str,
+    content: bytes,
+) -> str:
+    """Reconstruct the canonical transition digest at one historical version."""
+
+    try:
+        from scripts.bridge_lifecycle_resolver import (
+            BridgeLifecycleResolutionError,
+            resolve_bridge_lifecycle,
+        )
+    except ImportError as exc:
+        raise RegistryAuthorizationError("strict bridge lifecycle resolver is unavailable") from exc
+
+    validation_parent = project_root / ".gtkb-state" / "bridge-candidate-validation"
+    validation_parent.mkdir(parents=True, exist_ok=True)
+    exact_name = re.compile(rf"^{re.escape(document_name)}-(?P<version>[0-9]{{3}})\.md$")
+    candidate_name = f"{document_name}-{version:03d}.md"
+    thread_files: list[dict[str, str | int]] = []
+    try:
+        with tempfile.TemporaryDirectory(
+            prefix=f"{document_name}-{version:03d}-historical-",
+            dir=validation_parent,
+        ) as temporary:
+            candidate_root = Path(temporary)
+            candidate_bridge = candidate_root / "bridge"
+            candidate_bridge.mkdir()
+            live_bridge = project_root / "bridge"
+            if live_bridge.is_dir():
+                for source in live_bridge.iterdir():
+                    match = exact_name.fullmatch(source.name)
+                    if match is None or int(match.group("version")) >= version:
+                        continue
+                    if _path_object_kind(source) != "file":
+                        raise RegistryRecoveryRequired(
+                            "historical bridge publication lifecycle contains a non-regular file"
+                        )
+                    (candidate_bridge / source.name).write_bytes(source.read_bytes())
+            (candidate_bridge / candidate_name).write_bytes(content)
+            try:
+                resolution = resolve_bridge_lifecycle(candidate_root, document_name)
+            except BridgeLifecycleResolutionError as exc:
+                raise RegistryAuthorizationError(
+                    f"invalid historical bridge publication lifecycle: {exc.code}: {exc}"
+                ) from exc
+            for path in sorted(candidate_bridge.iterdir(), key=lambda item: item.name.casefold()):
+                if _path_object_kind(path) != "file" or exact_name.fullmatch(path.name) is None:
+                    continue
+                payload = path.read_bytes()
+                thread_files.append(
+                    {
+                        "path": f"bridge/{path.name}",
+                        "size": len(payload),
+                        "sha256": _sha256_bytes(payload),
+                    }
+                )
+    finally:
+        with suppress(OSError):
+            validation_parent.rmdir()
+
+    latest = resolution.latest_strict_state
+    expected_path = f"bridge/{document_name}-{version:03d}.md"
+    if (
+        latest.version != version
+        or latest.status != status
+        or latest.path != expected_path
+        or resolution.blocking_diagnostics
+    ):
+        raise RegistryAuthorizationError("historical lifecycle did not resolve to the exact requested terminal state")
+    return _json_digest(
+        {
+            "evidence_schema_version": 2,
+            "document_name": document_name,
+            "version": version,
+            "status": status,
+            "thread_files": thread_files,
+            "latest": asdict(latest),
+            "audit_versions": [asdict(item) for item in resolution.audit_versions],
+            "quarantined_paths": list(resolution.quarantined_paths),
+            "blocking_diagnostics": [asdict(item) for item in resolution.blocking_diagnostics],
+        }
+    )
+
+
 def _latest_artifact_revision(
     conn: sqlite3.Connection,
     entry_id: str,
@@ -3290,6 +3378,73 @@ def _bridge_aggregate_digest_without_target(
 def _bridge_publication_quarantine_path(project_root: Path, capability_hash: str) -> Path:
     digest = capability_hash.removeprefix("sha256:")
     return project_root / ".gtkb-state" / "bridge-publication-recovery" / f"{digest}.rollback"
+
+
+def _bridge_publication_pending_sidecar_path(
+    project_root: Path,
+    target: Path,
+) -> Path:
+    relative = target.resolve().relative_to(project_root.resolve()).as_posix()
+    digest = hashlib.sha256(relative.encode("utf-8")).hexdigest()[:16]
+    return project_root / ".gtkb-state" / "bridge-publication-pending" / f"{target.stem}-{digest}.json"
+
+
+def _read_exact_bridge_publication_pending_sidecar(
+    *,
+    project_root: Path,
+    target: Path,
+    capability_hash: str,
+    content_digest: str,
+    document_name: str,
+    version: int,
+    status: str,
+    claim_session: str,
+) -> tuple[Path, bytes, str]:
+    sidecar = _bridge_publication_pending_sidecar_path(project_root, target)
+    relative_sidecar = sidecar.relative_to(project_root)
+    component = project_root
+    for part in relative_sidecar.parts:
+        component /= part
+        if not (component.exists() or component.is_symlink()):
+            continue
+        kind = _path_object_kind(component)
+        if component != sidecar and kind != "directory":
+            raise RegistryRecoveryRequired(
+                "recovery-required publication pending sidecar path contains a redirected component"
+            )
+        if kind in {"symlink", "junction", "reparse"}:
+            raise RegistryRecoveryRequired(
+                "recovery-required publication pending sidecar path contains a redirected component"
+            )
+    sidecar_dir = sidecar.parent
+    if sidecar_dir.is_dir():
+        candidates = sorted(sidecar_dir.glob(f"{target.stem}-*.json"), key=lambda item: item.name.casefold())
+    else:
+        candidates = []
+    if candidates != [sidecar]:
+        raise RegistryRecoveryRequired(
+            "recovery-required publication requires exactly one deterministic pending sidecar"
+        )
+    if not (sidecar.exists() or sidecar.is_symlink()) or _path_object_kind(sidecar) != "file":
+        raise RegistryRecoveryRequired("recovery-required publication pending sidecar is not one exact regular file")
+    try:
+        raw = sidecar.read_bytes()
+        payload = json.loads(raw.decode("utf-8", errors="strict"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RegistryRecoveryRequired("recovery-required publication pending sidecar is unreadable") from exc
+    expected: dict[str, str | int] = {
+        "schema_version": 1,
+        "capability_hash": capability_hash,
+        "content_digest": content_digest,
+        "document_name": document_name,
+        "version": version,
+        "status": status,
+        "target_path": target.relative_to(project_root).as_posix(),
+        "session_id": claim_session,
+    }
+    if not isinstance(payload, dict) or any(payload.get(name) != value for name, value in expected.items()):
+        raise RegistryAuthorizationError("recovery-required publication pending sidecar binding mismatch")
+    return sidecar, raw, _sha256_bytes(raw)
 
 
 def _mark_bridge_publication_recovery_required(
@@ -3884,6 +4039,551 @@ def recover_missing_bridge_publication_capability(
 
     return BridgePublicationReceipt(
         capability_hash=capability_hash,
+        revision_id=revision_id,
+        target_path=relative,
+        aggregate_digest=aggregate_digest,
+        capability_state="consumed",
+    )
+
+
+def recover_recovery_required_bridge_publication_capability(
+    *,
+    document_name: str,
+    version: int,
+    target_path: str | Path,
+    content: bytes,
+    session_id: str,
+    owner_authorization: str,
+    expected_capability_hash: str,
+    expected_content_digest: str,
+    expected_status: str,
+    expected_failure_reason: str,
+    expected_sidecar_digest: str,
+    expected_tuple_row_count: int,
+    expected_predecessor_rowid: int,
+    expected_predecessor_capability_hash: str,
+    expected_predecessor_state: str,
+    expected_predecessor_digest: str,
+    expected_selected_rowid: int,
+    project_root: Path | None = None,
+    registry_path: Path | None = None,
+    packaged_registry_path: Path | None = None,
+    db_path: Path | None = None,
+) -> BridgePublicationReceipt:
+    """Consume the newest exact ``recovery_required`` publication row in place.
+
+    This owner-authorized recovery is deliberately distinct from missing-receipt
+    backfill and ordinary crash recovery: it never creates or deletes a receipt,
+    changes no bridge file, and does not invoke a publication writer.  All exact
+    bindings are checked under the registry lock before one transactional row
+    transition and provenance revision are committed.
+    """
+
+    authorization = owner_authorization.strip() if isinstance(owner_authorization, str) else ""
+    operator_session = session_id.strip() if isinstance(session_id, str) else ""
+    exact_strings = (
+        document_name,
+        expected_capability_hash,
+        expected_content_digest,
+        expected_status,
+        expected_failure_reason,
+        expected_sidecar_digest,
+        expected_predecessor_capability_hash,
+        expected_predecessor_state,
+        expected_predecessor_digest,
+    )
+    if not authorization:
+        raise RegistryAuthorizationError("recovery-required publication recovery requires owner authorization")
+    if not operator_session:
+        raise RegistryAuthorizationError("recovery-required publication recovery requires an operator session")
+    if not all(isinstance(value, str) and value.strip() for value in exact_strings):
+        raise RegistryAuthorizationError("recovery-required publication recovery bindings must be non-empty")
+    if not isinstance(content, bytes) or not content:
+        raise RegistryAuthorizationError("recovery-required publication recovery content bytes are required")
+    if type(version) is not int or version < 1:
+        raise RegistryAuthorizationError("recovery-required publication version must be a positive integer")
+    if type(expected_tuple_row_count) is not int or expected_tuple_row_count != 2:
+        raise RegistryAuthorizationError("recovery-required publication requires the exact two-row tuple")
+    if type(expected_selected_rowid) is not int or expected_selected_rowid < 1:
+        raise RegistryAuthorizationError("recovery-required publication selected rowid must be positive")
+    if type(expected_predecessor_rowid) is not int or expected_predecessor_rowid < 1:
+        raise RegistryAuthorizationError("recovery-required publication predecessor rowid must be positive")
+    if expected_predecessor_state != "consumed":
+        raise RegistryAuthorizationError("recovery-required publication predecessor must be consumed")
+
+    paths = RegistryPaths.resolve(
+        project_root=project_root,
+        registry_path=registry_path,
+        packaged_registry_path=packaged_registry_path,
+        db_path=db_path,
+    )
+    expected_relative = f"bridge/{document_name}-{version:03d}.md"
+    supplied = Path(target_path)
+    if supplied.is_absolute():
+        try:
+            supplied_relative = supplied.absolute().relative_to(paths.project_root.absolute()).as_posix()
+        except ValueError as exc:
+            raise RegistryAuthorizationError("recovery-required publication target escapes project root") from exc
+    else:
+        supplied_relative = supplied.as_posix().strip("/")
+    if supplied_relative != expected_relative:
+        raise RegistryAuthorizationError(
+            "recovery-required publication requires the exact lexical canonical target path"
+        )
+    lexical_probe = paths.project_root
+    for part in PurePosixPath(expected_relative).parts:
+        lexical_probe /= part
+        if lexical_probe.exists() or lexical_probe.is_symlink():
+            kind = _path_object_kind(lexical_probe)
+            if lexical_probe != paths.project_root / expected_relative and kind != "directory":
+                raise RegistryRecoveryRequired(
+                    "recovery-required publication target path contains a redirected component"
+                )
+            if kind in {"symlink", "junction", "reparse"}:
+                raise RegistryRecoveryRequired(
+                    "recovery-required publication target path contains a redirected component"
+                )
+    relative, _ = _bridge_publication_target(
+        paths.project_root,
+        document_name=document_name,
+        version=version,
+        target_path=target_path,
+    )
+    lexical_target = paths.project_root / relative
+    content_digest = _sha256_bytes(content)
+    if content_digest != expected_content_digest:
+        raise RegistryAuthorizationError("recovery-required publication content binding mismatch")
+    if not (lexical_target.exists() or lexical_target.is_symlink()) or _path_object_kind(lexical_target) != "file":
+        raise RegistryRecoveryRequired("recovery-required publication target is not a regular file")
+    if _hash_file(lexical_target) != content_digest:
+        raise RegistryAuthorizationError("recovery-required publication target bytes do not match content")
+
+    try:
+        from scripts.bridge_lifecycle_resolver import (
+            BridgeLifecycleResolutionError,
+            resolve_bridge_lifecycle,
+        )
+    except ImportError as exc:
+        raise RegistryAuthorizationError("strict bridge lifecycle resolver is unavailable") from exc
+
+    with _RegistryFileLock(paths.lock_path):
+        _ensure_no_nonterminal_journal(paths.db_path)
+        if not (lexical_target.exists() or lexical_target.is_symlink()) or _path_object_kind(lexical_target) != "file":
+            raise RegistryRecoveryRequired("recovery-required publication target is not a regular file")
+        if _hash_file(lexical_target) != content_digest:
+            raise RegistryAuthorizationError("recovery-required publication target bytes do not match content")
+
+        try:
+            resolution = resolve_bridge_lifecycle(paths.project_root, document_name)
+        except BridgeLifecycleResolutionError as exc:
+            raise RegistryRecoveryRequired(
+                f"recovery-required publication lifecycle is invalid: {exc.code}: {exc}"
+            ) from exc
+        matching_states = [
+            state for state in resolution.audit_versions if state.version == version and state.path == relative
+        ]
+        if len(matching_states) != 1 or resolution.blocking_diagnostics:
+            raise RegistryRecoveryRequired(
+                "recovery-required publication cannot prove one exact nonblocking lifecycle state"
+            )
+        lifecycle_state = matching_states[0]
+        if lifecycle_state.status != expected_status:
+            raise RegistryAuthorizationError("recovery-required publication lifecycle status mismatch")
+        author_session = _bridge_publication_author_session(content)
+        transition_digest = _historical_bridge_publication_transition_digest(
+            paths.project_root,
+            document_name=document_name,
+            version=version,
+            status=expected_status,
+            content=content,
+        )
+
+        snapshot = _load_snapshot_unlocked(paths)
+        aggregate_record = _bridge_aggregate_record(snapshot, relative)
+        aggregate_digest, _, _ = artifact_content_state(paths.project_root, aggregate_record)
+        lifecycle_digest = _json_digest(
+            {
+                "document_name": document_name,
+                "version": version,
+                "status": expected_status,
+                "target_path": relative,
+                "state": asdict(lifecycle_state),
+                "audit_versions": [asdict(item) for item in resolution.audit_versions],
+                "quarantined_paths": list(resolution.quarantined_paths),
+                "blocking_diagnostics": [asdict(item) for item in resolution.blocking_diagnostics],
+            }
+        )
+
+        conn = sqlite3.connect(str(paths.db_path))
+        conn.row_factory = sqlite3.Row
+        try:
+            ensure_control_plane_schema(conn)
+            conn.commit()
+            rows = conn.execute(
+                "SELECT * FROM sot_registry_bridge_publication_capabilities "
+                "WHERE document_name = ? AND version = ? AND target_path = ? ORDER BY rowid ASC",
+                (document_name, version, relative),
+            ).fetchall()
+            if len(rows) != expected_tuple_row_count:
+                raise RegistryRecoveryRequired(
+                    "recovery-required publication requires exactly the authorized two-row tuple"
+                )
+            older = rows[0]
+            newest = rows[-1]
+            predecessor_digest = _json_digest(dict(older))
+            if (
+                int(older["rowid"]) != expected_predecessor_rowid
+                or older["capability_hash"] != expected_predecessor_capability_hash
+                or older["capability_state"] != expected_predecessor_state
+                or predecessor_digest != expected_predecessor_digest
+            ):
+                raise RegistryAuthorizationError(
+                    "older exact publication row does not match the authorized predecessor preimage"
+                )
+            if int(newest["rowid"]) != expected_selected_rowid:
+                raise RegistryAuthorizationError(
+                    "newest recovery-required publication rowid does not match expected selection"
+                )
+            if newest["capability_hash"] != expected_capability_hash:
+                raise RegistryAuthorizationError(
+                    "newest recovery-required publication row does not match expected capability"
+                )
+            row_bindings = {
+                "content_digest": expected_content_digest,
+                "status": expected_status,
+                "author_session_context_id": author_session,
+                "aggregate_entry_id": aggregate_record.id,
+                "transition_digest": transition_digest,
+                "authority_kind": _BRIDGE_PUBLICATION_AUTHORITY_KIND,
+            }
+            mismatched = [name for name, expected in row_bindings.items() if newest[name] != expected]
+            if mismatched:
+                raise RegistryAuthorizationError(
+                    "recovery-required publication row binding mismatch: " + ", ".join(sorted(mismatched))
+                )
+            if newest["operation"] != _BRIDGE_PUBLICATION_AUTHORITY_KIND:
+                raise RegistryAuthorizationError("recovery-required publication row operation is not typed")
+            if newest["compensation_revision_id"] is not None or newest["compensation_digest"] is not None:
+                raise RegistryAuthorizationError("recovery-required publication row has compensation evidence")
+            if (
+                older["capability_state"] != "consumed"
+                or older["capability_hash"] == expected_capability_hash
+                or older["consumed_at"] is None
+                or not older["result_digest"]
+                or not older["revision_id"]
+            ):
+                raise RegistryAuthorizationError(
+                    "older exact publication row does not preserve consumed receipt evidence"
+                )
+
+            minted_count = conn.execute(
+                "SELECT COUNT(*) FROM sot_registry_bridge_publication_capabilities WHERE capability_state = 'minted'"
+            ).fetchone()[0]
+            if minted_count != 0:
+                raise RegistryAuthorizationError(
+                    "recovery-required publication requires zero globally minted capabilities"
+                )
+            total_capability_count = conn.execute(
+                "SELECT COUNT(*) FROM sot_registry_bridge_publication_capabilities"
+            ).fetchone()[0]
+
+            sidecar, sidecar_bytes, sidecar_digest = _read_exact_bridge_publication_pending_sidecar(
+                project_root=paths.project_root,
+                target=lexical_target,
+                capability_hash=expected_capability_hash,
+                content_digest=expected_content_digest,
+                document_name=document_name,
+                version=version,
+                status=expected_status,
+                claim_session=newest["claim_session"],
+            )
+            if sidecar_digest != expected_sidecar_digest:
+                raise RegistryAuthorizationError("recovery-required publication pending sidecar digest mismatch")
+
+            latest = _latest_artifact_revision(conn, aggregate_record.id)
+            if latest is None or latest["content_digest"] != aggregate_digest:
+                raise RegistryRecoveryRequired("recovery-required publication aggregate revision is not current")
+            currentness = registry_currentness(
+                snapshot,
+                project_root=paths.project_root,
+                db_path=paths.db_path,
+                record_ids={aggregate_record.id},
+            )
+            if not currentness["current"]:
+                raise RegistryRecoveryRequired(f"recovery-required publication aggregate is not current: {currentness}")
+
+            if newest["capability_state"] == "consumed":
+                if not newest["revision_id"] or not newest["result_digest"] or newest["consumed_at"] is None:
+                    raise RegistryRecoveryRequired("consumed recovery-required publication row lacks evidence")
+                if newest["failure_reason"] is not None:
+                    raise RegistryRecoveryRequired(
+                        "consumed recovery-required publication row retained a failure marker"
+                    )
+                revision = conn.execute(
+                    "SELECT * FROM sot_artifact_revisions WHERE revision_id = ?",
+                    (newest["revision_id"],),
+                ).fetchone()
+                if (
+                    revision is None
+                    or revision["content_digest"] != aggregate_digest
+                    or revision["capability_hash"] != expected_capability_hash
+                    or revision["bridge_id"] != document_name
+                    or revision["actor_session"] != operator_session
+                    or revision["operation"] != "bridge_publication_recovery_required_repair"
+                    or revision["evidence_view"] != "recovery"
+                    or revision["evidence_source_reference"] != expected_capability_hash
+                ):
+                    raise RegistryRecoveryRequired(
+                        "consumed recovery-required publication row lacks exact revision provenance"
+                    )
+                try:
+                    pauth_evidence = json.loads(revision["pauth_decision"])
+                except (TypeError, json.JSONDecodeError) as exc:
+                    raise RegistryRecoveryRequired(
+                        "consumed recovery-required publication row lacks parseable recovery provenance"
+                    ) from exc
+                replay_bindings = {
+                    "authorization_id": authorization,
+                    "operation": "recover_recovery_required_bridge_publication_capability",
+                    "document_name": document_name,
+                    "version": version,
+                    "target_path": relative,
+                    "capability_hash": expected_capability_hash,
+                    "prior_failure_reason": expected_failure_reason,
+                    "operator_session": operator_session,
+                    "author_session_context_id": author_session,
+                    "preimage_row_count": expected_tuple_row_count,
+                    "predecessor_rowid": expected_predecessor_rowid,
+                    "predecessor_capability_hash": expected_predecessor_capability_hash,
+                    "predecessor_state": expected_predecessor_state,
+                    "predecessor_digest": predecessor_digest,
+                    "selected_rowid": expected_selected_rowid,
+                    "sidecar_digest": sidecar_digest,
+                    "sidecar_path": sidecar.relative_to(paths.project_root).as_posix(),
+                    "lifecycle_digest": lifecycle_digest,
+                    "transition_digest": transition_digest,
+                    "content_digest": content_digest,
+                    "aggregate_digest": aggregate_digest,
+                }
+                if any(pauth_evidence.get(name) != value for name, value in replay_bindings.items()):
+                    raise RegistryRecoveryRequired(
+                        "consumed recovery-required publication row provenance binding mismatch"
+                    )
+                expected_result_digest = _json_digest(
+                    {
+                        "recovered_recovery_required": True,
+                        "owner_authorization": authorization,
+                        "operator_session": operator_session,
+                        "author_session_context_id": author_session,
+                        "document_name": document_name,
+                        "version": version,
+                        "status": expected_status,
+                        "target_path": relative,
+                        "capability_hash": expected_capability_hash,
+                        "content_digest": content_digest,
+                        "transition_digest": transition_digest,
+                        "compliance_digest": newest["compliance_digest"],
+                        "aggregate_digest": aggregate_digest,
+                        "aggregate_preimage_digest": newest["aggregate_preimage_digest"],
+                        "lifecycle_digest": lifecycle_digest,
+                        "prior_failure_reason": expected_failure_reason,
+                        "preimage_row_count": expected_tuple_row_count,
+                        "postimage_row_count": expected_tuple_row_count,
+                        "predecessor_rowid": expected_predecessor_rowid,
+                        "predecessor_capability_hash": expected_predecessor_capability_hash,
+                        "predecessor_state": expected_predecessor_state,
+                        "predecessor_digest": predecessor_digest,
+                        "selected_rowid": expected_selected_rowid,
+                        "sidecar_path": sidecar.relative_to(paths.project_root).as_posix(),
+                        "sidecar_digest": sidecar_digest,
+                        "revision_id": newest["revision_id"],
+                    }
+                )
+                if newest["result_digest"] != expected_result_digest:
+                    raise RegistryRecoveryRequired("consumed recovery-required publication result digest mismatch")
+                if _path_object_kind(sidecar) != "file" or sidecar.read_bytes() != sidecar_bytes:
+                    raise RegistryRecoveryRequired(
+                        "recovery-required publication pending sidecar changed during replay"
+                    )
+                return BridgePublicationReceipt(
+                    capability_hash=expected_capability_hash,
+                    revision_id=newest["revision_id"],
+                    target_path=relative,
+                    aggregate_digest=aggregate_digest,
+                    capability_state="consumed",
+                )
+            if newest["capability_state"] != "recovery_required":
+                raise RegistryAuthorizationError("newest exact publication row is not recovery_required or consumed")
+            if newest["failure_reason"] != expected_failure_reason:
+                raise RegistryAuthorizationError("recovery-required publication row binding mismatch: failure_reason")
+            if (
+                newest["consumed_at"] is not None
+                or newest["result_digest"] is not None
+                or newest["revision_id"] is not None
+            ):
+                raise RegistryAuthorizationError("recovery-required publication row already contains terminal evidence")
+
+            row_count = expected_tuple_row_count
+            newest_rowid = int(newest["rowid"])
+            preimage_rows = [dict(row) for row in rows]
+            row_preimage = dict(newest)
+            now = _utc_now()
+            pauth_evidence = json.dumps(
+                {
+                    "authorization_id": authorization,
+                    "operation": "recover_recovery_required_bridge_publication_capability",
+                    "document_name": document_name,
+                    "version": version,
+                    "target_path": relative,
+                    "capability_hash": expected_capability_hash,
+                    "prior_failure_reason": expected_failure_reason,
+                    "operator_session": operator_session,
+                    "author_session_context_id": author_session,
+                    "preimage_row_count": row_count,
+                    "predecessor_rowid": expected_predecessor_rowid,
+                    "predecessor_capability_hash": expected_predecessor_capability_hash,
+                    "predecessor_state": expected_predecessor_state,
+                    "predecessor_digest": predecessor_digest,
+                    "selected_rowid": newest_rowid,
+                    "sidecar_path": sidecar.relative_to(paths.project_root).as_posix(),
+                    "sidecar_digest": sidecar_digest,
+                    "lifecycle_digest": lifecycle_digest,
+                    "transition_digest": transition_digest,
+                    "content_digest": content_digest,
+                    "aggregate_digest": aggregate_digest,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            conn.execute("BEGIN IMMEDIATE")
+            revision_id = _append_revision(
+                conn,
+                project_root=paths.project_root,
+                record=aggregate_record,
+                actor_session=operator_session,
+                operation="bridge_publication_recovery_required_repair",
+                changed_by="bridge-publication-recovery",
+                changed_at=now,
+                change_reason=(
+                    "owner-authorized in-place recovery of recovery_required publication receipt: "
+                    f"{authorization}; prior failure: {expected_failure_reason}"
+                ),
+                capability_hash=expected_capability_hash,
+                bridge_id=document_name,
+                pauth_decision=pauth_evidence,
+                evidence_view="recovery",
+                evidence_source_reference=expected_capability_hash,
+            )
+            revision = conn.execute(
+                "SELECT content_digest FROM sot_artifact_revisions WHERE revision_id = ?",
+                (revision_id,),
+            ).fetchone()
+            if revision is None or revision["content_digest"] != aggregate_digest:
+                raise RegistryRecoveryRequired("recovery-required publication revision did not bind exact aggregate")
+            result_digest = _json_digest(
+                {
+                    "recovered_recovery_required": True,
+                    "owner_authorization": authorization,
+                    "operator_session": operator_session,
+                    "author_session_context_id": author_session,
+                    "document_name": document_name,
+                    "version": version,
+                    "status": expected_status,
+                    "target_path": relative,
+                    "capability_hash": expected_capability_hash,
+                    "content_digest": content_digest,
+                    "transition_digest": transition_digest,
+                    "compliance_digest": newest["compliance_digest"],
+                    "aggregate_digest": aggregate_digest,
+                    "aggregate_preimage_digest": newest["aggregate_preimage_digest"],
+                    "lifecycle_digest": lifecycle_digest,
+                    "prior_failure_reason": expected_failure_reason,
+                    "preimage_row_count": row_count,
+                    "postimage_row_count": row_count,
+                    "predecessor_rowid": expected_predecessor_rowid,
+                    "predecessor_capability_hash": expected_predecessor_capability_hash,
+                    "predecessor_state": expected_predecessor_state,
+                    "predecessor_digest": predecessor_digest,
+                    "selected_rowid": newest_rowid,
+                    "sidecar_path": sidecar.relative_to(paths.project_root).as_posix(),
+                    "sidecar_digest": sidecar_digest,
+                    "revision_id": revision_id,
+                }
+            )
+            updated = conn.execute(
+                "UPDATE sot_registry_bridge_publication_capabilities "
+                "SET capability_state = 'consumed', consumed_at = ?, result_digest = ?, "
+                "revision_id = ?, failure_reason = NULL "
+                "WHERE rowid = ? AND capability_hash = ? AND capability_state = 'recovery_required' "
+                "AND failure_reason = ?",
+                (
+                    now,
+                    result_digest,
+                    revision_id,
+                    newest_rowid,
+                    expected_capability_hash,
+                    expected_failure_reason,
+                ),
+            )
+            if updated.rowcount != 1:
+                raise RegistryAuthorizationError(
+                    "recovery-required publication lost its exact in-place single-use race"
+                )
+            post_rows = conn.execute(
+                "SELECT * FROM sot_registry_bridge_publication_capabilities "
+                "WHERE document_name = ? AND version = ? AND target_path = ? ORDER BY rowid ASC",
+                (document_name, version, relative),
+            ).fetchall()
+            if len(post_rows) != row_count or int(post_rows[-1]["rowid"]) != newest_rowid:
+                raise RegistryRecoveryRequired("recovery-required publication tuple cardinality changed")
+            if dict(post_rows[0]) != preimage_rows[0]:
+                raise RegistryRecoveryRequired("older exact publication row changed during recovery")
+            for name, value in row_preimage.items():
+                if name in {"capability_state", "consumed_at", "result_digest", "revision_id", "failure_reason"}:
+                    continue
+                if post_rows[-1][name] != value:
+                    raise RegistryRecoveryRequired(f"recovery-required publication immutable binding changed: {name}")
+            if any(
+                post_rows[-1][name] != expected
+                for name, expected in {
+                    "capability_state": "consumed",
+                    "consumed_at": now,
+                    "result_digest": result_digest,
+                    "revision_id": revision_id,
+                    "failure_reason": None,
+                }.items()
+            ):
+                raise RegistryRecoveryRequired("recovery-required publication postimage is incomplete")
+            if _path_object_kind(sidecar) != "file" or sidecar.read_bytes() != sidecar_bytes:
+                raise RegistryRecoveryRequired("recovery-required publication pending sidecar changed before commit")
+            if _path_object_kind(lexical_target) != "file" or _hash_file(lexical_target) != content_digest:
+                raise RegistryRecoveryRequired("recovery-required publication target changed before commit")
+            confirmed_aggregate_digest, _, _ = artifact_content_state(
+                paths.project_root,
+                aggregate_record,
+            )
+            if confirmed_aggregate_digest != aggregate_digest:
+                raise RegistryRecoveryRequired("recovery-required publication aggregate changed before commit")
+            post_minted_count = conn.execute(
+                "SELECT COUNT(*) FROM sot_registry_bridge_publication_capabilities WHERE capability_state = 'minted'"
+            ).fetchone()[0]
+            if post_minted_count != 0:
+                raise RegistryRecoveryRequired("recovery-required publication produced a globally minted capability")
+            post_total_capability_count = conn.execute(
+                "SELECT COUNT(*) FROM sot_registry_bridge_publication_capabilities"
+            ).fetchone()[0]
+            if post_total_capability_count != total_capability_count:
+                raise RegistryRecoveryRequired("recovery-required publication capability-table cardinality changed")
+            conn.commit()
+        except Exception:
+            if conn.in_transaction:
+                conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    return BridgePublicationReceipt(
+        capability_hash=expected_capability_hash,
         revision_id=revision_id,
         target_path=relative,
         aggregate_digest=aggregate_digest,
