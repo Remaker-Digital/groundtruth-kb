@@ -512,14 +512,18 @@ def propose_bridge(
     if bridge_file.exists():
         raise BridgeFileAlreadyExistsError(
             f"{bridge_file} already exists — pick a fresh slug or bump to "
-            f"-002 for a REVISED version. The skill never silently overwrites."
+            f"-002 only after a controlling NO-GO. The skill never silently overwrites."
         )
     session_id = resolve_work_intent_session_id()
     work_intent_registry = _acquire_bridge_work_intent(topic_slug, session_id, project_root=project_root)
-    bridge_file.parent.mkdir(parents=True, exist_ok=True)
-    bridge_file.write_bytes(body_to_write.encode("utf-8"))
-    _release_bridge_work_intent(work_intent_registry, topic_slug, session_id, project_root=project_root)
-    return bridge_file
+    return _bridge_writer.write_bridge_file(
+        topic_slug,
+        1,
+        body_to_write,
+        project_root,
+        require_author_metadata=False,
+        claim_registry=work_intent_registry,
+    )
 
 
 def propose_bridge_codex_non_bypass(
@@ -583,10 +587,14 @@ def propose_bridge_codex_non_bypass(
         )
     session_id = resolve_work_intent_session_id()
     work_intent_registry = _acquire_bridge_work_intent(topic_slug, session_id, project_root=project_root)
-    bridge_file.parent.mkdir(parents=True, exist_ok=True)
-    bridge_file.write_bytes(body_to_write.encode("utf-8"))
-    _release_bridge_work_intent(work_intent_registry, topic_slug, session_id, project_root=project_root)
-    return bridge_file
+    return _bridge_writer.write_bridge_file(
+        topic_slug,
+        version,
+        body_to_write,
+        project_root,
+        require_author_metadata=False,
+        claim_registry=work_intent_registry,
+    )
 
 
 __all__ = [
@@ -610,3 +618,45 @@ __all__ = [
     "resolve_work_intent_session_id",
     "scan_credential_hits",
 ]
+
+
+# ---------------------------------------------------------------------------
+# WI-5767 C3: direct helper usage contract.
+# ---------------------------------------------------------------------------
+
+
+def _print_usage(stream) -> None:
+    """Print the direct-invocation usage contract for this helper."""
+    stream.write(
+        "usage: write_bridge.py [--help]\n"
+        "\n"
+        "GT-KB bridge-propose helper. This module is a library; it is not intended\n"
+        "for direct script invocation. It exposes these governed entry points:\n"
+        "\n"
+        "  propose_bridge(topic_slug, body, ...)\n"
+        "      Create bridge/<topic_slug>-001.md (version-1 only; the skill never\n"
+        "      silently overwrites and never writes beyond -001 through this helper).\n"
+        "  propose_bridge_codex_non_bypass(...)\n"
+        "      Codex non-bypass proposal path (same version-1-only constraint).\n"
+        "  BridgeFileAlreadyExistsError\n"
+        "      Raised when the target -001 file already exists (no overwrite).\n"
+        "\n"
+        "Governed append / verdict / advisory routes are handled by the bridge\n"
+        "write helpers (scripts.gtkb_bridge_writer.write_bridge_file) and the\n"
+        "Loyal Opposition / Prime Builder bridge skills -- not by this module's\n"
+        "direct CLI.\n"
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Direct-invocation entry point for the helper usage contract."""
+    args = list(sys.argv[1:] if argv is None else argv)
+    if any(arg in ("-h", "--help") for arg in args):
+        _print_usage(sys.stdout)
+        return 0
+    _print_usage(sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

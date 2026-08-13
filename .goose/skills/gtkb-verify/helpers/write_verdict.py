@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -994,14 +995,9 @@ def _apply_hunk_patch_to_index(project_root: Path, patch: HunkPatch, *, env: dic
     )
 
 
-def _cleanup_failed_verdict(project_root: Path, verdict_rel_path: str, staged_paths: tuple[str, ...]) -> None:
+def _cleanup_failed_staging(project_root: Path, staged_paths: tuple[str, ...]) -> None:
     if staged_paths:
         _run_git(["restore", "--staged", "--", *staged_paths], cwd=project_root)
-    verdict_path = project_root / verdict_rel_path
-    try:
-        verdict_path.unlink()
-    except FileNotFoundError:
-        pass
 
 
 def _append_commit_finalization_evidence(body: str, *, commit_message: str, paths: tuple[str, ...]) -> str:
@@ -1105,6 +1101,128 @@ def _assert_verdict_author_session_context_is_real(body: str) -> None:
         )
 
 
+_BRIDGE_COMPLIANCE_GATE_MODULES: dict[str, Any] = {}
+
+
+def _load_bridge_compliance_gate(project_root: Path) -> Any:
+    """Load the bridge-compliance gate module that will audit this write.
+
+    The gate owns the single definition of the self-referential
+    ``candidate_evidence_hash`` algorithm, so the helper never re-implements it
+    and the stamped value cannot drift from the audited value. Resolution reuses
+    the writer's own gate lookup, which guarantees the module loaded here is the
+    same file ``run_bridge_compliance_audit`` executes for this ``project_root``.
+
+    Loading is fail-closed, matching the review-independence comparator: no
+    terminal VERIFIED verdict may be finalized when the enforcement definition
+    is unavailable.
+    """
+    try:
+        from scripts.gtkb_bridge_writer import _bridge_compliance_gate_path
+
+        gate_path = _bridge_compliance_gate_path(project_root)
+        key = str(gate_path.resolve())
+        cached = _BRIDGE_COMPLIANCE_GATE_MODULES.get(key)
+        if cached is not None:
+            return cached
+        suffix = hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
+        spec = importlib.util.spec_from_file_location(f"gtkb_bridge_compliance_gate_{suffix}", gate_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"could not build a module spec for {gate_path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    except Exception as exc:  # noqa: BLE001 - any gate-load failure must deny finalization.
+        raise VerifiedFinalizationError(
+            "Bridge-compliance gate could not be loaded; VERIFIED finalization is denied. The gate "
+            "owns the candidate_evidence_hash definition and the verdict cannot be stamped without "
+            f"it ({exc})."
+        ) from exc
+    _BRIDGE_COMPLIANCE_GATE_MODULES[key] = module
+    return module
+
+
+def _restamp_candidate_evidence_hash(
+    body: str,
+    *,
+    verdict_rel_path: str,
+    project_root: Path,
+) -> str:
+    """Return the verdict body with ``candidate_evidence_hash`` stamped over final bytes.
+
+    ``candidate_evidence_hash`` is self-referential: the gate recomputes it over
+    the fully normalized candidate bytes it is about to audit. Every body
+    mutation performed after the reviewer stamped the field therefore
+    invalidates it. This step runs last, after the finalizer's own mutations and
+    after pre-applying the writer's pre-audit normalization, so the bytes stamped
+    here are the bytes the audit hashes.
+
+    Deterministic: no clock, no network, no retry. Fail-closed on every branch
+    where the gate could not validate the result.
+    """
+    from scripts.gtkb_bridge_writer import ensure_author_metadata, normalize_bridge_envelope_head
+
+    gate = _load_bridge_compliance_gate(project_root)
+
+    # Pre-apply the writer's pre-audit normalization so the stamped bytes and the
+    # audited bytes are identical. Both are idempotent for a finalizer-shaped body.
+    normalized = ensure_author_metadata(body, project_root=project_root, explicit=None)
+    normalized = normalize_bridge_envelope_head(normalized)
+
+    occurrences = list(gate.CANDIDATE_EVIDENCE_HASH_LINE_RE.finditer(normalized))
+    if len(occurrences) > 1:
+        raise VerifiedFinalizationError(
+            f"VERIFIED verdict body declares {len(occurrences)} `candidate_evidence_hash` fields; the "
+            "bridge-compliance gate requires exactly one and denies the write otherwise. Remove the "
+            "duplicate field(s) from the Applicability Preflight section."
+        )
+    if not occurrences:
+        # Mirror the gate's own activation condition: it only checks the hash when
+        # an Applicability Preflight section is present. Absent that section the
+        # field is not required, so there is nothing to stamp.
+        if gate._applicability_preflight_section(normalized) is not None:
+            raise VerifiedFinalizationError(
+                "VERIFIED verdict body has an `## Applicability Preflight` section but no "
+                "`candidate_evidence_hash` field, so the bridge-compliance gate will deny the write. "
+                f"Add `- candidate_evidence_hash: `{gate.CANDIDATE_EVIDENCE_HASH_SENTINEL}`` to that "
+                "section; the finalizer stamps the real value."
+            )
+        return normalized
+
+    expected = gate._candidate_evidence_hash(verdict_rel_path, normalized, project_root)
+    if expected is None:
+        raise VerifiedFinalizationError(
+            "VERIFIED finalization could not compute `candidate_evidence_hash` for "
+            f"{verdict_rel_path!r}; the verdict path must be root-contained and the field must carry "
+            "either the sentinel placeholder or a well-formed sha256 value."
+        )
+
+    stamped = gate.CANDIDATE_EVIDENCE_HASH_LINE_RE.sub(
+        lambda match: match.group("prefix") + expected + match.group("suffix"),
+        normalized,
+        count=1,
+    )
+
+    # The writer re-applies its normalization before auditing. Assert that
+    # re-application is a no-op here, so a future non-idempotent normalization
+    # change fails closed instead of silently reintroducing a stale stamp.
+    reapplied = normalize_bridge_envelope_head(
+        ensure_author_metadata(stamped, project_root=project_root, explicit=None)
+    )
+    if reapplied != stamped:
+        raise VerifiedFinalizationError(
+            "VERIFIED finalization detected non-idempotent bridge-writer normalization; the stamped "
+            "bytes would differ from the audited bytes. Refusing to write a verdict whose "
+            "`candidate_evidence_hash` cannot be guaranteed fresh."
+        )
+    recomputed = gate._candidate_evidence_hash(verdict_rel_path, stamped, project_root)
+    if recomputed != expected:
+        raise VerifiedFinalizationError(
+            "VERIFIED finalization could not reach a stable `candidate_evidence_hash` fixpoint for "
+            f"{verdict_rel_path!r} (expected {expected!r}, recomputed {recomputed!r})."
+        )
+    return stamped
+
+
 def finalize_verified_commit(
     slug: str,
     body: str,
@@ -1113,6 +1231,7 @@ def finalize_verified_commit(
     hunk_patch_paths: list[str] | None = None,
     commit_message: str,
     project_root: Path | None = None,
+    auto_retire_completed_projects: bool = True,
     pre_populate: bool = False,
     db: Any | bool | None = None,
     glossary_path: Path | None = None,
@@ -1125,7 +1244,10 @@ def finalize_verified_commit(
     disposable index, and commits that reviewed index with no pathspec.
     Unrelated paths already staged in the shared real index by other sessions
     are tolerated and never folded into this commit. If any step after the
-    verdict write fails, the verdict file is removed.
+    verdict write fails, the verdict file is removed. Project auto-retirement
+    remains enabled by default; callers with separately governed keep-open
+    authority may explicitly suppress that post-commit actuation for this
+    invocation.
     """
     root = _project_root_from_arg(project_root)
     hunk_patch_paths = hunk_patch_paths or []
@@ -1180,9 +1302,28 @@ def finalize_verified_commit(
     )
     _assert_verdict_author_session_context_is_real(body_to_write)
 
-    from scripts.gtkb_bridge_writer import write_bridge_file
+    # Must run last: every preceding step may mutate the body, and the gate hashes
+    # the final normalized bytes. Fail-closed, so no partial terminal artifact and
+    # no commit can result from a stale stamp.
+    body_to_write = _restamp_candidate_evidence_hash(
+        body_to_write,
+        verdict_rel_path=verdict_rel_path,
+        project_root=root,
+    )
 
-    write_bridge_file(slug, next_version, body_to_write, root)
+    from scripts.gtkb_bridge_writer import (
+        finalize_pending_bridge_publication,
+        rollback_pending_bridge_publication,
+        write_bridge_file,
+    )
+
+    publication_path = write_bridge_file(
+        slug,
+        next_version,
+        body_to_write,
+        root,
+        release_claim=False,
+    )
     temp_env: dict[str, str] | None = None
     temp_index: Path | None = None
     old_head = _git_lines(["rev-parse", "HEAD"], cwd=root)[0]
@@ -1222,6 +1363,7 @@ def finalize_verified_commit(
                 f"committed={sorted(committed)}; expected={sorted(temp_staged)}"
             )
         _realign_real_index_after_temp_commit(root, realignment_plan)
+        finalize_pending_bridge_publication(publication_path, root)
     except Exception as exc:
         if created_commit is not None:
             rollback = _run_git_with_lock_retry(
@@ -1234,14 +1376,20 @@ def finalize_verified_commit(
                     "VERIFIED finalization created a commit but could not atomically roll HEAD back after "
                     f"realignment failure; verdict retained for diagnosis: {(rollback.stderr or rollback.stdout).strip()}"
                 ) from exc
-        _cleanup_failed_verdict(root, verdict_rel_path, ())
+        _cleanup_failed_staging(root, ())
+        rollback_pending_bridge_publication(
+            publication_path,
+            root,
+            reason=f"VERIFIED finalization failed before durable commit: {exc}",
+        )
         raise
     finally:
         if temp_index is not None:
             temp_index.unlink(missing_ok=True)
 
     commit_sha = _git_lines(["rev-parse", "HEAD"], cwd=root)[0]
-    _auto_retire_completed_projects_after_verified(root)
+    if auto_retire_completed_projects:
+        _auto_retire_completed_projects_after_verified(root)
     return VerifiedFinalizationResult(
         commit_sha=commit_sha,
         verdict_path=verdict_rel_path,
@@ -1278,6 +1426,14 @@ def main(argv: list[str] | None = None) -> int:
         "--finalize-verified",
         action="store_true",
         help="Atomically write a VERIFIED verdict and create the final local commit.",
+    )
+    parser.add_argument(
+        "--no-auto-retire",
+        action="store_true",
+        help=(
+            "Explicitly suppress the post-commit project auto-retirement sweep for this "
+            "finalization; requires separate governed keep-open authority."
+        ),
     )
     parser.add_argument(
         "--include",
@@ -1321,6 +1477,7 @@ def main(argv: list[str] | None = None) -> int:
             hunk_patch_paths=args.hunk_patch,
             commit_message=args.commit_message or "",
             project_root=args.project_root,
+            auto_retire_completed_projects=not args.no_auto_retire,
             pre_populate=not args.no_prepopulate,
             db=False if args.no_semantic_search else None,
             log_path=log_path,

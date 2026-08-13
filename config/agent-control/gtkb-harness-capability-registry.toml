@@ -60,6 +60,12 @@ source_sha256 = "44b7fd37bc51973b7f045c492fb71064f64678a9f3fbd487cf76a5fef0d1f70
 surface = ".cursor/skills/gtkb-alternatives-investigation/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-alternatives-investigation/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-alternatives-investigation/SKILL.md"
+source_sha256 = "44b7fd37bc51973b7f045c492fb71064f64678a9f3fbd487cf76a5fef0d1f706"
 [[capabilities]]
 id = "skill.arch-audit"
 kind = "skill"
@@ -88,6 +94,12 @@ source_sha256 = "0c933f48c14c2f068a8fadca6a8b2727a489265c916a372338676772c1bd745
 surface = ".cursor/skills/gtkb-arch-audit/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-arch-audit/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-arch-audit/SKILL.md"
+source_sha256 = "0c933f48c14c2f068a8fadca6a8b2727a489265c916a372338676772c1bd7453"
 [[capabilities]]
 id = "skill.assertion-triage"
 kind = "skill"
@@ -116,6 +128,12 @@ source_sha256 = "d43e7a58978173c7b877652ba31b7e5a4be4d7f2c1d5973fddca19e31739b5d
 surface = ".cursor/skills/gtkb-assertion-triage/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-assertion-triage/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-assertion-triage/SKILL.md"
+source_sha256 = "d43e7a58978173c7b877652ba31b7e5a4be4d7f2c1d5973fddca19e31739b5df"
 [[capabilities]]
 id = "skill.bridge"
 kind = "skill"
@@ -144,6 +162,12 @@ source_sha256 = "2748c05afa97d733bf9e9d0b3adbdff248a374d275cfd8407eb4ff01d15ae42
 surface = ".cursor/skills/gtkb-bridge/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-bridge/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-bridge/SKILL.md"
+source_sha256 = "2748c05afa97d733bf9e9d0b3adbdff248a374d275cfd8407eb4ff01d15ae426"
 [[capabilities]]
 id = "skill.bridge-config"
 kind = "skill"
@@ -172,6 +196,12 @@ source_sha256 = "3e87f3b153c970444157317520d93279c195b9566b9e011aa7965e38e54245f
 surface = ".cursor/skills/gtkb-bridge-config/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-bridge-config/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-bridge-config/SKILL.md"
+source_sha256 = "3e87f3b153c970444157317520d93279c195b9566b9e011aa7965e38e54245fb"
 [[capabilities]]
 id = "skill.dispatcher-control"
 kind = "skill"
@@ -200,6 +230,12 @@ source_sha256 = "3ba260c4f6698a1d46c0031699984f5d8464549d74252cc675830c2dac30d6c
 surface = ".cursor/skills/gtkb-dispatcher-control/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-dispatcher-control/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-dispatcher-control/SKILL.md"
+source_sha256 = "3ba260c4f6698a1d46c0031699984f5d8464549d74252cc675830c2dac30d6c2"
 [[capabilities]]
 id = "skill.bridge-propose"
 kind = "skill"
@@ -228,6 +264,12 @@ source_sha256 = "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b
 surface = ".cursor/skills/gtkb-bridge-propose/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-bridge-propose/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-bridge-propose/SKILL.md"
+source_sha256 = "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
 [[capabilities]]
 id = "skill.bridge-reconciliation"
 kind = "skill"
@@ -256,6 +298,12 @@ source_sha256 = "04150ef93b4c545eb5a41310e03593b8fdd564d0bf13bf4db425661cb0b6808
 surface = ".cursor/skills/gtkb-bridge-reconciliation/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-bridge-reconciliation/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-bridge-reconciliation/SKILL.md"
+source_sha256 = "04150ef93b4c545eb5a41310e03593b8fdd564d0bf13bf4db425661cb0b6808b"
 [[capabilities]]
 id = "skill.gtkb-propose"
 kind = "skill"
@@ -284,6 +332,12 @@ source_sha256 = "ed037162b4091af7814529100eb84aa3f902e8904038bdf884a2f74eb0f028a
 surface = ".cursor/skills/gtkb-propose/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-propose/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-propose/SKILL.md"
+source_sha256 = "ed037162b4091af7814529100eb84aa3f902e8904038bdf884a2f74eb0f028a2"
 [[capabilities]]
 id = "skill.check-deliberations"
 kind = "skill"
@@ -312,6 +366,12 @@ source_sha256 = "c0366f647fb36d34171c336bade6157dcf4c8ba33bb3a8ad82f6e0ef778526e
 surface = ".cursor/skills/gtkb-check-deliberations/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-check-deliberations/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-check-deliberations/SKILL.md"
+source_sha256 = "c0366f647fb36d34171c336bade6157dcf4c8ba33bb3a8ad82f6e0ef778526e2"
 [[capabilities]]
 id = "skill.code-review-audit"
 kind = "skill"
@@ -340,6 +400,12 @@ source_sha256 = "5e16702bbb66c6667fcc69505d254b07912288ec5538a9d932f4039a9a87be5
 surface = ".cursor/skills/gtkb-code-review-audit/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-code-review-audit/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-code-review-audit/SKILL.md"
+source_sha256 = "5e16702bbb66c6667fcc69505d254b07912288ec5538a9d932f4039a9a87be54"
 [[capabilities]]
 id = "skill.lo-opportunity-radar"
 kind = "skill"
@@ -368,6 +434,12 @@ source_sha256 = "a47bfabea763756f69c20d4b4536f98eef0e408a6db115f616272d2099839d1
 surface = ".cursor/skills/gtkb-lo-opportunity-radar/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-lo-opportunity-radar/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-lo-opportunity-radar/SKILL.md"
+source_sha256 = "a47bfabea763756f69c20d4b4536f98eef0e408a6db115f616272d2099839d1f"
 [[capabilities]]
 id = "skill.codex-report"
 kind = "skill"
@@ -396,6 +468,12 @@ source_sha256 = "b30bff47d12c25c1ee2d684d95920562c47d03d2695b96efa0236b77b10054f
 surface = ".cursor/skills/gtkb-loyal-opposition-report/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-loyal-opposition-report/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-loyal-opposition-report/SKILL.md"
+source_sha256 = "b30bff47d12c25c1ee2d684d95920562c47d03d2695b96efa0236b77b10054f7"
 [[capabilities]]
 id = "skill.decision-capture"
 kind = "skill"
@@ -424,6 +502,12 @@ source_sha256 = "24d8335416edce0e9a7676250a868fed7373f79d7d6eb20fbbdc2c0397f2777
 surface = ".cursor/skills/gtkb-decision-capture/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-decision-capture/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-decision-capture/SKILL.md"
+source_sha256 = "24d8335416edce0e9a7676250a868fed7373f79d7d6eb20fbbdc2c0397f2777b"
 [[capabilities]]
 id = "skill.harness-parity-review"
 kind = "skill"
@@ -452,6 +536,12 @@ source_sha256 = "609a37f9545de53b3f65e1566e1e7509a0d0bd55ddab59e4c2bf563de7f295d
 surface = ".cursor/skills/gtkb-harness-parity-review/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-harness-parity-review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-harness-parity-review/SKILL.md"
+source_sha256 = "609a37f9545de53b3f65e1566e1e7509a0d0bd55ddab59e4c2bf563de7f295d1"
 [[capabilities]]
 id = "skill.skill-governance-lifecycle"
 kind = "skill"
@@ -478,6 +568,12 @@ reason = "WI-4839 authorizes only the canonical Claude source and generated Code
 [capabilities.cursor]
 status = "unsupported"
 reason = "WI-4839 authorizes only the canonical Claude source and generated Codex adapter; Cursor projection requires a separate target-path-covered proposal or typed parity disposition."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-skill-governance-lifecycle/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-skill-governance-lifecycle/SKILL.md"
+source_sha256 = "e30a2541f4042ca28c8f582743e380ecfda0a71cc7d3ceb58de6fd418bf1e550"
 [[capabilities]]
 id = "skill.advisory-disposition"
 kind = "skill"
@@ -504,6 +600,12 @@ reason = "WI-4840 authorizes only the canonical Claude source and generated Code
 [capabilities.cursor]
 status = "unsupported"
 reason = "WI-4840 authorizes only the canonical Claude source and generated Codex adapter; Cursor projection requires a separate target-path-covered proposal or typed parity disposition."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-advisory-disposition/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-advisory-disposition/SKILL.md"
+source_sha256 = "43a1e728f208d9ba1e484b9c715924aa47dd0b6670ef57e0814c5ad43b06a22e"
 
 [[capabilities]]
 id = "skill.advisory-proposal"
@@ -540,6 +642,12 @@ reason = "WI-5055 authorizes only the canonical Claude source and generated Code
 status = "unsupported"
 reason = "WI-5055 authorizes only the canonical Claude source and generated Codex adapter; OpenRouter projection requires a separate target-path-covered proposal or typed parity disposition."
 
+[capabilities.goose]
+surface = ".goose/skills/gtkb-advisory-proposal/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-advisory-proposal/SKILL.md"
+source_sha256 = "a1985ec2b71ab6a2aab6914854ae82194e3fe7930e17a458cbcc02c853931805"
+
 [[capabilities]]
 id = "skill.advisory-intake"
 kind = "skill"
@@ -575,6 +683,12 @@ reason = "WI-5056 authorizes only the canonical Claude source and generated Code
 status = "unsupported"
 reason = "WI-5056 authorizes only the canonical Claude source and generated Codex adapter; OpenRouter projection requires a separate target-path-covered proposal or typed parity disposition."
 
+[capabilities.goose]
+surface = ".goose/skills/gtkb-advisory-intake/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-advisory-intake/SKILL.md"
+source_sha256 = "25e4f360c5fb6bef91601c183e8df217b4eebf4008e7555d6527f1f2a8ab870e"
+
 [[capabilities]]
 id = "skill.kb-adr"
 kind = "skill"
@@ -603,6 +717,12 @@ source_sha256 = "4b1ec3c66407daa82cd66a84eefe1e2ed6e8d83cc4a4d7e0f7383bb7dd03b96
 surface = ".cursor/skills/gtkb-adr/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-adr/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-adr/SKILL.md"
+source_sha256 = "4b1ec3c66407daa82cd66a84eefe1e2ed6e8d83cc4a4d7e0f7383bb7dd03b969"
 [[capabilities]]
 id = "skill.kb-assert"
 kind = "skill"
@@ -631,6 +751,12 @@ source_sha256 = "21efa5bb54ede144061770a326b29632a6139d935c85e0fa3d6d4aefb85cbcd
 surface = ".cursor/skills/gtkb-assert/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-assert/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-assert/SKILL.md"
+source_sha256 = "21efa5bb54ede144061770a326b29632a6139d935c85e0fa3d6d4aefb85cbcdf"
 [[capabilities]]
 id = "skill.kb-batch"
 kind = "skill"
@@ -659,6 +785,12 @@ source_sha256 = "e3269505c142a81126c6615619d06b9f1156253b1cf88bbb71d272e42fd2df7
 surface = ".cursor/skills/gtkb-batch/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-batch/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-batch/SKILL.md"
+source_sha256 = "e3269505c142a81126c6615619d06b9f1156253b1cf88bbb71d272e42fd2df7c"
 [[capabilities]]
 id = "skill.kb-promote"
 kind = "skill"
@@ -687,6 +819,12 @@ source_sha256 = "5dab12bd288a3ce3d126c30d2670322617121432fcd7d0a38b7fdc93bed2e7c
 surface = ".cursor/skills/gtkb-promote/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-promote/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-promote/SKILL.md"
+source_sha256 = "5dab12bd288a3ce3d126c30d2670322617121432fcd7d0a38b7fdc93bed2e7cb"
 [[capabilities]]
 id = "skill.kb-query"
 kind = "skill"
@@ -715,6 +853,12 @@ source_sha256 = "f694720b346a85a5c239cb5aa03c01b18f819b33aa10a43aaff76eb46b8d1ca
 surface = ".cursor/skills/gtkb-query/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-query/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-query/SKILL.md"
+source_sha256 = "f694720b346a85a5c239cb5aa03c01b18f819b33aa10a43aaff76eb46b8d1ca5"
 [[capabilities]]
 id = "skill.kb-session-wrap"
 kind = "skill"
@@ -743,6 +887,12 @@ source_sha256 = "6680210122f77b617608d543ebc53e0674a89dc418f552bbe09976d89316657
 surface = ".cursor/skills/gtkb-session-wrap/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-session-wrap/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-session-wrap/SKILL.md"
+source_sha256 = "6680210122f77b617608d543ebc53e0674a89dc418f552bbe09976d893166575"
 [[capabilities]]
 id = "skill.kb-session-wrap-scan"
 kind = "skill"
@@ -771,6 +921,12 @@ source_sha256 = "9468768273e151445af117755950d0467a8bd19d1e0357e61639cf41c2dfd83
 surface = ".cursor/skills/gtkb-session-wrap-scan/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-session-wrap-scan/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-session-wrap-scan/SKILL.md"
+source_sha256 = "9468768273e151445af117755950d0467a8bd19d1e0357e61639cf41c2dfd83e"
 [[capabilities]]
 id = "skill.kb-spec"
 kind = "skill"
@@ -799,6 +955,12 @@ source_sha256 = "7430be6a9e5c424a3f27a71fe2b9f7580085f59858bcb1176252a095b67755a
 surface = ".cursor/skills/gtkb-spec/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-spec/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-spec/SKILL.md"
+source_sha256 = "7430be6a9e5c424a3f27a71fe2b9f7580085f59858bcb1176252a095b67755ac"
 [[capabilities]]
 id = "skill.kb-work-item"
 kind = "skill"
@@ -827,6 +989,12 @@ source_sha256 = "b3b4a36c21530da6cc31470583a8baf3a9d1f4da19c579941d6df76085cee01
 surface = ".cursor/skills/gtkb-work-item/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-work-item/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-work-item/SKILL.md"
+source_sha256 = "b3b4a36c21530da6cc31470583a8baf3a9d1f4da19c579941d6df76085cee015"
 [[capabilities]]
 id = "skill.projects"
 kind = "skill"
@@ -855,6 +1023,12 @@ source_sha256 = "17a2b01dd84becb7fe48487ef8ddff092f7b4897a16092406fb9b956f1394c2
 surface = ".cursor/skills/gtkb-projects/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-projects/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-projects/SKILL.md"
+source_sha256 = "17a2b01dd84becb7fe48487ef8ddff092f7b4897a16092406fb9b956f1394c2e"
 [[capabilities]]
 id = "skill.proposal-review"
 kind = "skill"
@@ -883,6 +1057,12 @@ source_sha256 = "2fa418d270b95d5c03995720375bacba6a6d3250475298c39918c30db95b9ec
 surface = ".cursor/skills/gtkb-proposal-review/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-proposal-review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-proposal-review/SKILL.md"
+source_sha256 = "2fa418d270b95d5c03995720375bacba6a6d3250475298c39918c30db95b9ec8"
 [[capabilities]]
 id = "skill.release-candidate-gate"
 kind = "skill"
@@ -911,6 +1091,12 @@ source_sha256 = "dc064edf4e9d291b640d0261bbd2293b24f37093f7bbc59127ed90ac997287b
 surface = ".cursor/skills/gtkb-release-candidate-gate/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-release-candidate-gate/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-release-candidate-gate/SKILL.md"
+source_sha256 = "dc064edf4e9d291b640d0261bbd2293b24f37093f7bbc59127ed90ac997287b9"
 [[capabilities]]
 id = "skill.send-review"
 kind = "skill"
@@ -939,6 +1125,12 @@ source_sha256 = "aa6437097d9fdcbb5b2368367e48b93b805b7082703edcc0fe4f720ae98eb7b
 surface = ".cursor/skills/gtkb-send-review/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-send-review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-send-review/SKILL.md"
+source_sha256 = "aa6437097d9fdcbb5b2368367e48b93b805b7082703edcc0fe4f720ae98eb7b2"
 [[capabilities]]
 id = "skill.spec-intake"
 kind = "skill"
@@ -967,6 +1159,12 @@ source_sha256 = "aa9090907a86ca0c1a05844ce51e509c66bdfe013ffa95b4ba4d5a3cf48ca11
 surface = ".cursor/skills/gtkb-spec-intake/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-spec-intake/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-spec-intake/SKILL.md"
+source_sha256 = "aa9090907a86ca0c1a05844ce51e509c66bdfe013ffa95b4ba4d5a3cf48ca111"
 [[capabilities]]
 id = "skill.structural-hygiene-review"
 kind = "skill"
@@ -995,6 +1193,12 @@ source_sha256 = "13de9e2f85addc7faa602baf9312bf00538d5bb33e4270036146052da0b1309
 surface = ".cursor/skills/gtkb-structural-hygiene-review/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-structural-hygiene-review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-structural-hygiene-review/SKILL.md"
+source_sha256 = "13de9e2f85addc7faa602baf9312bf00538d5bb33e4270036146052da0b1309b"
 [[capabilities]]
 id = "hook.advisory-router-scan"
 kind = "hook"
@@ -1083,6 +1287,12 @@ source_sha256 = "31a83117293b282f51310b01c097559e0c6d4b91c91d90b6ca19aa8a1b837d7
 surface = ".cursor/skills/gtkb-benchmarks/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-benchmarks/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-benchmarks/SKILL.md"
+source_sha256 = "31a83117293b282f51310b01c097559e0c6d4b91c91d90b6ca19aa8a1b837d79"
 [[capabilities]]
 id = "skill.grill-me-for-clarification"
 kind = "skill"
@@ -1111,6 +1321,12 @@ source_sha256 = "781e7752a6cdd0332b99971534b64b36cad4d10652926d520b54e83c02678c0
 surface = ".cursor/skills/gtkb-grill-me-for-clarification/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-grill-me-for-clarification/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-grill-me-for-clarification/SKILL.md"
+source_sha256 = "781e7752a6cdd0332b99971534b64b36cad4d10652926d520b54e83c02678c08"
 [[capabilities]]
 id = "skill.gtkb-hygiene-investigation"
 kind = "skill"
@@ -1139,6 +1355,12 @@ source_sha256 = "4474b3c97a78fd01896fc2c02dec4a36b1d3d158f43e8f1d97a97ea14b832e9
 surface = ".cursor/skills/gtkb-hygiene-investigation/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-hygiene-investigation/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-hygiene-investigation/SKILL.md"
+source_sha256 = "4474b3c97a78fd01896fc2c02dec4a36b1d3d158f43e8f1d97a97ea14b832e94"
 [[capabilities]]
 id = "skill.gtkb-hygiene-sweep"
 kind = "skill"
@@ -1167,6 +1389,12 @@ source_sha256 = "97ccc96744186df7ddb9a7548d15b64dc413c42cbde5909d99f87ab9ceb7465
 surface = ".cursor/skills/gtkb-hygiene-sweep/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-hygiene-sweep/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-hygiene-sweep/SKILL.md"
+source_sha256 = "97ccc96744186df7ddb9a7548d15b64dc413c42cbde5909d99f87ab9ceb7465c"
 
 [[capabilities]]
 id = "skill.gtkb-hygiene-reclaim"
@@ -1203,6 +1431,12 @@ reason = "WI-5142 phase 1 authorizes only the canonical Claude source and genera
 status = "unsupported"
 reason = "WI-5142 phase 1 authorizes only the canonical Claude source and generated Codex adapter; OpenRouter projection requires a separate target-path-covered proposal."
 
+[capabilities.goose]
+surface = ".goose/skills/gtkb-hygiene-reclaim/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-hygiene-reclaim/SKILL.md"
+source_sha256 = "0b928d4c238f7ad893bc194569f0be4c175ff71c32910d26baebb11d4b7cc152"
+
 [[capabilities]]
 id = "skill.gtkb-sweep-commit"
 kind = "skill"
@@ -1231,6 +1465,12 @@ source_sha256 = "fc4b1626c9eeeb2eee79565165160453668a6236f91f9582828873283ac679e
 surface = ".cursor/skills/gtkb-sweep-commit/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-sweep-commit/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-sweep-commit/SKILL.md"
+source_sha256 = "fc4b1626c9eeeb2eee79565165160453668a6236f91f9582828873283ac679ef"
 [[capabilities]]
 id = "skill.loyal-opposition-hygiene-assessment"
 kind = "skill"
@@ -1259,6 +1499,12 @@ source_sha256 = "69d66578cd14cbe3e807cd6a6a93c973e08dc8566a3734cfd773568bc7feaa9
 surface = ".cursor/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-lo-hygiene-assessment/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-lo-hygiene-assessment/SKILL.md"
+source_sha256 = "69d66578cd14cbe3e807cd6a6a93c973e08dc8566a3734cfd773568bc7feaa9c"
 [[capabilities]]
 id = "skill.verify"
 kind = "skill"
@@ -1287,6 +1533,12 @@ source_sha256 = "d0f13dc12f946f44c8a1536d3734d64e85c35c5a3bdaa5789a96cbf4c965d1e
 surface = ".cursor/skills/gtkb-verify/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-verify/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-verify/SKILL.md"
+source_sha256 = "d0f13dc12f946f44c8a1536d3734d64e85c35c5a3bdaa5789a96cbf4c965d1e4"
 [[capabilities]]
 id = "hook.directive-enforcement"
 kind = "hook"
@@ -2171,6 +2423,12 @@ reason = "Ollama is a provider harness and does not execute repo-local managed s
 status = "unsupported"
 reason = "OpenRouter is a provider harness and does not execute repo-local managed skill adapters in this WI-4842 slice."
 
+[capabilities.goose]
+surface = ".goose/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
+source_sha256 = "8fba2488531fb05a5e07dc07bfcd94eb62fc7fa891072ee8e57ffdb6949fff0f"
+
 [[capabilities]]
 id = "skill.managed-skill-adoption-review"
 kind = "skill"
@@ -2211,3 +2469,9 @@ reason = "OpenRouter is a provider harness and does not execute repo-local manag
 [capabilities.alibaba-cloud-studio]
 status = "unsupported"
 reason = "Alibaba Cloud Studio is a provider harness and does not execute repo-local managed skill adapters; structural managed-artifact review remains assigned to native/adapter-capable harnesses."
+
+[capabilities.goose]
+surface = ".goose/skills/gtkb-managed-skill-adoption-review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-managed-skill-adoption-review/SKILL.md"
+source_sha256 = "ab7cfdd90ddbeeee51b48dc546b3b092823736802c7bcc87c3cf368f3039e6b3"
