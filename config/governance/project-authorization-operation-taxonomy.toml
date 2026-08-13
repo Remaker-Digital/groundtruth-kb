@@ -11,6 +11,18 @@ mutation_class = "configuration"
 pattern = ".goosehints"
 mutation_class = "configuration"
 
+# Baseline path rules (bridge/gtkb-operation-taxonomy-baseline-path-rules, GO at
+# -002): the neutral harness baseline and the predecessor tree being retired are
+# configuration content; without these rules both evaluate to `unclassified` and
+# the operation-time evaluator fails closed on any target_paths containing them.
+[[path_rule]]
+pattern = ".harness-baseline-configuration/**"
+mutation_class = "configuration"
+
+[[path_rule]]
+pattern = ".agents/**"
+mutation_class = "configuration"
+
 [[mutation_class]]
 name = "bridge"
 aliases = ["bridge_proposal", "bridge_proposal_authoring", "bridge_report_write"]
