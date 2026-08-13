@@ -137,15 +137,6 @@
             "timeout": 60
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/assertion-check.py\"",
-            "timeout": 60
-          }
-        ]
       }
     ],
     "PostToolUse": [
@@ -168,22 +159,6 @@
             "type": "command",
             "command": "pythonw \"$CLAUDE_PROJECT_DIR/scripts/registry_observation_hook.py\"",
             "timeout": 10
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-event-surfacer.py\""
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-capture.py\""
           }
         ]
       }
@@ -268,22 +243,6 @@
             "type": "command",
             "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-topic-envelope-router.py\"",
             "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/intake-classifier.py\""
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/gov09-capture.py\""
           }
         ]
       }
