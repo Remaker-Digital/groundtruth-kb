@@ -12,8 +12,8 @@ from groundtruth_kb.project.lifecycle import ProjectLifecycleService
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCANNER_PATH = REPO_ROOT / "scripts" / "project_verified_completion_scanner.py"
-CLAUDE_HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "verify" / "helpers" / "write_verdict.py"
-CODEX_HELPER_PATH = REPO_ROOT / ".codex" / "skills" / "verify" / "helpers" / "write_verdict.py"
+CLAUDE_HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "gtkb-verify" / "helpers" / "write_verdict.py"
+CODEX_HELPER_PATH = REPO_ROOT / ".codex" / "skills" / "gtkb-verify" / "helpers" / "write_verdict.py"
 
 
 def _load_module(path: Path, name: str) -> ModuleType:
