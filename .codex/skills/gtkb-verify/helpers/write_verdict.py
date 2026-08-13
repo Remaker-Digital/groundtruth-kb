@@ -1231,6 +1231,7 @@ def finalize_verified_commit(
     hunk_patch_paths: list[str] | None = None,
     commit_message: str,
     project_root: Path | None = None,
+    auto_retire_completed_projects: bool = True,
     pre_populate: bool = False,
     db: Any | bool | None = None,
     glossary_path: Path | None = None,
@@ -1243,7 +1244,10 @@ def finalize_verified_commit(
     disposable index, and commits that reviewed index with no pathspec.
     Unrelated paths already staged in the shared real index by other sessions
     are tolerated and never folded into this commit. If any step after the
-    verdict write fails, the verdict file is removed.
+    verdict write fails, the verdict file is removed. Project auto-retirement
+    remains enabled by default; callers with separately governed keep-open
+    authority may explicitly suppress that post-commit actuation for this
+    invocation.
     """
     root = _project_root_from_arg(project_root)
     hunk_patch_paths = hunk_patch_paths or []
@@ -1384,7 +1388,8 @@ def finalize_verified_commit(
             temp_index.unlink(missing_ok=True)
 
     commit_sha = _git_lines(["rev-parse", "HEAD"], cwd=root)[0]
-    _auto_retire_completed_projects_after_verified(root)
+    if auto_retire_completed_projects:
+        _auto_retire_completed_projects_after_verified(root)
     return VerifiedFinalizationResult(
         commit_sha=commit_sha,
         verdict_path=verdict_rel_path,
@@ -1421,6 +1426,14 @@ def main(argv: list[str] | None = None) -> int:
         "--finalize-verified",
         action="store_true",
         help="Atomically write a VERIFIED verdict and create the final local commit.",
+    )
+    parser.add_argument(
+        "--no-auto-retire",
+        action="store_true",
+        help=(
+            "Explicitly suppress the post-commit project auto-retirement sweep for this "
+            "finalization; requires separate governed keep-open authority."
+        ),
     )
     parser.add_argument(
         "--include",
@@ -1464,6 +1477,7 @@ def main(argv: list[str] | None = None) -> int:
             hunk_patch_paths=args.hunk_patch,
             commit_message=args.commit_message or "",
             project_root=args.project_root,
+            auto_retire_completed_projects=not args.no_auto_retire,
             pre_populate=not args.no_prepopulate,
             db=False if args.no_semantic_search else None,
             log_path=log_path,
