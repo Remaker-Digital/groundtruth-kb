@@ -544,10 +544,16 @@ def propose_bridge(
         )
     session_id = resolve_work_intent_session_id()
     work_intent_registry = _acquire_bridge_work_intent(topic_slug, session_id, project_root=project_root)
-    bridge_file.parent.mkdir(parents=True, exist_ok=True)
-    bridge_file.write_bytes(body_to_write.encode("utf-8"))
-    _release_bridge_work_intent(work_intent_registry, topic_slug, session_id, project_root=project_root)
-    return bridge_file
+    # Governed publication path. A direct write_bytes here produces a bridge file
+    # with no publication capability consumed - the WI-5825-class stranding defect.
+    return _bridge_writer.write_bridge_file(
+        topic_slug,
+        1,
+        body_to_write,
+        project_root,
+        require_author_metadata=False,
+        claim_registry=work_intent_registry,
+    )
 
 
 def propose_bridge_codex_non_bypass(
@@ -611,10 +617,16 @@ def propose_bridge_codex_non_bypass(
         )
     session_id = resolve_work_intent_session_id()
     work_intent_registry = _acquire_bridge_work_intent(topic_slug, session_id, project_root=project_root)
-    bridge_file.parent.mkdir(parents=True, exist_ok=True)
-    bridge_file.write_bytes(body_to_write.encode("utf-8"))
-    _release_bridge_work_intent(work_intent_registry, topic_slug, session_id, project_root=project_root)
-    return bridge_file
+    # Governed publication path. A direct write_bytes here produces a bridge file
+    # with no publication capability consumed - the WI-5825-class stranding defect.
+    return _bridge_writer.write_bridge_file(
+        topic_slug,
+        version,
+        body_to_write,
+        project_root,
+        require_author_metadata=False,
+        claim_registry=work_intent_registry,
+    )
 
 
 __all__ = [
