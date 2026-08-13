@@ -40,11 +40,11 @@ selection_order = ["reviewer_precedence", "harness_id"]
 [budget]
 enabled = false
 
-[budget.harnesses.A]
-model = "gpt-5.5"
+    [budget.harnesses.A]
+    model = "dispatcher-only-model-a"
 
-[budget.harnesses.D]
-model = "deepseek-v4-pro-cloud"
+    [budget.harnesses.D]
+    model = "dispatcher-only-model-d"
 
 [harnesses.A]
 max_items = 1
@@ -186,7 +186,8 @@ def _enable_bridge_registry(root: Path) -> tuple[Path, Path, Path]:
     packaged.write_bytes(payload)
 
     db_path = root / "groundtruth.db"
-    KnowledgeDB(db_path=db_path)
+    db = KnowledgeDB(db_path=db_path)
+    db.close()
     sync_projection([record], db_path, changed_by="test", change_reason="state-report fixture")
     append_passive_observation(
         target_paths=["bridge/alpha-001.md"],
@@ -201,7 +202,7 @@ def _enable_bridge_registry(root: Path) -> tuple[Path, Path, Path]:
     return canonical, packaged, db_path
 
 
-def test_bridge_state_report_json_uses_exact_threads_and_harness_model_config(tmp_path: Path) -> None:
+def test_bridge_state_report_json_omits_dispatcher_and_uses_registry_model_config(tmp_path: Path) -> None:
     _root, config = _project(tmp_path)
 
     result = CliRunner().invoke(main, ["--config", str(config), "bridge", "state-report", "--json"])
@@ -225,8 +226,9 @@ def test_bridge_state_report_json_uses_exact_threads_and_harness_model_config(tm
         "REVISED": 1,
         "VERIFIED": 1,
     }
-    assert payload["dispatcher"]["health"] == "PASS"
-    assert payload["dispatcher"]["selected"] == {"loyal-opposition": ["D"], "prime-builder": ["A"]}
+    assert set(payload) == {"bridge", "registry_publication", "harnesses", "source_authority"}
+    assert "dispatcher" not in payload
+    assert "dispatcher" not in payload["source_authority"]
     assert payload["registry_publication"] == {
         "enabled": False,
         "aggregate_current": None,
@@ -235,13 +237,16 @@ def test_bridge_state_report_json_uses_exact_threads_and_harness_model_config(tm
     }
 
     harnesses = {row["id"]: row for row in payload["harnesses"]["rows"]}
+    assert all(set(row) == {"id", "harness", "model_config", "active", "events"} for row in harnesses.values())
     assert harnesses["A"]["model_config"] == "gpt-5.5; reasoning=xhigh; approval_policy=never"
     assert harnesses["D"]["model_config"] == "deepseek-v4-pro-cloud; skill=bridge-review"
     assert harnesses["A"]["events"] == "no"
-    assert harnesses["D"]["dispatchable"] == "yes"
+    assert harnesses["D"]["active"] == "yes"
+    assert "dispatcher-only-model-a" not in result.output
+    assert "dispatcher-only-model-d" not in result.output
 
 
-def test_bridge_state_report_markdown_is_four_owner_tables(tmp_path: Path) -> None:
+def test_bridge_state_report_markdown_is_three_worker_facing_tables(tmp_path: Path) -> None:
     _root, config = _project(tmp_path)
 
     result = CliRunner().invoke(main, ["--config", str(config), "bridge", "state-report", "--markdown"])
@@ -250,11 +255,12 @@ def test_bridge_state_report_markdown_is_four_owner_tables(tmp_path: Path) -> No
     assert "| Status | Count |" in result.output
     assert "| Aspect | Value |" in result.output
     assert "## REGISTRY PUBLICATION" in result.output
+    assert "## DISPATCHER" not in result.output
     assert "| Enabled | no |" in result.output
     assert "| Aggregate current | (unavailable) |" in result.output
-    assert "| ID | Harness | Model / Config | Role | Active | Dispatchable | Events |" in result.output
+    assert "| ID | Harness | Model / Config | Active | Events |" in result.output
     assert "| LO_ACTIONABLE_LATEST_NEW_REVISED_NO_ACTION | 3: alpha-child" in result.output
-    assert sum(1 for line in result.output.splitlines() if line.startswith("| ---")) == 4
+    assert sum(1 for line in result.output.splitlines() if line.startswith("| ---")) == 3
 
 
 def test_bridge_state_report_surfaces_current_and_stale_registry_aggregate(tmp_path: Path) -> None:

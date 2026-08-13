@@ -1,4 +1,10 @@
-"""Deterministic bridge, dispatcher, and harness state report."""
+"""Deterministic bridge, registry-publication, and harness state report.
+
+Worker-facing only: this report intentionally carries no TAFE dispatcher
+configuration. Workers must not be asked to know about the dispatcher or its
+configuration, so the report does not surface dispatcher state or
+dispatch-derived columns (WI-6186).
+"""
 
 from __future__ import annotations
 
@@ -11,12 +17,6 @@ from types import ModuleType
 from typing import Any
 
 from groundtruth_kb.bridge.disposition import LOYAL_OPPOSITION_ACTIONABLE_STATUSES
-from groundtruth_kb.bridge_dispatch_config import (
-    ROLE_LOYAL_OPPOSITION,
-    ROLE_PRIME_BUILDER,
-    BridgeDispatchStatus,
-    collect_bridge_dispatch_status,
-)
 from groundtruth_kb.harness_projection import read_roles
 from groundtruth_kb.project.registry_control_plane import (
     RegistryPaths,
@@ -29,20 +29,22 @@ BRIDGE_AGGREGATE_ID = "bridge-versioned-files"
 
 
 def build_state_report(project_root: Path) -> dict[str, Any]:
-    """Build a read-only state report from live bridge files and dispatcher state."""
+    """Build a read-only worker-facing state report from live bridge files.
+
+    The report exposes bridge and registry-publication state plus a worker-facing
+    harness summary. It deliberately excludes TAFE dispatcher configuration so no
+    worker is asked to know about the dispatcher (WI-6186).
+    """
 
     root = project_root.resolve()
-    dispatch_status = collect_bridge_dispatch_status(root)
     return {
         "bridge": _bridge_section(root),
         "registry_publication": _registry_publication_section(root),
-        "dispatcher": _dispatcher_section(dispatch_status),
-        "harnesses": _harness_section(root, dispatch_status),
+        "harnesses": _harness_section(root),
         "source_authority": {
             "bridge": "status-bearing numbered bridge files via scripts/bridge_thread_files.py",
             "registry_publication": "registry_currentness scoped to bridge-versioned-files",
-            "dispatcher": "collect_bridge_dispatch_status",
-            "harnesses": "harness-state/harness-registry.json plus config/dispatcher/rules.toml",
+            "harnesses": "harness-state/harness-registry.json via groundtruth_kb.harness_projection.read_roles",
         },
     }
 
@@ -52,7 +54,6 @@ def render_markdown(report: dict[str, Any]) -> str:
 
     bridge = report["bridge"]
     registry_publication = report["registry_publication"]
-    dispatcher = report["dispatcher"]
     harnesses = report["harnesses"]["rows"]
 
     bridge_rows = [
@@ -95,28 +96,18 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "## DISPATCHER",
-            "| Aspect | Value |",
-            "| --- | --- |",
-            f"| Health | {_md_cell(dispatcher['health'])} |",
-            f"| PB selected | {_md_cell(', '.join(dispatcher['selected']['prime-builder']) or '(none)')} |",
-            f"| LO selected | {_md_cell(', '.join(dispatcher['selected']['loyal-opposition']) or '(none)')} |",
-            f"| Findings | {_md_cell('; '.join(dispatcher['findings']) or '(none)')} |",
-            "",
             "## HARNESSES",
-            "| ID | Harness | Model / Config | Role | Active | Dispatchable | Events |",
-            "| --- | --- | --- | --- | --- | --- | --- |",
+            "| ID | Harness | Model / Config | Active | Events |",
+            "| --- | --- | --- | --- | --- |",
         ]
     )
     for row in harnesses:
         lines.append(
-            "| {id} | {harness} | {model_config} | {role} | {active} | {dispatchable} | {events} |".format(
+            "| {id} | {harness} | {model_config} | {active} | {events} |".format(
                 id=_md_cell(row["id"]),
                 harness=_md_cell(row["harness"]),
                 model_config=_md_cell(row["model_config"]),
-                role=_md_cell(row["role"]),
                 active=_md_cell(row["active"]),
-                dispatchable=_md_cell(row["dispatchable"]),
                 events=_md_cell(row["events"]),
             )
         )
@@ -197,39 +188,28 @@ def _bridge_section(root: Path) -> dict[str, Any]:
     }
 
 
-def _dispatcher_section(status: BridgeDispatchStatus) -> dict[str, Any]:
-    selected = {
-        role: [str(row.get("id")) for row in status.selected_by_role.get(role, []) if row.get("id")]
-        for role in (ROLE_PRIME_BUILDER, ROLE_LOYAL_OPPOSITION)
-    }
-    return {
-        "health": status.health_status,
-        "selected": selected,
-        "findings": list(status.health_findings),
-    }
+def _harness_section(root: Path) -> dict[str, Any]:
+    """Build the worker-facing harness summary from the non-dispatch projection.
 
-
-def _harness_section(root: Path, status: BridgeDispatchStatus) -> dict[str, Any]:
+    Uses ``read_roles`` directly (never the dispatcher's view) and drops the
+    dispatch-derived ``Role`` and ``Dispatchable`` columns (WI-6186). No worker
+    sees dispatcher configuration.
+    """
     projection = read_roles(root)
-    raw_by_id = {
-        str(row.get("id")): row
-        for row in projection.get("harnesses", [])
-        if isinstance(row, dict) and row.get("id") is not None
-    }
-    budget_by_id = status.config.budget.harnesses
+    harnesses = projection.get("harnesses", [])
+    if not isinstance(harnesses, list):
+        harnesses = []
     rows: list[dict[str, str]] = []
-    for summary in sorted(status.harnesses, key=lambda item: str(item.get("id") or "")):
-        harness_id = str(summary.get("id") or "")
-        raw = raw_by_id.get(harness_id, {})
+    for raw in sorted(harnesses, key=lambda item: str(item.get("id") or "") if isinstance(item, dict) else ""):
+        if not isinstance(raw, dict):
+            continue
         rows.append(
             {
-                "id": harness_id,
-                "harness": str(summary.get("harness_name") or raw.get("harness_name") or ""),
-                "model_config": _model_config(raw, budget_by_id.get(harness_id)),
-                "role": ", ".join(str(role) for role in summary.get("role", [])) or "(none)",
-                "active": _yes_no(summary.get("status") == "active"),
-                "dispatchable": _yes_no(summary.get("can_receive_dispatch") is True),
-                "events": _yes_no(summary.get("can_fire_events") is True or summary.get("event_driven_hooks") is True),
+                "id": str(raw.get("id") or ""),
+                "harness": str(raw.get("harness_name") or ""),
+                "model_config": _model_config(raw),
+                "active": _yes_no(str(raw.get("status")) == "active"),
+                "events": _yes_no(raw.get("can_fire_events") is True or raw.get("event_driven_hooks") is True),
             }
         )
     return {"rows": rows}
@@ -253,14 +233,11 @@ def _load_bridge_thread_helper(root: Path) -> ModuleType:
     raise RuntimeError(f"Unable to locate {BRIDGE_THREAD_HELPER.as_posix()}")
 
 
-def _model_config(raw_record: dict[str, Any], budget_row: Any) -> str:
+def _model_config(raw_record: dict[str, Any]) -> str:
     argv = _headless_argv(raw_record)
-    budget_model = getattr(budget_row, "model", None)
     argv_model = _argv_value(argv, "--model")
-    model = budget_model or argv_model or "(unspecified)"
+    model = argv_model or "(unspecified)"
     parts = [str(model)]
-    if argv_model and budget_model and argv_model != budget_model:
-        parts.append(f"argv_model={argv_model}")
 
     assignments = _argv_config_assignments(argv)
     reasoning = assignments.get("model_reasoning_effort") or assignments.get("reasoning")

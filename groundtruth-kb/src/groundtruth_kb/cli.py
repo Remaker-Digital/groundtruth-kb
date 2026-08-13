@@ -10567,6 +10567,50 @@ def mode_apply_pending(ctx: click.Context) -> None:
 
 _HARNESS_CLI_ACTOR = "gt-harness-cli"
 
+# Dispatch-derived fields that are internal to the dispatcher/registry SoT and
+# MUST NOT be exposed to workers (WI-6186). ``gt harness roles`` strips these
+# from the JSON it prints so no worker is asked to know about the dispatcher or
+# its configuration.
+_DISPATCH_CAPABILITY_FIELDS = frozenset({"can_receive_dispatch", "can_fire_events", "event_driven_hooks"})
+
+
+def _is_dispatch_field(key: str) -> bool:
+    """Return whether a harness-level field is dispatch-derived."""
+
+    return key in _DISPATCH_CAPABILITY_FIELDS or key.startswith("dispatch_")
+
+
+def _strip_dispatch_fields(data: Any) -> Any:
+    """Return a copy of the harness-roles document with dispatch fields removed.
+
+    Removes harness-level dispatch-derived fields, dispatch-derived fields from
+    retained invocation surfaces, and the ``invocation_surfaces.dispatch``
+    subtree. Other invocation-surface content is preserved, and the internal
+    source-of-truth document on disk is never mutated.
+    """
+
+    def strip_mapping(mapping: dict[str, Any]) -> dict[str, Any]:
+        return {key: value for key, value in mapping.items() if not _is_dispatch_field(key)}
+
+    def strip_record(record: dict[str, Any]) -> dict[str, Any]:
+        cleaned = strip_mapping(record)
+        surfaces = cleaned.get("invocation_surfaces")
+        if isinstance(surfaces, dict):
+            cleaned["invocation_surfaces"] = {
+                key: strip_mapping(value) if isinstance(value, dict) else value
+                for key, value in surfaces.items()
+                if key != "dispatch" and not _is_dispatch_field(key)
+            }
+        return cleaned
+
+    if not isinstance(data, dict):
+        return data
+    harnesses = data.get("harnesses")
+    if isinstance(harnesses, list):
+        data = dict(data)
+        data["harnesses"] = [strip_record(record) if isinstance(record, dict) else record for record in harnesses]
+    return data
+
 
 @main.group("harness")
 def harness_group() -> None:
@@ -10591,7 +10635,7 @@ def harness_roles_cmd(ctx: click.Context) -> None:
     except HarnessStateError as exc:
         click.echo(json.dumps({"status": "error", "message": str(exc)}, indent=2, sort_keys=True))
         raise SystemExit(1) from exc
-    click.echo(json.dumps(data, indent=2, sort_keys=True))
+    click.echo(json.dumps(_strip_dispatch_fields(data), indent=2, sort_keys=True))
 
 
 @harness_group.command("identity")
