@@ -71,6 +71,10 @@ ENVELOPE_RESPONDER_BY_STATUS: Mapping[str, str] = {
     "NEW": "lo",
     "REVISED": "lo",
     "NO-ACTION": "lo",
+    # ADVISORY is Loyal-Opposition-authored and Prime-actionable for interactive
+    # disposition per the file-bridge protocol. Its absence here left the Loyal
+    # Opposition advisory channel with no governed filing path at all.
+    "ADVISORY": "pb",
     "GO": "pb",
     "NO-GO": "pb",
     "VERIFIED": "pb",
