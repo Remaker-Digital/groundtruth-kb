@@ -2148,7 +2148,11 @@ def acknowledge_startup_owner_input(session_id: str | None, project_root: Path |
     )
 
 
-def _startup_response_pending(project_root: Path | None = None) -> bool:
+def _startup_response_pending(
+    project_root: Path | None = None,
+    *,
+    caller_session_id: str | None = None,
+) -> bool:
     state = _read_lifecycle_guard(project_root)
     content_scrubbed = _drop_startup_input_content(state)
     if state.get("startup_response_pending") is not True:
@@ -2170,6 +2174,28 @@ def _startup_response_pending(project_root: Path | None = None) -> bool:
             }
         )
         _write_lifecycle_guard(state, project_root)
+        return False
+    # WI-6304 / WI-5865 / WI-5871 / WI-6290: HARNESS_LIFECYCLE_GUARDS keys the
+    # guard file by harness name only, so a sibling session's fresh-start arm
+    # blocks every other concurrent session of the same harness for up to
+    # STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS. Parallel agents are intended
+    # design, so cross-session blocking is a defect, not scheduling.
+    #
+    # Session-scope the live block: only the session that armed the gate is
+    # gated by it. ``startup_guard_id`` already carries the arming session's id
+    # and is already compared this way in ``acknowledge_startup_owner_input``;
+    # this applies that existing mechanism to the block check.
+    #
+    # Fail closed: when either id is unavailable, retain the pre-existing
+    # blocking behaviour rather than opening the gate on missing evidence.
+    armed_guard_id = state.get("startup_guard_id")
+    if (
+        isinstance(armed_guard_id, str)
+        and armed_guard_id.strip()
+        and isinstance(caller_session_id, str)
+        and caller_session_id.strip()
+        and caller_session_id.strip() != armed_guard_id.strip()
+    ):
         return False
     started_at = _parse_iso8601(state.get("startup_prompt_discarded_at") or state.get("armed_at"))
     if started_at is None:
@@ -2363,7 +2389,9 @@ def guard_tool_use(
     * ``gtkb_infrastructure`` subject blocks ``application_product`` targets.
     """
 
-    if _startup_response_pending(project_root) and not _is_startup_relay_cache_read(payload, project_root):
+    if _startup_response_pending(
+        project_root, caller_session_id=payload.get("session_id")
+    ) and not _is_startup_relay_cache_read(payload, project_root):
         return {
             "decision": "block",
             "reason": (

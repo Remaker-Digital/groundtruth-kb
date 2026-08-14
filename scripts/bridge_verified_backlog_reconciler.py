@@ -372,6 +372,37 @@ def _target_covered_by_commit(target: str, changed_paths: set[str]) -> bool:
     return target in changed_paths
 
 
+def _target_is_uncommittable(
+    project_root: Path,
+    target: str,
+    cache: dict[str, bool],
+) -> bool:
+    """Return whether a declared target can never appear in any commit (WI-6280).
+
+    A gitignored path cannot be committed, so requiring it in the verdict's commit
+    makes closure permanently unsatisfiable: the work item can never auto-resolve
+    no matter what the implementer does. 46 items were blocked this way, 9 of them
+    on ``groundtruth.db`` alone. Such a path is excluded from the coverage
+    requirement rather than counted missing.
+
+    Deliberately narrow. Only IGNORED paths qualify. An untracked-but-not-ignored
+    path is a genuine "forgot to commit it" and MUST still count as missing, so the
+    check must not be widened to untracked. Glob targets are not tested: check-ignore
+    has no meaningful answer for a pattern, and a glob matching only ignored files is
+    a scope defect to surface, not to hide.
+    """
+
+    if any(char in target for char in "*?["):
+        return False
+    cached = cache.get(target)
+    if cached is not None:
+        return cached
+    result = _run_git(project_root, "check-ignore", "-q", target)
+    ignored = result.returncode == 0
+    cache[target] = ignored
+    return ignored
+
+
 def _commit_is_ancestor(
     project_root: Path,
     candidate: str,
@@ -498,7 +529,9 @@ def _terminal_verdict_commit_coverage(
     # This keeps GOV-FILE-BRIDGE-AUTHORITY-001's "a verdict exists and is
     # committed" invariant exactly where it was.
     ancestor_cache: dict[tuple[str, str], bool] = {}
+    ignore_cache: dict[str, bool] = {}
     missing = []
+    uncommittable = []
     for path in (verdict_rel_path, *target_paths):
         if _target_covered_by_commit(path, changed_paths):
             continue
@@ -506,12 +539,21 @@ def _terminal_verdict_commit_coverage(
             project_root, path, commit, provenance, ancestor_cache
         ):
             continue
+        # WI-6280: a gitignored implementation target can never be committed, so
+        # counting it missing makes closure permanently unsatisfiable. Exclude it
+        # and report it separately. The verdict artifact itself is NOT exempt --
+        # GOV-FILE-BRIDGE-AUTHORITY-001's "a verdict exists and is committed"
+        # invariant stays exactly where it was.
+        if path != verdict_rel_path and _target_is_uncommittable(project_root, path, ignore_cache):
+            uncommittable.append(path)
+            continue
         missing.append(path)
     return {
         "covered": not missing,
         "commit": commit,
         "changed_paths": sorted(changed_paths),
         "missing_paths": missing,
+        "uncommittable_paths": uncommittable,
         "verdict_state": "committed" if verdict_rel_path in changed_paths else "commit_omits_verdict",
     }
 
