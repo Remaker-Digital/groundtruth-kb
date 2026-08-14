@@ -49,13 +49,13 @@ status = "native"
 surface = ".codex/skills/gtkb-alternatives-investigation/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-alternatives-investigation/SKILL.md"
-source_sha256 = "44b7fd37bc51973b7f045c492fb71064f64678a9f3fbd487cf76a5fef0d1f706"
+source_sha256 = "c3bc6685182cc9dc43c03d6cafe27a39c201dbbdc071d8e71a6d0275268b3410"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-alternatives-investigation/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-alternatives-investigation/SKILL.md"
-source_sha256 = "44b7fd37bc51973b7f045c492fb71064f64678a9f3fbd487cf76a5fef0d1f706"
+source_sha256 = "c3bc6685182cc9dc43c03d6cafe27a39c201dbbdc071d8e71a6d0275268b3410"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-alternatives-investigation/SKILL.md"
 status = "fallback"
@@ -65,7 +65,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-alternatives-investigation/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-alternatives-investigation/SKILL.md"
-source_sha256 = "44b7fd37bc51973b7f045c492fb71064f64678a9f3fbd487cf76a5fef0d1f706"
+source_sha256 = "c3bc6685182cc9dc43c03d6cafe27a39c201dbbdc071d8e71a6d0275268b3410"
 [[capabilities]]
 id = "skill.arch-audit"
 kind = "skill"
@@ -117,13 +117,13 @@ status = "native"
 surface = ".codex/skills/gtkb-assertion-triage/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-assertion-triage/SKILL.md"
-source_sha256 = "d43e7a58978173c7b877652ba31b7e5a4be4d7f2c1d5973fddca19e31739b5df"
+source_sha256 = "3c627a46049669e607e7645dde0c016c62533b15d7a0cec79850e65aff3a1212"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-assertion-triage/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-assertion-triage/SKILL.md"
-source_sha256 = "d43e7a58978173c7b877652ba31b7e5a4be4d7f2c1d5973fddca19e31739b5df"
+source_sha256 = "3c627a46049669e607e7645dde0c016c62533b15d7a0cec79850e65aff3a1212"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-assertion-triage/SKILL.md"
 status = "fallback"
@@ -133,7 +133,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-assertion-triage/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-assertion-triage/SKILL.md"
-source_sha256 = "d43e7a58978173c7b877652ba31b7e5a4be4d7f2c1d5973fddca19e31739b5df"
+source_sha256 = "3c627a46049669e607e7645dde0c016c62533b15d7a0cec79850e65aff3a1212"
 [[capabilities]]
 id = "skill.bridge"
 kind = "skill"
@@ -151,13 +151,13 @@ status = "native"
 surface = ".codex/skills/gtkb-bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-bridge/SKILL.md"
-source_sha256 = "c046c9ce665251909efad7999265eb0032efcc6b610b9aaf3c45275407db5810"
+source_sha256 = "d42f8c4d4fee86afaa7bb07d0c8c65cbd959878c01d23348238834b4e76b0df5"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-bridge/SKILL.md"
-source_sha256 = "c046c9ce665251909efad7999265eb0032efcc6b610b9aaf3c45275407db5810"
+source_sha256 = "d42f8c4d4fee86afaa7bb07d0c8c65cbd959878c01d23348238834b4e76b0df5"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-bridge/SKILL.md"
 status = "fallback"
@@ -167,7 +167,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-bridge/SKILL.md"
-source_sha256 = "c046c9ce665251909efad7999265eb0032efcc6b610b9aaf3c45275407db5810"
+source_sha256 = "d42f8c4d4fee86afaa7bb07d0c8c65cbd959878c01d23348238834b4e76b0df5"
 [[capabilities]]
 id = "skill.bridge-config"
 kind = "skill"
@@ -253,13 +253,13 @@ status = "native"
 surface = ".codex/skills/gtkb-bridge-propose/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-bridge-propose/SKILL.md"
-source_sha256 = "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
+source_sha256 = "c3539fd32e902a598ec7e3e5cdb7aa830dbeea2bb7e0b0bb64448b29db5126f2"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-bridge-propose/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-bridge-propose/SKILL.md"
-source_sha256 = "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
+source_sha256 = "c3539fd32e902a598ec7e3e5cdb7aa830dbeea2bb7e0b0bb64448b29db5126f2"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-bridge-propose/SKILL.md"
 status = "fallback"
@@ -269,7 +269,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-bridge-propose/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-bridge-propose/SKILL.md"
-source_sha256 = "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
+source_sha256 = "c3539fd32e902a598ec7e3e5cdb7aa830dbeea2bb7e0b0bb64448b29db5126f2"
 [[capabilities]]
 id = "skill.bridge-reconciliation"
 kind = "skill"
@@ -389,13 +389,13 @@ status = "native"
 surface = ".codex/skills/gtkb-code-review-audit/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-code-review-audit/SKILL.md"
-source_sha256 = "5e16702bbb66c6667fcc69505d254b07912288ec5538a9d932f4039a9a87be54"
+source_sha256 = "e48ffd51a79e6ebb7a66fddfc1b416b9d971f5f2021335808b51934b8862628b"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-code-review-audit/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-code-review-audit/SKILL.md"
-source_sha256 = "5e16702bbb66c6667fcc69505d254b07912288ec5538a9d932f4039a9a87be54"
+source_sha256 = "e48ffd51a79e6ebb7a66fddfc1b416b9d971f5f2021335808b51934b8862628b"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-code-review-audit/SKILL.md"
 status = "fallback"
@@ -405,7 +405,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-code-review-audit/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-code-review-audit/SKILL.md"
-source_sha256 = "5e16702bbb66c6667fcc69505d254b07912288ec5538a9d932f4039a9a87be54"
+source_sha256 = "e48ffd51a79e6ebb7a66fddfc1b416b9d971f5f2021335808b51934b8862628b"
 [[capabilities]]
 id = "skill.lo-opportunity-radar"
 kind = "skill"
@@ -591,7 +591,7 @@ status = "native"
 surface = ".codex/skills/gtkb-advisory-disposition/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-advisory-disposition/SKILL.md"
-source_sha256 = "43a1e728f208d9ba1e484b9c715924aa47dd0b6670ef57e0814c5ad43b06a22e"
+source_sha256 = "2c935131137a2dc65d386cf901fdda3da07932e125adaec2b09077f2313c71bc"
 
 [capabilities.antigravity]
 status = "unsupported"
@@ -605,7 +605,7 @@ reason = "WI-4840 authorizes only the canonical Claude source and generated Code
 surface = ".goose/skills/gtkb-advisory-disposition/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-advisory-disposition/SKILL.md"
-source_sha256 = "43a1e728f208d9ba1e484b9c715924aa47dd0b6670ef57e0814c5ad43b06a22e"
+source_sha256 = "2c935131137a2dc65d386cf901fdda3da07932e125adaec2b09077f2313c71bc"
 
 [[capabilities]]
 id = "skill.advisory-proposal"
@@ -624,7 +624,7 @@ status = "native"
 surface = ".codex/skills/gtkb-advisory-proposal/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-advisory-proposal/SKILL.md"
-source_sha256 = "a1985ec2b71ab6a2aab6914854ae82194e3fe7930e17a458cbcc02c853931805"
+source_sha256 = "72ac74bc7207b846cd6cf8e3a955d9eb936fbc880397c48dbb40a1a7c4d0877a"
 
 [capabilities.antigravity]
 status = "unsupported"
@@ -646,7 +646,7 @@ reason = "WI-5055 authorizes only the canonical Claude source and generated Code
 surface = ".goose/skills/gtkb-advisory-proposal/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-advisory-proposal/SKILL.md"
-source_sha256 = "a1985ec2b71ab6a2aab6914854ae82194e3fe7930e17a458cbcc02c853931805"
+source_sha256 = "72ac74bc7207b846cd6cf8e3a955d9eb936fbc880397c48dbb40a1a7c4d0877a"
 
 [[capabilities]]
 id = "skill.advisory-intake"
@@ -665,7 +665,7 @@ status = "native"
 surface = ".codex/skills/gtkb-advisory-intake/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-advisory-intake/SKILL.md"
-source_sha256 = "25e4f360c5fb6bef91601c183e8df217b4eebf4008e7555d6527f1f2a8ab870e"
+source_sha256 = "19cfd4722c17ef0ae13453648f2ccd6aef269d52a370966710b0cc2f1eb3d0ee"
 
 [capabilities.antigravity]
 status = "unsupported"
@@ -687,7 +687,7 @@ reason = "WI-5056 authorizes only the canonical Claude source and generated Code
 surface = ".goose/skills/gtkb-advisory-intake/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-advisory-intake/SKILL.md"
-source_sha256 = "25e4f360c5fb6bef91601c183e8df217b4eebf4008e7555d6527f1f2a8ab870e"
+source_sha256 = "19cfd4722c17ef0ae13453648f2ccd6aef269d52a370966710b0cc2f1eb3d0ee"
 
 [[capabilities]]
 id = "skill.kb-adr"
@@ -706,13 +706,13 @@ status = "native"
 surface = ".codex/skills/gtkb-adr/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-adr/SKILL.md"
-source_sha256 = "4b1ec3c66407daa82cd66a84eefe1e2ed6e8d83cc4a4d7e0f7383bb7dd03b969"
+source_sha256 = "9374b8977d7c61f73126d2c73bce560f2a8a10f58bba6d3104a62e53c4494769"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-adr/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-adr/SKILL.md"
-source_sha256 = "4b1ec3c66407daa82cd66a84eefe1e2ed6e8d83cc4a4d7e0f7383bb7dd03b969"
+source_sha256 = "9374b8977d7c61f73126d2c73bce560f2a8a10f58bba6d3104a62e53c4494769"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-adr/SKILL.md"
 status = "fallback"
@@ -722,7 +722,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-adr/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-adr/SKILL.md"
-source_sha256 = "4b1ec3c66407daa82cd66a84eefe1e2ed6e8d83cc4a4d7e0f7383bb7dd03b969"
+source_sha256 = "9374b8977d7c61f73126d2c73bce560f2a8a10f58bba6d3104a62e53c4494769"
 [[capabilities]]
 id = "skill.kb-assert"
 kind = "skill"
@@ -808,13 +808,13 @@ status = "native"
 surface = ".codex/skills/gtkb-promote/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-promote/SKILL.md"
-source_sha256 = "5dab12bd288a3ce3d126c30d2670322617121432fcd7d0a38b7fdc93bed2e7cb"
+source_sha256 = "f39ad6ad50a4b919493e2b04ff184ce9e7c74acf35ec69fc5d90165fa703712b"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-promote/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-promote/SKILL.md"
-source_sha256 = "5dab12bd288a3ce3d126c30d2670322617121432fcd7d0a38b7fdc93bed2e7cb"
+source_sha256 = "f39ad6ad50a4b919493e2b04ff184ce9e7c74acf35ec69fc5d90165fa703712b"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-promote/SKILL.md"
 status = "fallback"
@@ -824,7 +824,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-promote/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-promote/SKILL.md"
-source_sha256 = "5dab12bd288a3ce3d126c30d2670322617121432fcd7d0a38b7fdc93bed2e7cb"
+source_sha256 = "f39ad6ad50a4b919493e2b04ff184ce9e7c74acf35ec69fc5d90165fa703712b"
 [[capabilities]]
 id = "skill.kb-query"
 kind = "skill"
@@ -842,13 +842,13 @@ status = "native"
 surface = ".codex/skills/gtkb-query/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-query/SKILL.md"
-source_sha256 = "f694720b346a85a5c239cb5aa03c01b18f819b33aa10a43aaff76eb46b8d1ca5"
+source_sha256 = "a07c5912015a2fb4271ddae7c9248e506fc9cdd10d42a5c3d9b34c9bd5a4bcb6"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-query/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-query/SKILL.md"
-source_sha256 = "f694720b346a85a5c239cb5aa03c01b18f819b33aa10a43aaff76eb46b8d1ca5"
+source_sha256 = "a07c5912015a2fb4271ddae7c9248e506fc9cdd10d42a5c3d9b34c9bd5a4bcb6"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-query/SKILL.md"
 status = "fallback"
@@ -858,7 +858,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-query/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-query/SKILL.md"
-source_sha256 = "f694720b346a85a5c239cb5aa03c01b18f819b33aa10a43aaff76eb46b8d1ca5"
+source_sha256 = "a07c5912015a2fb4271ddae7c9248e506fc9cdd10d42a5c3d9b34c9bd5a4bcb6"
 [[capabilities]]
 id = "skill.kb-session-wrap"
 kind = "skill"
@@ -944,13 +944,13 @@ status = "native"
 surface = ".codex/skills/gtkb-spec/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-spec/SKILL.md"
-source_sha256 = "7430be6a9e5c424a3f27a71fe2b9f7580085f59858bcb1176252a095b67755ac"
+source_sha256 = "0f4c4db36768670630d106108afcb079f4a9aa2844c46227bcfb9b41aa54e889"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-spec/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-spec/SKILL.md"
-source_sha256 = "7430be6a9e5c424a3f27a71fe2b9f7580085f59858bcb1176252a095b67755ac"
+source_sha256 = "0f4c4db36768670630d106108afcb079f4a9aa2844c46227bcfb9b41aa54e889"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-spec/SKILL.md"
 status = "fallback"
@@ -960,7 +960,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-spec/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-spec/SKILL.md"
-source_sha256 = "7430be6a9e5c424a3f27a71fe2b9f7580085f59858bcb1176252a095b67755ac"
+source_sha256 = "0f4c4db36768670630d106108afcb079f4a9aa2844c46227bcfb9b41aa54e889"
 [[capabilities]]
 id = "skill.kb-work-item"
 kind = "skill"
@@ -978,13 +978,13 @@ status = "native"
 surface = ".codex/skills/gtkb-work-item/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-work-item/SKILL.md"
-source_sha256 = "b3b4a36c21530da6cc31470583a8baf3a9d1f4da19c579941d6df76085cee015"
+source_sha256 = "783f15c982394bb1b853aa4bb5d671ff75175867421e4aeb2d5d3e5280e4d98b"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-work-item/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-work-item/SKILL.md"
-source_sha256 = "b3b4a36c21530da6cc31470583a8baf3a9d1f4da19c579941d6df76085cee015"
+source_sha256 = "783f15c982394bb1b853aa4bb5d671ff75175867421e4aeb2d5d3e5280e4d98b"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-work-item/SKILL.md"
 status = "fallback"
@@ -994,7 +994,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-work-item/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-work-item/SKILL.md"
-source_sha256 = "b3b4a36c21530da6cc31470583a8baf3a9d1f4da19c579941d6df76085cee015"
+source_sha256 = "783f15c982394bb1b853aa4bb5d671ff75175867421e4aeb2d5d3e5280e4d98b"
 [[capabilities]]
 id = "skill.projects"
 kind = "skill"
@@ -1012,13 +1012,13 @@ status = "native"
 surface = ".codex/skills/gtkb-projects/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-projects/SKILL.md"
-source_sha256 = "17a2b01dd84becb7fe48487ef8ddff092f7b4897a16092406fb9b956f1394c2e"
+source_sha256 = "38825e3da85f4221f29854e63d1262dc28b7c68b8bc6722533b64bc954d36aca"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-projects/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-projects/SKILL.md"
-source_sha256 = "17a2b01dd84becb7fe48487ef8ddff092f7b4897a16092406fb9b956f1394c2e"
+source_sha256 = "38825e3da85f4221f29854e63d1262dc28b7c68b8bc6722533b64bc954d36aca"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-projects/SKILL.md"
 status = "fallback"
@@ -1028,7 +1028,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-projects/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-projects/SKILL.md"
-source_sha256 = "17a2b01dd84becb7fe48487ef8ddff092f7b4897a16092406fb9b956f1394c2e"
+source_sha256 = "38825e3da85f4221f29854e63d1262dc28b7c68b8bc6722533b64bc954d36aca"
 [[capabilities]]
 id = "skill.proposal-review"
 kind = "skill"
@@ -1046,13 +1046,13 @@ status = "native"
 surface = ".codex/skills/gtkb-proposal-review/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-proposal-review/SKILL.md"
-source_sha256 = "127b55f6e266ba9b92eff6ca71a9c669566957cf1de37c3da65a6d9a978a1367"
+source_sha256 = "b6e5f2ae05eb2482ce4e61e18f7b9dfd0f0c1749658e793b15a9829c66ac5fe0"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-proposal-review/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-proposal-review/SKILL.md"
-source_sha256 = "127b55f6e266ba9b92eff6ca71a9c669566957cf1de37c3da65a6d9a978a1367"
+source_sha256 = "b6e5f2ae05eb2482ce4e61e18f7b9dfd0f0c1749658e793b15a9829c66ac5fe0"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-proposal-review/SKILL.md"
 status = "fallback"
@@ -1062,7 +1062,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-proposal-review/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-proposal-review/SKILL.md"
-source_sha256 = "127b55f6e266ba9b92eff6ca71a9c669566957cf1de37c3da65a6d9a978a1367"
+source_sha256 = "b6e5f2ae05eb2482ce4e61e18f7b9dfd0f0c1749658e793b15a9829c66ac5fe0"
 [[capabilities]]
 id = "skill.release-candidate-gate"
 kind = "skill"
@@ -1114,13 +1114,13 @@ status = "native"
 surface = ".codex/skills/gtkb-send-review/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-send-review/SKILL.md"
-source_sha256 = "aa6437097d9fdcbb5b2368367e48b93b805b7082703edcc0fe4f720ae98eb7b2"
+source_sha256 = "370aaf48889cd939ddc19adbfc9516bf6dff9b816eea1e32498be0fbaca0f9ab"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-send-review/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-send-review/SKILL.md"
-source_sha256 = "aa6437097d9fdcbb5b2368367e48b93b805b7082703edcc0fe4f720ae98eb7b2"
+source_sha256 = "370aaf48889cd939ddc19adbfc9516bf6dff9b816eea1e32498be0fbaca0f9ab"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-send-review/SKILL.md"
 status = "fallback"
@@ -1130,7 +1130,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-send-review/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-send-review/SKILL.md"
-source_sha256 = "aa6437097d9fdcbb5b2368367e48b93b805b7082703edcc0fe4f720ae98eb7b2"
+source_sha256 = "370aaf48889cd939ddc19adbfc9516bf6dff9b816eea1e32498be0fbaca0f9ab"
 [[capabilities]]
 id = "skill.spec-intake"
 kind = "skill"
@@ -1182,13 +1182,13 @@ status = "native"
 surface = ".codex/skills/gtkb-structural-hygiene-review/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-structural-hygiene-review/SKILL.md"
-source_sha256 = "13de9e2f85addc7faa602baf9312bf00538d5bb33e4270036146052da0b1309b"
+source_sha256 = "be0a2f6e21a34f1e2cd09c5de8e3ee5ad9aeb2ddfad98247d5db8ce2944307f9"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-structural-hygiene-review/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-structural-hygiene-review/SKILL.md"
-source_sha256 = "13de9e2f85addc7faa602baf9312bf00538d5bb33e4270036146052da0b1309b"
+source_sha256 = "be0a2f6e21a34f1e2cd09c5de8e3ee5ad9aeb2ddfad98247d5db8ce2944307f9"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-structural-hygiene-review/SKILL.md"
 status = "fallback"
@@ -1198,7 +1198,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-structural-hygiene-review/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-structural-hygiene-review/SKILL.md"
-source_sha256 = "13de9e2f85addc7faa602baf9312bf00538d5bb33e4270036146052da0b1309b"
+source_sha256 = "be0a2f6e21a34f1e2cd09c5de8e3ee5ad9aeb2ddfad98247d5db8ce2944307f9"
 [[capabilities]]
 id = "hook.advisory-router-scan"
 kind = "hook"
@@ -1344,13 +1344,13 @@ status = "native"
 surface = ".codex/skills/gtkb-hygiene-investigation/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-hygiene-investigation/SKILL.md"
-source_sha256 = "4474b3c97a78fd01896fc2c02dec4a36b1d3d158f43e8f1d97a97ea14b832e94"
+source_sha256 = "5b1398cd7bed3faf74ae0909dd3379764e75af70af888c95e49a9fc4a4780023"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-hygiene-investigation/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-hygiene-investigation/SKILL.md"
-source_sha256 = "4474b3c97a78fd01896fc2c02dec4a36b1d3d158f43e8f1d97a97ea14b832e94"
+source_sha256 = "5b1398cd7bed3faf74ae0909dd3379764e75af70af888c95e49a9fc4a4780023"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-hygiene-investigation/SKILL.md"
 status = "fallback"
@@ -1360,7 +1360,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-hygiene-investigation/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-hygiene-investigation/SKILL.md"
-source_sha256 = "4474b3c97a78fd01896fc2c02dec4a36b1d3d158f43e8f1d97a97ea14b832e94"
+source_sha256 = "5b1398cd7bed3faf74ae0909dd3379764e75af70af888c95e49a9fc4a4780023"
 [[capabilities]]
 id = "skill.gtkb-hygiene-sweep"
 kind = "skill"
@@ -1378,13 +1378,13 @@ status = "native"
 surface = ".codex/skills/gtkb-hygiene-sweep/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-hygiene-sweep/SKILL.md"
-source_sha256 = "97ccc96744186df7ddb9a7548d15b64dc413c42cbde5909d99f87ab9ceb7465c"
+source_sha256 = "2dece3573b1603f9f97fb27c12d048b167c00937877a8f587aa666098eebeac1"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-hygiene-sweep/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-hygiene-sweep/SKILL.md"
-source_sha256 = "97ccc96744186df7ddb9a7548d15b64dc413c42cbde5909d99f87ab9ceb7465c"
+source_sha256 = "2dece3573b1603f9f97fb27c12d048b167c00937877a8f587aa666098eebeac1"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-hygiene-sweep/SKILL.md"
 status = "fallback"
@@ -1394,7 +1394,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-hygiene-sweep/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-hygiene-sweep/SKILL.md"
-source_sha256 = "97ccc96744186df7ddb9a7548d15b64dc413c42cbde5909d99f87ab9ceb7465c"
+source_sha256 = "2dece3573b1603f9f97fb27c12d048b167c00937877a8f587aa666098eebeac1"
 
 [[capabilities]]
 id = "skill.gtkb-hygiene-reclaim"
@@ -1413,7 +1413,7 @@ status = "native"
 surface = ".codex/skills/gtkb-hygiene-reclaim/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-hygiene-reclaim/SKILL.md"
-source_sha256 = "0b928d4c238f7ad893bc194569f0be4c175ff71c32910d26baebb11d4b7cc152"
+source_sha256 = "ae324b373007ff4147ab3ce2f2ee0125c024d99a1f32eb92cca8756aad3f30a7"
 
 [capabilities.antigravity]
 status = "unsupported"
@@ -1435,7 +1435,7 @@ reason = "WI-5142 phase 1 authorizes only the canonical Claude source and genera
 surface = ".goose/skills/gtkb-hygiene-reclaim/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-hygiene-reclaim/SKILL.md"
-source_sha256 = "0b928d4c238f7ad893bc194569f0be4c175ff71c32910d26baebb11d4b7cc152"
+source_sha256 = "ae324b373007ff4147ab3ce2f2ee0125c024d99a1f32eb92cca8756aad3f30a7"
 
 [[capabilities]]
 id = "skill.gtkb-sweep-commit"
@@ -1488,13 +1488,13 @@ status = "native"
 surface = ".codex/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-lo-hygiene-assessment/SKILL.md"
-source_sha256 = "69d66578cd14cbe3e807cd6a6a93c973e08dc8566a3734cfd773568bc7feaa9c"
+source_sha256 = "0985ba2b241a600d073af9a47c3f5db42daa2684846bb8a4f7e4b7d9aa996e24"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-lo-hygiene-assessment/SKILL.md"
-source_sha256 = "69d66578cd14cbe3e807cd6a6a93c973e08dc8566a3734cfd773568bc7feaa9c"
+source_sha256 = "0985ba2b241a600d073af9a47c3f5db42daa2684846bb8a4f7e4b7d9aa996e24"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 status = "fallback"
@@ -1504,7 +1504,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-lo-hygiene-assessment/SKILL.md"
-source_sha256 = "69d66578cd14cbe3e807cd6a6a93c973e08dc8566a3734cfd773568bc7feaa9c"
+source_sha256 = "0985ba2b241a600d073af9a47c3f5db42daa2684846bb8a4f7e4b7d9aa996e24"
 [[capabilities]]
 id = "skill.verify"
 kind = "skill"
@@ -1522,13 +1522,13 @@ status = "native"
 surface = ".codex/skills/gtkb-verify/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-verify/SKILL.md"
-source_sha256 = "4472d09d17bed20105c5c862d86e6d73541d01c60d66707d24fee29bf0fc9eeb"
+source_sha256 = "0c8b939bcfca967888c33f96f9a2d5b57dd122beffad00b46d99fe1c2eafaced"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-verify/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-verify/SKILL.md"
-source_sha256 = "4472d09d17bed20105c5c862d86e6d73541d01c60d66707d24fee29bf0fc9eeb"
+source_sha256 = "0c8b939bcfca967888c33f96f9a2d5b57dd122beffad00b46d99fe1c2eafaced"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-verify/SKILL.md"
 status = "fallback"
@@ -1538,7 +1538,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 surface = ".goose/skills/gtkb-verify/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-verify/SKILL.md"
-source_sha256 = "4472d09d17bed20105c5c862d86e6d73541d01c60d66707d24fee29bf0fc9eeb"
+source_sha256 = "0c8b939bcfca967888c33f96f9a2d5b57dd122beffad00b46d99fe1c2eafaced"
 [[capabilities]]
 id = "hook.directive-enforcement"
 kind = "hook"
@@ -2415,7 +2415,7 @@ status = "native"
 surface = ".codex/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
-source_sha256 = "8fba2488531fb05a5e07dc07bfcd94eb62fc7fa891072ee8e57ffdb6949fff0f"
+source_sha256 = "940a1435f95e09a2b46708beede0f3109a74f27a9eb7c9c8a7ee17ace033bb43"
 
 [capabilities.antigravity]
 status = "unsupported"
@@ -2437,7 +2437,7 @@ reason = "OpenRouter is a provider harness and does not execute repo-local manag
 surface = ".goose/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
-source_sha256 = "8fba2488531fb05a5e07dc07bfcd94eb62fc7fa891072ee8e57ffdb6949fff0f"
+source_sha256 = "940a1435f95e09a2b46708beede0f3109a74f27a9eb7c9c8a7ee17ace033bb43"
 
 [[capabilities]]
 id = "skill.managed-skill-adoption-review"
@@ -2456,13 +2456,13 @@ status = "native"
 surface = ".codex/skills/gtkb-managed-skill-adoption-review/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-managed-skill-adoption-review/SKILL.md"
-source_sha256 = "ab7cfdd90ddbeeee51b48dc546b3b092823736802c7bcc87c3cf368f3039e6b3"
+source_sha256 = "46669ca6360371a43db880c85e1930987162934ea7ee955eb310049a22b31802"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-managed-skill-adoption-review/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-managed-skill-adoption-review/SKILL.md"
-source_sha256 = "ab7cfdd90ddbeeee51b48dc546b3b092823736802c7bcc87c3cf368f3039e6b3"
+source_sha256 = "46669ca6360371a43db880c85e1930987162934ea7ee955eb310049a22b31802"
 
 [capabilities.cursor]
 status = "unsupported"
@@ -2484,4 +2484,4 @@ reason = "Alibaba Cloud Studio is a provider harness and does not execute repo-l
 surface = ".goose/skills/gtkb-managed-skill-adoption-review/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-managed-skill-adoption-review/SKILL.md"
-source_sha256 = "ab7cfdd90ddbeeee51b48dc546b3b092823736802c7bcc87c3cf368f3039e6b3"
+source_sha256 = "46669ca6360371a43db880c85e1930987162934ea7ee955eb310049a22b31802"
