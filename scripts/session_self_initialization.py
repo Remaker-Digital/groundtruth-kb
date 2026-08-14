@@ -961,6 +961,68 @@ def _active_work_subject(project_root: Path) -> str:
     return FOCUS_GTKB_INFRASTRUCTURE
 
 
+def _bind_session_role_attestation(
+    project_root: Path,
+    session_id: str,
+    init_command: str,
+    harness_name: str,
+) -> str | None:
+    """Create the immutable init binding and its initial role attestation.
+
+    Called beside the role-marker writes so the attested fact and the marker
+    cache are established together. The markers are a cache; this is the
+    authority (``ADR-SESSION-ROLE-ATTESTATION-SERVICE-001``).
+
+    ``init_command`` MUST be the literal canonical init message. It is never
+    reconstructed from resolved role plus work subject: the binding digests the
+    command and is immutable, and the work subject is set independently of the
+    init line, so a reconstruction could bind a subject the owner never typed.
+    Callers without the literal command pass an empty string and no binding is
+    created.
+
+    Fail-soft: startup must never break on attestation. An already-bound
+    invoking context is the normal re-entry case, not an error.
+
+    Returns the attestation evidence reference on a fresh binding, else ``None``.
+    """
+
+    if not session_id or not init_command:
+        return None
+    try:
+        from groundtruth_kb.session.attestation import RoleAttestationError, bind_exact_init
+    except ImportError:  # pragma: no cover - attestation package absent
+        return None
+
+    try:
+        _binding, attestation = bind_exact_init(
+            project_root / "groundtruth.db",
+            invoking_context=session_id,
+            init_command=init_command,
+            issuer=harness_name or "unknown-harness",
+        )
+    except RoleAttestationError as exc:
+        # session_already_initialized is expected on re-entry; the binding is
+        # immutable by design, so a second init is a no-op rather than a fault.
+        if exc.code != "session_already_initialized":
+            _emit_attestation_bind_note(project_root, session_id, exc.code)
+        return None
+    except Exception:  # noqa: BLE001 - startup must not fail on attestation
+        return None
+    return attestation.evidence_reference
+
+
+def _emit_attestation_bind_note(project_root: Path, session_id: str, code: str) -> None:
+    """Record an unexpected binding failure without breaking startup."""
+
+    try:
+        log_dir = project_root / ".gtkb-state" / "session-attestation"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        with (log_dir / "bind-failures.jsonl").open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps({"session_id": session_id, "code": code}) + "\n")
+    except Exception:  # noqa: BLE001 - logging must never break startup
+        pass
+
+
 def _normalize_path(value: str) -> str:
     return value.replace("\\", "/").strip().lstrip("./").lower()
 
@@ -7695,6 +7757,21 @@ def main(argv: list[str] | None = None) -> int:
                 _candidate_marker_session_ids(session_id),
                 project_root,
                 source="session_self_initialization",
+            )
+            # The markers above are a cache. The attested binding below is the
+            # authority (ADR-SESSION-ROLE-ATTESTATION-SERVICE-001), so both are
+            # established in the same place and cannot drift apart at creation.
+            #
+            # Only the dispatch path carries the literal canonical init message
+            # (GTKB_BRIDGE_DISPATCH_KEYWORD, matched at the override_role
+            # resolution above). When override_role came from --role-profile
+            # instead, no literal command exists and no binding is created: see
+            # _bind_session_role_attestation on why reconstruction is refused.
+            _bind_session_role_attestation(
+                project_root,
+                session_id,
+                (os.environ.get("GTKB_BRIDGE_DISPATCH_KEYWORD") or "").strip(),
+                args.harness_name,
             )
     lifecycle_guard_path = (
         args.lifecycle_guard_path.resolve()
