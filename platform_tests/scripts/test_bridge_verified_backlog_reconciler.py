@@ -1017,7 +1017,19 @@ def test_untracked_terminal_verdict_lacks_commit_coverage(tmp_path: Path) -> Non
     assert evidence["commit_coverage"]["verdict_state"] == "uncommitted_or_untracked"
 
 
-def test_terminal_commit_omitting_approved_target_fails_closed(tmp_path: Path) -> None:
+def test_terminal_commit_with_ancestor_committed_target_closes(tmp_path: Path) -> None:
+    """Implementation in an earlier commit than the verdict now closes (WI-6280).
+
+    This test previously asserted the same-commit rule (skip +
+    missing_implementation_commit_coverage). That rule was superseded by owner
+    decision 2026-08-14 "Coverage rule", which settled a conflict between the
+    file-bridge-protocol VERIFIED commit-finalization gate (same commit) and the
+    owner-authorized auto-finalization sweep (verdict-only, implementation
+    committed separately). The split-commit shape below is exactly what the
+    sweep produces, and it must close.
+
+    Landed by bridge/gtkb-wi6280-verified-closure-ancestor-coverage (GO at -004).
+    """
     _init_git(tmp_path)
     target = tmp_path / "scripts" / "impl.py"
     target.parent.mkdir(parents=True)
@@ -1030,10 +1042,10 @@ def test_terminal_commit_omitting_approved_target_fails_closed(tmp_path: Path) -
 
     row = _classify_strict_thread(tmp_path, "WI-11498-D")
 
-    assert row["action"] == "skip"
-    assert row["reason"] == "missing_implementation_commit_coverage"
+    assert row["action"] == "resolve"
+    assert row["closure_reason"] == "genuinely_closable"
     evidence = row["verified_closure_evidence"]["strict-thread"]
-    assert evidence["commit_coverage"]["missing_paths"] == ["scripts/impl.py"]
+    assert evidence["commit_coverage"]["missing_paths"] == []
 
 
 def test_focused_commit_with_verdict_and_all_targets_is_genuinely_closable(tmp_path: Path) -> None:
@@ -1123,12 +1135,13 @@ def test_owner_by_reference_waiver_preserves_committed_verdict_closure(tmp_path:
 
 def test_waiver_reference_outside_report_does_not_bypass_commit_coverage(tmp_path: Path) -> None:
     _init_git(tmp_path)
-    target = tmp_path / "scripts" / "impl.py"
-    target.parent.mkdir(parents=True)
-    target.write_text("VALUE = 1\n", encoding="utf-8")
-    _git(tmp_path, "add", "scripts/impl.py")
-    _git(tmp_path, "commit", "-q", "-m", "implementation only")
-    paths = _write_strict_thread(tmp_path, "WI-11498-G", target_paths=["scripts/impl.py"])
+    # Vehicle changed by WI-6280: this test's subject is waiver SCOPING, not the
+    # same-commit rule. It previously induced a coverage failure by committing
+    # the implementation before the verdict -- a shape that now legitimately
+    # closes. The target below is never committed at all, so coverage still
+    # fails for an unrelated reason and the waiver-scoping property is asserted
+    # exactly as before.
+    paths = _write_strict_thread(tmp_path, "WI-11498-G", target_paths=["scripts/never_committed.py"])
     with paths["proposal"].open("a", encoding="utf-8") as handle:
         handle.write(
             "\n\n## Owner Decisions / Input\nA DELIB-TEST-BY-REFERENCE-WAIVER exists for an unrelated sibling thread.\n"

@@ -372,6 +372,57 @@ def _target_covered_by_commit(target: str, changed_paths: set[str]) -> bool:
     return target in changed_paths
 
 
+def _commit_is_ancestor(
+    project_root: Path,
+    candidate: str,
+    descendant: str,
+    cache: dict[tuple[str, str], bool],
+) -> bool:
+    """Return whether ``candidate`` is an ancestor of, or equal to, ``descendant``."""
+
+    if not candidate or not descendant:
+        return False
+    if candidate == descendant:
+        return True
+    key = (candidate, descendant)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    result = _run_git(project_root, "merge-base", "--is-ancestor", candidate, descendant)
+    ancestor = result.returncode == 0
+    cache[key] = ancestor
+    return ancestor
+
+
+def _target_covered_by_ancestor_commit(
+    project_root: Path,
+    target: str,
+    verdict_commit: str,
+    provenance: dict[str, Any],
+    cache: dict[tuple[str, str], bool],
+) -> bool:
+    """Return whether an approved target was committed at or before the verdict.
+
+    Ancestry, not mere presence (WI-6280). A path committed AFTER verification,
+    or on a branch unrelated to the verdict commit, is not work the verdict
+    verified, so it must not satisfy closure. Only the commit boundary moves;
+    the requirement that the path BE committed does not.
+    """
+
+    latest_commit_by_path = provenance["latest_commit_by_path"]
+    if any(char in target for char in "*?["):
+        # Mirrors _target_covered_by_commit's ANY-match glob semantics.
+        return any(
+            _commit_is_ancestor(project_root, latest_commit_by_path[path], verdict_commit, cache)
+            for path in provenance["tracked_paths"]
+            if fnmatch.fnmatchcase(path, target) and latest_commit_by_path.get(path)
+        )
+    commit = latest_commit_by_path.get(target)
+    if not commit:
+        return False
+    return _commit_is_ancestor(project_root, commit, verdict_commit, cache)
+
+
 def build_git_provenance_index(project_root: Path) -> dict[str, Any]:
     """Build one repository-wide Git provenance index for VERIFIED closure checks."""
 
@@ -442,7 +493,20 @@ def _terminal_verdict_commit_coverage(
             "missing_paths": [verdict_rel_path, *target_paths],
             "verdict_state": "commit_inspection_failed",
         }
-    missing = [path for path in (verdict_rel_path, *target_paths) if not _target_covered_by_commit(path, changed_paths)]
+    # The verdict artifact must still appear in its OWN commit; only
+    # implementation targets may be satisfied by an ancestor commit (WI-6280).
+    # This keeps GOV-FILE-BRIDGE-AUTHORITY-001's "a verdict exists and is
+    # committed" invariant exactly where it was.
+    ancestor_cache: dict[tuple[str, str], bool] = {}
+    missing = []
+    for path in (verdict_rel_path, *target_paths):
+        if _target_covered_by_commit(path, changed_paths):
+            continue
+        if path != verdict_rel_path and _target_covered_by_ancestor_commit(
+            project_root, path, commit, provenance, ancestor_cache
+        ):
+            continue
+        missing.append(path)
     return {
         "covered": not missing,
         "commit": commit,
