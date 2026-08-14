@@ -42,15 +42,42 @@ def resolve_changed_by(
     project_root: Path | str | None = None,
     harness_name: str | None = None,
 ) -> str:
-    """Return ``<document-role>/<document-harness>`` or fail before mutation."""
+    """Return ``<role>/<harness>`` or fail before mutation.
+
+    Role authority is the attestation resolver
+    (``DCL-SESSION-ROLE-RESOLUTION-001`` v8): the invoking session context
+    resolves through its immutable init binding to the role attestation in
+    force, and the attestation's evidence reference is what callers should
+    persist. During the ordered Slice 1-3 migration, sessions whose invoking
+    context predates the attestation store (typed ``no_session_binding``)
+    still resolve through the legacy worker-session document; Slice 3
+    removes that path once every live session initializes through the
+    binding transaction.
+    """
+    resolved_project_root = PROJECT_ROOT if project_root is None else Path(project_root)
+    session_id = _current_session_id()
+    resolved_harness = _expected_harness_name(harness_name)
+
+    from groundtruth_kb.session.attestation import RoleAttestationError, resolve_effective_role_for_context
+
+    try:
+        _binding, attestation = resolve_effective_role_for_context(
+            resolved_project_root / "groundtruth.db",
+            invoking_context=session_id,
+        )
+    except RoleAttestationError as exc:
+        if exc.code != "no_session_binding":
+            raise RuntimeError(f"resolve_changed_by: {exc}") from exc
+    else:
+        return f"{attestation.role}/{resolved_harness or 'unknown-harness'}"
+
     from groundtruth_kb.session.envelope import EnvelopeError, resolve_worker_role_provenance
 
-    resolved_project_root = PROJECT_ROOT if project_root is None else Path(project_root)
     try:
         provenance = resolve_worker_role_provenance(
             resolved_project_root,
-            current_session_id=_current_session_id(),
-            harness_name=_expected_harness_name(harness_name),
+            current_session_id=session_id,
+            harness_name=resolved_harness,
         )
     except EnvelopeError as exc:
         raise RuntimeError(f"resolve_changed_by: {exc}") from exc
