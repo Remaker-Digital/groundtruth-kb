@@ -47,6 +47,37 @@ operations that genuinely need session context unavailable to a service, and
 cases where friction is itself the governance value remain appropriately
 AI-mediated.
 
+## Every Tool Use Is a Test Principle
+
+Every invocation of a tool, skill, helper, or CLI is a test of an unproven
+implementation. What is under test is not only whether the invocation returns:
+it is the behavior, the output, the documentation, and the fitness of that tool
+for the purpose it was reached for.
+
+1. Inspect the output of every invocation and evaluate its utility. Never
+   assume correctness, completeness, or optimality — including when the
+   invocation appears to have succeeded.
+2. A defect, gap, mislabel, incorrect description, or overlooked case is
+   captured AT THE POINT OF DISCOVERY as an ADVISORY, which may become a
+   hygiene or enhancement work item. It is not batched to session end, and it
+   is not silently absorbed.
+3. Capture at the point of discovery is not implementation approval. The
+   captured item follows normal owner prioritization and the bridge protocol
+   before any repair is implemented.
+4. When a defect blocks the current task: document it, work around it through
+   a lawful path if one exists, and file the after-action record for
+   independent review.
+
+Silent absorption is the failure mode this principle exists to prevent. A
+defect that is worked around but never recorded leaves the next session to
+rediscover it at full cost, and keeps that cost invisible to governance.
+
+This principle extends `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`. Capture routes
+to the MemBase backlog per `GOV-STANDING-BACKLOG-001`; clause 4's after-action
+record follows `GOV-FILE-BRIDGE-AUTHORITY-001`. Neither clause displaces
+`GOV-ARTIFACT-APPROVAL-001` — approval evidence is still required before a
+captured item becomes implemented work.
+
 ## Clean-Before-You-Leave Principle
 
 When implementation work is complete, all temp, ephemeral, or session-only
