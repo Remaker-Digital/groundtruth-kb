@@ -67,18 +67,40 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 # Correction 1, .claude / .codex / .cursor already delegate and are correct;
 # .goose and both scaffold templates were the defective direct-write copies.
 HELPER_COPIES: dict[str, str] = {
-    # .agents is the baseline every other tree projects from, so it is covered
-    # first: exempting the source would invert the parity contract.
-    "agents": ".agents/skills/gtkb-bridge-propose/helpers/write_bridge.py",
+    # The shared single-source helper is covered first: it is the copy every
+    # projection routes to after the Phase B shared-helpers move
+    # (gtkb-baseline-correction-and-goose-projector-slice-1, GO -004), so
+    # exempting the source would invert the parity contract. Goose routes to
+    # it and carries no local copy; remaining per-harness copies persist
+    # until their own projector cutovers.
+    "shared": "scripts/skill-helpers/gtkb-bridge-propose/write_bridge.py",
     "claude": ".claude/skills/gtkb-bridge-propose/helpers/write_bridge.py",
     "codex": ".codex/skills/gtkb-bridge-propose/helpers/write_bridge.py",
     "cursor": ".cursor/skills/gtkb-bridge-propose/helpers/write_bridge.py",
-    "goose": ".goose/skills/gtkb-bridge-propose/helpers/write_bridge.py",
     "template_gtkb": "groundtruth-kb/templates/skills/gtkb-bridge-propose/helpers/write_bridge.py",
     "template_legacy": "groundtruth-kb/templates/skills/bridge-propose/helpers/write_bridge.py",
 }
 
 BRIDGE_AGGREGATE_GLOB = "bridge/*-[0-9][0-9][0-9].md"
+
+
+def _propose_fn(helper):
+    """Resolve the filing entry point across copy generations.
+
+    The shared single-source copy carries the neutral name ``propose_bridge``
+    (baseline neutralization, GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 3);
+    per-harness copies keep the legacy harness-named symbol until their own
+    projector cutovers retire them.
+    """
+    fn = getattr(helper, "propose_bridge_codex_non_bypass", None)
+    if fn is None:
+        # Shared copy: the harness-named symbol was neutralized to
+        # ``propose_bridge_inline_compliance`` (identical signature); legacy
+        # copies keep the harness-named symbol until their own projector
+        # cutovers retire them.
+        fn = helper.propose_bridge_inline_compliance
+    return fn
+
 
 # The helper's compliance audit enforces live work-item / project / project-
 # authorization membership
@@ -397,7 +419,7 @@ def test_helper_write_yields_consumed_publication_capability(
     # work-intent claim in the real repository.
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(root))
 
-    written = helper.propose_bridge_codex_non_bypass(
+    written = _propose_fn(helper)(
         slug,
         _proposal_body(slug, session_id),
         version=1,
@@ -431,12 +453,14 @@ def test_canonical_groundtruth_db_is_untouched(tmp_path: Path, monkeypatch: pyte
     assert _canonical_capability_rows(slug) == 0, "fixture slug already present in canonical MemBase before the run"
     assert not canonical_bridge_file.exists(), "fixture bridge file already present in canonical bridge/ before the run"
 
-    helper = _load_helper("goose")
+    # The shared single-source copy is the one Goose (and every future
+    # projection) routes to; it is therefore the isolation-critical copy.
+    helper = _load_helper("shared")
     _isolate_session_env(helper, monkeypatch, "wi5942-fixture-isolation")
     session_id = helper.resolve_work_intent_session_id()
     root = _build_fixture_root(tmp_path, session_id, slug)
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(root))
-    helper.propose_bridge_codex_non_bypass(
+    _propose_fn(helper)(
         slug,
         _proposal_body(slug, session_id),
         version=1,

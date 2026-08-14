@@ -300,10 +300,12 @@ def test_pointer_harnesses_resolve_to_live_helper_routes() -> None:
 
     assert ".codex/skills/gtkb-verify/helpers/write_verdict.py" in cursor_skill
     assert ".claude/skills/gtkb-verify/helpers/write_verdict.py" in antigravity_skill
-    # Provenance, not routing: the canonical baseline relocated to .agents, so the
-    # recorded canonical source moved with it. The routing assertions around this
-    # one are unchanged and are satisfied by the generators.
-    assert "Canonical source: `.agents/skills/gtkb-verify/SKILL.md`" in goose_skill
+    # Goose is a full projection, not a pointer stub, per
+    # gtkb-baseline-correction-and-goose-projector-slice-1 (GO -004) and owner
+    # Option A: the projected SKILL.md carries the whole body with a
+    # non-canonical stamp and a goose-local helper route.
+    assert "THIS FILE IS A PROJECTION, NOT CANONICAL." in goose_skill
+    assert "scripts/skill-helpers/gtkb-verify/write_verdict.py" in goose_skill
     assert ".claude/skills/gtkb-verify/helpers/write_verdict.py" in claude_skill
 
 

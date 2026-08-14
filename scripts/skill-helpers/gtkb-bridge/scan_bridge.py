@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
-# THIS FILE IS A PROJECTION, NOT CANONICAL.
-# Projected from the neutral harness baseline by the GT-KB projection engine.
-# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-# `gt harness project goose`. If a needed change cannot be made through
-# the baseline and re-projection, file a work item against the projector
-# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """Bridge scanner: role-filtered actionable list.
 
 Reads status-bearing versioned bridge files and emits a structured summary of
 which threads need attention from the calling harness based on its durable
 operating role.
 
-Filter rules (per ``.goose/rules/file-bridge-protocol.md``):
+Filter rules (per ``.harness-baseline-configuration/rules/file-bridge-protocol.md``):
 
 - ``prime-builder`` acts on latest ``NO-GO`` (revise) and latest ``GO``
   (implement) — EXCEPT a latest ``GO`` whose operative Prime proposal carries a
@@ -37,7 +31,7 @@ terminal). Parity with the canonical token set is asserted by
 ``platform_tests/scripts/test_scan_bridge.py``.
 
 The helper performs no mutations and is idempotent. It implements the manual
-Scan procedure documented in ``.goose/skills/gtkb-bridge/SKILL.md``.
+Scan procedure documented in ``.harness-baseline-configuration/skills/gtkb-bridge/SKILL.md``.
 
 CLI usage:
 
