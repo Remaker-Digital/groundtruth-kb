@@ -174,8 +174,8 @@ def _env_session_id() -> str | None:
     return None
 
 
-def _harness_name() -> str | None:
-    """Resolve the active harness name from host-provided environment.
+def _harness_name(project_root: Path | None = None) -> str | None:
+    """Resolve the active harness name from host environment or acting identity.
 
     Returns ``None`` when the host declares no harness name so that downstream
     provenance resolution derives the harness from the session that actually
@@ -184,9 +184,30 @@ def _harness_name() -> str | None:
     ``harness-state/<harness>/session-envelopes/`` tree, which surfaces as
     "Worker role provenance is missing for the current session" and makes
     verdict publication impossible from that harness (WI-6211).
+
+    ``GTKB_HARNESS_NAME`` retains precedence. When it is unset and
+    ``project_root`` is supplied, fall back to
+    :func:`resolve_acting_harness_identity`, which derives the acting harness
+    from runtime markers plus durable identity and fails closed on conflicting
+    markers. That fallback resolves harness IDENTITY only: it selects which
+    ``session-envelopes`` tree to read and never supplies role authority, which
+    remains inside the selected envelope (WI-6307).
     """
     value = (__import__("os").environ.get("GTKB_HARNESS_NAME") or "").strip()
-    return value or None
+    if value:
+        return value
+    if project_root is None:
+        return None
+    from groundtruth_kb.session.envelope import (
+        EnvelopeError,
+        resolve_acting_harness_identity,
+    )
+
+    try:
+        name, _resolved_id = resolve_acting_harness_identity(project_root)
+    except EnvelopeError:
+        return None
+    return name or None
 
 
 def _declared_model_fields(content: str) -> dict[str, str]:
@@ -253,7 +274,7 @@ def _metadata_from_attestation(session_id: str, project_root: Path, content: str
             return None
         raise VerdictFilingError(f"role attestation unusable for verdict filing: {exc}") from exc
 
-    harness_name = _harness_name() or ""
+    harness_name = _harness_name(project_root) or ""
     harness_id = _harness_id_for(harness_name, project_root)
     derived = {
         "author_identity": f"{attestation.role}/{harness_name or 'unknown-harness'}",
@@ -324,10 +345,10 @@ def _metadata_from_envelope(session_id: str, project_root: Path, content: str = 
             return derived
     except Exception:
         pass
-    harness = _harness_name()
+    harness = _harness_name(project_root)
     return {
         "author_identity": f"loyal-opposition/{harness or 'unknown'}",
-        "author_harness_id": (harness or "").upper()[:1],
+        "author_harness_id": _harness_id_for(harness or "", project_root),
         "author_session_context_id": session_id,
         "author_model": "unknown",
         "author_model_version": "unknown",
