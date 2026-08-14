@@ -162,6 +162,11 @@ ADAPTER_GENERATOR_BY_MARKER = {
     "GTKB-ANTIGRAVITY-SKILL-ADAPTER": "scripts/generate_antigravity_skill_adapters.py",
     "GTKB-API-SKILL-ADAPTER": "scripts/generate_api_skill_adapters.py",
 }
+# Projection-engine harnesses resolve their generator from the registry
+# declaration instead of this static map, so a Phase-D cutover does not
+# silently re-break parity until someone remembers to add a row (WI-6267 M2).
+_PROJECTION_ENGINE_CACHE: dict[Path, dict[str, str]] = {}
+_PROJECTION_PLAN_CACHE: dict[str, dict[str, str]] = {}
 FRONTMATTER_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 
 
@@ -223,6 +228,23 @@ def _find_markers(text: str, expected_marker: str | None = None) -> tuple[str, s
     if not match:
         return None
     marker_name = match.group(1)
+
+    # Full-body projections emit the block as `<!-- MARKER-BEGIN ... MARKER-END -->`
+    # (harness_projection.project_harness.adapter_metadata_block), whereas the
+    # stub-contract generators emit `<!-- MARKER ... MARKER -->`. Try the
+    # BEGIN/END grammar first; the stub grammar is unchanged below, so
+    # CODEX/ANTIGRAVITY/API parsing is untouched (WI-6267 M3).
+    begin_token = f"{marker_name}-BEGIN"
+    begin_idx = text.find(begin_token)
+    if begin_idx != -1:
+        end_suffix = re.search(re.escape(f"{marker_name}-END") + r"\s*-->", text)
+        if end_suffix is None:
+            return None
+        prefix_idx = text.rfind("<!--", 0, begin_idx)
+        if prefix_idx == -1:
+            return None
+        return text[prefix_idx : begin_idx + len(begin_token)], end_suffix.group(0)
+
     start_idx = text.find(marker_name)
     if start_idx == -1:
         return None
@@ -279,6 +301,54 @@ def _normalized_adapter_semantics(text: str, expected_marker: str) -> str:
     return _strip_generated_block(text, expected_marker).lstrip("\ufeff").rstrip() + "\n"
 
 
+def _projection_engine_by_harness(project_root: Path) -> dict[str, str]:
+    """Map harness name to its declared ``projection_engine``, from the registry.
+
+    A harness that declares a projection engine is projected in full by that
+    engine rather than rendered as a compact adapter stub, so its parity
+    contract is the engine's own output (WI-6267 M1/M2).
+    """
+
+    cached = _PROJECTION_ENGINE_CACHE.get(project_root)
+    if cached is not None:
+        return cached
+    try:
+        registry, _ = load_registry(project_root)
+    except (OSError, tomllib.TOMLDecodeError):
+        registry = {}
+    harnesses = registry.get("harnesses")
+    engines: dict[str, str] = {}
+    if isinstance(harnesses, dict):
+        for name, configuration in harnesses.items():
+            if not isinstance(configuration, dict):
+                continue
+            engine = configuration.get("projection_engine")
+            if isinstance(engine, str) and engine.strip():
+                engines[str(name)] = engine.strip()
+    _PROJECTION_ENGINE_CACHE[project_root] = engines
+    return engines
+
+
+def _projection_plan_writes(harness: str) -> dict[str, str]:
+    """Return the projection engine's plan for ``harness``, memoised per run.
+
+    The engine is the authority on what a projected surface should contain, so
+    parity compares against its output rather than against a re-implementation
+    of it. ``build_plan`` shells out to ``ruff format`` for Python writes, so it
+    is invoked lazily and at most once per harness per run (WI-6267 M4).
+    """
+
+    cached = _PROJECTION_PLAN_CACHE.get(harness)
+    if cached is None:
+        if str(SCRIPT_DIR) not in sys.path:
+            sys.path.insert(0, str(SCRIPT_DIR))
+        from harness_projection import project_harness
+
+        cached = dict(project_harness.build_plan(harness).writes)
+        _PROJECTION_PLAN_CACHE[harness] = cached
+    return cached
+
+
 def _render_expected_adapter(
     *,
     capability: dict[str, Any],
@@ -287,8 +357,12 @@ def _render_expected_adapter(
     source_text: str,
     source_hash: str,
     expected_marker: str,
+    projection_harness: str | None = None,
 ) -> str | None:
     """Render the canonical adapter shape without trusting declared hashes alone."""
+
+    if projection_harness:
+        return _projection_plan_writes(projection_harness).get(surface)
 
     generated_at = "1970-01-01T00:00:00Z"
     common = {
@@ -665,7 +739,17 @@ def _status_for_surface(
         source_path = project_root / adapter_source
         if not source_path.is_file():
             return CapabilityResult(**common, state="MISSING", note=f"Adapter source is absent: {adapter_source}")
-        if manifest_adapters and harness in manifest_adapters:
+        # A harness that declares a projection engine is projected in full and
+        # carries its own marker, even when it also declares a skill-adapter
+        # manifest. Routing it into the API-stub branch demands the retired
+        # compact contract from a full projection and reports STALE by
+        # construction (WI-6267 M1).
+        projection_engine = _projection_engine_by_harness(project_root).get(harness)
+        projection_harness = harness if projection_engine else None
+        if projection_engine:
+            expected_marker = f"GTKB-{harness.upper()}-SKILL-ADAPTER"
+            source_expected_marker = expected_marker
+        elif manifest_adapters and harness in manifest_adapters:
             expected_marker = "GTKB-API-SKILL-ADAPTER"
             source_expected_marker = "GTKB-API-SKILL-ADAPTER"
         else:
@@ -674,7 +758,7 @@ def _status_for_surface(
         source_hash = _canonical_hash(source_path.read_text(encoding="utf-8"), source_expected_marker)
         declared_source_hash = str(harness_config.get("source_sha256") or "").strip()
         metadata = _adapter_metadata(adapter_text, expected_marker)
-        expected_generator = ADAPTER_GENERATOR_BY_MARKER.get(expected_marker)
+        expected_generator = projection_engine or ADAPTER_GENERATOR_BY_MARKER.get(expected_marker)
         if metadata.get("Generated by") != expected_generator:
             return CapabilityResult(
                 **common,
@@ -715,8 +799,9 @@ def _status_for_surface(
                 source_text=source_path.read_text(encoding="utf-8"),
                 source_hash=source_hash,
                 expected_marker=expected_marker,
+                projection_harness=projection_harness,
             )
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, OSError, RuntimeError) as exc:
             return CapabilityResult(
                 **common,
                 state="STALE",
