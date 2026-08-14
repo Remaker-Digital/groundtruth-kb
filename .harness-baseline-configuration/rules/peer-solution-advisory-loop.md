@@ -1,6 +1,6 @@
 # Peer Solution Advisory Loop Procedure
 
-This rule is the durable procedure for handling Loyal Opposition (LO) peer-solution advisories — investigations of external systems, frameworks, libraries, or processes that may inform GT-KB's design. It formalizes the classification vocabulary, the owner-dialogue workflow, and the Prime-side response template that the parent Slice-0 thread `bridge/gtkb-peer-solution-advisory-loop-conversion-003.md` (Codex GO at `-004`) authorized.
+This rule is the durable procedure for handling Loyal Opposition (LO) peer-solution advisories — investigations of external systems, frameworks, libraries, or processes that may inform GT-KB's design. It formalizes the classification vocabulary, the owner-dialogue workflow, and the Prime-side response template that the parent Slice-0 thread `bridge/gtkb-peer-solution-advisory-loop-conversion-003.md` (Loyal Opposition GO at `-004`) authorized.
 
 This rule is auto-loaded via `{{HARNESS_RULES_DIR}}/` convention.
 

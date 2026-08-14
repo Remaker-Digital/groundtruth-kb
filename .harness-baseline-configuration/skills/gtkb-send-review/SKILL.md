@@ -39,7 +39,7 @@ not create or restore aggregate queue artifacts.
 
 3. **File through `gtkb-bridge-propose`.** Use the helper-mediated bridge writer
    described in `{{HARNESS_SKILLS_DIR}}/gtkb-bridge-propose/SKILL.md`. The helper performs
-   credential scanning, bridge-compliance validation for Codex paths, proposal
+   credential scanning, bridge-compliance validation for the reviewing harness's paths, proposal
    file creation, author metadata insertion, and dispatcher/TAFE bridge-state
    publication via `gtkb-bridge-propose`.
 

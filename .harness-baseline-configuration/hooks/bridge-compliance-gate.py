@@ -515,7 +515,9 @@ def _ancestor_or_self(root: Path, cwd_path: Path) -> bool:
 
 def _is_under_harness_worktrees(path: Path) -> bool:
     parts = path.resolve().parts
-    return any(left == ".claude" and right == "worktrees" for left, right in zip(parts, parts[1:], strict=False))
+    return any(
+        left == "{{HARNESS_CONFIG_DIR}}" and right == "worktrees" for left, right in zip(parts, parts[1:], strict=False)
+    )
 
 
 def _has_scratch_boundary_between(root: Path, cwd_path: Path) -> bool:

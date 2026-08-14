@@ -182,18 +182,19 @@ The two-axis automation surface is implemented:
   active): the dispatcher daemon at
   `scripts/gtkb_dispatcher_daemon.py`. Spawns headless counterpart harness on
   actionable signature change.
-- AXIS 2 Codex-side: the inventoried Codex app-thread automation under
-  `config/agent-control/system-interface-map.toml`, which wakes the Codex
-  interactive session periodically.
-- AXIS 2 Claude-native: the `.claude/hooks/bridge-axis-2-surface.py`
-  UserPromptSubmit hook (per
+- AXIS 2 prompt-driven surface: the `{{HARNESS_HOOKS_DIR}}/bridge-axis-2-surface.py`
+  prompt-submit hook (registered via `hooks/manifest.toml`; per
   `bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-005.md` REVISED-2
-  Codex GO at `-006`). Surfaces newly-actionable Prime bridge work into the
-  next prompt as additionalContext when an interactive Claude session is
-  active. Pull-based by design: Claude's interaction model is prompt-driven,
-  so the natural Claude-native AXIS 2 mechanism is prompt-time surfacing, not
-  periodic wake. Both AXIS 2 mechanisms are complementary; each fits its
-  harness's native interaction model.
+  GO at `-006`). Surfaces newly-actionable Prime bridge work into the next
+  prompt as additional context when an interactive session is active.
+  Pull-based by design: a prompt-driven harness's natural AXIS 2 mechanism is
+  prompt-time surfacing, not periodic wake.
+- AXIS 2 periodic-wake surface: a harness whose interaction model supports
+  scheduled thread automation may implement AXIS 2 as a periodic
+  interactive-session wake instead (inventoried under
+  `config/agent-control/system-interface-map.toml`). The two AXIS 2 forms are
+  complementary; each harness's projection declares the form matching its
+  native interaction model.
 
 ### Both axes required; roles do not overlap
 

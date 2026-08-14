@@ -129,7 +129,7 @@ scalar reads during the transition window.
 
 The legacy **compatibility/provenance value** `acting-prime-builder` is
 accepted on READ (per `GOV-ACTING-PRIME-BUILDER-001` +
-`{{HARNESS_RULES_DIR}}/acting-prime-builder.md` section Compatibility/Provenance
+the MemBase governance record `DOC-ACTING-PRIME-BUILDER-PROVENANCE-001` section Compatibility/Provenance
 Classification) but rejected on SET; only `prime-builder` and
 `loyal-opposition` are valid SET targets via `scripts/harness_roles.py`.
 

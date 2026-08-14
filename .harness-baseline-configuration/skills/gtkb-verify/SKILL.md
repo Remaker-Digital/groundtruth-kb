@@ -21,7 +21,7 @@ This is an **activity-envelope-only** skill. Use it only after the current worke
 
 This skill helps Loyal Opposition author post-implementation verdict files
 (`VERIFIED` or `NO-GO`) that satisfy the **Mandatory Specification-Derived
-Verification Gate** in `.claude/rules/file-bridge-protocol.md`. It scaffolds
+Verification Gate** in `{{HARNESS_RULES_DIR}}/file-bridge-protocol.md`. It scaffolds
 the structural conventions of the verdict file: header metadata, prior-
 deliberation citations, applicability and clause preflight output, the
 spec-to-test mapping table, positive confirmations, finding structure for
@@ -151,8 +151,8 @@ zero-padded version number for the thread. Structure:
   Every carried-forward specification needs at least one row.
 - `## Positive Confirmations` — a bullet list of what was inspected and passed.
 - `## Findings` — for a `NO-GO` verdict only; each finding structured per
-  `.claude/rules/report-depth.md` and
-  `.claude/rules/report-depth-prime-builder-context.md` (observation,
+  `{{HARNESS_RULES_DIR}}/report-depth.md` and
+  `{{HARNESS_RULES_DIR}}/report-depth-prime-builder-context.md` (observation,
   deficiency rationale, proposed solution, option rationale, Prime Builder
   implementation context).
 - `## Required Revisions` — for a `NO-GO` verdict only; the finding-by-finding

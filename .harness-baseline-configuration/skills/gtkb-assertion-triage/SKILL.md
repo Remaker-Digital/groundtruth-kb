@@ -49,7 +49,7 @@ Options: `--chronic-threshold N`, `--flaky-window N`, `--drift-prior-pass N`,
 `--drift-window-days N`, `--dry-run`, `--format text|json`.
 
 Default `--chronic-threshold=5` matches the current `assertion_runs` retention
-cap in `.claude/hooks/assertion-check.py`. When the retention cap is widened
+cap in `{{HARNESS_HOOKS_DIR}}/assertion-check.py`. When the retention cap is widened
 (Slice 4 of the umbrella), raise the threshold via the flag.
 
 ### `review-candidates`

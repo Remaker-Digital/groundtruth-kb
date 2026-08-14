@@ -1,6 +1,6 @@
 ---
 name: gtkb-bridge-propose
-description: Write a bridge proposal to ``bridge/<topic>-001.md`` through the governed no-index bridge path under governance-safe credential-scan and concurrency controls. Use when drafting a new NEW or REVISED proposal through the helper path (non-Claude-Write).
+description: Write a bridge proposal to ``bridge/<topic>-001.md`` through the governed no-index bridge path under governance-safe credential-scan and concurrency controls. Use when drafting a new NEW or REVISED proposal through the helper path rather than a direct file write.
 ---
 
 This skill implements the helper-mediated bridge-write path. It is the
@@ -76,18 +76,18 @@ Do NOT use for:
 
 The bridge-propose helper has two governed authoring paths:
 
-- **Claude path:** helper composer functions may return proposal content for
-  the harness to persist through Claude ``Write`` / ``Edit`` tool
-  calls. Those calls flow through the live Claude PreToolUse governance hooks.
-- **Codex path:** Codex must use the helper-mediated path that runs
-  ``.claude/hooks/bridge-compliance-gate.py --audit-only`` against the composed
-  proposal content before any proposal file is written. Codex must not treat
-  ``apply_patch`` as equivalent to Claude ``Write`` / ``Edit`` for bridge
+- **Native-Write path:** helper composer functions may return proposal content for
+  the harness to persist through its governed native ``Write`` / ``Edit`` tool
+  calls. Those calls flow through the live PreToolUse governance hooks.
+- **Helper-mediated path:** a harness without intercepted native Write tools must use the helper-mediated path that runs
+  ``{{HARNESS_HOOKS_DIR}}/bridge-compliance-gate.py --audit-only`` against the composed
+  proposal content before any proposal file is written. Such a harness must not treat
+  its patch-apply mechanism as equivalent to governed ``Write`` / ``Edit`` for bridge
   compliance unless a future hook-parity change explicitly adds that coverage.
 
 The pure composer functions are ``compose_proposal(...)`` and state-publication
-helpers. They perform no file I/O. The Codex writer entry
-point is ``propose_bridge_codex_non_bypass(...)``; it preserves credential
+helpers. They perform no file I/O. The non-bypass writer entry
+point is ``propose_bridge_non_bypass(...)``; it preserves credential
 scanning, author metadata insertion, bridge-compliance validation, file-first
 write ordering, and no-index dispatcher/TAFE publication behavior.
 
@@ -151,7 +151,7 @@ author content, helper-suggested candidates land under a
 prior content.
 
 The author then reviews and prunes irrelevant entries before the
-proposal is filed. The Loyal Opposition review-side check (``counterpart-review-gate.md``
+proposal is filed. The Loyal Opposition review-side check (``gtkb-review-gate.md``
 sixth review obligation) NO-GOs proposals with empty Prior Deliberations
 sections lacking justification (a ``_No prior deliberations: <reason>._``
 line is the explicit empty-justification convention for novel topics).
