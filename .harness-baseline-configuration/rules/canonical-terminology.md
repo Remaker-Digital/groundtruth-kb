@@ -1323,4 +1323,4 @@ An env var like GTKB_SESSION_ID tells the CLI *which* session envelope to read, 
 
 When a target_paths entry matches no classifier rule in bridge_applicability_preflight.py, it is classified as unclassified. Paths classified as unclassified may cause implementation_authorization.py begin to fail if they fall into a protected scope that the classifier did not match. To resolve, refine the glob pattern to match a known classified sub-pattern (e.g., .../**/*.md -> governance_evidence rather than .../**).
 
-*{{COPYRIGHT}}*
+*(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

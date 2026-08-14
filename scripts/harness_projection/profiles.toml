@@ -1,0 +1,116 @@
+# Harness projection profiles - GT-KB neutral baseline projection framework
+#
+# Bridge: gtkb-baseline-correction-and-goose-projector-slice-1 (GO at -004).
+# Spec: GOV-HARNESS-NEUTRAL-BASELINE-001 (obligations 2, 4, 5).
+#
+# Each [harnesses.<name>] table is the ONLY artifact aware of the difference
+# between that harness's configuration surface and the neutral baseline
+# (obligation 4). The projection engine (project_harness.py) reads this file
+# and the baseline; it contains no per-harness branches of its own beyond the
+# renderer classes declared here.
+
+schema_version = 1
+
+[baseline]
+root = ".harness-baseline-configuration"
+# Neutral tokens the engine substitutes per harness. A token appearing in a
+# baseline file and NOT declared in a profile is a projection error (fail
+# closed), never silently passed through.
+tokens = [
+    "HARNESS_CONFIG_DIR",
+    "HARNESS_SKILLS_DIR",
+    "HARNESS_RULES_DIR",
+    "HARNESS_HOOKS_DIR",
+    "HARNESS_PROJECT_DIR_VAR",
+    "HARNESS_SESSION_ID_VAR",
+    "HARNESS_NAME",
+    "SHARED_HELPERS_DIR",
+]
+hook_manifest = "hooks/manifest.toml"
+shared_helpers_dir = "scripts/skill-helpers"
+
+[stamp]
+# Obligation 5: every projected artifact declares it is not canonical.
+# Rendered in syntax valid for the file type; for files with YAML
+# frontmatter the stamp is placed AFTER the closing delimiter.
+text = """THIS FILE IS A PROJECTION, NOT CANONICAL.
+Projected from the neutral harness baseline by the GT-KB projection engine.
+Do not edit here: change the baseline ({baseline_root}) and re-project with
+`gt harness project {harness}`. If a needed change cannot be made through
+the baseline and re-projection, file a work item against the projector
+(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6)."""
+
+[harnesses.goose]
+config_dir = ".goose"
+skills_dir = ".goose/skills"
+rules_dir = ".goose/rules"
+hooks_dir = ".goose/hooks"
+project_dir_var = "GOOSE_PROJECT_DIR"
+session_id_var = "GOOSE_SESSION_ID"
+# Full native skill bodies per owner decision (Option A,
+# DELIB-20260813-BASELINE-CLEANSE-AND-PROJECTOR-ARCHITECTURE): Goose loads
+# SKILL.md directly with progressive disclosure.
+skill_body = "full"
+rules_projection = true
+hooks_projection = "plugin_hooks_json"
+# Goose-native hook registration: shell commands consuming JSON on stdin,
+# registered at plugins/gtkb/hooks/hooks.json. Only PreToolUse and Stop can
+# block; other events are registered non-blocking.
+hooks_json_path = ".goose/plugins/gtkb/hooks/hooks.json"
+manifest_generator = "scripts/generate_goose_manifest.py"
+# Neutral lifecycle events -> Goose hook event names.
+[harnesses.goose.hook_events]
+pre_tool_use = "PreToolUse"
+post_tool_use = "PostToolUse"
+prompt_submit = "UserPromptSubmit"
+session_start = "SessionStart"
+turn_end = "Stop"
+[harnesses.goose.blocking_events]
+# Goose honors deny results only on these events.
+supported = ["PreToolUse", "Stop"]
+
+[harnesses.claude]
+config_dir = ".claude"
+skills_dir = ".claude/skills"
+rules_dir = ".claude/rules"
+hooks_dir = ".claude/hooks"
+project_dir_var = "CLAUDE_PROJECT_DIR"
+session_id_var = "CLAUDE_SESSION_ID"
+skill_body = "full"
+rules_projection = true
+hooks_projection = "settings_json"
+hooks_json_path = ".claude/settings.json"
+[harnesses.claude.hook_events]
+pre_tool_use = "PreToolUse"
+post_tool_use = "PostToolUse"
+prompt_submit = "UserPromptSubmit"
+session_start = "SessionStart"
+turn_end = "Stop"
+[harnesses.claude.intent_matchers]
+# Neutral intents -> native tool-matcher vocabulary.
+file_write = "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy"
+shell_exec = "Bash|PowerShell"
+read_access = "Read|Grep|Glob"
+all = ""
+
+# Remaining harnesses are declared as placeholders so the roster lives HERE
+# (not in the baseline). Their surface details land with their own projector
+# slices (Phase D of the parent bridge thread).
+[harnesses.codex]
+config_dir = ".codex"
+status = "profile_pending"
+[harnesses.cursor]
+config_dir = ".cursor"
+status = "profile_pending"
+[harnesses.antigravity]
+config_dir = ".agent"
+status = "profile_pending"
+[harnesses.ollama]
+config_dir = ".api-harness"
+status = "profile_pending"
+[harnesses.openrouter]
+config_dir = ".api-harness"
+status = "profile_pending"
+[harnesses.alibaba-cloud-studio]
+config_dir = ".api-harness"
+status = "profile_pending"

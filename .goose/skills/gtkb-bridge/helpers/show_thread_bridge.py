@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project goose`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """Bridge thread loader: read full version chain for a given slug.
 
 Resolves all ``bridge/<slug>-NNN.md`` files for a given thread slug, sorts by
@@ -10,7 +16,7 @@ don't have to issue N separate Read calls and reconstruct ordering manually.
 
 CLI usage:
 
-  python .claude/skills/bridge/helpers/show_thread_bridge.py <slug> [--format json|markdown]
+  python scripts/skill-helpers/gtkb-bridge/show_thread_bridge.py <slug> [--format json|markdown]
                                                                     [--preview-lines N]
 
 Public API:

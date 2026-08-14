@@ -1,3 +1,9 @@
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project goose`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Helper utilities for Loyal Opposition verdict authoring."""
 
@@ -1007,7 +1013,7 @@ def _append_commit_finalization_evidence(body: str, *, commit_message: str, path
     subject = commit_message.splitlines()[0].strip()
     return (
         body.rstrip() + "\n\n## Commit Finalization Evidence\n\n"
-        "- Finalization helper: `.claude/skills/gtkb-verify/helpers/write_verdict.py --finalize-verified`\n"
+        "- Finalization helper: `scripts/skill-helpers/gtkb-verify/write_verdict.py --finalize-verified`\n"
         f"- Intended commit subject: `{subject}`\n"
         "- Same-transaction path set:\n"
         f"{path_lines}\n"

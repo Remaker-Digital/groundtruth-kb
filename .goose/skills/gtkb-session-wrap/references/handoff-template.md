@@ -1,3 +1,11 @@
+<!--
+THIS FILE IS A PROJECTION, NOT CANONICAL.
+Projected from the neutral harness baseline by the GT-KB projection engine.
+Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+`gt harness project goose`. If a needed change cannot be made through
+the baseline and re-projection, file a work item against the projector
+(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+-->
 # Session Handoff Prompt Template
 
 Use this template for Phase 5 of `kb-session-wrap`. The prompt must be complete enough for a fresh agent to continue without hidden chat memory.
@@ -55,7 +63,7 @@ db = KnowledgeDB("groundtruth.db")
 db.insert_session_prompt(
     session_id="<NEXT_SESSION_ID>",
     prompt_text=prompt_text,
-    changed_by="codex",
+    changed_by="<active-harness attribution>",
     change_reason="<SESSION_ID>: session wrap handoff",
 )
 ```

@@ -2127,6 +2127,16 @@ result_envelope_limitations = "Cursor parity is assessed through generated adapt
 
 [harnesses.goose]
 skill_adapter_manifest = ".goose/skills/MANIFEST.json"
+# Full projection surface per gtkb-baseline-correction-and-goose-projector-slice-1
+# (GO at -004): .goose is rendered from the neutral baseline by the projection
+# engine (full native SKILL.md bodies, rules, hooks, plugin hooks.json), then
+# indexed by the Goose manifest generator.
+skill_adapter_generator = "scripts/harness_projection/project_harness.py"
+skill_adapter_generation_supported = true
+skill_adapter_drift_check_supported = true
+projection_engine = "scripts/harness_projection/project_harness.py"
+projection_profile = "scripts/harness_projection/profiles.toml"
+manifest_generator = "scripts/generate_goose_manifest.py"
 
 [harnesses.ollama]
 # Harness-level capability floor declaration per GOV-HARNESS-ONBOARDING-CONTRACT-001 Layer 3

@@ -1,3 +1,9 @@
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project goose`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Helper for the /gtkb-bridge-propose skill.
 
@@ -379,7 +385,7 @@ def _run_bridge_compliance_audit(
     project_root: Path,
 ) -> dict[str, Any]:
     """Run bridge-compliance-gate.py in audit mode for in-memory content."""
-    gate_path = PROJECT_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
+    gate_path = PROJECT_ROOT / ".goose/hooks" / "bridge-compliance-gate.py"
     payload = {
         "cwd": str(project_root.resolve()),
         "tool_input": {
@@ -438,7 +444,7 @@ def propose_bridge(
     GTKB-DA-READ-SURFACE-CORRECTION): when
     ``pre_populate_prior_deliberations=True`` (default), call
     :func:`pre_populate_prior_deliberations` on ``body`` before scanning.
-    Glossary-source seeding from ``.claude/rules/canonical-terminology.md``
+    Glossary-source seeding from ``.goose/rules/canonical-terminology.md``
     plus optional semantic search (when ``db`` is provided) populates the
     proposal's ``## Prior Deliberations`` section. Authors review and
     prune. Set ``pre_populate_prior_deliberations=False`` to opt out;
@@ -469,7 +475,7 @@ def propose_bridge(
             stage of pre-population. ``None`` skips semantic search;
             glossary-source seeding still runs.
         glossary_path: Override the glossary path used for seeding.
-            Defaults to ``.claude/rules/canonical-terminology.md``.
+            Defaults to ``.goose/rules/canonical-terminology.md``.
         pre_populate_log_path: Override the audit-log path. ``None``
             (default) writes to ``.gtkb-state/bridge-propose-helper/
             last-prepopulation.json``; ``False`` disables logging.
@@ -526,7 +532,7 @@ def propose_bridge(
     )
 
 
-def propose_bridge_codex_non_bypass(
+def propose_bridge_inline_compliance(
     topic_slug: str,
     body: str,
     *,
@@ -540,9 +546,9 @@ def propose_bridge_codex_non_bypass(
     pre_populate_log_path: Path | bool | None = None,
     author_metadata: dict[str, Any] | None = None,
 ) -> Path:
-    """Create a bridge proposal through the Codex inline-compliance path.
+    """Create a bridge proposal through the inline-compliance path.
 
-    This path is for Codex harnesses where ``apply_patch`` is not covered by
+    This path is for harnesses whose patch-apply tooling is not covered by
     the bridge-compliance PreToolUse hook. It composes the proposal body,
     ensures author metadata, runs ``bridge-compliance-gate.py --audit-only`` on
     the in-memory proposal content, and only then writes the proposal file.
@@ -613,7 +619,7 @@ __all__ = [
     "handle_hits_abort_or_redact",
     "pre_populate_prior_deliberations",
     "propose_bridge",
-    "propose_bridge_codex_non_bypass",
+    "propose_bridge_inline_compliance",
     "redact_credential_hits",
     "resolve_work_intent_session_id",
     "scan_credential_hits",
@@ -636,8 +642,8 @@ def _print_usage(stream) -> None:
         "  propose_bridge(topic_slug, body, ...)\n"
         "      Create bridge/<topic_slug>-001.md (version-1 only; the skill never\n"
         "      silently overwrites and never writes beyond -001 through this helper).\n"
-        "  propose_bridge_codex_non_bypass(...)\n"
-        "      Codex non-bypass proposal path (same version-1-only constraint).\n"
+        "  propose_bridge_inline_compliance(...)\n"
+        "      Inline-compliance (non-bypass) proposal path (same version-1-only constraint).\n"
         "  BridgeFileAlreadyExistsError\n"
         "      Raised when the target -001 file already exists (no overwrite).\n"
         "\n"

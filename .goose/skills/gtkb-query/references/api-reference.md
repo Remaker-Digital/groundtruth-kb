@@ -1,3 +1,11 @@
+<!--
+THIS FILE IS A PROJECTION, NOT CANONICAL.
+Projected from the neutral harness baseline by the GT-KB projection engine.
+Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+`gt harness project goose`. If a needed change cannot be made through
+the baseline and re-projection, file a work item against the projector
+(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+-->
 # Knowledge Database API Reference
 
 All queries use the Python API at `tools/knowledge-db/db.py`. **Never edit the SQLite database directly.**
@@ -140,24 +148,24 @@ The KB is append-only. Every mutation creates a new version.
 # Create a spec
 db.insert_spec(
     id="SPEC-XXXX", title="...", status="specified",
-    description="...", changed_by="Claude", change_reason="S189: ..."
+    description="...", changed_by="<active-harness attribution>", change_reason="S189: ..."
 )
 
 # Update a spec (creates new version)
 db.update_spec(
-    "SPEC-XXXX", changed_by="Claude", change_reason="...",
+    "SPEC-XXXX", changed_by="<active-harness attribution>", change_reason="...",
     status="implemented"
 )
 
 # Create a work item
 db.insert_work_item(
     id="WI-XXXX", title="...", origin="defect", component="...",
-    resolution_status="open", changed_by="Claude", change_reason="..."
+    resolution_status="open", changed_by="<active-harness attribution>", change_reason="..."
 )
 
 # Record test result
 db.update_test(
-    "TEST-XXXX", changed_by="Claude", change_reason="...",
+    "TEST-XXXX", changed_by="<active-harness attribution>", change_reason="...",
     last_result="pass", last_executed_at="2026-03-16T00:00:00Z"
 )
 ```

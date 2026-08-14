@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project goose`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """Helper for filing bridge post-implementation reports.
 
 The helper has three modes:
@@ -32,10 +38,10 @@ def _resolve_bridge_propose_helper(root: Path) -> Path:
     """Prefer the canonical gtkb- prefixed helper, falling back to the pre-rename
     name for backward compatibility (WI-5651 skill-rename path canonicalization)."""
     for name in ("gtkb-bridge-propose", "bridge-propose"):
-        candidate = root / ".claude" / "skills" / name / "helpers" / "write_bridge.py"
+        candidate = root / "scripts" / "skill-helpers" / name / "write_bridge.py"
         if candidate.is_file():
             return candidate
-    return root / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py"
+    return root / "scripts" / "skill-helpers" / "gtkb-bridge-propose" / "write_bridge.py"
 
 
 BRIDGE_PROPOSE_HELPER = _resolve_bridge_propose_helper(PROJECT_ROOT)

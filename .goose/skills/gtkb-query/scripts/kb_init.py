@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project goose`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """Initialize KnowledgeDB connection for skill scripts.
 
-This is a kb-query skill helper invoked by Claude during KB queries. It
+This is a kb-query skill helper invoked by the active harness during KB queries. It
 imports the in-repo `tools.knowledge_db.db` module without requiring the
 package to be installed.
 
 Per S307 hardcoded-path directive (no machine-local literals in active code):
 the project root is discovered from this file's location, not configured.
-The script is at .claude/skills/kb-query/scripts/kb_init.py — four levels
+The script is at scripts/skill-helpers/gtkb-query/kb_init.py — three levels
 deep from the repo root. `Path(__file__).resolve().parents[4]` resolves to
 the repo root regardless of which workstation runs it. This makes the skill
 portable across workstations and pip-install scenarios.
@@ -16,16 +22,17 @@ Long-term this should become `from groundtruth_kb import KnowledgeDB` once
 the package install is the supported path.
 
 Usage:
-    python .claude/skills/kb-query/scripts/kb_init.py summary
-    python .claude/skills/kb-query/scripts/kb_init.py specs specified
-    python .claude/skills/kb-query/scripts/kb_init.py wi open
-    python .claude/skills/kb-query/scripts/kb_init.py next-ids
+    python scripts/skill-helpers/gtkb-query/kb_init.py summary
+    python scripts/skill-helpers/gtkb-query/kb_init.py specs specified
+    python scripts/skill-helpers/gtkb-query/kb_init.py wi open
+    python scripts/skill-helpers/gtkb-query/kb_init.py next-ids
 """
+
 import sys
 from pathlib import Path
 
-# Discover repo root from this file's location: .claude/skills/kb-query/scripts/kb_init.py
-# parents[0]=scripts, [1]=kb-query, [2]=skills, [3]=.claude, [4]=repo root
+# Discover repo root from this file's location: scripts/skill-helpers/gtkb-query/kb_init.py
+# parents[0]=gtkb-query, [1]=skill-helpers, [2]=scripts, [3]=repo root
 # Note: the tools dir is `tools/knowledge-db` (with a dash). Python module names
 # cannot contain dashes, so we must add the knowledge-db directory itself to
 # sys.path and import the bare module name `db`. Adding `_REPO_ROOT` alone
@@ -40,6 +47,7 @@ db = KnowledgeDB()
 
 if __name__ == "__main__":
     import json
+
     cmd = sys.argv[1] if len(sys.argv) > 1 else "summary"
 
     if cmd == "summary":
@@ -62,9 +70,19 @@ if __name__ == "__main__":
         wis = db.list_work_items()
         tests = db.list_tests()
         specs = db.list_specs()
-        next_wi = max((int(w['id'].split('-')[1]) for w in wis if w['id'].split('-')[1].isdigit()), default=0) + 1
-        next_test = max((int(t['id'].split('-')[1]) for t in tests if t['id'].split('-')[1].isdigit()), default=0) + 1
-        next_spec = max((int(s['id'].split('-')[1]) for s in specs if s['id'].startswith('SPEC-') and s['id'].split('-')[1].isdigit()), default=0) + 1
+        next_wi = max((int(w["id"].split("-")[1]) for w in wis if w["id"].split("-")[1].isdigit()), default=0) + 1
+        next_test = max((int(t["id"].split("-")[1]) for t in tests if t["id"].split("-")[1].isdigit()), default=0) + 1
+        next_spec = (
+            max(
+                (
+                    int(s["id"].split("-")[1])
+                    for s in specs
+                    if s["id"].startswith("SPEC-") and s["id"].split("-")[1].isdigit()
+                ),
+                default=0,
+            )
+            + 1
+        )
         print(f"  Next WI:   WI-{next_wi}")
         print(f"  Next TEST: TEST-{next_test}")
         print(f"  Next SPEC: SPEC-{next_spec}")
