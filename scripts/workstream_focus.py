@@ -267,6 +267,7 @@ CURRENT_REPO_BRIDGE_OR_GOVERNANCE_PREFIXES = (
     "config/dispatcher/",
     "config/governance/",
     "config/harness-parity/",
+    "config/membase-dump/",
     "config/project-templates/",
     "config/registry/",
     "docs/gtkb-dashboard/",
