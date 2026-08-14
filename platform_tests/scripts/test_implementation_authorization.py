@@ -3092,11 +3092,17 @@ def test_gate_rejects_orphaned_packet_via_work_intent_claim_check(auth_module, t
 # governance-hook parity proposal unfileable. These assertions run against the LIVE
 # taxonomy, as the proposal's verification mapping commits to.
 
-# The eight WI-5918 target paths regression-checked by the proposal, with the classes
-# they resolved to BEFORE the `.goosehints` rule was added. Adding a path_rule must not
-# reclassify any of them.
+# The eight WI-5918 target paths regression-checked by the proposal. Seven pin the
+# classes they resolved to BEFORE the `.goosehints` rule was added; a path_rule must
+# not silently reclassify them. The `.agents/plugins/...` entry was DELIBERATELY
+# moved from `governance_evidence` to `configuration` by the `.agents/**` rule
+# (bridge/gtkb-operation-taxonomy-baseline-path-rules, REVISED -007, GO -008): the
+# predecessor baseline tree is being retired under governed configuration-class
+# authorization, and the stricter class is the intended steady state for every path
+# under `.agents/**`. This guard caught that change as designed (-004 NO-GO); the
+# expectation now encodes the approved outcome.
 WI5918_UNCHANGED_CLASSIFICATIONS = {
-    ".agents/plugins/gtkb/hooks/hooks.json": "governance_evidence",
+    ".agents/plugins/gtkb/hooks/hooks.json": "configuration",
     "config/agent-control/gtkb-harness-capability-registry.toml": "configuration",
     "config/registry/sot-artifacts.toml": "configuration",
     "platform_tests/scripts/test_goose_hook_parity.py": "test",
@@ -3108,13 +3114,19 @@ WI5918_UNCHANGED_CLASSIFICATIONS = {
 
 
 def test_goosehints_classifies_configuration_and_wi5918_targets_unchanged():
-    """`.goosehints` resolves to `configuration`; the other WI-5918 targets are untouched.
+    """`.goosehints` resolves to `configuration`; the WI-5918 targets match the pinned map.
 
     The first assertion is the WI-6196 fix itself: it is what makes a `target_paths`
     entry of `.goosehints` survive the PAUTH operation-time mutation-class gate. The
-    second is the non-regression half -- a taxonomy `path_rule` is a global override,
-    so the change must narrow the unrecognized set by exactly one path and leave every
-    other WI-5918 target on its pre-change class.
+    second is the guard half: a taxonomy `path_rule` is a global override, so every
+    WI-5918 target must resolve exactly to the class the pinned map above encodes,
+    and any drift from that map is a regression. The map itself records one
+    DELIBERATE post-WI-5918 change: `.agents/plugins/gtkb/hooks/hooks.json` moved to
+    `configuration` when the `.agents/**` baseline-retirement rule landed
+    (bridge/gtkb-operation-taxonomy-baseline-path-rules, GO at -008) -- see the
+    comment on the map for the rationale. The test name's "unchanged" refers to the
+    guard's non-drift purpose, not to a claim that no expectation was ever
+    deliberately revised.
     """
     assert classify_target(".goosehints").mutation_class == "configuration"
 
