@@ -189,6 +189,82 @@ def _harness_name() -> str | None:
     return value or None
 
 
+def _declared_model_fields(content: str) -> dict[str, str]:
+    """Take model fields from the artifact's own declaration.
+
+    Model identity is not derivable from a role attestation or from session
+    provenance, and emitting a placeholder would fabricate provenance on a
+    governance artifact. The artifact's declared values stand or the fields are
+    omitted.
+    """
+
+    declared: dict[str, str] = {}
+    for field in ("author_model", "author_model_version", "author_model_configuration"):
+        match = re.search(rf"(?mi)^{field}\s*:\s*(?P<value>\S.*?)\s*$", content or "")
+        if match:
+            declared[field] = match.group("value")
+    return declared
+
+
+def _harness_id_for(harness_name: str, project_root: Path) -> str:
+    """Resolve the durable harness ID for a harness name, or empty string.
+
+    Read from the persistent identity map rather than derived from the name,
+    because the name-to-ID mapping is owner-assigned and not computable.
+    """
+
+    if not harness_name:
+        return ""
+    try:
+        from scripts.harness_identity import load_harness_identities
+
+        record = load_harness_identities(project_root).get("harnesses", {}).get(harness_name)
+    except Exception:
+        return ""
+    identifier = record.get("id") if isinstance(record, dict) else None
+    return str(identifier) if isinstance(identifier, str) else ""
+
+
+def _metadata_from_attestation(session_id: str, project_root: Path, content: str) -> dict[str, str] | None:
+    """Derive author metadata from the role attestation in force, or ``None``.
+
+    Returns ``None`` only for the typed ``no_session_binding`` case, which is
+    the ordered-migration fallback. Any other attestation failure is raised:
+    a session that HAS a binding but whose role cannot be resolved must not
+    quietly fall through to a resolver that infers role from durable registry
+    state.
+    """
+
+    try:
+        from groundtruth_kb.session.attestation import (
+            RoleAttestationError,
+            resolve_effective_role_for_context,
+        )
+    except ImportError:
+        return None
+
+    try:
+        _binding, attestation = resolve_effective_role_for_context(
+            project_root / "groundtruth.db",
+            invoking_context=session_id,
+        )
+    except RoleAttestationError as exc:
+        if exc.code == "no_session_binding":
+            return None
+        raise VerdictFilingError(f"role attestation unusable for verdict filing: {exc}") from exc
+
+    harness_name = _harness_name() or ""
+    harness_id = _harness_id_for(harness_name, project_root)
+    derived = {
+        "author_identity": f"{attestation.role}/{harness_name or 'unknown-harness'}",
+        "author_harness_id": harness_id,
+        "author_session_context_id": session_id,
+        "author_role_attestation": attestation.evidence_reference,
+    }
+    derived.update(_declared_model_fields(content))
+    return derived
+
+
 def _metadata_from_envelope(session_id: str, project_root: Path, content: str = "") -> dict[str, str]:
     """Derive trusted author metadata from the current session envelope.
 
@@ -199,6 +275,21 @@ def _metadata_from_envelope(session_id: str, project_root: Path, content: str = 
         BridgeAuthorMetadataError,
         load_author_metadata,
     )
+
+    # Role authority is the attestation resolver
+    # (``DCL-SESSION-ROLE-RESOLUTION-001`` v8): the invoking session context
+    # resolves through its immutable init binding to the role attestation in
+    # force, and the attestation's evidence reference is what this artifact
+    # persists. This runs BEFORE the legacy resolvers because those infer role
+    # from durable registry state, which is a routing label rather than an
+    # identity oracle. During the ordered Slice 1-3 migration, sessions whose
+    # invoking context predates the attestation store (typed
+    # ``no_session_binding``) still fall through to the legacy paths below;
+    # Slice 3 removes that fallback once every live session initializes through
+    # the binding transaction.
+    attested = _metadata_from_attestation(session_id, project_root, content)
+    if attested is not None:
+        return attested
 
     try:
         metadata = load_author_metadata(project_root)
@@ -229,10 +320,7 @@ def _metadata_from_envelope(session_id: str, project_root: Path, content: str = 
             }
             # Model fields are not derivable from provenance. Take the values the
             # artifact itself declares rather than fabricating a vendor default.
-            for field in ("author_model", "author_model_version", "author_model_configuration"):
-                match = re.search(rf"(?mi)^{field}\s*:\s*(?P<value>\S.*?)\s*$", content or "")
-                if match:
-                    derived[field] = match.group("value")
+            derived.update(_declared_model_fields(content))
             return derived
     except Exception:
         pass
