@@ -473,7 +473,20 @@ def _report_no_go_resumption_authority(
         return None
     if proposal_bridge_kind(report_text) != "implementation_report":
         return None
-    responds_match = re.search(r"(?im)^Responds\s+to\s*:\s*(\S+)\s*$", no_go_text)
+    # WI-6216 D3 (PARTIAL, by design). A trailing parenthetical annotation after
+    # the report path is tolerated: the path is matched as a prefix and the
+    # annotation stripped. Only a parenthetical is allowed, so an unrelated
+    # second path on the line still fails closed.
+    #
+    # This closes ONE of three barriers. WI-6237 remains OPEN for the other two,
+    # which this change deliberately does not touch:
+    #   1. the versions[1] index gate above, which returns None before this regex
+    #      runs once an intervening NO-ACTION is filed; and
+    #   2. the mutually unsatisfiable Responds-to contracts between
+    #      bridge_lifecycle_resolver (version N must respond to N-1) and this
+    #      resume path (the NO-GO must respond to the implementation report).
+    # See bridge/gtkb-operation-taxonomy-baseline-path-rules-006.md F2.
+    responds_match = re.search(r"(?im)^Responds\s+to\s*:\s*(\S+)(?:\s*\([^)]*\))?\s*$", no_go_text)
     if responds_match is None or responds_match.group(1).replace("\\", "/") != report_file.replace("\\", "/"):
         return None
 

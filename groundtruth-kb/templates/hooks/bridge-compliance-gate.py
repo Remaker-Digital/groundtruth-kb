@@ -17,6 +17,7 @@ All rights reserved.
 from __future__ import annotations
 
 import datetime as _dt
+import fnmatch
 import hashlib
 import json
 import os
@@ -24,6 +25,7 @@ import re
 import sqlite3
 import subprocess
 import sys
+import time
 from pathlib import Path
 from uuid import uuid4
 
@@ -1889,10 +1891,106 @@ def _pending_proposal_target_records(project_root: Path) -> list[dict[str, objec
     return records
 
 
+PARKED_THREAD_AGE_DAYS = 30
+
+
+def _path_claimed_by_target(file_path_normalized: str, target: str) -> bool:
+    """Root-anchored match of a repo-relative path against a target_paths entry.
+
+    WI-6216 D1(c). The prior implementation used ``endswith``, which let an
+    unrelated thread claim a file whose path merely ended with the target
+    string. Matching is now anchored at the repository root: a glob is matched
+    with fnmatch, and a non-glob target must be equal or a directory prefix.
+    """
+
+    target_norm = target.replace("\\", "/").strip()
+    if not target_norm:
+        return False
+    if any(ch in target_norm for ch in "*?["):
+        return fnmatch.fnmatchcase(file_path_normalized, target_norm)
+    if file_path_normalized == target_norm:
+        return True
+    return file_path_normalized.startswith(target_norm.rstrip("/") + "/")
+
+
+def _thread_last_activity(project_root: Path, doc_name: str) -> float:
+    """Newest bridge-file mtime for a thread slug, or 0.0 when unreadable."""
+
+    slug = doc_name[:-3] if doc_name.endswith(".md") else doc_name
+    slug = re.sub(r"-\d{3}$", "", slug)
+    newest = 0.0
+    try:
+        for path in (project_root / "bridge").glob(f"{slug}-*.md"):
+            try:
+                newest = max(newest, path.stat().st_mtime)
+            except OSError:
+                continue
+    except OSError:
+        return 0.0
+    return newest
+
+
+def _live_packet_authorizes(project_root: Path, file_path_normalized: str) -> bool:
+    """True when an unexpired implementation-start packet authorizes this path.
+
+    WI-6216 D1(a). A live packet means the session already cleared the bridge
+    GO gate for this exact path, so a pending-proposal banner is noise that
+    misdirects the implementer to an unrelated thread.
+    """
+
+    packet_dir = project_root / ".gtkb-state" / "implementation-authorizations" / "by-bridge"
+    try:
+        packets = list(packet_dir.glob("*.json"))
+    except OSError:
+        return False
+    now = _dt.datetime.now(_dt.UTC)
+    for packet_path in packets:
+        try:
+            packet = json.loads(packet_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        expires_raw = str(packet.get("expires_at") or "")
+        try:
+            expires = _dt.datetime.fromisoformat(expires_raw.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=_dt.UTC)
+        if expires <= now:
+            continue
+        globs = packet.get("target_path_globs")
+        if not isinstance(globs, list):
+            continue
+        for entry in globs:
+            if isinstance(entry, str) and _path_claimed_by_target(file_path_normalized, entry):
+                return True
+    return False
+
+
 def _pending_proposal_ask_reason(project_root: Path, file_path: str) -> str | None:
     """Return an ask-checkpoint reason when file_path matches a pending
-    proposal's target_paths, or None."""
+    proposal's target_paths, or None.
+
+    WI-6216 D1. Four corrections to the prior behaviour, which matched by path
+    suffix against every pending thread and returned the FIRST match:
+
+    (a) a live implementation-start packet authorizing this path suppresses the
+        banner entirely;
+    (b) among several matching threads the most recently active one is named,
+        rather than whichever happened to be enumerated first;
+    (c) matching is root-anchored (glob or exact/prefix), not suffix-based;
+    (d) a NO-GO thread with no new version in 30 days no longer claims paths.
+    """
+
     file_path_normalized = file_path.replace("\\", "/")
+
+    if _live_packet_authorizes(project_root, file_path_normalized):
+        return None
+
+    now = time.time()
+    parked_cutoff = now - (PARKED_THREAD_AGE_DAYS * 86400)
+    matches: list[tuple[float, str, str]] = []
+
     for record in _pending_proposal_target_records(project_root):
         doc_name = str(record.get("document") or "")
         status = str(record.get("status") or "")
@@ -1901,21 +1999,30 @@ def _pending_proposal_ask_reason(project_root: Path, file_path: str) -> str | No
         target_paths = record.get("target_paths")
         if not isinstance(target_paths, list):
             continue
-        for tp in target_paths:
-            if not isinstance(tp, str):
-                continue
-            tp_norm = tp.replace("\\", "/")
-            if file_path_normalized.endswith(tp_norm) or tp_norm == file_path_normalized:
-                if status == "NO-GO":
-                    return (
-                        "[Governance] Bridge proposal for this module has NO-GO status. "
-                        f"Review Codex findings at bridge/{doc_name} before implementing."
-                    )
-                return (
-                    f"[Governance] Bridge proposal for {doc_name} is pending Codex review ({status}). "
-                    "Wait for GO verdict before implementing."
-                )
-    return None
+        if not any(isinstance(tp, str) and _path_claimed_by_target(file_path_normalized, tp) for tp in target_paths):
+            continue
+
+        last_activity = _thread_last_activity(project_root, doc_name)
+        # (d) A long-parked NO-GO no longer claims paths. NEW/REVISED threads
+        # are live review work and are not aged out.
+        if status == "NO-GO" and last_activity and last_activity < parked_cutoff:
+            continue
+        matches.append((last_activity, doc_name, status))
+
+    if not matches:
+        return None
+
+    # (b) Prefer the most recently active thread.
+    _activity, doc_name, status = max(matches, key=lambda item: item[0])
+    if status == "NO-GO":
+        return (
+            "[Governance] Bridge proposal for this module has NO-GO status. "
+            f"Review Codex findings at bridge/{doc_name} before implementing."
+        )
+    return (
+        f"[Governance] Bridge proposal for {doc_name} is pending Codex review ({status}). "
+        "Wait for GO verdict before implementing."
+    )
 
 
 def _bridge_kind_validation_error(content: str) -> str | None:
