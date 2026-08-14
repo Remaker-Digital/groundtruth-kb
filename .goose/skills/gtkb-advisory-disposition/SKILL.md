@@ -150,17 +150,6 @@ An implementation report using this skill should include:
 - For no-op or deferred routes, the concrete evidence or trigger condition that
   makes the route appropriate.
 
-## Cross-Harness Disposition
-
-- Claude Code: canonical managed-skill source lives at
-  `.claude/skills/advisory-disposition/SKILL.md`.
-- Codex: generated adapter lives at
-  `.codex/skills/advisory-disposition/SKILL.md` and is declared in
-  `.codex/skills/MANIFEST.json`.
-- Antigravity, Cursor, and API harnesses: no direct skill adapter surface is
-  created by WI-4840. Projection to additional harnesses requires a separate
-  target-path-covered proposal or typed parity disposition.
-
 ## Non-Goals
 
 - This skill does not decide the owner's priorities.

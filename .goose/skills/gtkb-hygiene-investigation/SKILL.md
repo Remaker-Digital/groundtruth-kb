@@ -35,8 +35,6 @@ re-derivable surfaces** — the chunked report generator and the baseline-regist
 in this skill where they require model judgment.
 
 This skill body presents **identical content** to every harness via the cross-harness skill-adapter pipeline
-(`config/agent-control/harness-capability-registry.toml` + `scripts/generate_codex_skill_adapters.py`). The
-Codex adapter at `.codex/skills/gtkb-hygiene-investigation/SKILL.md` carries a `GTKB-CODEX-SKILL-ADAPTER`
 marker and is generated, not hand-edited; edit this canonical source and regenerate.
 
 ## When to invoke

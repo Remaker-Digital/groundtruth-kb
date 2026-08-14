@@ -95,17 +95,6 @@ When this skill is implemented or used in a governed workflow, preserve:
 - Any proposed next artifact route and the governance gate that still applies to
   that route.
 
-## Cross-Harness Disposition
-
-- Claude Code: canonical managed-skill source lives at
-  `.claude/skills/advisory-proposal/SKILL.md`.
-- Codex: generated adapter lives at
-  `.codex/skills/advisory-proposal/SKILL.md` and is declared in
-  `.codex/skills/MANIFEST.json`.
-- Antigravity, Cursor, and API harnesses: no direct skill adapter surface is
-  created by WI-5055. Projection to additional harnesses requires a separate
-  target-path-covered proposal or typed parity disposition.
-
 ## Non-Goals
 
 - This skill does not implement advisory recommendations.

@@ -4,6 +4,10 @@
   "baseline_root": ".harness-baseline-configuration",
   "engine": "scripts/harness_projection/project_harness.py",
   "paths": [
+    ".goose/hooks/__pycache__/narrative-artifact-approval-gate.cpython-314.pyc",
+    ".goose/hooks/__pycache__/project-completion-surface.cpython-314.pyc",
+    ".goose/hooks/__pycache__/session-topic-envelope-router.cpython-314.pyc",
+    ".goose/hooks/__pycache__/session_start_dispatch.cpython-314.pyc",
     ".goose/hooks/_delib_common.py",
     ".goose/hooks/advisory-router-scan.py",
     ".goose/hooks/assertion-check.py",

@@ -12,7 +12,6 @@ shared core. Behavior is identical across per-harness wrappers except ``HARNESS_
 and ``OUT_DIR``.
 
 The drift gate for the shared primitives lives in
-``scripts/check_codex_hook_parity.py::_resolution_table_parity_errors``, which
 asserts the primitives in the shared core plus per-wrapper delegation +
 intentional-difference guards.
 """

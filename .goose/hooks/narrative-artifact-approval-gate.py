@@ -16,9 +16,6 @@ Slice A of GTKB-NARRATIVE-ARTIFACT-APPROVAL-EXTENSION-001.
 Bridge:    bridge/gtkb-narrative-artifact-approval-extension-001-004.md (GO)
 Specs:     GOV-ARTIFACT-APPROVAL-001 (extended), DCL-ARTIFACT-APPROVAL-HOOK-001 (extended)
 
-Harness scope: Claude only (PreToolUse on Write|Edit). Codex template parity at
-groundtruth-kb/templates/hooks/narrative-artifact-approval-gate.py is
-forward-compatible-only per ADR-CODEX-HOOK-PARITY-FALLBACK-001; it is NOT a
 live Windows interception boundary. Slice C's pre-commit hook is the
 universal enforcement floor.
 

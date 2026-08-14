@@ -65,9 +65,6 @@ The former "Startup-Loaded Rules" block that listed every Loyal Opposition runbo
 start is retired by WI-4949. Use the global-baseline and activity-envelope tables
 above instead.
 
-## Legacy Cursor Artifact Location
-
-The former legacy Cursor artifact archive has been retired with the report-directory surface. Treat any surviving references to that archive as historical context only, not a live dependency or report destination.
 
 ## Update Convention
 

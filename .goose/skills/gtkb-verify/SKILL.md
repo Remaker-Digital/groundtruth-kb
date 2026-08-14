@@ -205,7 +205,6 @@ The verdict must honor these gates before `VERIFIED` is recorded:
   staging or commit failure means the review fails closed without terminal
   bridge state.
 
-## Cross-harness implementation notes
 
 The skill body is identical between Claude Code and Codex. The canonical file
 is `.claude/skills/gtkb-verify/SKILL.md`; the Codex adapter is

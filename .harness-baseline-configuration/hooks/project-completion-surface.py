@@ -18,9 +18,6 @@ This hook is the prompt-time trigger plus owner-visible notification; the
 transition itself is performed by
 ``ProjectLifecycleService.complete_project_authorization()``.
 
-This file is kept byte-identical between ``.claude/hooks/`` and
-``.codex/gtkb-hooks/`` for Claude/Codex hook parity
-(``ADR-CODEX-HOOK-PARITY-FALLBACK-001``); ``parents[2]`` resolves the repo root
 from either location.
 
 Stdin:  JSON hook event payload (consumed, not inspected).

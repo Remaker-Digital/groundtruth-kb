@@ -45,7 +45,7 @@ HARNESS_TOKENS = [
 # *.md,*.py,*.toml,*.json,*.yaml,*.txt). The number may ONLY decrease as
 # Phase A relocations and Phase D formal-artifact edits land. Raising it
 # requires an owner-approved bridge revision.
-CENSUS_CAP = 291
+CENSUS_CAP = 210
 
 
 def measure_census() -> int:

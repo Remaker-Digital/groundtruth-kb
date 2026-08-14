@@ -150,8 +150,6 @@ markdown ledger evidence for follow-on remediation work.
 
 ## Cross-harness implementation notes
 
-- The skill body is identical across Claude Code and Codex via the `scripts/generate_codex_skill_adapters.py` adapter pipeline. The Codex adapter at `.codex/skills/gtkb-hygiene-sweep/SKILL.md` carries a `<!-- GTKB-CODEX-SKILL-ADAPTER -->` marker; do NOT edit the adapter directly. Edit the canonical at `.claude/skills/gtkb-hygiene-sweep/SKILL.md` and regenerate via `python scripts/generate_codex_skill_adapters.py --update-registry`.
-- Hook-layer behavior differs between harnesses by necessity (different schemas: `.claude/settings.json` JSON vs `.codex/hooks.json` JSON). Hook handler scripts are shared regardless. This skill does not depend on hook-layer behavior; it operates entirely through CLI invocation + AskUserQuestion + bridge-proposal filing.
 
 ## Copyright
 

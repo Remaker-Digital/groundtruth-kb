@@ -111,17 +111,6 @@ When this skill is implemented or used in a governed workflow, preserve:
 - Proof that ADVISORY intake did not start protected edits before child proposal
   `GO` and implementation-start authorization.
 
-## Cross-Harness Disposition
-
-- Claude Code: canonical managed-skill source lives at
-  `.claude/skills/advisory-intake/SKILL.md`.
-- Codex: generated adapter lives at
-  `.codex/skills/advisory-intake/SKILL.md` and is declared in
-  `.codex/skills/MANIFEST.json`.
-- Antigravity, Cursor, and API harnesses: no direct skill adapter surface is
-  created by WI-5056. Projection to additional harnesses requires a separate
-  target-path-covered proposal or typed parity disposition.
-
 ## Non-Goals
 
 - This skill does not author Loyal Opposition ADVISORY entries.

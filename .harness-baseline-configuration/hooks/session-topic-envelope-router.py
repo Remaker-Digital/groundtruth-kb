@@ -2,8 +2,6 @@
 """UserPromptSubmit adapter for ::open / ::close topic-envelope routing.
 
 Slice 5 (first conformance case) of PROJECT-GTKB-CROSS-HARNESS-PARITY. This is the
-Claude-native counterpart to the Codex
-``.codex/gtkb-hooks/session_wrapup_trigger_dispatch.py`` topic-command branch:
 both adapters call the identical shared, harness-agnostic platform module
 ``groundtruth_kb.session.topic_router`` (``parse_topic_command`` /
 ``handle_topic_command`` / ``render_topic_context``), differing only in

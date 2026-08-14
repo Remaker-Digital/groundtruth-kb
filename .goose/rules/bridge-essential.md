@@ -41,7 +41,6 @@ canonical bridge automation path while it remains healthy.**
 
 The owner directive that halted OS pollers on 2026-04-25 applied to the
 former blind-polling implementation: Windows scheduled tasks
-`AgentRedFileBridgeIndexScan-Claude`, `AgentRedFileBridgeIndexScan-Codex`,
 `AgentRedBridgeLivenessAlert`, and `AgentRedPollerLivenessWatcher`; the
 `.claude/hooks/poller-freshness.py` `UserPromptSubmit` hook; and the
 foreground `Agent Red Bridge Monitor` watchdog startup shortcut. Those
@@ -225,7 +224,6 @@ without owner approval. Adding a new bridge automation requires:
 
 This section articulates the architecture; it does NOT ratify any specific
 existing automation as canonical. Owner disposition of currently-inventoried
-Codex-app automations (`monitor-gt-kb-bridge-codex-thread`,
 `gt-kb-bridge-monitor-codex-thread`) is a separate concern not addressed
 in this slice.
 
