@@ -3238,6 +3238,88 @@ def _bridge_publication_transition_digest(
     return _json_digest(evidence)
 
 
+TRANSITION_EVIDENCE_ALGORITHM_LEGACY_UNVERSIONED = "legacy_unversioned"
+"""Pre-WI5977 derivation: the seven shared lifecycle fields, nothing else.
+
+Rows minted before commit ``13c9f0f5`` carry a digest over exactly
+``document_name``, ``version``, ``status``, ``latest``, ``audit_versions``,
+``quarantined_paths`` and ``blocking_diagnostics``.  It has no
+``evidence_schema_version`` key and no ``thread_files`` vector.
+"""
+
+TRANSITION_EVIDENCE_ALGORITHM_SCHEMA_V2 = "schema_v2"
+"""Current derivation: the shared fields plus the two schema-v2 additions."""
+
+SUPPORTED_TRANSITION_EVIDENCE_ALGORITHMS = frozenset(
+    {
+        TRANSITION_EVIDENCE_ALGORITHM_LEGACY_UNVERSIONED,
+        TRANSITION_EVIDENCE_ALGORITHM_SCHEMA_V2,
+    }
+)
+
+
+def _transition_evidence_payload(
+    algorithm: str,
+    *,
+    shared_fields: dict[str, Any],
+    thread_files: list[dict[str, str | int]],
+) -> dict[str, Any]:
+    """Build the transition-evidence payload for one named algorithm era.
+
+    The algorithm must be named explicitly.  There is deliberately no default:
+    an absent, unknown or ambiguous identity is rejected rather than silently
+    resolved to the current era, which is the defect this dispatch exists to
+    prevent (WI-5953).
+    """
+
+    if algorithm == TRANSITION_EVIDENCE_ALGORITHM_LEGACY_UNVERSIONED:
+        return dict(shared_fields)
+    if algorithm == TRANSITION_EVIDENCE_ALGORITHM_SCHEMA_V2:
+        return {
+            "evidence_schema_version": 2,
+            **shared_fields,
+            "thread_files": thread_files,
+        }
+    raise RegistryAuthorizationError(
+        "unsupported transition-evidence algorithm identity: "
+        f"{algorithm!r}; supported: {sorted(SUPPORTED_TRANSITION_EVIDENCE_ALGORITHMS)}"
+    )
+
+
+def _historical_bridge_publication_thread_file_vector(
+    project_root: Path,
+    *,
+    document_name: str,
+    version: int,
+) -> list[dict[str, str | int]]:
+    """Return the exact path/size/sha256 vector for versions up to ``version``.
+
+    Used to bind a recovery operation to the precise historical file set, so
+    byte drift in any covered version aborts before mutation (WI-5953).
+    """
+
+    exact_name = re.compile(rf"^{re.escape(document_name)}-(?P<version>[0-9]{{3}})\.md$")
+    live_bridge = project_root / "bridge"
+    vector: list[dict[str, str | int]] = []
+    if not live_bridge.is_dir():
+        return vector
+    for source in sorted(live_bridge.iterdir(), key=lambda item: item.name.casefold()):
+        match = exact_name.fullmatch(source.name)
+        if match is None or int(match.group("version")) > version:
+            continue
+        if _path_object_kind(source) != "file":
+            raise RegistryRecoveryRequired("historical bridge publication file vector contains a non-regular file")
+        payload = source.read_bytes()
+        vector.append(
+            {
+                "path": f"bridge/{source.name}",
+                "size": len(payload),
+                "sha256": _sha256_bytes(payload),
+            }
+        )
+    return vector
+
+
 def _historical_bridge_publication_transition_digest(
     project_root: Path,
     *,
@@ -3245,8 +3327,15 @@ def _historical_bridge_publication_transition_digest(
     version: int,
     status: str,
     content: bytes,
+    algorithm: str = TRANSITION_EVIDENCE_ALGORITHM_SCHEMA_V2,
 ) -> str:
-    """Reconstruct the canonical transition digest at one historical version."""
+    """Reconstruct the canonical transition digest at one historical version.
+
+    ``algorithm`` names the derivation era.  It defaults to the current
+    schema-v2 derivation so existing callers keep their behaviour; callers
+    binding a legacy-minted row must pass
+    ``TRANSITION_EVIDENCE_ALGORITHM_LEGACY_UNVERSIONED`` explicitly.
+    """
 
     try:
         from scripts.bridge_lifecycle_resolver import (
@@ -3311,18 +3400,21 @@ def _historical_bridge_publication_transition_digest(
         or resolution.blocking_diagnostics
     ):
         raise RegistryAuthorizationError("historical lifecycle did not resolve to the exact requested terminal state")
+    shared_fields: dict[str, Any] = {
+        "document_name": document_name,
+        "version": version,
+        "status": status,
+        "latest": asdict(latest),
+        "audit_versions": [asdict(item) for item in resolution.audit_versions],
+        "quarantined_paths": list(resolution.quarantined_paths),
+        "blocking_diagnostics": [asdict(item) for item in resolution.blocking_diagnostics],
+    }
     return _json_digest(
-        {
-            "evidence_schema_version": 2,
-            "document_name": document_name,
-            "version": version,
-            "status": status,
-            "thread_files": thread_files,
-            "latest": asdict(latest),
-            "audit_versions": [asdict(item) for item in resolution.audit_versions],
-            "quarantined_paths": list(resolution.quarantined_paths),
-            "blocking_diagnostics": [asdict(item) for item in resolution.blocking_diagnostics],
-        }
+        _transition_evidence_payload(
+            algorithm,
+            shared_fields=shared_fields,
+            thread_files=thread_files,
+        )
     )
 
 
@@ -4065,6 +4157,10 @@ def recover_recovery_required_bridge_publication_capability(
     expected_predecessor_state: str,
     expected_predecessor_digest: str,
     expected_selected_rowid: int,
+    transition_evidence_algorithm: str,
+    expected_legacy_transition_digest: str,
+    expected_schema_v2_transition_digest: str,
+    expected_thread_file_vector: Sequence[Mapping[str, object]],
     project_root: Path | None = None,
     registry_path: Path | None = None,
     packaged_registry_path: Path | None = None,
@@ -4190,13 +4286,51 @@ def recover_recovery_required_bridge_publication_capability(
         if lifecycle_state.status != expected_status:
             raise RegistryAuthorizationError("recovery-required publication lifecycle status mismatch")
         author_session = _bridge_publication_author_session(content)
-        transition_digest = _historical_bridge_publication_transition_digest(
+
+        # WI-5953: the row being recovered may have been minted under either
+        # derivation era.  Both are reconstructed and both must bind before any
+        # mutation; the caller names which era the stored digest belongs to.
+        # A row minted under the legacy algorithm can never be bound by the
+        # schema-v2 payload, which is how the first authorized invocation failed
+        # closed.  The stored digest is valid and is never rewritten.
+        if transition_evidence_algorithm not in SUPPORTED_TRANSITION_EVIDENCE_ALGORITHMS:
+            raise RegistryAuthorizationError(
+                "recovery-required publication requires a supported transition-evidence "
+                f"algorithm identity; got {transition_evidence_algorithm!r}"
+            )
+        reconstructed = {
+            name: _historical_bridge_publication_transition_digest(
+                paths.project_root,
+                document_name=document_name,
+                version=version,
+                status=expected_status,
+                content=content,
+                algorithm=name,
+            )
+            for name in sorted(SUPPORTED_TRANSITION_EVIDENCE_ALGORITHMS)
+        }
+        legacy_digest = reconstructed[TRANSITION_EVIDENCE_ALGORITHM_LEGACY_UNVERSIONED]
+        schema_v2_digest = reconstructed[TRANSITION_EVIDENCE_ALGORITHM_SCHEMA_V2]
+        if legacy_digest != expected_legacy_transition_digest:
+            raise RegistryAuthorizationError(
+                "recovery-required publication legacy transition reconstruction does not match "
+                "the authorized legacy digest"
+            )
+        if schema_v2_digest != expected_schema_v2_transition_digest:
+            raise RegistryAuthorizationError(
+                "recovery-required publication schema-v2 transition reconstruction does not match "
+                "the authorized schema-v2 digest"
+            )
+        observed_vector = _historical_bridge_publication_thread_file_vector(
             paths.project_root,
             document_name=document_name,
             version=version,
-            status=expected_status,
-            content=content,
         )
+        if observed_vector != [dict(entry) for entry in expected_thread_file_vector]:
+            raise RegistryAuthorizationError(
+                "recovery-required publication thread file vector does not match the authorized vector"
+            )
+        transition_digest = reconstructed[transition_evidence_algorithm]
 
         snapshot = _load_snapshot_unlocked(paths)
         aggregate_record = _bridge_aggregate_record(snapshot, relative)
