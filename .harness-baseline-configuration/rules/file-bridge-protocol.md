@@ -1,10 +1,9 @@
 # File Bridge Protocol
 
-The bridge between Prime Builder and Loyal Opposition uses dispatcher/TAFE
+The bridge between Prime Builder and Loyal Opposition uses bridge state
 bridge state plus a shared directory of versioned markdown audit files.
 
-> **2026-06-15 bridge cutover note:** After WI-4510 Phase-3, TAFE-backed bridge
-> state and status-bearing numbered bridge files are canonical.
+> Bridge state and status-bearing numbered bridge files are canonical.
 
 ## Directory
 
@@ -69,7 +68,7 @@ python scripts/implementation_authorization.py begin --bridge-id <document-name>
 ```
 
 The resulting packet is session-local implementation-scope evidence. It must be
-derived from TAFE-backed bridge state, the approved proposal file, and the GO
+derived from bridge state, the approved proposal file, and the GO
 verdict file. It expires, fails closed on bridge status drift, and cannot
 replace formal-artifact approval packets.
 
@@ -105,7 +104,7 @@ Loyal Opposition MUST issue NO-GO on any bridge proposal whose
 preflight on its own operative file does not pass. The Loyal Opposition NO-GO message must
 include the offending `missing_*_specs` list.
 
-If the preflight cannot resolve the intended operative file from dispatcher/TAFE
+If the preflight cannot resolve the intended operative file from bridge state
 state and the numbered bridge file chain, treat that as a tooling defect and
 repair the resolver before relying on the result.
 
@@ -262,9 +261,8 @@ Examples:
 
 ## Bridge State Publication
 
-After the WI-4510 Phase-3 cutover, TAFE-backed bridge state is the canonical
-coordination state. New bridge writes must go through the governed bridge
-writer path, which publishes dispatcher/TAFE state and writes the status-bearing
+Bridge state is the canonical coordination state. New bridge writes must go through the governed bridge
+writer path, which publishes bridge state and writes the status-bearing
 numbered bridge file.
 
 ## Statuses
@@ -410,7 +408,7 @@ drafts.
 
 A `DEFERRED` entry MUST be recorded as both:
 
-1. dispatcher/TAFE lifecycle state for the thread; and
+1. bridge state lifecycle state for the thread; and
 2. a versioned bridge file whose first non-blank line is exactly `DEFERRED`.
 
 The `DEFERRED` file MUST include:
@@ -429,9 +427,9 @@ unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
 
 1. Write the proposal as `bridge/{name}-001.md` through the governed bridge
    writer path
-2. Let the governed writer publish TAFE-backed bridge state.
+2. Let the governed writer publish bridge state.
 3. Continue working on other tasks
-4. Periodically scan TAFE/dispatcher bridge state for GO, NO-GO, or ADVISORY
+4. Periodically scan bridge state for GO, NO-GO, or ADVISORY
    responses; GO and NO-GO are dispatchable implementation/revision work,
    ADVISORY is interactive-only disposition work (non-dispatchable). Skip
    DEFERRED, WITHDRAWN, and VERIFIED as non-actionable.
@@ -441,7 +439,7 @@ unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
 
 ## Loyal Opposition Workflow
 
-1. Periodically scan TAFE/dispatcher bridge state for NEW, REVISED, or NO-ACTION entries;
+1. Periodically scan bridge state for NEW, REVISED, or NO-ACTION entries;
    skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED as non-actionable for Loyal
    Opposition review work.
 2. Process entries starting from the oldest actionable item.
@@ -465,7 +463,7 @@ After Prime implements a GO'd proposal:
 
 ## Bridge State Maintenance
 
-Dispatcher/TAFE state is maintained by the governed bridge writer/reconcile
+Bridge state is maintained by the governed bridge writer/reconcile
 path. Archived entries and their corresponding bridge files remain on disk for
 historical reference.
 
@@ -476,7 +474,7 @@ historical reference.
 - Never delete bridge files — they form the audit trail
 - Use the governed bridge writer/reconcile path for state repair rather than
   hand-merging coordination data.
-- TAFE-backed bridge state is the source of truth for workflow state.
+- bridge state is the source of truth for workflow state.
 
 ## Mandatory Owner Decisions / Input Section Gate
 
@@ -511,7 +509,7 @@ A bridge file MAY be committed without becoming dispatcher-actionable when the c
 
 Parked drafts are deliberate work-in-progress artifacts that must NOT trigger Loyal Opposition review until they are promoted by:
 
-1. Publishing dispatcher/TAFE state with status `NEW` or `REVISED`.
+1. Publishing bridge state with status `NEW` or `REVISED`.
 2. The promotion commit message explicitly states `<bridge-id>: parked draft promoted to <status>`.
 
 Audits SHOULD identify parked drafts in their inventory phase but MUST NOT flag them as orphans without checking the originating commit message for the `parked` tag.

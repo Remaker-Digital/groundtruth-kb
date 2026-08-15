@@ -7,14 +7,13 @@ This rule auto-loads via `{{HARNESS_RULES_DIR}}/` convention and is TRACKED in g
 
 **Bridge integrity is the top-priority task. Always.**
 
-> **2026-06-15 cutover note:** After the WI-4510 Phase-3 cutover,
-> TAFE-backed dispatcher state plus status-bearing versioned files under
+> Bridge state plus status-bearing versioned files under
 > `bridge/` are canonical. Aggregate queue artifacts are not live bridge state.
 
 The Prime Builder / Loyal Opposition bridge is how GroundTruth-KB coordinates
 implementation proposals, reviews, and verification. GroundTruth-KB is
 non-functional when the bridge stops working. Therefore: keeping the
-TAFE-backed bridge state correct, dispatcher-visible, and consistent with the
+bridge state correct, dispatcher-visible, and consistent with the
 versioned bridge file chain is the first duty of every Prime Builder session,
 ahead of feature work, backlog progress, test runs, deployments, and
 documentation updates.
@@ -22,7 +21,7 @@ documentation updates.
 The bridge as a protocol (proposal -> review -> revise -> GO/NO-GO -> implement
 -> post-impl -> VERIFIED, all recorded in versioned files under `bridge/`) is
 permanently in force. Any proposal, refactor, or cleanup that would weaken the
-protocol's audit trail, GO/NO-GO discipline, or TAFE/dispatcher bridge-state
+protocol's audit trail, GO/NO-GO discipline, or bridge-state
 authority must be rejected.
 
 ## Operational Mode (current as of 2026-05-09)
@@ -51,7 +50,7 @@ liveness is now reported by `_check_bridge_dispatch_liveness` and
 
 Bridge dispatch automation is provided by the dispatcher daemon at
 `scripts/gtkb_dispatcher_daemon.py`. On daemon ticks it inspects
-dispatcher/TAFE state and dispatches the appropriate counterpart harness if a
+bridge state and dispatches the appropriate counterpart harness if a
 recipient's actionable queue signature has changed (the Loyal Opposition target on latest NEW or
 REVISED; Prime on latest GO or NO-GO). ADVISORY entries are surfaced in the Prime actionable
 list by `compute_actionable_pending` for interactive sessions, but the
@@ -60,7 +59,7 @@ False for ADVISORY, so every headless dispatch surface filters them out
 before the signature is computed and they never spawn a Prime worker.
 VERIFIED is terminal, and DEFERRED and WITHDRAWN are non-actionable for
 dispatch. The daemon is monitoring and dispatch infrastructure only;
-TAFE-backed bridge state is the
+bridge state is the
 canonical workflow state. Per-recipient dispatch state is recorded at
 `.gtkb-state/bridge-poller/dispatch-state.json` (path retained for
 compatibility with the smart-poller substrate).
@@ -149,7 +148,7 @@ The dispatcher daemon (`scripts/gtkb_dispatcher_daemon.py`)
 is the canonical mechanism for **dispatchable work** — work that can be
 completed by a freshly-spawned counterpart harness session without further
 owner input. It spawns counterpart harness sessions when actionable
-dispatcher/TAFE bridge-state changes are detected.
+bridge-state changes are detected.
 
 Examples of dispatchable work:
 - Loyal Opposition reviews of NEW or REVISED proposals.
@@ -160,7 +159,7 @@ Examples of dispatchable work:
 ### Axis 2: Non-dispatchable work — thread automation pattern
 
 A thread automation pattern wakes the interactive chat session
-periodically. Its role is to scan TAFE/dispatcher bridge state and surface work that
+periodically. Its role is to scan bridge state and surface work that
 **cannot be dispatched to a sub-agent** — work requiring interactive owner
 input mid-stream, accumulating context across turns, or coordination across
 threads.
@@ -224,7 +223,7 @@ in this slice.
 These remain in force regardless of whether bridge scans are manual or handled
 by the dispatcher daemon:
 
-- TAFE-backed bridge state plus status-bearing versioned files under `bridge/`
+- bridge state plus status-bearing versioned files under `bridge/`
   are the canonical workflow state. Do not recreate aggregate queue artifacts
   to satisfy stale helpers.
 - Bridge files are append-only. Never delete a bridge file; it forms the audit
@@ -268,8 +267,8 @@ Do NOT, without explicit owner approval:
   actionable work, because each fixed-interval tick spawned a harness
   unconditionally regardless of whether the bridge had changed. Owner directive halted the retired pollers and removed the
   freshness hook, restoring manual-trigger operation until smart-poller
-  automation is available. The protocol itself was unaffected; after the
-  2026-06-15 cutover, TAFE-backed bridge state is canonical. Lesson: automation is
+  automation is available. The protocol itself was unaffected; bridge state
+  is canonical. Lesson: automation is
   wasteful when it spends an expensive resource — principally agent
   investigation tokens — without a commensurate chance of value; the cheap
   fixed-interval check was never the defect, the unconditional expensive spawn

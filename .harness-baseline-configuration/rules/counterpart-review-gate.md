@@ -48,7 +48,7 @@ records `GO`, and the implementation-start packet is created from that GO.
 The hook `scripts/implementation_start_gate.py` must deny protected source,
 test, script, hook, configuration, deployment, repository-state, and KB-mutation
 work when the packet is missing, corrupt, expired, stale relative to
-TAFE/dispatcher bridge state, or outside the GO'd proposal's `target_paths`.
+bridge state, or outside the GO'd proposal's `target_paths`.
 
 Implementation proposals filed after this gate lands must include a
 `Requirement Sufficiency` subsection. It must state either that existing

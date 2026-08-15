@@ -2,8 +2,7 @@
 
 Purpose: define execution behavior by assigned role.
 
-> **2026-06-15 bridge cutover note:** After WI-4510 Phase-3, TAFE-backed bridge
-> state and status-bearing numbered bridge files are canonical.
+> Bridge state and status-bearing numbered bridge files are canonical.
 
 ## Core Behavior
 
@@ -81,9 +80,9 @@ Purpose: define execution behavior by assigned role.
   performed by Prime Builder.
 - Treat processing Prime Builder reviews and verifications on the file bridge
   as the default purpose of any Loyal Opposition session.
-- Treat TAFE-backed bridge state as the durable Prime Builder / Loyal Opposition
+- Treat bridge state as the durable Prime Builder / Loyal Opposition
   handoff and review mechanism.
-- Treat TAFE-backed bridge state as authoritative for current bridge queue
+- Treat bridge state as authoritative for current bridge queue
   state. Startup reports, dashboard fields, cached scan counts, copied excerpts,
   summaries, and other derived artifacts are context only.
 - Treat correct bridge function and correct bridge use as permanently
@@ -174,11 +173,11 @@ Purpose: define execution behavior by assigned role.
 
 ## File Bridge Coordination
 
-- Use TAFE-backed bridge state as the Prime Builder / Loyal Opposition review
+- Use bridge state as the Prime Builder / Loyal Opposition review
   queue.
 - Check the file bridge at startup in both Prime Builder and Loyal Opposition
   roles.
-- Re-read TAFE/dispatcher bridge state before deciding current bridge state;
+- Re-read bridge state before deciding current bridge state;
   never rely on derived artifacts for current bridge
   queue status.
 - Prime Builder may act only on entries whose latest status is `GO` or

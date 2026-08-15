@@ -201,7 +201,7 @@ Platform (IDP) that supports the application lifecycle.
 **Not to be confused with:** hosted application (the platform manages
 applications, is not one); cloud platform (e.g., AWS) which is unrelated.
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "platform";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "platform";
 `DELIB-GTKB-IDP-TERMINOLOGY`.
 
 ### application
@@ -215,7 +215,7 @@ when GT-KB is the active application.
 application; see "project" below); platform (GT-KB itself; see above);
 hosted application (an application in service).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "application".
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "application".
 
 ### hosted application
 
@@ -226,7 +226,7 @@ of an application (vs. the lifecycle record managed by GT-KB).
 **Not to be confused with:** application (the lifecycle object); platform
 (GT-KB itself).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "hosted application".
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "hosted application".
 
 ### Agent Red
 
@@ -303,7 +303,7 @@ workstream/program grouping; not the hosted application.
 applications contain projects); platform (GT-KB itself); work item (the
 atomic known-work unit).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "project"; owner
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "project"; owner
 clarification, 2026-05-06.
 
 ### project authorization
@@ -339,7 +339,7 @@ grouping, and continuation context.
 **Not to be confused with:** project or sub-project (groupings of work
 items); external issue or ticket records.
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "work item";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "work item";
 `work_items` table in MemBase; owner clarification, 2026-05-06.
 
 ### backlog
@@ -378,7 +378,7 @@ read with `gt bridge state-report`); ignore list or deprecated work (forbidden
 uses per operating-model Â§2); backlog snapshot (point-in-time export);
 a separate `backlog_items` conceptual class distinct from work items.
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "backlog";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "backlog";
 `GOV-STANDING-BACKLOG-001` (governance contract); owner clarification,
 2026-05-06.
 
@@ -391,7 +391,7 @@ recorded in MemBase as one of the spec subtypes (`SPEC-NNNN`, `GOV-NNN`,
 **Not to be confused with:** technical-design document; implementation
 proposal (a different bridge artifact); test (a verification artifact).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "specification";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "specification";
 `specifications` table in MemBase.
 
 ### requirement
@@ -405,7 +405,7 @@ requires owner-visible confirmation per `GOV-SPEC-CAPTURE-TRANSPARENCY-001`.
 behavior (must not be silently promoted to requirement per
 operating-model Â§1).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "requirement".
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "requirement".
 
 ### implementation proposal
 
@@ -419,7 +419,7 @@ criteria, and risk/rollback per
 **Not to be confused with:** specification (a different artifact type);
 implementation report (post-implementation; below).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "implementation proposal";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "implementation proposal";
 `{{HARNESS_RULES_DIR}}/file-bridge-protocol.md`.
 
 ### implementation report
@@ -435,7 +435,7 @@ Verification Gate.
 **Not to be confused with:** implementation proposal (pre-implementation);
 test (an independent artifact).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "implementation report";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "implementation report";
 `{{HARNESS_RULES_DIR}}/file-bridge-protocol.md`.
 
 ### verification
@@ -450,7 +450,7 @@ that a specification exists or has been claimed.
 verification can require many tests); validation (testing against
 real-world use; verification is internal-spec compliance).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "verification".
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "verification".
 
 ### dashboard
 
@@ -464,7 +464,7 @@ access to MemBase.
 **Not to be confused with:** static documentation (dashboard implies
 live data + interaction); non-interactive README-style views.
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "dashboard";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "dashboard";
 `GTKB-DASHBOARD-002` (slice progression).
 
 ### bridge
@@ -474,22 +474,21 @@ live data + interaction); non-interactive README-style views.
 **Definition:** The Prime Builder â†” Loyal Opposition coordination
 protocol implemented through dispatcher-backed bridge state and versioned
 markdown audit files under `bridge/`. Statuses: NEW, REVISED, GO, NO-GO,
-VERIFIED, ADVISORY, DEFERRED, WITHDRAWN. After the 2026-06-15
-TAFE/dispatcher cutover, aggregate queue artifacts are not canonical dispatcher
-or bridge-state authority. Implementation never proceeds without GO.
+VERIFIED, ADVISORY, DEFERRED, WITHDRAWN. Aggregate queue artifacts are not
+canonical dispatcher or bridge-state authority. Implementation never proceeds without GO.
 
 **Not to be confused with:** "the Bridge" as a generic concept (use
 "file bridge" in canonical text); the backlog; cross-system message bridges.
 Bare `bridge`, `bridge work`, `bridge-related`, `TAFE`, or `harness` topic
 language does not by itself select the bridge queue.
 
-**Source:** dispatcher/TAFE bridge-state surfaces; `{{HARNESS_RULES_DIR}}/file-bridge-protocol.md`
+**Source:** bridge-state surfaces; `{{HARNESS_RULES_DIR}}/file-bridge-protocol.md`
 for legacy helper behavior; `AGENTS.md` (cross-harness rule surface).
 
 ### bridge queue
 
 **Definition:** The current file-bridge handoff and review workload derived from
-TAFE/dispatcher state plus the status-bearing numbered files under `bridge/`.
+bridge state plus the status-bearing numbered files under `bridge/`.
 Read it with `gt bridge state-report`. Approved explicit resource terms are
 `bridge queue` and `review queue`.
 
@@ -908,7 +907,7 @@ information updates canonical source-of-truth artifacts.
 the legacy bridge index periodically and dispatched the appropriate harness
 when a recipient's actionable queue signature changed. The smart poller was
 monitoring/dispatch infrastructure only. Historical references saying
-aggregate queue artifacts were canonical describe pre-cutover behavior. Bridge
+aggregate queue artifacts were canonical describe superseded behavior. Bridge
 dispatch is now governed by the `dispatcher daemon` and the dispatcher
 configuration/status/health CLI (see entry below).
 
@@ -921,7 +920,7 @@ configuration/status/health CLI (see entry below).
 **Definition:** The current canonical bridge-dispatch automation, replacing
 the retired smart poller. Implemented as
 `scripts/gtkb_dispatcher_daemon.py` and kept alive by the headless dispatcher
-supervisor path. The daemon inspects dispatcher/TAFE bridge state on bounded
+supervisor path. The daemon inspects bridge state on bounded
 cycles and dispatches the appropriate counterpart harness when actionable work
 changes.
 Aggregate queue artifacts must not be cited as canonical dispatcher topology,
@@ -968,7 +967,7 @@ topology context).
 operating mode. A host-platform scheduled task (Windows Task Scheduler /
 launchd / cron per ``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001``) wakes
 the dispatcher routine on a fixed interval. The dispatcher reads
-dispatcher/TAFE bridge state, computes a per-role actionable signature using
+bridge state, computes a per-role actionable signature using
 the same kind-aware-routing path as the dispatcher daemon, and
 spawns subprocess workers for each role whose actionable signature has
 changed. Workers receive the canonical init keyword ``::init gtkb <mode>``

@@ -16,7 +16,7 @@ and use manual owner assignment/scanning until the daemon is repaired.
 2. Quiesce automated dispatch if needed by setting affected harnesses
    `can_receive_dispatch=false` through the dispatcher control surface.
 
-3. Continue bridge work manually from TAFE/dispatcher-backed state and numbered
+3. Continue bridge work manually from bridge state-backed state and numbered
    bridge files.
 
 4. Repair the daemon, then re-enable dispatchability only after health is clean.

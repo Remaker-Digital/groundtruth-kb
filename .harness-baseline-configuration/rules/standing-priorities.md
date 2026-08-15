@@ -7,8 +7,7 @@ Purpose: persistent priority directives loaded at session initialization.
 > is active), not at base session startup. Authority:
 > `config/agent-control/activity-envelope-sharding.toml` § `migration.wi4949`.
 
-> **2026-06-15 bridge cutover note:** After WI-4510 Phase-3, TAFE-backed bridge
-> state and status-bearing numbered bridge files are canonical.
+> Bridge state and status-bearing numbered bridge files are canonical.
 
 These priorities remain active across sessions unless Mike explicitly suspends them during a session. A suspension is temporary and does not persist across session boundaries.
 
@@ -43,14 +42,14 @@ These priorities remain active across sessions unless Mike explicitly suspends t
 
 ## File Bridge Operating Note
 
-- The active Prime Builder / Loyal Opposition bridge is TAFE-backed bridge
+- The active Prime Builder / Loyal Opposition bridge is bridge
   state, with `{{HARNESS_RULES_DIR}}/file-bridge-protocol.md` retained for legacy helper
   behavior and historical audit interpretation.
 - Aggregate queue artifacts are not the authoritative review queue.
 - Bridge reliability maintenance is no longer a standing priority unless the
   active role assignment, standing backlog, or owner direction makes it current.
 - Do not use or create alternate bridge runtimes or queues.
-- Investigate bridge mechanics only when Mike explicitly requests it or when a Prime-requested review cannot be processed from TAFE/dispatcher bridge state.
+- Investigate bridge mechanics only when Mike explicitly requests it or when a Prime-requested review cannot be processed from bridge state.
 
 ## Cross-Cutting Directive - GroundTruth KB Vision
 

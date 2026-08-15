@@ -17,7 +17,7 @@ registered in:
 
 The replacement contract is described in:
 
-- `.claude/rules/bridge-essential.md` (active operating mode).
+- `.harness-baseline-configuration/rules/bridge-essential.md` (active operating mode).
 - `templates/rules/prime-bridge-collaboration-protocol.md` § Bridge Dispatch
   Automation (per Slice 4 D5k).
 - `groundtruth-kb/docs/tutorials/dual-agent-setup.md` (tutorial; Slice 4 D5d).

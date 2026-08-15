@@ -3,14 +3,13 @@
 This rule defines mandatory collaboration behavior between Prime Builder and
 Loyal Opposition agents over the file bridge.
 
-> **2026-06-15 bridge cutover note:** This file preserves status and role
-> semantics for historical audit interpretation. After WI-4510 Phase-3,
-> TAFE-backed bridge state and status-bearing numbered bridge files are
-> canonical.
+> This file preserves status and role semantics for historical audit
+> interpretation. Bridge state and status-bearing numbered bridge files
+> are canonical.
 
 ## Operating Model
 
-- The active bridge is TAFE-backed and dispatcher-driven.
+- The active bridge is canonical.
 - Bridge documents under `bridge/` are the auditable exchange artifacts.
 - Only the latest status for each document is actionable.
 - The archived SQLite/MCP bridge runtime is legacy compatibility code and must
@@ -86,7 +85,7 @@ Routine collaboration must not depend on manual owner prompting.
 
 - The dispatcher daemon (`scripts/gtkb_dispatcher_daemon.py`) owns automated
   bridge dispatch.
-- On each daemon tick, it inspects dispatcher/TAFE state and dispatches the
+- On each daemon tick, it inspects bridge state and dispatches the
   appropriate counterpart harness when its actionable queue signature has
   changed.
 - Manual owner assignment/scanning is the only fallback when the daemon is
