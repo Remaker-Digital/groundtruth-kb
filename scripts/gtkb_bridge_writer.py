@@ -1,6 +1,6 @@
 """No-index bridge file writer used by governed bridge helpers.
 
-The current bridge model uses dispatcher/TAFE state plus status-bearing
+The current bridge model uses bridge state plus status-bearing
 numbered files under ``bridge/``. This module only writes a new numbered file
 after caller-side validation has passed; it never mutates aggregate queue state.
 """

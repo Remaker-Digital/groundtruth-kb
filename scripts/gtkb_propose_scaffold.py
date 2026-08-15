@@ -10,7 +10,7 @@ than in a revise loop. The composer counterpart to the gtkb-bridge-propose
 MemBase read-only and writes only a draft under
 ``.gtkb-state/propose-drafts/``. The author fills the ``TODO:`` placeholders,
 runs the printed self-review checklist, then hands the body to
-``gtkb-bridge-propose`` for the credential-scanned write and dispatcher
+``gtkb-bridge-propose`` for the credential-scanned write and bridge-state
 publication.
 
 GO: bridge/gtkb-proposal-standards-propose-scaffold-skill-002.md
@@ -230,7 +230,7 @@ TODO: risk surface + single-commit rollback note.
 
 This proposal is filed under `bridge/` as the next status-bearing numbered
 bridge file for `{slug}`; no prior version is deleted or rewritten
-(append-only). Dispatcher/TAFE state plus the numbered file chain are the live
+(append-only). Bridge state plus the numbered file chain are the live
 workflow state per `GOV-FILE-BRIDGE-AUTHORITY-001`.
 
 ## Recommended Commit Type
@@ -262,7 +262,7 @@ def self_review_checklist(slug: str) -> str:
 7. Replace every remaining `TODO:` placeholder with real content.
 
 When green, hand the filled draft body to the gtkb-bridge-propose skill for the
-credential-scanned write and dispatcher publication (do NOT write bridge/ from
+credential-scanned write and bridge-state publication (do NOT write bridge/ from
 this helper).
 """
 
