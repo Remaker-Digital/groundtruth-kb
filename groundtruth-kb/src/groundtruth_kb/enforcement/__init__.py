@@ -35,6 +35,24 @@ _NULL_SINKS = frozenset({"/dev/null", "/dev/stdout", "/dev/stderr", "nul"})
 _MSYS_PATH_RE = re.compile(r"^/([a-zA-Z])/(.*)$")
 _COMMAND_SEGMENT_RE = re.compile(r"(?:&&|\|\||[;|\r\n])")
 _COMMAND_TOKEN_RE = re.compile(r"\"([^\"]*)\"|'([^']*)'|([^\s]+)")
+# WI-6026: options whose values are free text, drawn from the governed CLI
+# surfaces that carry prose. A path-shaped token inside one of these values is
+# being described, not operated on, so it is excluded from boundary checking.
+_FREE_TEXT_OPTIONS = frozenset(
+    {
+        "--description",
+        "--change-reason",
+        "--status-detail",
+        "--summary",
+        "--title",
+        "--reason",
+        "--note",
+        "--test-expected-outcome",
+        "--scope",
+        "-m",
+        "--message",
+    }
+)
 _ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S+)$")
 # PowerShell assignment form (`$env:VAR='value'`). Without this, the whole
 # assignment stays one token and `_command_name` derives the head from the
@@ -330,13 +348,35 @@ def check_bash_command(command: str, project_root: Path) -> tuple[bool, str]:
         if not allowed:
             return False, f"Command contains blocked redirection target: {reason}"
 
-    # 2. Scan command for genuine absolute path arguments
-    for match in PATH_DELIMITER_RE.finditer(command):
-        classified = _classify_path_token(match.group(1))
-        if classified is None:
-            continue
-        allowed, reason = check_path_boundary(classified, project_root)
-        if not allowed:
-            return False, f"Command contains blocked path argument: {reason}"
+    # 2. Scan command for genuine absolute path operands.
+    #
+    # WI-6026: this pass is argument-role aware. Previously it scanned the raw
+    # command string, so a path-shaped token appearing inside a free-text option
+    # value -- a `--description`, a `--change-reason` -- was treated identically
+    # to a path the command would actually operate on. Describing an out-of-root
+    # path counted as using one. Only operand tokens are boundary-checked now;
+    # the values of the free-text options below are excluded. This narrows what
+    # is inspected, never what is permitted: an out-of-root path supplied as an
+    # operand is still refused.
+    for raw_segment in _COMMAND_SEGMENT_RE.split(command):
+        skip_next_token = False
+        for match in _COMMAND_TOKEN_RE.finditer(raw_segment):
+            token = next(group for group in match.groups() if group is not None)
+            if skip_next_token:
+                skip_next_token = False
+                continue
+            if token in _FREE_TEXT_OPTIONS:
+                skip_next_token = True
+                continue
+            option_name, separator, _ = token.partition("=")
+            if separator and option_name in _FREE_TEXT_OPTIONS:
+                continue
+            for path_match in PATH_DELIMITER_RE.finditer(token):
+                classified = _classify_path_token(path_match.group(1))
+                if classified is None:
+                    continue
+                allowed, reason = check_path_boundary(classified, project_root)
+                if not allowed:
+                    return False, f"Command contains blocked path argument: {reason}"
 
     return True, ""

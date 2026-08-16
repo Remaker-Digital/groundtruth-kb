@@ -151,3 +151,42 @@ note = 'Codex apply_patch allows path under local harness-specific directory'
 [[codex_apply_patch_block]]
 path = 'C:\Users\micha\secret.txt'
 note = 'Codex apply_patch adapter still blocks genuine out-of-root absolute paths'
+
+# --- WI-6026: argument-role awareness in the root-boundary Bash parser ---
+# The parser scanned the raw command string with no notion of argument role, so a
+# path-shaped token inside a free-text option value was treated identically to a
+# path the command operates on: describing an out-of-root path counted as using
+# one. The `_pass` entries pin the corrected behavior; the `_block` entries pin
+# that operands are still refused and the exclusion does not over-reach.
+
+[[bash_parser_pass]]
+command = 'gt backlog add --title "x" --description "E:\Claude-Playground is an archive only and must not be used as a live location"'
+note = 'WI-6026: out-of-root path described in --description prose, not operated on'
+
+[[bash_parser_pass]]
+command = 'gt backlog add --title "x" --change-reason "supersedes the C:\Users\micha\old-notes.md draft"'
+note = 'WI-6026: out-of-root path named in --change-reason prose'
+
+[[bash_parser_pass]]
+command = 'gt backlog update WI-1 --status-detail "checker stalled while reading C:\Users\micha\AppData\Local\Temp\probe"'
+note = 'WI-6026: out-of-root path named in --status-detail prose'
+
+[[bash_parser_pass]]
+command = 'git commit -m "fix: stop resolving \\server\share\config as a live dependency"'
+note = 'WI-6026: out-of-root path named in a -m commit message'
+
+[[bash_parser_pass]]
+command = 'gt backlog add --title "x" --description=E:\Claude-Playground-archive-only'
+note = 'WI-6026: --option=value form of a free-text option'
+
+[[bash_parser_pass]]
+command = 'gt projects authorize P --scope "Prime never reads C:\Users\micha\secret.txt directly"'
+note = 'WI-6026: out-of-root path named in --scope prose'
+
+[[bash_parser_block]]
+command = 'gt backlog add --description "harmless prose" && cat C:\Users\micha\secret.txt'
+note = 'WI-6026: the free-text exclusion must not leak across a command segment boundary'
+
+[[bash_parser_block]]
+command = 'cat --description C:\Users\micha\a.txt C:\Users\micha\secret.txt'
+note = 'WI-6026: only the value immediately following a free-text option is excluded; later operands are still blocked'
