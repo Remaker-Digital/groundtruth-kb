@@ -4439,6 +4439,52 @@ def backlog_authorize_implementation(
     )
 
 
+def _classify_project_membership(
+    config: GTConfig,
+    result: dict[str, Any],
+    project_name: str | None,
+    project_id: str | None,
+) -> tuple[str, str | None]:
+    """Explain why a work-item create did or did not bind project membership.
+
+    WI-6445: ``--project-name`` sets a label; only ``--project`` binds membership.
+    The two are separate stores, and reporting ``project_membership: null`` with no
+    reason let that divergence accumulate invisibly. Returns ``(reason, warning)``
+    where *warning* is non-None only when the caller supplied a label naming a real
+    project and no membership was created.
+    """
+
+    if result.get("project_membership") is not None:
+        return "created", None
+    if project_id:
+        # A membership was explicitly requested but the result carries none.
+        return "requested_but_not_created", (
+            f"--project {project_id} was supplied but no project membership was created."
+        )
+    if not project_name:
+        return "not_requested", None
+
+    try:
+        from .db import KnowledgeDB
+
+        resolved = KnowledgeDB(str(config.db_path)).get_project(project_name)
+    except Exception:  # resolution is diagnostic only; never fail the create
+        resolved = None
+
+    work_item_id = result.get("work_item_id", "the work item")
+    if resolved is None:
+        return "label_only_unknown_project", (
+            f"--project-name {project_name!r} was recorded as a label on {work_item_id}, "
+            "and it does not resolve to a known project id. No membership was created."
+        )
+    return "label_only_no_membership", (
+        f"--project-name {project_name!r} resolves to an existing project but only set a "
+        f"label on {work_item_id}; NO membership was created, so {work_item_id} will not "
+        f"appear in `gt backlog list --member-of {project_name}`. "
+        f"Re-run with `--project {project_name}` to bind membership."
+    )
+
+
 @backlog.command("add-work-item")
 @click.option("--title", required=True, help="Work item title.")
 @click.option(
@@ -4542,6 +4588,15 @@ def backlog_add_work_item(
         result = add_work_item_with_test(config, request)
     except (AddWorkItemError, RuntimeError) as exc:
         raise click.ClickException(str(exc)) from exc
+
+    # WI-6445: a null project_membership must never be reported silently. Classify
+    # why it is null so machine consumers can distinguish "not requested" from
+    # "requested and not created", and warn when a label was supplied that names a
+    # real project but created no membership.
+    reason, warning = _classify_project_membership(config, result, project_name, project_id)
+    result["project_membership_reason"] = reason
+    if warning:
+        click.echo(f"WARNING: {warning}", err=True)
 
     if json_output:
         click.echo(json.dumps(result, indent=2, sort_keys=True, default=str))
