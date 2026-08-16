@@ -1,3 +1,0 @@
-# Placeholder - capture script will overwrite this file when executed.
-# Run from E:\GT-KB:
-#   groundtruth-kb\.venv\Scripts\python.exe bridge\_run_wi5144_evidence_capture.py
