@@ -1464,6 +1464,28 @@ def publish_lo_verdict(
     )
     content_to_publish = normalize_bridge_envelope_head(content_to_publish)
     target = _bridge_dir(root) / f"{document_name}-{next_version:03d}.md"
+    # WI-5554 / WI-6369: prepare the verdict candidate before the guards, mirroring
+    # the write_bridge_file path. prepare_verdict_candidate is what stamps a
+    # self-consistent candidate_evidence_hash; without it the freshness guard
+    # compares an author-supplied hash against a hash over unprepared content,
+    # which no author can reproduce because preparation is the step that makes any
+    # value self-consistent. That non-convergence blocked all Loyal Opposition
+    # verdict publication. Preparation is idempotent, so the second pass inside
+    # write_bridge_file is a no-op.
+    try:
+        from scripts.bridge_applicability_preflight import (
+            prepare_verdict_candidate,
+            verdict_candidate_needs_preparation,
+        )
+
+        if verdict_candidate_needs_preparation(content_to_publish):
+            content_to_publish = prepare_verdict_candidate(
+                candidate_path=target,
+                content=content_to_publish,
+                project_root=root,
+            )
+    except (OSError, SystemExit, ValueError) as exc:
+        raise BridgeComplianceError(f"verdict candidate preparation failed closed: {exc}") from exc
     _run_provider_verdict_guards(
         project_root=root,
         target=target,
