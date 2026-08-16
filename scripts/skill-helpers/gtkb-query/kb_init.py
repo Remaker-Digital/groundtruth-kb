@@ -8,9 +8,10 @@ package to be installed.
 Per S307 hardcoded-path directive (no machine-local literals in active code):
 the project root is discovered from this file's location, not configured.
 The script is at scripts/skill-helpers/gtkb-query/kb_init.py — three levels
-deep from the repo root. `Path(__file__).resolve().parents[4]` resolves to
-the repo root regardless of which workstation runs it. This makes the skill
-portable across workstations and pip-install scenarios.
+deep from the repo root. The root is located by ascending until a stable
+repository marker is found, which resolves correctly regardless of which
+workstation runs it and stays correct if the helper is relocated. This makes
+the skill portable across workstations and pip-install scenarios.
 
 Long-term this should become `from groundtruth_kb import KnowledgeDB` once
 the package install is the supported path.
@@ -26,13 +27,24 @@ import sys
 from pathlib import Path
 
 # Discover repo root from this file's location: scripts/skill-helpers/gtkb-query/kb_init.py
-# parents[0]=gtkb-query, [1]=skill-helpers, [2]=scripts, [3]=repo root
+# parents[0]=gtkb-query, [1]=skill-helpers, [2]=scripts, [3]=repo root.
+# The marker walk below is depth-independent and stays correct if this helper
+# moves; the parents[3] fallback matches the layout documented above (WI-6444).
 # Note: the tools dir is `tools/knowledge-db` (with a dash). Python module names
 # cannot contain dashes, so we must add the knowledge-db directory itself to
 # sys.path and import the bare module name `db`. Adding `_REPO_ROOT` alone
 # does not work because `from tools.knowledge_db ...` (underscore) finds
 # nothing, and `from tools.knowledge-db ...` (dash) is a syntax error.
-_REPO_ROOT = Path(__file__).resolve().parents[4]
+
+
+def _discover_repo_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "scripts" / "bridge_author_metadata.py").is_file():
+            return parent
+    return Path(__file__).resolve().parents[3]
+
+
+_REPO_ROOT = _discover_repo_root()
 sys.path.insert(0, str(_REPO_ROOT / "tools" / "knowledge-db"))
 
 from db import KnowledgeDB  # type: ignore[import-not-found]

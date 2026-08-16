@@ -54,7 +54,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
+
+def _discover_project_root() -> Path:
+    """Ascend to the directory holding a stable repository marker.
+
+    Depth-independent, unlike a bare ``parents[N]`` index: correct wherever the
+    helper is placed. Replaces ``parents[4]``, which resolved one level *above*
+    the project root from this module's depth (WI-6444).
+    """
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "scripts" / "bridge_author_metadata.py").is_file():
+            return parent
+    return Path(__file__).resolve().parents[3]
+
+
+PROJECT_ROOT = _discover_project_root()
 DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
