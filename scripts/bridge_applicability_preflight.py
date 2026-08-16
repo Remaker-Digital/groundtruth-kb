@@ -132,7 +132,12 @@ FINALIZATION_BRIDGE_KINDS: Final[frozenset[str]] = frozenset(
 )
 PAUTH_PHASE_OPERATIONS: Final[dict[str, tuple[str, ...]]] = {
     "proposal": ("implementation_packet_create", "implementation_start"),
-    "finalization": ("git_commit", "protected_mutation"),
+    # WI-6458: the finalization phase requests only the authority a Prime-authored
+    # implementation report actually exercises. Prime Builder never commits -- the
+    # verifying Loyal Opposition commits the work product and then emits VERIFIED
+    # separately -- so demanding `git_commit` here denied every implementation
+    # report under any PAUTH that (correctly) forbids it.
+    "finalization": ("protected_mutation",),
 }
 VERDICT_CANDIDATE_STATUSES: Final[frozenset[str]] = frozenset({"GO", "NO-GO", "VERIFIED"})
 RESPONDS_TO_BRIDGE_PATH_RE: Final[re.Pattern[str]] = re.compile(

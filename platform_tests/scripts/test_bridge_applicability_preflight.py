@@ -1467,6 +1467,76 @@ def test_pauth_proposal_allowed_finalization_denied_when_bridge_class_missing(tm
     assert report_packet["preflight_passed"] is False
 
 
+def test_finalization_phase_does_not_request_git_commit() -> None:
+    """WI-6458: Prime Builder never commits, so a Prime-authored implementation
+    report must not request `git_commit` authority at filing time."""
+    assert "git_commit" not in preflight.PAUTH_PHASE_OPERATIONS["finalization"]
+
+
+def test_finalization_phase_still_requests_protected_mutation() -> None:
+    """WI-6458: authority must not widen -- declared-target scoping is preserved."""
+    assert preflight.PAUTH_PHASE_OPERATIONS["finalization"] == ("protected_mutation",)
+
+
+def test_proposal_phase_operations_unchanged() -> None:
+    """WI-6458 regression floor: the proposal phase is untouched."""
+    assert preflight.PAUTH_PHASE_OPERATIONS["proposal"] == (
+        "implementation_packet_create",
+        "implementation_start",
+    )
+
+
+def test_implementation_report_under_git_commit_forbidding_pauth_passes(tmp_path: Path, monkeypatch) -> None:
+    """WI-6458 end-to-end: the defect this change repairs.
+
+    A post-GO implementation report under a PAUTH that forbids `git_commit`
+    previously produced `preflight_passed: False` with a
+    `PAUTH operation-time denial (git_commit)` blocking error, hard-blocking the
+    write in `run_bridge_compliance_audit`. It must now pass, while still being
+    classified as the finalization phase.
+    """
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        1,
+        "REVISED",
+        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+    )
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        2,
+        "GO",
+        "Responds to: bridge/pauth-phase-001.md\n\n# Reviewed proposal\n",
+    )
+    report = tmp_path / "report.md"
+    report.write_text(
+        _implementation_content(
+            kind="implementation_report",
+            version=3,
+            targets=["platform_tests/test_tool.py"],
+            approved=1,
+        ),
+        encoding="utf-8",
+    )
+    _install_operation_time_fixture(monkeypatch, _operation_time_envelope(forbidden=["git_commit"]))
+
+    packet = preflight.build_packet(
+        bridge_id="pauth-phase",
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=report,
+    )
+
+    report_pauth = packet["project_authorization_operation_time"]
+    assert report_pauth["requested_operations"] == ["protected_mutation"]
+    assert report_pauth["status"] == "allowed"
+    assert not [error for error in packet["blocking_errors"] if "git_commit" in error]
+
+
 def test_pauth_phase_cohort_allowed_and_reported(tmp_path: Path, monkeypatch) -> None:
     config = tmp_path / "spec-applicability.toml"
     _write_config(config)
