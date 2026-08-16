@@ -789,6 +789,114 @@ def test_emergency_env_does_not_exempt_unknown_mutating_target(tmp_path: Path, m
     assert "<unknown-mutating-target>" in result["reason"]
 
 
+PROTECTED_COMMIT_CHECKER = "scripts/check_protected_commit_authorization.py"
+
+
+def test_bridge_function_exact_includes_protected_commit_checker() -> None:
+    """WI-6036: the checker must be reachable by the emergency-bootstrap exception.
+
+    Repairing the checker requires committing it; committing it runs the
+    protected-commit gate, which is the code under repair. Membership here is
+    what gives that repair a landable path.
+    """
+    assert PROTECTED_COMMIT_CHECKER in gate.BRIDGE_FUNCTION_EXACT
+
+
+def test_bridge_function_exact_membership_is_exactly_the_expected_set() -> None:
+    """WI-6036 acceptance 5: no other entry is added or removed."""
+    expected = {
+        ".claude/settings.json",
+        ".codex/hooks.json",
+        "scripts/bridge_claim_cli.py",
+        PROTECTED_COMMIT_CHECKER,
+        "scripts/dispatcher_runtime.py",
+        "scripts/gtkb_bridge_writer.py",
+        "scripts/implementation_authorization.py",
+        "scripts/implementation_start_gate.py",
+    }
+    assert expected == gate.BRIDGE_FUNCTION_EXACT
+
+
+def test_bridge_function_prefixes_are_unchanged() -> None:
+    """WI-6036 acceptance 5: BRIDGE_FUNCTION_PREFIXES is unchanged."""
+    assert gate.BRIDGE_FUNCTION_PREFIXES == (
+        ".claude/hooks/",
+        ".codex/gtkb-hooks/",
+        "groundtruth-kb/src/groundtruth_kb/bridge/",
+    )
+
+
+def test_emergency_bridge_repair_allows_protected_commit_checker_edit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-6036 acceptance 1: the checker edit is exempt under the opt-in."""
+    audit_path = tmp_path / "gate-events.jsonl"
+    monkeypatch.setenv(gate.EMERGENCY_BRIDGE_REPAIR_ENV_VAR, "1")
+    monkeypatch.setenv("GTKB_GATE_DENIALS_PATH", str(audit_path))
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, target=PROTECTED_COMMIT_CHECKER))
+
+    assert result == {}
+    [record] = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
+    assert record["event"] == "exemption"
+    assert record["pattern_id"] == "emergency-bridge-repair"
+    assert record["paths"] == [PROTECTED_COMMIT_CHECKER]
+
+
+def test_no_emergency_env_blocks_protected_commit_checker_edit(tmp_path: Path) -> None:
+    """WI-6036 acceptance 2: the opt-in remains mandatory; no new standing authority."""
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, target=PROTECTED_COMMIT_CHECKER))
+
+    assert result["decision"] == "block"
+    assert "authorization packet" in result["reason"]
+
+
+def test_emergency_env_refuses_checker_mixed_with_non_bridge_function_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-6036 acceptance 3: the all-paths rule is unchanged.
+
+    One non-bridge-function protected path in the operation still defeats the
+    exception, so the checker's membership cannot be used to smuggle unrelated
+    protected edits through the bootstrap escape.
+    """
+    monkeypatch.setenv(gate.EMERGENCY_BRIDGE_REPAIR_ENV_VAR, "1")
+    patch = (
+        "*** Begin Patch\n"
+        f"*** Update File: {PROTECTED_COMMIT_CHECKER}\n@@\n+pass\n"
+        "*** Update File: groundtruth-kb/src/groundtruth_kb/project/registry_control_plane.py\n@@\n+pass\n"
+        "*** End Patch\n"
+    )
+    payload = {
+        "cwd": str(tmp_path),
+        "session_id": "session-1",
+        "tool_name": "apply_patch",
+        "tool_input": {"patch": patch},
+    }
+
+    result = gate.gate_decision(payload)
+
+    assert result["decision"] == "block"
+    assert "authorization packet" in result["reason"]
+
+
+def test_emergency_env_does_not_exempt_unknown_mutating_checker_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-6036 acceptance 4: the <unknown-mutating-target> refusal is unchanged."""
+    monkeypatch.setenv(gate.EMERGENCY_BRIDGE_REPAIR_ENV_VAR, "1")
+    payload = {
+        "cwd": str(tmp_path),
+        "tool_name": "Bash",
+        "tool_input": {"command": f"python -c \"open('{PROTECTED_COMMIT_CHECKER}', 'w').write('x')\""},
+    }
+
+    result = gate.gate_decision(payload)
+
+    assert result["decision"] == "block"
+    assert "<unknown-mutating-target>" in result["reason"]
+
+
 def test_non_go_bridge_entry_cannot_create_authorization(tmp_path: Path) -> None:
     _write_thread(tmp_path, latest_status="REVISED")
 

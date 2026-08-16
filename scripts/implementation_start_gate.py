@@ -130,6 +130,7 @@ BRIDGE_FUNCTION_EXACT = {
     ".claude/settings.json",
     ".codex/hooks.json",
     "scripts/bridge_claim_cli.py",
+    "scripts/check_protected_commit_authorization.py",
     "scripts/dispatcher_runtime.py",
     "scripts/gtkb_bridge_writer.py",
     "scripts/implementation_authorization.py",
