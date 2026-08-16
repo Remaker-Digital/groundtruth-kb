@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import functools
 import hashlib
 import json
@@ -1775,7 +1776,102 @@ def _bridge_snapshot(
         yield _BridgeSnapshot(root=snapshot_root, ledger=ledger)
 
 
-def _verify_snapshot_ledger(snapshot: _BridgeSnapshot) -> None:
+# Upper bound on ledger-verification concurrency. Sized above typical core
+# counts because the work is I/O-bound, and capped so a large host does not
+# spawn an unbounded pool (WI-5998).
+_LEDGER_VERIFY_WORKER_CAP = 32
+
+
+def _ledger_verify_worker_count(entry_count: int, max_workers: int | None = None) -> int:
+    """Worker count for ledger verification: CPU-derived, capped, never below 1.
+
+    Verification is I/O-bound (stat plus full-file read per entry), so the pool
+    is sized above core count to hide disk latency, then capped so a large
+    machine does not spawn an unbounded pool. ``max_workers`` is honoured
+    verbatim when supplied so tests can pin a count, including 1 to reproduce
+    serial ordering (WI-5998).
+    """
+    if max_workers is not None:
+        return max(1, max_workers)
+    if entry_count <= 1:
+        return 1
+    derived = (os.cpu_count() or 1) * 2
+    return max(1, min(_LEDGER_VERIFY_WORKER_CAP, derived, entry_count))
+
+
+def _verify_ledger_entry(snapshot: _BridgeSnapshot, rel_path: str, expected: Any) -> None:
+    """Verify one ledger entry. Body preserved verbatim from the serial loop.
+
+    Raises ``GateError`` on any mismatch; returns None on success. Every check
+    and its order is unchanged from the pre-WI-5998 serial implementation --
+    only the dispatch around it changed.
+    """
+    if expected.content_exempt:
+        if expected.pauth_read_snapshot is not None:
+            raise GateError(f"content-exempt ledger entry cannot carry PAUTH authority: {rel_path}")
+        if not expected.oid or expected.size < 0 or not expected.mode:
+            raise GateError(f"content-exempt ledger entry has incomplete metadata: {rel_path}")
+        return
+    candidate = snapshot.root / rel_path
+    if not candidate.is_file() or _path_is_linklike(candidate):
+        raise GateError(f"prospective audit authority path is no longer a regular file: {rel_path}")
+    info = candidate.stat()
+    if (
+        info.st_size != expected.size
+        or info.st_dev != expected.device
+        or info.st_ino != expected.inode
+        or info.st_nlink != expected.link_count
+    ):
+        raise GateError(f"prospective audit authority file identity drifted during audit: {rel_path}")
+    actual_hash = hashlib.sha256(candidate.read_bytes()).hexdigest()
+    if actual_hash != expected.sha256:
+        raise GateError(f"prospective audit authority bytes drifted during audit: {rel_path}")
+    if os.name != "nt":
+        actual_executable = bool(info.st_mode & stat.S_IXUSR)
+        if actual_executable != (expected.mode == "100755"):
+            raise GateError(f"prospective audit authority mode drifted during audit: {rel_path}")
+    if expected.pauth_read_snapshot is not None:
+        if rel_path != PAUTH_READ_SNAPSHOT_REL:
+            raise GateError(f"PAUTH read snapshot ledger entry uses an unexpected path: {rel_path}")
+        if expected.pauth_read_snapshot.source_identity != snapshot.pauth_source_identity:
+            raise GateError("PAUTH read snapshot ledger source identity changed from canonical source binding")
+        _verify_pauth_projection(candidate, expected.pauth_read_snapshot)
+
+
+def _verify_ledger_entries(snapshot: _BridgeSnapshot, *, max_workers: int | None = None) -> None:
+    """Verify every ledger entry, dispatching in parallel and failing closed.
+
+    Fail-closed contract (WI-5998): every future is drained, so no worker
+    exception can be swallowed. When several entries drift at once, the failure
+    re-raised is the one earliest in ledger order -- not the first to complete --
+    so the reported entry and message are identical across repeated runs and
+    across worker counts.
+    """
+    entries = list(snapshot.ledger.items())
+    if not entries:
+        return
+    workers = _ledger_verify_worker_count(len(entries), max_workers)
+    if workers == 1:
+        for rel_path, expected in entries:
+            _verify_ledger_entry(snapshot, rel_path, expected)
+        return
+    failures: dict[int, GateError] = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {
+            pool.submit(_verify_ledger_entry, snapshot, rel_path, expected): index
+            for index, (rel_path, expected) in enumerate(entries)
+        }
+        for future in concurrent.futures.as_completed(futures):
+            index = futures[future]
+            try:
+                future.result()
+            except GateError as exc:
+                failures[index] = exc
+    if failures:
+        raise failures[min(failures)]
+
+
+def _verify_snapshot_ledger(snapshot: _BridgeSnapshot, *, max_workers: int | None = None) -> None:
     # WI-5659 mechanism 4 (DELIB-202667187): skip ONLY the owner-authorized audit
     # scratch boundary `.gtkb-state/compliance-audit/` (both _isolated_compliance_audit
     # and the audit-candidate quarantine live under it), NOT every non-ledger path.
@@ -1809,37 +1905,7 @@ def _verify_snapshot_ledger(snapshot: _BridgeSnapshot) -> None:
     exempt_on_disk = sorted(rel for rel in exempt_paths if (snapshot.root / rel).exists())
     if exempt_on_disk:
         raise GateError(f"content-exempt ledger paths must not exist on disk: {exempt_on_disk}")
-    for rel_path, expected in snapshot.ledger.items():
-        if expected.content_exempt:
-            if expected.pauth_read_snapshot is not None:
-                raise GateError(f"content-exempt ledger entry cannot carry PAUTH authority: {rel_path}")
-            if not expected.oid or expected.size < 0 or not expected.mode:
-                raise GateError(f"content-exempt ledger entry has incomplete metadata: {rel_path}")
-            continue
-        candidate = snapshot.root / rel_path
-        if not candidate.is_file() or _path_is_linklike(candidate):
-            raise GateError(f"prospective audit authority path is no longer a regular file: {rel_path}")
-        info = candidate.stat()
-        if (
-            info.st_size != expected.size
-            or info.st_dev != expected.device
-            or info.st_ino != expected.inode
-            or info.st_nlink != expected.link_count
-        ):
-            raise GateError(f"prospective audit authority file identity drifted during audit: {rel_path}")
-        actual_hash = hashlib.sha256(candidate.read_bytes()).hexdigest()
-        if actual_hash != expected.sha256:
-            raise GateError(f"prospective audit authority bytes drifted during audit: {rel_path}")
-        if os.name != "nt":
-            actual_executable = bool(info.st_mode & stat.S_IXUSR)
-            if actual_executable != (expected.mode == "100755"):
-                raise GateError(f"prospective audit authority mode drifted during audit: {rel_path}")
-        if expected.pauth_read_snapshot is not None:
-            if rel_path != PAUTH_READ_SNAPSHOT_REL:
-                raise GateError(f"PAUTH read snapshot ledger entry uses an unexpected path: {rel_path}")
-            if expected.pauth_read_snapshot.source_identity != snapshot.pauth_source_identity:
-                raise GateError("PAUTH read snapshot ledger source identity changed from canonical source binding")
-            _verify_pauth_projection(candidate, expected.pauth_read_snapshot)
+    _verify_ledger_entries(snapshot, max_workers=max_workers)
 
 
 def _set_snapshot_read_only(snapshot: _BridgeSnapshot, read_only: bool) -> None:

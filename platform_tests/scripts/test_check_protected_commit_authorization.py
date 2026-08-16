@@ -5184,3 +5184,135 @@ def test_wi6183_non_pauth_transaction_does_not_open_projection(
         )
 
     assert candidate_path == verdict
+
+
+# --- WI-5998: parallel ledger verification -----------------------------------
+#
+# The per-entry verification loop is dispatched through a thread pool. These
+# tests pin the three properties the parallelisation must not break: outcomes
+# are identical to serial at every worker count, no worker exception is
+# swallowed, and the reported failure is deterministic when several entries
+# drift at once.
+
+_WORKER_COUNTS = (1, 2, 8)
+
+
+def _ledger_snapshot(module, root, files):
+    """Build a snapshot whose ledger truthfully describes files on disk."""
+    ledger = {}
+    for rel, payload in files.items():
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
+        info = path.stat()
+        ledger[rel] = SimpleNamespace(
+            mode="100644",
+            sha256=hashlib.sha256(payload).hexdigest(),
+            size=info.st_size,
+            device=info.st_dev,
+            inode=info.st_ino,
+            link_count=info.st_nlink,
+            oid="0" * 40,
+            content_exempt=False,
+            pauth_read_snapshot=None,
+        )
+    return SimpleNamespace(root=root, ledger=ledger, pauth_source_identity=None)
+
+
+def _verify_outcome(module, snapshot, workers):
+    """Return None on accept, or the GateError message on reject."""
+    try:
+        module._verify_ledger_entries(snapshot, max_workers=workers)
+    except module.GateError as exc:
+        return str(exc)
+    return None
+
+
+@pytest.mark.parametrize("workers", _WORKER_COUNTS)
+def test_clean_ledger_verifies_at_every_worker_count(tmp_path, workers):
+    module = _load_module()
+    snapshot = _ledger_snapshot(module, tmp_path, {f"f{i}.txt": f"payload-{i}".encode() for i in range(24)})
+    assert _verify_outcome(module, snapshot, workers) is None
+
+
+@pytest.mark.parametrize("workers", _WORKER_COUNTS)
+@pytest.mark.parametrize("drift", ["bytes", "size", "inode", "link_count", "missing", "exempt_metadata"])
+def test_each_drift_class_still_fails_closed(tmp_path, workers, drift):
+    module = _load_module()
+    root = tmp_path / drift
+    root.mkdir()
+    snapshot = _ledger_snapshot(module, root, {f"f{i}.txt": f"payload-{i}".encode() for i in range(12)})
+    entry = snapshot.ledger["f5.txt"]
+
+    if drift == "bytes":
+        (root / "f5.txt").write_bytes(b"tampered-payload-of-same-length!!")
+        entry.size = (root / "f5.txt").stat().st_size
+        entry.inode = (root / "f5.txt").stat().st_ino
+    elif drift == "size":
+        entry.size += 1
+    elif drift == "inode":
+        entry.inode += 1
+    elif drift == "link_count":
+        entry.link_count += 1
+    elif drift == "missing":
+        (root / "f5.txt").unlink()
+    elif drift == "exempt_metadata":
+        entry.content_exempt = True
+        entry.oid = ""
+
+    message = _verify_outcome(module, snapshot, workers)
+    assert message is not None, f"drift class {drift!r} was not detected at {workers} worker(s)"
+
+
+def test_parallel_outcome_matches_serial_for_every_drift_class(tmp_path):
+    """Equivalence: parallel dispatch must accept and reject exactly as serial does."""
+    module = _load_module()
+    for drift in ("bytes", "size", "inode", "missing", "clean"):
+        serial_root = tmp_path / f"serial-{drift}"
+        parallel_root = tmp_path / f"parallel-{drift}"
+        outcomes = []
+        for root, workers in ((serial_root, 1), (parallel_root, 8)):
+            root.mkdir()
+            snapshot = _ledger_snapshot(module, root, {f"f{i}.txt": f"payload-{i}".encode() for i in range(16)})
+            if drift == "bytes":
+                (root / "f3.txt").write_bytes(b"different-bytes-entirely")
+            elif drift == "size":
+                snapshot.ledger["f3.txt"].size += 7
+            elif drift == "inode":
+                snapshot.ledger["f3.txt"].inode += 7
+            elif drift == "missing":
+                (root / "f3.txt").unlink()
+            outcomes.append(_verify_outcome(module, snapshot, workers))
+        serial_outcome, parallel_outcome = outcomes
+        assert serial_outcome == parallel_outcome, (
+            f"drift class {drift!r}: serial produced {serial_outcome!r} but parallel produced {parallel_outcome!r}"
+        )
+
+
+def test_reported_failure_is_deterministic_across_workers_and_runs(tmp_path):
+    """With several entries drifting at once, the reported entry must be stable.
+
+    ``as_completed`` yields in completion order, so without explicit ordering the
+    reported entry would vary run to run. The implementation re-raises the
+    failure earliest in ledger order; this pins that.
+    """
+    module = _load_module()
+    messages = set()
+    for run in range(3):
+        for workers in _WORKER_COUNTS:
+            root = tmp_path / f"multi-{run}-{workers}"
+            root.mkdir()
+            snapshot = _ledger_snapshot(module, root, {f"f{i:02d}.txt": f"payload-{i}".encode() for i in range(20)})
+            for rel in ("f03.txt", "f11.txt", "f17.txt"):
+                snapshot.ledger[rel].size += 3
+            messages.add(_verify_outcome(module, snapshot, workers))
+    assert len(messages) == 1, f"failure report was not deterministic; saw {sorted(messages)}"
+    assert "f03.txt" in messages.pop(), "the earliest drifting ledger entry should be the reported one"
+
+
+def test_worker_count_is_derived_capped_and_overridable():
+    module = _load_module()
+    assert module._ledger_verify_worker_count(1) == 1
+    assert module._ledger_verify_worker_count(100_000) == module._LEDGER_VERIFY_WORKER_CAP
+    assert module._ledger_verify_worker_count(100_000, 1) == 1
+    assert module._ledger_verify_worker_count(4) <= 4
