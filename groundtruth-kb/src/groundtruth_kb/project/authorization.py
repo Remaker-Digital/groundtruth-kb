@@ -51,11 +51,13 @@ def reject_authorization_creation_c2_c4(
     included_work_item_ids: list[str] | None,
     excluded_work_item_ids: list[str] | None,
     new_identity: bool,
+    status: str = "active",
 ) -> None:
-    """Reject C2 (new identity only) and C4 (any version) before a row is appended.
+    """Reject C4 always, and C2 on any active row, before a row is appended.
 
-    Existing PAUTH-WI-* identities remain appendable until WI-6618's
-    supersession pass; C2 fail-closed on that population is out of this slice.
+    After WI-6618, C2 is fail-closed for every active insert, not only a new
+    identity. Superseded historical versions of PAUTH-WI-* ids may still be
+    appended. ``new_identity`` is retained for call-site compatibility.
     """
     included = _normalized_id_list(included_work_item_ids)
     excluded = _normalized_id_list(excluded_work_item_ids)
@@ -65,10 +67,12 @@ def reject_authorization_creation_c2_c4(
             "excluded work-item IDs (GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001 "
             "v3 / DCL-PROJECT-AUTHORIZATION-EVENT-TRANSACTION-001 C4)."
         )
-    if new_identity:
-        reason = work_item_scoped_authorization_identity(authorization_id, scope_summary)
-        if reason:
-            raise ValueError(reason)
+    if str(status or "active").strip().lower() != "active":
+        return
+    reason = work_item_scoped_authorization_identity(authorization_id, scope_summary)
+    if reason:
+        raise ValueError(reason)
+    del new_identity  # call-site compatibility; C2 applies to every active insert
 
 
 def parse_expires_at(value: str | None) -> datetime | None:

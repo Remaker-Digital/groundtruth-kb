@@ -6091,7 +6091,17 @@ class KnowledgeDB:
             included_work_item_ids=included_work_item_ids,
             excluded_work_item_ids=excluded_work_item_ids,
             new_identity=version == 1,
+            status=status,
         )
+        if str(status or "").strip().lower() == "active":
+            for existing in self.list_project_authorizations(project_id):
+                existing_id = str(existing.get("id") or "")
+                if existing_id and existing_id != authorization_id:
+                    raise ValueError(
+                        f"Project {project_id!r} already has current authorization "
+                        f"{existing_id!r}; a second current identity is prohibited "
+                        "(DCL-PROJECT-AUTHORIZATION-EVENT-TRANSACTION-001 C1)."
+                    )
         if version > 1:
             prior_authorization = self.get_project_authorization(authorization_id)
             if prior_authorization is not None:
