@@ -294,6 +294,82 @@ class ProjectLifecycleService:
             raise ProjectLifecycleError("Project update did not return a current project")
         return project
 
+    @staticmethod
+    def _authorization_json_list(row: dict[str, Any], key: str) -> list[str] | None:
+        parsed = row.get(f"{key}_parsed")
+        if isinstance(parsed, list):
+            values = [str(item) for item in parsed if str(item).strip()]
+            return values or None
+        return None
+
+    def _append_reauthorization_for_membership_event(
+        self,
+        project_id: str,
+        *,
+        changed_by: str,
+        change_reason: str,
+    ) -> None:
+        """C3: append a new current authorization version when one already exists.
+
+        A project with no current authorization must not mint one as a side
+        effect of membership-only change (WI-6617).
+        """
+        current_auths = list(self.db.list_project_authorizations(project_id))
+        if not current_auths:
+            return
+        membership_reason = (
+            f"{change_reason} (DCL-PROJECT-AUTHORIZATION-EVENT-TRANSACTION-001 C3 membership re-authorization)"
+        )
+        for auth in current_auths:
+            try:
+                inserted = self.db.insert_project_authorization(
+                    str(auth["project_id"]),
+                    str(auth.get("authorization_name") or ""),
+                    str(auth.get("owner_decision_deliberation_id") or ""),
+                    str(auth.get("scope_summary") or ""),
+                    changed_by,
+                    membership_reason,
+                    id=str(auth["id"]),
+                    status=ACTIVE_PROJECT_AUTHORIZATION_STATUS,
+                    allowed_mutation_classes=self._authorization_json_list(auth, "allowed_mutation_classes"),
+                    forbidden_operations=self._authorization_json_list(auth, "forbidden_operations"),
+                    included_work_item_ids=None,
+                    excluded_work_item_ids=None,
+                    included_spec_ids=self._authorization_json_list(auth, "included_spec_ids"),
+                    excluded_spec_ids=self._authorization_json_list(auth, "excluded_spec_ids"),
+                    expires_at=auth.get("expires_at"),
+                    commit=False,
+                )
+            except ValueError as exc:
+                raise ProjectLifecycleError(str(exc)) from exc
+            if inserted is None:
+                raise ProjectLifecycleError("Membership re-authorization insert did not return a current authorization")
+
+    def _link_membership_with_reauthorization(
+        self,
+        *,
+        project_id: str,
+        changed_by: str,
+        change_reason: str,
+        link,
+        missing_message: str,
+    ) -> dict[str, Any]:
+        conn = self.db._get_conn()
+        try:
+            membership = link()
+            if membership is None:
+                raise ProjectLifecycleError(missing_message)
+            self._append_reauthorization_for_membership_event(
+                project_id,
+                changed_by=changed_by,
+                change_reason=change_reason,
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        return membership
+
     def add_project_item(
         self,
         project_id: str,
@@ -305,21 +381,32 @@ class ProjectLifecycleService:
         membership_order: int | None = None,
         source: str | None = "gt projects add-item",
     ) -> dict[str, Any]:
-        try:
-            membership = self.db.link_project_work_item(
-                _require_nonempty(project_id, "project_id"),
-                _require_nonempty(work_item_id, "work_item_id"),
-                _require_nonempty(changed_by, "changed_by"),
-                _require_nonempty(change_reason, "change_reason"),
-                membership_role=membership_role,
-                membership_order=membership_order,
-                source=source,
-            )
-        except ValueError as exc:
-            raise ProjectLifecycleError(str(exc)) from exc
-        if membership is None:
-            raise ProjectLifecycleError("Project membership insert did not return a current membership")
-        return membership
+        normalized_project_id = _require_nonempty(project_id, "project_id")
+        normalized_changed_by = _require_nonempty(changed_by, "changed_by")
+        normalized_change_reason = _require_nonempty(change_reason, "change_reason")
+
+        def _link() -> dict[str, Any] | None:
+            try:
+                return self.db.link_project_work_item(
+                    normalized_project_id,
+                    _require_nonempty(work_item_id, "work_item_id"),
+                    normalized_changed_by,
+                    normalized_change_reason,
+                    membership_role=membership_role,
+                    membership_order=membership_order,
+                    source=source,
+                    commit=False,
+                )
+            except ValueError as exc:
+                raise ProjectLifecycleError(str(exc)) from exc
+
+        return self._link_membership_with_reauthorization(
+            project_id=normalized_project_id,
+            changed_by=normalized_changed_by,
+            change_reason=normalized_change_reason,
+            link=_link,
+            missing_message="Project membership insert did not return a current membership",
+        )
 
     @staticmethod
     def dependency_kind_registry() -> dict[str, Any]:
@@ -775,22 +862,32 @@ class ProjectLifecycleService:
             raise ProjectLifecycleError(
                 f"No active membership to remove for {normalized_work_item_id} in {normalized_project_id}"
             )
-        try:
-            membership = self.db.link_project_work_item(
-                normalized_project_id,
-                normalized_work_item_id,
-                _require_nonempty(changed_by, "changed_by"),
-                _require_nonempty(change_reason, "change_reason"),
-                membership_role=current.get("membership_role") or "member",
-                membership_order=current.get("membership_order"),
-                status=normalized_status,
-                source=current.get("membership_source"),
-            )
-        except ValueError as exc:
-            raise ProjectLifecycleError(str(exc)) from exc
-        if membership is None:
-            raise ProjectLifecycleError("Project membership removal did not return a current membership")
-        return membership
+        normalized_changed_by = _require_nonempty(changed_by, "changed_by")
+        normalized_change_reason = _require_nonempty(change_reason, "change_reason")
+
+        def _link() -> dict[str, Any] | None:
+            try:
+                return self.db.link_project_work_item(
+                    normalized_project_id,
+                    normalized_work_item_id,
+                    normalized_changed_by,
+                    normalized_change_reason,
+                    membership_role=current.get("membership_role") or "member",
+                    membership_order=current.get("membership_order"),
+                    status=normalized_status,
+                    source=current.get("membership_source"),
+                    commit=False,
+                )
+            except ValueError as exc:
+                raise ProjectLifecycleError(str(exc)) from exc
+
+        return self._link_membership_with_reauthorization(
+            project_id=normalized_project_id,
+            changed_by=normalized_changed_by,
+            change_reason=normalized_change_reason,
+            link=_link,
+            missing_message="Project membership removal did not return a current membership",
+        )
 
     def _validate_retire_item_approval_packet(
         self,
@@ -897,22 +994,31 @@ class ProjectLifecycleService:
             raise ProjectLifecycleError(
                 f"No active membership to retire for {normalized_work_item_id} in {normalized_project_id}"
             )
-        try:
-            membership = self.db.link_project_work_item(
-                normalized_project_id,
-                normalized_work_item_id,
-                _require_nonempty(changed_by, "changed_by"),
-                normalized_change_reason,
-                membership_role=current.get("membership_role") or "member",
-                membership_order=current.get("membership_order"),
-                status=normalized_status,
-                source=current.get("membership_source"),
-            )
-        except ValueError as exc:
-            raise ProjectLifecycleError(str(exc)) from exc
-        if membership is None:
-            raise ProjectLifecycleError("Project membership retirement did not return a current membership")
-        return membership
+        normalized_changed_by = _require_nonempty(changed_by, "changed_by")
+
+        def _link() -> dict[str, Any] | None:
+            try:
+                return self.db.link_project_work_item(
+                    normalized_project_id,
+                    normalized_work_item_id,
+                    normalized_changed_by,
+                    normalized_change_reason,
+                    membership_role=current.get("membership_role") or "member",
+                    membership_order=current.get("membership_order"),
+                    status=normalized_status,
+                    source=current.get("membership_source"),
+                    commit=False,
+                )
+            except ValueError as exc:
+                raise ProjectLifecycleError(str(exc)) from exc
+
+        return self._link_membership_with_reauthorization(
+            project_id=normalized_project_id,
+            changed_by=normalized_changed_by,
+            change_reason=normalized_change_reason,
+            link=_link,
+            missing_message="Project membership retirement did not return a current membership",
+        )
 
     def reorder_project_items(
         self,
@@ -1052,6 +1158,16 @@ class ProjectLifecycleService:
     ) -> dict[str, Any]:
         self._require_project_dependency_gate_ready(project_id, "authorization")
         try:
+            from groundtruth_kb.project.authorization import reject_authorization_creation_c2_c4
+
+            existing = self.db.get_project_authorization(authorization_id) if authorization_id else None
+            reject_authorization_creation_c2_c4(
+                authorization_id=authorization_id,
+                scope_summary=scope,
+                included_work_item_ids=included_work_item_ids,
+                excluded_work_item_ids=excluded_work_item_ids,
+                new_identity=existing is None,
+            )
             authorization = self.db.insert_project_authorization(
                 _require_nonempty(project_id, "project_id"),
                 _require_nonempty(name, "name"),
@@ -1063,8 +1179,6 @@ class ProjectLifecycleService:
                 status=ACTIVE_PROJECT_AUTHORIZATION_STATUS,
                 allowed_mutation_classes=allowed_mutation_classes,
                 forbidden_operations=forbidden_operations,
-                included_work_item_ids=included_work_item_ids,
-                excluded_work_item_ids=excluded_work_item_ids,
                 included_spec_ids=included_spec_ids,
                 excluded_spec_ids=excluded_spec_ids,
                 expires_at=expires_at,
@@ -1100,6 +1214,36 @@ class ProjectLifecycleService:
             except ValueError as exc:
                 raise ProjectLifecycleError(str(exc)) from exc
         return authorization
+
+    def amend_authorization(
+        self,
+        authorization_id: str,
+        *,
+        owner_decision: str,
+        change_reason: str,
+        changed_by: str = PROJECTS_CHANGED_BY,
+        add_work_items: list[str] | None = None,
+        remove_work_items: list[str] | None = None,
+        add_spec_ids: list[str] | None = None,
+        remove_spec_ids: list[str] | None = None,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Amendment is not an authorization path (GOV v3 / WI-6617).
+
+        Scope change requires a new current version under direct owner approval
+        of the complete proposed envelope. Include-list deltas are rejected.
+        Historical authorization rows are not deleted.
+        """
+        _require_nonempty(authorization_id, "authorization_id")
+        _require_nonempty(owner_decision, "owner_decision")
+        _require_nonempty(change_reason, "change_reason")
+        _require_nonempty(changed_by, "changed_by")
+        raise ProjectLifecycleError(
+            "Amendment of an existing authorization version is not an authorization "
+            "path (GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001 v3). Scope change "
+            "requires a new current version under direct owner approval of the "
+            "complete proposed envelope."
+        )
 
     def list_project_authorizations(
         self,

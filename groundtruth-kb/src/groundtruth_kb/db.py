@@ -6067,8 +6067,11 @@ class KnowledgeDB:
         expires_at: str | None = None,
         supersedes: list[str] | None = None,
         superseded_by: list[str] | None = None,
+        commit: bool = True,
     ) -> dict[str, Any] | None:
         """Insert a new append-only project authorization version."""
+        from groundtruth_kb.project.authorization import reject_authorization_creation_c2_c4
+
         if self.get_project(project_id) is None:
             raise ValueError(f"Project {project_id} not found")
         if self.get_deliberation(owner_decision_deliberation_id) is None:
@@ -6082,6 +6085,13 @@ class KnowledgeDB:
 
         authorization_id = id or _stable_project_link_id("PAUTH", project_id, authorization_name)
         version = self._next_project_authorization_version(authorization_id)
+        reject_authorization_creation_c2_c4(
+            authorization_id=authorization_id,
+            scope_summary=scope_summary,
+            included_work_item_ids=included_work_item_ids,
+            excluded_work_item_ids=excluded_work_item_ids,
+            new_identity=version == 1,
+        )
         if version > 1:
             prior_authorization = self.get_project_authorization(authorization_id)
             if prior_authorization is not None:
@@ -6130,7 +6140,8 @@ class KnowledgeDB:
                 change_reason,
             ),
         )
-        conn.commit()
+        if commit:
+            conn.commit()
         return self.get_project_authorization(authorization_id)
 
     def get_project_authorization(self, authorization_id: str) -> dict[str, Any] | None:
@@ -7956,8 +7967,10 @@ class KnowledgeDB:
                 "allowed_mutation_classes", current_json("allowed_mutation_classes")
             ),
             "forbidden_operations": fields.get("forbidden_operations", current_json("forbidden_operations")),
-            "included_work_item_ids": fields.get("included_work_item_ids", current_json("included_work_item_ids")),
-            "excluded_work_item_ids": fields.get("excluded_work_item_ids", current_json("excluded_work_item_ids")),
+            # WI-6617 C4: do not copy work-item include/exclude lists onto a new
+            # version. Coverage is current project membership.
+            "included_work_item_ids": fields.get("included_work_item_ids"),
+            "excluded_work_item_ids": fields.get("excluded_work_item_ids"),
             "included_spec_ids": fields.get("included_spec_ids", current_json("included_spec_ids")),
             "excluded_spec_ids": fields.get("excluded_spec_ids", current_json("excluded_spec_ids")),
             "expires_at": fields.get("expires_at", current["expires_at"]),
