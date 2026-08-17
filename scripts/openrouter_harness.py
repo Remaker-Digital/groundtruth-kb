@@ -259,7 +259,7 @@ governance-compliant verdict through review_no_action. Do not encode an
 exclusive corrected-verdict status set. Do not stop with prose when a bridge verdict is
 required.
 Use harness-state/harness-registry.json through the canonical role reader as the role source
-of truth. Do not treat harness-local operating-role.md files as live role authority.
+of truth.
 
 For proposal reviews, write GO or NO-GO. For post-implementation reports, write VERIFIED or
 NO-GO. Run preflight checks and include their raw output in the verdict as advisory context for the Prime Builder. A nonzero preflight exit is a note to attach to the verdict body, not a rejection criterion. Your verdict (GO / NO-GO / VERIFIED) evaluates the substantive quality of the proposal or implementation report being reviewed — not whether every applicable cross-cutting spec appears in the linked specs list.

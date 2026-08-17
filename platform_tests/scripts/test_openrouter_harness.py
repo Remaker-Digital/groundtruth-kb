@@ -258,6 +258,18 @@ def test_bridge_review_prompt_uses_no_index_bridge_instructions(tmp_path: Path):
     assert "Do not encode an\nexclusive corrected-verdict status set" in prompt
 
 
+def test_bridge_review_prompt_states_canonical_role_source_positively(tmp_path: Path):
+    """The OpenRouter system prompt names the canonical role reader positively
+    and no longer carries probative language naming the obsolete
+    harness-local operating-role.md surface (WI-6017)."""
+    root = make_root(tmp_path)
+    prompt = orh.build_system_prompt("bridge-review", route(root))
+
+    assert prompt is not None
+    assert "harness-state/harness-registry.json through the canonical role reader" in prompt
+    assert "operating-role.md" not in prompt
+
+
 def test_bridge_review_prompt_requires_governed_verdict_publication(tmp_path: Path):
     root = make_root(tmp_path)
     prompt = orh.build_system_prompt("bridge-review", route(root))
