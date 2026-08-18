@@ -1,7 +1,7 @@
 schema_version = 1
 registry_id = "gtkb-harness-capability-registry"
 purpose = "Canonical registry for semantic capability parity across Claude Code and Codex harnesses."
-last_updated = "2026-06-27"
+last_updated = "2026-08-18"
 
 # â”€â”€ Cross-harness parity schema (ADR-CROSS-HARNESS-PARITY-001 / DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001) â”€â”€
 # Slice 2 of PROJECT-GTKB-CROSS-HARNESS-PARITY. `parity_schema_version` declares
@@ -2485,3 +2485,38 @@ surface = ".goose/skills/gtkb-managed-skill-adoption-review/SKILL.md"
 status = "adapter"
 adapter_source = ".harness-baseline-configuration/skills/gtkb-managed-skill-adoption-review/SKILL.md"
 source_sha256 = "46669ca6360371a43db880c85e1930987162934ea7ee955eb310049a22b31802"
+
+
+[[capabilities]]
+id = "hook.goose-blocking-gate-empirical-firing"
+kind = "hook"
+canonical_name = "goose-blocking-gate-empirical-firing"
+canonical_purpose = "Empirical hard-block proof that installed Goose intercepts the nine named blocking governance gates (WI-5918). Registration is evidenced separately by .goose/plugins/gtkb/hooks/hooks.json."
+canonical_source = "config/hooks/gtkb-destructive-gate.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "required"
+applicability = "universal"
+
+[capabilities.claude]
+status = "unsupported"
+reason = "Empirical Goose PreToolUse firing is Goose-specific."
+
+[capabilities.codex]
+status = "unsupported"
+reason = "Empirical Goose PreToolUse firing is Goose-specific."
+
+[capabilities.antigravity]
+status = "unsupported"
+reason = "Empirical Goose PreToolUse firing is Goose-specific."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "Empirical Goose PreToolUse firing is Goose-specific."
+
+[[parity_waivers]]
+capability_id = "hook.goose-blocking-gate-empirical-firing"
+harness = "goose"
+reason_class = "hard-limitation"
+rationale = "This Cursor (harness E) implementation session cannot drive the installed Goose desktop PreToolUse interceptor, so empirical hard-block was not observed for destructive-gate.py, credential-scan.py, formal-artifact-approval-gate.py, bridge-compliance-gate.py, implementation-start-gate.py, lo-file-safety-gate.py, sot-read-discipline.py, narrative-artifact-approval-gate.py, or document_author_provenance_gate.py. Mechanical fallback: platform_tests/scripts/test_goose_hook_parity.py census of .goose/plugins/gtkb/hooks/hooks.json plus scripts/check_harness_parity.py Goose plugin-registration evidence (ADR-CODEX-HOOK-PARITY-FALLBACK-001). Silent non-enforcement remains a defect; re-run empirical intercept in a Goose desktop session."
+owner_approval_ref = "DELIB-20260808012227"
+review_trigger = "Re-evaluate when an implementation session runs inside Goose desktop or Goose CLI hook invocation becomes available to prove per-gate refusal."

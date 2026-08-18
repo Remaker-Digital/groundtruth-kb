@@ -33,6 +33,23 @@ HARNESS_ADAPTER_SKILLS_ROOT = {
     "openrouter": Path(".openrouter") / "skills",
     "alibaba-cloud-studio": Path(".alibaba-cloud-studio") / "skills",
 }
+GOOSE_PLUGIN_HOOKS_JSON = Path(".goose") / "plugins" / "gtkb" / "hooks" / "hooks.json"
+GOOSE_HOOKS_PROJECTION_MARKER = "PROJECTION, NOT CANONICAL"
+GOOSE_EMPIRICAL_FIRING_CAPABILITY_ID = "hook.goose-blocking-gate-empirical-firing"
+# WI-5918 named blocking gates. Skill adapters never evidence these.
+GOOSE_REQUIRED_BLOCKING_HOOK_SCRIPTS = frozenset(
+    {
+        "destructive-gate.py",
+        "credential-scan.py",
+        "formal-artifact-approval-gate.py",
+        "bridge-compliance-gate.py",
+        "implementation-start-gate.py",
+        "lo-file-safety-gate.py",
+        "sot-read-discipline.py",
+        "narrative-artifact-approval-gate.py",
+        "document_author_provenance_gate.py",
+    }
+)
 
 
 def _load_sibling_script_module(module_name: str) -> Any:
@@ -652,12 +669,160 @@ def _base_result(
     )
 
 
+def _capability_hook_script_name(capability: dict[str, Any]) -> str:
+    source = str(capability.get("canonical_source") or "").strip()
+    name = Path(source).name
+    if name.startswith("gtkb-"):
+        name = name[5:]
+    return name
+
+
+def load_goose_plugin_hook_registration(project_root: Path) -> dict[str, Any]:
+    """Parse Goose plugin hook registration (WI-5918). Skill adapters are not evidence."""
+    relative = GOOSE_PLUGIN_HOOKS_JSON.as_posix()
+    path = project_root / GOOSE_PLUGIN_HOOKS_JSON
+    empty: dict[str, Any] = {
+        "path": relative,
+        "exists": False,
+        "is_projection": False,
+        "scripts": set(),
+        "commands": [],
+    }
+    if not path.is_file():
+        return empty
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {**empty, "exists": True}
+    comment = ""
+    hooks = None
+    if isinstance(payload, dict):
+        comment = str(payload.get("_comment") or "")
+        hooks = payload.get("hooks")
+    commands: list[str] = []
+    if isinstance(hooks, dict):
+        for entries in hooks.values():
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if isinstance(entry, dict) and isinstance(entry.get("command"), str):
+                    commands.append(entry["command"])
+    scripts: set[str] = set()
+    for command in commands:
+        for token in command.split():
+            token_name = Path(token).name
+            if token_name.endswith(".py") or token_name.endswith(".cmd"):
+                scripts.add(token_name)
+    return {
+        "path": relative,
+        "exists": True,
+        "is_projection": GOOSE_HOOKS_PROJECTION_MARKER in comment,
+        "scripts": scripts,
+        "commands": commands,
+    }
+
+
+def _status_for_goose_hook_registration(
+    project_root: Path,
+    capability: dict[str, Any],
+) -> CapabilityResult | None:
+    """Evidence Goose hooks from plugin hooks.json, never from skill adapters."""
+    cap_id = str(capability.get("id") or "")
+    if cap_id == GOOSE_EMPIRICAL_FIRING_CAPABILITY_ID:
+        return _base_result(
+            capability,
+            "goose",
+            configured_status="unproven",
+            evidence=GOOSE_PLUGIN_HOOKS_JSON.as_posix(),
+            state="MISSING",
+            note=(
+                "Plugin registration does not prove Goose intercepted a violating "
+                "operation. Empirical firing requires an installed Goose session "
+                "or a typed parity waiver."
+            ),
+        )
+    registration = load_goose_plugin_hook_registration(project_root)
+    script = _capability_hook_script_name(capability)
+    if not script:
+        return None
+    if registration["exists"] and script in registration["scripts"]:
+        return _base_result(
+            capability,
+            "goose",
+            configured_status="native",
+            evidence=registration["path"],
+            state="PASS",
+            note=(
+                "Goose hook capability evidenced by plugin hooks.json registration, "
+                "not skill-adapter presence."
+            ),
+        )
+    if script in GOOSE_REQUIRED_BLOCKING_HOOK_SCRIPTS:
+        return _base_result(
+            capability,
+            "goose",
+            configured_status="missing-registration",
+            evidence=registration["path"],
+            state="MISSING",
+            note=(
+                f"Required Goose blocking gate {script} is not registered in "
+                "plugin hooks.json. Skill adapter manifests do not prove hook "
+                "registration or invocation."
+            ),
+        )
+    return None
+
+
+def _goose_required_blocking_gate_results(
+    project_root: Path,
+    selected_harnesses: list[str],
+) -> list[CapabilityResult]:
+    if "goose" not in selected_harnesses:
+        return []
+    registration = load_goose_plugin_hook_registration(project_root)
+    if not registration["exists"]:
+        return []
+    results: list[CapabilityResult] = []
+    for script in sorted(GOOSE_REQUIRED_BLOCKING_HOOK_SCRIPTS):
+        stem = script[:-3] if script.endswith(".py") else script
+        present = script in registration["scripts"]
+        capability = {
+            "id": f"goose.required-gate.{stem}",
+            "canonical_name": stem,
+            "parity_class": "required",
+            "required_for_roles": ["prime-builder", "loyal-opposition"],
+        }
+        results.append(
+            _base_result(
+                capability,
+                "goose",
+                configured_status="native" if present else "missing-registration",
+                evidence=registration["path"],
+                state="PASS" if present else "MISSING",
+                note=(
+                    "Goose required blocking gate evidenced by plugin hooks.json registration."
+                    if present
+                    else (
+                        f"Required Goose blocking gate {script} is not registered in "
+                        "plugin hooks.json. Skill adapter manifests do not prove hook "
+                        "registration or invocation."
+                    )
+                ),
+            )
+        )
+    return results
+
+
 def _status_for_surface(
     project_root: Path,
     capability: dict[str, Any],
     harness: str,
     manifest_adapters: dict[str, dict[str, Any]] | None = None,
 ) -> CapabilityResult:
+    if harness == "goose" and capability.get("kind") == "hook":
+        goose_result = _status_for_goose_hook_registration(project_root, capability)
+        if goose_result is not None:
+            return goose_result
     harness_config = capability.get(harness)
     if not isinstance(harness_config, dict):
         if manifest_adapters and harness in manifest_adapters:
@@ -1462,6 +1627,8 @@ def check_harness_parity(
         for selected_harness in capability_harnesses:
             result = _status_for_surface(project_root, capability, selected_harness, harness_manifest_adapters)
             results.append(_apply_waiver(result, waivers.get((result.capability_id, selected_harness))))
+    for gate_result in _goose_required_blocking_gate_results(project_root, active_harnesses):
+        results.append(_apply_waiver(gate_result, waivers.get((gate_result.capability_id, gate_result.harness))))
     for floor_harness in registered_floor_harnesses:
         results.extend(_evaluate_capability_floor(floor_harness, registry))
     envelope_harnesses = (

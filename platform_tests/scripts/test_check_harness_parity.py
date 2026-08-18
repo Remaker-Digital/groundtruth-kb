@@ -1398,3 +1398,124 @@ reason = "fixture"
 
     assert historical.selected_harnesses == ["goose"]
     assert any(result.harness == "goose" and result.capability_id == "test.lifecycle" for result in historical.results)
+
+
+
+def _write_goose_plugin_hooks(project_root: Path, scripts: list[str], *, projection: bool = True) -> None:
+    path = project_root / ".goose" / "plugins" / "gtkb" / "hooks" / "hooks.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    comment = "PROJECTION, NOT CANONICAL - test fixture" if projection else "hand-written fixture"
+    entries = [{"command": f"python .goose/hooks/{name}", "blocking": True} for name in scripts]
+    path.write_text(
+        json.dumps({"_comment": comment, "hooks": {"PreToolUse": entries}}),
+        encoding="utf-8",
+    )
+
+
+def _write_goose_skill_manifest(project_root: Path) -> None:
+    manifest = project_root / ".goose" / "skills" / "MANIFEST.json"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(json.dumps({"adapters": []}), encoding="utf-8")
+    (project_root / "harness-state").mkdir(parents=True, exist_ok=True)
+    (project_root / "harness-state" / "harness-registry.json").write_text(
+        json.dumps({"harnesses": [{"harness_name": "goose", "status": "active", "role": ["loyal-opposition"]}]}),
+        encoding="utf-8",
+    )
+
+
+def test_goose_skill_adapter_manifest_does_not_prove_required_hook_registration(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_goose_skill_manifest(tmp_path)
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "hook.destructive-gate"
+kind = "hook"
+canonical_name = "destructive-gate"
+canonical_source = "config/hooks/gtkb-destructive-gate.py"
+required_for_roles = ["loyal-opposition"]
+parity_class = "required"
+
+[harnesses.goose]
+skill_adapter_manifest = ".goose/skills/MANIFEST.json"
+""",
+    )
+
+    report = module.check_harness_parity(tmp_path, harness="goose", role="loyal-opposition")
+
+    target = [result for result in report.results if result.capability_id == "hook.destructive-gate"]
+    assert len(target) == 1
+    assert target[0].state == "MISSING"
+    assert "Skill adapter manifests do not prove hook registration" in target[0].note
+    assert report.overall_status == "FAIL"
+
+
+def test_goose_plugin_hooks_json_evidences_hook_capability(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_goose_skill_manifest(tmp_path)
+    _write_goose_plugin_hooks(tmp_path, ["sot-read-discipline.py"])
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "hook.sot-read-discipline"
+kind = "hook"
+canonical_name = "sot-read-discipline"
+canonical_source = "config/hooks/gtkb-sot-read-discipline.py"
+required_for_roles = ["loyal-opposition"]
+parity_class = "required"
+
+[harnesses.goose]
+skill_adapter_manifest = ".goose/skills/MANIFEST.json"
+""",
+    )
+
+    report = module.check_harness_parity(tmp_path, harness="goose", role="loyal-opposition")
+
+    target = [result for result in report.results if result.capability_id == "hook.sot-read-discipline"]
+    assert len(target) == 1
+    assert target[0].state == "PASS"
+    assert target[0].evidence.endswith("hooks.json")
+    assert "plugin hooks.json registration" in target[0].note
+
+
+def test_goose_required_gate_census_fails_when_plugin_omits_named_gate(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_goose_skill_manifest(tmp_path)
+    _write_goose_plugin_hooks(tmp_path, ["sot-read-discipline.py"])
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "skill.x"
+kind = "skill"
+canonical_name = "x"
+canonical_source = ".claude/skills/x/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/x/SKILL.md"
+status = "native"
+
+[harnesses.goose]
+skill_adapter_manifest = ".goose/skills/MANIFEST.json"
+""",
+    )
+    _write_skill(tmp_path, "x")
+
+    report = module.check_harness_parity(tmp_path, harness="goose", role="loyal-opposition", include_all=True)
+    missing_gates = [
+        result
+        for result in report.results
+        if result.capability_id.startswith("goose.required-gate.") and result.state == "MISSING"
+    ]
+    present = [
+        result
+        for result in report.results
+        if result.capability_id == "goose.required-gate.sot-read-discipline" and result.state == "PASS"
+    ]
+    assert present
+    assert any(result.capability_id == "goose.required-gate.destructive-gate" for result in missing_gates)
+    assert report.overall_status == "FAIL"
