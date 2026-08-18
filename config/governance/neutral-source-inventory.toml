@@ -1,0 +1,88 @@
+# Neutral-source inventory configuration (WI-6040).
+#
+# Governs `scripts/neutral_source_inventory.py`. The canonical neutral
+# configuration source is `.harness-baseline-configuration`; generated harness
+# trees (`.claude/`, `.codex/`, `.goose/`, `.cursor/`, `.agent/`,
+# `.api-harness/`) are projections and are NEVER treated as source families
+# (GOV-HARNESS-NEUTRAL-BASELINE-001).
+
+schema_version = 1
+
+# Root directories the inventory walks. Each entry must be a path under
+# `E:\GT-KB` (project-root boundary). Relative paths resolve against the host
+# root (the directory containing `groundtruth.toml`).
+[roots]
+harness_baseline = ".harness-baseline-configuration"
+config = "config"
+scripts = "scripts"
+groundtruth_kb_src = "groundtruth-kb/src/groundtruth_kb"
+
+# Registered source families. Every current source artifact must classify as
+# exactly one family; an artifact with no matching family is a contamination
+# and the inventory fails closed.
+[families]
+configuration = { description = "Canonical neutral configuration source; edited in place" }
+source = { description = "Python source and automation scripts" }
+test = { description = "Test artifacts (unit/integration/e2e/assertion)" }
+governance_evidence = { description = "Approval packets and governed evidence" }
+documentation = { description = "Markdown and prose guidance" }
+metadata = { description = "Machine-readable metadata/registry rows" }
+junk = { description = "Caches, scratch, and disposable content; never authority" }
+
+# Owner mapping (informational; the inventory reports it per artifact).
+[owners]
+platform = "GT-KB platform"
+applications = "Agent Red / adopter applications"
+
+# Read/mutation route vocabulary.
+[routes.read]
+configuration = "edit-in-place (baseline source)"
+source = "edit-in-place"
+test = "edit-in-place"
+governance_evidence = "governed packet write"
+documentation = "edit-in-place"
+metadata = "governed record write"
+junk = "delete-only"
+
+[routes.mutate]
+configuration = "allowed (baseline source)"
+source = "allowed under PAUTH"
+test = "allowed under PAUTH"
+governance_evidence = "governed packet write only"
+documentation = "allowed under PAUTH"
+metadata = "governed record write only"
+junk = "delete-only; never authority"
+
+# Paths that must NEVER be treated as source families (projections and
+# generated harness trees). A file under one of these prefixes is classified
+# as `projection` in the report; if one is misclassified as a source family,
+# the inventory fails closed.
+[projection_prefixes]
+paths = [
+  ".claude/",
+  ".codex/",
+  ".goose/",
+  ".cursor/",
+  ".agent/",
+  ".api-harness/",
+]
+
+# Disposable/scratch markers. Content under these prefixes is disposable and
+# must not be cited as authority, evidence, implementation input, readiness,
+# or permission. A canonical source, governance configuration, mutation
+# classifier, test, or current planning record that cites a disposable path
+# as authority fails the inventory (WI-6040 acceptance 5).
+[disposable_prefixes]
+paths = [
+  "scratchpad/",
+  ".gtkb-state/",
+  ".pytest-tmp/",
+  "**/__pycache__/",
+  "**/*.pyc",
+  "**/.pytest_cache/",
+]
+
+# Machine-path citation check: a literal absolute path in a canonical source
+# or governance configuration that resolves outside the host root fails
+# closed (WI-6040 acceptance 5).
+check_literal_machine_paths = true
