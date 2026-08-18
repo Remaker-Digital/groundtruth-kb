@@ -11,3 +11,5 @@
 config/agent-control/** text eol=lf
 groundtruth-kb/templates/hooks/** text eol=lf
 groundtruth-kb/templates/skills/** text eol=lf
+.harness-baseline-configuration/hooks/** text eol=lf
+.claude/hooks/** text eol=lf

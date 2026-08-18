@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
 """
-Claude Code PreToolUse hook -- Narrative-artifact approval gate.
+PreToolUse hook -- Narrative-artifact approval gate.
 
 Blocks Write/Edit on narrative-artifact paths (rule files, AGENTS.md,
-CLAUDE*.md) unless the call references a valid
+harness instruction files) unless the call references a valid
 approval packet that proves owner-visible packet display per DELIB-0835.
 
 Slice A of GTKB-NARRATIVE-ARTIFACT-APPROVAL-EXTENSION-001.
 Bridge:    bridge/gtkb-narrative-artifact-approval-extension-001-004.md (GO)
 Specs:     GOV-ARTIFACT-APPROVAL-001 (extended), DCL-ARTIFACT-APPROVAL-HOOK-001 (extended)
 
-Harness scope: Claude only (PreToolUse on Write|Edit). Codex template parity at
-groundtruth-kb/templates/hooks/narrative-artifact-approval-gate.py is
-forward-compatible-only per ADR-CODEX-HOOK-PARITY-FALLBACK-001; it is NOT a
 live Windows interception boundary. Slice C's pre-commit hook is the
 universal enforcement floor.
 
 Stdin:  JSON {"tool_name": "Write|Edit", "tool_input": {"file_path": "...", ...}, ...}
 Stdout: JSON {"decision": "block", "reason": "..."} or {} (allow)
-Exit:   Always 0 (Claude Code hook contract: hook always returns 0; decision is in stdout)
+Exit:   Always 0 (harness hook contract: hook always returns 0; decision is in stdout)
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -64,8 +61,20 @@ VALID_APPROVAL_MODES = {"approve", "acknowledge", "edit-and-approve", "auto"}
 NARRATIVE_ARTIFACT_TYPE = "narrative_artifact"
 
 
+def _normalize_lf(text: str) -> str:
+    """Normalize CRLF and bare CR line endings to LF.
+
+    Owner-approved packets are stored LF-normalized. A Windows Write/Edit tool
+    may carry the same content with CRLF line endings, which would otherwise
+    fail the byte-exact hash/equality checks. Applying this helper before
+    hashing and comparison makes autodiscovery match the packet without
+    mutating the proposed content.
+    """
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
 def _project_root() -> Path:
-    return Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()).resolve()
+    return Path(os.environ.get("{{HARNESS_PROJECT_DIR_VAR}}") or os.getcwd()).resolve()
 
 
 def _emit(decision: dict[str, Any]) -> None:
@@ -82,12 +91,16 @@ def _emit_block(reason: str) -> None:
 
 
 def _record_gate_denial(pattern_id: str, subject: str, reason: str) -> None:
-    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl"))
+    path = Path(
+        os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl")
+    )
     if not path.is_absolute():
         path = _project_root() / path
     record = {
         "schema_version": 1,
-        "timestamp_utc": _dt.datetime.now(tz=_dt.UTC).isoformat().replace("+00:00", "Z"),
+        "timestamp_utc": _dt.datetime.now(tz=_dt.UTC)
+        .isoformat()
+        .replace("+00:00", "Z"),
         "gate": "narrative-artifact-approval-gate",
         "pattern_id": pattern_id,
         "command_hash": hashlib.sha256(subject.encode("utf-8")).hexdigest(),
@@ -149,7 +162,9 @@ def _is_protected(rel_path: str, config: dict[str, Any]) -> bool:
     return not (exempted_patterns and _matches_any(exempted_patterns, rel_path))
 
 
-def _resolve_packet_path(tool_input: dict[str, Any], config: dict[str, Any], root: Path) -> str | None:
+def _resolve_packet_path(
+    tool_input: dict[str, Any], config: dict[str, Any], root: Path
+) -> str | None:
     detection = config.get("hook_detection", {}) or {}
     env_names = detection.get("env_var_names", []) or []
     for name in env_names:
@@ -163,7 +178,9 @@ def _resolve_packet_path(tool_input: dict[str, Any], config: dict[str, Any], roo
     return None
 
 
-def _load_packet(packet_ref: str, root: Path) -> tuple[dict[str, Any] | None, str | None]:
+def _load_packet(
+    packet_ref: str, root: Path
+) -> tuple[dict[str, Any] | None, str | None]:
     try:
         path = Path(packet_ref).expanduser()
         if not path.is_absolute():
@@ -211,8 +228,12 @@ def _validate_packet(
 
     # When the tool call carries the proposed write content, ensure the packet
     # describes the same content. Edit operations may not include full content
-    # in tool_input; we only enforce when content is present.
-    if new_content is not None and new_content != full_content:
+    # in tool_input; we only enforce when content is present. The comparison is
+    # LF-normalized so a Windows Write carrying CRLF bytes still matches the
+    # LF-normalized owner-approved packet (WI-6012).
+    if new_content is not None and _normalize_lf(new_content) != _normalize_lf(
+        full_content
+    ):
         return (
             "approval packet full_content does not match the proposed Write/Edit content "
             "(packet must be regenerated when the content changes)"
@@ -243,7 +264,11 @@ def _reconstruct_edit_content(file_path: str, tool_input: dict[str, Any]) -> str
     """
     old_string = tool_input.get("old_string")
     new_string = tool_input.get("new_string")
-    if not isinstance(old_string, str) or not old_string or not isinstance(new_string, str):
+    if (
+        not isinstance(old_string, str)
+        or not old_string
+        or not isinstance(new_string, str)
+    ):
         return None
     try:
         current = Path(file_path).read_text(encoding="utf-8")
@@ -260,7 +285,9 @@ def _reconstruct_edit_content(file_path: str, tool_input: dict[str, Any]) -> str
     return current.replace(old_string, new_string, 1)
 
 
-def _autodiscover_packet(root: Path, rel_path: str, new_content: str | None) -> str | None:
+def _autodiscover_packet(
+    root: Path, rel_path: str, new_content: str | None
+) -> str | None:
     """HYG-047 (FAB-14): find an owner-approved packet on disk matching THIS write.
 
     Scans .groundtruth/formal-artifact-approvals/*.json newest-first for a packet
@@ -277,7 +304,7 @@ def _autodiscover_packet(root: Path, rel_path: str, new_content: str | None) -> 
     approvals_dir = root / ".groundtruth" / "formal-artifact-approvals"
     if not approvals_dir.is_dir():
         return None
-    target_hash = hashlib.sha256(new_content.encode("utf-8")).hexdigest()
+    target_hash = hashlib.sha256(_normalize_lf(new_content).encode("utf-8")).hexdigest()
     matches: list[tuple[float, str]] = []
     for packet_file in approvals_dir.glob("*.json"):
         try:
@@ -368,7 +395,9 @@ def main() -> None:
 
     packet, parse_error = _load_packet(packet_ref, root)
     if parse_error or packet is None:
-        _emit_block(_block_reason(rel_path, parse_error or "approval packet did not load"))
+        _emit_block(
+            _block_reason(rel_path, parse_error or "approval packet did not load")
+        )
         return
 
     error = _validate_packet(packet, rel_path, new_content)

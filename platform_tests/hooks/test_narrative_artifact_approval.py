@@ -23,12 +23,25 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-HOOK = REPO_ROOT / ".claude" / "hooks" / "narrative-artifact-approval-gate.py"
-CODEX_TEMPLATE = REPO_ROOT / "groundtruth-kb" / "templates" / "hooks" / "narrative-artifact-approval-gate.py"
+HOOK = (
+    REPO_ROOT
+    / ".harness-baseline-configuration"
+    / "hooks"
+    / "narrative-artifact-approval-gate.py"
+)
+CODEX_TEMPLATE = (
+    REPO_ROOT
+    / "groundtruth-kb"
+    / "templates"
+    / "hooks"
+    / "narrative-artifact-approval-gate.py"
+)
 CONFIG_PATH = REPO_ROOT / "config" / "governance" / "narrative-artifact-approval.toml"
 
 
-def _run_hook(payload: dict, env_overrides: dict | None = None, cwd: Path | None = None) -> dict:
+def _run_hook(
+    payload: dict, env_overrides: dict | None = None, cwd: Path | None = None
+) -> dict:
     env = None
     if env_overrides is not None:
         import os
@@ -87,7 +100,9 @@ def test_a_pathset_includes_role_governance_family():
     with CONFIG_PATH.open("rb") as fh:
         config = tomllib.load(fh)
     protected_blocks = config.get("protected_artifacts", [])
-    assert protected_blocks, "narrative-artifact-approval.toml has no protected_artifacts blocks"
+    assert protected_blocks, (
+        "narrative-artifact-approval.toml has no protected_artifacts blocks"
+    )
     patterns: list[str] = []
     for block in protected_blocks:
         patterns.extend(block.get("patterns", []))
@@ -114,7 +129,9 @@ def test_a_pathset_includes_role_governance_family():
 
 def test_a_block_protected_path_without_packet(tmp_path):
     """T-A-block-without-packet: Write to .claude/rules/example.md without a packet is blocked."""
-    target = REPO_ROOT / ".claude" / "rules" / "example.md"  # not real; path-pattern match only
+    target = (
+        REPO_ROOT / ".claude" / "rules" / "example.md"
+    )  # not real; path-pattern match only
     payload = {
         "tool_name": "Write",
         "tool_input": {"file_path": str(target), "content": "new content\n"},
@@ -130,7 +147,10 @@ def test_a_block_agents_md_without_packet():
     target = REPO_ROOT / "AGENTS.md"
     payload = {
         "tool_name": "Write",
-        "tool_input": {"file_path": str(target), "content": "draft AGENTS.md content\n"},
+        "tool_input": {
+            "file_path": str(target),
+            "content": "draft AGENTS.md content\n",
+        },
     }
     result = _run_hook(payload, env_overrides={})
     assert result.get("decision") == "block"
@@ -265,7 +285,10 @@ def test_a_non_protected_paths_allowed():
 
 def test_a_non_write_tool_passes():
     """Read/Bash/etc. tools should pass through unchanged."""
-    payload = {"tool_name": "Read", "tool_input": {"file_path": str(REPO_ROOT / "AGENTS.md")}}
+    payload = {
+        "tool_name": "Read",
+        "tool_input": {"file_path": str(REPO_ROOT / "AGENTS.md")},
+    }
     result = _run_hook(payload, env_overrides={})
     assert result == {}
 
@@ -277,16 +300,21 @@ def test_a_non_write_tool_passes():
 
 def test_a_codex_template_parity_exists_and_matches():
     """T-A-codex-template-parity: forward-compatible Codex template exists and is byte-equivalent
-    to the live Claude hook (per ADR-CODEX-HOOK-PARITY-FALLBACK-001).
+    to the neutral baseline hook (per ADR-CODEX-HOOK-PARITY-FALLBACK-001 and
+    GOV-HARNESS-NEUTRAL-BASELINE-001).
 
-    The template is NOT claimed as a live Windows interception boundary — Codex's `apply_patch`
+    The canonical source is the baseline hook; the generated `.claude/hooks/` copy
+    is refreshed only by the projector (WI-6012). The template is NOT claimed as a
+    live Windows interception boundary — Codex's `apply_patch`
     does not invoke it on Windows. It is filed for forward compatibility and adopter parity
     when distributed via gt project upgrade.
     """
     assert CODEX_TEMPLATE.exists(), f"Codex template missing at {CODEX_TEMPLATE}"
-    claude_bytes = HOOK.read_bytes()
+    baseline_bytes = HOOK.read_bytes()
     template_bytes = CODEX_TEMPLATE.read_bytes()
-    assert claude_bytes == template_bytes, "Codex template must be byte-equivalent to Claude hook"
+    assert baseline_bytes == template_bytes, (
+        "Codex template must be byte-equivalent to baseline hook"
+    )
 
 
 def test_a_codex_hooks_json_does_not_claim_narrative_gate_on_windows():
@@ -303,6 +331,44 @@ def test_a_codex_hooks_json_does_not_claim_narrative_gate_on_windows():
         "as a live Codex hook (forward-compatible template only per "
         "ADR-CODEX-HOOK-PARITY-FALLBACK-001)"
     )
+
+
+# ---------------------------------------------------------------------------
+# T-A-crlf-autodiscovery (WI-6012)
+# ---------------------------------------------------------------------------
+
+
+def test_a_autodiscovery_allows_crlf_write_matching_lf_packet(tmp_path):
+    """T-A-crlf-autodiscovery: a Write whose proposed content differs from the
+    packet full_content only by CRLF line endings is allowed via on-disk packet
+    autodiscovery (WI-6012 LF-normalize fix).
+
+    Regression for the Windows defect where `_autodiscover_packet` hashed
+    `new_content` bytes as-is and `_validate_packet` compared raw bytes, so a
+    CRLF Write never matched an LF owner-approved packet.
+    """
+    rel_target = ".claude/rules/example.md"
+    target = REPO_ROOT / rel_target
+    approved_lf = "line one\nline two\n"
+    crlf_write = "line one\r\nline two\r\n"
+
+    # The packet records LF content (as stored by the approval pipeline).
+    packet = _make_packet(rel_target, approved_lf)
+    approvals_dir = REPO_ROOT / ".groundtruth" / "formal-artifact-approvals"
+    approvals_dir.mkdir(parents=True, exist_ok=True)
+    packet_path = approvals_dir / "wi6012-crlf-autodiscovery-test.json"
+    packet_path.write_text(json.dumps(packet), encoding="utf-8")
+    try:
+        payload = {
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(target), "content": crlf_write},
+        }
+        result = _run_hook(payload, env_overrides={})
+        assert result == {}, (
+            f"expected allow via CRLF-normalized autodiscovery, got {result!r}"
+        )
+    finally:
+        packet_path.unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------------------
