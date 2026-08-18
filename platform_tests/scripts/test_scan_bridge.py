@@ -1,17 +1,26 @@
-"""Unit tests for .codex/skills/bridge/helpers/scan_bridge.py."""
+"""Unit tests for scripts/skill-helpers/gtkb-bridge/scan_bridge.py."""
 
 from __future__ import annotations
 
 import importlib.util
+import json
 import sqlite3
 from pathlib import Path
 
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-HELPER_PATH = PROJECT_ROOT / ".codex" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
+HELPER_PATH = (
+    PROJECT_ROOT / "scripts" / "skill-helpers" / "gtkb-bridge" / "scan_bridge.py"
+)
 TEMPLATE_HELPER_PATH = (
-    PROJECT_ROOT / "groundtruth-kb" / "templates" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
+    PROJECT_ROOT
+    / "groundtruth-kb"
+    / "templates"
+    / "skills"
+    / "gtkb-bridge"
+    / "helpers"
+    / "scan_bridge.py"
 )
 
 
@@ -55,7 +64,8 @@ def _normalized_scan_result(result: dict) -> dict:
         "role": result["role"],
         "summary": result["summary"],
         "actionable": sorted(
-            (thread["document"], thread["latest_status"], thread["latest_path"]) for thread in result["actionable"]
+            (thread["document"], thread["latest_status"], thread["latest_path"])
+            for thread in result["actionable"]
         ),
         "blocked": sorted(
             (
@@ -203,12 +213,20 @@ def test_compact_live_scan_bounds_reads_and_matches_full_classification(
         encoding="utf-8",
     )
 
-    _write_version(bridge_dir, "gtkb-go", 1, "NEW", bridge_kind="implementation_proposal")
+    _write_version(
+        bridge_dir, "gtkb-go", 1, "NEW", bridge_kind="implementation_proposal"
+    )
     _write_version(bridge_dir, "gtkb-go", 2, "NO-GO")
-    _write_version(bridge_dir, "gtkb-go", 3, "REVISED", bridge_kind="implementation_proposal")
+    _write_version(
+        bridge_dir, "gtkb-go", 3, "REVISED", bridge_kind="implementation_proposal"
+    )
     _write_version(bridge_dir, "gtkb-go", 4, "GO")
-    _write_version(bridge_dir, "gtkb-new", 1, "NEW", bridge_kind="implementation_proposal")
-    _write_version(bridge_dir, "gtkb-archived", 1, "NEW", bridge_kind="implementation_proposal")
+    _write_version(
+        bridge_dir, "gtkb-new", 1, "NEW", bridge_kind="implementation_proposal"
+    )
+    _write_version(
+        bridge_dir, "gtkb-archived", 1, "NEW", bridge_kind="implementation_proposal"
+    )
     for version in range(1, 13):
         status = "VERIFIED" if version == 12 else ("GO" if version % 2 == 0 else "NEW")
         _write_version(
@@ -252,7 +270,9 @@ def test_template_compact_scan_bounds_reads_and_matches_full_classification(
     tmp_path,
     role,
 ) -> None:
-    template_helper = _load_module(TEMPLATE_HELPER_PATH, f"scan_bridge_template_compact_{role}")
+    template_helper = _load_module(
+        TEMPLATE_HELPER_PATH, f"scan_bridge_template_compact_{role}"
+    )
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     statuses = {
@@ -268,7 +288,9 @@ def test_template_compact_scan_bounds_reads_and_matches_full_classification(
                 slug,
                 version,
                 latest_status,
-                bridge_kind="implementation_proposal" if latest_status in {"NEW", "REVISED"} else None,
+                bridge_kind="implementation_proposal"
+                if latest_status in {"NEW", "REVISED"}
+                else None,
             )
 
     status_reads: list[str] = []
@@ -278,7 +300,9 @@ def test_template_compact_scan_bounds_reads_and_matches_full_classification(
         status_reads.append(Path(path).name)
         return original_status_reader(path)
 
-    monkeypatch.setattr(template_helper, "_status_from_bridge_file", counted_status_reader)
+    monkeypatch.setattr(
+        template_helper, "_status_from_bridge_file", counted_status_reader
+    )
     index_path = bridge_dir / "state.md"
 
     full = template_helper.scan(role=role, index_path=index_path)
@@ -327,7 +351,13 @@ NEW: bridge/gtkb-e-001.md
     assert lo_docs == {"gtkb-b", "gtkb-e"}  # NEW + REVISED
 
     assert {t["document"] for t in prime_result["terminal_verified"]} == {"gtkb-c"}
-    assert prime_result["summary"] == {"GO": 1, "NEW": 1, "VERIFIED": 1, "NO-GO": 1, "REVISED": 1}
+    assert prime_result["summary"] == {
+        "GO": 1,
+        "NEW": 1,
+        "VERIFIED": 1,
+        "NO-GO": 1,
+        "REVISED": 1,
+    }
 
 
 def test_t8_comment_header_skipped(helper) -> None:
@@ -362,7 +392,13 @@ NEW: bridge/gtkb-foo-001.md
 """
     result = helper.scan(role="loyal-opposition", index_text=index)
     chain = result["actionable"][0]["version_chain"]
-    assert [v["status"] for v in chain] == ["REVISED", "NO-GO", "REVISED", "NO-GO", "NEW"]
+    assert [v["status"] for v in chain] == [
+        "REVISED",
+        "NO-GO",
+        "REVISED",
+        "NO-GO",
+        "NEW",
+    ]
     assert chain[0]["path"] == "bridge/gtkb-foo-005.md"
 
 
@@ -375,7 +411,9 @@ def test_generated_at_iso_format(helper) -> None:
 # --- Terminal-kind GO filtering (WI-4278; gtkb-manual-bridge-scan-terminal-go-filter) ---
 
 
-def _write_bridge_thread(bridge_dir: Path, slug: str, operative_kind: str, latest_status: str) -> None:
+def _write_bridge_thread(
+    bridge_dir: Path, slug: str, operative_kind: str, latest_status: str
+) -> None:
     """Write the operative Prime proposal file for a thread.
 
     Only the operative (NEW) file needs to exist; classification reads
@@ -390,7 +428,9 @@ def _write_bridge_thread(bridge_dir: Path, slug: str, operative_kind: str, lates
 
 def _write_current_work_items(root: Path, rows: dict[str, str]) -> None:
     with sqlite3.connect(root / "groundtruth.db") as con:
-        con.execute("CREATE TABLE current_work_items (id TEXT PRIMARY KEY, resolution_status TEXT)")
+        con.execute(
+            "CREATE TABLE current_work_items (id TEXT PRIMARY KEY, resolution_status TEXT)"
+        )
         con.executemany(
             "INSERT INTO current_work_items (id, resolution_status) VALUES (?, ?)",
             sorted(rows.items()),
@@ -446,7 +486,9 @@ def test_terminal_kind_go_excluded_from_prime(helper, tmp_path) -> None:
 
 def test_template_terminal_work_item_go_moved_to_blocked_bucket(tmp_path) -> None:
     """The managed helper template excludes GO/NO-GO entries whose MemBase WI is terminal."""
-    template_helper = _load_module(TEMPLATE_HELPER_PATH, "scan_bridge_template_terminal_wi")
+    template_helper = _load_module(
+        TEMPLATE_HELPER_PATH, "scan_bridge_template_terminal_wi"
+    )
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     _write_work_item_bridge_thread(bridge_dir, "gtkb-terminal-wi", "NO-GO", "WI-5002")
@@ -454,13 +496,17 @@ def test_template_terminal_work_item_go_moved_to_blocked_bucket(tmp_path) -> Non
     index = "Document: gtkb-terminal-wi\nNO-GO: bridge/gtkb-terminal-wi-002.md\nNEW: bridge/gtkb-terminal-wi-001.md\n"
     index_path = bridge_dir / "state.md"
 
-    result = template_helper.scan(role="prime-builder", index_text=index, index_path=index_path)
+    result = template_helper.scan(
+        role="prime-builder", index_text=index, index_path=index_path
+    )
 
     assert result["actionable"] == []
     assert len(result["blocked_non_activatable"]) == 1
     assert result["blocked_non_activatable"][0]["document"] == "gtkb-terminal-wi"
     assert result["blocked_non_activatable"][0]["latest_status"] == "NO-GO"
-    assert result["blocked_non_activatable"][0]["reasons"] == ["referenced work item terminal (WI-5002=retired)"]
+    assert result["blocked_non_activatable"][0]["reasons"] == [
+        "referenced work item terminal (WI-5002=retired)"
+    ]
 
 
 def test_terminal_kind_does_not_affect_lo(helper, tmp_path) -> None:
@@ -506,14 +552,19 @@ def test_actionable_status_sets_parity_with_shared_disposition(helper) -> None:
     from groundtruth_kb.bridge import disposition
 
     assert helper.PRIME_ACTIONABLE_STATUSES == disposition.PRIME_ACTIONABLE_STATUSES
-    assert helper.LO_ACTIONABLE_STATUSES == disposition.LOYAL_OPPOSITION_ACTIONABLE_STATUSES
+    assert (
+        helper.LO_ACTIONABLE_STATUSES
+        == disposition.LOYAL_OPPOSITION_ACTIONABLE_STATUSES
+    )
 
 
 def test_template_terminal_tokens_parity_with_live_helper(helper) -> None:
     """The managed template helper must not drift from the live helper."""
     template_helper = _load_module(TEMPLATE_HELPER_PATH, "scan_bridge_template")
 
-    assert set(template_helper._KIND_TERMINAL_TOKENS) == set(helper._KIND_TERMINAL_TOKENS)
+    assert set(template_helper._KIND_TERMINAL_TOKENS) == set(
+        helper._KIND_TERMINAL_TOKENS
+    )
 
 
 def test_advisory_actionable_for_prime_not_lo(helper) -> None:
@@ -535,7 +586,11 @@ ADVISORY: bridge/gtkb-foo-advisory-001.md
 
 
 def test_non_activatable_go_moved_to_blocked_bucket(helper, monkeypatch) -> None:
-    monkeypatch.setattr(helper, "_go_activatable", lambda _root, _bridge_id: (False, ["missing spec links"]))
+    monkeypatch.setattr(
+        helper,
+        "_go_activatable",
+        lambda _root, _bridge_id: (False, ["missing spec links"]),
+    )
     index = """\
 Document: gtkb-dead-end
 GO: bridge/gtkb-dead-end-002.md
@@ -547,7 +602,9 @@ NEW: bridge/gtkb-dead-end-001.md
     assert result["actionable"] == []
     assert len(result["blocked_non_activatable"]) == 1
     assert result["blocked_non_activatable"][0]["document"] == "gtkb-dead-end"
-    assert result["blocked_non_activatable"][0]["go_file"] == "bridge/gtkb-dead-end-002.md"
+    assert (
+        result["blocked_non_activatable"][0]["go_file"] == "bridge/gtkb-dead-end-002.md"
+    )
     assert result["blocked_non_activatable"][0]["reasons"] == ["missing spec links"]
 
 
@@ -567,7 +624,9 @@ NEW: bridge/gtkb-ready-001.md
 
 def test_blocked_go_carries_begin_gate_reasons(helper, monkeypatch, tmp_path) -> None:
     def fail_packet(_project_root, _bridge_id):
-        raise helper.AuthorizationError("missing spec links; missing ## Requirement Sufficiency")
+        raise helper.AuthorizationError(
+            "missing spec links; missing ## Requirement Sufficiency"
+        )
 
     monkeypatch.setattr(helper, "create_authorization_packet", fail_packet)
 
@@ -577,7 +636,9 @@ def test_blocked_go_carries_begin_gate_reasons(helper, monkeypatch, tmp_path) ->
     assert reasons == ["missing spec links", "missing ## Requirement Sufficiency"]
 
 
-def test_prefix_named_go_still_runs_activatability(helper, monkeypatch, tmp_path) -> None:
+def test_prefix_named_go_still_runs_activatability(
+    helper, monkeypatch, tmp_path
+) -> None:
     def fail_packet(_project_root, _bridge_id):
         raise helper.AuthorizationError("self-review refused")
 
@@ -589,11 +650,15 @@ def test_prefix_named_go_still_runs_activatability(helper, monkeypatch, tmp_path
     assert reasons == ["self-review refused"]
 
 
-def test_dispatch_terminal_go_still_filtered_before_activatability(helper, monkeypatch, tmp_path) -> None:
+def test_dispatch_terminal_go_still_filtered_before_activatability(
+    helper, monkeypatch, tmp_path
+) -> None:
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     _write_bridge_thread(bridge_dir, "gtkb-gov", "governance_review", "GO")
-    index = "Document: gtkb-gov\nGO: bridge/gtkb-gov-002.md\nNEW: bridge/gtkb-gov-001.md\n"
+    index = (
+        "Document: gtkb-gov\nGO: bridge/gtkb-gov-002.md\nNEW: bridge/gtkb-gov-001.md\n"
+    )
     index_path = bridge_dir / "state.md"
 
     def should_not_run(_root, _bridge_id):
@@ -623,5 +688,153 @@ ADVISORY: bridge/gtkb-advisory-001.md
 
     result = helper.scan(role="prime-builder", index_text=index)
 
-    assert {thread["document"] for thread in result["actionable"]} == {"gtkb-nogo", "gtkb-advisory"}
+    assert {thread["document"] for thread in result["actionable"]} == {
+        "gtkb-nogo",
+        "gtkb-advisory",
+    }
     assert result["blocked_non_activatable"] == []
+
+
+def test_many_version_compact_cli_completes_in_bound_and_prints_json(
+    helper, tmp_path, monkeypatch, capsys
+) -> None:
+    """WI-6607 (a): many-version compact scan completes inside the bound and prints JSON."""
+    monkeypatch.setenv(helper._COMPLETION_BOUND_ENV, "60")
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    for index in range(25):
+        slug = f"gtkb-many-{index:03d}"
+        for version in range(1, 13):
+            if version == 1:
+                status = "NEW"
+            elif version == 12:
+                status = "GO"
+            else:
+                status = "REVISED" if version % 2 else "NO-GO"
+            _write_version(
+                bridge_dir,
+                slug,
+                version,
+                status,
+                bridge_kind="implementation_proposal"
+                if status in {"NEW", "REVISED"}
+                else None,
+            )
+    index_path = bridge_dir / "state.md"
+
+    rc = helper.main(
+        [
+            "--role",
+            "prime-builder",
+            "--compact",
+            "--format",
+            "json",
+            "--index-path",
+            str(index_path),
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert rc == 0
+    assert captured.err == ""
+    payload = json.loads(captured.out)
+    assert payload["compact"] is True
+    assert payload["role"] == "prime-builder"
+    assert len(payload["actionable"]) == 25
+    assert all(thread["latest_status"] == "GO" for thread in payload["actionable"])
+
+
+def test_compact_prime_scan_does_not_call_create_authorization_packet(
+    helper, monkeypatch, tmp_path
+) -> None:
+    """WI-6607 (b): compact Prime listing does not mint packets or call _go_activatable."""
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    _write_version(
+        bridge_dir, "gtkb-ready", 1, "NEW", bridge_kind="implementation_proposal"
+    )
+    _write_version(bridge_dir, "gtkb-ready", 2, "GO")
+    index_path = bridge_dir / "state.md"
+
+    def boom_packet(*_args, **_kwargs):
+        raise AssertionError("create_authorization_packet must not run in compact mode")
+
+    def boom_activatable(*_args, **_kwargs):
+        raise AssertionError("_go_activatable must not run in compact mode")
+
+    monkeypatch.setattr(helper, "create_authorization_packet", boom_packet)
+    monkeypatch.setattr(helper, "_go_activatable", boom_activatable)
+
+    result = helper.scan(role="prime-builder", index_path=index_path, compact=True)
+
+    assert [thread["document"] for thread in result["actionable"]] == ["gtkb-ready"]
+    assert result["blocked_non_activatable"] == []
+
+
+def test_expired_deadline_fails_closed_named_stderr_empty_stdout(
+    helper, tmp_path, monkeypatch, capsys
+) -> None:
+    """WI-6607 (c): expired bound fails closed with named stderr and no stdout."""
+    monkeypatch.setenv(helper._COMPLETION_BOUND_ENV, "0")
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    _write_version(
+        bridge_dir, "gtkb-timeout", 1, "NEW", bridge_kind="implementation_proposal"
+    )
+    index_path = bridge_dir / "state.md"
+
+    with pytest.raises(helper.ScanBridgeCompletionBoundExceeded) as excinfo:
+        helper.scan(role="prime-builder", index_path=index_path, compact=True)
+    assert helper.SCAN_BRIDGE_COMPLETION_BOUND_EXCEEDED in str(excinfo.value)
+
+    rc = helper.main(
+        [
+            "--role",
+            "prime-builder",
+            "--compact",
+            "--format",
+            "json",
+            "--index-path",
+            str(index_path),
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert rc != 0
+    assert captured.out == ""
+    assert helper.SCAN_BRIDGE_COMPLETION_BOUND_EXCEEDED in captured.err
+    assert "elapsed" in captured.err
+    assert "limit" in captured.err
+
+
+def test_status_reads_do_not_consume_bytes_past_header_budget(
+    helper, tmp_path, monkeypatch
+) -> None:
+    """WI-6607 (d): status reads cap at _HEADER_READ_BUDGET_BYTES."""
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    oversized = "NEW\n" + ("x" * (helper._HEADER_READ_BUDGET_BYTES * 4))
+    path = bridge_dir / "gtkb-header-budget-001.md"
+    path.write_text(oversized, encoding="utf-8")
+
+    read_sizes: list[int] = []
+    original_open = Path.open
+
+    def wrapping_open(self, *args, **kwargs):
+        handle = original_open(self, *args, **kwargs)
+        orig_read = handle.read
+
+        def counted_read(size=-1):
+            read_sizes.append(size)
+            return orig_read(size)
+
+        handle.read = counted_read
+        return handle
+
+    monkeypatch.setattr(Path, "open", wrapping_open)
+
+    assert helper._status_from_bridge_file(path) == "NEW"
+    assert read_sizes
+    assert all(
+        size != -1 and size <= helper._HEADER_READ_BUDGET_BYTES for size in read_sizes
+    )

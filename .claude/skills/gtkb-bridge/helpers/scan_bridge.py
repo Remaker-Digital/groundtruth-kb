@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """Bridge scanner: role-filtered actionable list.
 
 Reads status-bearing versioned bridge files and emits a structured summary of
 which threads need attention from the calling harness based on its durable
 operating role.
 
-Filter rules (per ``.claude/rules/file-bridge-protocol.md``):
+Filter rules (per ``.harness-baseline-configuration/rules/file-bridge-protocol.md``):
 
 - ``prime-builder`` acts on latest ``NO-GO`` (revise) and latest ``GO``
   (implement) — EXCEPT a latest ``GO`` whose operative Prime proposal carries a
@@ -31,11 +37,11 @@ terminal). Parity with the canonical token set is asserted by
 ``platform_tests/scripts/test_scan_bridge.py``.
 
 The helper performs no mutations and is idempotent. It implements the manual
-Scan procedure documented in ``.claude/skills/bridge/SKILL.md``.
+Scan procedure documented in ``.harness-baseline-configuration/skills/gtkb-bridge/SKILL.md``.
 
 CLI usage:
 
-  python .claude/skills/bridge/helpers/scan_bridge.py --role prime-builder [--format json|markdown]
+  python scripts/skill-helpers/gtkb-bridge/scan_bridge.py --role prime-builder [--format json|markdown]
 
 Public API:
 
@@ -46,15 +52,32 @@ Public API:
 from __future__ import annotations
 
 import argparse
+import contextvars
 import datetime as _dt
 import json
+import os
 import re
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
+
+def _discover_project_root() -> Path:
+    """Ascend to the directory holding a stable repository marker.
+
+    Depth-independent, unlike a bare ``parents[N]`` index: correct wherever the
+    helper is placed. Replaces ``parents[4]``, which resolved one level *above*
+    the project root from this module's depth (WI-6444).
+    """
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "scripts" / "bridge_author_metadata.py").is_file():
+            return parent
+    return Path(__file__).resolve().parents[3]
+
+
+PROJECT_ROOT = _discover_project_root()
 DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
@@ -79,10 +102,12 @@ LO_ACTIONABLE_STATUSES = MATRIX_LOYAL_OPPOSITION_ACTIONABLE_STATUSES
 TERMINAL_STATUSES = MATRIX_VERIFIED_CONTEXT_STATUSES
 
 # Prime-authored proposal statuses. ``bridge_kind`` metadata lives on the
-# operative Prime proposal (latest NEW/REVISED), NOT on the Codex GO verdict.
+# operative Prime proposal (latest NEW/REVISED), NOT on the Loyal Opposition GO verdict.
 _PRIME_VERSION_STATUSES = frozenset({"NEW", "REVISED"})
 _NONTERMINAL_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO", "NO-ACTION"})
-_ARCHIVE_TERMINAL_STATUSES = frozenset({"VERIFIED", "WITHDRAWN", "DEFERRED", "ADVISORY", "ACCEPTED"})
+_ARCHIVE_TERMINAL_STATUSES = frozenset(
+    {"VERIFIED", "WITHDRAWN", "DEFERRED", "ADVISORY", "ACCEPTED"}
+)
 _IMPLEMENTATION_SIBLING_SUFFIX = "-implementation"
 
 # Terminal-kind ``bridge_kind`` substring tokens. MIRROR of
@@ -95,6 +120,56 @@ _KIND_TERMINAL_TOKENS = MATRIX_BRIDGE_KIND_TERMINAL_TOKENS
 
 # Header read budget (bytes). ``bridge_kind`` is always in the header section.
 _HEADER_READ_BUDGET_BYTES = 4096
+_COMPLETION_BOUND_ENV = "GTKB_SCAN_BRIDGE_COMPLETION_BOUND_SECONDS"
+_DEFAULT_COMPLETION_BOUND_SECONDS = 60.0
+SCAN_BRIDGE_COMPLETION_BOUND_EXCEEDED = "SCAN_BRIDGE_COMPLETION_BOUND_EXCEEDED"
+
+
+class ScanBridgeCompletionBoundExceeded(RuntimeError):
+    """Fail-closed when a scan exceeds the documented wall-clock bound."""
+
+    token = SCAN_BRIDGE_COMPLETION_BOUND_EXCEEDED
+
+    def __init__(self, elapsed_seconds: float, limit_seconds: float) -> None:
+        self.elapsed_seconds = elapsed_seconds
+        self.limit_seconds = limit_seconds
+        super().__init__(
+            f"{self.token}: elapsed {elapsed_seconds:.3f}s exceeds limit {limit_seconds:.3f}s"
+        )
+
+
+@dataclass(frozen=True)
+class _ScanDeadline:
+    started: float
+    limit_seconds: float
+
+    @classmethod
+    def start(cls) -> _ScanDeadline:
+        raw = os.environ.get(
+            _COMPLETION_BOUND_ENV, str(_DEFAULT_COMPLETION_BOUND_SECONDS)
+        )
+        try:
+            limit = float(raw)
+        except ValueError:
+            limit = _DEFAULT_COMPLETION_BOUND_SECONDS
+        return cls(started=time.monotonic(), limit_seconds=limit)
+
+    def check(self) -> None:
+        elapsed = time.monotonic() - self.started
+        if elapsed >= self.limit_seconds:
+            raise ScanBridgeCompletionBoundExceeded(elapsed, self.limit_seconds)
+
+
+_SCAN_DEADLINE: contextvars.ContextVar[_ScanDeadline | None] = contextvars.ContextVar(
+    "scan_bridge_deadline", default=None
+)
+
+
+def _check_deadline() -> None:
+    deadline = _SCAN_DEADLINE.get()
+    if deadline is not None:
+        deadline.check()
+
 
 _STATUS_LINE_RE = re.compile(
     r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|NO-ACTION|ACCEPTED|BLOCKED):\s*(bridge/.+\.md)\s*$"
@@ -182,14 +257,18 @@ def _parse_index(index_text: str) -> list[ThreadEntry]:
             continue
         m_status = _STATUS_LINE_RE.match(line)
         if m_status and current_doc is not None:
-            current_versions.append(VersionEntry(status=m_status.group(1), path=m_status.group(2)))
+            current_versions.append(
+                VersionEntry(status=m_status.group(1), path=m_status.group(2))
+            )
     flush()
     return threads
 
 
 def _status_from_bridge_file(path: Path) -> str | None:
+    _check_deadline()
     try:
-        text = path.read_text(encoding="utf-8", errors="replace")
+        with path.open("r", encoding="utf-8", errors="replace") as handle:
+            text = handle.read(_HEADER_READ_BUDGET_BYTES)
     except OSError:
         return None
     for line in text.splitlines():
@@ -201,9 +280,14 @@ def _status_from_bridge_file(path: Path) -> str | None:
     return None
 
 
-def _thread_from_rows(slug: str, rows: list[tuple[int, str, str]]) -> ThreadEntry | None:
+def _thread_from_rows(
+    slug: str, rows: list[tuple[int, str, str]]
+) -> ThreadEntry | None:
     ordered = sorted(rows, key=lambda row: row[0], reverse=True)
-    versions = tuple(VersionEntry(status=status, path=rel_path) for _version, status, rel_path in ordered)
+    versions = tuple(
+        VersionEntry(status=status, path=rel_path)
+        for _version, status, rel_path in ordered
+    )
     if not versions:
         return None
     return ThreadEntry(
@@ -214,11 +298,15 @@ def _thread_from_rows(slug: str, rows: list[tuple[int, str, str]]) -> ThreadEntr
     )
 
 
-def _inventory_version_files(project_root: Path) -> dict[str, list[tuple[int, Path, str]]]:
+def _inventory_version_files(
+    project_root: Path,
+) -> dict[str, list[tuple[int, Path, str]]]:
     """Group numbered files by slug without reading bridge content."""
     bridge_dir = project_root / "bridge"
     grouped: dict[str, list[tuple[int, Path, str]]] = {}
+    _check_deadline()
     for path in bridge_dir.glob("*.md"):
+        _check_deadline()
         match = _VERSION_FILE_RE.match(path.name)
         if not match:
             continue
@@ -234,9 +322,12 @@ def _inventory_version_files(project_root: Path) -> dict[str, list[tuple[int, Pa
     return grouped
 
 
-def _scan_rows_from_version_files(project_root: Path) -> dict[str, list[tuple[int, str, str]]]:
+def _scan_rows_from_version_files(
+    project_root: Path,
+) -> dict[str, list[tuple[int, str, str]]]:
     grouped: dict[str, list[tuple[int, str, str]]] = {}
     for slug, version_files in _inventory_version_files(project_root).items():
+        _check_deadline()
         for version, path, rel_path in version_files:
             status = _status_from_bridge_file(path)
             if status is not None:
@@ -255,6 +346,7 @@ def _compact_thread_from_version_files(
     need_prime_ancestry = False
 
     for index, (_version, path, rel_path) in enumerate(version_files):
+        _check_deadline()
         status = _status_from_bridge_file(path)
         if index == 0:
             physical_latest_status = status
@@ -290,13 +382,18 @@ def _compact_threads_from_version_files(
     threads_by_slug: dict[str, ThreadEntry] = {}
     physical_latest_statuses: dict[str, str | None] = {}
     for slug, version_files in inventory.items():
-        thread, physical_latest_status = _compact_thread_from_version_files(slug, version_files, role)
+        _check_deadline()
+        thread, physical_latest_status = _compact_thread_from_version_files(
+            slug, version_files, role
+        )
         physical_latest_statuses[slug] = physical_latest_status
         if thread is not None:
             threads_by_slug[slug] = thread
 
     try:
-        from groundtruth_kb.bridge.versioned_files import load_acknowledged_archived_slugs
+        from groundtruth_kb.bridge.versioned_files import (
+            load_acknowledged_archived_slugs,
+        )
 
         acknowledged = load_acknowledged_archived_slugs(project_root)
     except Exception:
@@ -306,7 +403,9 @@ def _compact_threads_from_version_files(
     for slug, physical_status in physical_latest_statuses.items():
         if physical_status not in _NONTERMINAL_STATUSES:
             continue
-        sibling_status = physical_latest_statuses.get(f"{slug}{_IMPLEMENTATION_SIBLING_SUFFIX}")
+        sibling_status = physical_latest_statuses.get(
+            f"{slug}{_IMPLEMENTATION_SIBLING_SUFFIX}"
+        )
         if slug in acknowledged or sibling_status in _ARCHIVE_TERMINAL_STATUSES:
             archived_slugs.add(slug)
 
@@ -345,7 +444,9 @@ def _acknowledged_archived_nonterminal_slugs(project_root: Path) -> set[str]:
     return archived
 
 
-def _render_state_from_version_files_with_archived(project_root: Path) -> tuple[str, list[ThreadEntry]]:
+def _render_state_from_version_files_with_archived(
+    project_root: Path,
+) -> tuple[str, list[ThreadEntry]]:
     grouped = _scan_rows_from_version_files(project_root)
     archived_slugs = _acknowledged_archived_nonterminal_slugs(project_root)
     lines: list[str] = []
@@ -357,14 +458,18 @@ def _render_state_from_version_files_with_archived(project_root: Path) -> tuple[
                 excluded_archived.append(thread)
             continue
         lines.append(f"Document: {slug}")
-        for _version, status, rel_path in sorted(grouped[slug], key=lambda row: row[0], reverse=True):
+        for _version, status, rel_path in sorted(
+            grouped[slug], key=lambda row: row[0], reverse=True
+        ):
             lines.append(f"{status}: {rel_path}")
         lines.append("")
     return "\n".join(lines), excluded_archived
 
 
 def _render_state_from_version_files(project_root: Path) -> str:
-    text, _excluded_archived = _render_state_from_version_files_with_archived(project_root)
+    text, _excluded_archived = _render_state_from_version_files_with_archived(
+        project_root
+    )
     return text
 
 
@@ -393,6 +498,7 @@ def _is_terminal_kind_go(thread: ThreadEntry, project_root: Path) -> bool:
     rel_path = _operative_prime_path(thread)
     if rel_path is None:
         return False
+    _check_deadline()
     full_path = project_root / rel_path
     try:
         with full_path.open("r", encoding="utf-8") as fh:
@@ -420,6 +526,7 @@ def _go_activatable(project_root: Path, bridge_id: str) -> tuple[bool, list[str]
     file-chain cases fail open so old scan-shape tests stay focused on role
     routing.
     """
+    _check_deadline()
     try:
         create_authorization_packet(project_root, bridge_id)
     except AuthorizationError as exc:
@@ -427,7 +534,8 @@ def _go_activatable(project_root: Path, bridge_id: str) -> tuple[bool, list[str]
         if (
             "Bridge document not found as exact numbered files" in message
             or "Bridge document not found as versioned files" in message
-            or "Implementation authorization requires a GO in the bridge chain" in message
+            or "Implementation authorization requires a GO in the bridge chain"
+            in message
             or "No approved proposal file found under GO" in message
         ):
             return True, []
@@ -436,7 +544,11 @@ def _go_activatable(project_root: Path, bridge_id: str) -> tuple[bool, list[str]
 
 
 def _role_filter(
-    threads: list[ThreadEntry], role: Role, project_root: Path
+    threads: list[ThreadEntry],
+    role: Role,
+    project_root: Path,
+    *,
+    check_activatable: bool = True,
 ) -> tuple[list[ThreadEntry], list[ThreadEntry], list[dict[str, Any]]]:
     """Return (actionable, terminal_verified) for the given role.
 
@@ -444,26 +556,33 @@ def _role_filter(
     a terminal-kind ``bridge_kind`` is excluded — the GO is the deliverable with
     no Prime implementation follow-up. A latest ``NO-GO`` is never excluded
     (Prime must revise regardless of kind). ``loyal-opposition`` is unaffected.
+    Compact scans skip ``_go_activatable`` / packet mint (WI-6607); latest GO
+    threads stay in the compact actionable list. Activatability remains an
+    implementation-start concern.
     """
     if role not in {"prime-builder", "loyal-opposition"}:
-        raise ValueError(f"Unknown role {role!r}; expected 'prime-builder' or 'loyal-opposition'")
+        raise ValueError(
+            f"Unknown role {role!r}; expected 'prime-builder' or 'loyal-opposition'"
+        )
 
     actionable: list[ThreadEntry] = []
     blocked_non_activatable: list[dict[str, Any]] = []
     for t in threads:
+        _check_deadline()
         decision = disposition_for_status(t.latest_status, role)
         if not decision.actionable:
             continue
         if role == "prime-builder" and t.latest_status == "GO":
             if _is_terminal_kind_go(t, project_root):
                 continue
-            activatable, reasons = _go_activatable(project_root, t.document)
-            if not activatable:
-                blocked = t.to_dict()
-                blocked["go_file"] = t.latest_path
-                blocked["reasons"] = reasons
-                blocked_non_activatable.append(blocked)
-                continue
+            if check_activatable:
+                activatable, reasons = _go_activatable(project_root, t.document)
+                if not activatable:
+                    blocked = t.to_dict()
+                    blocked["go_file"] = t.latest_path
+                    blocked["reasons"] = reasons
+                    blocked_non_activatable.append(blocked)
+                    continue
         actionable.append(t)
     terminal_verified = [t for t in threads if t.latest_status in TERMINAL_STATUSES]
     return actionable, terminal_verified, blocked_non_activatable
@@ -485,9 +604,12 @@ def _compact_scan_result(result: dict[str, Any]) -> dict[str, Any]:
     """Suppress terminal VERIFIED/archive payloads; keep actionable summaries only."""
     compact = dict(result)
     compact["compact"] = True
-    compact["actionable"] = [_compact_thread_dict(thread) for thread in result.get("actionable", [])]
+    compact["actionable"] = [
+        _compact_thread_dict(thread) for thread in result.get("actionable", [])
+    ]
     compact["blocked_non_activatable"] = [
-        _compact_thread_dict(thread) for thread in result.get("blocked_non_activatable", [])
+        _compact_thread_dict(thread)
+        for thread in result.get("blocked_non_activatable", [])
     ]
     compact["terminal_verified_count"] = len(result.get("terminal_verified", []))
     compact["excluded_archived_count"] = len(result.get("excluded_archived", []))
@@ -519,40 +641,55 @@ def scan(
           - ``summary``: counts by latest-status across all threads.
           - ``generated_at``: ISO-8601 UTC timestamp.
     """
-    threads: list[ThreadEntry] | None = None
-    if index_text is None:
-        project_root = index_path.resolve().parent.parent if index_path is not None else PROJECT_ROOT
-        if compact:
-            threads, excluded_archived = _compact_threads_from_version_files(project_root, role)
+    token = _SCAN_DEADLINE.set(_ScanDeadline.start())
+    try:
+        _check_deadline()
+        threads: list[ThreadEntry] | None = None
+        if index_text is None:
+            project_root = (
+                index_path.resolve().parent.parent
+                if index_path is not None
+                else PROJECT_ROOT
+            )
+            if compact:
+                threads, excluded_archived = _compact_threads_from_version_files(
+                    project_root, role
+                )
+            else:
+                index_text, excluded_archived = (
+                    _render_state_from_version_files_with_archived(project_root)
+                )
+        elif index_path is not None:
+            # Inline text but an explicit index path: resolve operative bridge files
+            # relative to that path's project root (used by terminal-kind tests).
+            project_root = index_path.resolve().parent.parent
+            excluded_archived = []
         else:
-            index_text, excluded_archived = _render_state_from_version_files_with_archived(project_root)
-    elif index_path is not None:
-        # Inline text but an explicit index path: resolve operative bridge files
-        # relative to that path's project root (used by terminal-kind tests).
-        project_root = index_path.resolve().parent.parent
-        excluded_archived = []
-    else:
-        # Inline text with no path: operative files (if any) resolve under the
-        # real project root; absent fixture files fail-open to actionable.
-        project_root = PROJECT_ROOT
-        excluded_archived = []
+            # Inline text with no path: operative files (if any) resolve under the
+            # real project root; absent fixture files fail-open to actionable.
+            project_root = PROJECT_ROOT
+            excluded_archived = []
 
-    if threads is None:
-        threads = _parse_index(index_text)
-    actionable, terminal_verified, blocked_non_activatable = _role_filter(threads, role, project_root)
+        if threads is None:
+            threads = _parse_index(index_text)
+        actionable, terminal_verified, blocked_non_activatable = _role_filter(
+            threads, role, project_root, check_activatable=not compact
+        )
 
-    result = {
-        "role": role,
-        "actionable": [t.to_dict() for t in actionable],
-        "blocked_non_activatable": blocked_non_activatable,
-        "excluded_archived": [t.to_dict() for t in excluded_archived],
-        "terminal_verified": [t.to_dict() for t in terminal_verified],
-        "summary": _summary_counts(threads),
-        "generated_at": _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-    }
-    if compact:
-        return _compact_scan_result(result)
-    return result
+        result = {
+            "role": role,
+            "actionable": [t.to_dict() for t in actionable],
+            "blocked_non_activatable": blocked_non_activatable,
+            "excluded_archived": [t.to_dict() for t in excluded_archived],
+            "terminal_verified": [t.to_dict() for t in terminal_verified],
+            "summary": _summary_counts(threads),
+            "generated_at": _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        if compact:
+            return _compact_scan_result(result)
+        return result
+    finally:
+        _SCAN_DEADLINE.reset(token)
 
 
 def _format_markdown(result: dict[str, Any]) -> str:
@@ -573,11 +710,15 @@ def _format_markdown(result: dict[str, Any]) -> str:
     lines.append("")
     if result["actionable"]:
         for thread in result["actionable"]:
-            lines.append(f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`")
+            lines.append(
+                f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`"
+            )
     else:
         lines.append("- (none)")
     lines.append("")
-    lines.append(f"## Blocked (non-activatable GO) ({len(result.get('blocked_non_activatable', []))})")
+    lines.append(
+        f"## Blocked (non-activatable GO) ({len(result.get('blocked_non_activatable', []))})"
+    )
     lines.append("")
     if result.get("blocked_non_activatable"):
         for thread in result["blocked_non_activatable"]:
@@ -588,27 +729,43 @@ def _format_markdown(result: dict[str, Any]) -> str:
         lines.append("- (none)")
     lines.append("")
     if result.get("compact"):
-        lines.append(f"## Excluded Archived Nonterminal (count only, {result.get('excluded_archived_count', 0)})")
+        lines.append(
+            f"## Excluded Archived Nonterminal (count only, {result.get('excluded_archived_count', 0)})"
+        )
         lines.append("")
-        lines.append("- Full archived payloads omitted in compact mode; rerun without `--compact` for archival detail.")
+        lines.append(
+            "- Full archived payloads omitted in compact mode; rerun without `--compact` for archival detail."
+        )
         lines.append("")
-        lines.append(f"## Terminal VERIFIED (count only, {result.get('terminal_verified_count', 0)})")
+        lines.append(
+            f"## Terminal VERIFIED (count only, {result.get('terminal_verified_count', 0)})"
+        )
         lines.append("")
-        lines.append("- Full VERIFIED payloads omitted in compact mode; rerun without `--compact` for archival detail.")
+        lines.append(
+            "- Full VERIFIED payloads omitted in compact mode; rerun without `--compact` for archival detail."
+        )
     else:
-        lines.append(f"## Excluded Archived Nonterminal ({len(result.get('excluded_archived', []))})")
+        lines.append(
+            f"## Excluded Archived Nonterminal ({len(result.get('excluded_archived', []))})"
+        )
         lines.append("")
         if result.get("excluded_archived"):
             for thread in result["excluded_archived"]:
-                lines.append(f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`")
+                lines.append(
+                    f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`"
+                )
         else:
             lines.append("- (none)")
         lines.append("")
-        lines.append(f"## Terminal VERIFIED (context, {len(result['terminal_verified'])})")
+        lines.append(
+            f"## Terminal VERIFIED (context, {len(result['terminal_verified'])})"
+        )
         lines.append("")
         if result["terminal_verified"]:
             for thread in result["terminal_verified"]:
-                lines.append(f"- {thread['document']} -- VERIFIED at `{thread['latest_path']}`")
+                lines.append(
+                    f"- {thread['document']} -- VERIFIED at `{thread['latest_path']}`"
+                )
         else:
             lines.append("- (none)")
     return "\n".join(lines)
@@ -616,11 +773,20 @@ def _format_markdown(result: dict[str, Any]) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--role", required=True, choices=["prime-builder", "loyal-opposition"])
     parser.add_argument(
-        "--index-path", default=None, help="Optional compatibility-state locator used to infer project root"
+        "--role", required=True, choices=["prime-builder", "loyal-opposition"]
     )
-    parser.add_argument("--format", default="json", choices=["json", "markdown"], help="Output format (default: json)")
+    parser.add_argument(
+        "--index-path",
+        default=None,
+        help="Optional compatibility-state locator used to infer project root",
+    )
+    parser.add_argument(
+        "--format",
+        default="json",
+        choices=["json", "markdown"],
+        help="Output format (default: json)",
+    )
     parser.add_argument(
         "--compact",
         action="store_true",
@@ -629,7 +795,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     index_path = Path(args.index_path) if args.index_path else None
-    result = scan(role=args.role, index_path=index_path, compact=args.compact)
+    try:
+        result = scan(role=args.role, index_path=index_path, compact=args.compact)
+    except ScanBridgeCompletionBoundExceeded as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
 
     if args.format == "json":
         print(json.dumps(result, indent=2, sort_keys=True))
