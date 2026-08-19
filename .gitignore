@@ -186,6 +186,13 @@ groundtruth (*).db*
 * ([0-9]).*
 * ([0-9][0-9]).*
 .groundtruth-chroma/
+# WI-6218: the deterministic text projection of the governed MemBase subset,
+# written by scripts/membase_dump.py. This is the tracked counterpart to the
+# ignored database above — the database stays runtime state, the projection is
+# what a clone can reconstruct governed content from. Negated explicitly so a
+# future broad pattern in this section cannot silently un-track it.
+!membase-dump/
+!membase-dump/**
 
 # =============================================================================
 # Docker
@@ -611,11 +618,10 @@ archive/worktrees/
 /.tmp-verdict-*.md
 /.temp_draft_*.md
 /gtkb-wi*-draft.*
-# Bridge verdict draft scratch (canonical bridge files are <slug>-NNN.md, never
-# matched by these). Draft .txt / *-draft.* bodies are pre-write scratch only.
-bridge/*-draft.txt
-bridge/.draft-*.txt
-bridge/draft-verdict-*.txt
+# Bridge coordination files (ephemeral runtime state per Canon §1, GOV-FILE-BRIDGE-AUTHORITY-001, and WI-6530)
+bridge/
+bridge/*
+
 # Skill-helper verdict/body drafts (scratch produced while authoring verdicts).
 .claude/skills/gtkb-bridge/helpers/draft-*.md
 .claude/skills/gtkb-verify/helpers/draft-*

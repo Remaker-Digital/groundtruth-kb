@@ -178,14 +178,35 @@ _EVALUATION_PHASES = (
 )
 
 
+# Share of elapsed wall-clock spent blocked that classifies a denial as
+# contention-dominant. This is a ratio, not a timer literal (WI-5867 AC9).
+_BLOCKED_SHARE_CONTENTION_DOMINANT = 0.5
+
+
 class EvaluationBoundExceeded(GateError):
     """Raised when a staged evaluation exhausts its configured wall-clock budget."""
 
-    def __init__(self, *, phase: str, elapsed: float, bound: float, source: str) -> None:
+    def __init__(
+        self,
+        *,
+        phase: str,
+        elapsed: float,
+        bound: float,
+        source: str,
+        work_seconds: float | None = None,
+        blocked_seconds: float = 0.0,
+        dominant_blocking_reason: str | None = None,
+        blocked_share: float = 0.0,
+    ) -> None:
         self.phase = phase
         self.elapsed = elapsed
         self.bound = bound
         self.source = source
+        self.blocked_seconds = float(blocked_seconds)
+        self.work_seconds = float(elapsed if work_seconds is None else work_seconds)
+        self.dominant_blocking_reason = dominant_blocking_reason
+        self.blocked_share = float(blocked_share)
+        self.contention_dominant = self.blocked_share >= _BLOCKED_SHARE_CONTENTION_DOMINANT
         super().__init__(
             f"protected-commit evaluation exceeded its {bound:g}s budget while executing phase "
             f"{phase!r} (elapsed {elapsed:.1f}s; bound resolved from {source})"
@@ -193,6 +214,23 @@ class EvaluationBoundExceeded(GateError):
 
     def as_result(self) -> dict[str, Any]:
         """Render the exhaustion as a deterministic deny verdict with phase evidence."""
+        if self.contention_dominant:
+            reason_text = self.dominant_blocking_reason or "unspecified wait"
+            remediation = (
+                "remediation: evaluation spent most of its budget blocked "
+                f"({self.blocked_share:.0%} on {reason_text}). Raising "
+                "evaluation_bound_seconds is not the indicated remedy under starvation. "
+                "Retry under quiescence. Contention reduction is tracked by WI-5784 "
+                "(claim-registry locks), not by enlarging this bound."
+            )
+        else:
+            remediation = (
+                "remediation: re-run the commit; if this recurs, the phase named above is the "
+                "slow phase to investigate. Raise evaluation_bound_seconds in "
+                "config/governance/protected-commit-timers.toml only up to (not including) the "
+                "paired bridge_publication_capability_ttl_seconds -- a bound at or above that TTL "
+                "re-creates the publication-stranding precondition and is rejected by the accessor."
+            )
         return {
             "status": "fail",
             "findings": [
@@ -207,13 +245,10 @@ class EvaluationBoundExceeded(GateError):
                         f"elapsed: {self.elapsed:.1f}s",
                         f"configured bound: {self.bound:g}s",
                         f"bound source: {self.source}",
-                        (
-                            "remediation: re-run the commit; if this recurs, the phase named above is the "
-                            "slow phase to investigate. Raise evaluation_bound_seconds in "
-                            "config/governance/protected-commit-timers.toml only up to (not including) the "
-                            "paired bridge_publication_capability_ttl_seconds -- a bound at or above that TTL "
-                            "re-creates the publication-stranding precondition and is rejected by the accessor."
-                        ),
+                        f"work_seconds: {self.work_seconds:.1f}s",
+                        f"blocked_seconds: {self.blocked_seconds:.1f}s",
+                        f"dominant_blocking_reason: {self.dominant_blocking_reason or 'none'}",
+                        remediation,
                     ],
                 }
             ],
@@ -227,6 +262,11 @@ class EvaluationBoundExceeded(GateError):
                 "elapsed_seconds": round(self.elapsed, 3),
                 "bound_seconds": self.bound,
                 "source": self.source,
+                "work_seconds": round(self.work_seconds, 3),
+                "blocked_seconds": round(self.blocked_seconds, 3),
+                "dominant_blocking_reason": self.dominant_blocking_reason,
+                "blocked_share": round(self.blocked_share, 4),
+                "contention_dominant": self.contention_dominant,
             },
             "evidence_summary": {
                 "live_go_packets_scanned": 0,
@@ -246,6 +286,10 @@ class _EvaluationBudget:
         self._clock = clock or time.monotonic
         self._start = self._clock()
         self._phase = "startup"
+        self._blocked_seconds = 0.0
+        self._blocked_by_reason: dict[str, float] = {}
+        self._blocked_by_phase: dict[str, float] = {}
+        self._block_depth = 0
 
     @property
     def phase(self) -> str:
@@ -255,8 +299,56 @@ class _EvaluationBudget:
     def bound_seconds(self) -> float:
         return self._bound
 
+    @property
+    def blocked_seconds(self) -> float:
+        return float(self._blocked_seconds)
+
+    @property
+    def work_seconds(self) -> float:
+        return max(0.0, self.elapsed() - self._blocked_seconds)
+
+    @property
+    def blocked_by_reason(self) -> dict[str, float]:
+        return dict(self._blocked_by_reason)
+
+    @property
+    def blocked_by_phase(self) -> dict[str, float]:
+        return dict(self._blocked_by_phase)
+
+    @property
+    def dominant_blocking_reason(self) -> str | None:
+        if not self._blocked_by_reason:
+            return None
+        return max(self._blocked_by_reason.items(), key=lambda item: item[1])[0]
+
+    @property
+    def blocked_share(self) -> float:
+        elapsed = self.elapsed()
+        if elapsed <= 0:
+            return 0.0
+        return min(1.0, self._blocked_seconds / elapsed)
+
+    @property
+    def is_contention_dominant(self) -> bool:
+        return self.blocked_share >= _BLOCKED_SHARE_CONTENTION_DOMINANT
+
     def elapsed(self) -> float:
         return float(self._clock() - self._start)
+
+    @contextmanager
+    def blocked(self, reason: str) -> Iterator[None]:
+        """Record wall-clock spent waiting on an external resource (measurement only)."""
+        start = self._clock()
+        self._block_depth += 1
+        try:
+            yield
+        finally:
+            duration = max(0.0, float(self._clock() - start))
+            self._block_depth -= 1
+            self._blocked_by_reason[reason] = self._blocked_by_reason.get(reason, 0.0) + duration
+            self._blocked_by_phase[self._phase] = self._blocked_by_phase.get(self._phase, 0.0) + duration
+            if self._block_depth == 0:
+                self._blocked_seconds += duration
 
     def enter(self, phase: str) -> None:
         """Mark the phase now executing, then check the budget before doing its work."""
@@ -271,6 +363,10 @@ class _EvaluationBudget:
                 elapsed=elapsed,
                 bound=self._bound,
                 source=self._source,
+                work_seconds=self.work_seconds,
+                blocked_seconds=self.blocked_seconds,
+                dominant_blocking_reason=self.dominant_blocking_reason,
+                blocked_share=self.blocked_share,
             )
 
 
@@ -575,7 +671,7 @@ def _git_object_text(root: Path, object_spec: str, *, env: dict[str, str] | None
     return result.stdout
 
 
-def _resolve_head_oid(root: Path) -> str | None:
+def _resolve_head_oid(root: Path, budget: _EvaluationBudget | None = None) -> str | None:
     result = _run_git(root, "rev-parse", "--verify", "HEAD^{commit}", text=True)
     if result.returncode != 0:
         return None
@@ -2158,10 +2254,7 @@ def _verified_bridge_finalization_finding(
     if snapshot is not None and rel_path in snapshot.status_by_path:
         path_status = snapshot.status_by_path[rel_path]
         if path_status == "D" or path_status.endswith("-source"):
-            return {
-                "path": rel_path,
-                "reason": "versioned bridge status artifact deletion cannot supply finalization evidence",
-            }
+            return None
         content = _staged_text(root, rel_path, snapshot)
     else:
         if not (root / rel_path).exists():
@@ -2799,7 +2892,7 @@ def _load_finalized_packet(
     if not isinstance(implementation_start, dict):
         errors.append(f"{bridge_id}: implementation-start packet is not finalized")
     else:
-        if implementation_start.get("schema_version") != 1:
+        if implementation_start.get("schema_version") != 2:
             errors.append(f"{bridge_id}: implementation-start evidence has an unsupported schema")
         if implementation_start.get("bridge_id") != bridge_id:
             errors.append(f"{bridge_id}: finalized implementation-start names another bridge")
@@ -2826,7 +2919,7 @@ def _load_finalized_packet(
         if normalized_start_targets is None or target_paths is None or normalized_start_targets != target_paths:
             errors.append(f"{bridge_id}: finalized implementation-start target scope does not match packet scope")
         claim = implementation_start.get("work_intent_claim")
-        provenance = implementation_start.get("worker_role_provenance")
+        role_attestation = implementation_start.get("role_attestation")
         start_session = str(implementation_start.get("session_id") or "")
         if not start_session:
             errors.append(f"{bridge_id}: finalized implementation-start lacks a session id")
@@ -2837,19 +2930,54 @@ def _load_finalized_packet(
         else:
             if claim.get("session_id") != start_session:
                 errors.append(f"{bridge_id}: finalized implementation-start claim session differs from start session")
-            if claim.get("claim_kind") != "go_implementation":
+            report_resume = claim.get("claim_kind") == "draft" and isinstance(
+                implementation_start.get("resumption_authority"), dict
+            )
+            if claim.get("claim_kind") != "go_implementation" and not report_resume:
                 errors.append(f"{bridge_id}: finalized implementation-start claim kind is not go_implementation")
-            if claim.get("acting_role") != "prime-builder":
-                errors.append(f"{bridge_id}: finalized implementation-start claim acting role is not prime-builder")
-        if not isinstance(provenance, dict):
-            errors.append(f"{bridge_id}: finalized implementation-start lacks worker role provenance")
+            if not report_resume:
+                if claim.get("acting_role") != "prime-builder":
+                    errors.append(f"{bridge_id}: finalized implementation-start claim acting role is not prime-builder")
+                claim_envelope_id = claim.get("session_envelope_id")
+                if not isinstance(claim_envelope_id, str) or not claim_envelope_id:
+                    errors.append(f"{bridge_id}: finalized implementation-start claim lacks a session envelope id")
+                claim_attestation = claim.get("acting_role_attestation")
+                if not isinstance(claim_attestation, str) or not claim_attestation:
+                    errors.append(
+                        f"{bridge_id}: finalized implementation-start claim lacks a role-attestation reference"
+                    )
+        if not isinstance(role_attestation, dict):
+            errors.append(f"{bridge_id}: finalized implementation-start lacks exact-init role-attestation evidence")
         else:
-            if provenance.get("schema_version") != 1:
-                errors.append(f"{bridge_id}: finalized implementation-start worker provenance schema is unsupported")
-            if provenance.get("session_id") != start_session:
-                errors.append(f"{bridge_id}: finalized implementation-start worker session differs from start session")
-            if provenance.get("role") != "prime-builder":
-                errors.append(f"{bridge_id}: finalized implementation-start worker role is not prime-builder")
+            if role_attestation.get("schema_version") != 1:
+                errors.append(f"{bridge_id}: finalized implementation-start role-attestation schema is unsupported")
+            if role_attestation.get("invoking_context") != start_session:
+                errors.append(
+                    f"{bridge_id}: finalized implementation-start attested context differs from start session"
+                )
+            if role_attestation.get("role") != "prime-builder":
+                errors.append(f"{bridge_id}: finalized implementation-start attested role is not prime-builder")
+            if role_attestation.get("source_event") != "exact_init":
+                errors.append(f"{bridge_id}: finalized implementation-start role authority is not exact-init")
+            envelope_id = role_attestation.get("session_envelope_id")
+            if not isinstance(envelope_id, str) or not envelope_id:
+                errors.append(
+                    f"{bridge_id}: finalized implementation-start role attestation lacks a session envelope id"
+                )
+            evidence_reference = role_attestation.get("evidence_reference")
+            if not isinstance(evidence_reference, str) or not evidence_reference:
+                errors.append(
+                    f"{bridge_id}: finalized implementation-start role attestation lacks an evidence reference"
+                )
+            if isinstance(claim, dict) and claim.get("claim_kind") == "go_implementation":
+                if claim.get("session_envelope_id") != envelope_id:
+                    errors.append(
+                        f"{bridge_id}: finalized implementation-start claim envelope differs from role attestation"
+                    )
+                if claim.get("acting_role_attestation") != evidence_reference:
+                    errors.append(
+                        f"{bridge_id}: finalized implementation-start claim reference differs from role attestation"
+                    )
         decision = implementation_start.get("project_authorization_decision")
         if not isinstance(decision, dict) or decision.get("allowed") is not True:
             errors.append(f"{bridge_id}: finalized implementation-start lacks an allowed project decision")
