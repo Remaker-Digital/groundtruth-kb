@@ -20,7 +20,9 @@ from groundtruth_kb.governance.approval_packet import construct_approval_packet
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "bridge_applicability_preflight.py"
 
-spec = importlib.util.spec_from_file_location("bridge_applicability_preflight", SCRIPT_PATH)
+spec = importlib.util.spec_from_file_location(
+    "bridge_applicability_preflight", SCRIPT_PATH
+)
 assert spec is not None
 preflight = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
@@ -34,10 +36,14 @@ def _write_bridge(root: Path, bridge_id: str, content: str) -> None:
     (bridge / f"{bridge_id}-001.md").write_text(f"NEW\n\n{content}", encoding="utf-8")
 
 
-def _write_bridge_version(root: Path, bridge_id: str, version: int, status: str, content: str) -> None:
+def _write_bridge_version(
+    root: Path, bridge_id: str, version: int, status: str, content: str
+) -> None:
     bridge = root / "bridge"
     bridge.mkdir(exist_ok=True)
-    (bridge / f"{bridge_id}-{version:03d}.md").write_text(f"{status}\n\n{content}", encoding="utf-8")
+    (bridge / f"{bridge_id}-{version:03d}.md").write_text(
+        f"{status}\n\n{content}", encoding="utf-8"
+    )
 
 
 def _write_config(path: Path) -> None:
@@ -71,7 +77,13 @@ def _write_pauth_db(root: Path) -> Path:
         )
         conn.execute(
             "INSERT INTO current_project_authorizations VALUES (?, ?, ?, ?, ?)",
-            ("PAUTH-FIXTURE", "PROJECT-FIXTURE", "active", json.dumps(["SPEC-OLD"]), json.dumps([])),
+            (
+                "PAUTH-FIXTURE",
+                "PROJECT-FIXTURE",
+                "active",
+                json.dumps(["SPEC-OLD"]),
+                json.dumps([]),
+            ),
         )
         conn.commit()
     finally:
@@ -121,9 +133,13 @@ def _approval_packet(
     )
 
 
-def test_preflight_reports_structured_pauth_amendment_blocking_error(tmp_path: Path) -> None:
+def test_preflight_reports_structured_pauth_amendment_blocking_error(
+    tmp_path: Path,
+) -> None:
     bridge_id = "pauth-amendment"
-    _write_bridge(tmp_path, bridge_id, _pauth_amendment_content("missing owner evidence"))
+    _write_bridge(
+        tmp_path, bridge_id, _pauth_amendment_content("missing owner evidence")
+    )
     config = tmp_path / "spec-applicability.toml"
     _write_config(config)
     db_path = _write_pauth_db(tmp_path)
@@ -142,13 +158,17 @@ def test_preflight_reports_structured_pauth_amendment_blocking_error(tmp_path: P
     assert "blocking_errors:" in preflight.format_markdown(packet)
 
 
-def test_preflight_accepts_structured_pauth_amendment_with_exact_owner_evidence(tmp_path: Path) -> None:
+def test_preflight_accepts_structured_pauth_amendment_with_exact_owner_evidence(
+    tmp_path: Path,
+) -> None:
     bridge_id = "pauth-amendment"
     rel_path = ".groundtruth/formal-artifact-approvals/pauth-amendment.json"
     packet_path = tmp_path / rel_path
     packet_path.parent.mkdir(parents=True)
     packet_path.write_text(json.dumps(_approval_packet()), encoding="utf-8")
-    _write_bridge(tmp_path, bridge_id, _pauth_amendment_content(f"Owner evidence: {rel_path}"))
+    _write_bridge(
+        tmp_path, bridge_id, _pauth_amendment_content(f"Owner evidence: {rel_path}")
+    )
     config = tmp_path / "spec-applicability.toml"
     _write_config(config)
     db_path = _write_pauth_db(tmp_path)
@@ -167,7 +187,9 @@ def test_preflight_accepts_structured_pauth_amendment_with_exact_owner_evidence(
 def test_preflight_rejects_out_of_root_pauth_approval_path(tmp_path: Path) -> None:
     bridge_id = "pauth-amendment"
     rel_path = ".groundtruth/formal-artifact-approvals/../../../outside.json"
-    _write_bridge(tmp_path, bridge_id, _pauth_amendment_content(f"Owner evidence: {rel_path}"))
+    _write_bridge(
+        tmp_path, bridge_id, _pauth_amendment_content(f"Owner evidence: {rel_path}")
+    )
     config = tmp_path / "spec-applicability.toml"
     _write_config(config)
     db_path = _write_pauth_db(tmp_path)
@@ -189,7 +211,9 @@ def test_preflight_rejects_malformed_pauth_approval_json(tmp_path: Path) -> None
     packet_path = tmp_path / rel_path
     packet_path.parent.mkdir(parents=True)
     packet_path.write_text("{malformed", encoding="utf-8")
-    _write_bridge(tmp_path, bridge_id, _pauth_amendment_content(f"Owner evidence: {rel_path}"))
+    _write_bridge(
+        tmp_path, bridge_id, _pauth_amendment_content(f"Owner evidence: {rel_path}")
+    )
     config = tmp_path / "spec-applicability.toml"
     _write_config(config)
     db_path = _write_pauth_db(tmp_path)
@@ -205,7 +229,9 @@ def test_preflight_rejects_malformed_pauth_approval_json(tmp_path: Path) -> None
     assert "not readable JSON" in packet["blocking_errors"][0]
 
 
-def test_preflight_rejects_invalid_nonowner_or_noncovering_pauth_packet(tmp_path: Path) -> None:
+def test_preflight_rejects_invalid_nonowner_or_noncovering_pauth_packet(
+    tmp_path: Path,
+) -> None:
     config = tmp_path / "spec-applicability.toml"
     _write_config(config)
     db_path = _write_pauth_db(tmp_path)
@@ -217,7 +243,9 @@ def test_preflight_rejects_invalid_nonowner_or_noncovering_pauth_packet(tmp_path
         ({}, "fails schema validation"),
         (_approval_packet(approved_by="reviewer"), "not owner-approved"),
         (
-            _approval_packet(identity="PROJECT-OTHER PAUTH-OTHER", artifact_id="GOV-OTHER"),
+            _approval_packet(
+                identity="PROJECT-OTHER PAUTH-OTHER", artifact_id="GOV-OTHER"
+            ),
             "does not mention project",
         ),
         (_approval_packet(coverage="SPEC-OTHER"), "does not cover the amendment"),
@@ -225,7 +253,9 @@ def test_preflight_rejects_invalid_nonowner_or_noncovering_pauth_packet(tmp_path
     for index, (approval_packet, expected) in enumerate(cases, start=1):
         bridge_id = f"pauth-amendment-{index}"
         packet_path.write_text(json.dumps(approval_packet), encoding="utf-8")
-        _write_bridge(tmp_path, bridge_id, _pauth_amendment_content(f"Owner evidence: {rel_path}"))
+        _write_bridge(
+            tmp_path, bridge_id, _pauth_amendment_content(f"Owner evidence: {rel_path}")
+        )
 
         packet = preflight.build_packet(
             bridge_id=bridge_id,
@@ -300,7 +330,9 @@ target_paths: ["applications/Agent_Red/src/app.py"]
     )
 
     assert packet["preflight_passed"] is False
-    assert packet["missing_required_specs"] == ["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]
+    assert packet["missing_required_specs"] == [
+        "ADR-ISOLATION-APPLICATION-PLACEMENT-001"
+    ]
     assert packet["missing_advisory_specs"] == []
     assert packet["packet_hash"].startswith("sha256:")
 
@@ -336,7 +368,9 @@ target_paths: ["applications/Agent_Red/src/app.py"]
     assert packet["missing_advisory_specs"] == []
 
 
-def test_preflight_resolves_versioned_bridge_files_when_index_is_absent(tmp_path: Path) -> None:
+def test_preflight_resolves_versioned_bridge_files_when_index_is_absent(
+    tmp_path: Path,
+) -> None:
     bridge_id = "application-move"
     bridge = tmp_path / "bridge"
     bridge.mkdir()
@@ -412,10 +446,14 @@ target_paths: ["applications/Agent_Red/src/app.py"]
     assert packet["content_source"]["mode"] == "pending_content"
     assert packet["operative_version"]["path"] == f"bridge/{bridge_id}-001.md"
     assert packet["preflight_passed"] is False
-    assert packet["missing_required_specs"] == ["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]
+    assert packet["missing_required_specs"] == [
+        "ADR-ISOLATION-APPLICATION-PLACEMENT-001"
+    ]
 
 
-def test_preflight_content_file_passes_for_pending_compliant_content(tmp_path: Path) -> None:
+def test_preflight_content_file_passes_for_pending_compliant_content(
+    tmp_path: Path,
+) -> None:
     bridge_id = "application-move"
     _write_bridge(
         tmp_path,
@@ -461,7 +499,9 @@ target_paths: ["applications/Agent_Red/src/app.py"]
     assert packet["missing_advisory_specs"] == []
 
 
-def test_preflight_cli_derives_bridge_id_from_content_file_document(tmp_path: Path, capsys) -> None:
+def test_preflight_cli_derives_bridge_id_from_content_file_document(
+    tmp_path: Path, capsys
+) -> None:
     pending = tmp_path / "pending.md"
     pending.write_text(
         """
@@ -505,7 +545,9 @@ target_paths: ["applications/Agent_Red/src/app.py"]
     assert packet["operative_version"] is None
 
 
-def test_withdrawn_status_is_parsed_as_terminal_operative_version(tmp_path: Path) -> None:
+def test_withdrawn_status_is_parsed_as_terminal_operative_version(
+    tmp_path: Path,
+) -> None:
     bridge_id = "retired-thread"
     bridge = tmp_path / "bridge"
     bridge.mkdir()
@@ -562,7 +604,9 @@ WITHDRAWN
     assert packet["preflight_passed"] is True
 
 
-def test_corrected_go_after_no_action_is_operative_and_packet_hash_is_stable(tmp_path: Path) -> None:
+def test_corrected_go_after_no_action_is_operative_and_packet_hash_is_stable(
+    tmp_path: Path,
+) -> None:
     bridge_id = "corrected-go"
     _write_bridge_version(
         tmp_path,
@@ -604,7 +648,9 @@ def test_corrected_go_after_no_action_is_operative_and_packet_hash_is_stable(tmp
     assert first["packet_hash"] == second["packet_hash"]
 
 
-def test_latest_verified_after_no_action_is_operative_when_metadata_links_chain(tmp_path: Path) -> None:
+def test_latest_verified_after_no_action_is_operative_when_metadata_links_chain(
+    tmp_path: Path,
+) -> None:
     bridge_id = "verified-correction"
     _write_bridge_version(tmp_path, bridge_id, 1, "NEW", "# Proposal\n")
     _write_bridge_version(tmp_path, bridge_id, 2, "NO-ACTION", "# Failed start\n")
@@ -616,7 +662,9 @@ def test_latest_verified_after_no_action_is_operative_when_metadata_links_chain(
         f"Verified: bridge/{bridge_id}-001.md\n\n## Specification Links\n",
     )
 
-    versions = preflight.parse_versioned_files_for_document(tmp_path / "bridge", bridge_id)
+    versions = preflight.parse_versioned_files_for_document(
+        tmp_path / "bridge", bridge_id
+    )
 
     assert preflight.choose_operative_version(versions).version_number == 3
 
@@ -626,7 +674,9 @@ def test_latest_standalone_no_action_remains_operative(tmp_path: Path) -> None:
     _write_bridge_version(tmp_path, bridge_id, 1, "NEW", "# Proposal\n")
     _write_bridge_version(tmp_path, bridge_id, 2, "NO-ACTION", "# Dependency hold\n")
 
-    versions = preflight.parse_versioned_files_for_document(tmp_path / "bridge", bridge_id)
+    versions = preflight.parse_versioned_files_for_document(
+        tmp_path / "bridge", bridge_id
+    )
 
     operative = preflight.choose_operative_version(versions)
     assert operative.status == "NO-ACTION"
@@ -680,7 +730,9 @@ def test_preflight_prose_slash_not_harvested() -> None:
         "roles, read/write semantics, and and/or phrasing.\n"
     )
     harvested = preflight.extract_target_paths(content)
-    assert harvested == set(), f"prose word/word tokens were harvested as paths: {sorted(harvested)}"
+    assert harvested == set(), (
+        f"prose word/word tokens were harvested as paths: {sorted(harvested)}"
+    )
 
 
 def test_preflight_declared_and_rooted_paths_still_harvested() -> None:
@@ -695,8 +747,12 @@ def test_preflight_declared_and_rooted_paths_still_harvested() -> None:
         "The change also touches config/governance/sample.toml as described.\n"
     )
     harvested = preflight.extract_target_paths(content)
-    assert "scripts/foo.py" in harvested, f"declared target_paths entry not harvested: {sorted(harvested)}"
-    assert "config/governance/sample.toml" in harvested, f"repo-rooted path mention not harvested: {sorted(harvested)}"
+    assert "scripts/foo.py" in harvested, (
+        f"declared target_paths entry not harvested: {sorted(harvested)}"
+    )
+    assert "config/governance/sample.toml" in harvested, (
+        f"repo-rooted path mention not harvested: {sorted(harvested)}"
+    )
 
 
 def test_declared_target_paths_exclude_incidental_applicability_evidence() -> None:
@@ -713,7 +769,9 @@ def test_declared_target_paths_exclude_incidental_applicability_evidence() -> No
     }
 
 
-def test_packet_separates_declared_scope_from_applicability_path_evidence(tmp_path: Path) -> None:
+def test_packet_separates_declared_scope_from_applicability_path_evidence(
+    tmp_path: Path,
+) -> None:
     bridge_id = "declared-scope"
     (tmp_path / "scripts").mkdir()
     _write_bridge(
@@ -788,7 +846,9 @@ def test_extract_spec_links_tolerates_trailing_qualifier_headings() -> None:
         "## Specification Links – inherited",  # en-dash
         "## Specification Links - inherited",  # hyphen
     ):
-        content = f"# Proposal\n\n{heading}\n\n- ADR-ISOLATION-APPLICATION-PLACEMENT-001\n"
+        content = (
+            f"# Proposal\n\n{heading}\n\n- ADR-ISOLATION-APPLICATION-PLACEMENT-001\n"
+        )
         harvested = preflight.extract_spec_links(content)
         assert "ADR-ISOLATION-APPLICATION-PLACEMENT-001" in harvested, (
             f"qualifier heading not harvested: {heading!r} -> {sorted(harvested)}"
@@ -806,7 +866,9 @@ def test_extract_spec_links_preserves_canonical_and_bare_headings() -> None:
         "## Governing Specification References",
     ):
         content = f"# Proposal\n\n{heading}\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
-        assert "GOV-FILE-BRIDGE-AUTHORITY-001" in preflight.extract_spec_links(content), heading
+        assert "GOV-FILE-BRIDGE-AUTHORITY-001" in preflight.extract_spec_links(
+            content
+        ), heading
 
 
 def test_extract_spec_links_does_not_over_harvest_unrelated_heading() -> None:
@@ -855,7 +917,9 @@ def test_classify_spec_links_section_distinguishes_statuses() -> None:
     assert harvested["status"] == "harvested"
     assert harvested["candidate_heading"] is None
 
-    empty = preflight.classify_spec_links_section("# P\n\n## Specification Links\n\n(none yet)\n")
+    empty = preflight.classify_spec_links_section(
+        "# P\n\n## Specification Links\n\n(none yet)\n"
+    )
     assert empty["status"] == "section_empty"
 
     unrecognized = preflight.classify_spec_links_section(
@@ -919,23 +983,39 @@ def test_strip_code_fences_opener_with_single_info_token():
 def test_strip_code_fences_closer_must_match_char_and_length():
     """A closer must be the same fence char and at least the opener length; a shorter run
     or a different fence char does not close the fence."""
-    lines = ["pre", "````", "inside", "```", "still inside", "~~~", "still", "````", "after"]
+    lines = [
+        "pre",
+        "````",
+        "inside",
+        "```",
+        "still inside",
+        "~~~",
+        "still",
+        "````",
+        "after",
+    ]
     out = preflight._strip_code_fences(lines)
     assert out[0] == "pre"
     assert out[1] == ""  # 4-backtick opener
     assert out[2] == ""  # inside
-    assert out[3] == ""  # 3-backtick line is shorter than opener -> interior, not a closer
+    assert (
+        out[3] == ""
+    )  # 3-backtick line is shorter than opener -> interior, not a closer
     assert out[4] == ""  # still inside
     assert out[5] == ""  # ~~~ is a different fence char -> interior, not a closer
     assert out[6] == ""  # still
     assert out[7] == ""  # 4-backtick bare closer -> closes
     assert out[8] == "after"
 
-    absent = preflight.classify_spec_links_section("# P\n\nNo spec links section here.\n")
+    absent = preflight.classify_spec_links_section(
+        "# P\n\nNo spec links section here.\n"
+    )
     assert absent["status"] == "no_section"
 
 
-def test_preflight_passes_with_carried_forward_qualifier_heading(tmp_path: Path) -> None:
+def test_preflight_passes_with_carried_forward_qualifier_heading(
+    tmp_path: Path,
+) -> None:
     """WI-4542 end-to-end: a required cross-cutting spec cited under
     `## Specification Links (carried forward)` now passes the gate (the bug
     previously hard-blocked it with a misleading missing_required_specs).
@@ -967,7 +1047,9 @@ target_paths: ["applications/Agent_Red/src/app.py"]
     assert packet["warnings"]["spec_links_section"]["status"] == "harvested"
 
 
-def test_preflight_unrecognized_heading_surfaces_diagnostic_without_relaxing_gate(tmp_path: Path) -> None:
+def test_preflight_unrecognized_heading_surfaces_diagnostic_without_relaxing_gate(
+    tmp_path: Path,
+) -> None:
     """WI-4542: a prefix-form spec-links heading the STRICT regex rejects keeps
     the gate FAILING (harvesting stays strict) AND surfaces the advisory
     heading_unrecognized diagnostic -- proving the diagnostic does not weaken
@@ -996,13 +1078,17 @@ target_paths: ["applications/Agent_Red/src/app.py"]
         db_path=tmp_path / "missing.db",
     )
     assert packet["preflight_passed"] is False
-    assert packet["missing_required_specs"] == ["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]
+    assert packet["missing_required_specs"] == [
+        "ADR-ISOLATION-APPLICATION-PLACEMENT-001"
+    ]
     diag = packet["warnings"]["spec_links_section"]
     assert diag["status"] == "heading_unrecognized"
     assert diag["candidate_heading"] == "## Carried-Forward Specification Links"
 
 
-def test_schema_v3_hash_is_stable_across_db_invocation_and_filesystem(tmp_path: Path) -> None:
+def test_schema_v3_hash_is_stable_across_db_invocation_and_filesystem(
+    tmp_path: Path,
+) -> None:
     bridge_id = "stable-packet"
     target_path = "applications/missing/src/app.py"
     _write_bridge(
@@ -1027,7 +1113,9 @@ target_paths: ["{target_path}"]
     db_path = tmp_path / "groundtruth.db"
     conn = sqlite3.connect(db_path)
     try:
-        conn.execute("CREATE TABLE current_specifications (id TEXT PRIMARY KEY, title TEXT, status TEXT, type TEXT)")
+        conn.execute(
+            "CREATE TABLE current_specifications (id TEXT PRIMARY KEY, title TEXT, status TEXT, type TEXT)"
+        )
         conn.execute(
             "INSERT INTO current_specifications VALUES (?, ?, ?, ?)",
             (
@@ -1071,9 +1159,23 @@ target_paths: ["{target_path}"]
     }
     assert live["packet_hash"] == explicit["packet_hash"] == no_db["packet_hash"]
     assert live["content_source"]["mode"] != explicit["content_source"]["mode"]
-    assert live["applicable_specs"]["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]["exists_in_membase"] is True
-    assert no_db["applicable_specs"]["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]["exists_in_membase"] is None
-    assert set(live["packet_hash_material"]["applicable_specs"]["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]) == {
+    assert (
+        live["applicable_specs"]["ADR-ISOLATION-APPLICATION-PLACEMENT-001"][
+            "exists_in_membase"
+        ]
+        is True
+    )
+    assert (
+        no_db["applicable_specs"]["ADR-ISOLATION-APPLICATION-PLACEMENT-001"][
+            "exists_in_membase"
+        ]
+        is None
+    )
+    assert set(
+        live["packet_hash_material"]["applicable_specs"][
+            "ADR-ISOLATION-APPLICATION-PLACEMENT-001"
+        ]
+    ) == {
         "spec_id",
         "severity",
         "rationale",
@@ -1197,7 +1299,9 @@ def test_explicit_canonical_source_ignores_newer_siblings_and_rejects_mismatch(
         )
 
 
-def test_schema_v3_hash_tracks_source_and_rules_bytes_with_lf_normalization(tmp_path: Path) -> None:
+def test_schema_v3_hash_tracks_source_and_rules_bytes_with_lf_normalization(
+    tmp_path: Path,
+) -> None:
     bridge_id = "mutation-sensitive"
     _write_bridge(tmp_path, bridge_id, "# Proposal\n\nWI-5441\n")
     source = tmp_path / "bridge" / f"{bridge_id}-001.md"
@@ -1272,7 +1376,9 @@ def _verdict_preparation_fixture(tmp_path: Path) -> tuple[Path, Path, Path, str]
     return source, config, draft, content
 
 
-def test_prepare_verdict_candidate_rebuilds_exact_source_and_final_byte_hash(tmp_path: Path) -> None:
+def test_prepare_verdict_candidate_rebuilds_exact_source_and_final_byte_hash(
+    tmp_path: Path,
+) -> None:
     _source, config, _draft, content = _verdict_preparation_fixture(tmp_path)
 
     prepared = preflight.prepare_verdict_candidate(
@@ -1302,10 +1408,15 @@ def test_prepare_verdict_candidate_rebuilds_exact_source_and_final_byte_hash(tmp
     ) != embedded.group("value")
 
 
-def test_prepare_verdict_candidate_fails_closed_on_wrong_thread_or_duplicate_section(tmp_path: Path) -> None:
+def test_prepare_verdict_candidate_fails_closed_on_wrong_thread_or_duplicate_section(
+    tmp_path: Path,
+) -> None:
     _source, config, _draft, content = _verdict_preparation_fixture(tmp_path)
 
-    with pytest.raises(preflight.VerdictCandidatePreparationError, match="must belong to the candidate bridge thread"):
+    with pytest.raises(
+        preflight.VerdictCandidatePreparationError,
+        match="must belong to the candidate bridge thread",
+    ):
         preflight.prepare_verdict_candidate(
             candidate_path="bridge/other-topic-002.md",
             content=content,
@@ -1314,7 +1425,9 @@ def test_prepare_verdict_candidate_fails_closed_on_wrong_thread_or_duplicate_sec
             db_path=tmp_path / "absent.db",
         )
 
-    with pytest.raises(preflight.VerdictCandidatePreparationError, match="exactly one Applicability"):
+    with pytest.raises(
+        preflight.VerdictCandidatePreparationError, match="exactly one Applicability"
+    ):
         preflight.prepare_verdict_candidate(
             candidate_path="bridge/prepare-topic-002.md",
             content=content + "\n## Applicability Preflight\n",
@@ -1354,7 +1467,9 @@ def test_prepare_verdict_candidate_cli_writes_only_final_bytes_to_stdout(
     assert not (tmp_path / "bridge" / "prepare-topic-002.md").exists()
 
 
-def _operation_time_envelope(*, allow_bridge: bool = True, forbidden: list[str] | None = None) -> dict[str, object]:
+def _operation_time_envelope(
+    *, allow_bridge: bool = True, forbidden: list[str] | None = None
+) -> dict[str, object]:
     allowed = ["source", "test_addition"]
     if allow_bridge:
         allowed.append("bridge")
@@ -1382,8 +1497,14 @@ def _install_operation_time_fixture(monkeypatch, envelope: dict[str, object]) ->
     )
 
 
-def _implementation_content(*, kind: str, version: int, targets: list[str], approved: int | None = None) -> str:
-    approved_line = f"Approved proposal: bridge/pauth-phase-{approved:03d}.md\n" if approved is not None else ""
+def _implementation_content(
+    *, kind: str, version: int, targets: list[str], approved: int | None = None
+) -> str:
+    approved_line = (
+        f"Approved proposal: bridge/pauth-phase-{approved:03d}.md\n"
+        if approved is not None
+        else ""
+    )
     return (
         "NEW\n"
         f"bridge_kind: {kind}\n"
@@ -1399,16 +1520,26 @@ def _implementation_content(*, kind: str, version: int, targets: list[str], appr
     )
 
 
-def test_pauth_proposal_allowed_finalization_denied_when_bridge_class_missing(tmp_path: Path, monkeypatch) -> None:
+def test_finalization_least_authority_allows_source_test_only_pauth(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """WI-6529: a source/test-only PAUTH allows a report of the approved durable cohort.
+
+    Numbered bridge files remain diagnostic coordination_paths and are never
+    PAUTH implementation targets. Proposal-phase evaluation is unchanged.
+    """
     config = tmp_path / "spec-applicability.toml"
     _write_config(config)
     (tmp_path / "bridge").mkdir()
+    durable = ["platform_tests/test_tool.py", "scripts/tool.py"]
     proposal = tmp_path / "proposal.md"
     proposal.write_text(
-        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+        _implementation_content(kind="prime_proposal", version=1, targets=durable),
         encoding="utf-8",
     )
-    _install_operation_time_fixture(monkeypatch, _operation_time_envelope(allow_bridge=False))
+    _install_operation_time_fixture(
+        monkeypatch, _operation_time_envelope(allow_bridge=False)
+    )
 
     proposal_packet = preflight.build_packet(
         bridge_id="pauth-phase",
@@ -1419,15 +1550,19 @@ def test_pauth_proposal_allowed_finalization_denied_when_bridge_class_missing(tm
     )
     proposal_pauth = proposal_packet["project_authorization_operation_time"]
     assert proposal_pauth["status"] == "allowed"
-    assert proposal_pauth["requested_operations"] == ["implementation_packet_create", "implementation_start"]
-    assert proposal_pauth["cohort"] == ["scripts/tool.py"]
+    assert proposal_pauth["requested_operations"] == [
+        "implementation_packet_create",
+        "implementation_start",
+    ]
+    assert proposal_pauth["cohort"] == durable
+    assert proposal_pauth.get("coordination_paths") == []
 
     _write_bridge_version(
         tmp_path,
         "pauth-phase",
         1,
         "REVISED",
-        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+        _implementation_content(kind="prime_proposal", version=1, targets=durable),
     )
     _write_bridge_version(
         tmp_path,
@@ -1441,7 +1576,7 @@ def test_pauth_proposal_allowed_finalization_denied_when_bridge_class_missing(tm
         _implementation_content(
             kind="implementation_report",
             version=3,
-            targets=["platform_tests/test_tool.py"],
+            targets=durable,
             approved=1,
         ),
         encoding="utf-8",
@@ -1454,17 +1589,15 @@ def test_pauth_proposal_allowed_finalization_denied_when_bridge_class_missing(tm
         content_file=report,
     )
     report_pauth = report_packet["project_authorization_operation_time"]
-    assert report_pauth["status"] == "denied"
-    assert report_pauth["reason_code"] == "target_mutation_class_not_allowed"
-    assert report_pauth["cohort"] == [
+    assert report_pauth["status"] == "allowed"
+    assert report_pauth["cohort"] == durable
+    assert all(not path.startswith("bridge/") for path in report_pauth["cohort"])
+    assert report_pauth["coordination_paths"] == [
         "bridge/pauth-phase-001.md",
         "bridge/pauth-phase-002.md",
         "bridge/pauth-phase-003.md",
-        "platform_tests/test_tool.py",
-        "scripts/tool.py",
     ]
-    assert {decision["reason_code"] for decision in report_pauth["decisions"]} == {"target_mutation_class_not_allowed"}
-    assert report_packet["preflight_passed"] is False
+    assert report_packet["preflight_passed"] is True
 
 
 def test_finalization_phase_does_not_request_git_commit() -> None:
@@ -1486,7 +1619,9 @@ def test_proposal_phase_operations_unchanged() -> None:
     )
 
 
-def test_implementation_report_under_git_commit_forbidding_pauth_passes(tmp_path: Path, monkeypatch) -> None:
+def test_implementation_report_under_git_commit_forbidding_pauth_passes(
+    tmp_path: Path, monkeypatch
+) -> None:
     """WI-6458 end-to-end: the defect this change repairs.
 
     A post-GO implementation report under a PAUTH that forbids `git_commit`
@@ -1502,7 +1637,9 @@ def test_implementation_report_under_git_commit_forbidding_pauth_passes(tmp_path
         "pauth-phase",
         1,
         "REVISED",
-        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+        _implementation_content(
+            kind="prime_proposal", version=1, targets=["scripts/tool.py"]
+        ),
     )
     _write_bridge_version(
         tmp_path,
@@ -1516,12 +1653,14 @@ def test_implementation_report_under_git_commit_forbidding_pauth_passes(tmp_path
         _implementation_content(
             kind="implementation_report",
             version=3,
-            targets=["platform_tests/test_tool.py"],
+            targets=["scripts/tool.py"],
             approved=1,
         ),
         encoding="utf-8",
     )
-    _install_operation_time_fixture(monkeypatch, _operation_time_envelope(forbidden=["git_commit"]))
+    _install_operation_time_fixture(
+        monkeypatch, _operation_time_envelope(forbidden=["git_commit"])
+    )
 
     packet = preflight.build_packet(
         bridge_id="pauth-phase",
@@ -1545,7 +1684,9 @@ def test_pauth_phase_cohort_allowed_and_reported(tmp_path: Path, monkeypatch) ->
         "pauth-phase",
         1,
         "REVISED",
-        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+        _implementation_content(
+            kind="prime_proposal", version=1, targets=["scripts/tool.py"]
+        ),
     )
     _write_bridge_version(
         tmp_path,
@@ -1559,7 +1700,7 @@ def test_pauth_phase_cohort_allowed_and_reported(tmp_path: Path, monkeypatch) ->
         _implementation_content(
             kind="implementation_report",
             version=3,
-            targets=["platform_tests/test_tool.py"],
+            targets=["scripts/tool.py"],
             approved=1,
         ),
         encoding="utf-8",
@@ -1586,7 +1727,180 @@ def test_pauth_phase_cohort_allowed_and_reported(tmp_path: Path, monkeypatch) ->
     assert pauth["evaluator_id"]
     assert pauth["taxonomy_sha256"]
     assert first["packet_hash"] == second["packet_hash"]
-    assert "Project Authorization Operation-Time Evaluation" in preflight.format_markdown(first)
+    assert (
+        "Project Authorization Operation-Time Evaluation"
+        in preflight.format_markdown(first)
+    )
+    assert "coordination_paths" in preflight.format_markdown(first)
+
+
+def test_finalization_pauth_decision_independent_of_ephemeral_bridge_history(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """WI-6529: identical durable targets yield the same PAUTH decision with or without extra numbered files."""
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        1,
+        "REVISED",
+        _implementation_content(
+            kind="prime_proposal", version=1, targets=["scripts/tool.py"]
+        ),
+    )
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        2,
+        "GO",
+        "Responds to: bridge/pauth-phase-001.md\n\n# Reviewed proposal\n",
+    )
+    report = tmp_path / "report.md"
+    report.write_text(
+        _implementation_content(
+            kind="implementation_report",
+            version=3,
+            targets=["scripts/tool.py"],
+            approved=1,
+        ),
+        encoding="utf-8",
+    )
+    _install_operation_time_fixture(
+        monkeypatch, _operation_time_envelope(allow_bridge=False)
+    )
+
+    sparse = preflight.build_packet(
+        bridge_id="pauth-phase",
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=report,
+    )
+    _write_bridge_version(tmp_path, "pauth-phase", 4, "NO-GO", "# Extra sibling\n")
+    _write_bridge_version(tmp_path, "pauth-phase", 5, "REVISED", "# Later sibling\n")
+    crowded = preflight.build_packet(
+        bridge_id="pauth-phase",
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=report,
+    )
+
+    sparse_pauth = sparse["project_authorization_operation_time"]
+    crowded_pauth = crowded["project_authorization_operation_time"]
+    for pauth in (sparse_pauth, crowded_pauth):
+        assert pauth["status"] == "allowed"
+        assert pauth["reason_code"] == "allowed"
+        assert pauth["cohort"] == ["scripts/tool.py"]
+        assert all(not path.startswith("bridge/") for path in pauth["cohort"])
+    assert sparse_pauth["status"] == crowded_pauth["status"]
+    assert sparse_pauth["reason_code"] == crowded_pauth["reason_code"]
+    assert sparse_pauth["cohort"] == crowded_pauth["cohort"]
+    assert sparse_pauth["allowed"] == crowded_pauth["allowed"]
+
+
+def test_finalization_forbidden_effect_denies_metadata_target(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """WI-6529: a metadata work-product target is still denied under source/test-only PAUTH."""
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    durable = ["groundtruth.db", "scripts/tool.py"]
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        1,
+        "REVISED",
+        _implementation_content(kind="prime_proposal", version=1, targets=durable),
+    )
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        2,
+        "GO",
+        "Responds to: bridge/pauth-phase-001.md\n\n# Reviewed proposal\n",
+    )
+    report = tmp_path / "report.md"
+    report.write_text(
+        _implementation_content(
+            kind="implementation_report",
+            version=3,
+            targets=durable,
+            approved=1,
+        ),
+        encoding="utf-8",
+    )
+    _install_operation_time_fixture(
+        monkeypatch, _operation_time_envelope(allow_bridge=False)
+    )
+
+    packet = preflight.build_packet(
+        bridge_id="pauth-phase",
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=report,
+    )
+    pauth = packet["project_authorization_operation_time"]
+    assert pauth["status"] == "denied"
+    assert pauth["reason_code"] == "target_mutation_class_not_allowed"
+    assert pauth["cohort"] == durable
+    assert all(not path.startswith("bridge/") for path in pauth["cohort"])
+    assert packet["preflight_passed"] is False
+
+
+def test_finalization_undeclared_source_target_is_denied(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """WI-6529: a report cannot add a durable source path absent from the approved proposal."""
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        1,
+        "REVISED",
+        _implementation_content(
+            kind="prime_proposal", version=1, targets=["scripts/tool.py"]
+        ),
+    )
+    _write_bridge_version(
+        tmp_path,
+        "pauth-phase",
+        2,
+        "GO",
+        "Responds to: bridge/pauth-phase-001.md\n\n# Reviewed proposal\n",
+    )
+    report = tmp_path / "report.md"
+    report.write_text(
+        _implementation_content(
+            kind="implementation_report",
+            version=3,
+            targets=["scripts/extra.py", "scripts/tool.py"],
+            approved=1,
+        ),
+        encoding="utf-8",
+    )
+    _install_operation_time_fixture(
+        monkeypatch, _operation_time_envelope(allow_bridge=False)
+    )
+
+    packet = preflight.build_packet(
+        bridge_id="pauth-phase",
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+        content_file=report,
+    )
+    pauth = packet["project_authorization_operation_time"]
+    assert pauth["status"] == "denied"
+    assert pauth["reason_code"] == "undeclared_implementation_target"
+    assert pauth["undeclared_implementation_targets"] == ["scripts/extra.py"]
+    assert all(not path.startswith("bridge/") for path in pauth["cohort"])
+    assert packet["preflight_passed"] is False
+    assert not (tmp_path / "bridge" / "pauth-phase-003.md").exists()
 
 
 def test_finalization_exact_source_horizon_is_invariant_after_successor_materializes(
@@ -1600,7 +1914,9 @@ def test_finalization_exact_source_horizon_is_invariant_after_successor_material
         "pauth-phase",
         1,
         "REVISED",
-        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+        _implementation_content(
+            kind="prime_proposal", version=1, targets=["scripts/tool.py"]
+        ),
     )
     _write_bridge_version(
         tmp_path,
@@ -1614,7 +1930,7 @@ def test_finalization_exact_source_horizon_is_invariant_after_successor_material
         _implementation_content(
             kind="implementation_report",
             version=3,
-            targets=["platform_tests/test_tool.py"],
+            targets=["scripts/tool.py"],
             approved=1,
         ),
         encoding="utf-8",
@@ -1643,11 +1959,13 @@ def test_finalization_exact_source_horizon_is_invariant_after_successor_material
         content_file=report,
     )
 
+    coordination = after["project_authorization_operation_time"]["coordination_paths"]
     cohort = after["project_authorization_operation_time"]["cohort"]
     assert before["packet_hash_material"] == after["packet_hash_material"]
     assert before["packet_hash"] == after["packet_hash"]
-    assert "bridge/pauth-phase-004.md" in cohort
-    assert "bridge/pauth-phase-005.md" not in cohort
+    assert cohort == ["scripts/tool.py"]
+    assert "bridge/pauth-phase-004.md" in coordination
+    assert "bridge/pauth-phase-005.md" not in coordination
 
 
 def test_finalization_noncanonical_source_ignores_stale_declared_version_for_observed_fallback(
@@ -1661,7 +1979,9 @@ def test_finalization_noncanonical_source_ignores_stale_declared_version_for_obs
         "pauth-phase",
         1,
         "REVISED",
-        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+        _implementation_content(
+            kind="prime_proposal", version=1, targets=["scripts/tool.py"]
+        ),
     )
     _write_bridge_version(
         tmp_path,
@@ -1678,7 +1998,7 @@ def test_finalization_noncanonical_source_ignores_stale_declared_version_for_obs
         _implementation_content(
             kind="implementation_report",
             version=3,
-            targets=["platform_tests/test_tool.py"],
+            targets=["scripts/tool.py"],
             approved=1,
         ),
         encoding="utf-8",
@@ -1693,12 +2013,16 @@ def test_finalization_noncanonical_source_ignores_stale_declared_version_for_obs
         content_file=report,
     )
 
+    coordination = packet["project_authorization_operation_time"]["coordination_paths"]
     cohort = packet["project_authorization_operation_time"]["cohort"]
-    assert "bridge/pauth-phase-006.md" in cohort
-    assert "bridge/pauth-phase-007.md" not in cohort
+    assert cohort == ["scripts/tool.py"]
+    assert "bridge/pauth-phase-006.md" in coordination
+    assert "bridge/pauth-phase-007.md" not in coordination
 
 
-def test_finalization_binds_cohort_to_go_approved_proposal(tmp_path: Path, monkeypatch) -> None:
+def test_finalization_binds_cohort_to_go_approved_proposal(
+    tmp_path: Path, monkeypatch
+) -> None:
     config = tmp_path / "spec-applicability.toml"
     _write_config(config)
     _write_bridge_version(
@@ -1706,7 +2030,9 @@ def test_finalization_binds_cohort_to_go_approved_proposal(tmp_path: Path, monke
         "pauth-phase",
         1,
         "REVISED",
-        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/approved.py"]),
+        _implementation_content(
+            kind="prime_proposal", version=1, targets=["scripts/approved.py"]
+        ),
     )
     _write_bridge_version(
         tmp_path,
@@ -1720,14 +2046,16 @@ def test_finalization_binds_cohort_to_go_approved_proposal(tmp_path: Path, monke
         "pauth-phase",
         3,
         "REVISED",
-        _implementation_content(kind="prime_proposal", version=3, targets=["config/unapproved.toml"]),
+        _implementation_content(
+            kind="prime_proposal", version=3, targets=["config/unapproved.toml"]
+        ),
     )
     report = tmp_path / "report.md"
     report.write_text(
         _implementation_content(
             kind="implementation_report",
             version=4,
-            targets=["platform_tests/test_approved.py"],
+            targets=["scripts/approved.py"],
             approved=1,
         ),
         encoding="utf-8",
@@ -1746,11 +2074,13 @@ def test_finalization_binds_cohort_to_go_approved_proposal(tmp_path: Path, monke
     assert pauth["status"] == "allowed"
     assert pauth["authorization_source"] == "bridge/pauth-phase-001.md"
     assert "scripts/approved.py" in pauth["cohort"]
-    assert "platform_tests/test_approved.py" in pauth["cohort"]
-    assert "config/unapproved.toml" not in pauth["cohort"]
+    assert "platform_tests/test_approved.py" not in pauth["cohort"]
+    assert all(not path.startswith("bridge/") for path in pauth["cohort"])
 
 
-def test_finalization_rejects_proposal_without_matching_go(tmp_path: Path, monkeypatch) -> None:
+def test_finalization_rejects_proposal_without_matching_go(
+    tmp_path: Path, monkeypatch
+) -> None:
     config = tmp_path / "spec-applicability.toml"
     _write_config(config)
     _write_bridge_version(
@@ -1758,7 +2088,9 @@ def test_finalization_rejects_proposal_without_matching_go(tmp_path: Path, monke
         "pauth-phase",
         1,
         "REVISED",
-        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+        _implementation_content(
+            kind="prime_proposal", version=1, targets=["scripts/tool.py"]
+        ),
     )
     _write_bridge_version(tmp_path, "pauth-phase", 2, "NO-GO", "# Rejected proposal\n")
     report = tmp_path / "report.md"
@@ -1766,7 +2098,7 @@ def test_finalization_rejects_proposal_without_matching_go(tmp_path: Path, monke
         _implementation_content(
             kind="implementation_report",
             version=3,
-            targets=["platform_tests/test_tool.py"],
+            targets=["scripts/tool.py"],
             approved=1,
         ),
         encoding="utf-8",
@@ -1788,19 +2120,25 @@ def test_finalization_rejects_proposal_without_matching_go(tmp_path: Path, monke
     assert packet["preflight_passed"] is False
 
 
-def test_pauth_load_or_evaluator_failure_is_distinct_cli_error(tmp_path: Path, monkeypatch, capsys) -> None:
+def test_pauth_load_or_evaluator_failure_is_distinct_cli_error(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
     config = tmp_path / "spec-applicability.toml"
     _write_config(config)
     (tmp_path / "bridge").mkdir()
     proposal = tmp_path / "proposal.md"
     proposal.write_text(
-        _implementation_content(kind="prime_proposal", version=1, targets=["scripts/tool.py"]),
+        _implementation_content(
+            kind="prime_proposal", version=1, targets=["scripts/tool.py"]
+        ),
         encoding="utf-8",
     )
     monkeypatch.setattr(
         preflight,
         "extract_and_validate_project_authorization",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(preflight.AuthorizationError("malformed PAUTH fixture")),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            preflight.AuthorizationError("malformed PAUTH fixture")
+        ),
     )
 
     result = preflight.main(
@@ -1824,7 +2162,9 @@ def test_pauth_load_or_evaluator_failure_is_distinct_cli_error(tmp_path: Path, m
     assert "malformed PAUTH fixture" in packet["blocking_errors"][0]
 
 
-def test_pauth_preflight_matches_canonical_evaluator(tmp_path: Path, monkeypatch) -> None:
+def test_pauth_preflight_matches_canonical_evaluator(
+    tmp_path: Path, monkeypatch
+) -> None:
     envelope = _operation_time_envelope()
     _install_operation_time_fixture(monkeypatch, envelope)
     cohort = ["bridge/parity-001.md", "scripts/tool.py"]

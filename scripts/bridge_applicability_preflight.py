@@ -60,7 +60,9 @@ except ImportError:  # pragma: no cover
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 DEFAULT_BRIDGE_DIR: Final[Path] = PROJECT_ROOT / "bridge"
-DEFAULT_CONFIG_PATH: Final[Path] = PROJECT_ROOT / "config" / "governance" / "spec-applicability.toml"
+DEFAULT_CONFIG_PATH: Final[Path] = (
+    PROJECT_ROOT / "config" / "governance" / "spec-applicability.toml"
+)
 DEFAULT_DB_PATH: Final[Path] = PROJECT_ROOT / "groundtruth.db"
 PACKET_HASH_SCHEMA_VERSION: Final[int] = 3
 PACKET_HASH_MATERIAL_KEYS: Final[frozenset[str]] = frozenset(
@@ -105,13 +107,21 @@ SPEC_LINK_HEADING_LOOSE_RE: Final[re.Pattern[str]] = re.compile(
     r"^#{1,6}\s+.*\bspecification.*\b(?:link|reference)",
     re.IGNORECASE,
 )
-SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ|DELIB)-[A-Z0-9][A-Z0-9_-]*\b")
+SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(
+    r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ|DELIB)-[A-Z0-9][A-Z0-9_-]*\b"
+)
 RULE_PATH_RE: Final[re.Pattern[str]] = re.compile(r"\.claude/rules/[a-z0-9_-]+\.md")
-WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:WI|GTKB)-[A-Z0-9][A-Z0-9_-]*\b")
-DOCUMENT_DECLARATION_RE: Final[re.Pattern[str]] = re.compile(r"(?im)^\s*Document:\s*([A-Za-z0-9_.-]+)\s*$")
+WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(
+    r"\b(?:WI|GTKB)-[A-Z0-9][A-Z0-9_-]*\b"
+)
+DOCUMENT_DECLARATION_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?im)^\s*Document:\s*([A-Za-z0-9_.-]+)\s*$"
+)
 # PATH_TOKEN_RE is imported from implementation_authorization (HYG-046 single
 # source; previously a drifted local copy that lacked 'memory/').
-TARGET_PATH_RE: Final[re.Pattern[str]] = re.compile(r"^\s*target_paths?\s*[:=]\s*(.+)", re.IGNORECASE)
+TARGET_PATH_RE: Final[re.Pattern[str]] = re.compile(
+    r"^\s*target_paths?\s*[:=]\s*(.+)", re.IGNORECASE
+)
 FILES_CHANGED_HEADING_RE: Final[re.Pattern[str]] = re.compile(
     r"^#{1,6}\s+Files\s+(?:Changed|Expected\s+To\s+Change)\s*$",
     re.IGNORECASE,
@@ -120,13 +130,21 @@ OPERATIVE_REFERENCE_RE: Final[re.Pattern[str]] = re.compile(
     r"(?im)^\s*(?:Responds\s+to|Corrects|Approved\s+proposal|Reviewed|Verified):\s*"
     r"(?:bridge/)?([^\s`]+)-(\d+)\.md\s*$"
 )
-BRIDGE_KIND_RE: Final[re.Pattern[str]] = re.compile(r"(?im)^\s*bridge_kind:\s*([a-z0-9_-]+)\s*$")
-VERSION_DECLARATION_RE: Final[re.Pattern[str]] = re.compile(r"(?im)^\s*Version:\s*(\d+)\s*$")
-PAUTH_METADATA_RE: Final[re.Pattern[str]] = re.compile(r"(?im)^\s*Project Authorization(?: ID)?:\s*\S+")
+BRIDGE_KIND_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?im)^\s*bridge_kind:\s*([a-z0-9_-]+)\s*$"
+)
+VERSION_DECLARATION_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?im)^\s*Version:\s*(\d+)\s*$"
+)
+PAUTH_METADATA_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?im)^\s*Project Authorization(?: ID)?:\s*\S+"
+)
 APPROVED_PROPOSAL_RE: Final[re.Pattern[str]] = re.compile(
     r"(?im)^\s*Approved proposal:\s*`?(?:bridge/)?([A-Za-z0-9_.-]+)-(\d{3})\.md`?\s*$"
 )
-PROPOSAL_BRIDGE_KINDS: Final[frozenset[str]] = frozenset({"prime_proposal", "implementation_proposal"})
+PROPOSAL_BRIDGE_KINDS: Final[frozenset[str]] = frozenset(
+    {"prime_proposal", "implementation_proposal"}
+)
 FINALIZATION_BRIDGE_KINDS: Final[frozenset[str]] = frozenset(
     {"implementation_report", "implementation_report_revision"}
 )
@@ -139,7 +157,9 @@ PAUTH_PHASE_OPERATIONS: Final[dict[str, tuple[str, ...]]] = {
     # report under any PAUTH that (correctly) forbids it.
     "finalization": ("protected_mutation",),
 }
-VERDICT_CANDIDATE_STATUSES: Final[frozenset[str]] = frozenset({"GO", "NO-GO", "VERIFIED"})
+VERDICT_CANDIDATE_STATUSES: Final[frozenset[str]] = frozenset(
+    {"GO", "NO-GO", "VERIFIED"}
+)
 RESPONDS_TO_BRIDGE_PATH_RE: Final[re.Pattern[str]] = re.compile(
     r"(?im)^\s*Responds\s+to\s*:\s*`?(?P<path>[^`\r\n]+?\.md)`?\s*$"
 )
@@ -213,7 +233,9 @@ def _is_fence_closer(line: str, fence_char: str, fence_len: int) -> bool:
     only whitespace (CommonMark). This keeps a marker-plus-language line inside a fence
     from closing it early (WI-4838 inner-marker desync).
     """
-    return re.match(rf"^\s*{re.escape(fence_char)}{{{fence_len},}}\s*$", line) is not None
+    return (
+        re.match(rf"^\s*{re.escape(fence_char)}{{{fence_len},}}\s*$", line) is not None
+    )
 
 
 def _strip_code_fences(lines: list[str]) -> list[str]:
@@ -272,7 +294,9 @@ def _status_from_content(text: str) -> str | None:
     return None
 
 
-def parse_versioned_files_for_document(bridge_dir: Path, bridge_id: str) -> list[BridgeVersion]:
+def parse_versioned_files_for_document(
+    bridge_dir: Path, bridge_id: str
+) -> list[BridgeVersion]:
     """Return versioned bridge files for ``bridge_id`` when INDEX is absent."""
     versions: list[BridgeVersion] = []
     for path in bridge_dir.glob(f"{bridge_id}-*.md"):
@@ -301,13 +325,17 @@ def choose_operative_version(versions: list[BridgeVersion]) -> BridgeVersion | N
         earlier_no_actions = [
             version
             for version in versions
-            if version.status == "NO-ACTION" and version.version_number < latest.version_number
+            if version.status == "NO-ACTION"
+            and version.version_number < latest.version_number
         ]
         if latest.status in {"GO", "NO-GO", "VERIFIED"} and earlier_no_actions:
             references = _operative_reference_versions(latest)
             if references:
                 return latest
-    for status_set in ({"NEW", "REVISED", "NO-ACTION"}, {"VERIFIED", "WITHDRAWN", "GO", "NO-GO"}):
+    for status_set in (
+        {"NEW", "REVISED", "NO-ACTION"},
+        {"VERIFIED", "WITHDRAWN", "GO", "NO-GO"},
+    ):
         candidates = [v for v in versions if v.status in status_set]
         if candidates:
             return max(candidates, key=lambda v: v.version_number)
@@ -321,7 +349,11 @@ def _operative_reference_versions(version: BridgeVersion) -> set[int]:
     except OSError:
         return set()
     thread_name = re.sub(r"-\d+\.md$", "", Path(version.rel_path).name)
-    return {int(match.group(2)) for match in OPERATIVE_REFERENCE_RE.finditer(content) if match.group(1) == thread_name}
+    return {
+        int(match.group(2))
+        for match in OPERATIVE_REFERENCE_RE.finditer(content)
+        if match.group(1) == thread_name
+    }
 
 
 def extract_spec_links(content: str) -> set[str]:
@@ -410,7 +442,11 @@ def _parse_declared_path_values(raw: str) -> set[str]:
     except json.JSONDecodeError:
         parsed = [p.strip("\"' ") for p in re.split(r"[,\s]+", raw) if p.strip("\"' ")]
     if isinstance(parsed, list):
-        return {_normalize_path_token(str(p)) for p in parsed if _normalize_path_token(str(p))}
+        return {
+            _normalize_path_token(str(p))
+            for p in parsed
+            if _normalize_path_token(str(p))
+        }
     parsed_token = _normalize_path_token(str(parsed))
     return {parsed_token} if parsed_token else set()
 
@@ -452,7 +488,9 @@ def collect_cited_implementation_paths(content: str) -> set[str]:
     return paths
 
 
-def compute_missing_parent_dir_warnings(project_root: Path, paths: set[str]) -> list[str]:
+def compute_missing_parent_dir_warnings(
+    project_root: Path, paths: set[str]
+) -> list[str]:
     warnings: list[str] = []
     root = project_root.resolve()
     for rel_path in sorted(paths):
@@ -479,9 +517,15 @@ def _parse_rules(content: str) -> list[ApplicabilityRule]:
                 spec_id=str(raw["spec_id"]),
                 severity=str(raw.get("severity", "blocking")),
                 rationale=str(raw.get("rationale", "")),
-                applies_when_paths_match=tuple(str(v) for v in raw.get("applies_when_paths_match", [])),
-                applies_when_doc_matches=tuple(str(v) for v in raw.get("applies_when_doc_matches", [])),
-                applies_when_content_matches=tuple(str(v) for v in raw.get("applies_when_content_matches", [])),
+                applies_when_paths_match=tuple(
+                    str(v) for v in raw.get("applies_when_paths_match", [])
+                ),
+                applies_when_doc_matches=tuple(
+                    str(v) for v in raw.get("applies_when_doc_matches", [])
+                ),
+                applies_when_content_matches=tuple(
+                    str(v) for v in raw.get("applies_when_content_matches", [])
+                ),
             )
         )
     return rules
@@ -549,7 +593,9 @@ def enrich_from_membase(applicable: dict[str, ApplicableSpec], db_path: Path) ->
         conn.close()
 
 
-def _pauth_amendment_blocking_errors(content: str, project_root: Path, db_path: Path) -> list[str]:
+def _pauth_amendment_blocking_errors(
+    content: str, project_root: Path, db_path: Path
+) -> list[str]:
     """Thin adapter over the canonical structured PAUTH-amendment validator.
 
     Delegates real structured-replacement-envelope validation to
@@ -572,7 +618,9 @@ def _check_author_metadata_presence(content: str) -> list[str]:
     """Check for missing required author-metadata fields in bridge content."""
     warnings: list[str] = []
     for field_name in REQUIRED_AUTHOR_METADATA_FIELDS:
-        pattern = re.compile(r"^" + re.escape(field_name) + r"\s*:\s*(.+)$", re.MULTILINE | re.IGNORECASE)
+        pattern = re.compile(
+            r"^" + re.escape(field_name) + r"\s*:\s*(.+)$", re.MULTILINE | re.IGNORECASE
+        )
         if not pattern.search(content):
             warnings.append(field_name)
     return warnings
@@ -597,7 +645,9 @@ def _normalize_lf(content: str) -> str:
     return content.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def normalize_verdict_candidate_path(candidate_path: str | Path, project_root: Path) -> tuple[str, Path]:
+def normalize_verdict_candidate_path(
+    candidate_path: str | Path, project_root: Path
+) -> tuple[str, Path]:
     """Return one canonical root-relative numbered bridge-candidate path."""
 
     cleaned = str(candidate_path).strip().strip("`").replace("\\", "/")
@@ -609,20 +659,28 @@ def normalize_verdict_candidate_path(candidate_path: str | Path, project_root: P
     try:
         relative = resolved.relative_to(root).as_posix()
     except ValueError as exc:
-        raise VerdictCandidatePreparationError("candidate path escapes the project root") from exc
+        raise VerdictCandidatePreparationError(
+            "candidate path escapes the project root"
+        ) from exc
     if resolved.parent != (root / "bridge").resolve():
         raise VerdictCandidatePreparationError(
             "candidate path must be a direct child of the canonical bridge directory"
         )
     if re.fullmatch(r".+-\d{3}\.md", resolved.name) is None:
-        raise VerdictCandidatePreparationError("candidate path must name an exact three-digit numbered bridge file")
+        raise VerdictCandidatePreparationError(
+            "candidate path must name an exact three-digit numbered bridge file"
+        )
     return relative, resolved
 
 
 def _candidate_bridge_identity(candidate_relative: str) -> tuple[str, int]:
-    match = re.fullmatch(r"bridge/(?P<document>.+)-(?P<version>\d{3})\.md", candidate_relative)
+    match = re.fullmatch(
+        r"bridge/(?P<document>.+)-(?P<version>\d{3})\.md", candidate_relative
+    )
     if match is None:  # pragma: no cover - guarded by normalize_verdict_candidate_path
-        raise VerdictCandidatePreparationError("candidate path is not a canonical numbered bridge file")
+        raise VerdictCandidatePreparationError(
+            "candidate path is not a canonical numbered bridge file"
+        )
     return match.group("document"), int(match.group("version"))
 
 
@@ -634,8 +692,12 @@ def resolve_verdict_responds_to_source(
 ) -> tuple[str, Path, str]:
     """Resolve the exact existing same-thread source named by ``Responds to``."""
 
-    candidate_relative, _ = normalize_verdict_candidate_path(candidate_path, project_root)
-    candidate_document, candidate_version = _candidate_bridge_identity(candidate_relative)
+    candidate_relative, _ = normalize_verdict_candidate_path(
+        candidate_path, project_root
+    )
+    candidate_document, candidate_version = _candidate_bridge_identity(
+        candidate_relative
+    )
     matches = list(RESPONDS_TO_BRIDGE_PATH_RE.finditer(content))
     if len(matches) != 1:
         raise VerdictCandidatePreparationError(
@@ -647,21 +709,35 @@ def resolve_verdict_responds_to_source(
     )
     source_document, source_version = _candidate_bridge_identity(source_relative)
     if source_document != candidate_document:
-        raise VerdictCandidatePreparationError("Responds to source must belong to the candidate bridge thread")
+        raise VerdictCandidatePreparationError(
+            "Responds to source must belong to the candidate bridge thread"
+        )
     if source_version >= candidate_version:
-        raise VerdictCandidatePreparationError("Responds to source must be an earlier bridge version")
+        raise VerdictCandidatePreparationError(
+            "Responds to source must be an earlier bridge version"
+        )
     if not source_path.is_file():
-        raise VerdictCandidatePreparationError("Responds to source does not exist as a canonical bridge file")
+        raise VerdictCandidatePreparationError(
+            "Responds to source does not exist as a canonical bridge file"
+        )
     return source_relative, source_path, candidate_document
 
 
-def candidate_evidence_hash(candidate_path: str | Path, content: str, project_root: Path) -> str:
+def candidate_evidence_hash(
+    candidate_path: str | Path, content: str, project_root: Path
+) -> str:
     """Bind normalized candidate bytes to their exact root-relative path."""
 
-    candidate_relative, _ = normalize_verdict_candidate_path(candidate_path, project_root)
+    candidate_relative, _ = normalize_verdict_candidate_path(
+        candidate_path, project_root
+    )
     normalized = _normalize_lf(content)
     normalized, replacements = CANDIDATE_EVIDENCE_HASH_LINE_RE.subn(
-        lambda match: match.group("prefix") + CANDIDATE_EVIDENCE_HASH_SENTINEL + match.group("suffix"),
+        lambda match: (
+            match.group("prefix")
+            + CANDIDATE_EVIDENCE_HASH_SENTINEL
+            + match.group("suffix")
+        ),
         normalized,
     )
     if replacements != 1:
@@ -680,7 +756,9 @@ def _applicability_preflight_span(content: str) -> tuple[int, int]:
         )
     match = matches[0]
     heading_level = len(match.group("marks"))
-    next_heading = re.compile(rf"(?m)^#{{1,{heading_level}}}\s+").search(content, match.end())
+    next_heading = re.compile(rf"(?m)^#{{1,{heading_level}}}\s+").search(
+        content, match.end()
+    )
     end = next_heading.start() if next_heading is not None else len(content)
     return match.start(), end
 
@@ -688,8 +766,18 @@ def _applicability_preflight_span(content: str) -> tuple[int, int]:
 def verdict_candidate_needs_preparation(content: str) -> bool:
     """Return whether the writer should rebuild an existing verdict section."""
 
-    status = next((line.strip().upper() for line in _normalize_lf(content).splitlines() if line.strip()), "")
-    return status in VERDICT_CANDIDATE_STATUSES and APPLICABILITY_PREFLIGHT_HEADING_RE.search(content) is not None
+    status = next(
+        (
+            line.strip().upper()
+            for line in _normalize_lf(content).splitlines()
+            if line.strip()
+        ),
+        "",
+    )
+    return (
+        status in VERDICT_CANDIDATE_STATUSES
+        and APPLICABILITY_PREFLIGHT_HEADING_RE.search(content) is not None
+    )
 
 
 def _text_sha256(content: str) -> str:
@@ -711,7 +799,9 @@ def _canonical_explicit_version(
         return None
 
     versioned = re.fullmatch(r"(?P<document>.+)-(?P<version>\d+)\.md", source_path.name)
-    looks_canonical = versioned is not None or source_path.name.startswith(f"{bridge_id}-")
+    looks_canonical = versioned is not None or source_path.name.startswith(
+        f"{bridge_id}-"
+    )
     if versioned is None:
         if looks_canonical:
             raise SystemExit(
@@ -731,7 +821,9 @@ def _canonical_explicit_version(
     try:
         rel_path = source_path.relative_to(bridge_root.parent).as_posix()
     except ValueError as exc:
-        raise SystemExit("ERR_EXPLICIT_BRIDGE_SOURCE_ESCAPE: canonical source escapes the project root") from exc
+        raise SystemExit(
+            "ERR_EXPLICIT_BRIDGE_SOURCE_ESCAPE: canonical source escapes the project root"
+        ) from exc
     return BridgeVersion(
         status=status,
         rel_path=rel_path,
@@ -750,7 +842,9 @@ def _source_identity(version: BridgeVersion | None) -> dict[str, Any] | None:
     }
 
 
-def _stable_applicable_specs(applicable: dict[str, ApplicableSpec]) -> dict[str, dict[str, Any]]:
+def _stable_applicable_specs(
+    applicable: dict[str, ApplicableSpec],
+) -> dict[str, dict[str, Any]]:
     return {
         spec_id: {
             "spec_id": item.spec_id,
@@ -762,7 +856,9 @@ def _stable_applicable_specs(applicable: dict[str, ApplicableSpec]) -> dict[str,
     }
 
 
-def _packet_hash_material(packet: dict[str, Any], applicable: dict[str, ApplicableSpec]) -> dict[str, Any]:
+def _packet_hash_material(
+    packet: dict[str, Any], applicable: dict[str, ApplicableSpec]
+) -> dict[str, Any]:
     pauth = packet.get("project_authorization_operation_time") or {}
     stable_pauth = {
         "applicable": pauth.get("applicable"),
@@ -814,7 +910,9 @@ def _packet_hash_material(packet: dict[str, Any], applicable: dict[str, Applicab
         "missing_advisory_specs": packet["missing_advisory_specs"],
         "project_authorization_operation_time": stable_pauth,
     }
-    if set(material) != PACKET_HASH_MATERIAL_KEYS:  # pragma: no cover - construction invariant
+    if (
+        set(material) != PACKET_HASH_MATERIAL_KEYS
+    ):  # pragma: no cover - construction invariant
         raise RuntimeError("packet hash material key set drifted")
     return material
 
@@ -832,7 +930,9 @@ def _pauth_phase(content: str, versions: list[BridgeVersion]) -> str | None:
         return "finalization"
     if PAUTH_METADATA_RE.search(content) and extract_declared_target_paths(content):
         status = _status_from_content(content)
-        if status in {"NEW", "REVISED"} and any(version.status == "GO" for version in versions):
+        if status in {"NEW", "REVISED"} and any(
+            version.status == "GO" for version in versions
+        ):
             return "finalization"
         return "proposal"
     return None
@@ -853,7 +953,10 @@ def _approved_proposal_for_report(
 
     def approved_by_go(proposal: BridgeVersion) -> bool:
         for verdict in versions:
-            if verdict.status != "GO" or verdict.version_number <= proposal.version_number:
+            if (
+                verdict.status != "GO"
+                or verdict.version_number <= proposal.version_number
+            ):
                 continue
             if report_version is not None and verdict.version_number >= report_version:
                 continue
@@ -861,8 +964,13 @@ def _approved_proposal_for_report(
                 verdict_content = verdict.abs_path.read_text(encoding="utf-8")
             except OSError:
                 continue
-            for reference_slug, reference_version in OPERATIVE_REFERENCE_RE.findall(verdict_content):
-                if reference_slug == bridge_id and int(reference_version) == proposal.version_number:
+            for reference_slug, reference_version in OPERATIVE_REFERENCE_RE.findall(
+                verdict_content
+            ):
+                if (
+                    reference_slug == bridge_id
+                    and int(reference_version) == proposal.version_number
+                ):
                     return True
         return False
 
@@ -870,13 +978,32 @@ def _approved_proposal_for_report(
     if explicit:
         explicit_slug, explicit_version_text = explicit.groups()
         if explicit_slug != bridge_id:
-            return None, None, f"Approved proposal references a different bridge thread: {explicit_slug}"
+            return (
+                None,
+                None,
+                f"Approved proposal references a different bridge thread: {explicit_slug}",
+            )
         explicit_version = int(explicit_version_text)
-        match = next((version for version in versions if version.version_number == explicit_version), None)
+        match = next(
+            (
+                version
+                for version in versions
+                if version.version_number == explicit_version
+            ),
+            None,
+        )
         if match is None:
-            return None, None, f"Approved proposal version is absent: bridge/{bridge_id}-{explicit_version:03d}.md"
+            return (
+                None,
+                None,
+                f"Approved proposal version is absent: bridge/{bridge_id}-{explicit_version:03d}.md",
+            )
         if report_version is not None and explicit_version >= report_version:
-            return None, None, "Approved proposal must precede the implementation report"
+            return (
+                None,
+                None,
+                "Approved proposal must precede the implementation report",
+            )
         try:
             proposal_content = match.abs_path.read_text(encoding="utf-8")
         except OSError as exc:
@@ -888,7 +1015,11 @@ def _approved_proposal_for_report(
                 f"Approved proposal metadata does not identify a proposal-kind artifact: {match.rel_path}",
             )
         if not approved_by_go(match):
-            return None, None, f"Approved proposal has no matching earlier GO verdict: {match.rel_path}"
+            return (
+                None,
+                None,
+                f"Approved proposal has no matching earlier GO verdict: {match.rel_path}",
+            )
         return proposal_content, match.rel_path, None
 
     candidates: list[tuple[BridgeVersion, str]] = []
@@ -899,7 +1030,9 @@ def _approved_proposal_for_report(
             candidate_content = version.abs_path.read_text(encoding="utf-8")
         except OSError:
             continue
-        if _bridge_kind(candidate_content) in PROPOSAL_BRIDGE_KINDS and approved_by_go(version):
+        if _bridge_kind(candidate_content) in PROPOSAL_BRIDGE_KINDS and approved_by_go(
+            version
+        ):
             candidates.append((version, candidate_content))
     if not candidates:
         # WI-5837 Slice A: legacy bridge-kind tolerance. Pre-convention versions
@@ -916,7 +1049,10 @@ def _approved_proposal_for_report(
                 continue
             if _bridge_kind(candidate_content) is not None:
                 continue  # only tolerate versions with NO marker
-            if APPROVED_PROPOSAL_RE.search(candidate_content) or "Controlling GO:" in candidate_content:
+            if (
+                APPROVED_PROPOSAL_RE.search(candidate_content)
+                or "Controlling GO:" in candidate_content
+            ):
                 continue  # report-shaped legacy artifact
             if not extract_declared_target_paths(candidate_content):
                 continue
@@ -924,15 +1060,55 @@ def _approved_proposal_for_report(
                 continue
             legacy.append((version, candidate_content))
         if legacy:
-            proposal, proposal_content = max(legacy, key=lambda item: item[0].version_number)
+            proposal, proposal_content = max(
+                legacy, key=lambda item: item[0].version_number
+            )
             return proposal_content, proposal.rel_path, None
         return (
             None,
             None,
             "Implementation report has no readable earlier proposal-kind artifact with a matching GO verdict",
         )
-    proposal, proposal_content = max(candidates, key=lambda item: item[0].version_number)
+    proposal, proposal_content = max(
+        candidates, key=lambda item: item[0].version_number
+    )
     return proposal_content, proposal.rel_path, None
+
+
+NUMBERED_BRIDGE_FILE_RE: Final[re.Pattern[str]] = re.compile(
+    r"^bridge/[A-Za-z0-9_.-]+-\d{3}\.md$"
+)
+
+
+def _is_numbered_bridge_file(path: str) -> bool:
+    normalized = path.replace("\\", "/").strip().strip("/")
+    return NUMBERED_BRIDGE_FILE_RE.fullmatch(normalized) is not None
+
+
+def _durable_implementation_targets(paths: set[str]) -> set[str]:
+    return {path for path in paths if not _is_numbered_bridge_file(path)}
+
+
+def _finalization_coordination_paths(
+    *,
+    bridge_id: str,
+    versions: list[BridgeVersion],
+    source_horizon_version: int | None = None,
+) -> list[str]:
+    """Numbered bridge files are diagnostic coordination only (WI-6529).
+
+    WI-6140 horizon pinning is preserved here so a later sibling cannot expand
+    the diagnostic chain of an already-hashed canonical source. These paths
+    are never PAUTH implementation targets.
+    """
+    if source_horizon_version is not None:
+        next_version = source_horizon_version + 1
+    else:
+        observed_versions = [version.version_number for version in versions]
+        next_version = max(observed_versions, default=0) + 1
+    return [
+        f"bridge/{bridge_id}-{version:03d}.md" for version in range(1, next_version + 1)
+    ]
 
 
 def _pauth_phase_cohort(
@@ -945,28 +1121,24 @@ def _pauth_phase_cohort(
     approved_proposal_content: str | None = None,
     source_horizon_version: int | None = None,
 ) -> list[str]:
-    cohort = set(declared_target_paths)
+    """Return durable implementation targets for operation-time PAUTH.
+
+    Numbered ``bridge/`` files are excluded. Callers that need the diagnostic
+    numbered-file chain should use ``_finalization_coordination_paths``.
+    """
+    _ = content
+    implementation_targets = _durable_implementation_targets(declared_target_paths)
     if phase != "finalization":
-        return sorted(cohort)
+        return sorted(implementation_targets)
 
     if approved_proposal_content is not None:
-        cohort.update(extract_declared_target_paths(approved_proposal_content))
-
-    if source_horizon_version is not None:
-        # WI-6140: only an explicitly resolved canonical numbered source is the
-        # packet's observation horizon. Its prospective verdict is exactly the
-        # immediate successor; newer siblings must not make unchanged
-        # responded-to bytes synthesize a later cohort member and invalidate
-        # their own packet hash.
-        next_version = source_horizon_version + 1
-    else:
-        # Legacy, scanned, and noncanonical draft content retains the
-        # observed-chain fallback even when its body contains stale Version
-        # metadata, because no exact canonical source horizon was resolved.
-        observed_versions = [version.version_number for version in versions]
-        next_version = max(observed_versions, default=0) + 1
-    cohort.update(f"bridge/{bridge_id}-{version:03d}.md" for version in range(1, next_version + 1))
-    return sorted(cohort)
+        implementation_targets.update(
+            _durable_implementation_targets(
+                extract_declared_target_paths(approved_proposal_content)
+            )
+        )
+    _ = bridge_id, versions, source_horizon_version
+    return sorted(implementation_targets)
 
 
 def _evaluate_pauth_phase(
@@ -1014,9 +1186,13 @@ def _evaluate_pauth_phase(
                 "implementation-bearing bridge content does not cite Project Authorization metadata"
             )
         if _evaluate_envelope is None or _load_operation_taxonomy is None:
-            raise AuthorizationError("canonical project-authorization operation evaluator is unavailable")
+            raise AuthorizationError(
+                "canonical project-authorization operation evaluator is unavailable"
+            )
         taxonomy = _load_operation_taxonomy(project_root)
-        effective_decision_time = (decision_time or datetime.now(UTC)).replace(microsecond=0)
+        effective_decision_time = (decision_time or datetime.now(UTC)).replace(
+            microsecond=0
+        )
         decisions = [
             _evaluate_envelope(
                 envelope,
@@ -1038,16 +1214,32 @@ def _evaluate_pauth_phase(
                 "status": "allowed" if allowed else "denied",
                 "reason_code": "allowed"
                 if allowed
-                else next(decision.reason_code for decision in decisions if not decision.allowed),
+                else next(
+                    decision.reason_code
+                    for decision in decisions
+                    if not decision.allowed
+                ),
                 "decisions": decision_payloads,
                 "target_classifications": (
-                    decision_payloads[0].get("classified_targets", []) if decision_payloads else []
+                    decision_payloads[0].get("classified_targets", [])
+                    if decision_payloads
+                    else []
                 ),
-                "evaluator_id": decision_payloads[0].get("evaluator_id") if decision_payloads else None,
-                "evaluator_version": decision_payloads[0].get("evaluator_version") if decision_payloads else None,
-                "evaluator_sha256": decision_payloads[0].get("evaluator_sha256") if decision_payloads else None,
-                "taxonomy_version": decision_payloads[0].get("taxonomy_version") if decision_payloads else None,
-                "taxonomy_sha256": decision_payloads[0].get("taxonomy_sha256") if decision_payloads else None,
+                "evaluator_id": decision_payloads[0].get("evaluator_id")
+                if decision_payloads
+                else None,
+                "evaluator_version": decision_payloads[0].get("evaluator_version")
+                if decision_payloads
+                else None,
+                "evaluator_sha256": decision_payloads[0].get("evaluator_sha256")
+                if decision_payloads
+                else None,
+                "taxonomy_version": decision_payloads[0].get("taxonomy_version")
+                if decision_payloads
+                else None,
+                "taxonomy_sha256": decision_payloads[0].get("taxonomy_sha256")
+                if decision_payloads
+                else None,
             }
         )
         errors = [
@@ -1120,7 +1312,9 @@ def build_packet(
     required = {sid for sid, item in applicable.items() if item.severity == "blocking"}
     missing_required = sorted(required - cited_specs)
     advisory_missing = sorted(
-        sid for sid, item in applicable.items() if item.severity != "blocking" and sid not in cited_specs
+        sid
+        for sid, item in applicable.items()
+        if item.severity != "blocking" and sid not in cited_specs
     )
     blocking_errors = _pauth_amendment_blocking_errors(content, project_root, db_path)
     pauth_phase = _pauth_phase(content, versions)
@@ -1146,8 +1340,28 @@ def build_packet(
         declared_target_paths=declared_target_paths,
         versions=versions,
         approved_proposal_content=approved_content,
-        source_horizon_version=explicit_version.version_number if explicit_version is not None else None,
+        source_horizon_version=explicit_version.version_number
+        if explicit_version is not None
+        else None,
     )
+    coordination_paths = (
+        _finalization_coordination_paths(
+            bridge_id=bridge_id,
+            versions=versions,
+            source_horizon_version=explicit_version.version_number
+            if explicit_version is not None
+            else None,
+        )
+        if pauth_phase == "finalization"
+        else []
+    )
+    undeclared_implementation_targets: list[str] = []
+    if pauth_phase == "finalization" and approved_content is not None:
+        approved_durable = _durable_implementation_targets(
+            extract_declared_target_paths(approved_content)
+        )
+        report_durable = _durable_implementation_targets(declared_target_paths)
+        undeclared_implementation_targets = sorted(report_durable - approved_durable)
     if proposal_error is not None:
         pauth_operation_time = {
             "applicable": True,
@@ -1155,13 +1369,35 @@ def build_packet(
             "status": "error",
             "requested_operations": list(PAUTH_PHASE_OPERATIONS[pauth_phase]),
             "cohort": pauth_cohort,
+            "coordination_paths": coordination_paths,
             "allowed": False,
             "reason_code": "approved_proposal_resolution_failed",
             "authorization_source": None,
             "decisions": [],
             "error": proposal_error,
         }
-        pauth_errors = [f"PAUTH operation-time evaluation failed closed: {proposal_error}"]
+        pauth_errors = [
+            f"PAUTH operation-time evaluation failed closed: {proposal_error}"
+        ]
+    elif undeclared_implementation_targets:
+        pauth_operation_time = {
+            "applicable": True,
+            "phase": pauth_phase,
+            "status": "denied",
+            "requested_operations": list(PAUTH_PHASE_OPERATIONS[pauth_phase]),
+            "cohort": pauth_cohort,
+            "coordination_paths": coordination_paths,
+            "undeclared_implementation_targets": undeclared_implementation_targets,
+            "allowed": False,
+            "reason_code": "undeclared_implementation_target",
+            "authorization_source": authorization_source,
+            "decisions": [],
+        }
+        pauth_errors = [
+            "PAUTH operation-time denial (undeclared_implementation_target): "
+            "report durable targets absent from the approved proposal: "
+            + ", ".join(undeclared_implementation_targets)
+        ]
     else:
         pauth_operation_time, pauth_errors = _evaluate_pauth_phase(
             content=authorization_content,
@@ -1171,6 +1407,7 @@ def build_packet(
             cited_specs=authorization_specs,
             authorization_source=authorization_source,
         )
+        pauth_operation_time["coordination_paths"] = coordination_paths
     blocking_errors.extend(pauth_errors)
     packet: dict[str, Any] = {
         "packet_hash_schema_version": PACKET_HASH_SCHEMA_VERSION,
@@ -1193,13 +1430,19 @@ def build_packet(
         "declared_target_paths": sorted(declared_target_paths),
         "applicability_path_evidence": sorted(applicability_path_evidence),
         "warnings": {
-            "missing_parent_dirs": compute_missing_parent_dir_warnings(project_root, cited_implementation_paths),
+            "missing_parent_dirs": compute_missing_parent_dir_warnings(
+                project_root, cited_implementation_paths
+            ),
             "spec_links_section": classify_spec_links_section(content),
             "author_metadata_warnings": _check_author_metadata_presence(content),
-            "unclassified_target_paths": _check_unclassified_target_paths(declared_target_paths),
+            "unclassified_target_paths": _check_unclassified_target_paths(
+                declared_target_paths
+            ),
         },
         "work_items": work_items,
-        "applicable_specs": {sid: asdict(item) for sid, item in sorted(applicable.items())},
+        "applicable_specs": {
+            sid: asdict(item) for sid, item in sorted(applicable.items())
+        },
         "missing_required_specs": missing_required,
         "missing_advisory_specs": advisory_missing,
         "project_authorization_operation_time": pauth_operation_time,
@@ -1207,8 +1450,12 @@ def build_packet(
         "preflight_passed": not missing_required and not blocking_errors,
     }
     packet["packet_hash_material"] = _packet_hash_material(packet, applicable)
-    canonical = json.dumps(packet["packet_hash_material"], sort_keys=True, separators=(",", ":"))
-    packet["packet_hash"] = "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    canonical = json.dumps(
+        packet["packet_hash_material"], sort_keys=True, separators=(",", ":")
+    )
+    packet["packet_hash"] = (
+        "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    )
     return packet
 
 
@@ -1267,6 +1514,7 @@ def format_markdown(packet: dict[str, Any]) -> str:
             f"- authorization_source: `{pauth.get('authorization_source')}`",
             f"- requested_operations: {json.dumps(pauth.get('requested_operations', []))}",
             f"- cohort: {json.dumps(pauth.get('cohort', []))}",
+            f"- coordination_paths: {json.dumps(pauth.get('coordination_paths', []))}",
             f"- allowed: `{str(pauth.get('allowed')).lower()}`",
             f"- evaluator: `{pauth.get('evaluator_id')}` v`{pauth.get('evaluator_version')}`",
             f"- evaluator_sha256: `{pauth.get('evaluator_sha256')}`",
@@ -1286,7 +1534,10 @@ def format_markdown(packet: dict[str, Any]) -> str:
                 f"`{str(decision.get('allowed')).lower()}` | "
                 f"`{decision.get('reason_code')}` | {reason} |"
             )
-    if packet.get("missing_required_specs") and spec_links_diag.get("status") == "heading_unrecognized":
+    if (
+        packet.get("missing_required_specs")
+        and spec_links_diag.get("status") == "heading_unrecognized"
+    ):
         lines.append(
             "- NOTE: a Specification-Links-like heading "
             f"({json.dumps(spec_links_diag.get('candidate_heading'))}) was found "
@@ -1302,7 +1553,9 @@ def format_markdown(packet: dict[str, Any]) -> str:
     cited = set(packet["cited_specs"])
     for spec_id, item in packet["applicable_specs"].items():
         matched = ", ".join(item["matched_by"])
-        lines.append(f"| `{spec_id}` | `{item['severity']}` | `{'yes' if spec_id in cited else 'no'}` | {matched} |")
+        lines.append(
+            f"| `{spec_id}` | `{item['severity']}` | `{'yes' if spec_id in cited else 'no'}` | {matched} |"
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -1317,10 +1570,16 @@ def prepare_verdict_candidate(
     """Rebuild exact-source applicability evidence for final verdict bytes."""
 
     normalized = _normalize_lf(content)
-    status = next((line.strip().upper() for line in normalized.splitlines() if line.strip()), "")
+    status = next(
+        (line.strip().upper() for line in normalized.splitlines() if line.strip()), ""
+    )
     if status not in VERDICT_CANDIDATE_STATUSES:
-        raise VerdictCandidatePreparationError("candidate preparation is limited to GO, NO-GO, and VERIFIED verdicts")
-    candidate_relative, _ = normalize_verdict_candidate_path(candidate_path, project_root)
+        raise VerdictCandidatePreparationError(
+            "candidate preparation is limited to GO, NO-GO, and VERIFIED verdicts"
+        )
+    candidate_relative, _ = normalize_verdict_candidate_path(
+        candidate_path, project_root
+    )
     source_relative, source_path, bridge_id = resolve_verdict_responds_to_source(
         candidate_path=candidate_relative,
         content=normalized,
@@ -1330,20 +1589,26 @@ def prepare_verdict_candidate(
     packet = build_packet(
         bridge_id=bridge_id,
         bridge_dir=project_root / "bridge",
-        config_path=config_path or project_root / "config" / "governance" / "spec-applicability.toml",
+        config_path=config_path
+        or project_root / "config" / "governance" / "spec-applicability.toml",
         db_path=db_path or project_root / "groundtruth.db",
         content_file=source_path,
     )
     rebuilt_section = format_markdown(packet)
     content_anchor = f"- content_file: `{source_relative}`"
     if content_anchor not in rebuilt_section:
-        raise VerdictCandidatePreparationError("rebuilt applicability packet did not bind the exact Responds to source")
+        raise VerdictCandidatePreparationError(
+            "rebuilt applicability packet did not bind the exact Responds to source"
+        )
     packet_hash_line = f"- packet_hash: `{packet['packet_hash']}`\n"
     if rebuilt_section.count(packet_hash_line) != 1:
-        raise VerdictCandidatePreparationError("rebuilt applicability packet has an ambiguous packet_hash field")
+        raise VerdictCandidatePreparationError(
+            "rebuilt applicability packet has an ambiguous packet_hash field"
+        )
     rebuilt_section = rebuilt_section.replace(
         packet_hash_line,
-        packet_hash_line + f"- candidate_evidence_hash: `{CANDIDATE_EVIDENCE_HASH_SENTINEL}`\n",
+        packet_hash_line
+        + f"- candidate_evidence_hash: `{CANDIDATE_EVIDENCE_HASH_SENTINEL}`\n",
         1,
     )
     prefix = normalized[:section_start]
@@ -1359,7 +1624,9 @@ def prepare_verdict_candidate(
         prepared,
     )
     if replacements != 1:  # pragma: no cover - construction invariant
-        raise VerdictCandidatePreparationError("candidate evidence insertion was not singular")
+        raise VerdictCandidatePreparationError(
+            "candidate evidence insertion was not singular"
+        )
     return prepared
 
 
@@ -1370,7 +1637,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Bridge document name / versioned bridge-thread slug. Optional when --content-file is supplied.",
     )
     parser.add_argument(
-        "--content-file", type=Path, default=None, help="Evaluate pending Markdown content from a file."
+        "--content-file",
+        type=Path,
+        default=None,
+        help="Evaluate pending Markdown content from a file.",
     )
     parser.add_argument(
         "--prepare-verdict-candidate",
@@ -1386,7 +1656,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--bridge-dir", type=Path, default=DEFAULT_BRIDGE_DIR)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
-    parser.add_argument("--json", action="store_true", help="Emit JSON instead of Markdown.")
+    parser.add_argument(
+        "--json", action="store_true", help="Emit JSON instead of Markdown."
+    )
     return parser
 
 
@@ -1395,9 +1667,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.prepare_verdict_candidate:
         if args.content_file is None or args.candidate_path is None:
-            parser.error("--prepare-verdict-candidate requires --content-file and --candidate-path")
+            parser.error(
+                "--prepare-verdict-candidate requires --content-file and --candidate-path"
+            )
         if args.json:
-            parser.error("--prepare-verdict-candidate is incompatible with --json report output")
+            parser.error(
+                "--prepare-verdict-candidate is incompatible with --json report output"
+            )
         try:
             prepared = prepare_verdict_candidate(
                 candidate_path=args.candidate_path,
@@ -1439,7 +1715,9 @@ def main(argv: list[str] | None = None) -> int:
             + ", ".join(str(path) for path in missing_parent_dirs)
             + "\n"
         )
-    pauth_status = (packet.get("project_authorization_operation_time") or {}).get("status")
+    pauth_status = (packet.get("project_authorization_operation_time") or {}).get(
+        "status"
+    )
     if pauth_status == "error":
         return 6
     return 0 if packet["preflight_passed"] else 5
