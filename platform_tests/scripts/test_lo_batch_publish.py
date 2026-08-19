@@ -34,7 +34,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = REPO_ROOT / "scripts" / "lo_batch_publish.py"
 
-UUID_RE = re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b")
+UUID_RE = re.compile(
+    r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
+)
 ISO_DATE_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 
 REVIEWER_SESSION = "11111111-2222-3333-4444-555555555555"
@@ -67,7 +69,9 @@ def author_metadata():
     }
 
 
-def _write_artifact(path: Path, *, author_session: str | None, status: str = "NEW") -> Path:
+def _write_artifact(
+    path: Path, *, author_session: str | None, status: str = "NEW"
+) -> Path:
     lines = [status, ""]
     if author_session is not None:
         lines.append(f"author_session_context_id: {author_session}")
@@ -83,7 +87,9 @@ def _write_artifact(path: Path, *, author_session: str | None, status: str = "NE
 
 def test_t1_self_review_is_refused(mod, tmp_path):
     """Publication is refused when the reviewer session authored the predecessor."""
-    artifact = _write_artifact(tmp_path / "thread-001.md", author_session=REVIEWER_SESSION)
+    artifact = _write_artifact(
+        tmp_path / "thread-001.md", author_session=REVIEWER_SESSION
+    )
     with pytest.raises(mod.ReviewIndependenceError) as excinfo:
         mod.assert_review_independence(REVIEWER_SESSION, artifact)
     assert "self-review refused" in str(excinfo.value)
@@ -106,7 +112,9 @@ def test_t2_unreadable_artifact_fails_closed(mod, tmp_path):
 
 def test_t1_distinct_sessions_are_accepted(mod, tmp_path):
     """A genuinely independent predecessor returns its author session."""
-    artifact = _write_artifact(tmp_path / "thread-001.md", author_session=AUTHOR_SESSION)
+    artifact = _write_artifact(
+        tmp_path / "thread-001.md", author_session=AUTHOR_SESSION
+    )
     assert mod.assert_review_independence(REVIEWER_SESSION, artifact) == AUTHOR_SESSION
 
 
@@ -140,7 +148,9 @@ def test_t3_body_carries_runtime_session(mod, author_metadata):
 
 def test_t3_provenance_fails_closed_without_session(mod, tmp_path, monkeypatch):
     """Unresolvable session provenance raises rather than substituting a placeholder."""
-    monkeypatch.setattr(mod, "load_author_metadata", lambda *a, **k: {"author_identity": "lo/cursor"})
+    monkeypatch.setattr(
+        mod, "load_author_metadata", lambda *a, **k: {"author_identity": "lo/cursor"}
+    )
     with pytest.raises(mod.PublisherProvenanceError):
         mod.resolve_publisher_identity(tmp_path, env={})
 
@@ -180,13 +190,17 @@ def test_t4_body_uses_supplied_runtime_date(mod, author_metadata):
 def test_t5_absent_deliberations_disclose_rather_than_claim(mod):
     """With no supplied citations, the body discloses what was done, not a result."""
     rendered = mod.prior_deliberations_markdown({"slug": "thread"})
-    assert "No deliberation search was performed by this publishing transport" in rendered
+    assert (
+        "No deliberation search was performed by this publishing transport" in rendered
+    )
     assert "not a finding that no prior deliberations exist" in rendered
 
 
 def test_t5_supplied_deliberations_are_rendered(mod):
     """Reviewer-supplied citations are rendered verbatim."""
-    rendered = mod.prior_deliberations_markdown({"prior_deliberations": ["DELIB-1", "DELIB-2"]})
+    rendered = mod.prior_deliberations_markdown(
+        {"prior_deliberations": ["DELIB-1", "DELIB-2"]}
+    )
     assert "- DELIB-1" in rendered and "- DELIB-2" in rendered
     assert "No deliberation search was performed" not in rendered
 
@@ -199,8 +213,12 @@ def test_t5_supplied_deliberations_are_rendered(mod):
 def test_t6_batch_publication_is_throttled(mod, monkeypatch, author_metadata):
     """Successive publications are separated by the configured minimum interval."""
     slept: list[float] = []
-    monkeypatch.setattr(mod, "resolve_publisher_identity", lambda *a, **k: author_metadata)
-    monkeypatch.setattr(mod, "publish_one", lambda item, **kwargs: {"slug": item["slug"], "ok": True})
+    monkeypatch.setattr(
+        mod, "resolve_publisher_identity", lambda *a, **k: author_metadata
+    )
+    monkeypatch.setattr(
+        mod, "publish_one", lambda item, **kwargs: {"slug": item["slug"], "ok": True}
+    )
 
     items = [{"slug": f"thread-{i}", "verdict": "GO"} for i in range(4)]
     results = mod.publish_batch(items, min_interval_seconds=7.5, sleep=slept.append)
@@ -214,14 +232,24 @@ def test_t6_batch_publication_is_throttled(mod, monkeypatch, author_metadata):
 def test_t6_no_delay_before_first_publication(mod, monkeypatch, author_metadata):
     """A single-item batch publishes without an artificial leading delay."""
     slept: list[float] = []
-    monkeypatch.setattr(mod, "resolve_publisher_identity", lambda *a, **k: author_metadata)
-    monkeypatch.setattr(mod, "publish_one", lambda item, **kwargs: {"slug": item["slug"], "ok": True})
+    monkeypatch.setattr(
+        mod, "resolve_publisher_identity", lambda *a, **k: author_metadata
+    )
+    monkeypatch.setattr(
+        mod, "publish_one", lambda item, **kwargs: {"slug": item["slug"], "ok": True}
+    )
 
-    mod.publish_batch([{"slug": "only", "verdict": "GO"}], min_interval_seconds=5.0, sleep=slept.append)
+    mod.publish_batch(
+        [{"slug": "only", "verdict": "GO"}],
+        min_interval_seconds=5.0,
+        sleep=slept.append,
+    )
     assert slept == []
 
 
-def test_t6_contention_is_retried_with_exponential_backoff(mod, tmp_path, monkeypatch, author_metadata):
+def test_t6_contention_is_retried_with_exponential_backoff(
+    mod, tmp_path, monkeypatch, author_metadata
+):
     """Contention-shaped publication failures back off exponentially, then succeed."""
     bridge = tmp_path / "bridge"
     bridge.mkdir()
@@ -233,7 +261,9 @@ def test_t6_contention_is_retried_with_exponential_backoff(mod, tmp_path, monkey
     def flaky(*args, **kwargs):
         attempts["n"] += 1
         if attempts["n"] < 3:
-            raise RuntimeError("another bridge publication capability is active for bridge/x.md")
+            raise RuntimeError(
+                "another bridge publication capability is active for bridge/x.md"
+            )
 
         class _Published:
             def to_dict(self):
@@ -241,7 +271,9 @@ def test_t6_contention_is_retried_with_exponential_backoff(mod, tmp_path, monkey
 
         return _Published()
 
-    monkeypatch.setattr(mod, "prepare_verdict_candidate", lambda **kwargs: kwargs["content"])
+    monkeypatch.setattr(
+        mod, "prepare_verdict_candidate", lambda **kwargs: kwargs["content"]
+    )
     monkeypatch.setattr(mod, "acquire", lambda *a, **k: True)
     monkeypatch.setattr(mod, "release", lambda *a, **k: None)
     monkeypatch.setattr(mod, "publish_lo_verdict", flaky)
@@ -259,7 +291,9 @@ def test_t6_contention_is_retried_with_exponential_backoff(mod, tmp_path, monkey
     assert slept == [2.0, 4.0]
 
 
-def test_t6_non_contention_failure_is_not_retried(mod, tmp_path, monkeypatch, author_metadata):
+def test_t6_non_contention_failure_is_not_retried(
+    mod, tmp_path, monkeypatch, author_metadata
+):
     """A deterministic (non-contention) failure fails fast instead of spinning."""
     bridge = tmp_path / "bridge"
     bridge.mkdir()
@@ -270,7 +304,9 @@ def test_t6_non_contention_failure_is_not_retried(mod, tmp_path, monkeypatch, au
     def boom(*args, **kwargs):
         raise ValueError("malformed verdict body")
 
-    monkeypatch.setattr(mod, "prepare_verdict_candidate", lambda **kwargs: kwargs["content"])
+    monkeypatch.setattr(
+        mod, "prepare_verdict_candidate", lambda **kwargs: kwargs["content"]
+    )
     monkeypatch.setattr(mod, "acquire", lambda *a, **k: True)
     monkeypatch.setattr(mod, "release", lambda *a, **k: None)
     monkeypatch.setattr(mod, "publish_lo_verdict", boom)
@@ -291,7 +327,9 @@ def test_t6_non_actionable_predecessor_is_refused(mod, tmp_path, author_metadata
     """A predecessor whose latest status is terminal is not published over."""
     bridge = tmp_path / "bridge"
     bridge.mkdir()
-    _write_artifact(bridge / "thread-001.md", author_session=AUTHOR_SESSION, status="VERIFIED")
+    _write_artifact(
+        bridge / "thread-001.md", author_session=AUTHOR_SESSION, status="VERIFIED"
+    )
 
     result = mod.publish_one(
         {"slug": "thread", "verdict": "GO"},
@@ -300,6 +338,53 @@ def test_t6_non_actionable_predecessor_is_refused(mod, tmp_path, author_metadata
     )
     assert result["ok"] is False
     assert result["error"].startswith("latest_status_not_actionable:VERIFIED")
+
+
+def test_publish_one_retries_occupancy_with_fresh_slug_listing(
+    mod, tmp_path, monkeypatch, author_metadata
+):
+    """A lost create rebuilds Version from a fresh per-slug listing, not latest+1 once."""
+    bridge = tmp_path / "bridge"
+    bridge.mkdir()
+    _write_artifact(bridge / "thread-001.md", author_session=AUTHOR_SESSION)
+    versions: list[int] = []
+    slept: list[float] = []
+
+    class _Published:
+        def to_dict(self):
+            return {"verdict_path": "bridge/thread-003.md"}
+
+    def flaky(_slug, _verdict, body, _project_root, **_kwargs):
+        match = re.search(r"(?im)^Version:\s*`?(\d{3})", body)
+        assert match is not None
+        version = int(match.group(1))
+        versions.append(version)
+        if len(versions) == 1:
+            (bridge / "thread-002.md").write_text("GO\nracer\n", encoding="utf-8")
+            raise RuntimeError(
+                "bridge/thread-002.md already exists; refusing to overwrite"
+            )
+        return _Published()
+
+    monkeypatch.setattr(
+        mod, "prepare_verdict_candidate", lambda **kwargs: kwargs["content"]
+    )
+    monkeypatch.setattr(mod, "acquire", lambda *a, **k: True)
+    monkeypatch.setattr(mod, "release", lambda *a, **k: None)
+    monkeypatch.setattr(mod, "publish_lo_verdict", flaky)
+
+    result = mod.publish_one(
+        {"slug": "thread", "verdict": "GO", "summary": "ok", "version": 2},
+        project_root=tmp_path,
+        author_metadata=author_metadata,
+        backoff_base_seconds=0.5,
+        sleep=slept.append,
+    )
+
+    assert result["ok"] is True
+    assert versions == [2, 3]
+    assert result["attempts"] == 2
+    assert slept == [0.5]
 
 
 # ---------------------------------------------------------------------------

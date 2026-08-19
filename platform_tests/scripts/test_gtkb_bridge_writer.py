@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -28,7 +29,6 @@ from scripts.gtkb_bridge_writer import (
     PRIME_STATUSES,
     VALID_STATUSES,
     BridgeComplianceError,
-    BridgeConflictError,
     BridgeEnvelopeError,
     BridgePublicationError,
     BridgeTransitionError,
@@ -47,7 +47,9 @@ AUTHOR_METADATA = {
 }
 
 
-def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+def _git(
+    repo: Path, *args: str, check: bool = True
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", *args],
         cwd=repo,
@@ -73,7 +75,9 @@ def _author_metadata_lines(session_id: str = "reviewed-session") -> str:
 
 def _valid_proposal_body(*, include_requirement_sufficiency: bool = True) -> str:
     requirement_sufficiency = (
-        "## Requirement Sufficiency\n\nExisting requirements sufficient.\n\n" if include_requirement_sufficiency else ""
+        "## Requirement Sufficiency\n\nExisting requirements sufficient.\n\n"
+        if include_requirement_sufficiency
+        else ""
     )
     return (
         "NEW\n\n"
@@ -174,7 +178,9 @@ def _valid_verified_verdict() -> str:
     )
 
 
-def _stage_reviewed_file(tmp_path: Path, slug: str, version: int = 1, status: str = "NEW") -> None:
+def _stage_reviewed_file(
+    tmp_path: Path, slug: str, version: int = 1, status: str = "NEW"
+) -> None:
     _write_applicability_config(tmp_path)
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir(exist_ok=True)
@@ -243,7 +249,9 @@ def _enable_real_typed_publication(tmp_path: Path, slug: str, session_id: str) -
     packaged.write_bytes(payload)
     db_path = tmp_path / "groundtruth.db"
     KnowledgeDB(db_path=db_path)
-    sync_projection([record], db_path, changed_by="test", change_reason="writer crash fixture")
+    sync_projection(
+        [record], db_path, changed_by="test", change_reason="writer crash fixture"
+    )
     append_passive_observation(
         record_ids=[record.id],
         actor_session=session_id,
@@ -263,10 +271,16 @@ def _typed_publication_content(status: str, document_name: str, version: int) ->
     )
 
 
-def test_write_bridge_file_creates_numbered_file_with_metadata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+def test_write_bridge_file_creates_numbered_file_with_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"}
+    )
 
-    path = write_bridge_file("docthing", 1, _valid_proposal_body(), tmp_path, author_metadata=AUTHOR_METADATA)
+    path = write_bridge_file(
+        "docthing", 1, _valid_proposal_body(), tmp_path, author_metadata=AUTHOR_METADATA
+    )
 
     assert path == tmp_path / "bridge" / "docthing-001.md"
     written = path.read_text(encoding="utf-8")
@@ -317,8 +331,12 @@ def test_typed_publication_observes_before_claim_release(
         assert events == ["mint", "consume-current"]
         events.append("release")
 
-    monkeypatch.setattr(registry_control_plane, "mint_bridge_publication_capability", mint)
-    monkeypatch.setattr(registry_control_plane, "consume_bridge_publication_capability", consume)
+    monkeypatch.setattr(
+        registry_control_plane, "mint_bridge_publication_capability", mint
+    )
+    monkeypatch.setattr(
+        registry_control_plane, "consume_bridge_publication_capability", consume
+    )
     monkeypatch.setattr(writer, "_release_claim", release)
 
     path = write_bridge_file(
@@ -343,7 +361,9 @@ def test_pending_publication_sidecar_is_secret_free_and_recovers_after_process_r
     target = tmp_path / relative_target
     events: list[str] = []
 
-    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+    monkeypatch.setattr(
+        writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"}
+    )
     monkeypatch.setattr(writer, "_run_provider_verdict_guards", lambda **_kwargs: ())
     monkeypatch.setattr(
         registry_control_plane,
@@ -371,8 +391,12 @@ def test_pending_publication_sidecar_is_secret_free_and_recovers_after_process_r
             capability_state="consumed",
         )
 
-    monkeypatch.setattr(registry_control_plane, "recover_bridge_publication", recover, raising=False)
-    monkeypatch.setattr(writer, "_release_claim", lambda *_args, **_kwargs: events.append("release"))
+    monkeypatch.setattr(
+        registry_control_plane, "recover_bridge_publication", recover, raising=False
+    )
+    monkeypatch.setattr(
+        writer, "_release_claim", lambda *_args, **_kwargs: events.append("release")
+    )
 
     write_bridge_file(
         document_name,
@@ -383,7 +407,9 @@ def test_pending_publication_sidecar_is_secret_free_and_recovers_after_process_r
         release_claim=False,
     )
 
-    sidecars = list((tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json"))
+    sidecars = list(
+        (tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json")
+    )
     assert len(sidecars) == 1
     assert "raw-secret-must-not-persist" not in sidecars[0].read_text(encoding="utf-8")
     writer._PENDING_BRIDGE_PUBLICATIONS.clear()
@@ -404,7 +430,9 @@ def test_pending_publication_sidecar_rolls_back_after_process_restart(
     target = tmp_path / relative_target
     events: list[tuple[str, str]] = []
 
-    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+    monkeypatch.setattr(
+        writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"}
+    )
     monkeypatch.setattr(writer, "_run_provider_verdict_guards", lambda **_kwargs: ())
     monkeypatch.setattr(
         registry_control_plane,
@@ -425,7 +453,9 @@ def test_pending_publication_sidecar_rolls_back_after_process_restart(
     def recover(**kwargs: object) -> None:
         events.append((str(kwargs["mode"]), str(kwargs["session_id"])))
 
-    monkeypatch.setattr(registry_control_plane, "recover_bridge_publication", recover, raising=False)
+    monkeypatch.setattr(
+        registry_control_plane, "recover_bridge_publication", recover, raising=False
+    )
 
     write_bridge_file(
         document_name,
@@ -435,18 +465,26 @@ def test_pending_publication_sidecar_rolls_back_after_process_restart(
         require_author_metadata=False,
         release_claim=False,
     )
-    sidecars = list((tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json"))
+    sidecars = list(
+        (tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json")
+    )
     assert len(sidecars) == 1
-    assert "rollback-secret-must-not-persist" not in sidecars[0].read_text(encoding="utf-8")
+    assert "rollback-secret-must-not-persist" not in sidecars[0].read_text(
+        encoding="utf-8"
+    )
     writer._PENDING_BRIDGE_PUBLICATIONS.clear()
 
-    writer.rollback_pending_bridge_publication(target, tmp_path, reason="outer transaction failed")
+    writer.rollback_pending_bridge_publication(
+        target, tmp_path, reason="outer transaction failed"
+    )
 
     assert events == [("rollback", "session-123")]
     assert not sidecars[0].exists()
 
 
-def test_hard_exit_between_create_and_consume_recovers_in_fresh_process(tmp_path: Path) -> None:
+def test_hard_exit_between_create_and_consume_recovers_in_fresh_process(
+    tmp_path: Path,
+) -> None:
     document_name = "typed-hard-exit"
     session_id = "session-123"
     _enable_real_typed_publication(tmp_path, document_name, session_id)
@@ -487,7 +525,9 @@ writer.write_bridge_file(
     written = target.read_text(encoding="utf-8")
     assert written.startswith("NEW\n::init gtkb lo\n::open build\n")
     assert f"Document: {document_name}\n" in written
-    sidecars = list((tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json"))
+    sidecars = list(
+        (tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json")
+    )
     assert len(sidecars) == 1
     sidecar = json.loads(sidecars[0].read_text(encoding="utf-8"))
     assert "capability" not in sidecar
@@ -515,7 +555,9 @@ def test_rollback_recovery_is_idempotent_across_hard_exit_windows(
     document_name = f"typed-rollback-{crash_window}"
     session_id = "session-123"
     _enable_real_typed_publication(tmp_path, document_name, session_id)
-    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+    monkeypatch.setattr(
+        writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"}
+    )
     monkeypatch.setattr(writer, "_run_provider_verdict_guards", lambda **_kwargs: ())
     target = write_bridge_file(
         document_name,
@@ -565,14 +607,20 @@ registry_control_plane.recover_bridge_publication(
 
     assert crashed.returncode == expected_exit, crashed.stderr
     assert not target.exists()
-    quarantine = list((tmp_path / ".gtkb-state" / "bridge-publication-recovery").glob("*.rollback"))
+    quarantine = list(
+        (tmp_path / ".gtkb-state" / "bridge-publication-recovery").glob("*.rollback")
+    )
     assert len(quarantine) == 1
 
-    writer.rollback_pending_bridge_publication(target, tmp_path, reason="resume hard-exit rollback")
+    writer.rollback_pending_bridge_publication(
+        target, tmp_path, reason="resume hard-exit rollback"
+    )
 
     assert not target.exists()
     assert not quarantine[0].exists()
-    assert not list((tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json"))
+    assert not list(
+        (tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json")
+    )
 
 
 def test_sidecar_cleanup_failure_does_not_compensate_released_publication(
@@ -584,7 +632,9 @@ def test_sidecar_cleanup_failure_does_not_compensate_released_publication(
     relative_target = f"bridge/{document_name}-001.md"
     target = tmp_path / relative_target
     events: list[str] = []
-    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+    monkeypatch.setattr(
+        writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"}
+    )
     monkeypatch.setattr(writer, "_run_provider_verdict_guards", lambda **_kwargs: ())
     monkeypatch.setattr(
         registry_control_plane,
@@ -601,16 +651,22 @@ def test_sidecar_cleanup_failure_does_not_compensate_released_publication(
         "consume_bridge_publication_capability",
         lambda **_kwargs: events.append("consume"),
     )
-    monkeypatch.setattr(writer, "_release_claim", lambda *_args, **_kwargs: events.append("release"))
+    monkeypatch.setattr(
+        writer, "_release_claim", lambda *_args, **_kwargs: events.append("release")
+    )
     monkeypatch.setattr(
         registry_control_plane,
         "compensate_bridge_publication",
-        lambda **_kwargs: pytest.fail("cleanup failure must not compensate a completed publication"),
+        lambda **_kwargs: pytest.fail(
+            "cleanup failure must not compensate a completed publication"
+        ),
     )
     monkeypatch.setattr(
         writer,
         "_delete_pending_publication_sidecar",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("injected cleanup failure")),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            OSError("injected cleanup failure")
+        ),
     )
 
     written = write_bridge_file(
@@ -633,7 +689,9 @@ def test_restart_recovery_rejects_sidecar_capability_hash_mismatch(
     document_name = "typed-sidecar-binding"
     session_id = "session-123"
     _enable_real_typed_publication(tmp_path, document_name, session_id)
-    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+    monkeypatch.setattr(
+        writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"}
+    )
     monkeypatch.setattr(writer, "_run_provider_verdict_guards", lambda **_kwargs: ())
     target = write_bridge_file(
         document_name,
@@ -644,12 +702,16 @@ def test_restart_recovery_rejects_sidecar_capability_hash_mismatch(
         release_claim=False,
     )
     writer._PENDING_BRIDGE_PUBLICATIONS.clear()
-    sidecar = next((tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json"))
+    sidecar = next(
+        (tmp_path / ".gtkb-state" / "bridge-publication-pending").glob("*.json")
+    )
     payload = json.loads(sidecar.read_text(encoding="utf-8"))
     payload["capability_hash"] = "sha256:" + "f" * 64
     sidecar.write_text(json.dumps(payload), encoding="utf-8")
 
-    with pytest.raises(registry_control_plane.RegistryAuthorizationError, match="exact.*row"):
+    with pytest.raises(
+        registry_control_plane.RegistryAuthorizationError, match="exact.*row"
+    ):
         writer.finalize_pending_bridge_publication(target, tmp_path)
 
     assert target.exists()
@@ -697,9 +759,15 @@ def test_typed_publication_failures_compensate_and_retain_claim(
             raise RuntimeError("forced release failure")
         events.append("release-success")
 
-    monkeypatch.setattr(registry_control_plane, "mint_bridge_publication_capability", mint)
-    monkeypatch.setattr(registry_control_plane, "consume_bridge_publication_capability", consume)
-    monkeypatch.setattr(registry_control_plane, "compensate_bridge_publication", compensate)
+    monkeypatch.setattr(
+        registry_control_plane, "mint_bridge_publication_capability", mint
+    )
+    monkeypatch.setattr(
+        registry_control_plane, "consume_bridge_publication_capability", consume
+    )
+    monkeypatch.setattr(
+        registry_control_plane, "compensate_bridge_publication", compensate
+    )
     monkeypatch.setattr(writer, "_release_claim", release)
 
     if failure == "create":
@@ -766,7 +834,9 @@ def test_typed_publication_compensation_failure_retains_repair_state(
     monkeypatch.setattr(
         registry_control_plane,
         "compensate_bridge_publication",
-        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("forced compensation failure")),
+        lambda **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("forced compensation failure")
+        ),
     )
     monkeypatch.setattr(
         writer,
@@ -796,7 +866,9 @@ def test_typed_publication_compliance_failure_precedes_mint(
     monkeypatch.setattr(
         writer,
         "run_bridge_compliance_audit",
-        lambda **_kwargs: (_ for _ in ()).throw(BridgeComplianceError("forced compliance failure")),
+        lambda **_kwargs: (_ for _ in ()).throw(
+            BridgeComplianceError("forced compliance failure")
+        ),
     )
     monkeypatch.setattr(
         registry_control_plane,
@@ -816,15 +888,28 @@ def test_typed_publication_compliance_failure_precedes_mint(
     assert not target.exists()
 
 
-def test_write_bridge_file_rejects_existing_numbered_file(tmp_path: Path) -> None:
+def test_write_bridge_file_retries_onto_next_version_when_requested_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"}
+    )
     target = tmp_path / "bridge" / "conflict-001.md"
     target.parent.mkdir()
     target.write_text("NEW\nexisting\n", encoding="utf-8")
 
-    with pytest.raises(BridgeConflictError, match="already exists"):
-        write_bridge_file("conflict", 1, "NEW\nnew body\n", tmp_path, require_author_metadata=False)
+    path = write_bridge_file(
+        "conflict",
+        1,
+        "NEW\nnew body\n",
+        tmp_path,
+        require_author_metadata=False,
+        release_claim=False,
+    )
 
     assert target.read_text(encoding="utf-8") == "NEW\nexisting\n"
+    assert path.name == "conflict-002.md"
+    assert "new body" in path.read_text(encoding="utf-8")
 
 
 def test_write_bridge_file_rejects_non_positive_version(tmp_path: Path) -> None:
@@ -835,12 +920,21 @@ def test_write_bridge_file_rejects_non_positive_version(tmp_path: Path) -> None:
 def test_write_bridge_file_accepts_pre_metadata_content_when_injection_skipped(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+    monkeypatch.setattr(
+        writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"}
+    )
 
     _stage_reviewed_file(tmp_path, "docthing")
-    content = "GO\n" + _author_metadata_lines("reviewer-session") + "\n" + _valid_go_verdict().split("\n", 1)[1]
+    content = (
+        "GO\n"
+        + _author_metadata_lines("reviewer-session")
+        + "\n"
+        + _valid_go_verdict().split("\n", 1)[1]
+    )
 
-    path = write_bridge_file("docthing", 2, content, tmp_path, require_author_metadata=False)
+    path = write_bridge_file(
+        "docthing", 2, content, tmp_path, require_author_metadata=False
+    )
 
     written = path.read_text(encoding="utf-8")
     assert written.startswith("GO\n::init gtkb pb\n::open build\n")
@@ -852,13 +946,29 @@ def test_no_action_is_valid_prime_authored_status() -> None:
     assert "NO-ACTION" in VALID_STATUSES
     assert "NO-ACTION" in PRIME_STATUSES
     assert (
-        frozenset({"NEW", "REVISED", "GO", "NO-GO", "NO-ACTION", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN"})
+        frozenset(
+            {
+                "NEW",
+                "REVISED",
+                "GO",
+                "NO-GO",
+                "NO-ACTION",
+                "VERIFIED",
+                "ADVISORY",
+                "DEFERRED",
+                "WITHDRAWN",
+            }
+        )
         == VALID_STATUSES
     )
 
 
-def test_write_bridge_file_materializes_no_action_envelope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+def test_write_bridge_file_materializes_no_action_envelope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"}
+    )
 
     path = write_bridge_file(
         "no-action-thread",
@@ -868,7 +978,9 @@ def test_write_bridge_file_materializes_no_action_envelope(tmp_path: Path, monke
         author_metadata=AUTHOR_METADATA,
     )
 
-    assert path.read_text(encoding="utf-8").startswith("NO-ACTION\n::init gtkb lo\n::open build\n")
+    assert path.read_text(encoding="utf-8").startswith(
+        "NO-ACTION\n::init gtkb lo\n::open build\n"
+    )
 
 
 @pytest.mark.parametrize(
@@ -889,7 +1001,9 @@ def test_governed_status_envelope_targets_next_responder_with_build_activity(
 
     normalized = writer.normalize_bridge_envelope_head(content)
 
-    assert normalized.startswith(f"{status}\n::init gtkb {expected_responder}\n::open build\n")
+    assert normalized.startswith(
+        f"{status}\n::init gtkb {expected_responder}\n::open build\n"
+    )
 
 
 def test_write_bridge_file_rejects_mismatched_envelope_role(tmp_path: Path) -> None:
@@ -932,9 +1046,13 @@ def test_write_bridge_file_rejects_envelope_for_unmapped_status(tmp_path: Path) 
         )
 
 
-def test_write_bridge_file_rejects_version_in_git_history(tmp_path: Path) -> None:
-    """write_bridge_file raises BridgeConflictError when the target version exists in
-    git history but is absent from disk (deleted-then-recreate attempt, WI-4740)."""
+def test_write_bridge_file_skips_git_history_occupied_version_onto_next(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Occupied git-history versions are skipped; the next free NNN is published."""
+    monkeypatch.setattr(
+        writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"}
+    )
     try:
         _git(tmp_path, "init", "--quiet")
         _git(tmp_path, "config", "user.email", "test@example.com")
@@ -948,18 +1066,20 @@ def test_write_bridge_file_rejects_version_in_git_history(tmp_path: Path) -> Non
     committed.write_text("GO\n\n# Original verdict\n", encoding="utf-8")
     _git(tmp_path, "add", ".")
     _git(tmp_path, "commit", "-m", "initial bridge file")
-
-    # Delete from disk — now committed in history but absent on disk.
     committed.unlink()
 
-    with pytest.raises(BridgeConflictError, match="git history"):
-        write_bridge_file(
-            "gtkb-history-guard",
-            1,
-            "NEW\n\n# Recreate attempt - should fail\n",
-            project_root=tmp_path,
-            require_author_metadata=False,
-        )
+    path = write_bridge_file(
+        "gtkb-history-guard",
+        1,
+        "NEW\n\n# Recreate attempt - should skip git-occupied 001\n",
+        project_root=tmp_path,
+        require_author_metadata=False,
+        release_claim=False,
+    )
+
+    assert path.name == "gtkb-history-guard-002.md"
+    assert not committed.exists()
+    assert "Recreate attempt" in path.read_text(encoding="utf-8")
 
 
 def test_write_bridge_file_rejects_malformed_proposal_before_disk_write(
@@ -968,7 +1088,9 @@ def test_write_bridge_file_rejects_malformed_proposal_before_disk_write(
     def deny_requirement_sufficiency(**_kwargs):
         raise BridgeComplianceError("Requirement Sufficiency")
 
-    monkeypatch.setattr(writer, "run_bridge_compliance_audit", deny_requirement_sufficiency)
+    monkeypatch.setattr(
+        writer, "run_bridge_compliance_audit", deny_requirement_sufficiency
+    )
 
     with pytest.raises(BridgeComplianceError, match="Requirement Sufficiency"):
         write_bridge_file(
@@ -996,7 +1118,9 @@ def test_write_bridge_file_allows_valid_verdicts_without_proposal_only_sections(
     content_factory,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+    monkeypatch.setattr(
+        writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"}
+    )
 
     _stage_reviewed_file(tmp_path, slug)
     if slug == "verifiedthing":
@@ -1006,7 +1130,9 @@ def test_write_bridge_file_allows_valid_verdicts_without_proposal_only_sections(
     else:
         version = 2
 
-    path = write_bridge_file(slug, version, content_factory(), tmp_path, author_metadata=AUTHOR_METADATA)
+    path = write_bridge_file(
+        slug, version, content_factory(), tmp_path, author_metadata=AUTHOR_METADATA
+    )
 
     written = path.read_text(encoding="utf-8")
     assert "## Requirement Sufficiency" not in written
@@ -1049,7 +1175,9 @@ def _provider_go_content(**metadata_overrides: str) -> str:
     )
 
 
-def _prepare_provider_mocks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[tuple[str, str]]:
+def _prepare_provider_mocks(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> list[tuple[str, str]]:
     released: list[tuple[str, str]] = []
     monkeypatch.setattr(
         writer,
@@ -1070,7 +1198,7 @@ def _prepare_provider_mocks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     return released
 
 
-def test_write_bridge_file_exclusive_create_closes_exists_check_race(
+def test_write_bridge_file_lost_exclusive_create_retries_onto_next_version(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     target = tmp_path / "bridge/race-002.md"
@@ -1083,18 +1211,111 @@ def test_write_bridge_file_exclusive_create_closes_exists_check_race(
 
     monkeypatch.setattr(writer, "_bridge_file_committed_in_git", create_racing_target)
     if hasattr(writer, "run_bridge_compliance_audit"):
-        monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
-
-    with pytest.raises(BridgeConflictError, match="already exists"):
-        write_bridge_file(
-            "race",
-            2,
-            _provider_go_content().replace("provider-thread", "race"),
-            tmp_path,
-            require_author_metadata=False,
+        monkeypatch.setattr(
+            writer,
+            "run_bridge_compliance_audit",
+            lambda **_kwargs: {"decision": "pass"},
         )
 
+    path = write_bridge_file(
+        "race",
+        2,
+        _provider_go_content().replace("provider-thread", "race"),
+        tmp_path,
+        require_author_metadata=False,
+    )
+
     assert target.read_text(encoding="utf-8") == "GO\n\nracing writer\n"
+    assert path.name == "race-003.md"
+    written = path.read_text(encoding="utf-8")
+    assert "Version: 003" in written
+    assert "Version: 002" not in written
+
+
+def test_write_bridge_file_concurrent_same_slug_publishes_distinct_versions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"}
+    )
+    _stage_reviewed_file(tmp_path, "alloc")
+    errors: list[BaseException] = []
+    paths: list[Path] = []
+    barrier = threading.Barrier(2)
+
+    def worker() -> None:
+        try:
+            barrier.wait(timeout=5)
+            path = write_bridge_file(
+                "alloc",
+                2,
+                "NEW\nconcurrent body\n",
+                tmp_path,
+                require_author_metadata=False,
+                release_claim=False,
+            )
+            paths.append(path)
+        except BaseException as exc:  # noqa: BLE001 - collect for the parent thread
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+
+    assert errors == []
+    names = sorted(path.name for path in paths)
+    assert names == ["alloc-002.md", "alloc-003.md"]
+    original = (tmp_path / "bridge" / "alloc-001.md").read_text(encoding="utf-8")
+    assert original.startswith("NEW")
+    for name in names:
+        assert "concurrent body" in (tmp_path / "bridge" / name).read_text(
+            encoding="utf-8"
+        )
+
+
+def test_publish_lo_verdict_retries_lost_exclusive_create_onto_next_version(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _provider_thread(tmp_path)
+    released = _prepare_provider_mocks(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        writer, "_trusted_author_content", lambda content, **_kwargs: content
+    )
+    if hasattr(writer, "run_bridge_compliance_audit"):
+        monkeypatch.setattr(
+            writer,
+            "run_bridge_compliance_audit",
+            lambda **_kwargs: {"decision": "pass"},
+        )
+    target = tmp_path / "bridge/provider-thread-002.md"
+
+    def create_racing_target(_target: Path, _root: Path) -> bool:
+        if _target.name.endswith("-002.md"):
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("GO\n\nracing writer\n", encoding="utf-8")
+        return False
+
+    monkeypatch.setattr(writer, "_bridge_file_committed_in_git", create_racing_target)
+
+    result = publish_lo_verdict(
+        "provider-thread",
+        "GO",
+        _provider_go_content(),
+        tmp_path,
+        session_id="dispatch-H-1",
+        harness_name="alibaba-cloud-studio",
+        author_metadata=PROVIDER_METADATA,
+    )
+
+    assert result.verdict_path == "bridge/provider-thread-003.md"
+    assert result.claim_released is True
+    assert released == [("provider-thread", "dispatch-H-1")]
+    assert target.read_text(encoding="utf-8") == "GO\n\nracing writer\n"
+    written = (tmp_path / result.verdict_path).read_text(encoding="utf-8")
+    assert "Version: 003" in written
+    assert written.startswith("GO\n::init gtkb pb\n::open build\n")
 
 
 def test_publish_lo_verdict_computes_next_path_and_releases_claim_after_success(
@@ -1103,7 +1324,11 @@ def test_publish_lo_verdict_computes_next_path_and_releases_claim_after_success(
     _provider_thread(tmp_path)
     released = _prepare_provider_mocks(monkeypatch, tmp_path)
     if hasattr(writer, "run_bridge_compliance_audit"):
-        monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+        monkeypatch.setattr(
+            writer,
+            "run_bridge_compliance_audit",
+            lambda **_kwargs: {"decision": "pass"},
+        )
 
     result = publish_lo_verdict(
         "provider-thread",
@@ -1118,10 +1343,16 @@ def test_publish_lo_verdict_computes_next_path_and_releases_claim_after_success(
     assert result.verdict_path == "bridge/provider-thread-002.md"
     assert result.claim_released is True
     assert released == [("provider-thread", "dispatch-H-1")]
-    assert (tmp_path / result.verdict_path).read_text(encoding="utf-8").startswith("GO\n::init gtkb pb\n::open build\n")
+    assert (
+        (tmp_path / result.verdict_path)
+        .read_text(encoding="utf-8")
+        .startswith("GO\n::init gtkb pb\n::open build\n")
+    )
 
 
-def test_publish_lo_verdict_denies_wrong_role_before_mutation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_publish_lo_verdict_denies_wrong_role_before_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _provider_thread(tmp_path)
     monkeypatch.setattr(
         writer,
@@ -1165,7 +1396,11 @@ def test_publish_lo_verdict_denies_missing_or_other_session_claim(
             author_metadata=PROVIDER_METADATA,
         )
 
-    monkeypatch.setattr(writer, "_claim_holder", lambda *_args, **_kwargs: {"session_id": "dispatch-H-2"})
+    monkeypatch.setattr(
+        writer,
+        "_claim_holder",
+        lambda *_args, **_kwargs: {"session_id": "dispatch-H-2"},
+    )
     with pytest.raises(BridgePublicationError, match="another session"):
         publish_lo_verdict(
             "provider-thread",
@@ -1184,7 +1419,11 @@ def test_publish_lo_verdict_normalizes_trusted_runtime_model_metadata(
     _provider_thread(tmp_path)
     _prepare_provider_mocks(monkeypatch, tmp_path)
     if hasattr(writer, "run_bridge_compliance_audit"):
-        monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+        monkeypatch.setattr(
+            writer,
+            "run_bridge_compliance_audit",
+            lambda **_kwargs: {"decision": "pass"},
+        )
 
     stale_values = {
         "author_model": "model-authored-name",
@@ -1213,7 +1452,11 @@ def test_publish_lo_verdict_fills_missing_runtime_model_metadata(
     _provider_thread(tmp_path)
     _prepare_provider_mocks(monkeypatch, tmp_path)
     if hasattr(writer, "run_bridge_compliance_audit"):
-        monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+        monkeypatch.setattr(
+            writer,
+            "run_bridge_compliance_audit",
+            lambda **_kwargs: {"decision": "pass"},
+        )
 
     content = _provider_go_content()
     for key in writer.PROVIDER_RUNTIME_MODEL_FIELDS:
@@ -1274,7 +1517,9 @@ def test_publish_lo_verdict_denies_missing_trusted_runtime_model_metadata(
     incomplete_metadata = dict(PROVIDER_METADATA)
     incomplete_metadata[field] = ""
 
-    with pytest.raises(BridgePublicationError, match=rf"missing trusted author metadata: {field}"):
+    with pytest.raises(
+        BridgePublicationError, match=rf"missing trusted author metadata: {field}"
+    ):
         publish_lo_verdict(
             "provider-thread",
             "GO",
@@ -1292,7 +1537,9 @@ def test_publish_lo_verdict_denies_stale_response_version_and_guard_failure(
     _provider_thread(tmp_path)
     released = _prepare_provider_mocks(monkeypatch, tmp_path)
 
-    stale = _provider_go_content().replace("bridge/provider-thread-001.md", "bridge/provider-thread-000.md")
+    stale = _provider_go_content().replace(
+        "bridge/provider-thread-001.md", "bridge/provider-thread-000.md"
+    )
     with pytest.raises(BridgePublicationError, match="respond to current latest"):
         publish_lo_verdict(
             "provider-thread",
@@ -1350,7 +1597,9 @@ def test_publish_lo_verdict_denies_stale_response_version_and_guard_failure(
         )
 
 
-def test_provider_hunk_coverage_recognizes_binary_patch_diff_git_header(tmp_path: Path) -> None:
+def test_provider_hunk_coverage_recognizes_binary_patch_diff_git_header(
+    tmp_path: Path,
+) -> None:
     _git(tmp_path, "init")
     _git(tmp_path, "config", "user.email", "test@example.com")
     _git(tmp_path, "config", "user.name", "Test User")
@@ -1361,7 +1610,9 @@ def test_provider_hunk_coverage_recognizes_binary_patch_diff_git_header(tmp_path
     patch_text = _git(tmp_path, "diff", "--binary", "--", "groundtruth.db").stdout
     assert "GIT binary patch" in patch_text
     assert "+++ b/groundtruth.db" not in patch_text
-    (tmp_path / "groundtruth-db.patch").write_text(patch_text, encoding="utf-8", newline="\n")
+    (tmp_path / "groundtruth-db.patch").write_text(
+        patch_text, encoding="utf-8", newline="\n"
+    )
 
     covered = writer._hunk_patch_covered_paths(tmp_path, ["groundtruth-db.patch"])
 
@@ -1383,12 +1634,16 @@ def test_provider_hunk_coverage_rejects_declared_size_mismatch(tmp_path: Path) -
     latest_content = (
         "NEW\n\nbridge_kind: implementation_report\n\n## Hunk Patch Evidence\n\n"
         "- Hunk patch: `feature.patch`\n"
-        "- Patch SHA-256: `" + __import__("hashlib").sha256(patch_path.read_bytes()).hexdigest() + "`\n"
+        "- Patch SHA-256: `"
+        + __import__("hashlib").sha256(patch_path.read_bytes()).hexdigest()
+        + "`\n"
         f"- Patch size: `{len(patch_path.read_bytes()) + 1}` bytes\n"
     )
 
     with pytest.raises(BridgePublicationError, match="size mismatch"):
-        writer._hunk_patch_covered_paths(tmp_path, ["feature.patch"], latest_content=latest_content)
+        writer._hunk_patch_covered_paths(
+            tmp_path, ["feature.patch"], latest_content=latest_content
+        )
 
 
 def test_provider_hunk_coverage_rejects_corrupt_patch(tmp_path: Path) -> None:
@@ -1414,11 +1669,21 @@ def test_provider_hunk_coverage_rejects_corrupt_patch(tmp_path: Path) -> None:
         writer._hunk_patch_covered_paths(tmp_path, ["corrupt.patch"])
 
 
-def test_write_bridge_file_appends_closing_instruction_footer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_write_bridge_file_appends_closing_instruction_footer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """WI-5935 Slice E: every filed bridge artifact carries the closing instruction."""
-    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+    monkeypatch.setattr(
+        writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"}
+    )
 
-    path = write_bridge_file("closing-footer", 1, _valid_proposal_body(), tmp_path, author_metadata=AUTHOR_METADATA)
+    path = write_bridge_file(
+        "closing-footer",
+        1,
+        _valid_proposal_body(),
+        tmp_path,
+        author_metadata=AUTHOR_METADATA,
+    )
     written = path.read_text(encoding="utf-8")
     assert writer._CLOSING_INSTRUCTION in written
     assert written.rstrip().endswith(writer._CLOSING_INSTRUCTION)

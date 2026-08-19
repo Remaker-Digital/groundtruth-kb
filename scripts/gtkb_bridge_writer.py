@@ -58,14 +58,28 @@ def _bridge_file_committed_in_git(target: Path, project_root: Path) -> bool:
 
 
 # WI-5935 Slice E: closing instruction carried by every filed bridge artifact.
-_CLOSING_INSTRUCTION = "When you are finished working, close your session envelope by invoking ::wrap."
+_CLOSING_INSTRUCTION = (
+    "When you are finished working, close your session envelope by invoking ::wrap."
+)
 
 
 VALID_STATUSES: frozenset[str] = frozenset(
-    {"NEW", "REVISED", "GO", "NO-GO", "NO-ACTION", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN"}
+    {
+        "NEW",
+        "REVISED",
+        "GO",
+        "NO-GO",
+        "NO-ACTION",
+        "VERIFIED",
+        "ADVISORY",
+        "DEFERRED",
+        "WITHDRAWN",
+    }
 )
 PRIME_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "NO-ACTION"})
-LOYAL_OPPOSITION_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "VERIFIED", "ADVISORY"})
+LOYAL_OPPOSITION_STATUSES: frozenset[str] = frozenset(
+    {"GO", "NO-GO", "VERIFIED", "ADVISORY"}
+)
 ENVELOPE_RESPONDER_BY_STATUS: Mapping[str, str] = {
     # The envelope names the next responder, not the author of the artifact.
     "NEW": "lo",
@@ -79,8 +93,12 @@ ENVELOPE_RESPONDER_BY_STATUS: Mapping[str, str] = {
     "NO-GO": "pb",
     "VERIFIED": "pb",
 }
-ENVELOPE_ACTIVITY_VALUES: frozenset[str] = frozenset({"ops", "deliberation", "build", "test", "spec", "project"})
-LO_ENVELOPE_BRIDGE_KINDS: frozenset[str] = frozenset({"lo_verdict", "loyal_opposition_review", "verification_verdict"})
+ENVELOPE_ACTIVITY_VALUES: frozenset[str] = frozenset(
+    {"ops", "deliberation", "build", "test", "spec", "project"}
+)
+LO_ENVELOPE_BRIDGE_KINDS: frozenset[str] = frozenset(
+    {"lo_verdict", "loyal_opposition_review", "verification_verdict"}
+)
 
 PRIME_ROLE_SLOT = "prime-builder"
 LOYAL_OPPOSITION_ROLE_SLOT = "loyal-opposition"
@@ -95,16 +113,26 @@ PROVIDER_VERDICT_GUARDS: tuple[Path, ...] = (
     Path(".claude/hooks/scanner-safe-writer.py"),
     Path(".claude/hooks/bridge-compliance-gate.py"),
 )
-_DOCUMENT_LINE_RE = re.compile(r"(?im)^\s*Document:\s*`?(?P<value>[A-Za-z0-9_.-]+)`?\s*$")
+_DOCUMENT_LINE_RE = re.compile(
+    r"(?im)^\s*Document:\s*`?(?P<value>[A-Za-z0-9_.-]+)`?\s*$"
+)
 _VERSION_LINE_RE = re.compile(r"(?im)^\s*Version:\s*`?(?P<value>\d{3})\b")
-_BRIDGE_KIND_RE = re.compile(r"(?im)^\s*bridge_kind:\s*`?(?P<value>[A-Za-z0-9_.-]+)`?\s*$")
+_BRIDGE_KIND_RE = re.compile(
+    r"(?im)^\s*bridge_kind:\s*`?(?P<value>[A-Za-z0-9_.-]+)`?\s*$"
+)
 _ENVELOPE_INIT_RE = re.compile(r"^::init gtkb (?P<role>pb|lo)$")
-_ENVELOPE_OPEN_RE = re.compile(r"^::open (?P<activity>ops|deliberation|build|test|spec|project)$")
+_ENVELOPE_OPEN_RE = re.compile(
+    r"^::open (?P<activity>ops|deliberation|build|test|spec|project)$"
+)
 _SAFE_SLUG_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 _PATCH_PATH_RE = re.compile(r"(?m)^(?:---|\+\+\+) (?P<path>[^\r\n]+)$")
 _DIFF_GIT_PATH_RE = re.compile(r"(?m)^diff --git a/(?P<old>.*?) b/(?P<new>[^\r\n]*)$")
-_PATCH_SHA256_DECL_RE = re.compile(r"(?i)\b(?:patch\s+)?sha-?256\b[^0-9a-f]*(?P<value>[0-9a-f]{64})")
-_PATCH_SIZE_DECL_RE = re.compile(r"(?i)\b(?:patch\s+)?size\b[^0-9]*(?P<value>\d+)\s*(?:bytes?)?")
+_PATCH_SHA256_DECL_RE = re.compile(
+    r"(?i)\b(?:patch\s+)?sha-?256\b[^0-9a-f]*(?P<value>[0-9a-f]{64})"
+)
+_PATCH_SIZE_DECL_RE = re.compile(
+    r"(?i)\b(?:patch\s+)?size\b[^0-9]*(?P<value>\d+)\s*(?:bytes?)?"
+)
 
 
 class BridgeError(Exception):
@@ -113,6 +141,10 @@ class BridgeError(Exception):
 
 class BridgeConflictError(BridgeError):
     """Live disk state conflicts with the proposed bridge file write."""
+
+
+DEFAULT_BRIDGE_VERSION_ALLOCATION_RETRIES = 32
+_OCCUPANCY_CONFLICT_MARKERS = ("already exists", "git history")
 
 
 class BridgeTransitionError(BridgeError):
@@ -173,7 +205,9 @@ def _bridge_compliance_gate_path(project_root: Path) -> Path:
         gate = parent / ".claude" / "hooks" / "bridge-compliance-gate.py"
         if gate.is_file():
             return gate
-    raise BridgeComplianceError("bridge-compliance-gate.py is unavailable; refusing helper-managed bridge write")
+    raise BridgeComplianceError(
+        "bridge-compliance-gate.py is unavailable; refusing helper-managed bridge write"
+    )
 
 
 def run_bridge_compliance_audit(
@@ -220,15 +254,22 @@ def run_bridge_compliance_audit(
         try:
             audit = json.loads(audit_output.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            raise BridgeComplianceError("bridge-compliance audit did not produce readable JSON") from exc
+            raise BridgeComplianceError(
+                "bridge-compliance audit did not produce readable JSON"
+            ) from exc
     if audit.get("decision") != "pass":
-        reason = audit.get("reason") or "bridge-compliance audit denied the candidate bridge file"
+        reason = (
+            audit.get("reason")
+            or "bridge-compliance audit denied the candidate bridge file"
+        )
         raise BridgeComplianceError(str(reason))
     return audit
 
 
 def _synthetic_session_context_id_for_content(content: str) -> str | None:
-    session_context_id = extract_author_metadata(content).get("author_session_context_id")
+    session_context_id = extract_author_metadata(content).get(
+        "author_session_context_id"
+    )
     if is_synthetic_session_context_id(session_context_id):
         return str(session_context_id).strip().strip("`")
     return None
@@ -277,7 +318,9 @@ def _validate_activity(activity: str) -> str:
     normalized = activity.strip()
     if normalized not in ENVELOPE_ACTIVITY_VALUES:
         allowed = ", ".join(sorted(ENVELOPE_ACTIVITY_VALUES))
-        raise BridgeEnvelopeError(f"invalid bridge envelope activity {activity!r}; expected one of: {allowed}")
+        raise BridgeEnvelopeError(
+            f"invalid bridge envelope activity {activity!r}; expected one of: {allowed}"
+        )
     return normalized
 
 
@@ -312,13 +355,17 @@ def _validated_existing_envelope(
     init_idx = init_indices[0]
     open_idx = open_indices[0]
     if open_idx != init_idx + 1:
-        raise BridgeEnvelopeError("bridge artifact-head envelope lines must be adjacent")
+        raise BridgeEnvelopeError(
+            "bridge artifact-head envelope lines must be adjacent"
+        )
 
     init_line = lines[init_idx].strip()
     open_line = lines[open_idx].strip()
     init_match = _ENVELOPE_INIT_RE.fullmatch(init_line)
     if init_match is None:
-        raise BridgeEnvelopeError(f"malformed bridge envelope ::init line for {status}: {init_line!r}")
+        raise BridgeEnvelopeError(
+            f"malformed bridge envelope ::init line for {status}: {init_line!r}"
+        )
     actual_role = init_match.group("role")
     if actual_role != expected_role:
         raise BridgeEnvelopeError(
@@ -327,7 +374,9 @@ def _validated_existing_envelope(
 
     open_match = _ENVELOPE_OPEN_RE.fullmatch(open_line)
     if open_match is None:
-        raise BridgeEnvelopeError(f"malformed or invalid bridge envelope ::open line for {status}: {open_line!r}")
+        raise BridgeEnvelopeError(
+            f"malformed or invalid bridge envelope ::open line for {status}: {open_line!r}"
+        )
     actual_activity = open_match.group("activity")
     if actual_activity != expected_activity:
         raise BridgeEnvelopeError(
@@ -355,10 +404,14 @@ def validate_bridge_envelope_head(
     expected_role = ENVELOPE_RESPONDER_BY_STATUS.get(status)
     if expected_role is None:
         if init_indices or open_indices:
-            raise BridgeEnvelopeError(f"bridge status {status} has no formal responder-role envelope mapping")
+            raise BridgeEnvelopeError(
+                f"bridge status {status} has no formal responder-role envelope mapping"
+            )
         return
 
-    selected_activity = _validate_activity(activity or default_bridge_envelope_activity(content, status))
+    selected_activity = _validate_activity(
+        activity or default_bridge_envelope_activity(content, status)
+    )
     if not init_indices and not open_indices:
         if require_dispatchable:
             raise BridgeEnvelopeError(
@@ -373,7 +426,9 @@ def validate_bridge_envelope_head(
         expected_activity=selected_activity,
     )
     if require_dispatchable and kept != {1, 2}:
-        raise BridgeEnvelopeError("bridge artifact-head envelope must occupy fixed lines 2 and 3")
+        raise BridgeEnvelopeError(
+            "bridge artifact-head envelope must occupy fixed lines 2 and 3"
+        )
 
 
 def normalize_bridge_envelope_head(content: str, *, activity: str | None = None) -> str:
@@ -390,10 +445,14 @@ def normalize_bridge_envelope_head(content: str, *, activity: str | None = None)
     expected_role = ENVELOPE_RESPONDER_BY_STATUS.get(status)
     if expected_role is None:
         if init_indices or open_indices or activity is not None:
-            raise BridgeEnvelopeError(f"bridge status {status} has no formal responder-role envelope mapping")
+            raise BridgeEnvelopeError(
+                f"bridge status {status} has no formal responder-role envelope mapping"
+            )
         return content
 
-    selected_activity = _validate_activity(activity or default_bridge_envelope_activity(content, status))
+    selected_activity = _validate_activity(
+        activity or default_bridge_envelope_activity(content, status)
+    )
     if len(init_indices) != 1 or len(open_indices) != 1:
         remove_indices = set(init_indices) | set(open_indices)
     else:
@@ -403,7 +462,9 @@ def normalize_bridge_envelope_head(content: str, *, activity: str | None = None)
             expected_role=expected_role,
             expected_activity=selected_activity,
         )
-    body_lines = [line.rstrip("\r") for idx, line in enumerate(lines) if idx not in remove_indices]
+    body_lines = [
+        line.rstrip("\r") for idx, line in enumerate(lines) if idx not in remove_indices
+    ]
     envelope_lines = [f"::init gtkb {expected_role}", f"::open {selected_activity}"]
     normalized_lines = [body_lines[0], *envelope_lines, *body_lines[1:]]
     trailing_newline = "\n" if content.endswith(("\n", "\r")) else ""
@@ -414,7 +475,9 @@ def _provider_relative_path(path: Path, project_root: Path) -> str:
     try:
         return path.resolve().relative_to(project_root.resolve()).as_posix()
     except ValueError as exc:
-        raise BridgePublicationError(f"provider verdict path escapes project root: {path}") from exc
+        raise BridgePublicationError(
+            f"provider verdict path escapes project root: {path}"
+        ) from exc
 
 
 def _normalize_provider_runtime_model_metadata(
@@ -426,7 +489,9 @@ def _normalize_provider_runtime_model_metadata(
     for key in PROVIDER_RUNTIME_MODEL_FIELDS:
         value = str(author_metadata.get(key) or "").strip().strip("`")
         if not value:
-            raise BridgePublicationError(f"provider verdict is missing trusted author metadata: {key}")
+            raise BridgePublicationError(
+                f"provider verdict is missing trusted author metadata: {key}"
+            )
         trusted_values[key] = value
 
     lines = content.split("\n")
@@ -455,7 +520,9 @@ def _trusted_author_content(
     project_root: Path,
     author_metadata: Mapping[str, object],
 ) -> str:
-    content = _normalize_provider_runtime_model_metadata(content, author_metadata=author_metadata)
+    content = _normalize_provider_runtime_model_metadata(
+        content, author_metadata=author_metadata
+    )
     existing = extract_author_metadata(content)
     for key, expected in author_metadata.items():
         if key in PROVIDER_RUNTIME_MODEL_FIELDS:
@@ -466,19 +533,34 @@ def _trusted_author_content(
             raise BridgePublicationError(
                 f"provider verdict author metadata conflict for {key}: got {actual!r}, expected {expected_text!r}"
             )
-    normalized = ensure_author_metadata(content, project_root=project_root, explicit=author_metadata)
+    normalized = ensure_author_metadata(
+        content, project_root=project_root, explicit=author_metadata
+    )
     normalized_metadata = extract_author_metadata(normalized)
-    missing = [key for key in author_metadata if not str(normalized_metadata.get(key) or "").strip()]
+    missing = [
+        key
+        for key in author_metadata
+        if not str(normalized_metadata.get(key) or "").strip()
+    ]
     if missing:
-        raise BridgePublicationError(f"provider verdict is missing trusted author metadata: {', '.join(missing)}")
+        raise BridgePublicationError(
+            f"provider verdict is missing trusted author metadata: {', '.join(missing)}"
+        )
     return normalized
 
 
-def _resolve_lo_worker(project_root: Path, *, session_id: str, harness_name: str) -> Mapping[str, object]:
+def _resolve_lo_worker(
+    project_root: Path, *, session_id: str, harness_name: str
+) -> Mapping[str, object]:
     try:
-        from groundtruth_kb.session.envelope import EnvelopeError, resolve_worker_role_provenance
+        from groundtruth_kb.session.envelope import (
+            EnvelopeError,
+            resolve_worker_role_provenance,
+        )
     except ImportError as exc:
-        raise BridgePublicationError("provider verdict worker-role resolver is unavailable") from exc
+        raise BridgePublicationError(
+            "provider verdict worker-role resolver is unavailable"
+        ) from exc
     try:
         provenance = resolve_worker_role_provenance(
             project_root,
@@ -486,7 +568,9 @@ def _resolve_lo_worker(project_root: Path, *, session_id: str, harness_name: str
             harness_name=harness_name,
         )
     except EnvelopeError as exc:
-        raise BridgePublicationError(f"provider verdict worker-role provenance is unavailable: {exc}") from exc
+        raise BridgePublicationError(
+            f"provider verdict worker-role provenance is unavailable: {exc}"
+        ) from exc
     if provenance.get("role") != LOYAL_OPPOSITION_ROLE_SLOT:
         raise BridgePublicationError(
             "PublishBridgeVerdict requires a document-authoritative loyal-opposition worker session"
@@ -494,13 +578,17 @@ def _resolve_lo_worker(project_root: Path, *, session_id: str, harness_name: str
     return provenance
 
 
-def _claim_holder(project_root: Path, document_name: str) -> Mapping[str, object] | None:
+def _claim_holder(
+    project_root: Path, document_name: str
+) -> Mapping[str, object] | None:
     try:
         from scripts.bridge_work_intent_registry import current_holder
 
         return current_holder(document_name, project_root=project_root)
     except Exception as exc:
-        raise BridgePublicationError(f"provider verdict claim lookup failed: {exc}") from exc
+        raise BridgePublicationError(
+            f"provider verdict claim lookup failed: {exc}"
+        ) from exc
 
 
 def _release_claim(
@@ -518,7 +606,9 @@ def _release_claim(
 
         release(document_name, session_id, project_root=project_root)
     except Exception as exc:
-        raise BridgePublicationError(f"bridge publication claim release failed: {exc}") from exc
+        raise BridgePublicationError(
+            f"bridge publication claim release failed: {exc}"
+        ) from exc
 
 
 def _thread_state(project_root: Path, document_name: str) -> tuple[Path, int, str, str]:
@@ -529,21 +619,29 @@ def _thread_state(project_root: Path, document_name: str) -> tuple[Path, int, st
             versioned_bridge_files,
         )
     except ImportError as exc:
-        raise BridgePublicationError("canonical bridge-thread reader is unavailable") from exc
+        raise BridgePublicationError(
+            "canonical bridge-thread reader is unavailable"
+        ) from exc
 
     files = versioned_bridge_files(project_root, document_name)
     if not files:
-        raise BridgePublicationError(f"bridge thread {document_name!r} has no numbered files")
+        raise BridgePublicationError(
+            f"bridge thread {document_name!r} has no numbered files"
+        )
     latest = files[-1]
     parsed = parse_versioned_bridge_filename(latest.name)
     latest_status = status_from_bridge_file(latest)
     if parsed is None or latest_status is None:
-        raise BridgePublicationError(f"bridge thread {document_name!r} has unreadable latest state")
+        raise BridgePublicationError(
+            f"bridge thread {document_name!r} has unreadable latest state"
+        )
     latest_content = latest.read_text(encoding="utf-8", errors="replace")
     return latest, parsed[1] + 1, latest_status, latest_content
 
 
-def _validate_provider_transition(*, latest_status: str, latest_content: str, verdict: str) -> None:
+def _validate_provider_transition(
+    *, latest_status: str, latest_content: str, verdict: str
+) -> None:
     bridge_kind_match = _BRIDGE_KIND_RE.search(latest_content)
     bridge_kind = bridge_kind_match.group("value").lower() if bridge_kind_match else ""
     implementation_report = bridge_kind == "implementation_report"
@@ -589,23 +687,32 @@ def _run_provider_verdict_guards(
         "project_root": str(project_root),
         "session_id": session_id,
         "tool_name": "Write",
-        "tool_input": {"file_path": _provider_relative_path(target, project_root), "content": content},
+        "tool_input": {
+            "file_path": _provider_relative_path(target, project_root),
+            "content": content,
+        },
     }
     env = dict(os.environ)
     env.update(
         {
             "GTKB_AUTHOR_IDENTITY": str(author_metadata["author_identity"]),
             "GTKB_AUTHOR_HARNESS_ID": str(author_metadata["author_harness_id"]),
-            "GTKB_AUTHOR_SESSION_CONTEXT_ID": str(author_metadata["author_session_context_id"]),
+            "GTKB_AUTHOR_SESSION_CONTEXT_ID": str(
+                author_metadata["author_session_context_id"]
+            ),
             "GTKB_AUTHOR_MODEL": str(author_metadata["author_model"]),
             "GTKB_AUTHOR_MODEL_VERSION": str(author_metadata["author_model_version"]),
-            "GTKB_AUTHOR_MODEL_CONFIGURATION": str(author_metadata["author_model_configuration"]),
+            "GTKB_AUTHOR_MODEL_CONFIGURATION": str(
+                author_metadata["author_model_configuration"]
+            ),
         }
     )
     for relative_guard in PROVIDER_VERDICT_GUARDS:
         guard = project_root / relative_guard
         if not guard.is_file():
-            raise BridgePublicationError(f"provider verdict guard is missing: {relative_guard.as_posix()}")
+            raise BridgePublicationError(
+                f"provider verdict guard is missing: {relative_guard.as_posix()}"
+            )
         result = subprocess.run(
             [sys.executable, str(guard)],
             cwd=project_root,
@@ -625,7 +732,9 @@ def _run_provider_verdict_guards(
             )
         stdout = (result.stdout or "").strip()
         if not stdout:
-            raise BridgePublicationError(f"provider verdict guard emitted empty output: {relative_guard.as_posix()}")
+            raise BridgePublicationError(
+                f"provider verdict guard emitted empty output: {relative_guard.as_posix()}"
+            )
         try:
             data = json.loads(stdout)
         except json.JSONDecodeError as exc:
@@ -633,10 +742,14 @@ def _run_provider_verdict_guards(
                 f"provider verdict guard emitted malformed JSON: {relative_guard.as_posix()}"
             ) from exc
         if not isinstance(data, Mapping):
-            raise BridgePublicationError(f"provider verdict guard output is not an object: {relative_guard.as_posix()}")
+            raise BridgePublicationError(
+                f"provider verdict guard output is not an object: {relative_guard.as_posix()}"
+            )
         reason = _hook_block_reason(data)
         if reason:
-            raise BridgePublicationError(f"bridge publication guard denied publication: {reason}")
+            raise BridgePublicationError(
+                f"bridge publication guard denied publication: {reason}"
+            )
         evidence.append({"guard": relative_guard.as_posix(), "result": dict(data)})
     return tuple(evidence)
 
@@ -651,11 +764,25 @@ def _finalize_verified_provider_verdict(
     commit_message: str,
     env: Mapping[str, str],
 ) -> Mapping[str, object]:
-    helper = project_root / ".claude" / "skills" / "gtkb-verify" / "helpers" / "write_verdict.py"
+    helper = (
+        project_root
+        / ".claude"
+        / "skills"
+        / "gtkb-verify"
+        / "helpers"
+        / "write_verdict.py"
+    )
     if not helper.is_file():
         # WI-5661: fall back to the pre-rename skill dir for backward compatibility
         # (WI-5651 renamed verify -> gtkb-verify; a future re-rename must not re-break this).
-        _legacy = project_root / ".claude" / "skills" / "verify" / "helpers" / "write_verdict.py"
+        _legacy = (
+            project_root
+            / ".claude"
+            / "skills"
+            / "verify"
+            / "helpers"
+            / "write_verdict.py"
+        )
         if _legacy.is_file():
             helper = _legacy
     if not helper.is_file():
@@ -691,18 +818,25 @@ def _finalize_verified_provider_verdict(
     )
     if result.returncode != 0:
         raise BridgePublicationError(
-            "canonical VERIFIED finalizer failed: " + (result.stderr or result.stdout or "unknown failure").strip()
+            "canonical VERIFIED finalizer failed: "
+            + (result.stderr or result.stdout or "unknown failure").strip()
         )
     try:
         data = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
-        raise BridgePublicationError("canonical VERIFIED finalizer returned malformed JSON") from exc
+        raise BridgePublicationError(
+            "canonical VERIFIED finalizer returned malformed JSON"
+        ) from exc
     if not isinstance(data, Mapping):
-        raise BridgePublicationError("canonical VERIFIED finalizer returned a non-object result")
+        raise BridgePublicationError(
+            "canonical VERIFIED finalizer returned a non-object result"
+        )
     return data
 
 
-def _modified_tracked_include_paths(project_root: Path, include_paths: Sequence[str]) -> set[str]:
+def _modified_tracked_include_paths(
+    project_root: Path, include_paths: Sequence[str]
+) -> set[str]:
     result = subprocess.run(
         ["git", "diff", "--name-only", "HEAD", "--", *include_paths],
         cwd=project_root,
@@ -719,7 +853,11 @@ def _modified_tracked_include_paths(project_root: Path, include_paths: Sequence[
             "could not determine modified tracked VERIFIED include paths: "
             + (result.stderr or result.stdout or "git diff failed").strip()
         )
-    return {line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip()}
+    return {
+        line.strip().replace("\\", "/")
+        for line in result.stdout.splitlines()
+        if line.strip()
+    }
 
 
 def _patch_path_token(path_text: str) -> str | None:
@@ -735,7 +873,9 @@ def _patch_header_text(raw_line: bytes, raw_path: str) -> str:
     try:
         return raw_line.decode("utf-8")
     except UnicodeDecodeError as exc:
-        raise BridgePublicationError(f"VERIFIED hunk patch has a non-UTF-8 path header: {raw_path}") from exc
+        raise BridgePublicationError(
+            f"VERIFIED hunk patch has a non-UTF-8 path header: {raw_path}"
+        ) from exc
 
 
 def _patch_paths_from_bytes(patch_bytes: bytes, raw_path: str) -> set[str]:
@@ -763,7 +903,9 @@ def _patch_paths_from_bytes(patch_bytes: bytes, raw_path: str) -> set[str]:
 
 
 def _section_body(text: str, heading: str) -> str:
-    pattern = re.compile(rf"^##\s+{re.escape(heading)}\s*$", re.IGNORECASE | re.MULTILINE)
+    pattern = re.compile(
+        rf"^##\s+{re.escape(heading)}\s*$", re.IGNORECASE | re.MULTILINE
+    )
     match = pattern.search(text)
     if match is None:
         return ""
@@ -849,15 +991,21 @@ def _hunk_patch_apply_check(
     )
 
 
-def _assert_hunk_patch_git_applyable(project_root: Path, patch: Path, raw_path: str) -> None:
+def _assert_hunk_patch_git_applyable(
+    project_root: Path, patch: Path, raw_path: str
+) -> None:
     forward = _hunk_patch_apply_check(project_root, patch)
     if forward.returncode == 0:
         return
     reverse = _hunk_patch_apply_check(project_root, patch, reverse=True)
     if reverse.returncode == 0:
         return
-    failure = (forward.stderr or forward.stdout or reverse.stderr or reverse.stdout).strip()
-    raise BridgePublicationError(f"VERIFIED hunk patch is not Git-applyable: {raw_path}: {failure}")
+    failure = (
+        forward.stderr or forward.stdout or reverse.stderr or reverse.stdout
+    ).strip()
+    raise BridgePublicationError(
+        f"VERIFIED hunk patch is not Git-applyable: {raw_path}: {failure}"
+    )
 
 
 def _hunk_patch_covered_paths(
@@ -874,11 +1022,15 @@ def _hunk_patch_covered_paths(
         try:
             patch_rel_path = patch.relative_to(root).as_posix()
         except ValueError as exc:
-            raise BridgePublicationError(f"VERIFIED hunk patch escapes project root: {raw_path}") from exc
+            raise BridgePublicationError(
+                f"VERIFIED hunk patch escapes project root: {raw_path}"
+            ) from exc
         try:
             patch_bytes = patch.read_bytes()
         except OSError as exc:
-            raise BridgePublicationError(f"VERIFIED hunk patch is unreadable: {raw_path}") from exc
+            raise BridgePublicationError(
+                f"VERIFIED hunk patch is unreadable: {raw_path}"
+            ) from exc
         _validate_hunk_patch_metadata(
             raw_path=raw_path,
             patch_rel_path=patch_rel_path,
@@ -909,9 +1061,16 @@ def _pending_publication_sidecar_path(target: Path, project_root: Path) -> Path:
     try:
         relative = target.resolve().relative_to(project_root.resolve()).as_posix()
     except ValueError as exc:
-        raise BridgePublicationError(f"pending bridge target escapes project root: {target}") from exc
+        raise BridgePublicationError(
+            f"pending bridge target escapes project root: {target}"
+        ) from exc
     digest = hashlib.sha256(relative.encode("utf-8")).hexdigest()[:16]
-    return project_root / ".gtkb-state" / "bridge-publication-pending" / f"{target.stem}-{digest}.json"
+    return (
+        project_root
+        / ".gtkb-state"
+        / "bridge-publication-pending"
+        / f"{target.stem}-{digest}.json"
+    )
 
 
 def _write_pending_publication_sidecar(
@@ -935,7 +1094,9 @@ def _write_pending_publication_sidecar(
         "version": publication.version,
     }
     sidecar.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary_name = tempfile.mkstemp(prefix=sidecar.name + ".", suffix=".tmp", dir=sidecar.parent)
+    fd, temporary_name = tempfile.mkstemp(
+        prefix=sidecar.name + ".", suffix=".tmp", dir=sidecar.parent
+    )
     temporary = Path(temporary_name)
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
@@ -950,19 +1111,27 @@ def _write_pending_publication_sidecar(
     return sidecar
 
 
-def _load_pending_publication_sidecar(target: Path, project_root: Path) -> dict[str, object] | None:
+def _load_pending_publication_sidecar(
+    target: Path, project_root: Path
+) -> dict[str, object] | None:
     sidecar = _pending_publication_sidecar_path(target, project_root)
     if not sidecar.is_file():
         return None
     try:
         payload = json.loads(sidecar.read_text(encoding="utf-8"))
     except (OSError, ValueError, TypeError) as exc:
-        raise BridgePublicationError(f"pending bridge publication sidecar is unreadable: {sidecar}") from exc
+        raise BridgePublicationError(
+            f"pending bridge publication sidecar is unreadable: {sidecar}"
+        ) from exc
     if not isinstance(payload, dict) or payload.get("schema_version") != 1:
-        raise BridgePublicationError(f"pending bridge publication sidecar is malformed: {sidecar}")
+        raise BridgePublicationError(
+            f"pending bridge publication sidecar is malformed: {sidecar}"
+        )
     expected = target.resolve().relative_to(project_root.resolve()).as_posix()
     if str(payload.get("target_path") or "") != expected:
-        raise BridgePublicationError("pending bridge publication sidecar target binding mismatch")
+        raise BridgePublicationError(
+            "pending bridge publication sidecar target binding mismatch"
+        )
     document_name = str(payload.get("document_name") or "")
     status = str(payload.get("status") or "")
     session_id = str(payload.get("session_id") or "")
@@ -979,7 +1148,9 @@ def _load_pending_publication_sidecar(target: Path, project_root: Path) -> dict[
         or version < 1
         or expected != f"bridge/{document_name}-{version:03d}.md"
     ):
-        raise BridgePublicationError("pending bridge publication sidecar bindings are malformed")
+        raise BridgePublicationError(
+            "pending bridge publication sidecar bindings are malformed"
+        )
     return payload
 
 
@@ -1003,10 +1174,18 @@ def _registry_publication_enabled(project_root: Path) -> bool:
     )
     if not canonical.exists():
         return False
-    missing = [path for path in (packaged, project_root / "groundtruth.db") if not path.is_file()]
+    missing = [
+        path
+        for path in (packaged, project_root / "groundtruth.db")
+        if not path.is_file()
+    ]
     if missing:
-        rendered = ", ".join(_relative_to_project(path, project_root) for path in missing)
-        raise BridgePublicationError(f"configured registry publication control plane is incomplete: {rendered}")
+        rendered = ", ".join(
+            _relative_to_project(path, project_root) for path in missing
+        )
+        raise BridgePublicationError(
+            f"configured registry publication control plane is incomplete: {rendered}"
+        )
     return True
 
 
@@ -1026,9 +1205,13 @@ def _publication_compliance_digest(
 
 def _publication_author_session(content: str) -> tuple[str, Mapping[str, object]]:
     metadata = extract_author_metadata(content)
-    session_id = str(metadata.get("author_session_context_id") or "").strip().strip(chr(96))
+    session_id = (
+        str(metadata.get("author_session_context_id") or "").strip().strip(chr(96))
+    )
     if not session_id:
-        raise BridgePublicationError("bridge publication requires author_session_context_id")
+        raise BridgePublicationError(
+            "bridge publication requires author_session_context_id"
+        )
     return session_id, metadata
 
 
@@ -1039,7 +1222,9 @@ def _compensate_publication(
     reason: str,
 ) -> None:
     try:
-        from groundtruth_kb.project.registry_control_plane import compensate_bridge_publication
+        from groundtruth_kb.project.registry_control_plane import (
+            compensate_bridge_publication,
+        )
 
         compensate_bridge_publication(
             capability=publication.capability,
@@ -1068,7 +1253,9 @@ def finalize_pending_bridge_publication(target: Path, project_root: Path) -> Non
     if publication is None:
         pending = _load_pending_publication_sidecar(target, project_root)
         if pending is not None and _registry_publication_enabled(project_root):
-            from groundtruth_kb.project.registry_control_plane import recover_bridge_publication
+            from groundtruth_kb.project.registry_control_plane import (
+                recover_bridge_publication,
+            )
 
             session_id = str(pending.get("session_id") or "")
             receipt = recover_bridge_publication(
@@ -1126,7 +1313,9 @@ def rollback_pending_bridge_publication(
                 "BRIDGE_PUBLICATION_REPAIR_REQUIRED: pending capability context is unavailable; "
                 "file and claim are retained"
             )
-        from groundtruth_kb.project.registry_control_plane import recover_bridge_publication
+        from groundtruth_kb.project.registry_control_plane import (
+            recover_bridge_publication,
+        )
 
         recover_bridge_publication(
             target_path=str(pending.get("target_path") or ""),
@@ -1143,7 +1332,9 @@ def rollback_pending_bridge_publication(
         )
         _delete_pending_publication_sidecar(target, project_root)
         return
-    _compensate_publication(publication=publication, project_root=project_root, reason=reason)
+    _compensate_publication(
+        publication=publication, project_root=project_root, reason=reason
+    )
     _PENDING_BRIDGE_PUBLICATIONS.pop(key, None)
 
 
@@ -1154,7 +1345,128 @@ def _append_closing_instruction(content: str) -> str:
     return content.rstrip("\n") + "\n\n---\n\n" + _CLOSING_INSTRUCTION + "\n"
 
 
+def rewrite_declared_bridge_version(content: str, version: int) -> str:
+    """Rewrite a declared ``Version:`` line to ``NNN`` when one is present."""
+    match = _VERSION_LINE_RE.search(content)
+    if match is None:
+        return content
+    start, end = match.span("value")
+    return f"{content[:start]}{version:03d}{content[end:]}"
+
+
+def _version_from_bridge_filename(document_name: str, filename: str) -> int | None:
+    prefix = f"{document_name}-"
+    if not filename.startswith(prefix) or not filename.endswith(".md"):
+        return None
+    middle = filename[len(prefix) : -3]
+    if len(middle) == 3 and middle.isdigit():
+        return int(middle)
+    return None
+
+
+def next_free_bridge_version(
+    project_root: Path, document_name: str, *, min_version: int = 1
+) -> int:
+    """Return the next free numbered version for one slug.
+
+    Listing and occupancy checks are confined to ``document_name``. Unrelated
+    slugs are not serialized. Git-history occupancy is skipped rather than
+    reused (WI-4740 / WI-6564).
+    """
+    if min_version < 1:
+        raise BridgeTransitionError(
+            f"bridge version must be positive; got {min_version}"
+        )
+    latest = 0
+    try:
+        from scripts.bridge_thread_files import (
+            parse_versioned_bridge_filename,
+            versioned_bridge_files,
+        )
+
+        for path in versioned_bridge_files(project_root, document_name):
+            parsed = parse_versioned_bridge_filename(path.name)
+            if parsed is not None:
+                latest = max(latest, parsed[1])
+    except (ImportError, OSError):
+        bridge_dir = _bridge_dir(project_root)
+        if bridge_dir.is_dir():
+            for path in bridge_dir.glob(f"{document_name}-*.md"):
+                parsed = _version_from_bridge_filename(document_name, path.name)
+                if parsed is not None:
+                    latest = max(latest, parsed)
+    version = max(min_version, latest + 1)
+    ceiling = version + DEFAULT_BRIDGE_VERSION_ALLOCATION_RETRIES
+    while version <= ceiling:
+        target = _bridge_dir(project_root) / f"{document_name}-{version:03d}.md"
+        if not target.exists() and not _bridge_file_committed_in_git(
+            target, project_root
+        ):
+            return version
+        version += 1
+    raise BridgeConflictError(
+        f"no free per-slug bridge version for {document_name!r} at or below {ceiling:03d}"
+    )
+
+
+def _is_occupancy_conflict(exc: BridgeConflictError) -> bool:
+    message = str(exc).lower()
+    return any(marker in message for marker in _OCCUPANCY_CONFLICT_MARKERS)
+
+
 def write_bridge_file(
+    document_name: str,
+    version: int,
+    content: str,
+    project_root: Path,
+    *,
+    author_metadata: Mapping[str, object] | None = None,
+    require_author_metadata: bool = True,
+    release_claim: bool = True,
+    claim_registry: Any | None = None,
+) -> Path:
+    """Reserve the next free per-slug version and create-new write it.
+
+    Exclusive create (`open("x")`) remains the reservation. Occupancy and
+    lost `"x"` races raise a typed `BridgeConflictError` and retry against a
+    fresh listing of this slug only, rewriting a declared `Version:` line
+    before the next attempt. Bounded exhaustion fails closed. Status transition
+    validation stays with the caller.
+    """
+    if version < 1:
+        raise BridgeTransitionError(f"bridge version must be positive; got {version}")
+    original_content = content
+    last_conflict: BridgeConflictError | None = None
+    candidate = version
+    for attempt in range(DEFAULT_BRIDGE_VERSION_ALLOCATION_RETRIES):
+        attempt_content = (
+            original_content
+            if attempt == 0
+            else rewrite_declared_bridge_version(original_content, candidate)
+        )
+        try:
+            return _write_bridge_file_exclusive(
+                document_name,
+                candidate,
+                attempt_content,
+                project_root,
+                author_metadata=author_metadata,
+                require_author_metadata=require_author_metadata,
+                release_claim=release_claim,
+                claim_registry=claim_registry,
+            )
+        except BridgeConflictError as exc:
+            if not _is_occupancy_conflict(exc):
+                raise
+            last_conflict = exc
+            candidate = next_free_bridge_version(project_root, document_name)
+    raise BridgeConflictError(
+        f"bounded per-slug version allocation exhausted for {document_name!r} after "
+        f"{DEFAULT_BRIDGE_VERSION_ALLOCATION_RETRIES} attempts"
+    ) from last_conflict
+
+
+def _write_bridge_file_exclusive(
     document_name: str,
     version: int,
     content: str,
@@ -1182,7 +1494,9 @@ def write_bridge_file(
             f"{target} exists in git history; refusing to recreate at the same version. "
             "Use the next version number to append a new bridge entry."
         )
-    anchor_violations = validate_verdict_evidence_anchors(content, project_root=project_root)
+    anchor_violations = validate_verdict_evidence_anchors(
+        content, project_root=project_root
+    )
     if anchor_violations:
         raise BridgeEvidenceAnchorError(
             "refusing to write verdict with fabricated evidence anchors (WI-4520): "
@@ -1190,7 +1504,9 @@ def write_bridge_file(
             + ". Fix the citation, or mark the finding [inference] / [no exact anchor] / [absent]."
         )
     content_to_write = (
-        ensure_author_metadata(content, project_root=project_root, explicit=author_metadata)
+        ensure_author_metadata(
+            content, project_root=project_root, explicit=author_metadata
+        )
         if require_author_metadata
         else content
     )
@@ -1210,7 +1526,9 @@ def write_bridge_file(
                 project_root=project_root,
             )
     except (OSError, SystemExit, ValueError) as exc:
-        raise BridgeComplianceError(f"verdict candidate preparation failed closed: {exc}") from exc
+        raise BridgeComplianceError(
+            f"verdict candidate preparation failed closed: {exc}"
+        ) from exc
     audit = run_bridge_compliance_audit(
         file_path=target,
         content=content_to_write,
@@ -1221,7 +1539,9 @@ def write_bridge_file(
     status = _first_status(content_to_write)
     if typed_publication:
         if status not in VALID_STATUSES:
-            raise BridgePublicationError("typed bridge publication requires a canonical first-line status")
+            raise BridgePublicationError(
+                "typed bridge publication requires a canonical first-line status"
+            )
         session_id, metadata = _publication_author_session(content_to_write)
         guards = _run_provider_verdict_guards(
             project_root=project_root,
@@ -1253,17 +1573,22 @@ def write_bridge_file(
                 project_root=project_root,
             )
         except Exception as exc:
-            raise BridgePublicationError(f"typed bridge publication authorization failed: {exc}") from exc
+            raise BridgePublicationError(
+                f"typed bridge publication authorization failed: {exc}"
+            ) from exc
         publication = _PendingBridgePublication(
             capability=str(minted["capability"]),
             capability_hash=str(
                 minted.get("capability_hash")
-                or "sha256:" + hashlib.sha256(str(minted["capability"]).encode("utf-8")).hexdigest()
+                or "sha256:"
+                + hashlib.sha256(str(minted["capability"]).encode("utf-8")).hexdigest()
             ),
             target_path=str(minted["target_path"]),
             session_id=session_id,
             content_digest=str(
-                minted.get("content_digest") or "sha256:" + hashlib.sha256(content_to_write.encode("utf-8")).hexdigest()
+                minted.get("content_digest")
+                or "sha256:"
+                + hashlib.sha256(content_to_write.encode("utf-8")).hexdigest()
             ),
             document_name=document_name,
             version=version,
@@ -1281,7 +1606,9 @@ def write_bridge_file(
                 project_root=project_root,
                 reason=f"pending publication sidecar write failed: {exc}",
             )
-            raise BridgePublicationError(f"pending publication sidecar write failed: {exc}") from exc
+            raise BridgePublicationError(
+                f"pending publication sidecar write failed: {exc}"
+            ) from exc
 
     target.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -1294,7 +1621,9 @@ def write_bridge_file(
                 project_root=project_root,
                 reason="exclusive create lost a publication race",
             )
-        raise BridgeConflictError(f"{target} already exists; refusing to overwrite") from exc
+        raise BridgeConflictError(
+            f"{target} already exists; refusing to overwrite"
+        ) from exc
     except OSError as exc:
         if publication is not None:
             _compensate_publication(
@@ -1329,7 +1658,9 @@ def write_bridge_file(
             )
         else:
             target.unlink(missing_ok=True)
-        raise BridgeConflictError(f"post-write verification failed for {target}: content on disk differs")
+        raise BridgeConflictError(
+            f"post-write verification failed for {target}: content on disk differs"
+        )
 
     if publication is not None:
         try:
@@ -1402,30 +1733,47 @@ def publish_lo_verdict(
     root = project_root.resolve()
     normalized_verdict = verdict.strip().upper()
     if not document_name or _SAFE_SLUG_RE.fullmatch(document_name) is None:
-        raise BridgePublicationError("provider verdict slug must be a non-empty canonical bridge slug")
+        raise BridgePublicationError(
+            "provider verdict slug must be a non-empty canonical bridge slug"
+        )
     if normalized_verdict not in PROVIDER_VERDICT_STATUSES:
         raise BridgePublicationError(
             f"provider verdict must be one of {sorted(PROVIDER_VERDICT_STATUSES)}; got {verdict!r}"
         )
     if not session_id.strip():
-        raise BridgePublicationError("provider verdict requires a concrete worker session id")
+        raise BridgePublicationError(
+            "provider verdict requires a concrete worker session id"
+        )
 
-    provenance = _resolve_lo_worker(root, session_id=session_id, harness_name=harness_name)
+    provenance = _resolve_lo_worker(
+        root, session_id=session_id, harness_name=harness_name
+    )
     if provenance.get("role") != LOYAL_OPPOSITION_ROLE_SLOT:
         raise BridgePublicationError(
             "PublishBridgeVerdict requires a document-authoritative loyal-opposition worker session"
         )
     expected_harness_id = str(author_metadata.get("author_harness_id") or "").strip()
-    if expected_harness_id and str(provenance.get("harness_id") or "") != expected_harness_id:
-        raise BridgePublicationError("provider verdict harness metadata conflicts with worker-role provenance")
+    if (
+        expected_harness_id
+        and str(provenance.get("harness_id") or "") != expected_harness_id
+    ):
+        raise BridgePublicationError(
+            "provider verdict harness metadata conflicts with worker-role provenance"
+        )
 
     holder = _claim_holder(root, document_name)
     if holder is None:
-        raise BridgePublicationError(f"provider verdict requires an active claim for {document_name!r}")
+        raise BridgePublicationError(
+            f"provider verdict requires an active claim for {document_name!r}"
+        )
     if str(holder.get("session_id") or "") != session_id:
-        raise BridgePublicationError(f"provider verdict claim for {document_name!r} is held by another session")
+        raise BridgePublicationError(
+            f"provider verdict claim for {document_name!r} is held by another session"
+        )
 
-    latest_path, next_version, latest_status, latest_content = _thread_state(root, document_name)
+    latest_path, next_version, latest_status, latest_content = _thread_state(
+        root, document_name
+    )
     _validate_provider_transition(
         latest_status=latest_status,
         latest_content=latest_content,
@@ -1445,7 +1793,9 @@ def publish_lo_verdict(
         )
     document_match = _DOCUMENT_LINE_RE.search(content)
     if document_match and document_match.group("value") != document_name:
-        raise BridgePublicationError("provider verdict content Document field does not match the claimed thread")
+        raise BridgePublicationError(
+            "provider verdict content Document field does not match the claimed thread"
+        )
     version_match = _VERSION_LINE_RE.search(content)
     if version_match and int(version_match.group("value")) != next_version:
         raise BridgePublicationError(
@@ -1453,7 +1803,9 @@ def publish_lo_verdict(
         )
     latest_rel = _provider_relative_path(latest_path, root)
     if latest_rel not in content.replace("\\", "/"):
-        raise BridgePublicationError(f"provider verdict must respond to current latest entry {latest_rel}")
+        raise BridgePublicationError(
+            f"provider verdict must respond to current latest entry {latest_rel}"
+        )
 
     trusted_metadata = dict(author_metadata)
     trusted_metadata["author_session_context_id"] = session_id
@@ -1485,7 +1837,9 @@ def publish_lo_verdict(
                 project_root=root,
             )
     except (OSError, SystemExit, ValueError) as exc:
-        raise BridgeComplianceError(f"verdict candidate preparation failed closed: {exc}") from exc
+        raise BridgeComplianceError(
+            f"verdict candidate preparation failed closed: {exc}"
+        ) from exc
     _run_provider_verdict_guards(
         project_root=root,
         target=target,
@@ -1497,9 +1851,13 @@ def publish_lo_verdict(
     commit_sha: str | None = None
     if normalized_verdict == "VERIFIED":
         if not include_paths or not commit_message.strip():
-            raise BridgePublicationError("VERIFIED publication requires include_paths and commit_message")
+            raise BridgePublicationError(
+                "VERIFIED publication requires include_paths and commit_message"
+            )
         modified_tracked = _modified_tracked_include_paths(root, include_paths)
-        covered_by_hunks = _hunk_patch_covered_paths(root, hunk_patch_paths, latest_content=latest_content)
+        covered_by_hunks = _hunk_patch_covered_paths(
+            root, hunk_patch_paths, latest_content=latest_content
+        )
         uncovered = sorted(modified_tracked - covered_by_hunks)
         if uncovered:
             raise BridgePublicationError(
@@ -1513,8 +1871,12 @@ def publish_lo_verdict(
                 "GTKB_AUTHOR_HARNESS_ID": str(trusted_metadata["author_harness_id"]),
                 "GTKB_AUTHOR_SESSION_CONTEXT_ID": session_id,
                 "GTKB_AUTHOR_MODEL": str(trusted_metadata["author_model"]),
-                "GTKB_AUTHOR_MODEL_VERSION": str(trusted_metadata["author_model_version"]),
-                "GTKB_AUTHOR_MODEL_CONFIGURATION": str(trusted_metadata["author_model_configuration"]),
+                "GTKB_AUTHOR_MODEL_VERSION": str(
+                    trusted_metadata["author_model_version"]
+                ),
+                "GTKB_AUTHOR_MODEL_CONFIGURATION": str(
+                    trusted_metadata["author_model_configuration"]
+                ),
             }
         )
         finalization = _finalize_verified_provider_verdict(
@@ -1526,7 +1888,9 @@ def publish_lo_verdict(
             commit_message=commit_message,
             env=env,
         )
-        verdict_path = str(finalization.get("verdict_path") or _provider_relative_path(target, root))
+        verdict_path = str(
+            finalization.get("verdict_path") or _provider_relative_path(target, root)
+        )
         commit_sha = str(finalization.get("commit_sha") or "") or None
     else:
         path = write_bridge_file(

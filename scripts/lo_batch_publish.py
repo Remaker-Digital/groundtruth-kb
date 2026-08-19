@@ -69,7 +69,7 @@ from scripts.bridge_author_metadata import (  # noqa: E402
     load_author_metadata,
 )
 from scripts.bridge_work_intent_registry import acquire, release  # noqa: E402
-from scripts.gtkb_bridge_writer import publish_lo_verdict  # noqa: E402
+from scripts.gtkb_bridge_writer import next_free_bridge_version, publish_lo_verdict  # noqa: E402
 
 VERSIONED_RE = re.compile(r"^(?P<slug>.+)-(?P<ver>\d{3})\.md$")
 
@@ -88,6 +88,10 @@ _CONTENTION_MARKERS = (
     "database is locked",
     "busy",
     "lock",
+    "already exists",
+    "git history",
+    "bounded per-slug version allocation exhausted",
+    "no free per-slug bridge version",
 )
 
 
@@ -114,7 +118,9 @@ def resolve_publisher_identity(
     try:
         metadata = load_author_metadata(project_root, explicit=explicit, env=environ)
     except Exception as exc:  # noqa: BLE001 - surfaced as a typed provenance failure
-        raise PublisherProvenanceError(f"author metadata could not be resolved: {exc}") from exc
+        raise PublisherProvenanceError(
+            f"author metadata could not be resolved: {exc}"
+        ) from exc
 
     session_id = str(metadata.get("author_session_context_id") or "").strip()
     if not session_id:
@@ -124,7 +130,9 @@ def resolve_publisher_identity(
         )
     identity = str(metadata.get("author_identity") or "").strip()
     if not identity:
-        raise PublisherProvenanceError("author identity is unresolved for the publishing session")
+        raise PublisherProvenanceError(
+            "author identity is unresolved for the publishing session"
+        )
     return {str(k): str(v) for k, v in metadata.items()}
 
 
@@ -132,7 +140,9 @@ def harness_name_from_identity(author_identity: str) -> str:
     """Extract the harness name from a ``role/harness[/id]`` author identity."""
     parts = [part for part in str(author_identity).split("/") if part]
     if len(parts) < 2:
-        raise PublisherProvenanceError(f"author identity is not role/harness shaped: {author_identity!r}")
+        raise PublisherProvenanceError(
+            f"author identity is not role/harness shaped: {author_identity!r}"
+        )
     return parts[1]
 
 
@@ -163,7 +173,9 @@ def read_author_session(path: Path) -> str | None:
         content = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
-    session_id = str(extract_author_metadata(content).get("author_session_context_id") or "").strip()
+    session_id = str(
+        extract_author_metadata(content).get("author_session_context_id") or ""
+    ).strip()
     return session_id or None
 
 
@@ -307,50 +319,74 @@ def publish_one(
 ) -> dict[str, Any]:
     """Publish a single verdict with computed provenance and bounded retries."""
     slug = item["slug"]
-    metadata = dict(author_metadata or resolve_publisher_identity(project_root, env=env))
+    metadata = dict(
+        author_metadata or resolve_publisher_identity(project_root, env=env)
+    )
     reviewer_session = metadata["author_session_context_id"]
     harness_name = harness_name_from_identity(metadata["author_identity"])
 
-    latest_v, latest_path = latest_version(project_root, slug)
-    next_version = int(item.get("version") or (latest_v + 1))
+    _, latest_path = latest_version(project_root, slug)
     responds = item.get("responds") or f"bridge/{latest_path.name}"
     responds_path = project_root / responds
 
-    status = latest_path.read_text(encoding="utf-8", errors="replace").splitlines()[0].strip().upper()
+    status = (
+        latest_path.read_text(encoding="utf-8", errors="replace")
+        .splitlines()[0]
+        .strip()
+        .upper()
+    )
     if status not in ACTIONABLE_PREDECESSOR_STATUSES:
-        return {"slug": slug, "ok": False, "error": f"latest_status_not_actionable:{status}"}
+        return {
+            "slug": slug,
+            "ok": False,
+            "error": f"latest_status_not_actionable:{status}",
+        }
 
     try:
-        predecessor_session = assert_review_independence(reviewer_session, responds_path)
+        predecessor_session = assert_review_independence(
+            reviewer_session, responds_path
+        )
     except ReviewIndependenceError as exc:
         return {"slug": slug, "ok": False, "error": f"review_independence: {exc}"}
 
     published_date = datetime.now(UTC).strftime("%Y-%m-%d")
-    body = build_body(
-        item,
-        next_version=next_version,
-        responds=responds,
-        author_metadata=metadata,
-        reviewer_session=reviewer_session,
-        predecessor_session=predecessor_session,
-        published_date=published_date,
-    )
 
-    try:
-        body = prepare_verdict_candidate(
-            candidate_path=f"bridge/{slug}-{next_version:03d}.md",
-            content=body,
-            project_root=project_root,
-        )
-    except Exception as exc:  # noqa: BLE001 - reported as a per-item failure
-        return {"slug": slug, "ok": False, "error": f"prepare_failed: {type(exc).__name__}: {exc}"}
-
-    if not acquire(slug, reviewer_session, ttl_seconds=claim_ttl_seconds, project_root=project_root):
+    if not acquire(
+        slug, reviewer_session, ttl_seconds=claim_ttl_seconds, project_root=project_root
+    ):
         return {"slug": slug, "ok": False, "error": "claim_held"}
 
     attempt = 0
     try:
         while True:
+            next_version = next_free_bridge_version(project_root, slug)
+            requested = item.get("version")
+            if requested is not None:
+                requested_version = int(requested)
+                hinted = project_root / "bridge" / f"{slug}-{requested_version:03d}.md"
+                if requested_version >= 1 and not hinted.exists():
+                    next_version = requested_version
+            body = build_body(
+                item,
+                next_version=next_version,
+                responds=responds,
+                author_metadata=metadata,
+                reviewer_session=reviewer_session,
+                predecessor_session=predecessor_session,
+                published_date=published_date,
+            )
+            try:
+                body = prepare_verdict_candidate(
+                    candidate_path=f"bridge/{slug}-{next_version:03d}.md",
+                    content=body,
+                    project_root=project_root,
+                )
+            except Exception as exc:  # noqa: BLE001 - reported as a per-item failure
+                return {
+                    "slug": slug,
+                    "ok": False,
+                    "error": f"prepare_failed: {type(exc).__name__}: {exc}",
+                }
             try:
                 published = publish_lo_verdict(
                     slug,
@@ -361,7 +397,12 @@ def publish_one(
                     harness_name=harness_name,
                     author_metadata=metadata,
                 )
-                return {"slug": slug, "ok": True, "result": published.to_dict(), "attempts": attempt + 1}
+                return {
+                    "slug": slug,
+                    "ok": True,
+                    "result": published.to_dict(),
+                    "attempts": attempt + 1,
+                }
             except Exception as exc:  # noqa: BLE001 - retried only when contention-shaped
                 attempt += 1
                 if attempt > max_retries or not _is_contention(exc):
@@ -402,7 +443,13 @@ def publish_batch(
     for index, item in enumerate(items):
         if index > 0 and min_interval_seconds > 0:
             if on_event:
-                on_event({"event": "throttle", "slug": item.get("slug"), "seconds": min_interval_seconds})
+                on_event(
+                    {
+                        "event": "throttle",
+                        "slug": item.get("slug"),
+                        "seconds": min_interval_seconds,
+                    }
+                )
             sleep(min_interval_seconds)
         result = publish_one(
             item,
@@ -425,15 +472,24 @@ def publish_batch(
 
 
 def main(argv: Sequence[str]) -> int:
-    parser = argparse.ArgumentParser(description="Publish Loyal Opposition verdicts from a recommendations JSON file.")
-    parser.add_argument("recs", type=Path, help="Path to the recommendations JSON file.")
+    parser = argparse.ArgumentParser(
+        description="Publish Loyal Opposition verdicts from a recommendations JSON file."
+    )
+    parser.add_argument(
+        "recs", type=Path, help="Path to the recommendations JSON file."
+    )
     parser.add_argument(
         "--min-interval-seconds",
         type=float,
         default=DEFAULT_MIN_INTERVAL_SECONDS,
         help="Minimum seconds between successive publications.",
     )
-    parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT, help="Override the project root.")
+    parser.add_argument(
+        "--project-root",
+        type=Path,
+        default=PROJECT_ROOT,
+        help="Override the project root.",
+    )
     args = parser.parse_args(list(argv))
 
     items = json.loads(args.recs.read_text(encoding="utf-8"))
