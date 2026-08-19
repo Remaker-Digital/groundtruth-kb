@@ -71,6 +71,8 @@ from scripts.bridge_author_metadata import (  # noqa: E402
 from scripts.bridge_work_intent_registry import acquire, release  # noqa: E402
 from scripts.gtkb_bridge_writer import next_free_bridge_version, publish_lo_verdict  # noqa: E402
 
+from groundtruth_kb.bridge.versioned_files import status_from_bridge_file  # noqa: E402
+
 VERSIONED_RE = re.compile(r"^(?P<slug>.+)-(?P<ver>\d{3})\.md$")
 
 ACTIONABLE_PREDECESSOR_STATUSES = frozenset({"NEW", "REVISED", "NO-ACTION"})
@@ -329,12 +331,12 @@ def publish_one(
     responds = item.get("responds") or f"bridge/{latest_path.name}"
     responds_path = project_root / responds
 
-    status = (
-        latest_path.read_text(encoding="utf-8", errors="replace")
-        .splitlines()[0]
-        .strip()
-        .upper()
-    )
+    # WI-6541: read the header block as a unit. The status token is identified
+    # by pattern, not by line position, so a marker-first header
+    # (``::init`` / ``::open`` before the status) resolves identically to a
+    # status-first header. Returns ``None`` for a header with no canonical
+    # status token, which is not actionable.
+    status = status_from_bridge_file(latest_path)
     if status not in ACTIONABLE_PREDECESSOR_STATUSES:
         return {
             "slug": slug,

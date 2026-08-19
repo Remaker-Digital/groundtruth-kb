@@ -1,8 +1,7 @@
-"""Document-authoritative ``changed_by`` resolution for canonical backlog writers.
+"""Exact-init ``changed_by`` resolution for canonical backlog writers.
 
-Roles for non-dispatcher behavior never come from the durable harness registry,
-shared markers, dispatcher selection, or vendor identity. A worker session must
-first carry validated ``worker_role_provenance`` in its own open session document.
+Role is an immutable property of the invoking session context. Harness identity
+is attribution only and never supplies role authority.
 """
 
 from __future__ import annotations
@@ -33,8 +32,40 @@ def _current_session_id() -> str:
 
     session_id = resolve_session_id(order=BRIDGE_WORK_INTENT_ORDER)
     if not session_id:
-        raise RuntimeError("resolve_changed_by: current session id is missing; worker role provenance is required.")
+        raise RuntimeError(
+            "resolve_changed_by: current session id is missing; exact-init role authority is required."
+        )
     return session_id
+
+
+def _resolve_harness_attribution(project_root: Path, harness_name: str | None) -> str:
+    """Resolve and cross-check the acting harness without reading a role field."""
+
+    selected_name = _expected_harness_name(harness_name)
+    if not selected_name:
+        raise RuntimeError(
+            "resolve_changed_by: acting harness identity is unavailable."
+        )
+
+    from groundtruth_kb.session.envelope import (
+        EnvelopeError,
+        resolve_acting_harness_identity,
+        resolve_harness_identity,
+    )
+
+    try:
+        durable_name, durable_id = resolve_harness_identity(
+            project_root,
+            harness_name=selected_name,
+        )
+        acting_name, _acting_id = resolve_acting_harness_identity(
+            project_root,
+            harness_name=durable_name,
+            harness_id=durable_id,
+        )
+    except EnvelopeError as exc:
+        raise RuntimeError(f"resolve_changed_by: {exc}") from exc
+    return acting_name
 
 
 def resolve_changed_by(
@@ -44,21 +75,19 @@ def resolve_changed_by(
 ) -> str:
     """Return ``<role>/<harness>`` or fail before mutation.
 
-    Role authority is the attestation resolver
-    (``DCL-SESSION-ROLE-RESOLUTION-001`` v8): the invoking session context
-    resolves through its immutable init binding to the role attestation in
-    force, and the attestation's evidence reference is what callers should
-    persist. During the ordered Slice 1-3 migration, sessions whose invoking
-    context predates the attestation store (typed ``no_session_binding``)
-    still resolve through the legacy worker-session document; Slice 3
-    removes that path once every live session initializes through the
-    binding transaction.
+    The invoking session context must resolve to its immutable exact-init
+    binding and initial role attestation. Worker-session documents, harness
+    role registries, dispatcher selection, markers, and role environment values
+    are never fallback authority.
     """
     resolved_project_root = PROJECT_ROOT if project_root is None else Path(project_root)
     session_id = _current_session_id()
-    resolved_harness = _expected_harness_name(harness_name)
+    resolved_harness = _resolve_harness_attribution(resolved_project_root, harness_name)
 
-    from groundtruth_kb.session.attestation import RoleAttestationError, resolve_effective_role_for_context
+    from groundtruth_kb.session.attestation import (
+        RoleAttestationError,
+        resolve_effective_role_for_context,
+    )
 
     try:
         _binding, attestation = resolve_effective_role_for_context(
@@ -66,22 +95,17 @@ def resolve_changed_by(
             invoking_context=session_id,
         )
     except RoleAttestationError as exc:
-        if exc.code != "no_session_binding":
-            raise RuntimeError(f"resolve_changed_by: {exc}") from exc
-    else:
-        return f"{attestation.role}/{resolved_harness or 'unknown-harness'}"
-
-    from groundtruth_kb.session.envelope import EnvelopeError, resolve_worker_role_provenance
-
-    try:
-        provenance = resolve_worker_role_provenance(
-            resolved_project_root,
-            current_session_id=session_id,
-            harness_name=resolved_harness,
-        )
-    except EnvelopeError as exc:
         raise RuntimeError(f"resolve_changed_by: {exc}") from exc
-    return f"{provenance['role']}/{provenance['harness_name']}"
+    if attestation.source_event != "exact_init":
+        raise RuntimeError(
+            "resolve_changed_by: changed_by role requires the immutable exact-init attestation; "
+            f"got source_event={attestation.source_event or '<missing>'}"
+        )
+    if attestation.role not in {"prime-builder", "loyal-opposition"}:
+        raise RuntimeError(
+            f"resolve_changed_by: unsupported exact-init role {attestation.role!r}"
+        )
+    return f"{attestation.role}/{resolved_harness}"
 
 
 def resolve_changed_by_or_none(

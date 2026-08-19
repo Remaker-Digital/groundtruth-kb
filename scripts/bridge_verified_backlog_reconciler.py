@@ -40,14 +40,31 @@ TOKEN_SPLIT_RE = re.compile(r"[,;\r\n]+")
 # Anchored and MULTILINE so only the metadata declaration matches, never a prose
 # WI mention. The captured ID is upper-cased to key the reverse index against the
 # canonical uppercase work_items.id form.
-_WORK_ITEM_METADATA_RE = re.compile(r"^Work Item:\s*(WI-[A-Za-z0-9-]+)\s*$", re.MULTILINE | re.IGNORECASE)
-_BRIDGE_KIND_RE = re.compile(r"^bridge_kind:\s*([A-Za-z0-9_.-]+)\s*$", re.MULTILINE | re.IGNORECASE)
-_TARGET_PATHS_METADATA_RE = re.compile(r"^\s*target_paths\s*:\s*(.*?)\s*$", re.MULTILINE | re.IGNORECASE)
-_BRIDGE_VERSION_REFERENCE_RE = re.compile(r"(?:bridge[/\\])?(?P<slug>[A-Za-z0-9_.-]+?)-(?P<version>\d{3})(?:\.md)?")
-_IMPLEMENTATION_PROPOSAL_RE = re.compile(r"^#\s+.*implementation proposal", re.MULTILINE | re.IGNORECASE)
+_WORK_ITEM_METADATA_RE = re.compile(
+    r"^Work Item:\s*(WI-[A-Za-z0-9-]+)\s*$", re.MULTILINE | re.IGNORECASE
+)
+_BRIDGE_KIND_RE = re.compile(
+    r"^bridge_kind:\s*([A-Za-z0-9_.-]+)\s*$", re.MULTILINE | re.IGNORECASE
+)
+_TARGET_PATHS_METADATA_RE = re.compile(
+    r"^\s*target_paths\s*:\s*(.*?)\s*$", re.MULTILINE | re.IGNORECASE
+)
+_BRIDGE_VERSION_REFERENCE_RE = re.compile(
+    r"(?:bridge[/\\])?(?P<slug>[A-Za-z0-9_.-]+?)-(?P<version>\d{3})(?:\.md)?"
+)
+_IMPLEMENTATION_PROPOSAL_RE = re.compile(
+    r"^#\s+.*implementation proposal", re.MULTILINE | re.IGNORECASE
+)
 _WAIVER_HEADING_RE = re.compile(
-    r"^##\s+(?:By-Reference Finalization Waiver|Finalization Waiver|Owner Decisions / Input)\s*$",
-    re.MULTILINE | re.IGNORECASE,
+    r"^##\s+By-Reference Finalization Waiver\s*$",
+    re.MULTILINE,
+)
+_AFFIRMATIVE_WAIVER_RE = re.compile(
+    r"^Owner-approved by-reference waiver:\s*(DELIB-[A-Z0-9-]+)\.\s*$",
+    re.MULTILINE,
+)
+_NEGATED_WAIVER_RE = re.compile(
+    r"(?i)\b(?:do not|don't|does not|did not|not|never|no)\b.{0,80}by-reference waiver",
 )
 _ADVISORY_GO_TEXT_RE = re.compile(
     r"\b(?:constrained to advisory(?: and planning)?|advisory and planning direction only|planning direction only)\b",
@@ -61,9 +78,7 @@ _CLOSURE_REASON_PRIORITY = (
 )
 
 CHANGED_BY = "bridge-verified-backlog-reconciler"
-CHANGE_REASON = (
-    "Resolved by bridge VERIFIED backlog reconciler per DELIB-S345-BRIDGE-VERIFICATION-RETIRES-PARENT-BACKLOG-ITEM."
-)
+CHANGE_REASON = "Resolved by bridge VERIFIED backlog reconciler per DELIB-S345-BRIDGE-VERIFICATION-RETIRES-PARENT-BACKLOG-ITEM."
 REPAIR_CHANGED_BY = "bridge-verified-backlog-reconciler-repair"
 REPAIR_CHANGE_REASON = (
     "Reopened by bridge VERIFIED backlog reconciler repair after "
@@ -109,7 +124,10 @@ def collect_latest_bridge_statuses(project_root: Path) -> dict[str, dict[str, st
         prior = latest.get(slug)
         if prior is None or version > prior[0]:
             latest[slug] = (version, status, rel_path)
-    return {slug: {"status": status, "path": rel_path} for slug, (_version, status, rel_path) in sorted(latest.items())}
+    return {
+        slug: {"status": status, "path": rel_path}
+        for slug, (_version, status, rel_path) in sorted(latest.items())
+    }
 
 
 def _flatten_related_value(value: Any) -> list[str]:
@@ -231,7 +249,9 @@ def _bridge_rel_path(project_root: Path, path: Path) -> str:
 
 
 def _metadata_reference(markdown: str, label: str) -> str | None:
-    match = re.search(rf"^{re.escape(label)}:\s*(.+?)\s*$", markdown, re.MULTILINE | re.IGNORECASE)
+    match = re.search(
+        rf"^{re.escape(label)}:\s*(.+?)\s*$", markdown, re.MULTILINE | re.IGNORECASE
+    )
     if match is None:
         return None
     reference = _BRIDGE_VERSION_REFERENCE_RE.search(match.group(1))
@@ -240,11 +260,18 @@ def _metadata_reference(markdown: str, label: str) -> str | None:
     return f"bridge/{reference.group('slug')}-{reference.group('version')}.md"
 
 
-def _thread_file_by_rel_path(project_root: Path, files: list[Path], rel_path: str) -> Path | None:
-    return next((path for path in files if _bridge_rel_path(project_root, path) == rel_path), None)
+def _thread_file_by_rel_path(
+    project_root: Path, files: list[Path], rel_path: str
+) -> Path | None:
+    return next(
+        (path for path in files if _bridge_rel_path(project_root, path) == rel_path),
+        None,
+    )
 
 
-def _approved_proposal_file(project_root: Path, slug: str, verdict_path: Path, files: list[Path]) -> Path | None:
+def _approved_proposal_file(
+    project_root: Path, slug: str, verdict_path: Path, files: list[Path]
+) -> Path | None:
     """Resolve the proposal approved by the latest GO preceding ``verdict_path``."""
 
     try:
@@ -252,7 +279,14 @@ def _approved_proposal_file(project_root: Path, slug: str, verdict_path: Path, f
     except ValueError:
         return None
     prior_files = files[:verdict_index]
-    go_path = next((path for path in reversed(prior_files) if _status_from_bridge_file(path) == "GO"), None)
+    go_path = next(
+        (
+            path
+            for path in reversed(prior_files)
+            if _status_from_bridge_file(path) == "GO"
+        ),
+        None,
+    )
     if go_path is None:
         return None
     go_index = files.index(go_path)
@@ -266,16 +300,24 @@ def _approved_proposal_file(project_root: Path, slug: str, verdict_path: Path, f
             if _status_from_bridge_file(candidate) in {"NEW", "REVISED"}:
                 return candidate
 
-    candidates = [path for path in files[:go_index] if _status_from_bridge_file(path) in {"NEW", "REVISED"}]
+    candidates = [
+        path
+        for path in files[:go_index]
+        if _status_from_bridge_file(path) in {"NEW", "REVISED"}
+    ]
     for candidate in reversed(candidates):
         text = _read_bridge_text(candidate)
         kind = _BRIDGE_KIND_RE.search(text)
-        if (kind and kind.group(1).lower() == "prime_proposal") or _IMPLEMENTATION_PROPOSAL_RE.search(text):
+        if (
+            kind and kind.group(1).lower() == "prime_proposal"
+        ) or _IMPLEMENTATION_PROPOSAL_RE.search(text):
             return candidate
     return candidates[-1] if candidates else None
 
 
-def _parse_target_path_metadata(markdown: str) -> tuple[tuple[str, ...] | None, str | None]:
+def _parse_target_path_metadata(
+    markdown: str,
+) -> tuple[tuple[str, ...] | None, str | None]:
     """Parse strict inline-JSON target metadata.
 
     Missing metadata preserves legacy and bridge-only behavior. Once a
@@ -291,7 +333,9 @@ def _parse_target_path_metadata(markdown: str) -> tuple[tuple[str, ...] | None, 
         parsed = json.loads(matches[0].group(1))
     except json.JSONDecodeError:
         return None, "target_paths_not_json"
-    if not isinstance(parsed, list) or not all(isinstance(item, str) and item.strip() for item in parsed):
+    if not isinstance(parsed, list) or not all(
+        isinstance(item, str) and item.strip() for item in parsed
+    ):
         return None, "target_paths_not_string_list"
 
     normalized: list[str] = []
@@ -419,7 +463,9 @@ def _commit_is_ancestor(
     cached = cache.get(key)
     if cached is not None:
         return cached
-    result = _run_git(project_root, "merge-base", "--is-ancestor", candidate, descendant)
+    result = _run_git(
+        project_root, "merge-base", "--is-ancestor", candidate, descendant
+    )
     ancestor = result.returncode == 0
     cache[key] = ancestor
     return ancestor
@@ -444,7 +490,9 @@ def _target_covered_by_ancestor_commit(
     if any(char in target for char in "*?["):
         # Mirrors _target_covered_by_commit's ANY-match glob semantics.
         return any(
-            _commit_is_ancestor(project_root, latest_commit_by_path[path], verdict_commit, cache)
+            _commit_is_ancestor(
+                project_root, latest_commit_by_path[path], verdict_commit, cache
+            )
             for path in provenance["tracked_paths"]
             if fnmatch.fnmatchcase(path, target) and latest_commit_by_path.get(path)
         )
@@ -457,21 +505,29 @@ def _target_covered_by_ancestor_commit(
 def build_git_provenance_index(project_root: Path) -> dict[str, Any]:
     """Build one repository-wide Git provenance index for VERIFIED closure checks."""
 
-    status = _run_git(project_root, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--")
+    status = _run_git(
+        project_root, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--"
+    )
     tracked = _run_git(project_root, "ls-files", "-z", "--")
     history = _run_git(project_root, "log", "--format=commit:%H", "--name-only", "--")
     latest_commit_by_path: dict[str, str] = {}
     changed_paths_by_commit: dict[str, set[str]] = {}
     if history.returncode == 0:
-        latest_commit_by_path, changed_paths_by_commit = _git_log_name_index(history.stdout)
+        latest_commit_by_path, changed_paths_by_commit = _git_log_name_index(
+            history.stdout
+        )
     tracked_paths = (
-        {path.replace("\\", "/") for path in tracked.stdout.split("\0") if path} if tracked.returncode == 0 else set()
+        {path.replace("\\", "/") for path in tracked.stdout.split("\0") if path}
+        if tracked.returncode == 0
+        else set()
     )
     return {
         "status_ok": status.returncode == 0,
         "tracked_ok": tracked.returncode == 0,
         "history_ok": history.returncode == 0,
-        "dirty_paths": _parse_git_status_paths(status.stdout) if status.returncode == 0 else set(),
+        "dirty_paths": _parse_git_status_paths(status.stdout)
+        if status.returncode == 0
+        else set(),
         "tracked_paths": tracked_paths,
         "latest_commit_by_path": latest_commit_by_path,
         "changed_paths_by_commit": changed_paths_by_commit,
@@ -488,7 +544,11 @@ def _terminal_verdict_commit_coverage(
     provenance = git_provenance_index or build_git_provenance_index(project_root)
     dirty_paths = provenance["dirty_paths"]
     tracked_paths = provenance["tracked_paths"]
-    if not provenance["status_ok"] or not provenance["tracked_ok"] or verdict_rel_path in dirty_paths:
+    if (
+        not provenance["status_ok"]
+        or not provenance["tracked_ok"]
+        or verdict_rel_path in dirty_paths
+    ):
         return {
             "covered": False,
             "commit": None,
@@ -544,7 +604,9 @@ def _terminal_verdict_commit_coverage(
         # and report it separately. The verdict artifact itself is NOT exempt --
         # GOV-FILE-BRIDGE-AUTHORITY-001's "a verdict exists and is committed"
         # invariant stays exactly where it was.
-        if path != verdict_rel_path and _target_is_uncommittable(project_root, path, ignore_cache):
+        if path != verdict_rel_path and _target_is_uncommittable(
+            project_root, path, ignore_cache
+        ):
             uncommittable.append(path)
             continue
         missing.append(path)
@@ -554,22 +616,28 @@ def _terminal_verdict_commit_coverage(
         "changed_paths": sorted(changed_paths),
         "missing_paths": missing,
         "uncommittable_paths": uncommittable,
-        "verdict_state": "committed" if verdict_rel_path in changed_paths else "commit_omits_verdict",
+        "verdict_state": "committed"
+        if verdict_rel_path in changed_paths
+        else "commit_omits_verdict",
     }
 
 
 def _report_has_by_reference_waiver(report_path: Path | None) -> bool:
+    """Accept only one dedicated affirmative DELIB-backed by-reference waiver."""
+
     if report_path is None:
         return False
     text = _read_bridge_text(report_path)
     headings = list(_WAIVER_HEADING_RE.finditer(text))
-    for heading in headings:
-        next_heading = re.search(r"^##\s+", text[heading.end() :], re.MULTILINE)
-        end = heading.end() + next_heading.start() if next_heading else len(text)
-        body = text[heading.end() : end].lower()
-        if "by-reference" in body and "waiver" in body and ("owner" in body or "delib-" in body):
-            return True
-    return False
+    if len(headings) != 1:
+        return False
+    heading = headings[0]
+    next_heading = re.search(r"^##\s+", text[heading.end() :], re.MULTILINE)
+    end = heading.end() + next_heading.start() if next_heading else len(text)
+    body = text[heading.end() : end]
+    if _NEGATED_WAIVER_RE.search(body):
+        return False
+    return len(_AFFIRMATIVE_WAIVER_RE.findall(body)) == 1
 
 
 def verified_thread_closure_evidence(
@@ -583,22 +651,39 @@ def verified_thread_closure_evidence(
 
     files = _bridge_thread_files(project_root, slug, file_index=file_index)
     if not files:
-        return {"satisfied": False, "reason": "malformed_target_metadata", "detail": "missing_thread_files"}
+        return {
+            "satisfied": False,
+            "reason": "malformed_target_metadata",
+            "detail": "missing_thread_files",
+        }
     verdict_path = files[-1]
     verdict_rel_path = _bridge_rel_path(project_root, verdict_path)
     verdict_text = _read_bridge_text(verdict_path)
     response_reference = _metadata_reference(verdict_text, "Responds to")
     if response_reference == "":
-        return {"satisfied": False, "reason": "malformed_target_metadata", "detail": "malformed_responds_to"}
+        return {
+            "satisfied": False,
+            "reason": "malformed_target_metadata",
+            "detail": "malformed_responds_to",
+        }
     response_path = (
-        _thread_file_by_rel_path(project_root, files, response_reference) if response_reference is not None else None
+        _thread_file_by_rel_path(project_root, files, response_reference)
+        if response_reference is not None
+        else None
     )
     if response_reference is not None and response_path is None:
-        return {"satisfied": False, "reason": "malformed_target_metadata", "detail": "cross_thread_responds_to"}
+        return {
+            "satisfied": False,
+            "reason": "malformed_target_metadata",
+            "detail": "cross_thread_responds_to",
+        }
     if response_path is None:
         verdict_index = files.index(verdict_path)
         response_path = files[verdict_index - 1] if verdict_index > 0 else None
-    if response_path is not None and _status_from_bridge_file(response_path) == "NO-ACTION":
+    if (
+        response_path is not None
+        and _status_from_bridge_file(response_path) == "NO-ACTION"
+    ):
         return {
             "satisfied": False,
             "reason": "no_action_verified",
@@ -607,7 +692,11 @@ def verified_thread_closure_evidence(
 
     proposal_path = _approved_proposal_file(project_root, slug, verdict_path, files)
     if proposal_path is None:
-        return {"satisfied": True, "reason": "genuinely_closable", "mode": "legacy_or_bridge_only"}
+        return {
+            "satisfied": True,
+            "reason": "genuinely_closable",
+            "mode": "legacy_or_bridge_only",
+        }
     target_paths, error = _parse_target_path_metadata(_read_bridge_text(proposal_path))
     if error:
         return {
@@ -616,17 +705,30 @@ def verified_thread_closure_evidence(
             "detail": error,
             "proposal_path": _bridge_rel_path(project_root, proposal_path),
         }
-    if target_paths is None or not target_paths or all(path.startswith("bridge/") for path in target_paths):
-        return {"satisfied": True, "reason": "genuinely_closable", "mode": "legacy_or_bridge_only"}
+    if (
+        target_paths is None
+        or not target_paths
+        or all(path.startswith("bridge/") for path in target_paths)
+    ):
+        return {
+            "satisfied": True,
+            "reason": "genuinely_closable",
+            "mode": "legacy_or_bridge_only",
+        }
 
-    non_bridge_targets = tuple(path for path in target_paths if not path.startswith("bridge/"))
+    non_bridge_targets = tuple(
+        path for path in target_paths if not path.startswith("bridge/")
+    )
     coverage = _terminal_verdict_commit_coverage(
         project_root,
         verdict_rel_path,
         non_bridge_targets,
         git_provenance_index=git_provenance_index,
     )
-    if _report_has_by_reference_waiver(response_path) and verdict_rel_path not in coverage["missing_paths"]:
+    if (
+        _report_has_by_reference_waiver(response_path)
+        and verdict_rel_path not in coverage["missing_paths"]
+    ):
         return {
             "satisfied": True,
             "reason": "genuinely_closable",
@@ -648,7 +750,9 @@ def verified_thread_closure_evidence(
     }
 
 
-def _child_thread_slugs(slug: str, bridge_statuses: dict[str, dict[str, str]]) -> list[str]:
+def _child_thread_slugs(
+    slug: str, bridge_statuses: dict[str, dict[str, str]]
+) -> list[str]:
     """Return indexed thread slugs that are children of ``slug`` (``<slug>-*``).
 
     Child enumeration is a DISTINCT operation from parent-thread file
@@ -658,7 +762,11 @@ def _child_thread_slugs(slug: str, bridge_statuses: dict[str, dict[str, str]]) -
     """
 
     prefix = f"{slug}-"
-    return sorted(candidate for candidate in bridge_statuses if candidate != slug and candidate.startswith(prefix))
+    return sorted(
+        candidate
+        for candidate in bridge_statuses
+        if candidate != slug and candidate.startswith(prefix)
+    )
 
 
 def build_work_item_bridge_links(
@@ -703,7 +811,11 @@ def _contains_work_item_id(text: str, work_item_id: str) -> bool:
 
 
 def bridge_thread_has_parent_evidence(
-    project_root: Path, slug: str, work_item_id: str, *, file_index: dict[str, list[Path]] | None = None
+    project_root: Path,
+    slug: str,
+    work_item_id: str,
+    *,
+    file_index: dict[str, list[Path]] | None = None,
 ) -> dict[str, Any]:
     """Return explicit evidence that a bridge thread covers the work item.
 
@@ -723,13 +835,19 @@ def bridge_thread_has_parent_evidence(
             matched_files.append(str(path.relative_to(project_root)).replace("\\", "/"))
     return {
         "has_parent_evidence": bool(matched_files),
-        "files_checked": [str(path.relative_to(project_root)).replace("\\", "/") for path in files],
+        "files_checked": [
+            str(path.relative_to(project_root)).replace("\\", "/") for path in files
+        ],
         "matched_files": matched_files,
     }
 
 
 def bridge_thread_declares_work_item(
-    project_root: Path, slug: str, work_item_id: str, *, file_index: dict[str, list[Path]] | None = None
+    project_root: Path,
+    slug: str,
+    work_item_id: str,
+    *,
+    file_index: dict[str, list[Path]] | None = None,
 ) -> bool:
     """Return True if the thread's exact versioned chain canonically declares the WI.
 
@@ -781,7 +899,9 @@ def bridge_thread_is_non_implementation_link(
 
     if status in {"ADVISORY", "WITHDRAWN"}:
         return True
-    return status == "GO" and bridge_thread_is_advisory_kind(project_root, slug, file_index=file_index)
+    return status == "GO" and bridge_thread_is_advisory_kind(
+        project_root, slug, file_index=file_index
+    )
 
 
 def umbrella_satisfaction(
@@ -806,7 +926,9 @@ def umbrella_satisfaction(
     """
 
     children = _child_thread_slugs(slug, bridge_statuses)
-    all_children_verified = bool(children) and all(bridge_statuses[child]["status"] == "VERIFIED" for child in children)
+    all_children_verified = bool(children) and all(
+        bridge_statuses[child]["status"] == "VERIFIED" for child in children
+    )
     if verified_closure_cache is None:
         verified_closure_cache = {}
     child_closure_evidence: dict[str, dict[str, Any]] = {}
@@ -827,7 +949,9 @@ def umbrella_satisfaction(
         [
             child
             for child in children
-            if bridge_thread_declares_work_item(project_root, child, work_item_id, file_index=file_index)
+            if bridge_thread_declares_work_item(
+                project_root, child, work_item_id, file_index=file_index
+            )
         ]
         if all_children_closable
         else []
@@ -863,7 +987,9 @@ def _completion_evidence(current: dict[str, Any], row: dict[str, Any]) -> str:
             "DELIB-S345-BRIDGE-VERIFICATION-RETIRES-PARENT-BACKLOG-ITEM (WI-4704 parent-evidence relaxation)."
         )
     elif reason == "non_implementation_links_ignored":
-        implementation = ", ".join(row.get("satisfied_implementation_bridge_threads", []))
+        implementation = ", ".join(
+            row.get("satisfied_implementation_bridge_threads", [])
+        )
         non_implementation = ", ".join(row.get("non_blocking_bridge_threads", []))
         evidence = (
             "Bridge VERIFIED backlog reconciler resolved this work item because at least one "
@@ -902,7 +1028,9 @@ def classify_work_item(
         file_index = _index_bridge_thread_files(project_root)
     if verified_closure_cache is None:
         verified_closure_cache = {}
-    raw_links = item.get("related_bridge_threads_parsed", item.get("related_bridge_threads"))
+    raw_links = item.get(
+        "related_bridge_threads_parsed", item.get("related_bridge_threads")
+    )
     parsed_links = parse_related_bridge_threads(raw_links)
     if derived_links:
         for slug in derived_links.get(item["id"], []):
@@ -912,14 +1040,17 @@ def classify_work_item(
     missing = [slug for slug in parsed_links if slug not in bridge_statuses]
     statuses = {slug: bridge_statuses[slug]["status"] for slug in recognized}
     parent_evidence = {
-        slug: bridge_thread_has_parent_evidence(project_root, slug, item["id"], file_index=file_index)
+        slug: bridge_thread_has_parent_evidence(
+            project_root, slug, item["id"], file_index=file_index
+        )
         for slug in recognized
         if statuses.get(slug) == "VERIFIED"
     }
     missing_parent_evidence = [
         slug
         for slug in recognized
-        if statuses.get(slug) == "VERIFIED" and not parent_evidence[slug]["has_parent_evidence"]
+        if statuses.get(slug) == "VERIFIED"
+        and not parent_evidence[slug]["has_parent_evidence"]
     ]
     verified_closure_evidence: dict[str, dict[str, Any]] = {}
     for slug in recognized:
@@ -950,13 +1081,17 @@ def classify_work_item(
         for slug in recognized
         if statuses.get(slug) != "VERIFIED"
     }
-    umbrella_satisfied_slugs = [slug for slug, ev in umbrella_evidence.items() if ev["satisfied"]]
+    umbrella_satisfied_slugs = [
+        slug for slug, ev in umbrella_evidence.items() if ev["satisfied"]
+    ]
     non_blocking_bridge_threads = [
         slug
         for slug in recognized
         if statuses.get(slug) != "VERIFIED"
         and slug not in umbrella_satisfied_slugs
-        and bridge_thread_is_non_implementation_link(project_root, slug, statuses[slug], file_index=file_index)
+        and bridge_thread_is_non_implementation_link(
+            project_root, slug, statuses[slug], file_index=file_index
+        )
     ]
     unsatisfied_non_verified = [
         slug
@@ -974,7 +1109,9 @@ def classify_work_item(
         slug
         for slug in recognized
         if statuses.get(slug) == "VERIFIED"
-        and bridge_thread_declares_work_item(project_root, slug, item["id"], file_index=file_index)
+        and bridge_thread_declares_work_item(
+            project_root, slug, item["id"], file_index=file_index
+        )
     ]
     satisfied_verified_threads = [
         slug
@@ -983,9 +1120,13 @@ def classify_work_item(
         and verified_closure_evidence[slug]["satisfied"]
         and (slug not in missing_parent_evidence or slug in canonical_evidence_threads)
     ]
-    satisfied_implementation_threads = sorted(set(satisfied_verified_threads + umbrella_satisfied_slugs))
+    satisfied_implementation_threads = sorted(
+        set(satisfied_verified_threads + umbrella_satisfied_slugs)
+    )
     blocking_closure_reasons = [
-        evidence["reason"] for evidence in verified_closure_evidence.values() if not evidence["satisfied"]
+        evidence["reason"]
+        for evidence in verified_closure_evidence.values()
+        if not evidence["satisfied"]
     ]
     for evidence in umbrella_evidence.values():
         blocking_closure_reasons.extend(
@@ -994,11 +1135,18 @@ def classify_work_item(
             if not child_evidence["satisfied"]
         )
     closure_reason = next(
-        (reason for reason in _CLOSURE_REASON_PRIORITY if reason in blocking_closure_reasons),
+        (
+            reason
+            for reason in _CLOSURE_REASON_PRIORITY
+            if reason in blocking_closure_reasons
+        ),
         "genuinely_closable" if satisfied_implementation_threads else None,
     )
 
-    if not ignore_terminal and item.get("resolution_status") in WORK_ITEM_TERMINAL_RESOLUTION_STATUSES:
+    if (
+        not ignore_terminal
+        and item.get("resolution_status") in WORK_ITEM_TERMINAL_RESOLUTION_STATUSES
+    ):
         action = "skip"
         reason = "terminal_work_item"
     elif not parsed_links:
@@ -1013,7 +1161,11 @@ def classify_work_item(
     elif closure_reason in _CLOSURE_REASON_PRIORITY:
         action = "skip"
         reason = closure_reason
-    elif unsatisfied_non_verified or non_blocking_bridge_threads and not satisfied_implementation_threads:
+    elif (
+        unsatisfied_non_verified
+        or non_blocking_bridge_threads
+        and not satisfied_implementation_threads
+    ):
         action = "skip"
         reason = "linked_bridge_not_verified"
     elif missing_parent_evidence and not canonical_evidence_threads:
@@ -1108,7 +1260,9 @@ def _copy_work_item_version(
     )
 
 
-def _previous_nonterminal_version(db: KnowledgeDB, item_id: str) -> dict[str, Any] | None:
+def _previous_nonterminal_version(
+    db: KnowledgeDB, item_id: str
+) -> dict[str, Any] | None:
     for row in db.get_work_item_history(item_id)[1:]:
         if row.get("resolution_status") not in WORK_ITEM_TERMINAL_RESOLUTION_STATUSES:
             return row
@@ -1150,7 +1304,9 @@ def reconcile(
 
     bridge_statuses = collect_latest_bridge_statuses(root)
     file_index = _index_bridge_thread_files(root)
-    derived_links = build_work_item_bridge_links(root, bridge_statuses, file_index=file_index)
+    derived_links = build_work_item_bridge_links(
+        root, bridge_statuses, file_index=file_index
+    )
     git_provenance_index = build_git_provenance_index(root)
     verified_closure_cache: dict[str, dict[str, Any]] = {}
     db = KnowledgeDB(database_path)
@@ -1203,7 +1359,9 @@ def reconcile(
                         completion_evidence=_completion_evidence(current, row),
                     )
                     resolved_ids.append(row["id"])
-                except Exception as exc:  # pragma: no cover - defensive runtime reporting
+                except (
+                    Exception
+                ) as exc:  # pragma: no cover - defensive runtime reporting
                     errors.append({"id": row["id"], "error": str(exc)})
         if repair_overbroad:
             reconciler_resolutions = [
@@ -1230,7 +1388,12 @@ def reconcile(
                     try:
                         previous = _previous_nonterminal_version(db, row["id"])
                         if previous is None:
-                            errors.append({"id": row["id"], "error": "no_previous_nonterminal_version"})
+                            errors.append(
+                                {
+                                    "id": row["id"],
+                                    "error": "no_previous_nonterminal_version",
+                                }
+                            )
                             continue
                         _copy_work_item_version(
                             db,
@@ -1239,7 +1402,9 @@ def reconcile(
                             change_reason=REPAIR_CHANGE_REASON,
                         )
                         reopened_ids.append(row["id"])
-                    except Exception as exc:  # pragma: no cover - defensive runtime reporting
+                    except (
+                        Exception
+                    ) as exc:  # pragma: no cover - defensive runtime reporting
                         errors.append({"id": row["id"], "error": str(exc)})
     finally:
         db.close()
@@ -1254,10 +1419,14 @@ def reconcile(
         "mode": mode,
         "bridge_document_count": len(bridge_statuses),
         "candidate_count": len(inventory),
-        "would_resolve_ids": [row["id"] for row in inventory if row["action"] == "resolve"],
+        "would_resolve_ids": [
+            row["id"] for row in inventory if row["action"] == "resolve"
+        ],
         "resolved_ids": resolved_ids,
         "repair_candidate_count": len(repair_inventory),
-        "would_reopen_ids": [row["id"] for row in repair_inventory if row["action"] == "reopen"],
+        "would_reopen_ids": [
+            row["id"] for row in repair_inventory if row["action"] == "reopen"
+        ],
         "reopened_ids": reopened_ids,
         "errors": errors,
         "candidates": inventory,
@@ -1296,15 +1465,27 @@ def render_text(summary: dict[str, Any]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--dry-run", action="store_true", help="Report candidates without mutating MemBase.")
-    mode.add_argument("--apply", action="store_true", help="Resolve eligible work items.")
+    mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Report candidates without mutating MemBase.",
+    )
+    mode.add_argument(
+        "--apply", action="store_true", help="Resolve eligible work items."
+    )
     parser.add_argument(
         "--repair-overbroad",
         action="store_true",
         help="Audit reconciler-resolved rows and reopen ones without strict parent evidence.",
     )
-    parser.add_argument("--quiet", action="store_true", help="Suppress normal output unless errors occur.")
-    parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress normal output unless errors occur.",
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="Emit machine-readable JSON."
+    )
     parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT)
     parser.add_argument("--db-path", type=Path)
     args = parser.parse_args(argv)

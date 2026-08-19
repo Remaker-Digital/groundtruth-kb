@@ -25,7 +25,7 @@ STATUS_ADVISORY: Final[str] = "ADVISORY"
 STATUS_DEFERRED: Final[str] = "DEFERRED"
 STATUS_WITHDRAWN: Final[str] = "WITHDRAWN"
 
-PRIME_ACTIONABLE_STATUSES: Final[frozenset[str]] = frozenset({STATUS_GO, STATUS_NO_GO, STATUS_ADVISORY})
+PRIME_ACTIONABLE_STATUSES: Final[frozenset[str]] = frozenset({STATUS_GO, STATUS_NO_GO})
 LOYAL_OPPOSITION_ACTIONABLE_STATUSES: Final[frozenset[str]] = frozenset({STATUS_NEW, STATUS_REVISED, STATUS_NO_ACTION})
 OWNER_VISIBLE_STATUSES: Final[frozenset[str]] = frozenset({STATUS_ADVISORY})
 TERMINAL_OR_CLOSED_STATUSES: Final[frozenset[str]] = frozenset({STATUS_VERIFIED, STATUS_DEFERRED, STATUS_WITHDRAWN})
@@ -129,8 +129,6 @@ def _reason_for_actionable(status: str) -> tuple[str, str]:
         return "prime_go_continuation", "implement_or_continue"
     if status == STATUS_NO_GO:
         return "prime_revision_required", "revise"
-    if status == STATUS_ADVISORY:
-        return "prime_advisory_disposition", "owner_disposition"
     return "unknown_status", "none"
 
 
@@ -139,8 +137,8 @@ def _reason_for_non_actionable(status: str, expected_role: str | None) -> tuple[
         return "wrong_role_lo_review", "loyal_opposition_review"
     if status in {STATUS_GO, STATUS_NO_GO} and expected_role == PRIME_BUILDER_ROLE:
         return "wrong_role_prime_continuation", "prime_builder_continuation"
-    if status == STATUS_ADVISORY and expected_role == PRIME_BUILDER_ROLE:
-        return "wrong_role_prime_advisory", "prime_builder_advisory_disposition"
+    if status == STATUS_ADVISORY:
+        return "advisory_owner_visible", "none"
     if status == STATUS_VERIFIED:
         return "terminal_verified", "none"
     if status == STATUS_DEFERRED:

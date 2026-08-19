@@ -34,7 +34,7 @@ from groundtruth_kb.governance.project_authorization_operation_time import (
     normalized_envelope_hash,
 )
 
-APPROVED_SPEC_STATUSES = {"specified", "implemented", "verified"}
+APPROVED_SPEC_STATUSES = {"active", "specified", "implemented", "verified"}
 CHANGED_BY = "prime-builder/codex"
 FILING_OPERATION = "bridge_proposal_filing"
 NONIMPAIRMENT_REQUIRED_FIELDS = (
