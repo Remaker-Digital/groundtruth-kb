@@ -6,18 +6,31 @@ and ``-002`` (Codex GO).
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
-from rehearse._common import (  # noqa: E402
-    LEGACY_ROOT,
-    ManifestValidationError,
-    load_manifest,
-)
+def _load_rehearse_file(stem: str):
+    path = Path(__file__).resolve().parents[2] / "scripts" / "rehearse" / f"{stem}.py"
+    if not path.is_file():
+        pytest.skip(f"scripts/rehearse/{stem}.py is absent", allow_module_level=True)
+    name = f"wi6583_rehearse_{stem}"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        pytest.skip(f"unable to load {path.as_posix()}", allow_module_level=True)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_common = _load_rehearse_file("_common")
+LEGACY_ROOT = _common.LEGACY_ROOT
+ManifestValidationError = _common.ManifestValidationError
+load_manifest = _common.load_manifest
 
 _VALID_FILTER_TEMPLATE = (
     "git filter-repo --path <agent-red-paths-from-_path_rewrite> "
@@ -46,7 +59,10 @@ def _write_manifest(tmp_path: Path, **overrides) -> Path:
         if value is None:
             continue
         lines.append(f'{key} = "{value}"')
-    if "surface_treatments" not in overrides or overrides["surface_treatments"] is _empty_table_marker:
+    if (
+        "surface_treatments" not in overrides
+        or overrides["surface_treatments"] is _empty_table_marker
+    ):
         lines.append("[surface_treatments]")
     manifest_path = tmp_path / "manifest.toml"
     manifest_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -59,24 +75,34 @@ _empty_table_marker = object()
 # ----- Rule M1 — placeholder rejection -----
 
 
-def test_m1_owner_decision_required_in_blocking_field_rejected_for_wave2(tmp_path: Path) -> None:
+def test_m1_owner_decision_required_in_blocking_field_rejected_for_wave2(
+    tmp_path: Path,
+) -> None:
     """M1: output_dir = OWNER_DECISION_REQUIRED rejected when wave=2."""
     manifest_path = _write_manifest(tmp_path, output_dir="OWNER_DECISION_REQUIRED")
-    with pytest.raises(ManifestValidationError, match="M1.*output_dir.*OWNER_DECISION_REQUIRED"):
+    with pytest.raises(
+        ManifestValidationError, match="M1.*output_dir.*OWNER_DECISION_REQUIRED"
+    ):
         load_manifest(manifest_path, wave=2)
 
 
-def test_m1_owner_decision_required_in_db_reconciliation_accepted_for_wave2(tmp_path: Path) -> None:
+def test_m1_owner_decision_required_in_db_reconciliation_accepted_for_wave2(
+    tmp_path: Path,
+) -> None:
     """M1: db_reconciliation_strategy = OWNER_DECISION_REQUIRED accepted at wave=2 (surfaces at wave=3)."""
     manifest_path = _write_manifest(tmp_path)  # default has the placeholder
     data = load_manifest(manifest_path, wave=2)
     assert data["db_reconciliation_strategy"] == "OWNER_DECISION_REQUIRED"
 
 
-def test_m1_owner_decision_required_in_db_reconciliation_rejected_for_wave3(tmp_path: Path) -> None:
+def test_m1_owner_decision_required_in_db_reconciliation_rejected_for_wave3(
+    tmp_path: Path,
+) -> None:
     """M1: db_reconciliation_strategy = OWNER_DECISION_REQUIRED rejected at wave=3."""
     manifest_path = _write_manifest(tmp_path)
-    with pytest.raises(ManifestValidationError, match="M1.*db_reconciliation_strategy.*Wave 3"):
+    with pytest.raises(
+        ManifestValidationError, match="M1.*db_reconciliation_strategy.*Wave 3"
+    ):
         load_manifest(manifest_path, wave=3)
 
 
@@ -85,30 +111,41 @@ def test_m1_owner_decision_required_in_db_reconciliation_rejected_for_wave3(tmp_
 
 def test_m2_output_dir_under_legacy_root_rejected(tmp_path: Path) -> None:
     """M2: output_dir under LEGACY_ROOT rejected."""
-    manifest_path = _write_manifest(tmp_path, output_dir=(LEGACY_ROOT / "foo").as_posix())
-    with pytest.raises(ManifestValidationError, match="M2.*cannot be under LEGACY_ROOT"):
+    manifest_path = _write_manifest(
+        tmp_path, output_dir=(LEGACY_ROOT / "foo").as_posix()
+    )
+    with pytest.raises(
+        ManifestValidationError, match="M2.*cannot be under LEGACY_ROOT"
+    ):
         load_manifest(manifest_path, wave=2)
 
 
 def test_m2_output_dir_under_target_root_rejected(tmp_path: Path) -> None:
     """M2: output_dir under TARGET_ROOT_DEFAULT (applications/Agent_Red) rejected."""
     manifest_path = _write_manifest(
-        tmp_path, output_dir=(LEGACY_ROOT / "applications" / "Agent_Red" / "foo").as_posix()
+        tmp_path,
+        output_dir=(LEGACY_ROOT / "applications" / "Agent_Red" / "foo").as_posix(),
     )
-    with pytest.raises(ManifestValidationError, match="M2.*cannot be under .*TARGET_ROOT_DEFAULT"):
+    with pytest.raises(
+        ManifestValidationError, match="M2.*cannot be under .*TARGET_ROOT_DEFAULT"
+    ):
         load_manifest(manifest_path, wave=2)
 
 
 def test_m2_output_dir_drive_synced_pattern_rejected(tmp_path: Path) -> None:
     """M2: output_dir under known cloud-sync paths (e.g. OneDrive) rejected via allowlist mismatch."""
     manifest_path = _write_manifest(tmp_path, output_dir="C:/Users/micha/OneDrive/foo")
-    with pytest.raises(ManifestValidationError, match="M2.*does not match the sandbox allowlist"):
+    with pytest.raises(
+        ManifestValidationError, match="M2.*does not match the sandbox allowlist"
+    ):
         load_manifest(manifest_path, wave=2)
 
 
 def test_m2_output_dir_c_temp_accepted(tmp_path: Path) -> None:
     """M2: output_dir = C:/temp/agent-red-rehearsal* accepted."""
-    manifest_path = _write_manifest(tmp_path, output_dir="C:/temp/agent-red-rehearsal-20260426")
+    manifest_path = _write_manifest(
+        tmp_path, output_dir="C:/temp/agent-red-rehearsal-20260426"
+    )
     data = load_manifest(manifest_path, wave=2)
     assert data["output_dir"] == "C:/temp/agent-red-rehearsal-20260426"
 
@@ -125,8 +162,12 @@ def test_m3_git_strategy_unknown_rejected(tmp_path: Path) -> None:
 
 def test_m3_clone_with_history_filter_requires_command_template(tmp_path: Path) -> None:
     """M3: clone_with_history_filter without required placeholders in template rejected."""
-    manifest_path = _write_manifest(tmp_path, git_filter_command_template="git filter-repo --foo bar")
-    with pytest.raises(ManifestValidationError, match="M3.*missing required placeholder"):
+    manifest_path = _write_manifest(
+        tmp_path, git_filter_command_template="git filter-repo --foo bar"
+    )
+    with pytest.raises(
+        ManifestValidationError, match="M3.*missing required placeholder"
+    ):
         load_manifest(manifest_path, wave=2)
 
 
@@ -136,7 +177,8 @@ def test_m3_clone_with_history_filter_requires_command_template(tmp_path: Path) 
 def test_m4_authority_matrix_path_missing_rejected(tmp_path: Path) -> None:
     """M4: phase_1_authority_matrix_path pointing at non-existent file rejected."""
     manifest_path = _write_manifest(
-        tmp_path, phase_1_authority_matrix_path="independent-progress-assessments/does-not-exist.md"
+        tmp_path,
+        phase_1_authority_matrix_path="independent-progress-assessments/does-not-exist.md",
     )
     with pytest.raises(ManifestValidationError, match="M4.*does not exist on disk"):
         load_manifest(manifest_path, wave=2)
@@ -146,7 +188,11 @@ def test_m4_authority_matrix_path_correct_accepted(tmp_path: Path) -> None:
     """M4: real production authority matrix path accepted."""
     # Use the actual production manifest — should pass wave=2 validation.
     production_manifest = (
-        LEGACY_ROOT / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX" / "rehearsal" / "manifest.toml"
+        LEGACY_ROOT
+        / "independent-progress-assessments"
+        / "CODEX-INSIGHT-DROPBOX"
+        / "rehearsal"
+        / "manifest.toml"
     )
     if not production_manifest.exists():
         pytest.skip("production manifest not available in this checkout")
@@ -157,7 +203,9 @@ def test_m4_authority_matrix_path_correct_accepted(tmp_path: Path) -> None:
 # ----- Rule M5 — surface_treatments shape -----
 
 
-def test_m5_empty_surface_treatments_accepted_for_source_manifest(tmp_path: Path) -> None:
+def test_m5_empty_surface_treatments_accepted_for_source_manifest(
+    tmp_path: Path,
+) -> None:
     """M5: empty [surface_treatments] table accepted for Wave 2 source manifest."""
     manifest_path = _write_manifest(tmp_path)  # default has empty [surface_treatments]
     data = load_manifest(manifest_path, wave=2)

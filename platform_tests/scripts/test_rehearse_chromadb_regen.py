@@ -14,6 +14,7 @@ schema (``collections``, ``segments``, ``embeddings``,
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import sqlite3
 import sys
@@ -22,9 +23,22 @@ from typing import Any
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
-from rehearse import _chromadb_regen  # noqa: E402
+def _load_rehearse_file(stem: str):
+    path = Path(__file__).resolve().parents[2] / "scripts" / "rehearse" / f"{stem}.py"
+    if not path.is_file():
+        pytest.skip(f"scripts/rehearse/{stem}.py is absent", allow_module_level=True)
+    name = f"wi6583_rehearse_{stem}"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        pytest.skip(f"unable to load {path.as_posix()}", allow_module_level=True)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_chromadb_regen = _load_rehearse_file("_chromadb_regen")
 
 # ---- Fixtures ---------------------------------------------------------
 
@@ -140,7 +154,11 @@ def _write_membase_manifest(output_dir: Path, records: list[dict[str, Any]]) -> 
 
 
 def _read_plan(output_dir: Path) -> dict[str, Any]:
-    return json.loads((output_dir / "chromadb_regen" / "chromadb-regen-plan.json").read_text(encoding="utf-8"))
+    return json.loads(
+        (output_dir / "chromadb_regen" / "chromadb-regen-plan.json").read_text(
+            encoding="utf-8"
+        )
+    )
 
 
 # =====================================================================
@@ -157,7 +175,9 @@ def test_run_dry_run_returns_skipped(tmp_path: Path) -> None:
 
 def test_run_returns_ok_when_chromadb_store_absent(tmp_path: Path) -> None:
     """Absent ChromaDB store → status='ok' with empty plan + warning."""
-    result = _chromadb_regen.run({}, tmp_path / "output", chroma_path=tmp_path / "missing")
+    result = _chromadb_regen.run(
+        {}, tmp_path / "output", chroma_path=tmp_path / "missing"
+    )
     assert result["status"] == "ok"
     assert any("chromadb_store_absent" in w for w in result["warnings"])
 
@@ -167,7 +187,9 @@ def test_run_returns_ok_when_chromadb_store_absent(tmp_path: Path) -> None:
 # =====================================================================
 
 
-def test_run_opens_chroma_via_readonly_uri(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_opens_chroma_via_readonly_uri(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Per Codex `-002`/`-004`: lane opens chroma.sqlite3 with mode=ro URI."""
     chroma_dir = tmp_path / "chroma"
     _build_chroma_fixture(chroma_dir, chunks=[])
@@ -187,7 +209,9 @@ def test_run_opens_chroma_via_readonly_uri(tmp_path: Path, monkeypatch: pytest.M
     assert ro_uris, "expected at least one mode=ro sqlite URI"
 
 
-def test_run_attempt_to_write_chroma_via_lane_connection_raises_operationalerror(tmp_path: Path) -> None:
+def test_run_attempt_to_write_chroma_via_lane_connection_raises_operationalerror(
+    tmp_path: Path,
+) -> None:
     """Verify physical read-only protection: a write on a mode=ro connection raises."""
     chroma_dir = tmp_path / "chroma"
     _build_chroma_fixture(chroma_dir, chunks=[])
@@ -240,7 +264,9 @@ def test_run_pivots_metadata_per_chunk_id(tmp_path: Path) -> None:
     assert "origin_project" in keys
 
 
-def test_run_handles_metadata_with_typed_values_string_int_float_bool(tmp_path: Path) -> None:
+def test_run_handles_metadata_with_typed_values_string_int_float_bool(
+    tmp_path: Path,
+) -> None:
     """Metadata pivot dispatches across all four typed value columns."""
     chroma_dir = tmp_path / "chroma"
     _build_chroma_fixture(
@@ -263,7 +289,13 @@ def test_run_handles_metadata_with_typed_values_string_int_float_bool(tmp_path: 
     coll = plan["collections"][0]
     keys = set(coll["metadata_keys_observed"])
     # All 5 keys present despite different value types.
-    assert {"delib_id", "origin_project", "chunk_index", "embedding_score", "is_redacted"}.issubset(keys)
+    assert {
+        "delib_id",
+        "origin_project",
+        "chunk_index",
+        "embedding_score",
+        "is_redacted",
+    }.issubset(keys)
 
 
 # =====================================================================
@@ -276,7 +308,12 @@ def test_run_classifies_chunk_via_origin_project_agent_red(tmp_path: Path) -> No
     chroma_dir = tmp_path / "chroma"
     _build_chroma_fixture(
         chroma_dir,
-        chunks=[{"id": 1, "metadata": {"delib_id": "DELIB-001", "origin_project": "agent-red"}}],
+        chunks=[
+            {
+                "id": 1,
+                "metadata": {"delib_id": "DELIB-001", "origin_project": "agent-red"},
+            }
+        ],
     )
     _chromadb_regen.run({}, tmp_path / "output", chroma_path=chroma_dir)
     plan = _read_plan(tmp_path / "output")
@@ -291,7 +328,15 @@ def test_run_classifies_chunk_via_origin_project_groundtruth_kb(tmp_path: Path) 
     chroma_dir = tmp_path / "chroma"
     _build_chroma_fixture(
         chroma_dir,
-        chunks=[{"id": 1, "metadata": {"delib_id": "DELIB-001", "origin_project": "groundtruth-kb"}}],
+        chunks=[
+            {
+                "id": 1,
+                "metadata": {
+                    "delib_id": "DELIB-001",
+                    "origin_project": "groundtruth-kb",
+                },
+            }
+        ],
     )
     _chromadb_regen.run({}, tmp_path / "output", chroma_path=chroma_dir)
     plan = _read_plan(tmp_path / "output")
@@ -305,7 +350,12 @@ def test_run_does_not_classify_unrecognized_origin_project(tmp_path: Path) -> No
     chroma_dir = tmp_path / "chroma"
     _build_chroma_fixture(
         chroma_dir,
-        chunks=[{"id": 1, "metadata": {"delib_id": "DELIB-001", "origin_project": "unknown-org"}}],
+        chunks=[
+            {
+                "id": 1,
+                "metadata": {"delib_id": "DELIB-001", "origin_project": "unknown-org"},
+            }
+        ],
     )
     _chromadb_regen.run({}, tmp_path / "output", chroma_path=chroma_dir)
     plan = _read_plan(tmp_path / "output")
@@ -320,7 +370,9 @@ def test_run_does_not_classify_unrecognized_origin_project(tmp_path: Path) -> No
 # =====================================================================
 
 
-def test_run_classifies_chunk_via_membase_manifest_delib_id_lookup(tmp_path: Path) -> None:
+def test_run_classifies_chunk_via_membase_manifest_delib_id_lookup(
+    tmp_path: Path,
+) -> None:
     """Tier 2: chunk with no origin_project but matching delib_id in Slice 8 manifest."""
     chroma_dir = tmp_path / "chroma"
     _build_chroma_fixture(
@@ -392,12 +444,16 @@ def test_run_classifies_delib_prefixed_id_as_unclassified(tmp_path: Path) -> Non
     assert coll["framework_chunk_count"] == 0
 
 
-def test_run_classifies_chunk_unclassified_when_no_pointer_found(tmp_path: Path) -> None:
+def test_run_classifies_chunk_unclassified_when_no_pointer_found(
+    tmp_path: Path,
+) -> None:
     """Chunk with no delib_id and no origin_project → unclassified."""
     chroma_dir = tmp_path / "chroma"
     _build_chroma_fixture(
         chroma_dir,
-        chunks=[{"id": 1, "metadata": {"chunk_index": 0}}],  # no delib_id, no origin_project
+        chunks=[
+            {"id": 1, "metadata": {"chunk_index": 0}}
+        ],  # no delib_id, no origin_project
     )
     _chromadb_regen.run({}, tmp_path / "output", chroma_path=chroma_dir)
     plan = _read_plan(tmp_path / "output")
@@ -413,7 +469,9 @@ def test_run_classifies_chunk_unclassified_when_no_pointer_found(tmp_path: Path)
 def test_run_records_chroma_sqlite3_sha256_before_and_after(tmp_path: Path) -> None:
     """Byte-stable proof: SHA256 of chroma files captured before + after run."""
     chroma_dir = tmp_path / "chroma"
-    _build_chroma_fixture(chroma_dir, chunks=[{"id": 1, "metadata": {"delib_id": "DELIB-001"}}])
+    _build_chroma_fixture(
+        chroma_dir, chunks=[{"id": 1, "metadata": {"delib_id": "DELIB-001"}}]
+    )
     _chromadb_regen.run({}, tmp_path / "output", chroma_path=chroma_dir)
     plan = _read_plan(tmp_path / "output")
     proof = plan["no_chromadb_mutation_proof"]
@@ -453,12 +511,19 @@ def test_run_returns_error_when_chromadb_byte_stable_check_fails(
 # =====================================================================
 
 
-def test_run_exact_count_basis_is_full_metadata_pivot_via_direct_sqlite(tmp_path: Path) -> None:
+def test_run_exact_count_basis_is_full_metadata_pivot_via_direct_sqlite(
+    tmp_path: Path,
+) -> None:
     """Audit field name proves the pivot path was used."""
     chroma_dir = tmp_path / "chroma"
     _build_chroma_fixture(
         chroma_dir,
-        chunks=[{"id": 1, "metadata": {"delib_id": "DELIB-001", "origin_project": "agent-red"}}],
+        chunks=[
+            {
+                "id": 1,
+                "metadata": {"delib_id": "DELIB-001", "origin_project": "agent-red"},
+            }
+        ],
     )
     _chromadb_regen.run({}, tmp_path / "output", chroma_path=chroma_dir)
     plan = _read_plan(tmp_path / "output")
@@ -466,7 +531,9 @@ def test_run_exact_count_basis_is_full_metadata_pivot_via_direct_sqlite(tmp_path
     assert coll["exact_count_basis"] == "full_metadata_pivot_via_direct_sqlite"
 
 
-def test_run_reads_embedding_dimension_from_collections_table_not_hardcoded(tmp_path: Path) -> None:
+def test_run_reads_embedding_dimension_from_collections_table_not_hardcoded(
+    tmp_path: Path,
+) -> None:
     """Codex `-004` Fix 3: dimension comes from `collections.dimension`, not hardcoded.
 
     Fixture sets dimension=512 (not 384, not 1536); plan must record 512.
@@ -484,12 +551,20 @@ def test_run_reads_embedding_dimension_from_collections_table_not_hardcoded(tmp_
 # =====================================================================
 
 
-def test_run_does_not_call_chromadb_python_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_does_not_call_chromadb_python_api(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Lane uses sqlite3 stdlib only; never imports chromadb."""
     chroma_dir = tmp_path / "chroma"
-    _build_chroma_fixture(chroma_dir, chunks=[{"id": 1, "metadata": {"delib_id": "DELIB-001"}}])
+    _build_chroma_fixture(
+        chroma_dir, chunks=[{"id": 1, "metadata": {"delib_id": "DELIB-001"}}]
+    )
 
-    real_import = __builtins__["__import__"] if isinstance(__builtins__, dict) else __builtins__.__import__
+    real_import = (
+        __builtins__["__import__"]
+        if isinstance(__builtins__, dict)
+        else __builtins__.__import__
+    )
     forbidden_imports: list[str] = []
 
     def _trap_import(name: str, *args: object, **kwargs: object) -> Any:
@@ -510,7 +585,9 @@ def test_run_does_not_call_chromadb_python_api(tmp_path: Path, monkeypatch: pyte
 
 def test_run_writes_chromadb_regen_plan_json(tmp_path: Path) -> None:
     chroma_dir = tmp_path / "chroma"
-    _build_chroma_fixture(chroma_dir, chunks=[{"id": 1, "metadata": {"delib_id": "DELIB-001"}}])
+    _build_chroma_fixture(
+        chroma_dir, chunks=[{"id": 1, "metadata": {"delib_id": "DELIB-001"}}]
+    )
     _chromadb_regen.run({}, tmp_path / "output", chroma_path=chroma_dir)
     json_path = tmp_path / "output" / "chromadb_regen" / "chromadb-regen-plan.json"
     assert json_path.exists()
@@ -523,7 +600,9 @@ def test_run_writes_chromadb_regen_plan_json(tmp_path: Path) -> None:
 
 def test_run_writes_preview_markdown(tmp_path: Path) -> None:
     chroma_dir = tmp_path / "chroma"
-    _build_chroma_fixture(chroma_dir, chunks=[{"id": 1, "metadata": {"delib_id": "DELIB-001"}}])
+    _build_chroma_fixture(
+        chroma_dir, chunks=[{"id": 1, "metadata": {"delib_id": "DELIB-001"}}]
+    )
     _chromadb_regen.run({}, tmp_path / "output", chroma_path=chroma_dir)
     md_path = tmp_path / "output" / "chromadb_regen" / "chromadb-regen-preview.md"
     assert md_path.exists()
@@ -534,7 +613,9 @@ def test_run_writes_preview_markdown(tmp_path: Path) -> None:
 
 def test_run_writes_result_json_on_ok_path(tmp_path: Path) -> None:
     chroma_dir = tmp_path / "chroma"
-    _build_chroma_fixture(chroma_dir, chunks=[{"id": 1, "metadata": {"delib_id": "DELIB-001"}}])
+    _build_chroma_fixture(
+        chroma_dir, chunks=[{"id": 1, "metadata": {"delib_id": "DELIB-001"}}]
+    )
     result = _chromadb_regen.run({}, tmp_path / "output", chroma_path=chroma_dir)
     assert result["status"] == "ok"
     result_path = tmp_path / "output" / "chromadb_regen" / "result.json"
@@ -569,7 +650,10 @@ def test_run_emits_classification_basis_counts(tmp_path: Path) -> None:
         chroma_dir,
         chunks=[
             # Tier 1: origin_project hit
-            {"id": 1, "metadata": {"delib_id": "DELIB-001", "origin_project": "agent-red"}},
+            {
+                "id": 1,
+                "metadata": {"delib_id": "DELIB-001", "origin_project": "agent-red"},
+            },
             # Tier 2: membase manifest hit (no origin_project)
             {"id": 2, "metadata": {"delib_id": "DELIB-S313-002"}},
             # Tier 3: prefix fallback (AR-)
@@ -601,9 +685,18 @@ def test_run_records_source_type_distribution(tmp_path: Path) -> None:
     _build_chroma_fixture(
         chroma_dir,
         chunks=[
-            {"id": 1, "metadata": {"delib_id": "DELIB-001", "source_type": "lo_review"}},
-            {"id": 2, "metadata": {"delib_id": "DELIB-002", "source_type": "lo_review"}},
-            {"id": 3, "metadata": {"delib_id": "DELIB-003", "source_type": "bridge_thread"}},
+            {
+                "id": 1,
+                "metadata": {"delib_id": "DELIB-001", "source_type": "lo_review"},
+            },
+            {
+                "id": 2,
+                "metadata": {"delib_id": "DELIB-002", "source_type": "lo_review"},
+            },
+            {
+                "id": 3,
+                "metadata": {"delib_id": "DELIB-003", "source_type": "bridge_thread"},
+            },
         ],
     )
     _chromadb_regen.run({}, tmp_path / "output", chroma_path=chroma_dir)
@@ -619,7 +712,9 @@ def test_run_records_source_type_distribution(tmp_path: Path) -> None:
 # =====================================================================
 
 
-def test_load_membase_partition_manifest_uses_real_producer_filename(tmp_path: Path) -> None:
+def test_load_membase_partition_manifest_uses_real_producer_filename(
+    tmp_path: Path,
+) -> None:
     """Default path must be ``membase-partition-manifest.json`` (the real
     Slice 8 producer filename), not the test-only ``partition_manifest.json``.
 
@@ -636,7 +731,9 @@ def test_load_membase_partition_manifest_uses_real_producer_filename(tmp_path: P
     assert result == {"DELIB-PRODUCER-FILENAME-001": "framework"}
 
 
-def test_load_membase_partition_manifest_parses_versioned_records_key(tmp_path: Path) -> None:
+def test_load_membase_partition_manifest_parses_versioned_records_key(
+    tmp_path: Path,
+) -> None:
     """Loader must consume ``versioned_records[*]``, not the test-only ``records[*]`` key.
 
     Regression guard: explicitly write a manifest with both keys; only
@@ -665,7 +762,9 @@ def test_load_membase_partition_manifest_parses_versioned_records_key(tmp_path: 
     assert "DELIB-OLD-KEY-002" not in result
 
 
-def test_load_membase_partition_manifest_skips_invalid_classifications(tmp_path: Path) -> None:
+def test_load_membase_partition_manifest_skips_invalid_classifications(
+    tmp_path: Path,
+) -> None:
     """Records carrying unrecognized classifications are skipped (defense-in-depth).
 
     Only ``framework``, ``adopter``, ``unclassified`` are accepted.
@@ -723,7 +822,9 @@ def test_run_honors_explicit_partition_manifest_path_verbatim(tmp_path: Path) ->
     # only manifest is at the custom path. If the override-handling bug
     # were still present, the loader would look for
     # output_dir/membase_export/<old-name> and find nothing.
-    _chromadb_regen.run({}, output_dir, chroma_path=chroma_dir, partition_manifest_path=custom_manifest)
+    _chromadb_regen.run(
+        {}, output_dir, chroma_path=chroma_dir, partition_manifest_path=custom_manifest
+    )
     plan = _read_plan(output_dir)
     coll = plan["collections"][0]
     assert coll["framework_chunk_count"] == 1
@@ -763,10 +864,14 @@ def test_run_classifies_via_real_membase_partition_manifest_when_slice8_lane_run
     deliberation_entries = [
         r
         for r in manifest_data["versioned_records"]
-        if r.get("table_name") == "deliberations" and isinstance(r.get("id"), str) and r["id"].startswith("DELIB-")
+        if r.get("table_name") == "deliberations"
+        and isinstance(r.get("id"), str)
+        and r["id"].startswith("DELIB-")
     ]
     if not deliberation_entries:
-        pytest.skip("live KB has no deliberations table entries; cannot exercise cross-ref path")
+        pytest.skip(
+            "live KB has no deliberations table entries; cannot exercise cross-ref path"
+        )
     sample_entry = deliberation_entries[0]
     sample_id = sample_entry["id"]
     sample_classification = sample_entry["classification"]
@@ -787,7 +892,9 @@ def test_run_classifies_via_real_membase_partition_manifest_when_slice8_lane_run
     plan = _read_plan(output_dir)
     coll = plan["collections"][0]
     # The proof shape Codex `-008` reported as missing.
-    assert coll["classification_basis_counts"].get("membase_manifest_delib_id", 0) >= 1, (
+    assert (
+        coll["classification_basis_counts"].get("membase_manifest_delib_id", 0) >= 1
+    ), (
         f"Tier 2 manifest cross-ref did not fire; basis_counts={coll['classification_basis_counts']}"
     )
     # The chunk's classification must match the manifest's recorded value.

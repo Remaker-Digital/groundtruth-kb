@@ -567,11 +567,9 @@ def test_template_terminal_tokens_parity_with_live_helper(helper) -> None:
     )
 
 
-def test_advisory_actionable_for_prime_not_lo(helper) -> None:
-    """ADVISORY status entries surface in the Prime actionable list (so manual
-    `/bridge` scans show them for owner-deliberation/UAQ disposition) but never
-    surface for Loyal Opposition. Per gtkb-advisory-prime-actionability-
-    surfacing-002 (Codex GO 2026-06-14) Condition 1.
+def test_advisory_not_actionable_for_prime_or_lo(helper) -> None:
+    """ADVISORY status entries are owner-visible informational input and must
+    not appear in Prime or Loyal Opposition ``actionable`` lists.
     """
     index = """\
 Document: gtkb-foo-advisory
@@ -579,10 +577,12 @@ ADVISORY: bridge/gtkb-foo-advisory-001.md
 """
     prime_result = helper.scan(role="prime-builder", index_text=index)
     lo_result = helper.scan(role="loyal-opposition", index_text=index)
-    assert len(prime_result["actionable"]) == 1
-    assert prime_result["actionable"][0]["document"] == "gtkb-foo-advisory"
-    assert prime_result["actionable"][0]["latest_status"] == "ADVISORY"
+    assert prime_result["actionable"] == []
     assert lo_result["actionable"] == []
+    assert len(prime_result["owner_visible"]) == 1
+    assert prime_result["owner_visible"][0]["document"] == "gtkb-foo-advisory"
+    assert prime_result["owner_visible"][0]["latest_status"] == "ADVISORY"
+    assert lo_result["owner_visible"][0]["document"] == "gtkb-foo-advisory"
 
 
 def test_non_activatable_go_moved_to_blocked_bucket(helper, monkeypatch) -> None:
@@ -672,7 +672,7 @@ def test_dispatch_terminal_go_still_filtered_before_activatability(
     assert result["blocked_non_activatable"] == []
 
 
-def test_nogo_and_advisory_actionability_unchanged(helper, monkeypatch) -> None:
+def test_nogo_actionable_advisory_owner_visible(helper, monkeypatch) -> None:
     def should_not_run(_root, _bridge_id):
         raise AssertionError("activatability applies only to GO entries")
 
@@ -688,11 +688,38 @@ ADVISORY: bridge/gtkb-advisory-001.md
 
     result = helper.scan(role="prime-builder", index_text=index)
 
-    assert {thread["document"] for thread in result["actionable"]} == {
-        "gtkb-nogo",
-        "gtkb-advisory",
+    assert {thread["document"] for thread in result["actionable"]} == {"gtkb-nogo"}
+    assert {thread["document"] for thread in result["owner_visible"]} == {
+        "gtkb-advisory"
     }
     assert result["blocked_non_activatable"] == []
+
+
+def test_prime_actionable_ordered_oldest_first(helper, monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(helper, "_go_activatable", lambda _root, _bridge_id: (True, []))
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "gtkb-newer-002.md").write_text(
+        "GO\nDate: 2026-08-18 UTC\nbridge_kind: implementation_proposal\n",
+        encoding="utf-8",
+    )
+    (bridge_dir / "gtkb-older-002.md").write_text(
+        "NO-GO\nDate: 2026-08-10 UTC\n",
+        encoding="utf-8",
+    )
+    index = """\
+Document: gtkb-newer
+GO: bridge/gtkb-newer-002.md
+
+Document: gtkb-older
+NO-GO: bridge/gtkb-older-002.md
+"""
+    index_path = bridge_dir / "state.md"
+    result = helper.scan(role="prime-builder", index_text=index, index_path=index_path)
+    assert [thread["document"] for thread in result["actionable"]] == [
+        "gtkb-older",
+        "gtkb-newer",
+    ]
 
 
 def test_many_version_compact_cli_completes_in_bound_and_prints_json(

@@ -630,10 +630,12 @@ def _active_authorization_for_work_item(
                 authorization=authorization,
             )
         envelope = _authorization_envelope(authorization)
+        # WI-6673: filing writes only the bridge file; request.target_paths describe
+        # a later implementation session and are evaluated at implementation_packet_create.
         evaluated = evaluate_envelope(
             envelope,
             requested_operation=FILING_OPERATION,
-            target_paths=request.target_paths,
+            target_paths=(f"bridge/{request.slug}-001.md",),
             decision_time=decision_time,
             taxonomy=load_operation_taxonomy(project_root),
         )

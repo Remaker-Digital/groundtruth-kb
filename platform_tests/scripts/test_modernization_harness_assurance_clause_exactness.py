@@ -55,7 +55,9 @@ from scripts import collect_modernization_semantic_evidence as collector  # noqa
 from scripts.benchmarks import activity_envelope_load  # noqa: E402
 
 MANIFEST = json.loads(
-    (ROOT / "config" / "governance" / "modernization-release-candidate.json").read_text(encoding="utf-8")
+    (ROOT / "config" / "governance" / "modernization-release-candidate.json").read_text(
+        encoding="utf-8"
+    )
 )
 PRIMARY_HARNESSES = {"claude", "codex", "cursor", "antigravity"}
 HEADLESS_HARNESSES = {"ollama", "openrouter", "alibaba-cloud-studio"}
@@ -68,7 +70,9 @@ def _write_json(path: Path, payload: object) -> None:
 
 
 def _seed_harness_state(root: Path, roles: dict[str, tuple[str, str]]) -> None:
-    identities = {name: {"id": harness_id} for name, (harness_id, _role) in roles.items()}
+    identities = {
+        name: {"id": harness_id} for name, (harness_id, _role) in roles.items()
+    }
     registry = [
         {
             "id": harness_id,
@@ -79,8 +83,14 @@ def _seed_harness_state(root: Path, roles: dict[str, tuple[str, str]]) -> None:
         }
         for name, (harness_id, role) in roles.items()
     ]
-    _write_json(root / "harness-state" / "harness-identities.json", {"schema_version": 1, "harnesses": identities})
-    _write_json(root / "harness-state" / "harness-registry.json", {"schema_version": 1, "harnesses": registry})
+    _write_json(
+        root / "harness-state" / "harness-identities.json",
+        {"schema_version": 1, "harnesses": identities},
+    )
+    _write_json(
+        root / "harness-state" / "harness-registry.json",
+        {"schema_version": 1, "harnesses": registry},
+    )
 
 
 @functools.lru_cache(maxsize=1)
@@ -90,12 +100,16 @@ def _parity_report() -> harness_checker.ParityReport:
 
 def _registry() -> dict[str, Any]:
     return tomllib.loads(
-        (ROOT / "config" / "agent-control" / "harness-capability-registry.toml").read_text(encoding="utf-8")
+        (
+            ROOT / "config" / "agent-control" / "harness-capability-registry.toml"
+        ).read_text(encoding="utf-8")
     )
 
 
 def _projection_rows() -> list[dict[str, Any]]:
-    return json.loads((ROOT / "harness-state" / "harness-registry.json").read_text(encoding="utf-8"))["harnesses"]
+    return json.loads(
+        (ROOT / "harness-state" / "harness-registry.json").read_text(encoding="utf-8")
+    )["harnesses"]
 
 
 def _plan(handle_id: str) -> collector.Plan:
@@ -107,16 +121,25 @@ def _plan(handle_id: str) -> collector.Plan:
 def _assert_hashed_reference(reference: dict[str, Any]) -> None:
     path = ROOT / str(reference["path"])
     assert path.is_file(), reference
-    assert hashlib.sha256(path.read_bytes()).hexdigest().upper() == str(reference["sha256"]).upper()
+    assert (
+        hashlib.sha256(path.read_bytes()).hexdigest().upper()
+        == str(reference["sha256"]).upper()
+    )
 
 
-def test_mod_hp01_registered_harness_audit_covers_every_required_behavioral_domain() -> None:
+def test_mod_hp01_registered_harness_audit_covers_every_required_behavioral_domain() -> (
+    None
+):
     """MOD-HP01: every registered harness and named audit domain is mechanically evaluated."""
     report = _parity_report()
     registered = {str(row["harness_name"]) for row in _projection_rows()}
     assert set(report.selected_harnesses) == registered
     assert not report.errors
-    assert not [row for row in report.results if row.parity_class == "required" and row.state == "MISSING"]
+    assert not [
+        row
+        for row in report.results
+        if row.parity_class == "required" and row.state == "MISSING"
+    ]
 
     required_domains = {
         "prompt",
@@ -144,7 +167,9 @@ def test_mod_hp01_registered_harness_audit_covers_every_required_behavioral_doma
     )
 
 
-def test_mod_hp02_normalized_worker_contract_exposes_all_required_behavioral_sections(tmp_path: Path) -> None:
+def test_mod_hp02_normalized_worker_contract_exposes_all_required_behavioral_sections(
+    tmp_path: Path,
+) -> None:
     """MOD-HP02: session, role, activity, resource, access, degradation, and result are normalized."""
     _seed_harness_state(tmp_path, {"codex": ("A", "prime-builder")})
     envelope = open_session(
@@ -165,7 +190,9 @@ def test_mod_hp02_normalized_worker_contract_exposes_all_required_behavioral_sec
         "degradation": envelope.get("degradation_contract"),
         "result": envelope.get("result_contract"),
     }
-    assert all(normalized.values()), f"normalized minimum contract is incomplete: {normalized}"
+    assert all(normalized.values()), (
+        f"normalized minimum contract is incomplete: {normalized}"
+    )
 
 
 @pytest.mark.parametrize(
@@ -181,7 +208,12 @@ def test_mod_hp02_normalized_worker_contract_exposes_all_required_behavioral_sec
             "optimized-startup",
         ),
     ],
-    ids=["MOD-HP03-claude", "MOD-HP04-codex", "MOD-HP05-cursor", "MOD-HP06-antigravity"],
+    ids=[
+        "MOD-HP03-claude",
+        "MOD-HP04-codex",
+        "MOD-HP05-cursor",
+        "MOD-HP06-antigravity",
+    ],
 )
 def test_mod_hp03_hp06_local_delivery_is_complete_and_live_proof_is_receipt_backed(
     handle_id: str,
@@ -192,30 +224,49 @@ def test_mod_hp03_hp06_local_delivery_is_complete_and_live_proof_is_receipt_back
     """MOD-HP03..06: static delivery is executable; verification remains a real-invocation receipt."""
     rows = [row for row in _parity_report().results if row.harness == harness_name]
     assert rows
-    assert not [row for row in rows if row.parity_class == "required" and row.state == "MISSING"]
-    projection = next(row for row in rows if row.capability_id == "activity_envelope.activity_envelope_projection_mode")
+    assert not [
+        row for row in rows if row.parity_class == "required" and row.state == "MISSING"
+    ]
+    projection = next(
+        row
+        for row in rows
+        if row.capability_id == "activity_envelope.activity_envelope_projection_mode"
+    )
     assert projection.configured_status == expected_mode
     plan = _plan(handle_id)
-    assert (plan.receipt_name, plan.kind, plan.harnesses) == (receipt_name, "live-harness", (harness_name,))
+    assert (plan.receipt_name, plan.kind, plan.harnesses) == (
+        receipt_name,
+        "live-harness",
+        (harness_name,),
+    )
 
 
-def test_mod_hp07_every_registered_headless_provider_has_static_conformance_and_live_receipt_route() -> None:
+def test_mod_hp07_every_registered_headless_provider_has_static_conformance_and_live_receipt_route() -> (
+    None
+):
     """MOD-HP07: all registered headless providers have conformance and honest live-evidence routing."""
     rows = _projection_rows()
     registered = {
         str(row["harness_name"])
         for row in rows
-        if str(row.get("harness_type")) in HEADLESS_HARNESSES or str(row.get("harness_name")) in HEADLESS_HARNESSES
+        if str(row.get("harness_type")) in HEADLESS_HARNESSES
+        or str(row.get("harness_name")) in HEADLESS_HARNESSES
     }
     assert registered == HEADLESS_HARNESSES
     report_rows = [row for row in _parity_report().results if row.harness in registered]
     assert {row.harness for row in report_rows} == registered
-    assert not [row for row in report_rows if row.parity_class == "required" and row.state == "MISSING"]
+    assert not [
+        row
+        for row in report_rows
+        if row.parity_class == "required" and row.state == "MISSING"
+    ]
     plan = _plan("MOD-HP07")
     assert plan.kind == "live-harness" and set(plan.harnesses) == registered
 
 
-def test_mod_hp08_semantic_skill_drift_is_rejected_even_when_adapter_hash_metadata_is_current(tmp_path: Path) -> None:
+def test_mod_hp08_semantic_skill_drift_is_rejected_even_when_adapter_hash_metadata_is_current(
+    tmp_path: Path,
+) -> None:
     """MOD-HP08 negative: refreshed metadata must not hide behaviorally contradictory adapter content."""
     source_path = tmp_path / ".claude" / "skills" / "example" / "SKILL.md"
     adapter_path = tmp_path / ".codex" / "skills" / "example" / "SKILL.md"
@@ -248,33 +299,52 @@ def test_mod_hp08_semantic_skill_drift_is_rejected_even_when_adapter_hash_metada
         },
     }
     result = harness_checker._status_for_surface(tmp_path, capability, "codex")
-    assert result.state in {"MISSING", "STALE"}, "hash-current semantic contradiction was accepted"
+    assert result.state in {"MISSING", "STALE"}, (
+        "hash-current semantic contradiction was accepted"
+    )
 
 
 def test_mod_hp09_operational_parity_models_every_discoverability_domain() -> None:
     """MOD-HP09: CLI, plugin, MCP, installation, availability, and recovery are executable dimensions."""
-    required = {"cli", "plugin", "mcp", "installation", "service_availability", "recovery_route"}
+    required = {
+        "cli",
+        "plugin",
+        "mcp",
+        "installation",
+        "service_availability",
+        "recovery_route",
+    }
     declared = {
         str(domain)
         for capability in _registry()["capabilities"]
         for domain in capability.get("operational_domains", [])
     }
-    assert required <= declared, f"operational parity has no executable coverage for {sorted(required - declared)}"
+    assert required <= declared, (
+        f"operational parity has no executable coverage for {sorted(required - declared)}"
+    )
 
 
 def test_mod_hp12_confusion_corpus_plan_binds_scenarios_and_real_replays() -> None:
     """MOD-HP12: the collector must name the corpus scenarios replayed by three real harnesses."""
     plan = _plan("MOD-HP12")
-    assert plan.kind == "live-harness" and set(plan.harnesses) == {"claude", "codex", "cursor"}
+    assert plan.kind == "live-harness" and set(plan.harnesses) == {
+        "claude",
+        "codex",
+        "cursor",
+    }
     assert plan.command and plan.required_assertions, (
         "live harness presence alone is not a confusion-corpus replay; bind executable corpus scenario IDs"
     )
 
 
-def test_mod_hp13_fallback_is_explicit_degraded_and_cannot_replace_session_authority(tmp_path: Path) -> None:
+def test_mod_hp13_fallback_is_explicit_degraded_and_cannot_replace_session_authority(
+    tmp_path: Path,
+) -> None:
     """MOD-HP13: fallbacks are observable and preserve explicit worker authority."""
     _seed_harness_state(tmp_path, {"codex": ("A", "prime-builder")})
-    fallback = open_session(tmp_path, harness_name="codex", session_id="fallback-session")
+    fallback = open_session(
+        tmp_path, harness_name="codex", session_id="fallback-session"
+    )
     assert fallback["role_resolved"] == "prime-builder"
     assert fallback["role_resolution"]["authority_mode"] == "durable_registry_fallback"
 
@@ -299,11 +369,19 @@ def test_mod_hp13_fallback_is_explicit_degraded_and_cannot_replace_session_autho
             harness_name="codex",
         )
 
-    degraded = [row for row in _parity_report().results if row.harness == "codex" and row.state == "DEGRADED"]
-    assert degraded and all(row.configured_status == "fallback" and row.note for row in degraded)
+    degraded = [
+        row
+        for row in _parity_report().results
+        if row.harness == "codex" and row.state == "DEGRADED"
+    ]
+    assert degraded and all(
+        row.configured_status == "fallback" and row.note for row in degraded
+    )
 
 
-def test_mod_hp14_verification_matrix_executes_each_named_contract_class(tmp_path: Path) -> None:
+def test_mod_hp14_verification_matrix_executes_each_named_contract_class(
+    tmp_path: Path,
+) -> None:
     """MOD-HP14: aggregate verification covers all nine named behavioral classes."""
     _seed_harness_state(tmp_path, {"codex": ("A", "prime-builder")})
     session = ensure_worker_session(
@@ -320,8 +398,13 @@ def test_mod_hp14_verification_matrix_executes_each_named_contract_class(tmp_pat
     codex_rows = [row for row in report.results if row.harness == "codex"]
     coverage = {
         "contract": bool(codex_rows),
-        "semantic": any(row.capability_id.startswith("skill.") and row.state == "PASS" for row in codex_rows),
-        "resource": bool(profiles["test"].skills and profiles["test"].history_state.get("sources")),
+        "semantic": any(
+            row.capability_id.startswith("skill.") and row.state == "PASS"
+            for row in codex_rows
+        ),
+        "resource": bool(
+            profiles["test"].skills and profiles["test"].history_state.get("sources")
+        ),
         "isolation": resolve_worker_role_provenance(
             tmp_path, current_session_id="mod-hp14-session", harness_name="codex"
         )["session_id"]
@@ -329,19 +412,24 @@ def test_mod_hp14_verification_matrix_executes_each_named_contract_class(tmp_pat
         "role": session["worker_role_provenance"]["role"] == "prime-builder",
         "activity": activity["type"] == "test" and bool(activity["route_target"]),
         "transcript": any(
-            row.capability_id == "activity_envelope.full_transcript_archive_independence" and row.state == "PASS"
+            row.capability_id
+            == "activity_envelope.full_transcript_archive_independence"
+            and row.state == "PASS"
             for row in codex_rows
         ),
         "fallback": any(row.state == "DEGRADED" for row in codex_rows),
         "result_envelope": any(
-            row.capability_id == "activity_envelope.compact_result_envelope_mode" and row.state == "PASS"
+            row.capability_id == "activity_envelope.compact_result_envelope_mode"
+            and row.state == "PASS"
             for row in codex_rows
         ),
     }
     assert all(coverage.values()), coverage
 
 
-def test_mod_as01_historical_baseline_is_reproducible_hashed_and_dimension_complete() -> None:
+def test_mod_as01_historical_baseline_is_reproducible_hashed_and_dimension_complete() -> (
+    None
+):
     """MOD-AS01: use actual pre-cutoff artifacts; never synthesize absent measurements."""
     measurement = collector.Collector(project_root=ROOT)._pre_baseline()
     assert measurement == collector.Collector(project_root=ROOT)._pre_baseline()
@@ -355,7 +443,9 @@ def test_mod_as01_historical_baseline_is_reproducible_hashed_and_dimension_compl
         "failures",
         "regressions",
     }
-    assert datetime.fromisoformat(measurement["cutoff"]).astimezone(UTC) == datetime(2026, 7, 10, tzinfo=UTC)
+    assert datetime.fromisoformat(measurement["cutoff"]).astimezone(UTC) == datetime(
+        2026, 7, 10, tzinfo=UTC
+    )
     for name, reference in measurement["historical_sources"].items():
         if name == "session_envelopes":
             for session_reference in reference:
@@ -388,23 +478,41 @@ def test_mod_as02_every_governing_carrier_has_executable_current_evidence() -> N
     by_id = {str(row["subject_id"]): row for row in report["evaluations"]}
     assert set(by_id) == {str(row["id"]) for row in carriers}
     failures = {
-        carrier_id: row["evaluation_reason"] for carrier_id, row in by_id.items() if row["carrier_result"] != "PASS"
+        carrier_id: row["evaluation_reason"]
+        for carrier_id, row in by_id.items()
+        if row["carrier_result"] != "PASS"
     }
-    assert not failures, f"hard-invariant registry is incomplete or non-current: {failures}"
+    assert not failures, (
+        f"hard-invariant registry is incomplete or non-current: {failures}"
+    )
 
 
-def test_mod_as03_fresh_worker_simulator_accepts_only_generated_context_and_bounded_prompt() -> None:
+def test_mod_as03_fresh_worker_simulator_accepts_only_generated_context_and_bounded_prompt() -> (
+    None
+):
     """MOD-AS03: the simulator is a production API with an enforced prompt bound."""
     simulator = getattr(context_manifest, "simulate_fresh_worker", None)
-    assert callable(simulator), "fresh-worker behavior exists only in test helpers; provide a production simulator API"
-    result = simulator(activity="build", role="Prime Builder", task_prompt="inspect one approved work item")
+    assert callable(simulator), (
+        "fresh-worker behavior exists only in test helpers; provide a production simulator API"
+    )
+    result = simulator(
+        activity="build",
+        role="Prime Builder",
+        task_prompt="inspect one approved work item",
+    )
     assert result["context_origin"] in {"generated", "packaged_default"}
     assert result["task_prompt_bytes"] <= result["task_prompt_limit_bytes"]
     with pytest.raises((ValueError, context_manifest.ContextManifestError)):
-        simulator(activity="build", role="Prime Builder", task_prompt="x" * (result["task_prompt_limit_bytes"] + 1))
+        simulator(
+            activity="build",
+            role="Prime Builder",
+            task_prompt="x" * (result["task_prompt_limit_bytes"] + 1),
+        )
 
 
-def test_mod_as04_orientation_report_has_seven_by_five_executable_scenario_matrix() -> None:
+def test_mod_as04_orientation_report_has_seven_by_five_executable_scenario_matrix() -> (
+    None
+):
     """MOD-AS04: every context category is exercised in positive/absent/stale/conflicting/degraded states."""
     report = context_checker.run_contract()
     expected_categories = set(context_manifest.REQUIRED_CATEGORIES)
@@ -412,30 +520,47 @@ def test_mod_as04_orientation_report_has_seven_by_five_executable_scenario_matri
     matrix = report.get("orientation_scenario_matrix")
     assert isinstance(matrix, dict), "context checker has no objective scenario matrix"
     assert set(matrix) == expected_categories
-    assert all(set(matrix[category]) == expected_states for category in expected_categories)
     assert all(
-        matrix[category][state].get("status") == "PASS" and matrix[category][state].get("evidence")
+        set(matrix[category]) == expected_states for category in expected_categories
+    )
+    assert all(
+        matrix[category][state].get("status") == "PASS"
+        and matrix[category][state].get("evidence")
         for category in expected_categories
         for state in expected_states
     )
 
 
-def test_mod_as05_six_activity_profiles_define_authority_actions_prohibitions_resources_routes_and_next_steps() -> None:
+def test_mod_as05_six_activity_profiles_define_authority_actions_prohibitions_resources_routes_and_next_steps() -> (
+    None
+):
     """MOD-AS05: execute the complete six-activity behavior matrix."""
     profiles = load_activity_profiles()
     assert tuple(profiles) == CANONICAL_ACTIVITY_ORDER
     for name, profile in profiles.items():
-        guardrails = [str(item).lower() for item in profile.direction.get("guardrails", [])]
+        guardrails = [
+            str(item).lower() for item in profile.direction.get("guardrails", [])
+        ]
         assert profile.headless_eligibility
         assert profile.direction.get("stance") and profile.direction.get("manipulates")
-        assert any(token in guardrail for guardrail in guardrails for token in ("no ", "do not", "must", "requires"))
-        assert profile.skills and profile.terminology and profile.history_state.get("sources")
+        assert any(
+            token in guardrail
+            for guardrail in guardrails
+            for token in ("no ", "do not", "must", "requires")
+        )
+        assert (
+            profile.skills
+            and profile.terminology
+            and profile.history_state.get("sources")
+        )
         assert profile.classification["history_state"] == "explicit_query"
         assert profile.classification["direction"] == "activity_only"
         assert name in ACTIVITIES
 
 
-def test_mod_as07_known_transcript_and_advisory_confusion_cases_replay_fail_closed(tmp_path: Path) -> None:
+def test_mod_as07_known_transcript_and_advisory_confusion_cases_replay_fail_closed(
+    tmp_path: Path,
+) -> None:
     """MOD-AS07: stale context, ambiguous role, and advisory-as-approval confusion stay closed."""
     now = datetime(2026, 7, 13, tzinfo=UTC)
     stale = evaluate_extract(
@@ -470,7 +595,9 @@ def test_mod_as07_known_transcript_and_advisory_confusion_cases_replay_fail_clos
             dispatch_run_id=f"confusion-{name}",
         )
     with pytest.raises(EnvelopeError, match="ambiguous"):
-        resolve_worker_role_provenance(tmp_path, current_session_id="confused-shared-session")
+        resolve_worker_role_provenance(
+            tmp_path, current_session_id="confused-shared-session"
+        )
 
     advisory = disposition_for_status("ADVISORY", "prime-builder")
     assert advisory.actionable is True
@@ -479,7 +606,9 @@ def test_mod_as07_known_transcript_and_advisory_confusion_cases_replay_fail_clos
     assert advisory.reason_code == "prime_advisory_disposition"
 
 
-def test_mod_as08_nonimpairment_orchestrator_executes_every_named_regression_suite() -> None:
+def test_mod_as08_nonimpairment_orchestrator_executes_every_named_regression_suite() -> (
+    None
+):
     """MOD-AS08: the orchestrator must run all thirteen objective suite classes."""
     required_suites = {
         "bridge",
@@ -497,7 +626,11 @@ def test_mod_as08_nonimpairment_orchestrator_executes_every_named_regression_sui
         "governance",
     }
     plan = _plan("MOD-AS08")
-    configured = {item.strip().lower() for item in (plan.prerequisite or "").split(",") if item.strip()}
+    configured = {
+        item.strip().lower()
+        for item in (plan.prerequisite or "").split(",")
+        if item.strip()
+    }
     assert required_suites <= configured, (
         "a single AT-HARD-INVARIANTS clean-run result is not the thirteen-suite non-impairment orchestrator; "
         f"missing={sorted(required_suites - configured)}"
@@ -509,12 +642,16 @@ def test_mod_as09_live_repository_measurements_cover_every_required_dimension() 
     benchmark = activity_envelope_load.build_report(project_root=ROOT)
     assert benchmark["status"] in {"PASS", "WARN"}
     assert set(benchmark["activities"]) == ACTIVITIES
-    assert all(row["explicit_query_source_count"] > 0 for row in benchmark["activities"].values())
+    assert all(
+        row["explicit_query_source_count"] > 0
+        for row in benchmark["activities"].values()
+    )
     assert not benchmark["never_startup"]["missing_required_forbidden_payloads"]
 
     telemetry_dir = ROOT / ".gtkb-state" / "bridge-poller" / "dispatch-runs"
     telemetry = [
-        json.loads(path.read_text(encoding="utf-8")) for path in sorted(telemetry_dir.glob("*.telemetry.json"))
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in sorted(telemetry_dir.glob("*.telemetry.json"))
     ]
     usable = [
         row
@@ -528,7 +665,9 @@ def test_mod_as09_live_repository_measurements_cover_every_required_dimension() 
     assert benchmark["summary"]["activity_auto_payload_token_estimate_total"] > 0
 
 
-def test_mod_as11_threshold_service_requires_baseline_shadow_and_zero_tolerance_evidence() -> None:
+def test_mod_as11_threshold_service_requires_baseline_shadow_and_zero_tolerance_evidence() -> (
+    None
+):
     """MOD-AS11 local clause: threshold calibration depends on receipts and cannot relax hard failures."""
     plan = _plan("MOD-AS11")
     assert plan.kind == "dependent-receipts"
@@ -537,25 +676,48 @@ def test_mod_as11_threshold_service_requires_baseline_shadow_and_zero_tolerance_
             "canonical_authority": "GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001",
             "primary_read_route": "gt status",
             "primary_mutation_route": "gt projects",
-            "measurements": [{"id": "latency", "baseline": 5, "result": 4, "direction": "lower_or_equal"}],
-            "rollback": {"instructions": "restore", "tested": True, "evidence": "receipt"},
+            "measurements": [
+                {
+                    "id": "latency",
+                    "baseline": 5,
+                    "result": 4,
+                    "direction": "lower_or_equal",
+                }
+            ],
+            "rollback": {
+                "instructions": "restore",
+                "tested": True,
+                "evidence": "receipt",
+            },
             "hard_invariants": [],
             "worker_loading_paths": [],
             "superseded_guidance": [],
         }
     )
     assert missing_hard["status"] == "FAIL"
-    assert any(row["severity"] == "P0" and row["id"] == "hard-invariant" for row in missing_hard["findings"])
+    assert any(
+        row["severity"] == "P0" and row["id"] == "hard-invariant"
+        for row in missing_hard["findings"]
+    )
 
 
-def test_mod_as12_activation_slice_plan_requires_before_after_and_executed_rollback_evidence() -> None:
+def test_mod_as12_activation_slice_plan_requires_before_after_and_executed_rollback_evidence() -> (
+    None
+):
     """MOD-AS12: passing install/portability tests cannot substitute for an observed activation rollback."""
     plan = _plan("MOD-AS12")
     assert plan.kind == "activation-slice"
-    assert set(plan.required_assertions) >= {"before", "after", "rollback_executed", "rollback_restored_baseline"}
+    assert set(plan.required_assertions) >= {
+        "before",
+        "after",
+        "rollback_executed",
+        "rollback_restored_baseline",
+    }
 
 
-def test_mod_as13_operational_observation_binds_activities_harnesses_promotion_and_quiescence() -> None:
+def test_mod_as13_operational_observation_binds_activities_harnesses_promotion_and_quiescence() -> (
+    None
+):
     """MOD-AS13: recurrence evidence must cover every named dimension, not merely any successful run."""
     plan = _plan("MOD-AS13")
     assert plan.kind == "pilot-observation"
@@ -568,8 +730,24 @@ def test_mod_as13_operational_observation_binds_activities_harnesses_promotion_a
     }
 
 
-def test_mod_gl02_confirmed_intake_and_all_authority_clauses_execute(tmp_path: Path) -> None:
-    """MOD-GL02: confirmed intake plus branch, promotion, commit, lease, recovery, and denial behavior."""
+@pytest.mark.timeout(180)
+def test_mod_gl02_confirmed_intake_and_all_authority_clauses_execute(
+    tmp_path: Path,
+) -> None:
+    """MOD-GL02: confirmed intake plus branch, promotion, commit, lease, recovery, and denial behavior.
+
+    WI-6222 Slice 1 — per-test timeout override. This case executes six real git
+    lifecycle assertions, each spawning subprocesses; measured at 21.55s in
+    isolation, which sits uncomfortably close to the 30s global ``--timeout`` in
+    ``addopts``. Under full-sweep load it exceeds that budget, and because
+    pytest-timeout has only the ``thread`` method on Windows, the expiry
+    terminates the whole pytest process rather than failing this one test — one
+    slow test costing an entire sweep.
+
+    The override raises the ceiling for this case only. It does not weaken the
+    assertions and does not suppress a genuine hang: a real deadlock still
+    expires, just at 180s instead of 30s.
+    """
     db = KnowledgeDB(ROOT / "groundtruth.db")
     try:
         intake = db.get_deliberation("INTAKE-c5792b0c")
@@ -582,10 +760,14 @@ def test_mod_gl02_confirmed_intake_and_all_authority_clauses_execute(tmp_path: P
     assert content["confirmed_spec_id"] == requirement["id"]
     assert intake["outcome"] == "owner_decision"
 
-    assert deterministic_work_branch("WI-5158", "Git binding bootstrap").startswith("work-item/wi-5158-")
+    assert deterministic_work_branch("WI-5158", "Git binding bootstrap").startswith(
+        "work-item/wi-5158-"
+    )
     for target in ("develop", "stage", "main"):
         with pytest.raises(OperationDenied, match="governed target branches") as denied:
-            GitLifecycleService.validate_remote_push("work-item/wi-5158-git-binding-bootstrap", target)
+            GitLifecycleService.validate_remote_push(
+                "work-item/wi-5158-git-binding-bootstrap", target
+            )
         assert denied.value.code == "direct_push_prohibited"
 
     executable_clauses = {
@@ -596,6 +778,9 @@ def test_mod_gl02_confirmed_intake_and_all_authority_clauses_execute(tmp_path: P
         "recovery": git_acceptance._assert_a12,
         "forbidden-operations": git_acceptance._assert_a16,
     }
-    evidence = {clause: assertion(tmp_path / clause) for clause, assertion in executable_clauses.items()}
+    evidence = {
+        clause: assertion(tmp_path / clause)
+        for clause, assertion in executable_clauses.items()
+    }
     assert set(evidence) == set(executable_clauses)
     assert all(value for value in evidence.values())

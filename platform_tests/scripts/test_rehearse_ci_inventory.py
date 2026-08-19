@@ -11,6 +11,7 @@ constants to compare classification + signal + mechanism_origin exactly.
 from __future__ import annotations
 
 import csv
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -18,12 +19,23 @@ from typing import Any
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
-from rehearse import (
-    _ci_inventory,  # noqa: E402
-    _release_readiness_split,  # noqa: E402  (cross-slice consistency import)
-)
+def _load_rehearse_file(stem: str):
+    path = Path(__file__).resolve().parents[2] / "scripts" / "rehearse" / f"{stem}.py"
+    if not path.is_file():
+        pytest.skip(f"scripts/rehearse/{stem}.py is absent", allow_module_level=True)
+    name = f"wi6583_rehearse_{stem}"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        pytest.skip(f"unable to load {path.as_posix()}", allow_module_level=True)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_ci_inventory = _load_rehearse_file("_ci_inventory")
+_release_readiness_split = _load_rehearse_file("_release_readiness_split")
 
 # ---- Fixtures ----------------------------------------------------------
 
@@ -97,7 +109,9 @@ def test_run_dry_run_returns_skipped(tmp_path: Path) -> None:
 # ---- Classification: workflows -----------------------------------------
 
 
-def test_run_classifies_release_candidate_gate_as_adopter_not_framework(tmp_path: Path) -> None:
+def test_run_classifies_release_candidate_gate_as_adopter_not_framework(
+    tmp_path: Path,
+) -> None:
     """Slice 6 cross-slice consistency regression guard (per -003 fix + -004 GO).
 
     The original Slice 7 -001 proposal incorrectly stated Slice 6 classified
@@ -110,7 +124,11 @@ def test_run_classifies_release_candidate_gate_as_adopter_not_framework(tmp_path
     )
     assert result["status"] == "ok"
     payload = _read_json_artifact(tmp_path)
-    rcg = next(w for w in payload["workflows"] if w["path"].endswith("release-candidate-gate.yml"))
+    rcg = next(
+        w
+        for w in payload["workflows"]
+        if w["path"].endswith("release-candidate-gate.yml")
+    )
     assert rcg["classification"] == "adopter"
     assert rcg["classification_signal"] == "application_release_gate_surface"
     assert rcg["mechanism_origin"] == "agent_red_local"
@@ -127,7 +145,9 @@ def test_run_classifies_build_agent_containers_as_adopter(tmp_path: Path) -> Non
     assert row["classification_signal"] == "application_build_or_deploy_workflow"
 
 
-def test_run_classifies_accessibility_chromatic_visual_regression_as_adopter(tmp_path: Path) -> None:
+def test_run_classifies_accessibility_chromatic_visual_regression_as_adopter(
+    tmp_path: Path,
+) -> None:
     result = _run_lane(
         tmp_path,
         workflow_files={
@@ -154,7 +174,9 @@ def test_run_classifies_deploy_docs_as_adopter(tmp_path: Path) -> None:
     assert row["classification_signal"] == "application_docs_workflow"
 
 
-def test_run_content_scan_groundtruth_kb_reference_classifies_framework(tmp_path: Path) -> None:
+def test_run_content_scan_groundtruth_kb_reference_classifies_framework(
+    tmp_path: Path,
+) -> None:
     """Workflow with no filename rule but groundtruth_kb body reference → framework."""
     _run_lane(
         tmp_path,
@@ -208,10 +230,14 @@ def test_run_workflow_with_no_signal_is_unclassified(tmp_path: Path) -> None:
 def test_run_sonar_properties_classifies_adopter(tmp_path: Path) -> None:
     _run_lane(
         tmp_path,
-        ci_config_files={"sonar-project.properties": "sonar.projectKey=mike-remakerdigital_agent-red\n"},
+        ci_config_files={
+            "sonar-project.properties": "sonar.projectKey=mike-remakerdigital_agent-red\n"
+        },
     )
     payload = _read_json_artifact(tmp_path)
-    sonar = next(c for c in payload["ci_configs"] if c["path"] == "sonar-project.properties")
+    sonar = next(
+        c for c in payload["ci_configs"] if c["path"] == "sonar-project.properties"
+    )
     assert sonar["classification"] == "adopter"
     assert sonar["classification_signal"] == "agent_red_sonar_config"
     assert sonar["exists"] is True
@@ -223,7 +249,9 @@ def test_run_absent_ci_configs_recorded_with_exists_false(tmp_path: Path) -> Non
     payload = _read_json_artifact(tmp_path)
     assert all(c["exists"] is False for c in payload["ci_configs"])
     assert all(c["classification"] == "unclassified" for c in payload["ci_configs"])
-    assert all(c["classification_signal"] == "absent_probed" for c in payload["ci_configs"])
+    assert all(
+        c["classification_signal"] == "absent_probed" for c in payload["ci_configs"]
+    )
 
 
 # ---- Output artifacts -------------------------------------------------
@@ -255,7 +283,9 @@ def test_run_writes_preview_markdown_with_three_sections(tmp_path: Path) -> None
             "lint.yml": "#\n",  # unclassified (mixed-scope)
         },
     )
-    preview = (tmp_path / "output" / "ci_inventory" / "ci-rewrite-preview.md").read_text(encoding="utf-8")
+    preview = (
+        tmp_path / "output" / "ci_inventory" / "ci-rewrite-preview.md"
+    ).read_text(encoding="utf-8")
     assert "## Move to `applications/Agent_Red/<path>` (adopter)" in preview
     assert "## Keep at GT-KB root (framework)" in preview
     assert "## Owner decision required (unclassified)" in preview
@@ -280,7 +310,9 @@ def test_run_writes_result_json_on_ok_path(tmp_path: Path) -> None:
     assert any("result.json" in str(p) for p in result["output_files"])
 
 
-def test_run_writes_result_json_on_error_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_writes_result_json_on_error_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Probe failure path emits result.json with status=error."""
     project_root = tmp_path / "project"
     project_root.mkdir()
@@ -305,7 +337,9 @@ def test_run_writes_result_json_on_error_path(tmp_path: Path, monkeypatch: pytes
 # ---- Cross-reference with Slice 4 -------------------------------------
 
 
-def test_run_cross_references_path_rewrite_classification_when_present(tmp_path: Path) -> None:
+def test_run_cross_references_path_rewrite_classification_when_present(
+    tmp_path: Path,
+) -> None:
     """If Slice 4's classification.json exists in same output dir, look up ownership."""
     project_root = tmp_path / "project"
     project_root.mkdir()
@@ -352,7 +386,9 @@ def test_run_cross_reference_absent_leaves_column_empty(tmp_path: Path) -> None:
 # ---- Cross-slice consistency with Slice 6 (per GO -004) ---------------
 
 
-def test_run_classification_matches_slice6_for_release_candidate_gate(tmp_path: Path) -> None:
+def test_run_classification_matches_slice6_for_release_candidate_gate(
+    tmp_path: Path,
+) -> None:
     """Slice 7 + Slice 6 must agree on release-candidate-gate.yml.
 
     Per Codex post-impl NO-GO -006 §"Required Revision": derive ALL three
@@ -373,7 +409,9 @@ def test_run_classification_matches_slice6_for_release_candidate_gate(tmp_path: 
     workflow_in_fixture.write_text("# release gate workflow\n", encoding="utf-8")
 
     # Invoke Slice 6's runtime classifier against the fixture; pull its row.
-    slice6_entries = _release_readiness_split._classify_release_gate_surfaces(fixture_root)
+    slice6_entries = _release_readiness_split._classify_release_gate_surfaces(
+        fixture_root
+    )
     slice6_row = next(e for e in slice6_entries if e["path"] == slice6_relpath)
 
     # Run Slice 7 against the same workflow file via its own fixture path.
@@ -396,7 +434,9 @@ def test_run_classification_matches_slice6_for_release_candidate_gate(tmp_path: 
 # ---- Manifest excluded_paths consumption (per Codex -008 NO-GO) -------
 
 
-def test_run_excluded_paths_skip_workflow_files_under_excluded_top_level(tmp_path: Path) -> None:
+def test_run_excluded_paths_skip_workflow_files_under_excluded_top_level(
+    tmp_path: Path,
+) -> None:
     """Per proposal -001 §6.6 + Codex -008 §"Required Revision" item 1:
     when manifest excludes a top-level dir containing CI surfaces, those
     surfaces must NOT appear in the inventory.
@@ -414,15 +454,21 @@ def test_run_excluded_paths_skip_workflow_files_under_excluded_top_level(tmp_pat
         ci_configs_root=project_root,
     )
     assert result["status"] == "ok"
-    payload = json.loads((output_dir / "ci_inventory" / "ci_inventory.json").read_text(encoding="utf-8"))
+    payload = json.loads(
+        (output_dir / "ci_inventory" / "ci_inventory.json").read_text(encoding="utf-8")
+    )
     # accessibility.yml should NOT be in the inventory because .github excluded.
-    assert payload["workflows"] == [], f"Excluded workflow appeared in inventory: {payload['workflows']}"
+    assert payload["workflows"] == [], (
+        f"Excluded workflow appeared in inventory: {payload['workflows']}"
+    )
     # CI configs probed at root: .github/dependabot.yml is also excluded.
     rel_paths = {c["path"] for c in payload["ci_configs"]}
     assert ".github/dependabot.yml" not in rel_paths
 
 
-def test_run_excluded_paths_full_path_match_skips_specific_config(tmp_path: Path) -> None:
+def test_run_excluded_paths_full_path_match_skips_specific_config(
+    tmp_path: Path,
+) -> None:
     """A specific full-path match in excluded_paths skips that single CI config.
 
     Validates the second match mode in _is_path_excluded_by_manifest:
@@ -434,7 +480,9 @@ def test_run_excluded_paths_full_path_match_skips_specific_config(tmp_path: Path
     workflows_dir.mkdir(parents=True)
     _build_ci_configs_fixture(
         project_root,
-        {"sonar-project.properties": "sonar.projectKey=mike-remakerdigital_agent-red\n"},
+        {
+            "sonar-project.properties": "sonar.projectKey=mike-remakerdigital_agent-red\n"
+        },
     )
     output_dir = tmp_path / "output"
     result = _ci_inventory.run(
@@ -444,7 +492,9 @@ def test_run_excluded_paths_full_path_match_skips_specific_config(tmp_path: Path
         ci_configs_root=project_root,
     )
     assert result["status"] == "ok"
-    payload = json.loads((output_dir / "ci_inventory" / "ci_inventory.json").read_text(encoding="utf-8"))
+    payload = json.loads(
+        (output_dir / "ci_inventory" / "ci_inventory.json").read_text(encoding="utf-8")
+    )
     rel_paths = {c["path"] for c in payload["ci_configs"]}
     assert "sonar-project.properties" not in rel_paths
 
@@ -452,7 +502,9 @@ def test_run_excluded_paths_full_path_match_skips_specific_config(tmp_path: Path
 # ---- python-tests.yml content-scan classifier (per proposal §3 + Codex -008) ---
 
 
-def test_run_pytest_workflow_classifies_by_pytest_target_adopter(tmp_path: Path) -> None:
+def test_run_pytest_workflow_classifies_by_pytest_target_adopter(
+    tmp_path: Path,
+) -> None:
     """python-tests.yml running pytest against tests/ (no groundtruth_kb subpath)
     classifies as adopter with signal agent_red_pytest_workflow."""
     _run_lane(
@@ -468,13 +520,21 @@ def test_run_pytest_workflow_classifies_by_pytest_target_adopter(tmp_path: Path)
             )
         },
     )
-    payload = json.loads((tmp_path / "output" / "ci_inventory" / "ci_inventory.json").read_text(encoding="utf-8"))
-    row = next(w for w in payload["workflows"] if w["path"].endswith("python-tests.yml"))
+    payload = json.loads(
+        (tmp_path / "output" / "ci_inventory" / "ci_inventory.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    row = next(
+        w for w in payload["workflows"] if w["path"].endswith("python-tests.yml")
+    )
     assert row["classification"] == "adopter"
     assert row["classification_signal"] == "agent_red_pytest_workflow"
 
 
-def test_run_pytest_workflow_classifies_by_pytest_target_framework(tmp_path: Path) -> None:
+def test_run_pytest_workflow_classifies_by_pytest_target_framework(
+    tmp_path: Path,
+) -> None:
     """python-tests.yml running pytest tests/groundtruth_kb classifies as framework."""
     _run_lane(
         tmp_path,
@@ -489,20 +549,34 @@ def test_run_pytest_workflow_classifies_by_pytest_target_framework(tmp_path: Pat
             )
         },
     )
-    payload = json.loads((tmp_path / "output" / "ci_inventory" / "ci_inventory.json").read_text(encoding="utf-8"))
-    row = next(w for w in payload["workflows"] if w["path"].endswith("python-tests.yml"))
+    payload = json.loads(
+        (tmp_path / "output" / "ci_inventory" / "ci_inventory.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    row = next(
+        w for w in payload["workflows"] if w["path"].endswith("python-tests.yml")
+    )
     assert row["classification"] == "framework"
     assert row["classification_signal"] == "framework_pytest_workflow"
 
 
-def test_run_pytest_workflow_classifies_no_pytest_command_as_unclassified(tmp_path: Path) -> None:
+def test_run_pytest_workflow_classifies_no_pytest_command_as_unclassified(
+    tmp_path: Path,
+) -> None:
     """python-tests.yml with no pytest command falls to no_classification_signal."""
     _run_lane(
         tmp_path,
         workflow_files={"python-tests.yml": "# placeholder\n"},
     )
-    payload = json.loads((tmp_path / "output" / "ci_inventory" / "ci_inventory.json").read_text(encoding="utf-8"))
-    row = next(w for w in payload["workflows"] if w["path"].endswith("python-tests.yml"))
+    payload = json.loads(
+        (tmp_path / "output" / "ci_inventory" / "ci_inventory.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    row = next(
+        w for w in payload["workflows"] if w["path"].endswith("python-tests.yml")
+    )
     assert row["classification"] == "unclassified"
     assert row["classification_signal"] == "no_classification_signal"
 
@@ -533,17 +607,21 @@ def test_run_pytest_workflow_recognizes_gha_test_args_pattern(tmp_path: Path) ->
         "          python -m pytest ${{ steps.paths.outputs.test_args }}\n"
     )
     _run_lane(tmp_path, workflow_files={"python-tests.yml": live_shape_content})
-    payload = json.loads((tmp_path / "output" / "ci_inventory" / "ci_inventory.json").read_text(encoding="utf-8"))
-    row = next(w for w in payload["workflows"] if w["path"].endswith("python-tests.yml"))
+    payload = json.loads(
+        (tmp_path / "output" / "ci_inventory" / "ci_inventory.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    row = next(
+        w for w in payload["workflows"] if w["path"].endswith("python-tests.yml")
+    )
     assert row["classification"] == "adopter"
     assert row["classification_signal"] == "agent_red_pytest_workflow"
 
 
 def test_extract_pytest_targets_handles_multi_target_test_args(tmp_path: Path) -> None:
     """_extract_pytest_targets splits multi-target test_args= lines correctly."""
-    content = (
-        '          echo "test_args=tests/multi_tenant tests/migrations tests/test_health.py" >> "$GITHUB_OUTPUT"\n'
-    )
+    content = '          echo "test_args=tests/multi_tenant tests/migrations tests/test_health.py" >> "$GITHUB_OUTPUT"\n'
     targets = _ci_inventory._extract_pytest_targets(content.lower())
     assert "multi_tenant" in targets
     assert "migrations" in targets

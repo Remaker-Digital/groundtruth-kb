@@ -22,7 +22,14 @@ PROJECT_ID = "PROJECT-GTKB-DETERMINISTIC-SERVICES-TEST"
 AUTH_ID = "PAUTH-WI-4567-TEST"
 DELIB_ID = "DELIB-WI-4567-TEST"
 SPEC_ID = "SPEC-WI-4567-TEST"
-ALLOWED_MUTATION_CLASSES = ["bridge", "configuration", "governance_evidence", "metadata", "source", "test"]
+ALLOWED_MUTATION_CLASSES = [
+    "bridge",
+    "configuration",
+    "governance_evidence",
+    "metadata",
+    "source",
+    "test",
+]
 
 
 @pytest.fixture(autouse=True)
@@ -49,8 +56,12 @@ def _nonimpairment_disposition(content: str) -> dict[str, Any]:
     return json.loads(fenced)
 
 
-def _replace_nonimpairment_disposition(content: str, disposition: dict[str, Any]) -> str:
-    heading, remainder = content.split("## Intuitiveness / Non-Impairment Disposition", 1)
+def _replace_nonimpairment_disposition(
+    content: str, disposition: dict[str, Any]
+) -> str:
+    heading, remainder = content.split(
+        "## Intuitiveness / Non-Impairment Disposition", 1
+    )
     _, after = remainder.split("```json", 1)
     _, suffix = after.split("```", 1)
     rendered = json.dumps(disposition, ensure_ascii=True, indent=2)
@@ -61,7 +72,9 @@ class _FakeWriter:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
 
-    def propose_bridge_codex_non_bypass(self, topic_slug: str, body: str, **kwargs: Any) -> Path:
+    def propose_bridge_codex_non_bypass(
+        self, topic_slug: str, body: str, **kwargs: Any
+    ) -> Path:
         bridge_dir = Path(kwargs["bridge_dir"])
         bridge_dir.mkdir(parents=True, exist_ok=True)
         path = bridge_dir / f"{topic_slug}-{int(kwargs.get('version', 1)):03d}.md"
@@ -84,7 +97,9 @@ def _write_config(root: Path) -> Path:
     return config
 
 
-def _seed_db(root: Path, *, membership: bool = True, authorization: bool = True) -> None:
+def _seed_db(
+    root: Path, *, membership: bool = True, authorization: bool = True
+) -> None:
     db = KnowledgeDB(db_path=root / "groundtruth.db")
     try:
         db.insert_spec(
@@ -97,13 +112,16 @@ def _seed_db(root: Path, *, membership: bool = True, authorization: bool = True)
         db.insert_deliberation(
             id=DELIB_ID,
             source_type="owner_conversation",
+            outcome="owner_decision",
             title="Owner decision for WI-4567",
             summary="Owner approved bounded proposal-filing state creation.",
             content="Owner approved bounded proposal-filing state creation.",
             changed_by="test",
             change_reason="seed owner decision",
         )
-        db.insert_project("Deterministic Services", "test", "seed project", id=PROJECT_ID)
+        db.insert_project(
+            "Deterministic Services", "test", "seed project", id=PROJECT_ID
+        )
         db.insert_work_item(
             id=WI_ID,
             title="Bridge proposal filing service",
@@ -153,7 +171,9 @@ def _insert_authorization(
             "test",
             "seed authorization candidate",
             id=authorization_id,
-            allowed_mutation_classes=kwargs.pop("allowed_mutation_classes", ALLOWED_MUTATION_CLASSES),
+            allowed_mutation_classes=kwargs.pop(
+                "allowed_mutation_classes", ALLOWED_MUTATION_CLASSES
+            ),
             forbidden_operations=kwargs.pop("forbidden_operations", []),
             included_work_item_ids=included_work_item_ids,
             included_spec_ids=kwargs.pop("included_spec_ids", [SPEC_ID]),
@@ -170,7 +190,9 @@ def _install_fakes(monkeypatch) -> tuple[_FakeWriter, list[dict[str, Any]]]:
     def fake_load_writer(_project_root: Path) -> _FakeWriter:
         return writer
 
-    def fake_preflight(project_root: Path, *, name: str, content_file=None, bridge_id=None):
+    def fake_preflight(
+        project_root: Path, *, name: str, content_file=None, bridge_id=None
+    ):
         preflights.append(
             {
                 "project_root": project_root,
@@ -179,7 +201,9 @@ def _install_fakes(monkeypatch) -> tuple[_FakeWriter, list[dict[str, Any]]]:
                 "bridge_id": bridge_id,
             }
         )
-        return proposal_filing.PreflightResult(name=name, returncode=0, stdout="PASS", stderr="")
+        return proposal_filing.PreflightResult(
+            name=name, returncode=0, stdout="PASS", stderr=""
+        )
 
     monkeypatch.setattr(proposal_filing, "_load_bridge_writer", fake_load_writer)
     monkeypatch.setattr(proposal_filing, "_run_preflight_command", fake_preflight)
@@ -202,7 +226,9 @@ def _with_test_author_metadata(content: str) -> str:
     return content.replace("NEW\n\n", f"NEW\n\n{metadata}", 1)
 
 
-def test_file_implementation_proposal_reuses_active_state_and_writes_new(tmp_path: Path, monkeypatch) -> None:
+def test_file_implementation_proposal_reuses_active_state_and_writes_new(
+    tmp_path: Path, monkeypatch
+) -> None:
     _write_config(tmp_path)
     _seed_db(tmp_path)
     writer, preflights = _install_fakes(monkeypatch)
@@ -234,19 +260,27 @@ def test_file_implementation_proposal_reuses_active_state_and_writes_new(tmp_pat
     assert "Project Authorization Candidates:" in result.output
     assert f"Project: {PROJECT_ID}" in content
     assert f"Work Item: {WI_ID}" in content
-    assert 'target_paths: ["groundtruth-kb/src/groundtruth_kb/cli_bridge_propose.py"]' in content
+    assert (
+        'target_paths: ["groundtruth-kb/src/groundtruth_kb/cli_bridge_propose.py"]'
+        in content
+    )
     assert "## Specification-Derived Verification Plan" in content
     assert "## Intuitiveness / Non-Impairment Disposition" in content
     disposition = _nonimpairment_disposition(content)
     assert set(proposal_filing.NONIMPAIRMENT_REQUIRED_FIELDS) <= set(disposition)
     assert disposition["schema_version"] == 1
     assert disposition["applicability"] == "applicable"
-    assert content.index("## Intuitiveness / Non-Impairment Disposition") < content.index(
-        "## Specification-Derived Verification Plan"
-    )
+    assert content.index(
+        "## Intuitiveness / Non-Impairment Disposition"
+    ) < content.index("## Specification-Derived Verification Plan")
     assert "## Cross-Harness Disposition" not in content
     assert writer.calls[0]["topic_slug"] == "gtkb-wi4567-test"
-    assert [item["name"] for item in preflights] == ["applicability", "adr_dcl", "applicability", "adr_dcl"]
+    assert [item["name"] for item in preflights] == [
+        "applicability",
+        "adr_dcl",
+        "applicability",
+        "adr_dcl",
+    ]
     assert preflights[0]["content_file"] is not None
     assert preflights[-1]["bridge_id"] == "gtkb-wi4567-test"
 
@@ -324,14 +358,21 @@ def test_file_implementation_proposal_selects_exact_authorization_independent_of
     payload = json.loads(result.output)
     assert payload["project_authorization_id"] == "PAUTH-EXACT-TEST"
     assert [
-        (candidate["project_authorization_id"], candidate["coverage"], candidate["specificity_rank"])
+        (
+            candidate["project_authorization_id"],
+            candidate["coverage"],
+            candidate["specificity_rank"],
+        )
         for candidate in payload["project_authorization_candidates"]
     ] == [
         ("PAUTH-EXACT-TEST", "exact_singleton", [0, 1]),
         ("PAUTH-EXPLICIT-TEST", "explicit_list", [1, 2]),
         ("PAUTH-FALLBACK-TEST", "project_membership_fallback", [2, 0]),
     ]
-    assert [candidate["selected"] for candidate in payload["project_authorization_candidates"]] == [
+    assert [
+        candidate["selected"]
+        for candidate in payload["project_authorization_candidates"]
+    ] == [
         True,
         False,
         False,
@@ -344,7 +385,9 @@ def test_file_implementation_proposal_prefers_smaller_explicit_authorization(
 ) -> None:
     _write_config(tmp_path)
     _seed_db(tmp_path, authorization=False)
-    _insert_authorization(tmp_path, "PAUTH-EXPLICIT-THREE-TEST", [WI_ID, "WI-4568", "WI-4569"])
+    _insert_authorization(
+        tmp_path, "PAUTH-EXPLICIT-THREE-TEST", [WI_ID, "WI-4568", "WI-4569"]
+    )
     _insert_authorization(tmp_path, "PAUTH-EXPLICIT-TWO-TEST", [WI_ID, "WI-4568"])
     _insert_authorization(tmp_path, "PAUTH-FALLBACK-TEST", None)
     _install_fakes(monkeypatch)
@@ -401,7 +444,10 @@ def test_file_implementation_proposal_fails_before_publication_on_equal_rank_amb
     )
 
     assert result.exit_code == 1
-    assert "Ambiguous active project authorizations cover WI-4567 at specificity rank [0, 1]" in result.output
+    assert (
+        "Ambiguous active project authorizations cover WI-4567 at specificity rank [0, 1]"
+        in result.output
+    )
     assert "PAUTH-EXACT-A-TEST, PAUTH-EXACT-B-TEST" in result.output
     assert writer.calls == []
     assert preflights == []
@@ -474,7 +520,11 @@ def test_file_implementation_proposal_rejects_source_create_missing_without_side
     finally:
         db.close()
     assert memberships == []
-    covering = [auth for auth in authorizations if WI_ID in (auth.get("included_work_item_ids_parsed") or [])]
+    covering = [
+        auth
+        for auth in authorizations
+        if WI_ID in (auth.get("included_work_item_ids_parsed") or [])
+    ]
     assert covering == []
     assert not (tmp_path / "bridge").exists()
 
@@ -514,7 +564,11 @@ def test_file_implementation_proposal_can_create_bridge_state_with_owner_decisio
     finally:
         db.close()
     assert [item["work_item_id"] for item in memberships] == [WI_ID]
-    covering = [auth for auth in authorizations if WI_ID in (auth.get("included_work_item_ids_parsed") or [])]
+    covering = [
+        auth
+        for auth in authorizations
+        if WI_ID in (auth.get("included_work_item_ids_parsed") or [])
+    ]
     assert len(covering) == 1
     assert covering[0]["allowed_mutation_classes_parsed"] == ["bridge", "metadata"]
     assert (tmp_path / "bridge" / "gtkb-wi4567-test-001.md").is_file()
@@ -739,7 +793,9 @@ def test_file_implementation_proposal_authorization_expiry_is_fail_closed(
     payload = json.loads(result.output)
     if expected_code is None:
         assert result.exit_code == 0, result.output
-        assert payload["authorization_decision"]["authorization"]["normalized_expiry"] == ("2099-01-01T00:00:00Z")
+        assert payload["authorization_decision"]["authorization"][
+            "normalized_expiry"
+        ] == ("2099-01-01T00:00:00Z")
     else:
         assert result.exit_code == 1
         assert payload["authorization_decision"]["reason_code"] == expected_code
@@ -811,7 +867,9 @@ def test_file_implementation_proposal_spec_exclusion_denies(
         "--json",
     )
     assert excluded.exit_code == 1
-    assert json.loads(excluded.output)["authorization_decision"]["reason_code"] == ("linked_specification_excluded")
+    assert json.loads(excluded.output)["authorization_decision"]["reason_code"] == (
+        "linked_specification_excluded"
+    )
 
 
 def test_file_implementation_proposal_forbidden_operation_denies(
@@ -843,7 +901,10 @@ def test_file_implementation_proposal_forbidden_operation_denies(
         "--json",
     )
     assert result.exit_code == 1
-    assert json.loads(result.output)["authorization_decision"]["reason_code"] == "forbidden_operation"
+    assert (
+        json.loads(result.output)["authorization_decision"]["reason_code"]
+        == "forbidden_operation"
+    )
 
 
 def test_file_implementation_proposal_create_missing_rolls_back_membership_on_pauth_failure(
@@ -875,7 +936,9 @@ def test_file_implementation_proposal_create_missing_rolls_back_membership_on_pa
                 run_candidate_preflights=False,
                 run_live_preflights=False,
             )
-        assert error.value.decision["reason_code"] == "authorization_state_creation_failed"
+        assert (
+            error.value.decision["reason_code"] == "authorization_state_creation_failed"
+        )
         assert db.list_project_work_items(PROJECT_ID) == []
         assert db.list_project_authorizations(PROJECT_ID, include_terminal=True) == []
         assert not (tmp_path / "bridge").exists()
@@ -892,7 +955,9 @@ def test_file_implementation_proposal_revalidates_after_candidate_preflight(
     writer = _FakeWriter()
     changed = False
 
-    def fake_preflight(project_root: Path, *, name: str, content_file=None, bridge_id=None):
+    def fake_preflight(
+        project_root: Path, *, name: str, content_file=None, bridge_id=None
+    ):
         nonlocal changed
         if not changed:
             changed = True
@@ -907,7 +972,9 @@ def test_file_implementation_proposal_revalidates_after_candidate_preflight(
                 )
             finally:
                 drift_db.close()
-        return proposal_filing.PreflightResult(name=name, returncode=0, stdout="PASS", stderr="")
+        return proposal_filing.PreflightResult(
+            name=name, returncode=0, stdout="PASS", stderr=""
+        )
 
     monkeypatch.setattr(proposal_filing, "_load_bridge_writer", lambda _root: writer)
     monkeypatch.setattr(proposal_filing, "_run_preflight_command", fake_preflight)
@@ -926,7 +993,10 @@ def test_file_implementation_proposal_revalidates_after_candidate_preflight(
         "--json",
     )
     assert result.exit_code == 1
-    assert json.loads(result.output)["authorization_decision"]["reason_code"] == "project_not_active"
+    assert (
+        json.loads(result.output)["authorization_decision"]["reason_code"]
+        == "project_not_active"
+    )
     assert writer.calls == []
     assert not (tmp_path / "bridge").exists()
 
@@ -1003,7 +1073,11 @@ def test_file_implementation_proposal_decision_identity_matches_content_and_resu
     finally:
         db.close()
 
-    line = next(item for item in result.content.splitlines() if item.startswith("Project Authorization Decision: "))
+    line = next(
+        item
+        for item in result.content.splitlines()
+        if item.startswith("Project Authorization Decision: ")
+    )
     embedded = json.loads(line.split(": ", 1)[1])
     assert embedded == result.authorization_decision
     assert embedded["decision_id"].startswith("sha256:")
@@ -1015,7 +1089,9 @@ def test_file_implementation_proposal_decision_identity_matches_content_and_resu
     assert embedded["invalidation_inputs"]["planned_bridge_version"] == 1
 
 
-def test_file_implementation_proposal_rejects_agent_red_target(tmp_path: Path, monkeypatch) -> None:
+def test_file_implementation_proposal_rejects_agent_red_target(
+    tmp_path: Path, monkeypatch
+) -> None:
     _write_config(tmp_path)
     _seed_db(tmp_path)
     _install_fakes(monkeypatch)
@@ -1038,7 +1114,9 @@ def test_file_implementation_proposal_rejects_agent_red_target(tmp_path: Path, m
     assert "Agent Red targets are out of scope" in result.output
 
 
-def test_file_implementation_proposal_renders_parity_dispositions_and_passes_real_audit(tmp_path: Path) -> None:
+def test_file_implementation_proposal_renders_parity_dispositions_and_passes_real_audit(
+    tmp_path: Path,
+) -> None:
     _write_config(tmp_path)
     _seed_db(tmp_path)
     db = KnowledgeDB(db_path=tmp_path / "groundtruth.db")
@@ -1076,7 +1154,9 @@ def test_file_implementation_proposal_renders_parity_dispositions_and_passes_rea
     )
 
     writer = proposal_filing._load_bridge_writer(tmp_path)
-    content = writer.normalize_bridge_envelope_head(_with_test_author_metadata(result.content))
+    content = writer.normalize_bridge_envelope_head(
+        _with_test_author_metadata(result.content)
+    )
     audit = writer._run_bridge_compliance_audit(
         file_path=tmp_path / "bridge" / "gtkb-wi4567-parity-test-001.md",
         content=content,
@@ -1121,8 +1201,12 @@ def test_file_implementation_proposal_nonimpairment_remains_fail_closed(
         disposition["before_behavior"] = invalid_value
     invalid_content = _replace_nonimpairment_disposition(result.content, disposition)
     writer = proposal_filing._load_bridge_writer(tmp_path)
-    normalized = writer.normalize_bridge_envelope_head(_with_test_author_metadata(invalid_content))
-    with pytest.raises(writer.BridgeComplianceError, match="Intuitiveness/Non-Impairment Disposition"):
+    normalized = writer.normalize_bridge_envelope_head(
+        _with_test_author_metadata(invalid_content)
+    )
+    with pytest.raises(
+        writer.BridgeComplianceError, match="Intuitiveness/Non-Impairment Disposition"
+    ):
         writer._run_bridge_compliance_audit(
             file_path=tmp_path / "bridge" / "gtkb-wi4567-parity-test-001.md",
             content=normalized,
@@ -1130,7 +1214,9 @@ def test_file_implementation_proposal_nonimpairment_remains_fail_closed(
         )
 
 
-def test_file_implementation_proposal_without_parity_disposition_remains_denied(tmp_path: Path) -> None:
+def test_file_implementation_proposal_without_parity_disposition_remains_denied(
+    tmp_path: Path,
+) -> None:
     _write_config(tmp_path)
     _seed_db(tmp_path)
     db = KnowledgeDB(db_path=tmp_path / "groundtruth.db")
@@ -1152,7 +1238,9 @@ def test_file_implementation_proposal_without_parity_disposition_remains_denied(
         db.close()
 
     writer = proposal_filing._load_bridge_writer(tmp_path)
-    content = writer.normalize_bridge_envelope_head(_with_test_author_metadata(result.content))
+    content = writer.normalize_bridge_envelope_head(
+        _with_test_author_metadata(result.content)
+    )
     with pytest.raises(writer.BridgeComplianceError, match="Cross-Harness Disposition"):
         writer._run_bridge_compliance_audit(
             file_path=tmp_path / "bridge" / "gtkb-wi4567-parity-test-001.md",
@@ -1232,7 +1320,9 @@ def test_file_implementation_proposal_rejects_duplicate_parity_disposition_key(
 
 
 def test_file_implementation_proposal_help_resolves() -> None:
-    result = CliRunner().invoke(main, ["bridge", "file-implementation-proposal", "--help"])
+    result = CliRunner().invoke(
+        main, ["bridge", "file-implementation-proposal", "--help"]
+    )
     assert result.exit_code == 0, result.output
     assert "File a dispatchable NEW implementation proposal" in result.output
     assert "--cross-harness-disposition" in result.output

@@ -10,11 +10,17 @@ Specs:
 - F4 of -004 closure: no-console settings verified.
 
 All tests use nonce-suffixed task names to avoid mutating the production task.
-Cleanup via try/finally ensures test tasks are removed even on failure.
+Cleanup via try/finally removes test tasks on ordinary failure, but NOT when the
+process is killed outright: pytest-timeout's thread method terminates the
+process on Windows, so ``finally`` never runs and the registered task survives
+armed. That is the measured provenance of the stray ``GTKB-SingleHarness-E2E-Test-*``
+task recorded in WI-6316, and it is why the host-mutating end-to-end case below
+is opt-in rather than merely timeout-bounded (WI-6222 Slice 1).
 """
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -27,7 +33,38 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 INSTALLER = PROJECT_ROOT / "scripts" / "install_single_harness_dispatcher_task.ps1"
 UNINSTALLER = PROJECT_ROOT / "scripts" / "uninstall_single_harness_dispatcher_task.ps1"
 
-WINDOWS_ONLY = pytest.mark.skipif(sys.platform != "win32", reason="Windows-only Task Scheduler tests")
+WINDOWS_ONLY = pytest.mark.skipif(
+    sys.platform != "win32", reason="Windows-only Task Scheduler tests"
+)
+
+# WI-6222 Slice 1 — environment gate for the host-mutating end-to-end case.
+#
+# Unlike the other cases in this module, the end-to-end test does not merely
+# inspect an installer's output: it REGISTERS a real Windows scheduled task,
+# STARTS it, and polls for up to 30s for the dispatcher to write state. Two
+# properties make it unsafe as a default-on test:
+#
+#   1. It mutates host state outside the project root, and its cleanup is not
+#      kill-safe (see the module docstring and WI-6316).
+#   2. It requires a working Task Scheduler environment in which a freshly
+#      registered task actually runs. Where that environment is absent the poll
+#      cannot succeed, and the test previously consumed its full budget and then
+#      killed the entire sweep rather than failing honestly.
+#
+# The gate is opt-in rather than auto-detected because "can this host run a
+# scheduled task end to end" is not reliably detectable without performing the
+# very registration under test. Opt-in also keeps the case correct under the
+# standing owner direction that legacy dispatcher authorities stay disabled
+# pending Dispatcher Next (WI-5624): the substrate this exercises is slated for
+# retirement, so it must not run by default.
+SCHEDULED_TASK_E2E_ENV = "GTKB_SCHEDULED_TASK_E2E"
+SCHEDULED_TASK_E2E_ONLY = pytest.mark.skipif(
+    os.environ.get(SCHEDULED_TASK_E2E_ENV) != "1",
+    reason=(
+        f"host-mutating scheduled-task E2E; set {SCHEDULED_TASK_E2E_ENV}=1 to opt in "
+        "(registers and starts a real Windows scheduled task)"
+    ),
+)
 
 
 def _nonce_task_name(prefix: str = "GTKB-SingleHarnessBridgeDispatcher-Test") -> str:
@@ -73,7 +110,9 @@ def test_installer_dry_run_does_not_register() -> None:
             task_name,
             "-DryRun",
         )
-        assert result.returncode == 0, f"installer exit={result.returncode}: {result.stderr}"
+        assert result.returncode == 0, (
+            f"installer exit={result.returncode}: {result.stderr}"
+        )
         assert "WOULD REGISTER" in result.stdout
         assert f"TaskName={task_name}" in result.stdout
         assert "--max-items 999" in result.stdout
@@ -102,10 +141,14 @@ def test_uninstaller_dry_run_does_not_unregister() -> None:
             "-TaskName",
             task_name,
         )
-        assert register_result.returncode == 0, f"pre-register failed: {register_result.stderr}"
+        assert register_result.returncode == 0, (
+            f"pre-register failed: {register_result.stderr}"
+        )
 
         # Dry-run uninstall.
-        uninstall_result = _run_powershell("-File", str(UNINSTALLER), "-TaskName", task_name, "-DryRun")
+        uninstall_result = _run_powershell(
+            "-File", str(UNINSTALLER), "-TaskName", task_name, "-DryRun"
+        )
         assert uninstall_result.returncode == 0
         assert "WOULD UNREGISTER" in uninstall_result.stdout
         assert f"TaskName={task_name}" in uninstall_result.stdout
@@ -241,7 +284,9 @@ def test_installer_preserves_non_targeted_task() -> None:
             f"$t = Get-ScheduledTask -TaskName '{target_name}' -ErrorAction SilentlyContinue; "
             f'Write-Output "$($null -ne $p)|$($null -ne $t)"',
         )
-        assert "True|True" in check.stdout, f"preserve task or target task missing: {check.stdout!r}"
+        assert "True|True" in check.stdout, (
+            f"preserve task or target task missing: {check.stdout!r}"
+        )
     finally:
         _unregister_silent(preserve_name)
         _unregister_silent(target_name)
@@ -273,7 +318,9 @@ def test_installer_task_action_uses_absolute_script_path() -> None:
         lines = probe.stdout.splitlines()
         exec_line = next((line for line in lines if line.startswith("EXEC=")), "")
         args_line = next((line for line in lines if line.startswith("ARGS=")), "")
-        assert exec_line.endswith("pythonw.exe"), f"F4: Execute must be pythonw.exe (got {exec_line!r})"
+        assert exec_line.endswith("pythonw.exe"), (
+            f"F4: Execute must be pythonw.exe (got {exec_line!r})"
+        )
         # Tokenize Arguments respecting quoted segments. First token = script path.
         args_value = args_line[len("ARGS=") :]
         # Drive-anchored absolute path ending in scripts\single_harness_bridge_dispatcher.py.
@@ -288,13 +335,19 @@ def test_installer_task_action_uses_absolute_script_path() -> None:
         )
         # Verify --project-root is separately present.
         assert "--project-root" in args_value, "F3: --project-root flag missing"
-        assert "--max-items 999" in args_value, "regular automation must dispatch the full selected queue"
+        assert "--max-items 999" in args_value, (
+            "regular automation must dispatch the full selected queue"
+        )
     finally:
         _unregister_silent(task_name)
 
 
 @WINDOWS_ONLY
-def test_single_harness_dispatcher_end_to_end_via_scheduled_task(tmp_path: Path) -> None:
+@SCHEDULED_TASK_E2E_ONLY
+@pytest.mark.timeout(120)
+def test_single_harness_dispatcher_end_to_end_via_scheduled_task(
+    tmp_path: Path,
+) -> None:
     """End-to-end validation per F1 of -008 closure:
     scheduled task -> dispatcher -> applicability gate -> signature compute
     -> dispatch-state.json written. Proves the full chain works in an isolated
@@ -337,7 +390,12 @@ def test_single_harness_dispatcher_end_to_end_via_scheduled_task(tmp_path: Path)
         _json.dumps(
             {
                 "schema_version": 1,
-                "harnesses": {"B": {"role": ["prime-builder", "loyal-opposition"], "harness_type": "claude"}},
+                "harnesses": {
+                    "B": {
+                        "role": ["prime-builder", "loyal-opposition"],
+                        "harness_type": "claude",
+                    }
+                },
             }
         ),
         encoding="utf-8",
@@ -366,7 +424,9 @@ def test_single_harness_dispatcher_end_to_end_via_scheduled_task(tmp_path: Path)
 
     # Register the task manually (not via installer.ps1 because installer
     # has its own argument shape; we need --dry-run + scratch project root).
-    dispatcher_path = str(PROJECT_ROOT / "scripts" / "single_harness_bridge_dispatcher.py")
+    dispatcher_path = str(
+        PROJECT_ROOT / "scripts" / "single_harness_bridge_dispatcher.py"
+    )
     pythonw_exe = str(Path(sys.executable).with_name("pythonw.exe"))
     register_cmd = (
         f"$action = New-ScheduledTaskAction -Execute '{pythonw_exe}' "
@@ -383,7 +443,9 @@ def test_single_harness_dispatcher_end_to_end_via_scheduled_task(tmp_path: Path)
         assert register.returncode == 0, f"register failed: {register.stderr}"
 
         # Trigger the task immediately.
-        start = _run_powershell("-Command", f"Start-ScheduledTask -TaskName '{task_name}'")
+        start = _run_powershell(
+            "-Command", f"Start-ScheduledTask -TaskName '{task_name}'"
+        )
         assert start.returncode == 0, f"start failed: {start.stderr}"
 
         # Wait for completion. The dispatcher should run + exit quickly
@@ -410,7 +472,9 @@ def test_single_harness_dispatcher_end_to_end_via_scheduled_task(tmp_path: Path)
         lo_state = recipients["loyal-opposition"]
         # Dry-run path leaves last_result either as the dry_run reason in last_launch
         # or as a dispatched signature update.
-        assert lo_state.get("pending_count", 0) >= 1, f"LO should have had pending work; got {lo_state}"
+        assert lo_state.get("pending_count", 0) >= 1, (
+            f"LO should have had pending work; got {lo_state}"
+        )
 
         # Verify no real subprocess artifacts (no .stdout.log/.stderr.log in dispatch-runs).
         runs_dir = state_dir / "dispatch-runs"
@@ -418,7 +482,9 @@ def test_single_harness_dispatcher_end_to_end_via_scheduled_task(tmp_path: Path)
         # --dry-run it should be absent OR empty.
         if runs_dir.exists():
             run_logs = list(runs_dir.glob("*.log"))
-            assert run_logs == [], f"--dry-run should not produce dispatch-runs/*.log files; found: {run_logs}"
+            assert run_logs == [], (
+                f"--dry-run should not produce dispatch-runs/*.log files; found: {run_logs}"
+            )
     finally:
         _unregister_silent(task_name)
 
@@ -446,7 +512,11 @@ def test_installer_task_action_uses_no_console_settings() -> None:
         lines = probe.stdout.splitlines()
         exec_line = next((line for line in lines if line.startswith("EXEC=")), "")
         hidden_line = next((line for line in lines if line.startswith("HIDDEN=")), "")
-        assert exec_line.endswith("pythonw.exe"), f"F4: Execute must be pythonw.exe (got {exec_line!r})"
-        assert "True" in hidden_line, f"F4: Settings.Hidden must be True (got {hidden_line!r})"
+        assert exec_line.endswith("pythonw.exe"), (
+            f"F4: Execute must be pythonw.exe (got {exec_line!r})"
+        )
+        assert "True" in hidden_line, (
+            f"F4: Settings.Hidden must be True (got {hidden_line!r})"
+        )
     finally:
         _unregister_silent(task_name)

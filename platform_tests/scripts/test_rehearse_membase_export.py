@@ -12,6 +12,7 @@ signals.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import sqlite3
 import sys
@@ -20,9 +21,22 @@ from typing import Any
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
-from rehearse import _membase_export  # noqa: E402
+def _load_rehearse_file(stem: str):
+    path = Path(__file__).resolve().parents[2] / "scripts" / "rehearse" / f"{stem}.py"
+    if not path.is_file():
+        pytest.skip(f"scripts/rehearse/{stem}.py is absent", allow_module_level=True)
+    name = f"wi6583_rehearse_{stem}"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        pytest.skip(f"unable to load {path.as_posix()}", allow_module_level=True)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_membase_export = _load_rehearse_file("_membase_export")
 
 # ---- Fixtures ---------------------------------------------------------
 
@@ -34,14 +48,10 @@ _VERSIONED_TABLE_SCHEMA = "id TEXT, version INTEGER, title TEXT, description TEX
 # Per Codex ``-008`` Finding 1: tests classify by ``test_file`` path.
 # Fixture schema must include the path columns so ``_classify_test_path``
 # is exercised end-to-end.
-_TESTS_TABLE_SCHEMA = (
-    "id TEXT, version INTEGER, title TEXT, description TEXT, test_file TEXT, test_class TEXT, test_function TEXT"
-)
+_TESTS_TABLE_SCHEMA = "id TEXT, version INTEGER, title TEXT, description TEXT, test_file TEXT, test_class TEXT, test_function TEXT"
 # Per Codex ``-008`` Finding 1: deliberations classify by
 # ``origin_project``. Fixture schema includes the origin columns.
-_DELIBERATIONS_TABLE_SCHEMA = (
-    "id TEXT, version INTEGER, title TEXT, description TEXT, origin_project TEXT, origin_repo TEXT"
-)
+_DELIBERATIONS_TABLE_SCHEMA = "id TEXT, version INTEGER, title TEXT, description TEXT, origin_project TEXT, origin_repo TEXT"
 _RELATIONSHIP_DELIB_SPECS_SCHEMA = "deliberation_id TEXT, spec_id TEXT"
 _RELATIONSHIP_DELIB_WIS_SCHEMA = "deliberation_id TEXT, work_item_id TEXT"
 _TELEMETRY_SCHEMA = "id INTEGER PRIMARY KEY, payload TEXT"
@@ -79,10 +89,20 @@ def _create_minimal_live_schema(kb_path: Path) -> sqlite3.Connection:
     ):
         cur.execute(f'CREATE TABLE "{name}" ({_VERSIONED_TABLE_SCHEMA})')
     # Relationship tables (2).
-    cur.execute(f'CREATE TABLE "deliberation_specs" ({_RELATIONSHIP_DELIB_SPECS_SCHEMA})')
-    cur.execute(f'CREATE TABLE "deliberation_work_items" ({_RELATIONSHIP_DELIB_WIS_SCHEMA})')
+    cur.execute(
+        f'CREATE TABLE "deliberation_specs" ({_RELATIONSHIP_DELIB_SPECS_SCHEMA})'
+    )
+    cur.execute(
+        f'CREATE TABLE "deliberation_work_items" ({_RELATIONSHIP_DELIB_WIS_SCHEMA})'
+    )
     # Excluded telemetry tables (5).
-    for name in ("assertion_runs", "pipeline_events", "quality_scores", "test_coverage", "work_intent_claims"):
+    for name in (
+        "assertion_runs",
+        "pipeline_events",
+        "quality_scores",
+        "test_coverage",
+        "work_intent_claims",
+    ):
         cur.execute(f'CREATE TABLE "{name}" ({_TELEMETRY_SCHEMA})')
     # Per-session tables (3).
     cur.execute(f'CREATE TABLE "session_prompts" ({_PER_SESSION_PROMPTS_SCHEMA})')
@@ -113,7 +133,11 @@ def _run_lane(
 
 
 def _read_manifest(output_dir: Path) -> dict[str, Any]:
-    return json.loads((output_dir / "membase_export" / "membase-partition-manifest.json").read_text(encoding="utf-8"))
+    return json.loads(
+        (output_dir / "membase_export" / "membase-partition-manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
 
 
 # ---- Common contract --------------------------------------------------
@@ -145,7 +169,9 @@ def test_run_returns_error_when_kb_path_missing(tmp_path: Path) -> None:
 # ---- Read-only access (proposal §1) -----------------------------------
 
 
-def test_run_opens_kb_via_readonly_uri(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_opens_kb_via_readonly_uri(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Lane opens the KB with mode=ro URI per proposal §1 read-only access."""
     kb_path = _build_kb(tmp_path)
     captured_uris: list[str] = []
@@ -168,7 +194,9 @@ def test_run_opens_kb_via_readonly_uri(tmp_path: Path, monkeypatch: pytest.Monke
 # ---- Schema drift detection (Codex -006 fix 3) ------------------------
 
 
-def test_run_returns_error_when_known_versioned_table_lacks_id_version(tmp_path: Path) -> None:
+def test_run_returns_error_when_known_versioned_table_lacks_id_version(
+    tmp_path: Path,
+) -> None:
     """Per Codex -006 GO + proposal §3 fix 3: known versioned table
     without id+version columns → status='error' with schema_drift warning.
     """
@@ -192,9 +220,18 @@ def test_run_returns_error_when_known_versioned_table_lacks_id_version(tmp_path:
         "testable_elements",
     ):
         cur.execute(f'CREATE TABLE "{name}" ({_VERSIONED_TABLE_SCHEMA})')
-    cur.execute(f'CREATE TABLE "deliberation_specs" ({_RELATIONSHIP_DELIB_SPECS_SCHEMA})')
-    cur.execute(f'CREATE TABLE "deliberation_work_items" ({_RELATIONSHIP_DELIB_WIS_SCHEMA})')
-    for name in ("assertion_runs", "pipeline_events", "quality_scores", "test_coverage"):
+    cur.execute(
+        f'CREATE TABLE "deliberation_specs" ({_RELATIONSHIP_DELIB_SPECS_SCHEMA})'
+    )
+    cur.execute(
+        f'CREATE TABLE "deliberation_work_items" ({_RELATIONSHIP_DELIB_WIS_SCHEMA})'
+    )
+    for name in (
+        "assertion_runs",
+        "pipeline_events",
+        "quality_scores",
+        "test_coverage",
+    ):
         cur.execute(f'CREATE TABLE "{name}" ({_TELEMETRY_SCHEMA})')
     cur.execute(f'CREATE TABLE "session_prompts" ({_PER_SESSION_PROMPTS_SCHEMA})')
     cur.execute(f'CREATE TABLE "session_snapshots" ({_PER_SESSION_SNAPSHOTS_SCHEMA})')
@@ -204,9 +241,9 @@ def test_run_returns_error_when_known_versioned_table_lacks_id_version(tmp_path:
 
     result = _run_lane(kb_path, tmp_path / "output")
     assert result["status"] == "error"
-    assert any("schema_drift" in w and "specifications" in w for w in result["warnings"]), (
-        f"expected schema_drift warning naming specifications; got {result['warnings']}"
-    )
+    assert any(
+        "schema_drift" in w and "specifications" in w for w in result["warnings"]
+    ), f"expected schema_drift warning naming specifications; got {result['warnings']}"
 
 
 # ---- Unknown-table detection (Codex -006 constraint 1) ----------------
@@ -226,7 +263,10 @@ def test_run_returns_error_on_unclassified_table(tmp_path: Path) -> None:
 
     result = _run_lane(kb_path, tmp_path / "output")
     assert result["status"] == "error"
-    assert any("unclassified_table" in w and "experimental_feature_flags" in w for w in result["warnings"]), (
+    assert any(
+        "unclassified_table" in w and "experimental_feature_flags" in w
+        for w in result["warnings"]
+    ), (
         f"expected unclassified_table warning naming experimental_feature_flags; got {result['warnings']}"
     )
 
@@ -256,7 +296,9 @@ def test_run_enumerates_versioned_records_with_versions_array(tmp_path: Path) ->
     result = _run_lane(kb_path, tmp_path / "output")
     assert result["status"] == "ok", result["warnings"]
     payload = _read_manifest(tmp_path / "output")
-    spec_records = [r for r in payload["versioned_records"] if r["table_name"] == "specifications"]
+    spec_records = [
+        r for r in payload["versioned_records"] if r["table_name"] == "specifications"
+    ]
     by_id = {r["id"]: r for r in spec_records}
     assert by_id["SPEC-1834"]["versions"] == [1, 2]
     assert by_id["SPEC-1834"]["version_count"] == 2
@@ -301,7 +343,9 @@ def test_run_classifies_gtkb_prefix_as_framework(tmp_path: Path) -> None:
     assert record["classification_signal"] == "gtkb_prefix"
 
 
-def test_run_classifies_gtkb_with_adopter_content_as_unclassified(tmp_path: Path) -> None:
+def test_run_classifies_gtkb_with_adopter_content_as_unclassified(
+    tmp_path: Path,
+) -> None:
     """GTKB-* with explicit adopter content → unclassified per Slice 5
     F1 + Slice 6 F2: a conflict signal, not enough to auto-classify.
     """
@@ -316,7 +360,9 @@ def test_run_classifies_gtkb_with_adopter_content_as_unclassified(tmp_path: Path
 
     _run_lane(kb_path, tmp_path / "output")
     payload = _read_manifest(tmp_path / "output")
-    record = next(r for r in payload["versioned_records"] if r["id"] == "GTKB-MIGRATE-AGENT-RED")
+    record = next(
+        r for r in payload["versioned_records"] if r["id"] == "GTKB-MIGRATE-AGENT-RED"
+    )
     assert record["classification"] == "unclassified"
     assert record["classification_signal"] == "gtkb_prefix_with_adopter_content"
 
@@ -392,19 +438,29 @@ def test_run_classifies_test_path_transport_as_adopter_named(tmp_path: Path) -> 
     conn = sqlite3.connect(kb_path)
     conn.execute(
         "INSERT INTO tests (id, version, title, description, test_file) VALUES (?, ?, ?, ?, ?)",
-        ("TEST-TRANSPORT", 1, "Transport", "generic", "tests/transport/test_pipeline.py"),
+        (
+            "TEST-TRANSPORT",
+            1,
+            "Transport",
+            "generic",
+            "tests/transport/test_pipeline.py",
+        ),
     )
     conn.commit()
     conn.close()
 
     _run_lane(kb_path, tmp_path / "output")
     payload = _read_manifest(tmp_path / "output")
-    record = next(r for r in payload["versioned_records"] if r["id"] == "TEST-TRANSPORT")
+    record = next(
+        r for r in payload["versioned_records"] if r["id"] == "TEST-TRANSPORT"
+    )
     assert record["classification"] == "adopter"
     assert record["classification_signal"] == "test_path_adopter_named"
 
 
-def test_run_classifies_test_path_admin_scripts_as_adopter_named(tmp_path: Path) -> None:
+def test_run_classifies_test_path_admin_scripts_as_adopter_named(
+    tmp_path: Path,
+) -> None:
     """tests/scripts/test_admin_* → adopter (named)."""
     kb_path = _build_kb(tmp_path)
     conn = sqlite3.connect(kb_path)
@@ -422,7 +478,9 @@ def test_run_classifies_test_path_admin_scripts_as_adopter_named(tmp_path: Path)
     assert record["classification_signal"] == "test_path_adopter_named"
 
 
-def test_run_classifies_test_path_provider_scripts_as_adopter_named(tmp_path: Path) -> None:
+def test_run_classifies_test_path_provider_scripts_as_adopter_named(
+    tmp_path: Path,
+) -> None:
     """tests/scripts/test_provider_* → adopter (named)."""
     kb_path = _build_kb(tmp_path)
     conn = sqlite3.connect(kb_path)
@@ -440,7 +498,9 @@ def test_run_classifies_test_path_provider_scripts_as_adopter_named(tmp_path: Pa
     assert record["classification_signal"] == "test_path_adopter_named"
 
 
-def test_run_classifies_test_path_release_candidate_gate_as_mixed_scope(tmp_path: Path) -> None:
+def test_run_classifies_test_path_release_candidate_gate_as_mixed_scope(
+    tmp_path: Path,
+) -> None:
     """test_release_candidate_gate.py → unclassified mixed_scope_test.
 
     Mixed-scope check must run BEFORE the adopter-product default;
@@ -463,7 +523,9 @@ def test_run_classifies_test_path_release_candidate_gate_as_mixed_scope(tmp_path
     assert record["classification_signal"] == "mixed_scope_test"
 
 
-def test_run_classifies_other_test_path_under_tests_as_adopter_product(tmp_path: Path) -> None:
+def test_run_classifies_other_test_path_under_tests_as_adopter_product(
+    tmp_path: Path,
+) -> None:
     """Any tests/<dir>/ path that is not framework or named → adopter (product default).
 
     Justification: this lane runs against the *adopter* project's KB.
@@ -490,7 +552,9 @@ def test_run_classifies_other_test_path_under_tests_as_adopter_product(tmp_path:
 
     _run_lane(kb_path, tmp_path / "output")
     payload = _read_manifest(tmp_path / "output")
-    prod_records = [r for r in payload["versioned_records"] if r["id"].startswith("TEST-PROD-")]
+    prod_records = [
+        r for r in payload["versioned_records"] if r["id"].startswith("TEST-PROD-")
+    ]
     assert len(prod_records) == 4
     for record in prod_records:
         assert record["classification"] == "adopter"
@@ -537,7 +601,9 @@ def test_run_falls_through_when_test_file_outside_tests_dir(tmp_path: Path) -> N
 # Per Codex `-008` Finding 1 — REVISED-1.
 
 
-def test_run_classifies_deliberation_origin_agent_red_as_adopter(tmp_path: Path) -> None:
+def test_run_classifies_deliberation_origin_agent_red_as_adopter(
+    tmp_path: Path,
+) -> None:
     """deliberations.origin_project='agent-red' → adopter via type-specific signal.
 
     Title/description carry NO scope-bearing content; classification
@@ -567,7 +633,9 @@ def test_run_classifies_deliberation_origin_agent_red_as_adopter(tmp_path: Path)
     assert record["classification_signal"] == "deliberation_origin_project_agent_red"
 
 
-def test_run_classifies_deliberation_origin_groundtruth_kb_as_framework(tmp_path: Path) -> None:
+def test_run_classifies_deliberation_origin_groundtruth_kb_as_framework(
+    tmp_path: Path,
+) -> None:
     """deliberations.origin_project='groundtruth-kb' → framework."""
     kb_path = _build_kb(tmp_path)
     conn = sqlite3.connect(kb_path)
@@ -585,7 +653,9 @@ def test_run_classifies_deliberation_origin_groundtruth_kb_as_framework(tmp_path
     assert record["classification_signal"] == "deliberation_origin_project_framework"
 
 
-def test_run_classifies_deliberation_with_null_origin_falls_through_to_content(tmp_path: Path) -> None:
+def test_run_classifies_deliberation_with_null_origin_falls_through_to_content(
+    tmp_path: Path,
+) -> None:
     """deliberations with NULL origin_project fall through to content scan."""
     kb_path = _build_kb(tmp_path)
     conn = sqlite3.connect(kb_path)
@@ -613,7 +683,9 @@ def test_run_excludes_pipeline_events_with_documented_reason(tmp_path: Path) -> 
     kb_path = _build_kb(tmp_path)
     conn = sqlite3.connect(kb_path)
     for i in range(7):
-        conn.execute("INSERT INTO pipeline_events (payload) VALUES (?)", (f"event-{i}",))
+        conn.execute(
+            "INSERT INTO pipeline_events (payload) VALUES (?)", (f"event-{i}",)
+        )
     conn.commit()
     conn.close()
 
@@ -626,7 +698,9 @@ def test_run_excludes_pipeline_events_with_documented_reason(tmp_path: Path) -> 
     assert excluded["pipeline_events"]["cutover_policy"] == "discard_post_migration"
 
 
-def test_run_excluded_tables_block_includes_all_five_telemetry_tables(tmp_path: Path) -> None:
+def test_run_excluded_tables_block_includes_all_five_telemetry_tables(
+    tmp_path: Path,
+) -> None:
     """All five telemetry tables present in excluded_tables block."""
     kb_path = _build_kb(tmp_path)
     _run_lane(kb_path, tmp_path / "output")
@@ -684,7 +758,11 @@ def test_run_classifies_relationship_row_by_parent_deliberation(tmp_path: Path) 
 
     _run_lane(kb_path, tmp_path / "output")
     payload = _read_manifest(tmp_path / "output")
-    rel_records = [r for r in payload["relationship_records"] if r["table_name"] == "deliberation_specs"]
+    rel_records = [
+        r
+        for r in payload["relationship_records"]
+        if r["table_name"] == "deliberation_specs"
+    ]
     assert len(rel_records) == 1
     record = rel_records[0]
     assert record["deliberation_id"] == "DELIB-S313-001"
@@ -708,12 +786,17 @@ def test_run_warns_on_orphan_relationship_row(tmp_path: Path) -> None:
 
     result = _run_lane(kb_path, tmp_path / "output")
     assert result["status"] == "ok"
-    assert any("orphan_relationship_row" in w and "DELIB-MISSING-PARENT" in w for w in result["warnings"]), (
-        f"expected orphan_relationship_row warning; got {result['warnings']}"
-    )
+    assert any(
+        "orphan_relationship_row" in w and "DELIB-MISSING-PARENT" in w
+        for w in result["warnings"]
+    ), f"expected orphan_relationship_row warning; got {result['warnings']}"
 
     payload = _read_manifest(tmp_path / "output")
-    record = next(r for r in payload["relationship_records"] if r["deliberation_id"] == "DELIB-MISSING-PARENT")
+    record = next(
+        r
+        for r in payload["relationship_records"]
+        if r["deliberation_id"] == "DELIB-MISSING-PARENT"
+    )
     assert record["classification"] == "unclassified"
     assert record["classification_signal"] == "orphan_parent_deliberation_missing"
 
@@ -721,7 +804,9 @@ def test_run_warns_on_orphan_relationship_row(tmp_path: Path) -> None:
 # ---- Per-session classification (Codex -006 constraint 4) -------------
 
 
-def test_run_classifies_per_session_row_with_s_n_session_id_as_adopter(tmp_path: Path) -> None:
+def test_run_classifies_per_session_row_with_s_n_session_id_as_adopter(
+    tmp_path: Path,
+) -> None:
     """S{N} pattern → adopter per CLAUDE.md session convention."""
     kb_path = _build_kb(tmp_path)
     conn = sqlite3.connect(kb_path)
@@ -734,9 +819,13 @@ def test_run_classifies_per_session_row_with_s_n_session_id_as_adopter(tmp_path:
 
     _run_lane(kb_path, tmp_path / "output")
     payload = _read_manifest(tmp_path / "output")
-    record = next(r for r in payload["per_session_records"] if r["session_id"] == "S313")
+    record = next(
+        r for r in payload["per_session_records"] if r["session_id"] == "S313"
+    )
     assert record["classification"] == "adopter"
-    assert record["classification_signal"] == "session_owned_by_adopter_per_s_n_convention"
+    assert (
+        record["classification_signal"] == "session_owned_by_adopter_per_s_n_convention"
+    )
 
 
 def test_run_classifies_per_session_row_with_unrecognized_session_id_as_unclassified(
@@ -756,7 +845,9 @@ def test_run_classifies_per_session_row_with_unrecognized_session_id_as_unclassi
 
     _run_lane(kb_path, tmp_path / "output")
     payload = _read_manifest(tmp_path / "output")
-    record = next(r for r in payload["per_session_records"] if r["session_id"] == "unknown-format")
+    record = next(
+        r for r in payload["per_session_records"] if r["session_id"] == "unknown-format"
+    )
     assert record["classification"] == "unclassified"
     assert "ownership_undetermined" in record["classification_signal"]
 
@@ -777,7 +868,9 @@ def test_run_classifies_per_session_row_with_empty_session_id_as_unclassified(
     _run_lane(kb_path, tmp_path / "output")
     payload = _read_manifest(tmp_path / "output")
     record = next(
-        r for r in payload["per_session_records"] if r["table_name"] == "session_prompts" and not r["session_id"]
+        r
+        for r in payload["per_session_records"]
+        if r["table_name"] == "session_prompts" and not r["session_id"]
     )
     assert record["classification"] == "unclassified"
     assert "ownership_undetermined" in record["classification_signal"]
@@ -820,7 +913,9 @@ def test_run_emits_version_preservation_evidence(tmp_path: Path) -> None:
 def test_run_writes_partition_manifest_json(tmp_path: Path) -> None:
     kb_path = _build_kb(tmp_path)
     _run_lane(kb_path, tmp_path / "output")
-    json_path = tmp_path / "output" / "membase_export" / "membase-partition-manifest.json"
+    json_path = (
+        tmp_path / "output" / "membase_export" / "membase-partition-manifest.json"
+    )
     assert json_path.exists()
     payload = json.loads(json_path.read_text(encoding="utf-8"))
     assert payload["schema_version"] == 1
@@ -833,7 +928,9 @@ def test_run_writes_partition_manifest_json(tmp_path: Path) -> None:
 def test_run_writes_preview_markdown_with_all_sections(tmp_path: Path) -> None:
     kb_path = _build_kb(tmp_path)
     _run_lane(kb_path, tmp_path / "output")
-    md_path = tmp_path / "output" / "membase_export" / "membase-partition-manifest-preview.md"
+    md_path = (
+        tmp_path / "output" / "membase_export" / "membase-partition-manifest-preview.md"
+    )
     assert md_path.exists()
     content = md_path.read_text(encoding="utf-8")
     assert "# MemBase Partition Manifest" in content

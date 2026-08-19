@@ -60,7 +60,9 @@ VALID_ENFORCEMENT_MODES = {"blocking", "advisory"}
 
 
 def _load_module():
-    spec = importlib.util.spec_from_file_location("adr_dcl_clause_preflight", SCRIPT_PATH)
+    spec = importlib.util.spec_from_file_location(
+        "adr_dcl_clause_preflight", SCRIPT_PATH
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules["adr_dcl_clause_preflight"] = module
@@ -73,7 +75,9 @@ def preflight():
     return _load_module()
 
 
-def _stage_bridge(tmp_path: Path, bridge_id: str, content: str) -> tuple[Path, Path, Path]:
+def _stage_bridge(
+    tmp_path: Path, bridge_id: str, content: str
+) -> tuple[Path, Path, Path]:
     """Stage a strict-valid single-version bridge fixture.
 
     WI-5626 makes bridge-id mode consume the shared WI-5629 lifecycle
@@ -117,11 +121,15 @@ def test_schema_parses_with_five_fixtures(preflight):
         "GOV-STANDING-BACKLOG-001",
     }
     actual_spec_ids = {c.spec_id for c in clauses}
-    assert actual_spec_ids == required_spec_ids, f"spec_id set mismatch: {actual_spec_ids} != {required_spec_ids}"
+    assert actual_spec_ids == required_spec_ids, (
+        f"spec_id set mismatch: {actual_spec_ids} != {required_spec_ids}"
+    )
     for c in clauses:
         assert c.clause_id, f"missing clause_id on {c}"
         assert c.description, f"missing description on {c.clause_id}"
-        assert c.severity in ("blocking", "advisory"), f"invalid severity on {c.clause_id}"
+        assert c.severity in ("blocking", "advisory"), (
+            f"invalid severity on {c.clause_id}"
+        )
         assert c.enforcement_mode in VALID_ENFORCEMENT_MODES, (
             f"clause {c.clause_id} has invalid enforcement_mode={c.enforcement_mode!r}; "
             f"expected one of {VALID_ENFORCEMENT_MODES}"
@@ -136,13 +144,17 @@ def test_applicability_discovery_true_positive(preflight, tmp_path):
         "- ADR-ISOLATION-APPLICATION-PLACEMENT-001\n\n"
         "All artifacts must be in-root under E:\\GT-KB per the project root boundary.\n"
     )
-    bridge_file, index, bridge_dir = _stage_bridge(tmp_path, "test-true-positive", content)
+    bridge_file, index, bridge_dir = _stage_bridge(
+        tmp_path, "test-true-positive", content
+    )
     clauses = preflight.load_clauses(CLAUSES_CONFIG)
     in_root_clause = next(c for c in clauses if "CLAUSE-IN-ROOT" in c.clause_id)
     applicability, reasons = preflight.evaluate_applicability(
         in_root_clause, content, "test-true-positive", [f"bridge/{bridge_file.name}"]
     )
-    assert applicability == "must_apply", f"expected must_apply; got {applicability}; reasons: {reasons}"
+    assert applicability == "must_apply", (
+        f"expected must_apply; got {applicability}; reasons: {reasons}"
+    )
 
 
 def test_applicability_discovery_true_negative(preflight, tmp_path):
@@ -174,20 +186,24 @@ def test_evidence_detection_true_positive(preflight):
     clauses = preflight.load_clauses(CLAUSES_CONFIG)
     in_root_clause = next(c for c in clauses if "CLAUSE-IN-ROOT" in c.clause_id)
     found, reasons, gap = preflight.evaluate_evidence(in_root_clause, content)
-    assert found is True, f"expected evidence_found=True; got False; reasons: {reasons}; gap: {gap}"
+    assert found is True, (
+        f"expected evidence_found=True; got False; reasons: {reasons}; gap: {gap}"
+    )
     assert gap is None
 
 
 def test_evidence_detection_true_negative_with_gap_summary(preflight):
     """True negative: bridge references an out-of-root path → evidence_found=False with gap summary."""
-    content = (
-        "## Files Changed\n\n- C:\\Users\\example\\foo.py (new)\nOutputs go to a sandbox path: out-of-root location.\n"
-    )
+    content = "## Files Changed\n\n- C:\\Users\\example\\foo.py (new)\nOutputs go to a sandbox path: out-of-root location.\n"
     clauses = preflight.load_clauses(CLAUSES_CONFIG)
     in_root_clause = next(c for c in clauses if "CLAUSE-IN-ROOT" in c.clause_id)
     found, reasons, gap = preflight.evaluate_evidence(in_root_clause, content)
-    assert found is False, f"expected evidence_found=False; got {found}; reasons: {reasons}"
-    assert gap is not None and len(gap) > 0, f"expected non-empty gap_summary; got {gap}"
+    assert found is False, (
+        f"expected evidence_found=False; got {found}; reasons: {reasons}"
+    )
+    assert gap is not None and len(gap) > 0, (
+        f"expected non-empty gap_summary; got {gap}"
+    )
 
 
 def test_evidence_gap_summary_includes_satisfying_pattern(preflight):
@@ -199,7 +215,9 @@ def test_evidence_gap_summary_includes_satisfying_pattern(preflight):
         "This proposal discusses dispatcher state but omits the satisfying bridge-file phrasing.\n"
     )
     clauses = preflight.load_clauses(CLAUSES_CONFIG)
-    numbered_chain_clause = next(c for c in clauses if "CLAUSE-NUMBERED-FILE-CHAIN" in c.clause_id)
+    numbered_chain_clause = next(
+        c for c in clauses if "CLAUSE-NUMBERED-FILE-CHAIN" in c.clause_id
+    )
     found, _reasons, gap = preflight.evaluate_evidence(numbered_chain_clause, content)
     assert found is False
     assert gap is not None
@@ -310,7 +328,9 @@ def test_blocking_evidence_gap_exits_nonzero(preflight, tmp_path):
         f"Slice 2 mandatory gate: CLI must exit {preflight.EXIT_BLOCKING_GAP} on blocking gap; got {rc}"
     )
     report = out.read_text(encoding="utf-8")
-    assert "Blocking Gaps" in report, "Slice 2 report must include the Blocking Gaps subsection on gate failure"
+    assert "Blocking Gaps" in report, (
+        "Slice 2 report must include the Blocking Gaps subsection on gate failure"
+    )
     in_root_clause = next(
         c
         for c in preflight.load_clauses(CLAUSES_CONFIG)
@@ -348,7 +368,9 @@ def test_blocking_gap_report_surfaces_satisfying_evidence_pattern(preflight, tmp
     assert rc == preflight.EXIT_BLOCKING_GAP
     report = out.read_text(encoding="utf-8")
     numbered_chain_clause = next(
-        c for c in preflight.load_clauses(CLAUSES_CONFIG) if "CLAUSE-NUMBERED-FILE-CHAIN" in c.clause_id
+        c
+        for c in preflight.load_clauses(CLAUSES_CONFIG)
+        if "CLAUSE-NUMBERED-FILE-CHAIN" in c.clause_id
     )
     assert "Evidence pattern:" in report
     assert numbered_chain_clause.evidence_pattern in report
@@ -383,7 +405,9 @@ def test_blocking_evidence_present_exits_zero(preflight, tmp_path):
             str(out),
         ]
     )
-    assert rc == 0, f"Slice 2 mandatory gate: CLI must exit 0 when evidence is present; got {rc}"
+    assert rc == 0, (
+        f"Slice 2 mandatory gate: CLI must exit 0 when evidence is present; got {rc}"
+    )
 
 
 def test_report_only_flag_does_not_change_exit_code(preflight, tmp_path):
@@ -450,7 +474,9 @@ def test_report_only_emits_non_authorization_banner(preflight, tmp_path):
     )
     assert rc == 0, f"clean-evidence + --report-only must exit 0; got {rc}"
     report = out.read_text(encoding="utf-8")
-    assert "DIAGNOSTIC ONLY" in report, "--report-only output must include the non-authorization banner"
+    assert "DIAGNOSTIC ONLY" in report, (
+        "--report-only output must include the non-authorization banner"
+    )
     assert "CANNOT satisfy GO/VERIFIED" in report
     assert "Owner waiver:" in report  # The banner advertises the bypass mechanism.
 
@@ -483,7 +509,9 @@ def test_missing_operative_file_fails_closed(preflight, tmp_path):
     # WI-5626: bridge-id mode consumes the shared lifecycle resolver, so a
     # missing thread fails closed via the resolver rather than the legacy
     # "not found" scan path. Both are fail-closed (exit 5).
-    assert ("Operative file: (not found" in report) or ("lifecycle resolution failed" in report)
+    assert ("Operative file: (not found" in report) or (
+        "lifecycle resolution failed" in report
+    )
     assert "gate fails closed" in report
 
 
@@ -540,10 +568,14 @@ def test_explicit_owner_waiver_clears_blocking_gap(preflight, tmp_path):
             str(out),
         ]
     )
-    assert rc == 0, f"explicit owner-waiver line for the offending clause must clear the blocking gap; got exit {rc}"
+    assert rc == 0, (
+        f"explicit owner-waiver line for the offending clause must clear the blocking gap; got exit {rc}"
+    )
 
 
-def test_content_file_mode_matches_indexed_mode_for_equivalent_content(preflight, tmp_path):
+def test_content_file_mode_matches_indexed_mode_for_equivalent_content(
+    preflight, tmp_path
+):
     """Candidate-content mode should evaluate the same content without requiring
     the bridge file to be live in INDEX first."""
     bridge_id = "test-content-file-pass"
@@ -630,7 +662,9 @@ def test_content_file_mode_reports_blocking_gap_before_index_entry(preflight, tm
     assert f"Operative file: `{candidate}" in report or "candidate-gap.md" in report
 
 
-def test_content_file_mode_derives_bridge_id_from_document_metadata(preflight, tmp_path):
+def test_content_file_mode_derives_bridge_id_from_document_metadata(
+    preflight, tmp_path
+):
     """Content-file mode should not require a placeholder --bridge-id when the
     candidate draft carries bridge Document metadata.
     """
@@ -760,9 +794,14 @@ def test_clause_work_item_phrase_is_advisory(preflight):
         "This proposal updates exactly one work item and performs no sweeping change.\n"
     )
     clauses = preflight.load_clauses(CLAUSES_CONFIG)
-    bulk_ops_clause = next(c for c in clauses if "CLAUSE-VISIBILITY-BULK-OPS" in c.clause_id)
+    bulk_ops_clause = next(
+        c for c in clauses if "CLAUSE-VISIBILITY-BULK-OPS" in c.clause_id
+    )
     applicability, reasons = preflight.evaluate_applicability(
-        bulk_ops_clause, content, "test-work-item-phrase", ["bridge/test-work-item-phrase-001.md"]
+        bulk_ops_clause,
+        content,
+        "test-work-item-phrase",
+        ["bridge/test-work-item-phrase-001.md"],
     )
     assert applicability != "must_apply", (
         f"the bare phrase 'work item' must not force must_apply; got {applicability}; reasons: {reasons}"
@@ -782,9 +821,14 @@ def test_clause_genuine_bulk_op_still_must_apply(preflight):
         "This proposal performs a bulk transition across the standing backlog.\n"
     )
     clauses = preflight.load_clauses(CLAUSES_CONFIG)
-    bulk_ops_clause = next(c for c in clauses if "CLAUSE-VISIBILITY-BULK-OPS" in c.clause_id)
+    bulk_ops_clause = next(
+        c for c in clauses if "CLAUSE-VISIBILITY-BULK-OPS" in c.clause_id
+    )
     applicability, reasons = preflight.evaluate_applicability(
-        bulk_ops_clause, content, "test-genuine-bulk-op", ["bridge/test-genuine-bulk-op-001.md"]
+        bulk_ops_clause,
+        content,
+        "test-genuine-bulk-op",
+        ["bridge/test-genuine-bulk-op-001.md"],
     )
     assert applicability == "must_apply", (
         f"a genuine bulk standing-backlog operation must still yield must_apply; "
@@ -844,7 +888,9 @@ def test_clause_in_root_still_flags_out_of_root_path(preflight):
         f"standalone out-of-root /tmp/ path must still refute CLAUSE-IN-ROOT evidence; "
         f"got found={found}; reasons={reasons}"
     )
-    assert gap is not None and len(gap) > 0, f"expected non-empty gap_summary; got {gap}"
+    assert gap is not None and len(gap) > 0, (
+        f"expected non-empty gap_summary; got {gap}"
+    )
 
 
 def test_wi5626_bridge_id_mode_consumes_lifecycle_resolver(preflight, tmp_path):
@@ -858,7 +904,9 @@ def test_wi5626_bridge_id_mode_consumes_lifecycle_resolver(preflight, tmp_path):
         "- ADR-ISOLATION-APPLICATION-PLACEMENT-001 \u2014 in-root boundary\n\n"
         "Implementation stays inside the project root.\n"
     )
-    _bridge_file, index, bridge_dir = _stage_bridge(tmp_path, "test-resolver-consumer", content)
+    _bridge_file, index, bridge_dir = _stage_bridge(
+        tmp_path, "test-resolver-consumer", content
+    )
     out = tmp_path / "report.md"
     rc = preflight.main(
         [
@@ -920,3 +968,289 @@ def test_wi5626_malformed_history_fails_closed(preflight, tmp_path):
     report = out.read_text(encoding="utf-8")
     assert "lifecycle resolution failed" in report
     assert rc == preflight.EXIT_CANNOT_EVALUATE  # keep rc referenced for lint
+
+
+# WI-5577 / TEST-11624: spec-to-test clause applicability is document-type
+# anchored (first-line VERIFIED or bridge_kind implementation_report), not
+# incidental prose. Other registered clauses keep their current triggers.
+
+
+_SPEC_TO_TEST_ID = (
+    "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001/CLAUSE-SPEC-TO-TEST-MAPPING"
+)
+_REGISTERED_CLAUSE_IDS = {
+    "ADR-ISOLATION-APPLICATION-PLACEMENT-001/CLAUSE-IN-ROOT",
+    "GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-NUMBERED-FILE-CHAIN-IS-CANONICAL",
+    "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001/CLAUSE-CONCRETE-LINKS",
+    _SPEC_TO_TEST_ID,
+    "GOV-STANDING-BACKLOG-001/CLAUSE-VISIBILITY-BULK-OPS",
+}
+
+
+def _spec_to_test_clause(preflight):
+    return next(
+        c
+        for c in preflight.load_clauses(CLAUSES_CONFIG)
+        if c.clause_id == _SPEC_TO_TEST_ID
+    )
+
+
+def _wi5577_incidental_body(status: str) -> str:
+    return (
+        f"{status}\n"
+        "::init gtkb pb\n"
+        "::open build\n"
+        "bridge_kind: implementation_proposal\n"
+        "\n"
+        "# Review\n\n"
+        "This GO mentions a later VERIFIED outcome and cites "
+        "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001. It is not a "
+        "verification artifact. An implementation report is out of scope here.\n"
+    )
+
+
+@pytest.mark.parametrize("status", ["GO", "NO-GO", "NO-ACTION"])
+def test_wi5577_incidental_verified_prose_is_not_must_apply(preflight, status):
+    """TEST-11624 negative: GO/NO-GO/NO-ACTION incidental VERIFIED prose is not must_apply."""
+    content = _wi5577_incidental_body(status)
+    clause = _spec_to_test_clause(preflight)
+    applicability, reasons = preflight.evaluate_applicability(
+        clause,
+        content,
+        f"test-wi5577-{status.lower()}",
+        [f"bridge/test-wi5577-{status.lower()}-001.md"],
+    )
+    assert applicability != "must_apply", (
+        f"{status} incidental VERIFIED/spec-id prose must not make spec-to-test "
+        f"must_apply; got {applicability}; reasons: {reasons}"
+    )
+
+
+def test_wi5577_implementation_report_is_must_apply(preflight):
+    """TEST-11624 positive: NEW bridge_kind implementation_report is must_apply."""
+    content = (
+        "NEW\n"
+        "::init gtkb lo\n"
+        "bridge_kind: implementation_report\n"
+        "Document: test-wi5577-impl-report\n"
+        "Version: 001\n"
+        "\n"
+        "# Implementation Report\n"
+    )
+    clause = _spec_to_test_clause(preflight)
+    applicability, reasons = preflight.evaluate_applicability(
+        clause,
+        content,
+        "test-wi5577-impl-report",
+        ["bridge/test-wi5577-impl-report-001.md"],
+    )
+    assert applicability == "must_apply", (
+        f"implementation_report must remain must_apply; got {applicability}; reasons: {reasons}"
+    )
+
+
+def test_wi5577_first_line_verified_is_must_apply(preflight):
+    """TEST-11624 positive: first-line VERIFIED is must_apply."""
+    content = (
+        "VERIFIED\n"
+        "::init gtkb pb\n"
+        "bridge_kind: lo_verdict\n"
+        "Document: test-wi5577-verified\n"
+        "Version: 001\n"
+        "\n"
+        "# Verification\n"
+    )
+    clause = _spec_to_test_clause(preflight)
+    applicability, reasons = preflight.evaluate_applicability(
+        clause,
+        content,
+        "test-wi5577-verified",
+        ["bridge/test-wi5577-verified-001.md"],
+    )
+    assert applicability == "must_apply", (
+        f"first-line VERIFIED must remain must_apply; got {applicability}; reasons: {reasons}"
+    )
+
+
+def test_wi5577_verification_artifact_fails_closed_without_mapped_evidence(preflight):
+    """TEST-11624: verification artifacts fail closed without mapped command/result evidence."""
+    clause = _spec_to_test_clause(preflight)
+    content = "VERIFIED\nbridge_kind: implementation_report\n\nNo specification-derived mapping and no executed command.\n"
+    found, reasons, gap = preflight.evaluate_evidence(clause, content)
+    assert found is False, (
+        f"expected evidence_found=False; got {found}; reasons: {reasons}"
+    )
+    assert gap is not None and len(gap) > 0
+
+
+def test_wi5577_verification_artifact_passes_with_mapped_evidence(preflight):
+    """TEST-11624: verification artifacts pass when mapped command/result evidence is present."""
+    clause = _spec_to_test_clause(preflight)
+    content = (
+        "VERIFIED\n"
+        "bridge_kind: implementation_report\n"
+        "\n"
+        "## Specification-Derived Verification\n\n"
+        "python -m pytest platform_tests/scripts/test_adr_dcl_clause_preflight.py -q --tb=short\n"
+        "25 passed\n"
+    )
+    found, reasons, gap = preflight.evaluate_evidence(clause, content)
+    assert found is True, (
+        f"expected evidence_found=True; got {found}; reasons: {reasons}; gap: {gap}"
+    )
+    assert gap is None
+
+
+def _stage_wi5577_status_bridge(
+    tmp_path: Path, bridge_id: str, content: str
+) -> tuple[Path, Path, Path]:
+    """Stage a status-first verification fixture without rewriting it to NEW."""
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    bridge_file = bridge_dir / f"{bridge_id}-001.md"
+    header = (
+        f"author_identity: loyal-opposition/test\n"
+        f"author_harness_id: T\n"
+        f"author_session_context_id: T-test-fixture\n"
+        f"Document: {bridge_id}\n"
+        "Version: 001\n"
+        "\n"
+    )
+    # Keep the caller-supplied first-line status / bridge_kind intact.
+    if (
+        content.startswith("VERIFIED")
+        or "bridge_kind: implementation_report" in content
+    ):
+        bridge_file.write_text(
+            content if "author_identity:" in content else content + header,
+            encoding="utf-8",
+        )
+    else:
+        bridge_file.write_text(content + header, encoding="utf-8")
+    index = bridge_dir / "INDEX.md"
+    index.write_text(
+        f"# Bridge Index\n\nDocument: {bridge_id}\nNEW: bridge/{bridge_id}-001.md\n",
+        encoding="utf-8",
+    )
+    return bridge_file, index, bridge_dir
+
+
+def test_wi5577_cli_implementation_report_fails_closed_without_evidence(
+    preflight, tmp_path
+):
+    """TEST-11624 CLI: implementation_report without mapped evidence exits 5."""
+    bridge_id = "test-wi5577-report-gap"
+    content = (
+        "NEW\n"
+        "::init gtkb lo\n"
+        "author_identity: prime-builder/test\n"
+        "author_harness_id: T\n"
+        "author_session_context_id: T-test-fixture\n"
+        "Document: test-wi5577-report-gap\n"
+        "Version: 001\n"
+        "bridge_kind: implementation_report\n"
+        "\n"
+        "# Implementation Report\n\n"
+        "No mapped tests.\n"
+    )
+    _bridge_file, index, bridge_dir = _stage_wi5577_status_bridge(
+        tmp_path, bridge_id, content
+    )
+    out = tmp_path / "report.md"
+    rc = preflight.main(
+        [
+            "--bridge-id",
+            bridge_id,
+            "--clauses-config",
+            str(CLAUSES_CONFIG),
+            "--bridge-dir",
+            str(bridge_dir),
+            "--index",
+            str(index),
+            "--out",
+            str(out),
+        ]
+    )
+    assert rc == preflight.EXIT_BLOCKING_GAP, (
+        f"implementation_report without mapped evidence must exit 5; got {rc}"
+    )
+
+
+def test_wi5577_cli_verified_passes_with_mapped_evidence(preflight, tmp_path):
+    """TEST-11624 CLI: implementation_report with mapped evidence exits 0."""
+    bridge_id = "test-wi5577-verified-pass"
+    content = (
+        "NEW\n"
+        "::init gtkb lo\n"
+        "author_identity: prime-builder/test\n"
+        "author_harness_id: T\n"
+        "author_session_context_id: T-test-fixture\n"
+        "Document: test-wi5577-verified-pass\n"
+        "Version: 001\n"
+        "bridge_kind: implementation_report\n"
+        "\n"
+        "## Specification-Derived Verification\n\n"
+        "python -m pytest platform_tests/scripts/test_adr_dcl_clause_preflight.py -q --tb=short\n"
+        "PASS\n"
+    )
+    _bridge_file, index, bridge_dir = _stage_wi5577_status_bridge(
+        tmp_path, bridge_id, content
+    )
+    out = tmp_path / "report.md"
+    rc = preflight.main(
+        [
+            "--bridge-id",
+            bridge_id,
+            "--clauses-config",
+            str(CLAUSES_CONFIG),
+            "--bridge-dir",
+            str(bridge_dir),
+            "--index",
+            str(index),
+            "--out",
+            str(out),
+        ]
+    )
+    assert rc == 0, f"implementation_report with mapped evidence must exit 0; got {rc}"
+
+
+def test_wi5577_other_registered_clauses_retain_behavior(preflight):
+    """TEST-11624: the other four registered clauses keep current applicability."""
+    clauses = preflight.load_clauses(CLAUSES_CONFIG)
+    assert {c.clause_id for c in clauses} == _REGISTERED_CLAUSE_IDS
+    spec_to_test = _spec_to_test_clause(preflight)
+    assert list(spec_to_test.applies_when_content) == [
+        r"(?ims)(?:\A\s*VERIFIED\b|^bridge_kind:\s*implementation_report\b)"
+    ]
+    in_root = next(c for c in clauses if "CLAUSE-IN-ROOT" in c.clause_id)
+    applicability, reasons = preflight.evaluate_applicability(
+        in_root,
+        "All artifacts must be in-root under E:\\GT-KB per the project root boundary.\n",
+        "test-wi5577-in-root",
+        ["bridge/test-wi5577-in-root-001.md"],
+    )
+    assert applicability == "must_apply", reasons
+    numbered = next(c for c in clauses if "CLAUSE-NUMBERED-FILE-CHAIN" in c.clause_id)
+    applicability, reasons = preflight.evaluate_applicability(
+        numbered,
+        "Dispatcher/TAFE state plus numbered bridge files remain canonical.\n",
+        "test-wi5577-chain",
+        ["bridge/test-wi5577-chain-001.md"],
+    )
+    assert applicability == "must_apply", reasons
+    links = next(c for c in clauses if "CLAUSE-CONCRETE-LINKS" in c.clause_id)
+    applicability, reasons = preflight.evaluate_applicability(
+        links,
+        "## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n",
+        "test-wi5577-links",
+        ["bridge/test-wi5577-links-001.md"],
+    )
+    assert applicability == "must_apply", reasons
+    bulk = next(c for c in clauses if "CLAUSE-VISIBILITY-BULK-OPS" in c.clause_id)
+    applicability, reasons = preflight.evaluate_applicability(
+        bulk,
+        "This proposal performs a bulk transition across the standing backlog.\n",
+        "test-wi5577-bulk",
+        ["bridge/test-wi5577-bulk-001.md"],
+    )
+    assert applicability == "must_apply", reasons

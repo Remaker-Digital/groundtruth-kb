@@ -25,6 +25,7 @@ sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 
 from groundtruth_kb.cli import main  # noqa: E402
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
+from groundtruth_kb.session.attestation import bind_exact_init  # noqa: E402
 
 SEED_DELIB_ID = "DELIB-WI4357-TEST-DESIGN"
 SEED_PAUTH_ID = "PAUTH-PROJECT-TEST-BACKLOG-TEXT-EDIT-WI-IMPROVEMENT"
@@ -32,8 +33,8 @@ _TEST_SESSION_ID = "backlog-update-title-desc-test"
 
 
 @pytest.fixture(autouse=True)
-def document_actor(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Ensure command tests have explicit session-document authority only."""
+def exact_actor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure command tests select the exact-init actor fixture."""
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
     for name in (
         "GTKB_BRIDGE_POLLER_RUN_ID",
@@ -48,29 +49,23 @@ def document_actor(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GTKB_SESSION_ID", _TEST_SESSION_ID)
 
 
-def _write_worker_document(project_dir: Path) -> None:
-    path = project_dir / "harness-state" / "claude" / "session-envelopes" / f"{_TEST_SESSION_ID}.json"
+def _seed_exact_actor(project_dir: Path) -> None:
+    path = project_dir / "harness-state" / "harness-identities.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(
             {
-                "status": "open",
-                "session_id": _TEST_SESSION_ID,
-                "harness_id": "B",
-                "harness_name": "claude",
-                "worker_role_provenance": {
-                    "schema_version": 1,
-                    "session_id": _TEST_SESSION_ID,
-                    "harness_id": "B",
-                    "harness_name": "claude",
-                    "role": "prime-builder",
-                    "role_resolution_source": "transcript_init_keyword",
-                    "dispatch_run_id": None,
-                    "issued_at": "2026-07-10T18:00:00Z",
-                },
+                "schema_version": 1,
+                "harnesses": {"claude": {"id": "B"}},
             }
         ),
         encoding="utf-8",
+    )
+    bind_exact_init(
+        project_dir / "groundtruth.db",
+        invoking_context=_TEST_SESSION_ID,
+        init_command="::init gtkb pb",
+        issuer="test-fixture",
     )
 
 
@@ -83,7 +78,7 @@ def _project(tmp_path: Path) -> tuple[Path, Path]:
         '[groundtruth]\ndb_path = "./groundtruth.db"\nproject_root = "."\n',
         encoding="utf-8",
     )
-    _write_worker_document(root)
+    _seed_exact_actor(root)
 
     db = KnowledgeDB(db_path=root / "groundtruth.db")
     try:
@@ -191,21 +186,27 @@ def _config_args(config: Path) -> list[str]:
 
 def _current_title(db_path: Path, wi_id: str) -> str:
     with sqlite3.connect(db_path) as conn:
-        row = conn.execute("SELECT title FROM current_work_items WHERE id = ?", (wi_id,)).fetchone()
+        row = conn.execute(
+            "SELECT title FROM current_work_items WHERE id = ?", (wi_id,)
+        ).fetchone()
     assert row is not None, f"WI {wi_id} missing"
     return str(row[0])
 
 
 def _current_description(db_path: Path, wi_id: str) -> str | None:
     with sqlite3.connect(db_path) as conn:
-        row = conn.execute("SELECT description FROM current_work_items WHERE id = ?", (wi_id,)).fetchone()
+        row = conn.execute(
+            "SELECT description FROM current_work_items WHERE id = ?", (wi_id,)
+        ).fetchone()
     assert row is not None
     return None if row[0] is None else str(row[0])
 
 
 def _version_count(db_path: Path, wi_id: str) -> int:
     with sqlite3.connect(db_path) as conn:
-        row = conn.execute("SELECT COUNT(*) FROM work_items WHERE id = ?", (wi_id,)).fetchone()
+        row = conn.execute(
+            "SELECT COUNT(*) FROM work_items WHERE id = ?", (wi_id,)
+        ).fetchone()
     return int(row[0])
 
 
@@ -232,7 +233,10 @@ def test_gate_rejects_without_evidence(tmp_path: Path) -> None:
     assert "without text-edit authorization" in result.output
     # Verify no new version was persisted.
     assert _version_count(root / "groundtruth.db", "WI-IMPROVEMENT") == 1
-    assert _current_title(root / "groundtruth.db", "WI-IMPROVEMENT") == "Improvement work item"
+    assert (
+        _current_title(root / "groundtruth.db", "WI-IMPROVEMENT")
+        == "Improvement work item"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +260,10 @@ def test_owner_approved_admits_title_edit(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    assert _current_title(root / "groundtruth.db", "WI-IMPROVEMENT") == "Owner-approved new title"
+    assert (
+        _current_title(root / "groundtruth.db", "WI-IMPROVEMENT")
+        == "Owner-approved new title"
+    )
     assert _version_count(root / "groundtruth.db", "WI-IMPROVEMENT") == 2
 
 
@@ -280,7 +287,10 @@ def test_pauth_citation_admits_description_edit(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    assert _current_description(root / "groundtruth.db", "WI-IMPROVEMENT") == "New description authorized by PAUTH"
+    assert (
+        _current_description(root / "groundtruth.db", "WI-IMPROVEMENT")
+        == "New description authorized by PAUTH"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -303,7 +313,10 @@ def test_delib_citation_admits_text_edit(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    assert _current_title(root / "groundtruth.db", "WI-IMPROVEMENT") == "Title authorized by DELIB"
+    assert (
+        _current_title(root / "groundtruth.db", "WI-IMPROVEMENT")
+        == "Title authorized by DELIB"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -334,7 +347,9 @@ def test_nonexistent_delib_citation_rejected(tmp_path: Path) -> None:
 # T6: bridge_authorized approval_state is ignored for text-edit authority.
 # Spec: PROJECT-GTKB-OBSOLETE-REFERENCE-PURGE / WI-4936.
 # ---------------------------------------------------------------------------
-def test_bridge_authorized_approval_state_does_not_admit_text_edit(tmp_path: Path) -> None:
+def test_bridge_authorized_approval_state_does_not_admit_text_edit(
+    tmp_path: Path,
+) -> None:
     root, config = _project(tmp_path)
     result = CliRunner().invoke(
         main,
@@ -351,7 +366,10 @@ def test_bridge_authorized_approval_state_does_not_admit_text_edit(tmp_path: Pat
     )
     assert result.exit_code != 0, result.output
     assert "without text-edit authorization" in result.output
-    assert _current_title(root / "groundtruth.db", "WI-BRIDGE") == "Legacy approval-state work item"
+    assert (
+        _current_title(root / "groundtruth.db", "WI-BRIDGE")
+        == "Legacy approval-state work item"
+    )
     assert _version_count(root / "groundtruth.db", "WI-BRIDGE") == 1
 
 
@@ -401,7 +419,10 @@ def test_mixed_title_and_resolution_status_requires_both_gates(tmp_path: Path) -
         ],
     )
     assert result_ok.exit_code == 0, result_ok.output
-    assert _current_title(root / "groundtruth.db", "WI-DEFECT") == "Resolved with new title"
+    assert (
+        _current_title(root / "groundtruth.db", "WI-DEFECT")
+        == "Resolved with new title"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -431,7 +452,10 @@ def test_mixed_title_and_non_terminal_stage_text_gate_only(tmp_path: Path) -> No
         ],
     )
     assert result.exit_code == 0, result.output
-    assert _current_title(root / "groundtruth.db", "WI-TESTED") == "Title with stage advance"
+    assert (
+        _current_title(root / "groundtruth.db", "WI-TESTED")
+        == "Title with stage advance"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -463,7 +487,10 @@ def test_dry_run_validates_and_reports_no_write(tmp_path: Path) -> None:
     assert payload["fields"]["title"] == "Dry-run title proposal"
     # Verify no new version was persisted.
     assert _version_count(root / "groundtruth.db", "WI-IMPROVEMENT") == 1
-    assert _current_title(root / "groundtruth.db", "WI-IMPROVEMENT") == "Improvement work item"
+    assert (
+        _current_title(root / "groundtruth.db", "WI-IMPROVEMENT")
+        == "Improvement work item"
+    )
 
 
 # ---------------------------------------------------------------------------

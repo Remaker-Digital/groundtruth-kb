@@ -52,13 +52,17 @@ def _write_index(root: Path, statuses: dict[str, str]) -> Path:
     return path
 
 
-def _write_parent_evidence(root: Path, slug: str, item_id: str, *, version: str = "002") -> None:
+def _write_parent_evidence(
+    root: Path, slug: str, item_id: str, *, version: str = "002"
+) -> None:
     path = root / "bridge" / f"{slug}-{version}.md"
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
     path.write_text(f"{existing}\nParent work item: {item_id}\n", encoding="utf-8")
 
 
-def _write_work_item_metadata(root: Path, slug: str, item_id: str, *, version: str = "002") -> None:
+def _write_work_item_metadata(
+    root: Path, slug: str, item_id: str, *, version: str = "002"
+) -> None:
     """Append a canonical ``Work Item: WI-XXXX`` metadata line to a bridge file."""
 
     path = root / "bridge" / f"{slug}-{version}.md"
@@ -66,7 +70,9 @@ def _write_work_item_metadata(root: Path, slug: str, item_id: str, *, version: s
     path.write_text(f"{existing}\nWork Item: {item_id}\n", encoding="utf-8")
 
 
-def _write_bridge_kind(root: Path, slug: str, bridge_kind: str, *, version: str = "001") -> None:
+def _write_bridge_kind(
+    root: Path, slug: str, bridge_kind: str, *, version: str = "001"
+) -> None:
     path = root / "bridge" / f"{slug}-{version}.md"
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
     path.write_text(f"{existing}\nbridge_kind: {bridge_kind}\n", encoding="utf-8")
@@ -93,7 +99,9 @@ def _insert_work_item(
         "test",
         "seed",
         stage=stage,
-        related_bridge_threads=json.dumps(related) if not isinstance(related, str) else related,
+        related_bridge_threads=json.dumps(related)
+        if not isinstance(related, str)
+        else related,
     )
 
 
@@ -130,7 +138,9 @@ def _write_strict_thread(
 ) -> dict[str, Path]:
     bridge_dir = root / "bridge"
     bridge_dir.mkdir(parents=True, exist_ok=True)
-    target_value = json.dumps(target_paths) if isinstance(target_paths, list) else target_paths
+    target_value = (
+        json.dumps(target_paths) if isinstance(target_paths, list) else target_paths
+    )
     paths = {
         "proposal": bridge_dir / f"{slug}-001.md",
         "go": bridge_dir / f"{slug}-002.md",
@@ -231,7 +241,9 @@ def test_single_linked_parent_resolves_when_bridge_verified(tmp_path: Path) -> N
         db.close()
 
 
-def test_shared_parent_remains_active_when_any_link_is_not_verified(tmp_path: Path) -> None:
+def test_shared_parent_remains_active_when_any_link_is_not_verified(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     _write_index(tmp_path, {"thread-a": "VERIFIED", "thread-b": "GO"})
     _write_parent_evidence(tmp_path, "thread-a", "WI-0002")
@@ -278,7 +290,9 @@ def test_shared_parent_resolves_when_all_links_are_verified(tmp_path: Path) -> N
 
 
 @pytest.mark.parametrize("status", ["ADVISORY", "WITHDRAWN"])
-def test_non_implementation_terminal_link_does_not_block_verified_implementation(tmp_path: Path, status: str) -> None:
+def test_non_implementation_terminal_link_does_not_block_verified_implementation(
+    tmp_path: Path, status: str
+) -> None:
     module = _load_module()
     _write_index(tmp_path, {"impl-thread": "VERIFIED", "traceability-thread": status})
     _write_parent_evidence(tmp_path, "impl-thread", "WI-0201")
@@ -305,7 +319,9 @@ def test_non_implementation_terminal_link_does_not_block_verified_implementation
         db.close()
 
 
-def test_advisory_kind_go_link_does_not_block_verified_implementation(tmp_path: Path) -> None:
+def test_advisory_kind_go_link_does_not_block_verified_implementation(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     _write_index(tmp_path, {"impl-thread": "VERIFIED", "advisory-go": "GO"})
     _write_parent_evidence(tmp_path, "impl-thread", "WI-0202")
@@ -331,7 +347,9 @@ def test_advisory_kind_go_link_does_not_block_verified_implementation(tmp_path: 
         db.close()
 
 
-def test_advisory_link_alone_does_not_resolve_without_verified_implementation(tmp_path: Path) -> None:
+def test_advisory_link_alone_does_not_resolve_without_verified_implementation(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     _write_index(tmp_path, {"advisory": "ADVISORY"})
     db = _db(tmp_path)
@@ -353,10 +371,16 @@ def test_advisory_link_alone_does_not_resolve_without_verified_implementation(tm
         db.close()
 
 
-@pytest.mark.parametrize("blocking_status", ["NEW", "REVISED", "NO-ACTION", "NO-GO", "DEFERRED"])
-def test_implementation_like_non_verified_links_still_block_resolution(tmp_path: Path, blocking_status: str) -> None:
+@pytest.mark.parametrize(
+    "blocking_status", ["NEW", "REVISED", "NO-ACTION", "NO-GO", "DEFERRED"]
+)
+def test_implementation_like_non_verified_links_still_block_resolution(
+    tmp_path: Path, blocking_status: str
+) -> None:
     module = _load_module()
-    _write_index(tmp_path, {"impl-thread": "VERIFIED", "blocking-thread": blocking_status})
+    _write_index(
+        tmp_path, {"impl-thread": "VERIFIED", "blocking-thread": blocking_status}
+    )
     _write_parent_evidence(tmp_path, "impl-thread", "WI-0204")
     db = _db(tmp_path)
     try:
@@ -397,7 +421,9 @@ def test_terminal_work_items_are_skipped_without_new_version(tmp_path: Path) -> 
     _write_index(tmp_path, {"thread-a": "VERIFIED"})
     db = _db(tmp_path)
     try:
-        _insert_work_item(db, "WI-0005", ["thread-a"], resolution_status="resolved", stage="resolved")
+        _insert_work_item(
+            db, "WI-0005", ["thread-a"], resolution_status="resolved", stage="resolved"
+        )
         before_history = db.get_work_item_history("WI-0005")
     finally:
         db.close()
@@ -413,7 +439,9 @@ def test_terminal_work_items_are_skipped_without_new_version(tmp_path: Path) -> 
         db.close()
 
 
-def test_path_and_plain_slug_references_normalize_to_one_document(tmp_path: Path) -> None:
+def test_path_and_plain_slug_references_normalize_to_one_document(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     _write_index(tmp_path, {"thread-a": "VERIFIED"})
     _write_parent_evidence(tmp_path, "thread-a", "WI-0006")
@@ -452,7 +480,9 @@ def test_dry_run_reports_candidates_without_mutating_database(tmp_path: Path) ->
         db.close()
 
 
-def test_apply_revalidates_latest_bridge_status_before_resolution(tmp_path: Path, monkeypatch) -> None:
+def test_apply_revalidates_latest_bridge_status_before_resolution(
+    tmp_path: Path, monkeypatch
+) -> None:
     module = _load_module()
     _write_index(tmp_path, {"thread-a": "VERIFIED"})
     _write_parent_evidence(tmp_path, "thread-a", "WI-0015")
@@ -496,7 +526,9 @@ def test_apply_revalidates_latest_bridge_status_before_resolution(tmp_path: Path
         db.close()
 
 
-def test_contextual_verified_bridge_reference_without_parent_evidence_is_skipped(tmp_path: Path) -> None:
+def test_contextual_verified_bridge_reference_without_parent_evidence_is_skipped(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     _write_index(tmp_path, {"thread-a": "VERIFIED"})
     db = _db(tmp_path)
@@ -519,7 +551,9 @@ def test_contextual_verified_bridge_reference_without_parent_evidence_is_skipped
         db.close()
 
 
-def test_related_deliberation_bridge_provenance_is_not_an_implementation_link(tmp_path: Path) -> None:
+def test_related_deliberation_bridge_provenance_is_not_an_implementation_link(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     _write_index(tmp_path, {"thread-a": "VERIFIED"})
     db = _db(tmp_path)
@@ -552,7 +586,9 @@ def test_related_deliberation_bridge_provenance_is_not_an_implementation_link(tm
         db.close()
 
 
-def test_repair_overbroad_resolution_reopens_previous_nonterminal_version(tmp_path: Path) -> None:
+def test_repair_overbroad_resolution_reopens_previous_nonterminal_version(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     _write_index(tmp_path, {"thread-a": "VERIFIED"})
     db = _db(tmp_path)
@@ -585,7 +621,9 @@ def test_repair_overbroad_resolution_reopens_previous_nonterminal_version(tmp_pa
         db.close()
 
 
-def test_repair_overbroad_keeps_strict_evidence_resolution_closed(tmp_path: Path) -> None:
+def test_repair_overbroad_keeps_strict_evidence_resolution_closed(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     _write_index(tmp_path, {"thread-a": "VERIFIED"})
     _write_parent_evidence(tmp_path, "thread-a", "WI-0010")
@@ -614,7 +652,10 @@ def test_repair_overbroad_keeps_strict_evidence_resolution_closed(tmp_path: Path
         assert row["changed_by"] == module.CHANGED_BY
         assert summary["reopened_ids"] == []
         assert summary["would_reopen_ids"] == []
-        assert summary["repair_candidates"][0]["reason"] == "strict_parent_evidence_satisfied"
+        assert (
+            summary["repair_candidates"][0]["reason"]
+            == "strict_parent_evidence_satisfied"
+        )
     finally:
         db.close()
 
@@ -625,7 +666,10 @@ def test_build_work_item_bridge_index_parses_metadata_line_only(tmp_path: Path) 
     # Canonical metadata line for WI-0100; a prose mention of WI-0200 must not link.
     _write_work_item_metadata(tmp_path, "thread-a", "WI-0100")
     path = tmp_path / "bridge" / "thread-a-002.md"
-    path.write_text(path.read_text(encoding="utf-8") + "\nSee WI-0200 for related context.\n", encoding="utf-8")
+    path.write_text(
+        path.read_text(encoding="utf-8") + "\nSee WI-0200 for related context.\n",
+        encoding="utf-8",
+    )
 
     bridge_statuses = module.collect_latest_bridge_statuses(tmp_path)
     index = module.build_work_item_bridge_links(tmp_path, bridge_statuses)
@@ -634,7 +678,9 @@ def test_build_work_item_bridge_index_parses_metadata_line_only(tmp_path: Path) 
     assert "WI-0200" not in index
 
 
-def test_derives_link_from_bridge_work_item_metadata_resolves_unlinked_wi(tmp_path: Path) -> None:
+def test_derives_link_from_bridge_work_item_metadata_resolves_unlinked_wi(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     _write_index(tmp_path, {"thread-a": "VERIFIED"})
     _write_work_item_metadata(tmp_path, "thread-a", "WI-0011")
@@ -676,7 +722,10 @@ def test_derivation_ignores_prose_work_item_mentions(tmp_path: Path) -> None:
     _write_index(tmp_path, {"thread-a": "VERIFIED"})
     # WI-0012 appears only in prose, never as a `Work Item:` metadata line.
     path = tmp_path / "bridge" / "thread-a-002.md"
-    path.write_text(path.read_text(encoding="utf-8") + "\nThis work supports WI-0012 indirectly.\n", encoding="utf-8")
+    path.write_text(
+        path.read_text(encoding="utf-8") + "\nThis work supports WI-0012 indirectly.\n",
+        encoding="utf-8",
+    )
     db = _db(tmp_path)
     try:
         db.insert_work_item(
@@ -707,7 +756,9 @@ def test_derivation_ignores_prose_work_item_mentions(tmp_path: Path) -> None:
         db.close()
 
 
-def test_derived_link_with_unverified_sibling_thread_not_resolved(tmp_path: Path) -> None:
+def test_derived_link_with_unverified_sibling_thread_not_resolved(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     _write_index(tmp_path, {"thread-a": "VERIFIED", "thread-b": "GO"})
     # The WI's own link is the unverified sibling; the derivation adds the VERIFIED thread.
@@ -734,7 +785,9 @@ def test_derived_link_with_unverified_sibling_thread_not_resolved(tmp_path: Path
         db.close()
 
 
-def test_classify_work_item_without_derived_links_is_byte_identical(tmp_path: Path) -> None:
+def test_classify_work_item_without_derived_links_is_byte_identical(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     _write_index(tmp_path, {"thread-a": "VERIFIED"})
     _write_parent_evidence(tmp_path, "thread-a", "WI-0014")
@@ -748,17 +801,27 @@ def test_classify_work_item_without_derived_links_is_byte_identical(tmp_path: Pa
     }
 
     baseline = module.classify_work_item(item, bridge_statuses, project_root=tmp_path)
-    with_none = module.classify_work_item(item, bridge_statuses, project_root=tmp_path, derived_links=None)
-    with_empty = module.classify_work_item(item, bridge_statuses, project_root=tmp_path, derived_links={})
+    with_none = module.classify_work_item(
+        item, bridge_statuses, project_root=tmp_path, derived_links=None
+    )
+    with_empty = module.classify_work_item(
+        item, bridge_statuses, project_root=tmp_path, derived_links={}
+    )
 
     assert baseline == with_none == with_empty
     assert baseline["action"] == "resolve"
 
 
 def test_claude_and_codex_hooks_register_reconciler_command() -> None:
-    claude = json.loads((REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
-    codex = json.loads((REPO_ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8"))
-    codex_runner = (REPO_ROOT / ".codex" / "gtkb-hooks" / "run_py_no_window.py").read_text(encoding="utf-8")
+    claude = json.loads(
+        (REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8")
+    )
+    codex = json.loads(
+        (REPO_ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8")
+    )
+    codex_runner = (
+        REPO_ROOT / ".codex" / "gtkb-hooks" / "run_py_no_window.py"
+    ).read_text(encoding="utf-8")
 
     claude_text = json.dumps(claude)
     codex_text = json.dumps(codex)
@@ -774,7 +837,9 @@ def test_claude_and_codex_hooks_register_reconciler_command() -> None:
 # --- WI-4704: umbrella auto-closure + parent-evidence relaxation -------------
 
 
-def test_bridge_thread_files_excludes_child_and_prefix_sibling_files(tmp_path: Path) -> None:
+def test_bridge_thread_files_excludes_child_and_prefix_sibling_files(
+    tmp_path: Path,
+) -> None:
     """WI-4704 GO Condition 1: parent enumeration matches only ``<slug>-NNN.md``."""
 
     module = _load_module()
@@ -790,13 +855,19 @@ def test_bridge_thread_files_excludes_child_and_prefix_sibling_files(tmp_path: P
     assert sorted(p.name for p in files) == ["thread-001.md", "thread-002.md"]
 
 
-def test_umbrella_parent_go_resolves_when_all_children_verified_and_declare_wi(tmp_path: Path) -> None:
+def test_umbrella_parent_go_resolves_when_all_children_verified_and_declare_wi(
+    tmp_path: Path,
+) -> None:
     """WI-4704 Class 1 positive: GO umbrella with all children VERIFIED + declaring child."""
 
     module = _load_module()
     _write_index(
         tmp_path,
-        {"umbrella": "GO", "umbrella-slice-1": "VERIFIED", "umbrella-slice-2": "VERIFIED"},
+        {
+            "umbrella": "GO",
+            "umbrella-slice-1": "VERIFIED",
+            "umbrella-slice-2": "VERIFIED",
+        },
     )
     _write_work_item_metadata(tmp_path, "umbrella-slice-1", "WI-0101")
     db = _db(tmp_path)
@@ -855,7 +926,11 @@ def test_umbrella_not_resolved_when_no_child_declares_work_item(tmp_path: Path) 
     module = _load_module()
     _write_index(
         tmp_path,
-        {"umbrella": "GO", "umbrella-slice-1": "VERIFIED", "umbrella-slice-2": "VERIFIED"},
+        {
+            "umbrella": "GO",
+            "umbrella-slice-1": "VERIFIED",
+            "umbrella-slice-2": "VERIFIED",
+        },
     )
     db = _db(tmp_path)
     try:
@@ -876,7 +951,9 @@ def test_umbrella_not_resolved_when_no_child_declares_work_item(tmp_path: Path) 
         db.close()
 
 
-def test_parent_evidence_relaxation_resolves_when_one_verified_link_declares_wi(tmp_path: Path) -> None:
+def test_parent_evidence_relaxation_resolves_when_one_verified_link_declares_wi(
+    tmp_path: Path,
+) -> None:
     """WI-4704 Class 2 positive: a canonical declaration on one VERIFIED link resolves."""
 
     module = _load_module()
@@ -901,14 +978,17 @@ def test_parent_evidence_relaxation_resolves_when_one_verified_link_declares_wi(
         db.close()
 
 
-def test_parent_evidence_relaxation_rejects_prose_only_declaration(tmp_path: Path) -> None:
+def test_parent_evidence_relaxation_rejects_prose_only_declaration(
+    tmp_path: Path,
+) -> None:
     """WI-4704 Class 2 negative: a prose WI mention never satisfies the canonical floor."""
 
     module = _load_module()
     _write_index(tmp_path, {"thread-a": "VERIFIED", "thread-b": "VERIFIED"})
     path_a = tmp_path / "bridge" / "thread-a-002.md"
     path_a.write_text(
-        path_a.read_text(encoding="utf-8") + "\nThis thread supports WI-0105 broadly.\n",
+        path_a.read_text(encoding="utf-8")
+        + "\nThis thread supports WI-0105 broadly.\n",
         encoding="utf-8",
     )
     db = _db(tmp_path)
@@ -930,7 +1010,9 @@ def test_parent_evidence_relaxation_rejects_prose_only_declaration(tmp_path: Pat
         db.close()
 
 
-def test_reverse_link_construction_scans_bridge_dir_once_at_scale(tmp_path: Path, monkeypatch) -> None:
+def test_reverse_link_construction_scans_bridge_dir_once_at_scale(
+    tmp_path: Path, monkeypatch
+) -> None:
     """WI-4704 F1 scale guard: reverse-link construction must not glob the bridge dir per slug.
 
     Per-slug ``glob`` made the live dry-run O(slugs x dir) and time out at ~1099
@@ -957,7 +1039,9 @@ def test_reverse_link_construction_scans_bridge_dir_once_at_scale(tmp_path: Path
     monkeypatch.setattr(Path, "glob", counting_glob)
     derived = module.build_work_item_bridge_links(tmp_path, bridge_statuses)
 
-    assert scan_count["n"] <= 2, f"bridge dir scanned {scan_count['n']}x; expected one-pass (<=2), not per-slug"
+    assert scan_count["n"] <= 2, (
+        f"bridge dir scanned {scan_count['n']}x; expected one-pass (<=2), not per-slug"
+    )
     assert len(derived) == 25
 
 
@@ -1048,7 +1132,9 @@ def test_terminal_commit_with_ancestor_committed_target_closes(tmp_path: Path) -
     assert evidence["commit_coverage"]["missing_paths"] == []
 
 
-def test_focused_commit_with_verdict_and_all_targets_is_genuinely_closable(tmp_path: Path) -> None:
+def test_focused_commit_with_verdict_and_all_targets_is_genuinely_closable(
+    tmp_path: Path,
+) -> None:
     _init_git(tmp_path)
     target = tmp_path / "scripts" / "impl.py"
     target.parent.mkdir(parents=True)
@@ -1081,7 +1167,9 @@ def test_reconcile_reuses_batched_git_provenance_for_many_verified_threads(
             target = tmp_path / target_rel_path
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(f"VALUE = {index}\n", encoding="utf-8")
-            _write_strict_thread(tmp_path, item_id, target_paths=[target_rel_path], slug=slug)
+            _write_strict_thread(
+                tmp_path, item_id, target_paths=[target_rel_path], slug=slug
+            )
             _insert_work_item(db, item_id, [slug])
             expected_ids.append(item_id)
     finally:
@@ -1092,7 +1180,9 @@ def test_reconcile_reuses_batched_git_provenance_for_many_verified_threads(
     calls: list[tuple[str, ...]] = []
     original_run_git = module._run_git
 
-    def counting_run_git(project_root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    def counting_run_git(
+        project_root: Path, *args: str
+    ) -> subprocess.CompletedProcess[str]:
         calls.append(args)
         return original_run_git(project_root, *args)
 
@@ -1104,12 +1194,18 @@ def test_reconcile_reuses_batched_git_provenance_for_many_verified_threads(
     assert [args for args in calls if args[:1] == ("status",)] == [
         ("status", "--porcelain=v1", "-z", "--untracked-files=all", "--")
     ]
-    assert [args for args in calls if args[:1] == ("ls-files",)] == [("ls-files", "-z", "--")]
-    assert [args for args in calls if args[:1] == ("log",)] == [("log", "--format=commit:%H", "--name-only", "--")]
+    assert [args for args in calls if args[:1] == ("ls-files",)] == [
+        ("ls-files", "-z", "--")
+    ]
+    assert [args for args in calls if args[:1] == ("log",)] == [
+        ("log", "--format=commit:%H", "--name-only", "--")
+    ]
     assert [args for args in calls if args[:1] == ("diff-tree",)] == []
 
 
-def test_owner_by_reference_waiver_preserves_committed_verdict_closure(tmp_path: Path) -> None:
+def test_owner_by_reference_waiver_preserves_committed_verdict_closure(
+    tmp_path: Path,
+) -> None:
     _init_git(tmp_path)
     target = tmp_path / "scripts" / "impl.py"
     target.parent.mkdir(parents=True)
@@ -1133,7 +1229,9 @@ def test_owner_by_reference_waiver_preserves_committed_verdict_closure(tmp_path:
     assert evidence["mode"] == "by_reference_waiver"
 
 
-def test_waiver_reference_outside_report_does_not_bypass_commit_coverage(tmp_path: Path) -> None:
+def test_waiver_reference_outside_report_does_not_bypass_commit_coverage(
+    tmp_path: Path,
+) -> None:
     _init_git(tmp_path)
     # Vehicle changed by WI-6280: this test's subject is waiver SCOPING, not the
     # same-commit rule. It previously induced a coverage failure by committing
@@ -1141,7 +1239,9 @@ def test_waiver_reference_outside_report_does_not_bypass_commit_coverage(tmp_pat
     # closes. The target below is never committed at all, so coverage still
     # fails for an unrelated reason and the waiver-scoping property is asserted
     # exactly as before.
-    paths = _write_strict_thread(tmp_path, "WI-11498-G", target_paths=["scripts/never_committed.py"])
+    paths = _write_strict_thread(
+        tmp_path, "WI-11498-G", target_paths=["scripts/never_committed.py"]
+    )
     with paths["proposal"].open("a", encoding="utf-8") as handle:
         handle.write(
             "\n\n## Owner Decisions / Input\nA DELIB-TEST-BY-REFERENCE-WAIVER exists for an unrelated sibling thread.\n"
@@ -1155,3 +1255,95 @@ def test_waiver_reference_outside_report_does_not_bypass_commit_coverage(tmp_pat
     assert row["reason"] == "missing_implementation_commit_coverage"
     evidence = row["verified_closure_evidence"]["strict-thread"]
     assert "mode" not in evidence
+
+
+def _append_report_section(report_path: Path, section: str) -> None:
+    report_path.write_text(
+        report_path.read_text(encoding="utf-8") + section, encoding="utf-8"
+    )
+
+
+def test_owner_decisions_heading_does_not_activate_by_reference_waiver(
+    tmp_path: Path,
+) -> None:
+    """WI-5426: Owner Decisions / Input prose is not a by-reference waiver heading."""
+    _init_git(tmp_path)
+    paths = _write_strict_thread(
+        tmp_path, "WI-5426-OD", target_paths=["scripts/never_committed.py"]
+    )
+    _append_report_section(
+        paths["report"],
+        "\n\n## Owner Decisions / Input\nOwner-approved by-reference waiver: DELIB-TEST-BY-REFERENCE-001.\n",
+    )
+    _git(tmp_path, "add", "bridge")
+    _git(tmp_path, "commit", "-q", "-m", "owner-decisions heading is not a waiver")
+
+    row = _classify_strict_thread(tmp_path, "WI-5426-OD")
+
+    assert row["action"] == "skip"
+    evidence = row["verified_closure_evidence"]["strict-thread"]
+    assert evidence.get("mode") != "by_reference_waiver"
+
+
+def test_negated_by_reference_waiver_is_rejected(tmp_path: Path) -> None:
+    """WI-5426: negated waiver prose under the dedicated heading does not close."""
+    _init_git(tmp_path)
+    paths = _write_strict_thread(
+        tmp_path, "WI-5426-NEG", target_paths=["scripts/never_committed.py"]
+    )
+    _append_report_section(
+        paths["report"],
+        "\n\n## By-Reference Finalization Waiver\nDo not grant a by-reference waiver. Missing DELIB reference.\n",
+    )
+    _git(tmp_path, "add", "bridge")
+    _git(tmp_path, "commit", "-q", "-m", "negated waiver")
+
+    row = _classify_strict_thread(tmp_path, "WI-5426-NEG")
+
+    assert row["action"] == "skip"
+    evidence = row["verified_closure_evidence"]["strict-thread"]
+    assert evidence.get("mode") != "by_reference_waiver"
+
+
+def test_duplicate_by_reference_waiver_declarations_are_rejected(
+    tmp_path: Path,
+) -> None:
+    """WI-5426: duplicate affirmative declarations fail closed."""
+    _init_git(tmp_path)
+    paths = _write_strict_thread(
+        tmp_path, "WI-5426-DUP", target_paths=["scripts/never_committed.py"]
+    )
+    _append_report_section(
+        paths["report"],
+        "\n\n## By-Reference Finalization Waiver\n"
+        "Owner-approved by-reference waiver: DELIB-TEST-BY-REFERENCE-001.\n"
+        "Owner-approved by-reference waiver: DELIB-TEST-BY-REFERENCE-002.\n",
+    )
+    _git(tmp_path, "add", "bridge")
+    _git(tmp_path, "commit", "-q", "-m", "duplicate waiver declarations")
+
+    row = _classify_strict_thread(tmp_path, "WI-5426-DUP")
+
+    assert row["action"] == "skip"
+    evidence = row["verified_closure_evidence"]["strict-thread"]
+    assert evidence.get("mode") != "by_reference_waiver"
+
+
+def test_malformed_by_reference_waiver_declaration_is_rejected(tmp_path: Path) -> None:
+    """WI-5426: a dedicated heading without the anchored DELIB line fails closed."""
+    _init_git(tmp_path)
+    paths = _write_strict_thread(
+        tmp_path, "WI-5426-MAL", target_paths=["scripts/never_committed.py"]
+    )
+    _append_report_section(
+        paths["report"],
+        "\n\n## By-Reference Finalization Waiver\nOwner approved a by-reference waiver DELIB-TEST-BY-REFERENCE-001\n",
+    )
+    _git(tmp_path, "add", "bridge")
+    _git(tmp_path, "commit", "-q", "-m", "malformed waiver")
+
+    row = _classify_strict_thread(tmp_path, "WI-5426-MAL")
+
+    assert row["action"] == "skip"
+    evidence = row["verified_closure_evidence"]["strict-thread"]
+    assert evidence.get("mode") != "by_reference_waiver"

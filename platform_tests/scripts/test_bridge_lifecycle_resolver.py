@@ -1037,3 +1037,139 @@ def test_shared_thread_file_reader_matches_header_block(tmp_path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("::open spec\nNEW\n::init gtkb lo\n", encoding="utf-8")
     assert thread_status(path) == "NEW"
+
+
+# ---------------------------------------------------------------------------
+# WI-6541: consumer readers migrated onto the packaged header-block accessor.
+#
+# These assert the *consumers'* behavior, not the accessor's own contract
+# (which is covered by groundtruth-kb/tests/test_bridge_versioned_files_header.py).
+# They live in this module because the approved proposal's ``target_paths``
+# authorizes exactly two test files, and this is the one that already imports
+# ``scripts.*`` consumers.
+# ---------------------------------------------------------------------------
+
+
+def _write_header(tmp_path: Path, name: str, header: str) -> Path:
+    path = tmp_path / "bridge" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(header, encoding="utf-8")
+    return path
+
+
+def test_work_intent_registry_reads_marker_first_status(tmp_path: Path) -> None:
+    """A marker-first header must not be skipped as malformed."""
+
+    from scripts.bridge_work_intent_registry import _bridge_file_status
+
+    path = _write_header(
+        tmp_path, "marker-first-001.md", "::init gtkb lo\n::open build\nNEW\n"
+    )
+    assert _bridge_file_status(path) == "NEW"
+
+
+def test_work_intent_registry_keeps_stricter_acceptance_than_accessor(
+    tmp_path: Path,
+) -> None:
+    """Centralizing parsing must not widen what this consumer accepts.
+
+    The packaged accessor takes the first token of a decorated line and treats
+    ``PAUSED`` as canonical. The work-intent registry rejects both by contract
+    (see ``test_bridge_file_status_raises_malformed_on_unrecognized_first_line``
+    and ``test_latest_status_skips_legacy_token_version``). This asserts the
+    parsing/acceptance split holds: the accessor locates the line, the registry
+    decides whether the token is honored.
+    """
+
+    from groundtruth_kb.bridge.versioned_files import status_from_bridge_text
+
+    from scripts.bridge_work_intent_registry import (
+        MalformedBridgeStatusError,
+        _bridge_file_status,
+    )
+
+    decorated = _write_header(tmp_path, "decorated-001.md", "GO test\n\n# Body\n")
+    assert status_from_bridge_text("GO test\n") == "GO"  # accessor is permissive
+    with pytest.raises(MalformedBridgeStatusError) as excinfo:
+        _bridge_file_status(decorated)  # registry is not
+    assert excinfo.value.offending_line == "GO test"
+
+    legacy = _write_header(tmp_path, "legacy-001.md", "PAUSED\n\n# Body\n")
+    assert status_from_bridge_text("PAUSED\n") == "PAUSED"  # accessor admits it
+    with pytest.raises(MalformedBridgeStatusError):
+        _bridge_file_status(legacy)  # registry does not
+
+
+def test_work_intent_registry_still_fails_closed_without_status(tmp_path: Path) -> None:
+    """Markers alone are not a status; the malformed contract is preserved."""
+
+    from scripts.bridge_work_intent_registry import (
+        MalformedBridgeStatusError,
+        _bridge_file_status,
+    )
+
+    path = _write_header(
+        tmp_path, "no-status-001.md", "::init gtkb lo\n::open build\nDocument: x\n"
+    )
+    with pytest.raises(MalformedBridgeStatusError) as excinfo:
+        _bridge_file_status(path)
+    # The offending line reported must be the first non-marker line, not a marker.
+    assert not str(excinfo.value.offending_line).startswith("::")
+
+
+def test_work_intent_registry_reports_empty_file(tmp_path: Path) -> None:
+    from scripts.bridge_work_intent_registry import (
+        MalformedBridgeStatusError,
+        _bridge_file_status,
+    )
+
+    path = _write_header(tmp_path, "empty-001.md", "\n\n")
+    with pytest.raises(MalformedBridgeStatusError):
+        _bridge_file_status(path)
+
+
+def test_thread_file_reader_preserves_lowercase_leniency(tmp_path: Path) -> None:
+    """Removing the duplicate regex must not regress lowercase tolerance.
+
+    The removed fallback was ``re.IGNORECASE``; the packaged accessor is
+    uppercase-only. Leniency is preserved by the wrapper's case-normalized
+    retry rather than by a second parser.
+    """
+
+    from scripts.bridge_thread_files import status_from_bridge_file as thread_status
+
+    path = _write_header(tmp_path, "lower-001.md", "verified\n")
+    assert thread_status(path) == "VERIFIED"
+
+
+def test_cursor_harness_head_status_returns_bare_token(tmp_path: Path) -> None:
+    """The harness compares the head to a verdict string with ``!=``.
+
+    Returning the whole line made that equality test fail whenever the status
+    line carried trailing text; it must return the bare token.
+    """
+
+    from scripts.cursor_harness import _artifact_head_status
+
+    assert _artifact_head_status("::init gtkb lo\n::open build\nGO\n") == "GO"
+    assert _artifact_head_status("VERIFIED - commit abc123\n") == "VERIFIED"
+    assert _artifact_head_status("::init gtkb lo\n") == ""
+
+
+def test_lo_batch_publish_reads_marker_first_via_packaged_accessor(
+    tmp_path: Path,
+) -> None:
+    """The remaining line-0 reader must be gone; marker-first NEW is actionable."""
+
+    import inspect
+
+    import scripts.lo_batch_publish as lo_batch_publish
+    from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
+
+    path = _write_header(
+        tmp_path, "batch-marker-001.md", "::init gtkb lo\n::open build\nNEW\n"
+    )
+    assert status_from_bridge_file(path) == "NEW"
+    source = inspect.getsource(lo_batch_publish.publish_one)
+    assert "status_from_bridge_file" in source
+    assert "splitlines()[0]" not in source

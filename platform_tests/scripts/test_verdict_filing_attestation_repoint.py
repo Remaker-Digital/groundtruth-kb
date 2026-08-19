@@ -1,14 +1,4 @@
-"""Verdict filing derives author metadata from the role attestation (WI-6262).
-
-Landed by bridge/gtkb-session-role-attestation-service-slice-1 (GO at -004),
-verification expectation V1/V2: the repoint lands in
-``groundtruth_kb/bridge/verdict_filing.py`` and consumer tests accompany it.
-
-The load-bearing assertions are the ordering ones. Before this repoint the
-first resolver consulted inferred role from durable registry state, which is a
-routing label rather than an identity oracle; the attestation resolver must be
-consulted first, and a session that HAS a binding must not fall through.
-"""
+"""Verdict filing uses only the immutable exact-init role attestation."""
 
 from __future__ import annotations
 
@@ -26,6 +16,7 @@ for _extra in (PROJECT_ROOT, PROJECT_ROOT / "groundtruth-kb" / "src"):
 from groundtruth_kb.bridge import verdict_filing  # noqa: E402
 from groundtruth_kb.session.attestation import (  # noqa: E402
     RoleAttestationError,
+    attest_role_change,
     bind_exact_init,
 )
 
@@ -74,9 +65,9 @@ def bound_root(tmp_path: Path) -> tuple[Path, str]:
 def test_attestation_metadata_carries_the_attested_role(bound_root):
     root, context = bound_root
     metadata = verdict_filing._metadata_from_attestation(context, root, CONTENT)
-    assert metadata is not None
     assert metadata["author_identity"].startswith("prime-builder/")
     assert metadata["author_session_context_id"] == context
+    assert metadata["author_session_envelope_id"].startswith("SENV-")
 
 
 def test_attestation_metadata_persists_the_evidence_reference(bound_root):
@@ -114,17 +105,23 @@ def test_model_fields_come_from_the_artifact_declaration(bound_root):
 
 def test_model_fields_omitted_when_the_artifact_declares_none(bound_root):
     root, context = bound_root
-    metadata = verdict_filing._metadata_from_attestation(context, root, "VERIFIED\n\n# Body\n")
+    metadata = verdict_filing._metadata_from_attestation(
+        context, root, "VERIFIED\n\n# Body\n"
+    )
     assert "author_model" not in metadata
 
 
-def test_unbound_context_returns_none_for_ordered_migration(bound_root):
-    """no_session_binding is the ONLY case that falls through to legacy paths."""
+def test_unbound_context_fails_closed_without_legacy_fallback(bound_root):
     root, _context = bound_root
-    assert verdict_filing._metadata_from_attestation("not-a-bound-context", root, CONTENT) is None
+    with pytest.raises(
+        verdict_filing.VerdictFilingError, match="session-init binding exists"
+    ):
+        verdict_filing._metadata_from_attestation("not-a-bound-context", root, CONTENT)
 
 
-def test_bound_context_with_unresolvable_role_raises_rather_than_falling_through(bound_root):
+def test_bound_context_with_unresolvable_role_raises_rather_than_falling_through(
+    bound_root,
+):
     """A session that HAS a binding must not silently reach the legacy resolver.
 
     Falling through would re-admit registry-inferred role, which is the defect
@@ -140,19 +137,34 @@ def test_bound_context_with_unresolvable_role_raises_rather_than_falling_through
         verdict_filing._metadata_from_attestation(context, root, CONTENT)
 
 
-def test_envelope_entry_point_prefers_the_attestation(bound_root):
-    """_metadata_from_envelope consults the attestation before legacy resolvers."""
+def test_envelope_entry_point_requires_the_attestation(bound_root):
     root, context = bound_root
     metadata = verdict_filing._metadata_from_envelope(context, root, CONTENT)
-    assert "author_role_attestation" in metadata, (
-        "the attestation branch must win; a metadata dict without the evidence "
-        "reference means a legacy resolver answered first"
-    )
+    assert "author_role_attestation" in metadata
     assert metadata["author_session_context_id"] == context
+
+
+def test_later_role_change_cannot_authorize_verdict_filing(bound_root):
+    """The owner-corrected model keeps role immutable within one context."""
+
+    root, context = bound_root
+    initial = verdict_filing._metadata_from_attestation(context, root, CONTENT)
+    attest_role_change(
+        root / "groundtruth.db",
+        envelope_id=initial["author_session_envelope_id"],
+        role="loyal-opposition",
+        issuer="fixture-owner",
+        owner_decision_ref="DELIB-OBSOLETE-ROLE-CHANGE-FIXTURE",
+    )
+
+    with pytest.raises(verdict_filing.VerdictFilingError, match="exact-init"):
+        verdict_filing._metadata_from_attestation(context, root, CONTENT)
 
 
 def test_harness_id_resolves_from_the_identity_map_not_from_the_name():
     """The name-to-ID mapping is owner-assigned, so it must be read, not derived."""
     assert verdict_filing._harness_id_for("", PROJECT_ROOT) == ""
-    assert verdict_filing._harness_id_for("definitely-not-a-harness", PROJECT_ROOT) == ""
+    assert (
+        verdict_filing._harness_id_for("definitely-not-a-harness", PROJECT_ROOT) == ""
+    )
     assert verdict_filing._harness_id_for("claude", PROJECT_ROOT) == "B"

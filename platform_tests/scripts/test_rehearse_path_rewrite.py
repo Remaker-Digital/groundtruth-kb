@@ -14,6 +14,7 @@ run live classify-tree against LEGACY_ROOT in unit tests").
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import subprocess
 import sys
@@ -22,9 +23,22 @@ from typing import Any
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
-from rehearse import _path_rewrite  # noqa: E402
+def _load_rehearse_file(stem: str):
+    path = Path(__file__).resolve().parents[2] / "scripts" / "rehearse" / f"{stem}.py"
+    if not path.is_file():
+        pytest.skip(f"scripts/rehearse/{stem}.py is absent", allow_module_level=True)
+    name = f"wi6583_rehearse_{stem}"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        pytest.skip(f"unable to load {path.as_posix()}", allow_module_level=True)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_path_rewrite = _load_rehearse_file("_path_rewrite")
 
 _VALID_FILTER_TEMPLATE = (
     "git filter-repo --path <agent-red-paths-from-_path_rewrite> "
@@ -58,7 +72,9 @@ def _synth_classification(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "target_tree": "synthetic",
         "target_head": "def5678",
         "total_paths_classified": len(rows),
-        "owner_decision_pending_rows": sum(1 for r in rows if r.get("owner_decision_pending")),
+        "owner_decision_pending_rows": sum(
+            1 for r in rows if r.get("owner_decision_pending")
+        ),
         "rows": rows,
     }
 
@@ -89,7 +105,9 @@ def _mock_classify_tree_writes(
                 file_content if file_content is not None else json.dumps(payload),
                 encoding="utf-8",
             )
-        return subprocess.CompletedProcess(args=cmd, returncode=returncode, stdout="", stderr="")
+        return subprocess.CompletedProcess(
+            args=cmd, returncode=returncode, stdout="", stderr=""
+        )
 
     monkeypatch.setattr(subprocess, "run", _fake_run)
     return captured
@@ -122,7 +140,9 @@ def test_build_classify_tree_command_uses_callable_entrypoint(tmp_path: Path) ->
     assert cmd[2] == "from groundtruth_kb.cli import main; main()"
     # Regression guards: -m and groundtruth_kb.cli MUST NOT appear.
     assert "-m" not in cmd, f"argv must not use -m form: {cmd}"
-    assert "groundtruth_kb.cli" not in cmd, f"argv must use callable form, not module path: {cmd}"
+    assert "groundtruth_kb.cli" not in cmd, (
+        f"argv must use callable form, not module path: {cmd}"
+    )
 
 
 def test_build_classify_tree_command_includes_required_flags(tmp_path: Path) -> None:
@@ -161,7 +181,9 @@ def test_subprocess_smoke_invokes_classify_tree_against_tmp_dir(
     output_path = tmp_path / "smoke-classification.json"
     cmd = _path_rewrite._build_classify_tree_command(fixture_tree, output_path)
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    assert result.returncode == 0, f"classify-tree exited {result.returncode}; stderr={result.stderr!r}"
+    assert result.returncode == 0, (
+        f"classify-tree exited {result.returncode}; stderr={result.stderr!r}"
+    )
     assert output_path.exists(), (
         "classify-tree exited 0 but did not write classification.json — entrypoint regression (slice4-002 F1)."
     )
@@ -173,7 +195,9 @@ def test_subprocess_smoke_invokes_classify_tree_against_tmp_dir(
 # ----- T5: subprocess invoked correctly via mock -----
 
 
-def test_run_invokes_classify_tree_subprocess(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_invokes_classify_tree_subprocess(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Mocked subprocess called with the _build_classify_tree_command shape."""
     captured = _mock_classify_tree_writes(monkeypatch, rows=[])
     manifest = _build_manifest(tmp_path)
@@ -188,7 +212,9 @@ def test_run_invokes_classify_tree_subprocess(tmp_path: Path, monkeypatch: pytes
 # ----- T6: happy path adopter-owned -----
 
 
-def test_run_produces_rewrites_for_adopter_owned(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_produces_rewrites_for_adopter_owned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Adopter-owned rows produce path-rewrite entries."""
     rows = [
         {
@@ -203,7 +229,11 @@ def test_run_produces_rewrites_for_adopter_owned(tmp_path: Path, monkeypatch: py
     manifest = _build_manifest(tmp_path)
     result = _path_rewrite.run(manifest, tmp_path / "out", dry_run=False)
     assert result["status"] == "ok"
-    pr = json.loads((tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(encoding="utf-8"))
+    pr = json.loads(
+        (tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert len(pr["rewrites"]) == 1
     assert pr["rewrites"][0]["source"] == "src/foo.py"
     assert pr["rewrites"][0]["target"] == "applications/Agent_Red/src/foo.py"
@@ -212,7 +242,9 @@ def test_run_produces_rewrites_for_adopter_owned(tmp_path: Path, monkeypatch: py
 # ----- T7-T9: bucket partitioning -----
 
 
-def test_run_skips_gt_kb_managed_in_rewrites(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_skips_gt_kb_managed_in_rewrites(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """gt-kb-managed rows go to keep_at_root, not rewrites."""
     rows = [
         {
@@ -233,7 +265,11 @@ def test_run_skips_gt_kb_managed_in_rewrites(tmp_path: Path, monkeypatch: pytest
     _mock_classify_tree_writes(monkeypatch, rows=rows)
     manifest = _build_manifest(tmp_path)
     result = _path_rewrite.run(manifest, tmp_path / "out", dry_run=False)
-    pr = json.loads((tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(encoding="utf-8"))
+    pr = json.loads(
+        (tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert pr["rewrites"] == []
     assert len(pr["keep_at_root"]) == 2
     assert {r["path"] for r in pr["keep_at_root"]} == {
@@ -243,7 +279,9 @@ def test_run_skips_gt_kb_managed_in_rewrites(tmp_path: Path, monkeypatch: pytest
     assert result["status"] == "ok"
 
 
-def test_run_emits_shared_structured_to_shared_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_emits_shared_structured_to_shared_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """shared-structured rows go to shared_paths bucket."""
     rows = [
         {
@@ -257,13 +295,19 @@ def test_run_emits_shared_structured_to_shared_paths(tmp_path: Path, monkeypatch
     _mock_classify_tree_writes(monkeypatch, rows=rows)
     manifest = _build_manifest(tmp_path)
     _path_rewrite.run(manifest, tmp_path / "out", dry_run=False)
-    pr = json.loads((tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(encoding="utf-8"))
+    pr = json.loads(
+        (tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert len(pr["shared_paths"]) == 1
     assert pr["shared_paths"][0]["path"] == "memory/MEMORY.md"
     assert pr["rewrites"] == []
 
 
-def test_run_emits_legacy_exception_to_warnings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_emits_legacy_exception_to_warnings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """legacy-exception rows go to legacy_exceptions list + warning string."""
     rows = [
         {
@@ -278,13 +322,19 @@ def test_run_emits_legacy_exception_to_warnings(tmp_path: Path, monkeypatch: pyt
     manifest = _build_manifest(tmp_path)
     result = _path_rewrite.run(manifest, tmp_path / "out", dry_run=False)
     assert result["status"] == "ok"
-    pr = json.loads((tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(encoding="utf-8"))
+    pr = json.loads(
+        (tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert len(pr["legacy_exceptions"]) == 1
     assert pr["legacy_exceptions"][0]["path"] == "groundtruth.db"
     assert any("legacy_exceptions_present" in w for w in result["warnings"])
 
 
-def test_run_emits_unresolved_paths_when_pending(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_emits_unresolved_paths_when_pending(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """owner_decision_pending=True diverts to unresolved_paths regardless of ownership."""
     rows = [
         {
@@ -305,7 +355,11 @@ def test_run_emits_unresolved_paths_when_pending(tmp_path: Path, monkeypatch: py
     _mock_classify_tree_writes(monkeypatch, rows=rows)
     manifest = _build_manifest(tmp_path)
     result = _path_rewrite.run(manifest, tmp_path / "out", dry_run=False)
-    pr = json.loads((tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(encoding="utf-8"))
+    pr = json.loads(
+        (tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(
+            encoding="utf-8"
+        )
+    )
     # Both rows route to unresolved regardless of their ownership label.
     assert len(pr["unresolved_paths"]) == 2
     assert pr["rewrites"] == []
@@ -316,7 +370,9 @@ def test_run_emits_unresolved_paths_when_pending(tmp_path: Path, monkeypatch: py
 # ----- T11-T12: artifact files -----
 
 
-def test_run_writes_path_rewrite_json_with_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_writes_path_rewrite_json_with_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Main artifact path_rewrite.json is written with schema_version=1 and summary."""
     rows = [
         {
@@ -347,7 +403,9 @@ def test_run_writes_path_rewrite_json_with_summary(tmp_path: Path, monkeypatch: 
     assert "generated_at" in pr
 
 
-def test_run_writes_git_filter_args_file_format(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_writes_git_filter_args_file_format(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """git_filter_args.txt: one line per rewrite with --path / --path-rename."""
     rows = [
         {
@@ -372,14 +430,22 @@ def test_run_writes_git_filter_args_file_format(tmp_path: Path, monkeypatch: pyt
     assert args_path.exists()
     lines = args_path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2
-    assert lines[0] == "--path src/a.py --path-rename src/a.py:applications/Agent_Red/src/a.py"
-    assert lines[1] == "--path src/b.py --path-rename src/b.py:applications/Agent_Red/src/b.py"
+    assert (
+        lines[0]
+        == "--path src/a.py --path-rename src/a.py:applications/Agent_Red/src/a.py"
+    )
+    assert (
+        lines[1]
+        == "--path src/b.py --path-rename src/b.py:applications/Agent_Red/src/b.py"
+    )
 
 
 # ----- T12a-T12b: result.json artifact (per slice4 NO-GO -006 F2) -----
 
 
-def test_run_writes_result_json_containing_returned_dict(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_writes_result_json_containing_returned_dict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Per slice4 NO-GO ``-006`` F2 + Wave 2 -003 §4.2: result.json must
     exist under the lane dir and contain the returned structured result.
     """
@@ -396,7 +462,9 @@ def test_run_writes_result_json_containing_returned_dict(tmp_path: Path, monkeyp
     manifest = _build_manifest(tmp_path)
     result = _path_rewrite.run(manifest, tmp_path / "out", dry_run=False)
     result_path = tmp_path / "out" / "path_rewrite" / "result.json"
-    assert result_path.exists(), "result.json must be written under {output_dir}/path_rewrite/"
+    assert result_path.exists(), (
+        "result.json must be written under {output_dir}/path_rewrite/"
+    )
     on_disk = json.loads(result_path.read_text(encoding="utf-8"))
     # The on-disk result.json must equal the returned dict (incl. result.json
     # path in output_files since it references itself).
@@ -405,7 +473,9 @@ def test_run_writes_result_json_containing_returned_dict(tmp_path: Path, monkeyp
     assert str(result_path) in on_disk["output_files"]
 
 
-def test_run_writes_result_json_on_error_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_writes_result_json_on_error_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """result.json is also written on error returns (operator forensics).
 
     Wave 2 -003 §4.2 / umbrella -001 §4.2 don't qualify ``result.json`` as
@@ -426,7 +496,9 @@ def test_run_writes_result_json_on_error_path(tmp_path: Path, monkeypatch: pytes
 # ----- T13: target path format -----
 
 
-def test_run_target_path_format_correct(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_target_path_format_correct(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Source ``src/foo.py`` becomes ``applications/Agent_Red/src/foo.py``."""
     rows = [
         {
@@ -440,7 +512,11 @@ def test_run_target_path_format_correct(tmp_path: Path, monkeypatch: pytest.Monk
     _mock_classify_tree_writes(monkeypatch, rows=rows)
     manifest = _build_manifest(tmp_path)
     _path_rewrite.run(manifest, tmp_path / "out", dry_run=False)
-    pr = json.loads((tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(encoding="utf-8"))
+    pr = json.loads(
+        (tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert pr["rewrites"][0]["target"] == "applications/Agent_Red/src/foo.py"
     assert "/" in pr["rewrites"][0]["target"]
     assert "\\" not in pr["rewrites"][0]["target"]
@@ -475,7 +551,11 @@ def test_run_target_namespace_derived_from_manifest_not_hardcoded(
     _mock_classify_tree_writes(monkeypatch, rows=rows)
     manifest = _build_manifest(tmp_path, app_name="Different_App")
     _path_rewrite.run(manifest, tmp_path / "out", dry_run=False)
-    pr = json.loads((tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(encoding="utf-8"))
+    pr = json.loads(
+        (tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert pr["target_namespace"] == "applications/Different_App"
     assert pr["rewrites"][0]["target"] == "applications/Different_App/src/foo.py"
     assert "Agent_Red" not in pr["rewrites"][0]["target"]
@@ -485,7 +565,9 @@ def test_run_target_namespace_derived_from_manifest_not_hardcoded(
 # ----- T16-T18: error paths -----
 
 
-def test_run_returns_error_when_classify_tree_subprocess_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_returns_error_when_classify_tree_subprocess_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Non-zero subprocess exit → status='error', warning includes stderr."""
     _mock_classify_tree_writes(monkeypatch, rows=[], returncode=1, write_file=False)
     manifest = _build_manifest(tmp_path)
@@ -507,10 +589,15 @@ def test_run_returns_error_when_subprocess_zero_exit_but_no_file_produced(
     manifest = _build_manifest(tmp_path)
     result = _path_rewrite.run(manifest, tmp_path / "out", dry_run=False)
     assert result["status"] == "error"
-    assert any("classify_tree_zero_exit_but_no_classification_file" in w for w in result["warnings"])
+    assert any(
+        "classify_tree_zero_exit_but_no_classification_file" in w
+        for w in result["warnings"]
+    )
 
 
-def test_run_returns_error_when_classification_malformed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_returns_error_when_classification_malformed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Malformed JSON from classify-tree → status='error'."""
     _mock_classify_tree_writes(monkeypatch, file_content="this is not json {{{")
     manifest = _build_manifest(tmp_path)
@@ -519,7 +606,9 @@ def test_run_returns_error_when_classification_malformed(tmp_path: Path, monkeyp
     assert any("classification_json_unreadable" in w for w in result["warnings"])
 
 
-def test_run_unknown_ownership_emits_warning(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_unknown_ownership_emits_warning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Unknown ownership label → warning string + skip (not error)."""
     rows = [
         {
@@ -535,6 +624,10 @@ def test_run_unknown_ownership_emits_warning(tmp_path: Path, monkeypatch: pytest
     result = _path_rewrite.run(manifest, tmp_path / "out", dry_run=False)
     assert result["status"] == "ok"
     assert any("unknown_ownership_labels" in w for w in result["warnings"])
-    pr = json.loads((tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(encoding="utf-8"))
+    pr = json.loads(
+        (tmp_path / "out" / "path_rewrite" / "path_rewrite.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert pr["summary"]["unknown_ownership_count"] == 1
     assert pr["rewrites"] == []

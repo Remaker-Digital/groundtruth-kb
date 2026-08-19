@@ -1,14 +1,9 @@
-"""WI-5830: Selector hardening and packet-path/overwrite protection tests.
+"""WI-5830 packet-path and overwrite-protection tests.
 
-Selector tests (Slice A):
-- test_codex_home_alone_does_not_select_codex
-- test_declared_goose_provenance_resolves_despite_codex_home
-- test_codex_thread_id_still_selects_codex
-
-Packet-path tests (Slice B):
+Packet-path tests:
 - test_begin_stdout_includes_packet_paths
 
-Overwrite protection tests (Slice C):
+Overwrite protection tests:
 - test_rerun_begin_versions_previous_packet
 - test_history_preservation_failure_blocks_overwrite
 """
@@ -29,7 +24,9 @@ SCRIPT_PATH = REPO_ROOT / "scripts" / "implementation_authorization.py"
 
 @pytest.fixture(scope="module")
 def auth_module():
-    spec = importlib.util.spec_from_file_location("wi5830_implementation_authorization", SCRIPT_PATH)
+    spec = importlib.util.spec_from_file_location(
+        "wi5830_implementation_authorization", SCRIPT_PATH
+    )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -38,138 +35,13 @@ def auth_module():
 
 
 # ---------------------------------------------------------------------------
-# Slice A: Selector hardening
+# Packet-path disclosure
 # ---------------------------------------------------------------------------
 
 
-def test_codex_home_alone_does_not_select_codex(auth_module, monkeypatch: pytest.MonkeyPatch) -> None:
-    """With only CODEX_HOME set, _worker_harness_selector() returns None."""
-    monkeypatch.setenv("CODEX_HOME", "C:\\Users\\test\\.codex")
-    # Ensure no session-scoped markers are present
-    for name in (
-        "GTKB_HARNESS_NAME",
-        "GTKB_BRIDGE_POLLER_RUN_ID",
-        "CLAUDE_CODE_SESSION_ID",
-        "CLAUDECODE",
-        "CODEX_THREAD_ID",
-    ):
-        monkeypatch.delenv(name, raising=False)
-    assert auth_module._worker_harness_selector() is None
-
-
-def test_declared_goose_provenance_resolves_despite_codex_home(
+def test_begin_stdout_includes_packet_paths(
     auth_module, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Declared Goose envelope + CODEX_HOME set: resolves goose prime-builder.
-
-    This is the r3 reproduction case: a legitimately-declared Goose Prime
-    Builder with CODEX_HOME present in the environment must resolve via the
-    harness-agnostic declaration scan without needing GTKB_HARNESS_NAME.
-    """
-    harness_name = "goose"
-    session_id = "goose-session-001"
-
-    # Write a goose worker document
-    document = {
-        "status": "open",
-        "session_id": session_id,
-        "harness_id": "G",
-        "harness_name": harness_name,
-        "role": "prime-builder",
-        "role_asserted": "prime-builder",
-        "role_resolved": "prime-builder",
-        "worker_role_provenance": {
-            "schema_version": 1,
-            "session_id": session_id,
-            "harness_id": "G",
-            "harness_name": harness_name,
-            "role": "prime-builder",
-            "role_resolution_source": "transcript_init_keyword",
-            "issued_at": "2026-07-31T14:00:00Z",
-            "dispatch_run_id": None,
-        },
-    }
-    path = tmp_path / "harness-state" / harness_name / "session-envelopes" / f"{session_id}.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(document), encoding="utf-8")
-
-    # Set CODEX_HOME (installation marker) but NOT GTKB_HARNESS_NAME
-    monkeypatch.setenv("CODEX_HOME", "C:\\Users\\test\\.codex")
-    for name in (
-        "GTKB_HARNESS_NAME",
-        "GTKB_BRIDGE_POLLER_RUN_ID",
-        "CLAUDE_CODE_SESSION_ID",
-        "CLAUDECODE",
-        "CODEX_THREAD_ID",
-    ):
-        monkeypatch.delenv(name, raising=False)
-
-    # Stub dependencies for finalize_implementation_start_packet
-    holder = {
-        "thread_slug": "wi5830-fixture",
-        "session_id": session_id,
-        "claim_kind": auth_module.bridge_work_intent_registry.CLAIM_KIND_GO_IMPLEMENTATION,
-        "acting_role": "prime-builder",
-        "acquired_at": "2026-07-31T14:00:00Z",
-        "ttl_expires_at": "2026-07-31T16:00:00Z",
-        "project_id": "PROJECT-GTKB-HARNESS-TEST-CORRECTIONS",
-        "implementation_deadline": "2026-07-31T16:00:00Z",
-        "implementation_grace_expires_at": "2026-07-31T16:10:00Z",
-        "extensions_used": 0,
-        "extension_cap_seconds": 7200,
-        "bootstrap_owner_decision_id": None,
-        "bootstrap_project_id": None,
-        "bootstrap_work_item_id": None,
-        "bootstrap_authorization_id": None,
-        "bootstrap_carrier_targets": None,
-        "bootstrap_consumed_at": None,
-    }
-    monkeypatch.setattr(auth_module, "work_intent_claim_block_reason", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(
-        auth_module.bridge_work_intent_registry,
-        "current_holder",
-        lambda *_args, **_kwargs: holder,
-    )
-    monkeypatch.setattr(
-        auth_module,
-        "validate_packet_project_authorization_operation",
-        lambda *_args, **_kwargs: None,
-    )
-
-    packet: dict[str, Any] = {
-        "schema_version": 2,
-        "bridge_id": "wi5830-fixture",
-        "target_path_globs": ["scripts/implementation_authorization.py"],
-    }
-    packet["packet_hash"] = auth_module.packet_hash(packet)
-
-    finalized = auth_module.finalize_implementation_start_packet(tmp_path, packet, session_id=session_id)
-
-    provenance = finalized["implementation_start"]["worker_role_provenance"]
-    assert provenance["harness_name"] == "goose"
-    assert provenance["role"] == "prime-builder"
-
-
-def test_codex_thread_id_still_selects_codex(auth_module, monkeypatch: pytest.MonkeyPatch) -> None:
-    """CODEX_THREAD_ID alone still selects 'codex'."""
-    monkeypatch.setenv("CODEX_THREAD_ID", "codex-session-abc")
-    for name in (
-        "GTKB_HARNESS_NAME",
-        "GTKB_BRIDGE_POLLER_RUN_ID",
-        "CLAUDE_CODE_SESSION_ID",
-        "CLAUDECODE",
-        "CODEX_HOME",
-    ):
-        monkeypatch.delenv(name, raising=False)
-    assert auth_module._worker_harness_selector() == "codex"
-
-
-# ---------------------------------------------------------------------------
-# Slice B: Packet-path disclosure
-# ---------------------------------------------------------------------------
-
-
-def test_begin_stdout_includes_packet_paths(auth_module, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """begin success stdout includes packet_paths with named and active_pointer."""
 
     # We test the internal write_started_packets return value shape
@@ -180,14 +52,14 @@ def test_begin_stdout_includes_packet_paths(auth_module, tmp_path: Path, monkeyp
         "target_path_globs": ["scripts/implementation_authorization.py"],
         "packet_hash": "stub-not-real",
         "implementation_start": {
-            "schema_version": 1,
+            "schema_version": 2,
             "finalized_at": "2026-07-31T14:00:00Z",
             "bridge_id": "wi5830-path-test",
             "session_id": "test-session",
             "pre_start_packet_hash": "stub-not-real",
             "target_path_globs": ["scripts/implementation_authorization.py"],
             "work_intent_claim": {},
-            "worker_role_provenance": {},
+            "role_attestation": {},
             "project_authorization_decision": {},
         },
     }
@@ -211,7 +83,9 @@ def test_begin_stdout_includes_packet_paths(auth_module, tmp_path: Path, monkeyp
 # ---------------------------------------------------------------------------
 
 
-def test_rerun_begin_versions_previous_packet(auth_module, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_rerun_begin_versions_previous_packet(
+    auth_module, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Re-running begin for the same bridge versions rather than overwrites."""
     bridge_id = "wi5830-overwrite-test"
 
@@ -254,7 +128,9 @@ def test_rerun_begin_versions_previous_packet(auth_module, tmp_path: Path, monke
     assert history_bytes == saved_bytes1
 
 
-def test_byte_identical_rewrite_creates_no_history_entry(auth_module, tmp_path: Path) -> None:
+def test_byte_identical_rewrite_creates_no_history_entry(
+    auth_module, tmp_path: Path
+) -> None:
     """A byte-identical rewrite creates no history entry."""
     bridge_id = "wi5830-identical-test"
 
@@ -267,7 +143,13 @@ def test_byte_identical_rewrite_creates_no_history_entry(auth_module, tmp_path: 
 
     # Write once
     auth_module.write_named_packet(tmp_path, packet, bridge_id)
-    history_dir = tmp_path / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / f"{bridge_id}.history"
+    history_dir = (
+        tmp_path
+        / ".gtkb-state"
+        / "implementation-authorizations"
+        / "by-bridge"
+        / f"{bridge_id}.history"
+    )
 
     # Write identical packet again
     auth_module.write_named_packet(tmp_path, packet, bridge_id)

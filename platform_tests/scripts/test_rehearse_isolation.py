@@ -12,19 +12,47 @@ Per `bridge/gtkb-isolation-016-phase8-rehearsal-implementation-013.md`
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
-import rehearse_isolation as driver  # noqa: E402
-from rehearse._common import (  # noqa: E402
-    LEGACY_CONFLATED_SURFACES,
-    TargetRootError,
-    hash_set_walk,
-    validate_target_root,
-)
+
+def _load_rehearse_file(stem: str):
+    path = Path(__file__).resolve().parents[2] / "scripts" / "rehearse" / f"{stem}.py"
+    if not path.is_file():
+        pytest.skip(f"scripts/rehearse/{stem}.py is absent", allow_module_level=True)
+    name = f"wi6583_rehearse_{stem}"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        pytest.skip(f"unable to load {path.as_posix()}", allow_module_level=True)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_rehearse_isolation():
+    path = Path(__file__).resolve().parents[2] / "scripts" / "rehearse_isolation.py"
+    if not path.is_file():
+        pytest.skip("scripts/rehearse_isolation.py is absent", allow_module_level=True)
+    name = "wi6583_rehearse_isolation"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        pytest.skip(f"unable to load {path.as_posix()}", allow_module_level=True)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_common = _load_rehearse_file("_common")
+driver = _load_rehearse_isolation()
+LEGACY_CONFLATED_SURFACES = _common.LEGACY_CONFLATED_SURFACES
+TargetRootError = _common.TargetRootError
+hash_set_walk = _common.hash_set_walk
+validate_target_root = _common.validate_target_root
 
 # ============================================================================
 # T-DRIVER-1: refusal logic (parametric over conflated surfaces)
@@ -91,14 +119,18 @@ def test_target_root_allowed_for_valid_names(name: str) -> None:
     validate_target_root(good)
 
 
-def test_target_root_allowed_outside_legacy_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_target_root_allowed_outside_legacy_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A path outside the configured legacy root is allowed."""
     from rehearse import _common
 
     synthetic_legacy_root = tmp_path / "synthetic-legacy"
     outside_target = tmp_path / "sandbox" / "anywhere"
     monkeypatch.setattr(_common, "LEGACY_ROOT", synthetic_legacy_root)
-    monkeypatch.setattr(_common, "APPLICATIONS_NAMESPACE", synthetic_legacy_root / "applications")
+    monkeypatch.setattr(
+        _common, "APPLICATIONS_NAMESPACE", synthetic_legacy_root / "applications"
+    )
 
     assert not outside_target.is_relative_to(synthetic_legacy_root)
     validate_target_root(outside_target)
@@ -185,7 +217,9 @@ def test_dispatch_table_contains_required_lanes() -> None:
         "rollback",
     }
     actual = {entry[0] for entry in driver.DISPATCH_TABLE}
-    assert actual == required, f"Lane mismatch. Missing: {required - actual}; Extra: {actual - required}"
+    assert actual == required, (
+        f"Lane mismatch. Missing: {required - actual}; Extra: {actual - required}"
+    )
 
 
 def test_phase_choices_includes_all_dispatch_plus_aggregates() -> None:
@@ -239,11 +273,16 @@ def test_manifest_validation_accepts_canonical_paths(tmp_path: Path) -> None:
 
 import json as _json  # noqa: E402
 
-import rehearse_isolation as _driver  # noqa: E402
-from rehearse._common import LEGACY_ROOT, ManifestValidationError  # noqa: E402
+_driver = driver
+LEGACY_ROOT = _common.LEGACY_ROOT
+ManifestValidationError = _common.ManifestValidationError
 
 _PRODUCTION_MANIFEST_PATH = (
-    LEGACY_ROOT / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX" / "rehearsal" / "manifest.toml"
+    LEGACY_ROOT
+    / "independent-progress-assessments"
+    / "CODEX-INSIGHT-DROPBOX"
+    / "rehearsal"
+    / "manifest.toml"
 )
 
 
@@ -255,7 +294,9 @@ def _slice3_skip_if_no_production_manifest():
 # ----- F1: --execute opt-in semantics -----
 
 
-def test_main_loads_manifest_at_wave2_for_verify_phase(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_loads_manifest_at_wave2_for_verify_phase(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Phase-to-wave mapping: --phase verify still loads at wave=2 (Wave 2 phases unchanged).
 
     Per bridge/gtkb-isolation-016-phase8-wave3-execution-007.md F2 fix:
@@ -302,7 +343,9 @@ def test_main_loads_manifest_at_wave_3_when_db_filter_dryrun_phase_requested(
 
     monkeypatch.setattr(_driver, "load_manifest", _spy_load)
     _driver.main(["--phase", "db-filter-dryrun"])
-    assert captured["wave"] == 3, "db-filter-dryrun must trigger wave=3 manifest validation"
+    assert captured["wave"] == 3, (
+        "db-filter-dryrun must trigger wave=3 manifest validation"
+    )
 
 
 # ----- T19: CLI rejects unresolved db_reconciliation_strategy -----
@@ -335,7 +378,9 @@ def test_main_rejects_unresolved_db_reconciliation_strategy_via_cli_when_db_filt
         encoding="utf-8",
     )
     rc = _driver.main(["--phase", "db-filter-dryrun", "--manifest", str(manifest_path)])
-    assert rc == _driver.EXIT_USAGE, "CLI must reject unresolved db_reconciliation_strategy at wave=3"
+    assert rc == _driver.EXIT_USAGE, (
+        "CLI must reject unresolved db_reconciliation_strategy at wave=3"
+    )
 
 
 @pytest.mark.skipif(
@@ -419,7 +464,9 @@ def test_dispatch_lane_module_missing_returns_skipped() -> None:
     intent — that the dispatcher correctly distinguishes "module not on
     disk" from runtime defects — is unchanged.
     """
-    result = _driver._dispatch("rollback", manifest={}, output_dir=Path("ignored"), dry_run=True)
+    result = _driver._dispatch(
+        "rollback", manifest={}, output_dir=Path("ignored"), dry_run=True
+    )
     assert result["status"] == "skipped"
     assert any("not yet implemented" in w for w in result["warnings"])
 
@@ -439,9 +486,14 @@ def test_dispatch_lane_module_broken_dependency_returns_error(
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(_driver.importlib, "import_module", _broken_import)
-    result = _driver._dispatch("rewrite", manifest={}, output_dir=Path("ignored"), dry_run=True)
+    result = _driver._dispatch(
+        "rewrite", manifest={}, output_dir=Path("ignored"), dry_run=True
+    )
     assert result["status"] == "error"
-    assert any("missing dependency" in w and "some_missing_dependency" in w for w in result["warnings"])
+    assert any(
+        "missing dependency" in w and "some_missing_dependency" in w
+        for w in result["warnings"]
+    )
 
 
 def test_dispatch_lane_module_missing_run_function_returns_error(
@@ -459,7 +511,9 @@ def test_dispatch_lane_module_missing_run_function_returns_error(
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(_driver.importlib, "import_module", _import_module_without_run)
-    result = _driver._dispatch("rewrite", manifest={}, output_dir=Path("ignored"), dry_run=True)
+    result = _driver._dispatch(
+        "rewrite", manifest={}, output_dir=Path("ignored"), dry_run=True
+    )
     assert result["status"] == "error"
     assert any("module exists but has no" in w for w in result["warnings"])
 
@@ -481,7 +535,9 @@ def test_dispatch_unknown_phase_raises_valueerror() -> None:
     sys.platform != "win32",
     reason="rehearse driver loads production manifest with Windows-rooted paths; cannot validate on Linux",
 )
-def test_run_summary_written_when_lane_returns_ok(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_run_summary_written_when_lane_returns_ok(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Summary file appears when at least one lane returns ok."""
     _slice3_skip_if_no_production_manifest()
     output_dir = tmp_path / "run-output"
@@ -490,7 +546,9 @@ def test_run_summary_written_when_lane_returns_ok(monkeypatch: pytest.MonkeyPatc
         return {"status": "ok", "output_files": [], "metrics": {}, "warnings": []}
 
     monkeypatch.setattr(_driver, "_dispatch", _spy_dispatch)
-    monkeypatch.setattr(_driver, "_resolve_output_dir", lambda m, override=None: output_dir)
+    monkeypatch.setattr(
+        _driver, "_resolve_output_dir", lambda m, override=None: output_dir
+    )
     rc = _driver.main(["--phase", "inventory", "--execute"])
     assert rc == _driver.EXIT_OK
     summary_path = output_dir / "run-summary.json"
@@ -504,7 +562,9 @@ def test_run_summary_written_when_lane_returns_ok(monkeypatch: pytest.MonkeyPatc
     sys.platform != "win32",
     reason="rehearse driver loads production manifest with Windows-rooted paths; cannot validate on Linux",
 )
-def test_run_summary_not_written_when_all_lanes_skipped(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_run_summary_not_written_when_all_lanes_skipped(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Summary file does NOT appear if every lane returned skipped."""
     _slice3_skip_if_no_production_manifest()
     output_dir = tmp_path / "run-output-skipped"
@@ -518,11 +578,15 @@ def test_run_summary_not_written_when_all_lanes_skipped(monkeypatch: pytest.Monk
         }
 
     monkeypatch.setattr(_driver, "_dispatch", _all_skipped_dispatch)
-    monkeypatch.setattr(_driver, "_resolve_output_dir", lambda m, override=None: output_dir)
+    monkeypatch.setattr(
+        _driver, "_resolve_output_dir", lambda m, override=None: output_dir
+    )
     rc = _driver.main(["--phase", "rewrite"])
     assert rc == _driver.EXIT_OK
     summary_path = output_dir / "run-summary.json"
-    assert not summary_path.exists(), "run-summary.json should NOT be emitted when every lane was skipped"
+    assert not summary_path.exists(), (
+        "run-summary.json should NOT be emitted when every lane was skipped"
+    )
 
 
 # ----- Slice 4: rewrite lane is now implemented (driver integration) -----
@@ -562,7 +626,9 @@ def test_driver_dispatches_path_rewrite_lane_with_module_now_present(
                 ),
                 encoding="utf-8",
             )
-        return _subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+        return _subprocess.CompletedProcess(
+            args=cmd, returncode=0, stdout="", stderr=""
+        )
 
     monkeypatch.setattr(_subprocess, "run", _fake_run)
 
@@ -583,5 +649,7 @@ def test_driver_dispatches_path_rewrite_lane_with_module_now_present(
     # didn't exist on disk. Post-Slice-4: must be "ok" — the rewrite lane is
     # implemented and the synthetic empty classification produces a valid
     # (zero-rewrite) result.
-    assert result["status"] == "ok", f"rewrite lane should be implemented post-Slice-4, got {result}"
+    assert result["status"] == "ok", (
+        f"rewrite lane should be implemented post-Slice-4, got {result}"
+    )
     assert result["status"] != "skipped"

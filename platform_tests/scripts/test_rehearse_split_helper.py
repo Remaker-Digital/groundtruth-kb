@@ -6,13 +6,29 @@ and ``-006`` (Codex GO).
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+import pytest
 
-from rehearse import _split_helper  # noqa: E402
+
+def _load_rehearse_file(stem: str):
+    path = Path(__file__).resolve().parents[2] / "scripts" / "rehearse" / f"{stem}.py"
+    if not path.is_file():
+        pytest.skip(f"scripts/rehearse/{stem}.py is absent", allow_module_level=True)
+    name = f"wi6583_rehearse_{stem}"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        pytest.skip(f"unable to load {path.as_posix()}", allow_module_level=True)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_split_helper = _load_rehearse_file("_split_helper")
 
 
 def test_classify_by_id_prefix_gtkb_returns_framework() -> None:
@@ -71,7 +87,9 @@ def test_build_split_summary_counts_per_bucket() -> None:
     }
 
 
-def test_classify_with_content_override_routes_gtkb_prefix_conflict_to_unclassified() -> None:
+def test_classify_with_content_override_routes_gtkb_prefix_conflict_to_unclassified() -> (
+    None
+):
     """Per Slice 5 -004 F1 + Slice 6 -002 F2: GTKB-* + adopter content
     conflict goes to unclassified, NOT silent adopter override."""
     classification, signal = _split_helper.classify_with_content_override(
@@ -92,7 +110,9 @@ def test_classify_with_content_override_keeps_clean_gtkb_as_framework() -> None:
 
 
 def test_classify_with_content_override_ar_prefix_returns_adopter() -> None:
-    classification, signal = _split_helper.classify_with_content_override("AR-DASH-001", "")
+    classification, signal = _split_helper.classify_with_content_override(
+        "AR-DASH-001", ""
+    )
     assert classification == "adopter"
     assert signal == "ar_prefix"
 

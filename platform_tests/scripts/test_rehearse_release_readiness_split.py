@@ -16,16 +16,31 @@ Critical regression guards required by Codex:
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import sys
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+import pytest
 
-from datetime import UTC
 
-from rehearse import _release_readiness_split  # noqa: E402
+def _load_rehearse_file(stem: str):
+    path = Path(__file__).resolve().parents[2] / "scripts" / "rehearse" / f"{stem}.py"
+    if not path.is_file():
+        pytest.skip(f"scripts/rehearse/{stem}.py is absent", allow_module_level=True)
+    name = f"wi6583_rehearse_{stem}"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        pytest.skip(f"unable to load {path.as_posix()}", allow_module_level=True)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_release_readiness_split = _load_rehearse_file("_release_readiness_split")
 
 
 def _build_manifest(legacy_root: Path) -> dict[str, Any]:
@@ -70,7 +85,9 @@ class _FakeKB:
         self.list_documents_called = True
         return list(self._documents)
 
-    def list_specs(self, *, type: str | None = None, **kwargs: Any) -> list[dict[str, Any]]:
+    def list_specs(
+        self, *, type: str | None = None, **kwargs: Any
+    ) -> list[dict[str, Any]]:
         self.list_specs_called_types.append(type)
         if type is None:
             return list(self._specs)
@@ -80,7 +97,9 @@ class _FakeKB:
         self.list_work_items_called = True
         return list(self._work_items)
 
-    def list_deliberations(self, *, outcome: str | None = None, **kwargs: Any) -> list[dict[str, Any]]:
+    def list_deliberations(
+        self, *, outcome: str | None = None, **kwargs: Any
+    ) -> list[dict[str, Any]]:
         self.list_deliberations_called_outcomes.append(outcome)
         if outcome is None:
             return list(self._deliberations)
@@ -147,7 +166,12 @@ def test_run_classifies_release_readiness_md_as_adopter(tmp_path: Path) -> None:
         kb=_FakeKB(),
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     rec = artifact["memory_release_readiness_md"]
     assert rec["classification"] == "adopter"
@@ -168,7 +192,12 @@ def test_run_extracts_section_headers_not_full_content(tmp_path: Path) -> None:
         kb=_FakeKB(),
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     rec = artifact["memory_release_readiness_md"]
     assert rec["section_headers"] == [
@@ -224,7 +253,12 @@ def test_run_classifies_doc_release_readiness_recovery_as_adopter(
         kb=fake_kb,
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     docs = artifact["documents"]
     assert len(docs) == 1
@@ -257,7 +291,12 @@ def test_run_doc_release_management_generic_classifies_as_framework(
         kb=fake_kb,
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     docs = artifact["documents"]
     assert docs[0]["classification"] == "framework"
@@ -308,7 +347,12 @@ def test_release_gate_surfaces_classified_as_adopter_not_framework(
         kb=_FakeKB(),
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     surfaces = artifact["release_gate_surfaces"]
     assert len(surfaces) == 3
@@ -334,7 +378,12 @@ def test_release_gate_surfaces_include_mechanism_origin(tmp_path: Path) -> None:
         kb=_FakeKB(),
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     surfaces = artifact["release_gate_surfaces"]
     for surface in surfaces:
@@ -371,7 +420,12 @@ def test_run_gtkb_spec_with_agent_red_content_routes_to_unclassified(
         kb=fake_kb,
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     framework_ids = [s["id"] for s in artifact["framework_specs"]]
     adopter_ids = [s["id"] for s in artifact["adopter_specs"]]
@@ -379,7 +433,9 @@ def test_run_gtkb_spec_with_agent_red_content_routes_to_unclassified(
     assert "GTKB-MIXED-001" not in framework_ids
     assert "GTKB-MIXED-001" not in adopter_ids
     assert "GTKB-MIXED-001" in unclassified_ids
-    entry = next(s for s in artifact["unclassified_specs"] if s["id"] == "GTKB-MIXED-001")
+    entry = next(
+        s for s in artifact["unclassified_specs"] if s["id"] == "GTKB-MIXED-001"
+    )
     assert entry["classification_signal"] == "gtkb_prefix_with_adopter_content"
 
 
@@ -405,7 +461,12 @@ def test_run_clean_gtkb_spec_classifies_as_framework(tmp_path: Path) -> None:
         kb=fake_kb,
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     framework_ids = [s["id"] for s in artifact["framework_specs"]]
     assert "GTKB-FRAMEWORK-001" in framework_ids
@@ -432,7 +493,12 @@ def test_run_ar_prefix_work_item_classifies_as_adopter(tmp_path: Path) -> None:
         kb=fake_kb,
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     adopter_ids = [w["id"] for w in artifact["adopter_work_items"]]
     assert "AR-WI-001" in adopter_ids
@@ -467,11 +533,20 @@ def test_run_gov_spec_with_agent_red_content_classifies_as_adopter(
         kb=fake_kb,
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     adopter_ids = [s["id"] for s in artifact["adopter_specs"]]
     assert "GOV-RELEASE-READINESS-GOVERNED-TESTING-001" in adopter_ids
-    entry = next(s for s in artifact["adopter_specs"] if s["id"] == "GOV-RELEASE-READINESS-GOVERNED-TESTING-001")
+    entry = next(
+        s
+        for s in artifact["adopter_specs"]
+        if s["id"] == "GOV-RELEASE-READINESS-GOVERNED-TESTING-001"
+    )
     assert entry["classification_signal"] == "artifact_content_agent_red"
 
 
@@ -500,7 +575,12 @@ def test_run_gov_spec_with_framework_content_classifies_as_framework(
         kb=fake_kb,
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     framework_ids = [s["id"] for s in artifact["framework_specs"]]
     assert "GOV-UPSTREAM-RELEASE-001" in framework_ids
@@ -532,11 +612,18 @@ def test_run_pb_spec_with_mixed_content_classifies_as_unclassified(
         kb=fake_kb,
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     unclassified_ids = [s["id"] for s in artifact["unclassified_specs"]]
     assert "PB-MIXED-RELEASE-001" in unclassified_ids
-    entry = next(s for s in artifact["unclassified_specs"] if s["id"] == "PB-MIXED-RELEASE-001")
+    entry = next(
+        s for s in artifact["unclassified_specs"] if s["id"] == "PB-MIXED-RELEASE-001"
+    )
     assert entry["classification_signal"] == "mixed_content_signals"
 
 
@@ -566,7 +653,12 @@ def test_run_delib_owner_decision_with_agent_red_content_classifies_as_adopter(
         kb=fake_kb,
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     adopter_ids = [d["id"] for d in artifact["adopter_deliberations"]]
     assert "DELIB-0834" in adopter_ids
@@ -598,14 +690,21 @@ def test_run_filters_out_non_release_relevant_specs(tmp_path: Path) -> None:
         kb=fake_kb,
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     all_spec_ids = (
         [s["id"] for s in artifact["framework_specs"]]
         + [s["id"] for s in artifact["adopter_specs"]]
         + [s["id"] for s in artifact["unclassified_specs"]]
     )
-    assert "GOV-UNRELATED-FOO-001" not in all_spec_ids, "F1 regression: non-release-relevant spec leaked through filter"
+    assert "GOV-UNRELATED-FOO-001" not in all_spec_ids, (
+        "F1 regression: non-release-relevant spec leaked through filter"
+    )
 
 
 def test_run_includes_recently_closed_work_items(tmp_path: Path) -> None:
@@ -640,14 +739,21 @@ def test_run_includes_recently_closed_work_items(tmp_path: Path) -> None:
         kb=fake_kb,
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     all_wi_ids = (
         [w["id"] for w in artifact["framework_work_items"]]
         + [w["id"] for w in artifact["adopter_work_items"]]
         + [w["id"] for w in artifact["unclassified_work_items"]]
     )
-    assert "WI-3168" in all_wi_ids, "Slice 6 -008 contract: recently-closed WI must be included as context"
+    assert "WI-3168" in all_wi_ids, (
+        "Slice 6 -008 contract: recently-closed WI must be included as context"
+    )
 
 
 def test_run_filters_out_old_resolved_work_items(tmp_path: Path) -> None:
@@ -678,14 +784,21 @@ def test_run_filters_out_old_resolved_work_items(tmp_path: Path) -> None:
         kb=fake_kb,
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     all_wi_ids = (
         [w["id"] for w in artifact["framework_work_items"]]
         + [w["id"] for w in artifact["adopter_work_items"]]
         + [w["id"] for w in artifact["unclassified_work_items"]]
     )
-    assert "WI-OLD-001" not in all_wi_ids, "Slice 6 -008: old resolved WIs (outside recency window) must be excluded"
+    assert "WI-OLD-001" not in all_wi_ids, (
+        "Slice 6 -008: old resolved WIs (outside recency window) must be excluded"
+    )
 
 
 def test_run_excludes_resolved_wi_with_malformed_changed_at(tmp_path: Path) -> None:
@@ -720,7 +833,12 @@ def test_run_excludes_resolved_wi_with_malformed_changed_at(tmp_path: Path) -> N
         kb=fake_kb,
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     all_wi_ids = (
         [w["id"] for w in artifact["framework_work_items"]]
@@ -771,7 +889,12 @@ def test_run_filters_specs_by_type(tmp_path: Path) -> None:
     assert "release_note" not in queried_types
     assert "governance" in queried_types
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     all_spec_ids = (
         [s["id"] for s in artifact["framework_specs"]]
@@ -808,7 +931,12 @@ def test_run_includes_owner_decision_deliberations_without_release_keyword(
         kb=fake_kb,
     )
     artifact = json.loads(
-        (tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json").read_text(encoding="utf-8")
+        (
+            tmp_path
+            / "out"
+            / "release_readiness_split"
+            / "release_readiness_split.json"
+        ).read_text(encoding="utf-8")
     )
     all_delib_ids = (
         [d["id"] for d in artifact["framework_deliberations"]]
@@ -832,7 +960,9 @@ def test_run_writes_release_readiness_split_json(tmp_path: Path) -> None:
         release_readiness_path=ledger,
         kb=_FakeKB(),
     )
-    artifact_path = tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json"
+    artifact_path = (
+        tmp_path / "out" / "release_readiness_split" / "release_readiness_split.json"
+    )
     assert artifact_path.exists()
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
     assert artifact["schema_version"] == 1

@@ -12,7 +12,9 @@ MODULE_PATH = ROOT / "scripts" / "ops" / "codex_snapshot_window_hider.py"
 
 
 def _load_module():
-    spec = importlib.util.spec_from_file_location("codex_snapshot_window_hider_under_test", MODULE_PATH)
+    spec = importlib.util.spec_from_file_location(
+        "codex_snapshot_window_hider_under_test", MODULE_PATH
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -35,7 +37,9 @@ class _Process:
         return self._parent
 
 
-def _marker_qualified_command(*git_arguments: str, executable: str = "git.exe") -> list[str]:
+def _marker_qualified_command(
+    *git_arguments: str, executable: str = "git.exe"
+) -> list[str]:
     return [
         executable,
         "-c",
@@ -83,10 +87,14 @@ def test_exact_codex_snapshot_console_is_hidden_once() -> None:
         ("add", "--pathspec-from-file=-"),
     ],
 )
-def test_observed_codex_git_manager_command_shapes_qualify(git_arguments: tuple[str, ...]) -> None:
+def test_observed_codex_git_manager_command_shapes_qualify(
+    git_arguments: tuple[str, ...],
+) -> None:
     module = _load_module()
 
-    assert module.is_codex_git_manager_commandline(_marker_qualified_command(*git_arguments))
+    assert module.is_codex_git_manager_commandline(
+        _marker_qualified_command(*git_arguments)
+    )
 
 
 @pytest.mark.parametrize(
@@ -99,7 +107,9 @@ def test_observed_codex_git_manager_command_shapes_qualify(git_arguments: tuple[
 def test_outer_and_inner_git_executable_paths_qualify(executable: str) -> None:
     module = _load_module()
 
-    assert module.is_codex_git_manager_commandline(_marker_qualified_command("status", executable=executable))
+    assert module.is_codex_git_manager_commandline(
+        _marker_qualified_command("status", executable=executable)
+    )
 
 
 def test_case_insensitive_marker_keys_and_extra_config_qualify() -> None:
@@ -156,10 +166,21 @@ def test_case_insensitive_marker_keys_and_extra_config_qualify() -> None:
         ["git", "-c", "core.hooksPath=NUL", "-c", "core.fsmonitor=", "status"],
         ["cmd.exe", "-c", "core.hooksPath=NUL", "-c", "core.fsmonitor=", "status"],
         ["git.exe", "status", "-c", "core.hooksPath=NUL", "-c", "core.fsmonitor="],
-        ["git.exe", "-c", "user.name", "-c", "core.hooksPath=NUL", "-c", "core.fsmonitor=", "status"],
+        [
+            "git.exe",
+            "-c",
+            "user.name",
+            "-c",
+            "core.hooksPath=NUL",
+            "-c",
+            "core.fsmonitor=",
+            "status",
+        ],
     ],
 )
-def test_missing_duplicate_malformed_and_near_miss_commands_are_rejected(commandline: list[str]) -> None:
+def test_missing_duplicate_malformed_and_near_miss_commands_are_rejected(
+    commandline: list[str],
+) -> None:
     module = _load_module()
 
     assert module.is_codex_git_manager_commandline(commandline) is False
@@ -169,7 +190,6 @@ def test_missing_duplicate_malformed_and_near_miss_commands_are_rejected(command
     ("console_name", "git_args", "ancestor_name"),
     [
         ("cmd.exe", _marker_qualified_command("add", "-u"), "ChatGPT.exe"),
-        ("conhost.exe", ["git.exe", "status"], "ChatGPT.exe"),
         (
             "conhost.exe",
             _marker_qualified_command("add", "-u"),
@@ -177,7 +197,9 @@ def test_missing_duplicate_malformed_and_near_miss_commands_are_rejected(command
         ),
     ],
 )
-def test_near_miss_process_topologies_remain_untouched(console_name, git_args, ancestor_name) -> None:
+def test_near_miss_process_topologies_remain_untouched(
+    console_name, git_args, ancestor_name
+) -> None:
     module = _load_module()
     ancestor = _Process(ancestor_name)
     git = _Process("git.exe", git_args, ancestor)
@@ -201,24 +223,33 @@ def test_non_git_parent_process_remains_untouched() -> None:
     parent = _Process("cmd.exe", _marker_qualified_command("status"), chatgpt)
     console = _Process("conhost.exe", parent=parent)
 
-    assert module.is_qualifying_console_process(31, process_factory=lambda pid: console) is False
+    assert (
+        module.is_qualifying_console_process(31, process_factory=lambda pid: console)
+        is False
+    )
 
 
-def test_nested_git_ancestry_remains_untouched() -> None:
+def test_nested_git_ancestry_qualifies() -> None:
+    """WI-5298: intermediate nested git.exe ancestors remain acceptable."""
     module = _load_module()
     chatgpt = _Process("ChatGPT.exe")
     outer_git = _Process("git.exe", ["git.exe", "status"], chatgpt)
     snapshot_git = _Process("git.exe", _marker_qualified_command("status"), outer_git)
     console = _Process("conhost.exe", parent=snapshot_git)
 
-    assert module.is_qualifying_console_process(31, process_factory=lambda pid: console) is False
+    assert (
+        module.is_qualifying_console_process(31, process_factory=lambda pid: console)
+        is True
+    )
 
 
 def test_bounded_non_git_intermediary_preserves_chatgpt_ancestry() -> None:
     module = _load_module()
     chatgpt = _Process("ChatGPT.exe")
     intermediary = _Process("cmd.exe", parent=chatgpt)
-    snapshot_git = _Process("git.exe", _marker_qualified_command("status"), intermediary)
+    snapshot_git = _Process(
+        "git.exe", _marker_qualified_command("status"), intermediary
+    )
     console = _Process("conhost.exe", parent=snapshot_git)
 
     assert module.is_qualifying_console_process(31, process_factory=lambda pid: console)
@@ -232,7 +263,10 @@ def test_chatgpt_ancestry_beyond_bound_remains_untouched() -> None:
     snapshot_git = _Process("git.exe", _marker_qualified_command("status"), ancestor)
     console = _Process("conhost.exe", parent=snapshot_git)
 
-    assert module.is_qualifying_console_process(31, process_factory=lambda pid: console) is False
+    assert (
+        module.is_qualifying_console_process(31, process_factory=lambda pid: console)
+        is False
+    )
 
 
 def test_process_inspection_failure_leaves_window_visible() -> None:
@@ -274,7 +308,9 @@ def test_missing_process_metadata_leaves_window_visible() -> None:
         (0x8002, 9005, 0, 1),
     ],
 )
-def test_non_target_window_events_are_rejected(event, hwnd, object_id, child_id) -> None:
+def test_non_target_window_events_are_rejected(
+    event, hwnd, object_id, child_id
+) -> None:
     module = _load_module()
 
     assert module.is_target_window_show_event(event, hwnd, object_id, child_id) is False
@@ -283,23 +319,29 @@ def test_non_target_window_events_are_rejected(event, hwnd, object_id, child_id)
 def test_top_level_window_show_event_is_accepted() -> None:
     module = _load_module()
 
-    assert module.is_target_window_show_event(module.EVENT_OBJECT_SHOW, 9006, module.OBJID_WINDOW, 0)
+    assert module.is_target_window_show_event(
+        module.EVENT_OBJECT_SHOW, 9006, module.OBJID_WINDOW, 0
+    )
 
 
 def test_source_contains_only_hide_side_effect_and_no_dispatch_controls() -> None:
     body = MODULE_PATH.read_text(encoding="utf-8")
+    module = _load_module()
 
     assert "ShowWindowAsync" in body
     assert "SW_HIDE" in body
     assert "CreateMutexW" in body
     assert "ERROR_ALREADY_EXISTS" in body
-    assert module_mutex_name_is_stable(body)
+    assert module.MUTEX_NAME == r"Local\GTKB-CodexSnapshotWindowHider-v2"
+    assert "GTKB-CodexSnapshotWindowHider-v1" not in body
     for forbidden in (
         ".kill(",
         ".terminate(",
         "taskkill",
         "TerminateProcess",
         "SuspendThread",
+        "SetPriorityClass",
+        "GenerateConsoleCtrlEvent",
         "can_receive_dispatch",
         "dispatch_quality",
         "harness-registry",
@@ -308,5 +350,96 @@ def test_source_contains_only_hide_side_effect_and_no_dispatch_controls() -> Non
         assert forbidden not in body
 
 
-def module_mutex_name_is_stable(body: str) -> bool:
-    return 'MUTEX_NAME = "Local\\\\GTKB-CodexSnapshotWindowHider-v1"' in body
+@pytest.mark.parametrize(
+    "git_arguments",
+    [
+        ("add", "-u"),
+        ("status", "--short"),
+        ("diff", "--cached", "--quiet"),
+        ("ls-files", "--others", "--exclude-standard"),
+        ("rev-parse", "HEAD"),
+        ("remote", "-v"),
+        ("config", "--get", "remote.origin.url"),
+    ],
+)
+def test_provenance_qualified_git_family_is_hidden(
+    git_arguments: tuple[str, ...],
+) -> None:
+    """WI-5298: Git verbs are presentation-equivalent; arguments are not an allowlist."""
+    module = _load_module()
+    hidden: list[int] = []
+
+    result = module.hide_qualifying_window(
+        9010,
+        pid_resolver=lambda hwnd: 30,
+        hide_window=lambda hwnd: hidden.append(hwnd) or True,
+        process_factory=_qualifying_process_factory(["git.exe", *git_arguments]),
+    )
+
+    assert result is True
+    assert hidden == [9010]
+
+
+def test_unmarked_git_status_with_chatgpt_ancestry_is_hidden() -> None:
+    """WI-5298: git status without Codex -c markers still qualifies by provenance."""
+    module = _load_module()
+    hidden: list[int] = []
+
+    result = module.hide_qualifying_window(
+        9011,
+        pid_resolver=lambda hwnd: 30,
+        hide_window=lambda hwnd: hidden.append(hwnd) or True,
+        process_factory=_qualifying_process_factory(["git.exe", "status"]),
+    )
+
+    assert result is True
+    assert hidden == [9011]
+
+
+def test_transient_metadata_failure_recovers_on_retry() -> None:
+    """WI-5298: one bounded retry recovers once metadata becomes available."""
+    module = _load_module()
+    chatgpt = _Process("ChatGPT.exe")
+    git = _Process("git.exe", ["git.exe", "status"], chatgpt)
+    conhost = _Process("conhost.exe", parent=git)
+    calls = {"n": 0}
+
+    def factory(pid: int):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OSError("access denied")
+        return conhost if pid == 34 else None
+
+    hidden: list[int] = []
+    result = module.hide_qualifying_window(
+        9012,
+        pid_resolver=lambda hwnd: 34,
+        hide_window=lambda hwnd: hidden.append(hwnd) or True,
+        process_factory=factory,
+    )
+
+    assert result is True
+    assert hidden == [9012]
+    assert calls["n"] == 2
+
+
+def test_exhausted_metadata_retry_fails_open() -> None:
+    """WI-5298: persistent metadata failure leaves the window visible."""
+    module = _load_module()
+    calls = {"n": 0}
+
+    def factory(pid: int):
+        calls["n"] += 1
+        raise OSError("access denied")
+
+    hidden: list[int] = []
+    result = module.hide_qualifying_window(
+        9013,
+        pid_resolver=lambda hwnd: 35,
+        hide_window=lambda hwnd: hidden.append(hwnd) or True,
+        process_factory=factory,
+    )
+
+    assert result is False
+    assert hidden == []
+    assert calls["n"] == 2

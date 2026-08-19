@@ -278,7 +278,9 @@ def _isolated_environment(host: Path) -> dict[str, str]:
 
 
 def _build_wheel_offline(project_root: Path, output_dir: Path) -> Path:
-    config = tomllib.loads((project_root / "pyproject.toml").read_text(encoding="utf-8"))
+    config = tomllib.loads(
+        (project_root / "pyproject.toml").read_text(encoding="utf-8")
+    )
     requirement = config["build-system"]["requires"]
     assert requirement == [BUILD_BACKEND_REQUIREMENT]
     assert metadata.version("hatchling") == "1.29.0"
@@ -360,7 +362,9 @@ def _run_probe(host: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_fresh_worker_bootstraps_from_only_copied_product_assets(fresh_host: Path) -> None:
+def test_fresh_worker_bootstraps_from_only_copied_product_assets(
+    fresh_host: Path,
+) -> None:
     result = _run_probe(fresh_host)
 
     assert result.returncode == 0, result.stderr or result.stdout
@@ -373,7 +377,9 @@ def test_fresh_worker_bootstraps_from_only_copied_product_assets(fresh_host: Pat
     assert payload["isolation"]["outside_copy"] == {}
 
 
-def test_project_context_override_cannot_fall_back_to_packaged_assets(fresh_host: Path) -> None:
+def test_project_context_override_cannot_fall_back_to_packaged_assets(
+    fresh_host: Path,
+) -> None:
     override = fresh_host / "config" / "registry" / "context-manifests.toml"
     override.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(REPO_ROOT / "config" / "registry" / "context-manifests.toml", override)
@@ -387,7 +393,10 @@ def test_project_context_override_cannot_fall_back_to_packaged_assets(fresh_host
     assert "source is missing" in combined
     assert "baseline.glossary" in combined
     assert "recovery=gt canonical-terms list" in combined
-    assert str(REPO_ROOT / "config" / "governance" / "canonical-terms-sync.toml") not in combined
+    assert (
+        str(REPO_ROOT / "config" / "governance" / "canonical-terms-sync.toml")
+        not in combined
+    )
 
 
 @pytest.fixture(scope="session")
@@ -400,6 +409,7 @@ def _venv_python(venv: Path) -> Path:
     return venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
+@pytest.mark.timeout(180)
 def test_built_wheel_assembles_context_without_source_tree_or_root_config(
     built_groundtruth_wheel: Path,
     tmp_path: Path,
@@ -413,7 +423,9 @@ def test_built_wheel_assembles_context_without_source_tree_or_root_config(
     with zipfile.ZipFile(built_groundtruth_wheel) as wheel:
         wheel_entries = wheel.namelist()
         assert expected_resources <= set(wheel_entries)
-        assert all(wheel_entries.count(resource) == 1 for resource in expected_resources)
+        assert all(
+            wheel_entries.count(resource) == 1 for resource in expected_resources
+        )
 
     venv = tmp_path / "venv"
     create = subprocess.run(
@@ -487,13 +499,22 @@ print(json.dumps({
         "root_config_exists": False,
     }
     module_path = Path(payload["module"]).resolve()
-    source_module_path = (BUILD_PROJECT / "src" / "groundtruth_kb" / "__init__.py").resolve()
+    source_module_path = (
+        BUILD_PROJECT / "src" / "groundtruth_kb" / "__init__.py"
+    ).resolve()
     assert module_path.is_relative_to(venv.resolve())
     assert module_path != source_module_path
 
 
-def test_fresh_worker_cannot_fall_back_to_host_authority_taxonomy(fresh_host: Path) -> None:
-    missing = fresh_host / "config" / "governance" / "project-authorization-operation-taxonomy.toml"
+def test_fresh_worker_cannot_fall_back_to_host_authority_taxonomy(
+    fresh_host: Path,
+) -> None:
+    missing = (
+        fresh_host
+        / "config"
+        / "governance"
+        / "project-authorization-operation-taxonomy.toml"
+    )
     missing.unlink()
 
     result = _run_probe(fresh_host)
@@ -502,4 +523,12 @@ def test_fresh_worker_cannot_fall_back_to_host_authority_taxonomy(fresh_host: Pa
     combined = f"{result.stdout}\n{result.stderr}"
     assert "operation taxonomy" in combined.lower()
     assert str(missing) in combined
-    assert str(REPO_ROOT / "config" / "governance" / "project-authorization-operation-taxonomy.toml") not in combined
+    assert (
+        str(
+            REPO_ROOT
+            / "config"
+            / "governance"
+            / "project-authorization-operation-taxonomy.toml"
+        )
+        not in combined
+    )

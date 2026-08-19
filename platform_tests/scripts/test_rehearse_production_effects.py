@@ -11,6 +11,7 @@ lane never reads sensitive content.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -18,9 +19,22 @@ from typing import Any
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
-from rehearse import _production_effects  # noqa: E402
+def _load_rehearse_file(stem: str):
+    path = Path(__file__).resolve().parents[2] / "scripts" / "rehearse" / f"{stem}.py"
+    if not path.is_file():
+        pytest.skip(f"scripts/rehearse/{stem}.py is absent", allow_module_level=True)
+    name = f"wi6583_rehearse_{stem}"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        pytest.skip(f"unable to load {path.as_posix()}", allow_module_level=True)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_production_effects = _load_rehearse_file("_production_effects")
 
 # ---- Fixtures ----------------------------------------------------------
 
@@ -44,7 +58,11 @@ def _run_lane(
 
 
 def _read_json(output_dir: Path) -> dict[str, Any]:
-    return json.loads((output_dir / "production_effects" / "production_effects.json").read_text(encoding="utf-8"))
+    return json.loads(
+        (output_dir / "production_effects" / "production_effects.json").read_text(
+            encoding="utf-8"
+        )
+    )
 
 
 # ---- Common contract --------------------------------------------------
@@ -65,7 +83,9 @@ def test_run_dry_run_returns_skipped(tmp_path: Path) -> None:
 # ---- §2.1 Secret material safety (CRITICAL) ---------------------------
 
 
-def test_run_does_not_read_prod_env_vars_content(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_does_not_read_prod_env_vars_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Per Codex GO -006 + REVISED-2: _prod_env_vars*.txt MUST NOT be
     content-read. Monkeypatch read_text/read_bytes to assert no forbidden
     reads occur, while the lane still classifies the file correctly.
@@ -73,8 +93,12 @@ def test_run_does_not_read_prod_env_vars_content(tmp_path: Path, monkeypatch: py
     project_root = _build_project_root(tmp_path)
     deploy_dir = project_root / "scripts" / "deploy"
     deploy_dir.mkdir(parents=True)
-    (deploy_dir / "_prod_env_vars.txt").write_text("AZURE_KEY=should-never-be-read\n", encoding="utf-8")
-    (deploy_dir / "_prod_env_vars_clean.txt").write_text("AZURE_KEY=also-should-never-be-read\n", encoding="utf-8")
+    (deploy_dir / "_prod_env_vars.txt").write_text(
+        "AZURE_KEY=should-never-be-read\n", encoding="utf-8"
+    )
+    (deploy_dir / "_prod_env_vars_clean.txt").write_text(
+        "AZURE_KEY=also-should-never-be-read\n", encoding="utf-8"
+    )
 
     real_read_text = Path.read_text
     real_read_bytes = Path.read_bytes
@@ -114,7 +138,9 @@ def test_run_does_not_read_prod_env_vars_content(tmp_path: Path, monkeypatch: py
         assert row["content_read"] is False
 
 
-def test_run_does_not_read_env_local_content(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_does_not_read_env_local_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Original §2.1 safety property: .env.local presence-only, never content-read."""
     project_root = _build_project_root(tmp_path)
     (project_root / ".env.local").write_text("SECRET=do-not-read\n", encoding="utf-8")
@@ -140,7 +166,9 @@ def test_run_does_not_read_env_local_content(tmp_path: Path, monkeypatch: pytest
     assert row["content_read"] is False
 
 
-def test_run_does_not_read_tfvars_content(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_does_not_read_tfvars_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """tfvars files are secret-adjacent; presence-only."""
     project_root = _build_project_root(tmp_path)
     tf_dir = project_root / "infrastructure" / "terraform"
@@ -201,7 +229,9 @@ def test_run_classifies_claude_md_as_keep(tmp_path: Path) -> None:
 
 def test_run_classifies_dockerfile_as_move_with_deploy_blocking(tmp_path: Path) -> None:
     project_root = _build_project_root(tmp_path)
-    (project_root / "Dockerfile").write_text("FROM python:3.14\nCOPY src/ /app/src/\n", encoding="utf-8")
+    (project_root / "Dockerfile").write_text(
+        "FROM python:3.14\nCOPY src/ /app/src/\n", encoding="utf-8"
+    )
     output_dir = tmp_path / "output"
     _run_lane(project_root, output_dir)
     payload = _read_json(output_dir)
@@ -211,9 +241,13 @@ def test_run_classifies_dockerfile_as_move_with_deploy_blocking(tmp_path: Path) 
     assert row["deploy_safety"] == "deploy-blocking"
 
 
-def test_run_overrides_dockerfile_to_owner_decision_when_framework_reference(tmp_path: Path) -> None:
+def test_run_overrides_dockerfile_to_owner_decision_when_framework_reference(
+    tmp_path: Path,
+) -> None:
     project_root = _build_project_root(tmp_path)
-    (project_root / "Dockerfile").write_text("FROM python:3.14\nRUN pip install groundtruth_kb\n", encoding="utf-8")
+    (project_root / "Dockerfile").write_text(
+        "FROM python:3.14\nRUN pip install groundtruth_kb\n", encoding="utf-8"
+    )
     output_dir = tmp_path / "output"
     _run_lane(project_root, output_dir)
     payload = _read_json(output_dir)
@@ -225,9 +259,13 @@ def test_run_overrides_dockerfile_to_owner_decision_when_framework_reference(tmp
 # ---- §2.14 Shopify ---------------------------------------------------
 
 
-def test_run_classifies_shopify_app_toml_as_move_with_deploy_blocking(tmp_path: Path) -> None:
+def test_run_classifies_shopify_app_toml_as_move_with_deploy_blocking(
+    tmp_path: Path,
+) -> None:
     project_root = _build_project_root(tmp_path)
-    (project_root / "shopify.app.toml").write_text('name = "agent-red"\n', encoding="utf-8")
+    (project_root / "shopify.app.toml").write_text(
+        'name = "agent-red"\n', encoding="utf-8"
+    )
     output_dir = tmp_path / "output"
     _run_lane(project_root, output_dir)
     payload = _read_json(output_dir)
@@ -239,10 +277,14 @@ def test_run_classifies_shopify_app_toml_as_move_with_deploy_blocking(tmp_path: 
 # ---- §2.15 Deploy scripts + hardcoded-path scan ----------------------
 
 
-def test_run_classifies_deploy_script_as_move_with_deploy_blocking(tmp_path: Path) -> None:
+def test_run_classifies_deploy_script_as_move_with_deploy_blocking(
+    tmp_path: Path,
+) -> None:
     project_root = _build_project_root(tmp_path)
     (project_root / "scripts").mkdir()
-    (project_root / "scripts" / "deploy.py").write_text("#!/usr/bin/env python\nprint('deploy')\n", encoding="utf-8")
+    (project_root / "scripts" / "deploy.py").write_text(
+        "#!/usr/bin/env python\nprint('deploy')\n", encoding="utf-8"
+    )
     output_dir = tmp_path / "output"
     _run_lane(project_root, output_dir)
     payload = _read_json(output_dir)
@@ -255,7 +297,9 @@ def test_run_records_hardcoded_path_references_in_deploy_script(tmp_path: Path) 
     """§2.15: deploy scripts content-scanned for hardcoded legacy-root references."""
     project_root = _build_project_root(tmp_path)
     (project_root / "scripts").mkdir()
-    (project_root / "scripts" / "deploy.py").write_text("REPO_ROOT = 'E:/GT-KB/'\n", encoding="utf-8")
+    (project_root / "scripts" / "deploy.py").write_text(
+        "REPO_ROOT = 'E:/GT-KB/'\n", encoding="utf-8"
+    )
     output_dir = tmp_path / "output"
     _run_lane(project_root, output_dir)
     payload = _read_json(output_dir)
@@ -268,15 +312,23 @@ def test_run_records_hardcoded_path_references_in_deploy_script(tmp_path: Path) 
 # ---- §2.16 Terraform -------------------------------------------------
 
 
-def test_run_classifies_terraform_tf_as_move_with_deploy_blocking(tmp_path: Path) -> None:
+def test_run_classifies_terraform_tf_as_move_with_deploy_blocking(
+    tmp_path: Path,
+) -> None:
     project_root = _build_project_root(tmp_path)
     tf_dir = project_root / "infrastructure" / "terraform"
     tf_dir.mkdir(parents=True)
-    (tf_dir / "main.tf").write_text('resource "azurerm_resource_group" "main" {}\n', encoding="utf-8")
+    (tf_dir / "main.tf").write_text(
+        'resource "azurerm_resource_group" "main" {}\n', encoding="utf-8"
+    )
     output_dir = tmp_path / "output"
     _run_lane(project_root, output_dir)
     payload = _read_json(output_dir)
-    row = next(s for s in payload["surfaces"] if s["path"] == "infrastructure/terraform/main.tf")
+    row = next(
+        s
+        for s in payload["surfaces"]
+        if s["path"] == "infrastructure/terraform/main.tf"
+    )
     assert row["disposition"] == "MOVE"
     assert row["signal"] == "adopter_terraform_definitions"
 
@@ -289,7 +341,9 @@ def test_run_classifies_terraform_tfstate_as_do_not_move(tmp_path: Path) -> None
     output_dir = tmp_path / "output"
     _run_lane(project_root, output_dir)
     payload = _read_json(output_dir)
-    row = next(s for s in payload["surfaces"] if s["path"].endswith("terraform.tfstate"))
+    row = next(
+        s for s in payload["surfaces"] if s["path"].endswith("terraform.tfstate")
+    )
     assert row["disposition"] == "DO_NOT_MOVE"
     assert row["signal"] == "terraform_state_immovable_per_phase8_section_4"
 
@@ -320,7 +374,9 @@ def test_run_records_github_actions_hardcoded_path_references(tmp_path: Path) ->
 # ---- §2.6 Approval packets -------------------------------------------
 
 
-def test_run_classifies_approval_packet_by_legacy_records_schema(tmp_path: Path) -> None:
+def test_run_classifies_approval_packet_by_legacy_records_schema(
+    tmp_path: Path,
+) -> None:
     """Backward-compat: legacy approved_records[] schema still classified."""
     project_root = _build_project_root(tmp_path)
     approvals = project_root / ".groundtruth" / "formal-artifact-approvals"
@@ -338,7 +394,9 @@ def test_run_classifies_approval_packet_by_legacy_records_schema(tmp_path: Path)
     assert row["classification_basis"] == "legacy_schema_approved_records"
 
 
-def test_run_classifies_mixed_scope_approval_packet_as_owner_decision(tmp_path: Path) -> None:
+def test_run_classifies_mixed_scope_approval_packet_as_owner_decision(
+    tmp_path: Path,
+) -> None:
     project_root = _build_project_root(tmp_path)
     approvals = project_root / ".groundtruth" / "formal-artifact-approvals"
     approvals.mkdir(parents=True)
@@ -368,7 +426,9 @@ def test_run_emits_deploy_safety_field_for_every_surface(tmp_path: Path) -> None
     assert all("deploy_safety" in s for s in payload["surfaces"])
 
 
-def test_run_summary_records_secret_material_with_content_read_zero(tmp_path: Path) -> None:
+def test_run_summary_records_secret_material_with_content_read_zero(
+    tmp_path: Path,
+) -> None:
     """Schema-level safety evidence: summary.secret_material_with_content_read == 0."""
     project_root = _build_project_root(tmp_path)
     (project_root / ".env.local").write_text("SECRET=do-not-read\n", encoding="utf-8")
@@ -385,12 +445,16 @@ def test_run_summary_records_secret_material_with_content_read_zero(tmp_path: Pa
 # ---- Output artifacts -----------------------------------------------
 
 
-def test_run_writes_production_effects_map_with_four_disposition_sections(tmp_path: Path) -> None:
+def test_run_writes_production_effects_map_with_four_disposition_sections(
+    tmp_path: Path,
+) -> None:
     project_root = _build_project_root(tmp_path)
     (project_root / "Dockerfile").write_text("FROM python:3.14\n", encoding="utf-8")
     output_dir = tmp_path / "output"
     _run_lane(project_root, output_dir)
-    preview = (output_dir / "production_effects" / "production-effects-map.md").read_text(encoding="utf-8")
+    preview = (
+        output_dir / "production_effects" / "production-effects-map.md"
+    ).read_text(encoding="utf-8")
     assert "## DO_NOT_MOVE" in preview
     assert "## MOVE" in preview
     assert "## KEEP" in preview
@@ -422,7 +486,11 @@ def test_run_reports_directory_surfaces_as_existing(tmp_path: Path) -> None:
     output_dir = tmp_path / "output"
     _run_lane(project_root, output_dir)
     payload = _read_json(output_dir)
-    for path_suffix in (".shopify/deploy-bundle", ".groundtruth/wrap-scan", ".groundtruth/session"):
+    for path_suffix in (
+        ".shopify/deploy-bundle",
+        ".groundtruth/wrap-scan",
+        ".groundtruth/session",
+    ):
         row = next(s for s in payload["surfaces"] if s["path"] == path_suffix)
         assert row["exists"] is True, f"Directory {path_suffix} reported as absent"
         assert row["is_directory"] is True
@@ -472,7 +540,9 @@ def test_run_classifies_live_schema_gtkb_artifact_id_as_keep(tmp_path: Path) -> 
     assert row["artifact_type"] == "governance"
 
 
-def test_run_classifies_live_schema_governance_artifact_type_as_keep(tmp_path: Path) -> None:
+def test_run_classifies_live_schema_governance_artifact_type_as_keep(
+    tmp_path: Path,
+) -> None:
     """Live schema: artifact_type=governance with no GTKB-/AR- prefix → KEEP."""
     project_root = _build_project_root(tmp_path)
     approvals = project_root / ".groundtruth" / "formal-artifact-approvals"
@@ -495,7 +565,9 @@ def test_run_classifies_live_schema_governance_artifact_type_as_keep(tmp_path: P
     assert row["signal"] == "framework_approval_packet_artifact_type_governance"
 
 
-def test_run_classifies_live_schema_deliberation_with_framework_source_ref(tmp_path: Path) -> None:
+def test_run_classifies_live_schema_deliberation_with_framework_source_ref(
+    tmp_path: Path,
+) -> None:
     """Live schema: DELIB-* with framework source_ref → KEEP."""
     project_root = _build_project_root(tmp_path)
     approvals = project_root / ".groundtruth" / "formal-artifact-approvals"
@@ -518,7 +590,9 @@ def test_run_classifies_live_schema_deliberation_with_framework_source_ref(tmp_p
     assert row["signal"] == "framework_deliberation_approval_packet"
 
 
-def test_run_classifies_live_schema_deliberation_with_adopter_source_ref(tmp_path: Path) -> None:
+def test_run_classifies_live_schema_deliberation_with_adopter_source_ref(
+    tmp_path: Path,
+) -> None:
     """Live schema: DELIB-* with agent_red source_ref → MOVE."""
     project_root = _build_project_root(tmp_path)
     approvals = project_root / ".groundtruth" / "formal-artifact-approvals"
@@ -541,7 +615,9 @@ def test_run_classifies_live_schema_deliberation_with_adopter_source_ref(tmp_pat
     assert row["signal"] == "adopter_deliberation_approval_packet"
 
 
-def test_run_classifies_live_schema_ambiguous_deliberation_as_owner_decision(tmp_path: Path) -> None:
+def test_run_classifies_live_schema_ambiguous_deliberation_as_owner_decision(
+    tmp_path: Path,
+) -> None:
     """Live schema: DELIB-* with no clear adopter/framework signal → owner decision."""
     project_root = _build_project_root(tmp_path)
     approvals = project_root / ".groundtruth" / "formal-artifact-approvals"

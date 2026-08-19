@@ -32,7 +32,9 @@ SCRIPT_PATH = REPO_ROOT / "scripts" / "check_protected_commit_authorization.py"
 
 
 def _load_module():
-    spec = importlib.util.spec_from_file_location("check_protected_commit_authorization", SCRIPT_PATH)
+    spec = importlib.util.spec_from_file_location(
+        "check_protected_commit_authorization", SCRIPT_PATH
+    )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules["check_protected_commit_authorization"] = module
@@ -40,7 +42,9 @@ def _load_module():
     return module
 
 
-def _seed_registered_commit_fixture(root: Path, storage_path: str = "registered.txt") -> Path:
+def _seed_registered_commit_fixture(
+    root: Path, storage_path: str = "registered.txt"
+) -> Path:
     member = root / storage_path
     member.parent.mkdir(parents=True, exist_ok=True)
     member.write_text("before\n", encoding="utf-8")
@@ -100,7 +104,9 @@ def _sha256(payload: bytes) -> str:
     return "sha256:" + hashlib.sha256(payload).hexdigest()
 
 
-def _seed_bridge_publication_commit_fixture(root: Path, rel_paths: list[str]) -> dict[str, str]:
+def _seed_bridge_publication_commit_fixture(
+    root: Path, rel_paths: list[str]
+) -> dict[str, str]:
     _init_committed_paths(root, ["baseline.txt"])
     contents: dict[str, bytes] = {}
     for rel_path in rel_paths:
@@ -337,7 +343,9 @@ Responds to: {report}
         "proposal_project_id": "PROJECT-TEST",
         "version": 1,
         "normalized_envelope_hash": "test-envelope",
-        "target_classifications": [{"path": path, "mutation_class": "source"} for path in protected_paths],
+        "target_classifications": [
+            {"path": path, "mutation_class": "source"} for path in protected_paths
+        ],
         "evaluator_id": "test-evaluator",
         "evaluator_version": "1",
         "evaluator_sha256": "test-evaluator-sha",
@@ -361,7 +369,7 @@ Responds to: {report}
     packet.pop("packet_hash")
     packet["schema_version"] = 3
     packet["implementation_start"] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "bridge_id": bridge_id,
         "finalized_at": "2026-07-19T00:00:00Z",
         "session_id": "pb-start-session",
@@ -372,18 +380,33 @@ Responds to: {report}
             "session_id": "pb-start-session",
             "claim_kind": "go_implementation",
             "acting_role": "prime-builder",
+            "session_envelope_id": "SENV-pb-start-session",
+            "acting_role_attestation": "role-attestation:SENV-pb-start-session:1:0123456789abcdef",
             "project_id": "PROJECT-TEST",
         },
-        "worker_role_provenance": {
+        "role_attestation": {
             "schema_version": 1,
-            "session_id": "pb-start-session",
+            "invoking_context": "pb-start-session",
+            "session_envelope_id": "SENV-pb-start-session",
+            "subject": "gtkb",
+            "init_command_digest": "test-init-command-digest",
+            "binding_created_at": "2026-07-19T00:00:00Z",
             "role": "prime-builder",
-            "harness_id": "A",
+            "source_event": "exact_init",
+            "issuer": "test/exact-init",
+            "attested_at": "2026-07-19T00:00:00Z",
+            "evidence_reference": "role-attestation:SENV-pb-start-session:1:0123456789abcdef",
         },
         "project_authorization_decision": {"allowed": True},
     }
     packet["packet_hash"] = module.packet_hash(packet)
-    packet_path = root / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / f"{bridge_id}.json"
+    packet_path = (
+        root
+        / ".gtkb-state"
+        / "implementation-authorizations"
+        / "by-bridge"
+        / f"{bridge_id}.json"
+    )
     packet_path.parent.mkdir(parents=True, exist_ok=True)
     packet_path.write_text(json.dumps(packet), encoding="utf-8")
     monkeypatch.setattr(
@@ -406,7 +429,10 @@ def _corrected_report_resolution(tmp_path: Path, *, controlling_go: str | None):
     no_go = f"bridge/{bridge_id}-004.md"
     corrected_report = f"bridge/{bridge_id}-005.md"
     verdict = f"bridge/{bridge_id}-006.md"
-    protected_paths = ["scripts/authority.py", "platform_tests/scripts/test_authority.py"]
+    protected_paths = [
+        "scripts/authority.py",
+        "platform_tests/scripts/test_authority.py",
+    ]
     (tmp_path / "bridge").mkdir(parents=True, exist_ok=True)
     (tmp_path / proposal).write_text(
         f"NEW\n\ntarget_paths: {json.dumps(protected_paths)}\n",
@@ -418,27 +444,59 @@ def _corrected_report_resolution(tmp_path: Path, *, controlling_go: str | None):
         encoding="utf-8",
     )
     versions = (
-        SimpleNamespace(path=proposal, status="NEW", author_role="prime-builder", responds_to=None),
-        SimpleNamespace(path=go, status="GO", author_role="loyal-opposition", responds_to=proposal),
-        SimpleNamespace(path=first_report, status="NEW", author_role="prime-builder", responds_to=go),
-        SimpleNamespace(path=no_go, status="NO-GO", author_role="loyal-opposition", responds_to=first_report),
-        SimpleNamespace(path=corrected_report, status="REVISED", author_role="prime-builder", responds_to=no_go),
-        SimpleNamespace(path=verdict, status="VERIFIED", author_role="loyal-opposition", responds_to=corrected_report),
+        SimpleNamespace(
+            path=proposal, status="NEW", author_role="prime-builder", responds_to=None
+        ),
+        SimpleNamespace(
+            path=go, status="GO", author_role="loyal-opposition", responds_to=proposal
+        ),
+        SimpleNamespace(
+            path=first_report, status="NEW", author_role="prime-builder", responds_to=go
+        ),
+        SimpleNamespace(
+            path=no_go,
+            status="NO-GO",
+            author_role="loyal-opposition",
+            responds_to=first_report,
+        ),
+        SimpleNamespace(
+            path=corrected_report,
+            status="REVISED",
+            author_role="prime-builder",
+            responds_to=no_go,
+        ),
+        SimpleNamespace(
+            path=verdict,
+            status="VERIFIED",
+            author_role="loyal-opposition",
+            responds_to=corrected_report,
+        ),
     )
-    return SimpleNamespace(latest_strict_state=versions[-1], audit_versions=versions), (proposal, go, corrected_report)
+    return SimpleNamespace(latest_strict_state=versions[-1], audit_versions=versions), (
+        proposal,
+        go,
+        corrected_report,
+    )
 
 
-def test_approved_chain_accepts_explicit_controlling_go_after_report_no_go(tmp_path: Path) -> None:
+def test_approved_chain_accepts_explicit_controlling_go_after_report_no_go(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     go = "bridge/gtkb-corrected-report-fixture-002.md"
-    resolution, (proposal, _, report) = _corrected_report_resolution(tmp_path, controlling_go=go)
+    resolution, (proposal, _, report) = _corrected_report_resolution(
+        tmp_path, controlling_go=go
+    )
 
     chain = module._approved_chain(tmp_path, resolution)
 
     assert chain.proposal_path == proposal
     assert chain.go_path == go
     assert chain.report_path == report
-    assert chain.target_paths == ("scripts/authority.py", "platform_tests/scripts/test_authority.py")
+    assert chain.target_paths == (
+        "scripts/authority.py",
+        "platform_tests/scripts/test_authority.py",
+    )
 
 
 def test_approved_chain_rejects_fully_roleless_legacy_chain(tmp_path: Path) -> None:
@@ -458,14 +516,22 @@ def test_approved_chain_rejects_fully_roleless_legacy_chain(tmp_path: Path) -> N
         encoding="utf-8",
     )
     versions = (
-        SimpleNamespace(path=proposal, status="NEW", author_role=None, responds_to=None),
+        SimpleNamespace(
+            path=proposal, status="NEW", author_role=None, responds_to=None
+        ),
         SimpleNamespace(path=go, status="GO", author_role=None, responds_to=proposal),
         SimpleNamespace(path=report, status="NEW", author_role=None, responds_to=go),
-        SimpleNamespace(path=verdict, status="VERIFIED", author_role=None, responds_to=report),
+        SimpleNamespace(
+            path=verdict, status="VERIFIED", author_role=None, responds_to=report
+        ),
     )
-    resolution = SimpleNamespace(latest_strict_state=versions[-1], audit_versions=versions)
+    resolution = SimpleNamespace(
+        latest_strict_state=versions[-1], audit_versions=versions
+    )
 
-    with pytest.raises(module.GateError, match="not linked to a Prime implementation report"):
+    with pytest.raises(
+        module.GateError, match="not linked to a Prime implementation report"
+    ):
         module._approved_chain(tmp_path, resolution)
 
 
@@ -482,24 +548,38 @@ def test_approved_chain_rejects_missing_or_non_go_controlling_link(
     controlling_go: str | None,
 ) -> None:
     module = _load_module()
-    resolution, _ = _corrected_report_resolution(tmp_path, controlling_go=controlling_go)
+    resolution, _ = _corrected_report_resolution(
+        tmp_path, controlling_go=controlling_go
+    )
 
-    with pytest.raises(module.GateError, match="implementation report is not linked to its approving GO"):
+    with pytest.raises(
+        module.GateError,
+        match="implementation report is not linked to its approving GO",
+    ):
         module._approved_chain(tmp_path, resolution)
 
 
-def test_approved_chain_rejects_duplicate_controlling_go_headers(tmp_path: Path) -> None:
+def test_approved_chain_rejects_duplicate_controlling_go_headers(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     go = "bridge/gtkb-corrected-report-fixture-002.md"
-    resolution, (_, _, report) = _corrected_report_resolution(tmp_path, controlling_go=go)
+    resolution, (_, _, report) = _corrected_report_resolution(
+        tmp_path, controlling_go=go
+    )
     report_path = tmp_path / report
-    report_path.write_text(report_path.read_text(encoding="utf-8") + f"Controlling GO: `{go}`\n", encoding="utf-8")
+    report_path.write_text(
+        report_path.read_text(encoding="utf-8") + f"Controlling GO: `{go}`\n",
+        encoding="utf-8",
+    )
 
     with pytest.raises(module.GateError, match="more than one Controlling GO"):
         module._approved_chain(tmp_path, resolution)
 
 
-def _stage_transaction(root: Path, selected_paths: list[str], report: str, verdict: str) -> None:
+def _stage_transaction(
+    root: Path, selected_paths: list[str], report: str, verdict: str
+) -> None:
     hooks = root / "empty-hooks"
     hooks.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=root, check=True)
@@ -559,14 +639,23 @@ def _init_committed_paths(root: Path, paths: list[str]) -> None:
 
 
 def _seed_current_project_authorization(root: Path) -> None:
-    (root / "groundtruth.toml").write_text('[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8")
-    taxonomy_source = REPO_ROOT / "config" / "governance" / "project-authorization-operation-taxonomy.toml"
+    (root / "groundtruth.toml").write_text(
+        '[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8"
+    )
+    taxonomy_source = (
+        REPO_ROOT
+        / "config"
+        / "governance"
+        / "project-authorization-operation-taxonomy.toml"
+    )
     taxonomy_target = root / "config" / "governance" / taxonomy_source.name
     taxonomy_target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(taxonomy_source, taxonomy_target)
     conn = sqlite3.connect(root / "groundtruth.db")
     try:
-        conn.execute("CREATE TABLE current_projects (id TEXT PRIMARY KEY, status TEXT NOT NULL)")
+        conn.execute(
+            "CREATE TABLE current_projects (id TEXT PRIMARY KEY, status TEXT NOT NULL)"
+        )
         conn.execute(
             """CREATE TABLE current_project_authorizations (
                 id TEXT PRIMARY KEY,
@@ -587,7 +676,9 @@ def _seed_current_project_authorization(root: Path) -> None:
                 excluded_spec_ids TEXT
             )"""
         )
-        conn.execute("INSERT INTO current_projects (id, status) VALUES ('PROJECT-TEST', 'active')")
+        conn.execute(
+            "INSERT INTO current_projects (id, status) VALUES ('PROJECT-TEST', 'active')"
+        )
         conn.execute(
             """INSERT INTO current_project_authorizations VALUES
                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -615,7 +706,9 @@ def _seed_current_project_authorization(root: Path) -> None:
         conn.close()
 
 
-def test_blocks_protected_path_without_evidence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_blocks_protected_path_without_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _load_module()
     monkeypatch.setattr(module, "list_named_packets", lambda root: [])
 
@@ -644,7 +737,9 @@ def test_dot_prefixed_protected_surfaces_are_blocked_without_evidence(
     assert {finding["path"] for finding in result["findings"]} == set(paths)
 
 
-def test_live_go_packet_allows_protected_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_live_go_packet_allows_protected_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _load_module()
     monkeypatch.setattr(
         module,
@@ -666,7 +761,9 @@ def test_live_go_packet_allows_protected_path(tmp_path: Path, monkeypatch: pytes
     assert result["cleared"][0]["evidence"] == "live_go_packet"
 
 
-def test_terminal_verified_thread_allows_without_live_packet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_terminal_verified_thread_allows_without_live_packet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _load_module()
     selected_paths, report, verdict = _write_transaction_chain(
         tmp_path,
@@ -701,13 +798,21 @@ def test_terminal_verified_thread_allows_without_live_packet(tmp_path: Path, mon
 
     proposal_path = tmp_path / report.replace("-003.md", "-001.md")
     proposal_path.write_text(
-        proposal_path.read_text(encoding="utf-8").replace("scripts/foo.py", "scripts/worktree-evil.py"),
+        proposal_path.read_text(encoding="utf-8").replace(
+            "scripts/foo.py", "scripts/worktree-evil.py"
+        ),
         encoding="utf-8",
     )
     pinned_result = module.evaluate(tmp_path, paths=["scripts/foo.py"])
     assert pinned_result["status"] == "pass"
 
-    packet_path = tmp_path / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / "gtkb-example.json"
+    packet_path = (
+        tmp_path
+        / ".gtkb-state"
+        / "implementation-authorizations"
+        / "by-bridge"
+        / "gtkb-example.json"
+    )
     packet = json.loads(packet_path.read_text(encoding="utf-8"))
     packet["target_path_globs"] = ["scripts/packet-evil.py"]
     packet["packet_hash"] = module.packet_hash(packet)
@@ -745,7 +850,13 @@ def test_terminal_verified_packet_root_must_be_an_object(
         cwd=tmp_path,
         check=True,
     )
-    packet_path = tmp_path / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / "gtkb-terminal-root.json"
+    packet_path = (
+        tmp_path
+        / ".gtkb-state"
+        / "implementation-authorizations"
+        / "by-bridge"
+        / "gtkb-terminal-root.json"
+    )
     packet_path.write_text("[]", encoding="utf-8")
     monkeypatch.setattr(module, "list_named_packets", lambda root: [])
 
@@ -793,10 +904,16 @@ def test_evaluation_pins_one_head_oid_across_index_and_terminal_evidence(
     ).stdout.strip()
     proposal_path = tmp_path / report.replace("-003.md", "-001.md")
     proposal_path.write_text(
-        proposal_path.read_text(encoding="utf-8").replace("scripts/foo.py", "scripts/head-evil.py"),
+        proposal_path.read_text(encoding="utf-8").replace(
+            "scripts/foo.py", "scripts/head-evil.py"
+        ),
         encoding="utf-8",
     )
-    subprocess.run(["git", "add", "--", report.replace("-003.md", "-001.md")], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "add", "--", report.replace("-003.md", "-001.md")],
+        cwd=tmp_path,
+        check=True,
+    )
     subprocess.run([*commit_args, "tampered successor"], cwd=tmp_path, check=True)
     new_oid = subprocess.run(
         ["git", "rev-parse", "HEAD^{commit}"],
@@ -805,7 +922,9 @@ def test_evaluation_pins_one_head_oid_across_index_and_terminal_evidence(
         capture_output=True,
         text=True,
     ).stdout.strip()
-    subprocess.run(["git", "update-ref", "HEAD", old_oid, new_oid], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "update-ref", "HEAD", old_oid, new_oid], cwd=tmp_path, check=True
+    )
     subprocess.run(["git", "read-tree", old_oid], cwd=tmp_path, check=True)
     implementation_path = tmp_path / "scripts" / "foo.py"
     implementation_path.write_text("# staged after captured head\n", encoding="utf-8")
@@ -815,7 +934,9 @@ def test_evaluation_pins_one_head_oid_across_index_and_terminal_evidence(
     def advance_symbolic_head(root: Path) -> str:
         captured = original_resolve(root)
         assert captured == old_oid
-        subprocess.run(["git", "update-ref", "HEAD", new_oid, old_oid], cwd=root, check=True)
+        subprocess.run(
+            ["git", "update-ref", "HEAD", new_oid, old_oid], cwd=root, check=True
+        )
         return captured
 
     monkeypatch.setattr(module, "_resolve_head_oid", advance_symbolic_head)
@@ -828,7 +949,9 @@ def test_evaluation_pins_one_head_oid_across_index_and_terminal_evidence(
     assert result["cleared"][0]["evidence"] == "terminal_verified_bridge_thread"
 
 
-def test_routine_paths_short_circuit_before_packet_reads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_routine_paths_short_circuit_before_packet_reads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _load_module()
 
     def fail_if_called(root):
@@ -851,7 +974,9 @@ def test_routine_paths_short_circuit_before_packet_reads(tmp_path: Path, monkeyp
     assert result["protected_paths"] == []
 
 
-def test_verified_bridge_file_without_finalization_evidence_blocks(tmp_path: Path) -> None:
+def test_verified_bridge_file_without_finalization_evidence_blocks(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     bridge_file = tmp_path / "bridge" / "gtkb-example-004.md"
     bridge_file.parent.mkdir()
@@ -901,7 +1026,9 @@ def test_verified_bridge_file_with_finalization_evidence_passes(tmp_path: Path) 
     assert result["findings"] == []
 
 
-def test_corrupt_packet_blocks_protected_path_when_no_evidence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_corrupt_packet_blocks_protected_path_when_no_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _load_module()
     monkeypatch.setattr(
         module,
@@ -923,17 +1050,24 @@ def test_corrupt_packet_blocks_protected_path_when_no_evidence(tmp_path: Path, m
     assert "evidence_errors" in result["findings"][0]
 
 
-def test_groundtruth_db_and_githooks_are_protected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_groundtruth_db_and_githooks_are_protected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _load_module()
     monkeypatch.setattr(module, "list_named_packets", lambda root: [])
 
     result = module.evaluate(tmp_path, paths=["groundtruth.db", ".githooks/pre-commit"])
 
     assert result["status"] == "fail"
-    assert {finding["path"] for finding in result["findings"]} == {"groundtruth.db", ".githooks/pre-commit"}
+    assert {finding["path"] for finding in result["findings"]} == {
+        "groundtruth.db",
+        ".githooks/pre-commit",
+    }
 
 
-def test_bridge_index_and_runtime_state_paths_are_protected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_bridge_index_and_runtime_state_paths_are_protected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _load_module()
     monkeypatch.setattr(module, "list_named_packets", lambda root: [])
 
@@ -956,7 +1090,9 @@ def test_non_verified_numbered_bridge_files_remain_helper_commit_compatible(
     module = _load_module()
 
     def fail_if_called(root):
-        raise AssertionError("non-VERIFIED numbered bridge files should not read implementation packets")
+        raise AssertionError(
+            "non-VERIFIED numbered bridge files should not read implementation packets"
+        )
 
     monkeypatch.setattr(module, "list_named_packets", fail_if_called)
     bridge_file = tmp_path / "bridge" / "example-003.md"
@@ -969,11 +1105,15 @@ def test_non_verified_numbered_bridge_files_remain_helper_commit_compatible(
     assert result["protected_paths"] == []
 
 
-def test_json_shape_for_cli_paths(tmp_path: Path, capsys, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_json_shape_for_cli_paths(
+    tmp_path: Path, capsys, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _load_module()
     monkeypatch.setattr(module, "list_named_packets", lambda root: [])
 
-    exit_code = module.main(["--project-root", str(tmp_path), "--paths", "scripts/foo.py", "--json"])
+    exit_code = module.main(
+        ["--project-root", str(tmp_path), "--paths", "scripts/foo.py", "--json"]
+    )
     parsed = json.loads(capsys.readouterr().out)
 
     assert exit_code == 1
@@ -990,14 +1130,18 @@ def test_json_shape_for_cli_paths(tmp_path: Path, capsys, monkeypatch: pytest.Mo
     }
     assert "transaction-local" not in parsed["findings"][0]["reason"]
 
-    human_exit = module.main(["--project-root", str(tmp_path), "--paths", "scripts/foo.py"])
+    human_exit = module.main(
+        ["--project-root", str(tmp_path), "--paths", "scripts/foo.py"]
+    )
     human_output = capsys.readouterr().out
     assert human_exit == 1
     assert "transaction-local" not in human_output
     assert "committed terminal VERIFIED evidence" in human_output
 
 
-def test_evidence_sources_are_loaded_once_for_343_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_evidence_sources_are_loaded_once_for_343_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _load_module()
     calls = {"live": 0, "verified": 0}
 
@@ -1019,7 +1163,9 @@ def test_evidence_sources_are_loaded_once_for_343_paths(tmp_path: Path, monkeypa
 
     monkeypatch.setattr(module, "list_named_packets", live_packets)
     monkeypatch.setattr(
-        module, "_load_verified_evidence", lambda root, head_oid=None, protected_paths=None: verified_entry(root)
+        module,
+        "_load_verified_evidence",
+        lambda root, head_oid=None, protected_paths=None: verified_entry(root),
     )
     paths = [f"scripts/live-{index}.py" for index in range(172)] + [
         f"scripts/verified-{index}.py" for index in range(171)
@@ -1103,24 +1249,34 @@ def test_transaction_local_verified_manifest_clears_wi5629_shaped_paths(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module = _load_module()
-    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    selected_paths, report, verdict = _write_transaction_chain(
+        tmp_path, module, monkeypatch
+    )
     _stage_transaction(tmp_path, selected_paths, report, verdict)
     monkeypatch.setattr(module, "list_named_packets", lambda root: [])
-    monkeypatch.setattr(module, "run_bridge_compliance_audit", lambda **kwargs: {"decision": "pass"})
+    monkeypatch.setattr(
+        module, "run_bridge_compliance_audit", lambda **kwargs: {"decision": "pass"}
+    )
     immutable_checks = {"anchors": False, "independence": False}
     proposal = report.replace("-003.md", "-001.md")
 
     def validate_anchors(content: str, project_root: Path):
         del content
         with pytest.raises(PermissionError):
-            (project_root / proposal).write_text("transient anchor tamper\n", encoding="utf-8")
+            (project_root / proposal).write_text(
+                "transient anchor tamper\n", encoding="utf-8"
+            )
         immutable_checks["anchors"] = True
         return []
 
-    def validate_independence(content: str, bridge_id: str, project_root: Path, **kwargs):
+    def validate_independence(
+        content: str, bridge_id: str, project_root: Path, **kwargs
+    ):
         del content, bridge_id, kwargs
         with pytest.raises(PermissionError):
-            (project_root / report).write_text("transient independence tamper\n", encoding="utf-8")
+            (project_root / report).write_text(
+                "transient independence tamper\n", encoding="utf-8"
+            )
         immutable_checks["independence"] = True
         return None
 
@@ -1132,7 +1288,9 @@ def test_transaction_local_verified_manifest_clears_wi5629_shaped_paths(
         pauth_calls.append((requested_operations, target_paths))
         return {"operation_time_decisions": [{"allowed": True}]}
 
-    monkeypatch.setattr(module, "validate_packet_project_authorization_operation", validate_pauth)
+    monkeypatch.setattr(
+        module, "validate_packet_project_authorization_operation", validate_pauth
+    )
     (tmp_path / verdict).write_text("MALFORMED WORKTREE BYTES\n", encoding="utf-8")
 
     result = module.evaluate(tmp_path)
@@ -1169,17 +1327,27 @@ def test_finalized_packet_uses_real_current_pauth_validation(
         implementation_authorization.validate_packet_project_authorization_operation,
     )
     bridge_id = "gtkb-wi5629-fixture"
-    packet_path = tmp_path / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / f"{bridge_id}.json"
+    packet_path = (
+        tmp_path
+        / ".gtkb-state"
+        / "implementation-authorizations"
+        / "by-bridge"
+        / f"{bridge_id}.json"
+    )
     packet = json.loads(packet_path.read_text(encoding="utf-8"))
-    row = implementation_authorization._project_authorization_row(tmp_path, "PAUTH-TEST")
-    packet["project_authorization"] = implementation_authorization.validate_project_authorization_row(
-        tmp_path,
-        row,
-        proposal_project_id="PROJECT-TEST",
-        work_item_id=None,
-        spec_links=packet["spec_links"],
-        target_paths=protected_paths,
-        requested_operations=["protected_mutation"],
+    row = implementation_authorization._project_authorization_row(
+        tmp_path, "PAUTH-TEST"
+    )
+    packet["project_authorization"] = (
+        implementation_authorization.validate_project_authorization_row(
+            tmp_path,
+            row,
+            proposal_project_id="PROJECT-TEST",
+            work_item_id=None,
+            spec_links=packet["spec_links"],
+            target_paths=protected_paths,
+            requested_operations=["protected_mutation"],
+        )
     )
     start = packet.pop("implementation_start")
     packet.pop("packet_hash")
@@ -1197,20 +1365,28 @@ def test_finalized_packet_uses_real_current_pauth_validation(
         target_paths=tuple(protected_paths),
     )
 
-    loaded, errors = module._load_finalized_packet(tmp_path, bridge_id, chain, protected_paths)
+    loaded, errors = module._load_finalized_packet(
+        tmp_path, bridge_id, chain, protected_paths
+    )
 
     assert errors == []
     assert loaded is not None
 
     conn = sqlite3.connect(tmp_path / "groundtruth.db")
     try:
-        conn.execute("UPDATE current_project_authorizations SET status = 'revoked' WHERE id = 'PAUTH-TEST'")
+        conn.execute(
+            "UPDATE current_project_authorizations SET status = 'revoked' WHERE id = 'PAUTH-TEST'"
+        )
         conn.commit()
     finally:
         conn.close()
-    loaded, errors = module._load_finalized_packet(tmp_path, bridge_id, chain, protected_paths)
+    loaded, errors = module._load_finalized_packet(
+        tmp_path, bridge_id, chain, protected_paths
+    )
     assert loaded is None
-    assert any("PAUTH validation failed" in error and "not active" in error for error in errors)
+    assert any(
+        "PAUTH validation failed" in error and "not active" in error for error in errors
+    )
 
     conn = sqlite3.connect(tmp_path / "groundtruth.db")
     try:
@@ -1221,9 +1397,13 @@ def test_finalized_packet_uses_real_current_pauth_validation(
         conn.commit()
     finally:
         conn.close()
-    loaded, errors = module._load_finalized_packet(tmp_path, bridge_id, chain, protected_paths)
+    loaded, errors = module._load_finalized_packet(
+        tmp_path, bridge_id, chain, protected_paths
+    )
     assert loaded is None
-    assert any("PAUTH validation failed" in error and "expired" in error for error in errors)
+    assert any(
+        "PAUTH validation failed" in error and "expired" in error for error in errors
+    )
 
 
 def test_prospective_audit_tree_is_index_complete_and_ignores_live_gate_tamper(
@@ -1233,11 +1413,23 @@ def test_prospective_audit_tree_is_index_complete_and_ignores_live_gate_tamper(
     module = _load_module()
     gate_path = tmp_path / ".claude" / "hooks" / "bridge-compliance-gate.py"
     gate_path.parent.mkdir(parents=True)
-    shutil.copy2(REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py", gate_path)
-    (tmp_path / "groundtruth.toml").write_text('[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8")
+    shutil.copy2(
+        REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py", gate_path
+    )
+    (tmp_path / "groundtruth.toml").write_text(
+        '[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8"
+    )
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     subprocess.run(
-        ["git", "add", "--", ".claude/hooks/bridge-compliance-gate.py", "groundtruth.toml"], cwd=tmp_path, check=True
+        [
+            "git",
+            "add",
+            "--",
+            ".claude/hooks/bridge-compliance-gate.py",
+            "groundtruth.toml",
+        ],
+        cwd=tmp_path,
+        check=True,
     )
     hooks = tmp_path / "empty-hooks"
     hooks.mkdir()
@@ -1302,7 +1494,9 @@ Non-dispatchable governance advisory test fixture.
         f"from pathlib import Path\nPath({str(marker)!r}).write_text('injected', encoding='utf-8')\n",
         encoding="utf-8",
     )
-    (hostile / "git.cmd").write_text("@echo hostile-git-executed\r\n@exit /b 99\r\n", encoding="utf-8")
+    (hostile / "git.cmd").write_text(
+        "@echo hostile-git-executed\r\n@exit /b 99\r\n", encoding="utf-8"
+    )
     monkeypatch.setenv("PYTHONPATH", str(hostile))
     monkeypatch.setenv("PYTHONHOME", str(hostile))
     monkeypatch.setenv("PATH", str(hostile))
@@ -1313,7 +1507,9 @@ Non-dispatchable governance advisory test fixture.
     ):
         snapshot_root = bridge_snapshot.root
         assert snapshot_root.parent == tmp_path / ".gtkb-state"
-        assert (snapshot_root / ".claude" / "hooks" / "bridge-compliance-gate.py").is_file()
+        assert (
+            snapshot_root / ".claude" / "hooks" / "bridge-compliance-gate.py"
+        ).is_file()
         snapshot_candidate = snapshot_root / candidate_rel
         candidate = snapshot_candidate.read_text(encoding="utf-8")
         gate_path.write_text(
@@ -1337,11 +1533,15 @@ Non-dispatchable governance advisory test fixture.
         nonlocal mutation_blocked
         del file_path, content
         with pytest.raises(PermissionError):
-            (project_root / "groundtruth.toml").write_text("tampered during audit\n", encoding="utf-8")
+            (project_root / "groundtruth.toml").write_text(
+                "tampered during audit\n", encoding="utf-8"
+            )
         mutation_blocked = True
         return {"decision": "pass"}
 
-    monkeypatch.setattr(module, "run_bridge_compliance_audit", mutate_snapshot_authority)
+    monkeypatch.setattr(
+        module, "run_bridge_compliance_audit", mutate_snapshot_authority
+    )
     with (
         module._index_snapshot(tmp_path) as index_snapshot,
         module._bridge_snapshot(tmp_path, bridge_id, index_snapshot) as bridge_snapshot,
@@ -1359,7 +1559,9 @@ def test_transaction_local_manifest_must_equal_complete_staged_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module = _load_module()
-    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    selected_paths, report, verdict = _write_transaction_chain(
+        tmp_path, module, monkeypatch
+    )
     _stage_transaction(tmp_path, selected_paths, report, verdict)
     verdict_path = tmp_path / verdict
     verdict_path.write_text(
@@ -1371,8 +1573,12 @@ def test_transaction_local_manifest_must_equal_complete_staged_set(
     )
     subprocess.run(["git", "add", "--", verdict], cwd=tmp_path, check=True)
     monkeypatch.setattr(module, "list_named_packets", lambda root: [])
-    monkeypatch.setattr(module, "run_bridge_compliance_audit", lambda **kwargs: {"decision": "pass"})
-    monkeypatch.setattr(module, "validate_verdict_evidence_anchors", lambda content, project_root: [])
+    monkeypatch.setattr(
+        module, "run_bridge_compliance_audit", lambda **kwargs: {"decision": "pass"}
+    )
+    monkeypatch.setattr(
+        module, "validate_verdict_evidence_anchors", lambda content, project_root: []
+    )
 
     result = module.evaluate(tmp_path)
 
@@ -1403,7 +1609,9 @@ def test_transaction_local_manifest_rejects_each_ambiguous_form(
     expected: str,
 ) -> None:
     module = _load_module()
-    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    selected_paths, report, verdict = _write_transaction_chain(
+        tmp_path, module, monkeypatch
+    )
     _stage_transaction(tmp_path, selected_paths, report, verdict)
     verdict_path = tmp_path / verdict
     content = verdict_path.read_text(encoding="utf-8")
@@ -1414,7 +1622,9 @@ def test_transaction_local_manifest_rejects_each_ambiguous_form(
             "- `scripts/bridge_lifecycle_resolver.py`\n- `scripts/bridge_lifecycle_resolver.py`\n",
         )
     elif failure == "glob":
-        content = content.replace("- `scripts/bridge_lifecycle_resolver.py`\n", "- `scripts/*.py`\n")
+        content = content.replace(
+            "- `scripts/bridge_lifecycle_resolver.py`\n", "- `scripts/*.py`\n"
+        )
     else:
         second_candidate = "bridge/gtkb-other-004.md"
         (tmp_path / second_candidate).write_text(
@@ -1429,7 +1639,11 @@ def test_transaction_local_manifest_rejects_each_ambiguous_form(
     result = module.evaluate(tmp_path)
 
     assert result["status"] == "fail"
-    assert any(expected in error for finding in result["findings"] for error in finding.get("evidence_errors", []))
+    assert any(
+        expected in error
+        for finding in result["findings"]
+        for error in finding.get("evidence_errors", [])
+    )
 
 
 @pytest.mark.parametrize(
@@ -1510,9 +1724,12 @@ def test_transaction_manifest_rejects_casefold_collision(tmp_path: Path) -> None
         ("proposal_drift", "resolver-approved proposal"),
         ("go_drift", "resolver-approved GO"),
         ("prestart_hash", "pre-start packet hash mismatch"),
-        ("session_drift", "worker session differs from start session"),
-        ("provenance_schema", "worker provenance schema is unsupported"),
-        ("provenance_role", "worker role is not prime-builder"),
+        ("session_drift", "attested context differs from start session"),
+        ("attestation_schema", "role-attestation schema is unsupported"),
+        ("attestation_role", "attested role is not prime-builder"),
+        ("attestation_source", "role authority is not exact-init"),
+        ("claim_envelope", "claim envelope differs from role attestation"),
+        ("claim_attestation", "claim reference differs from role attestation"),
         ("claim_project", "claim project differs from packet PAUTH"),
         ("out_of_scope", "target scope differs"),
         ("pauth_denied", "protected-mutation PAUTH validation failed"),
@@ -1525,7 +1742,9 @@ def test_transaction_local_candidate_fails_closed_on_provenance_and_packet_error
     expected: str,
 ) -> None:
     module = _load_module()
-    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    selected_paths, report, verdict = _write_transaction_chain(
+        tmp_path, module, monkeypatch
+    )
     _stage_transaction(tmp_path, selected_paths, report, verdict)
     if failure == "self_review":
         report_path = tmp_path / report
@@ -1537,14 +1756,16 @@ def test_transaction_local_candidate_fails_closed_on_provenance_and_packet_error
     elif failure == "duplicate_session":
         verdict_path = tmp_path / verdict
         verdict_path.write_text(
-            verdict_path.read_text(encoding="utf-8") + "\nauthor_session_context_id: second-reviewer-session\n",
+            verdict_path.read_text(encoding="utf-8")
+            + "\nauthor_session_context_id: second-reviewer-session\n",
             encoding="utf-8",
         )
         subprocess.run(["git", "add", "--", verdict], cwd=tmp_path, check=True)
     elif failure == "duplicate_report_session":
         report_path = tmp_path / report
         report_path.write_text(
-            report_path.read_text(encoding="utf-8") + "\nauthor_session_context_id: second-pb-session\n",
+            report_path.read_text(encoding="utf-8")
+            + "\nauthor_session_context_id: second-pb-session\n",
             encoding="utf-8",
         )
         subprocess.run(["git", "add", "--", report], cwd=tmp_path, check=True)
@@ -1552,11 +1773,17 @@ def test_transaction_local_candidate_fails_closed_on_provenance_and_packet_error
         monkeypatch.setattr(
             module,
             "validate_packet_project_authorization_operation",
-            lambda *args, **kwargs: (_ for _ in ()).throw(module.AuthorizationError("current PAUTH denied")),
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                module.AuthorizationError("current PAUTH denied")
+            ),
         )
     else:
         packet_path = (
-            tmp_path / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / "gtkb-wi5629-fixture.json"
+            tmp_path
+            / ".gtkb-state"
+            / "implementation-authorizations"
+            / "by-bridge"
+            / "gtkb-wi5629-fixture.json"
         )
         if failure == "missing_packet":
             packet_path.unlink()
@@ -1579,7 +1806,7 @@ def test_transaction_local_candidate_fails_closed_on_provenance_and_packet_error
                 packet.pop("implementation_start")
                 packet["packet_hash"] = module.packet_hash(packet)
             elif failure == "start_schema":
-                packet["implementation_start"]["schema_version"] = 2
+                packet["implementation_start"]["schema_version"] = 1
                 packet["packet_hash"] = module.packet_hash(packet)
             elif failure == "missing_start_session":
                 packet["implementation_start"].pop("session_id")
@@ -1588,13 +1815,19 @@ def test_transaction_local_candidate_fails_closed_on_provenance_and_packet_error
                 packet["implementation_start"].pop("work_intent_claim")
                 packet["packet_hash"] = module.packet_hash(packet)
             elif failure == "claim_kind":
-                packet["implementation_start"]["work_intent_claim"]["claim_kind"] = "draft_review"
+                packet["implementation_start"]["work_intent_claim"]["claim_kind"] = (
+                    "draft_review"
+                )
                 packet["packet_hash"] = module.packet_hash(packet)
             elif failure == "claim_role":
-                packet["implementation_start"]["work_intent_claim"]["acting_role"] = "loyal-opposition"
+                packet["implementation_start"]["work_intent_claim"]["acting_role"] = (
+                    "loyal-opposition"
+                )
                 packet["packet_hash"] = module.packet_hash(packet)
             elif failure == "claim_session":
-                packet["implementation_start"]["work_intent_claim"]["session_id"] = "other-session"
+                packet["implementation_start"]["work_intent_claim"]["session_id"] = (
+                    "other-session"
+                )
                 packet["packet_hash"] = module.packet_hash(packet)
             elif failure == "wrong_bridge":
                 packet["implementation_start"]["bridge_id"] = "gtkb-other"
@@ -1603,7 +1836,9 @@ def test_transaction_local_candidate_fails_closed_on_provenance_and_packet_error
                 packet["implementation_start"].pop("finalized_at")
                 packet["packet_hash"] = module.packet_hash(packet)
             elif failure == "decision_denied":
-                packet["implementation_start"]["project_authorization_decision"] = {"allowed": False}
+                packet["implementation_start"]["project_authorization_decision"] = {
+                    "allowed": False
+                }
                 packet["packet_hash"] = module.packet_hash(packet)
             elif failure == "missing_pauth":
                 packet.pop("project_authorization")
@@ -1624,32 +1859,60 @@ def test_transaction_local_candidate_fails_closed_on_provenance_and_packet_error
                 packet["implementation_start"]["pre_start_packet_hash"] = "sha256:wrong"
                 packet["packet_hash"] = module.packet_hash(packet)
             elif failure == "session_drift":
-                packet["implementation_start"]["worker_role_provenance"]["session_id"] = "other-session"
+                packet["implementation_start"]["role_attestation"][
+                    "invoking_context"
+                ] = "other-session"
                 packet["packet_hash"] = module.packet_hash(packet)
-            elif failure == "provenance_schema":
-                packet["implementation_start"]["worker_role_provenance"]["schema_version"] = 2
+            elif failure == "attestation_schema":
+                packet["implementation_start"]["role_attestation"]["schema_version"] = 2
                 packet["packet_hash"] = module.packet_hash(packet)
-            elif failure == "provenance_role":
-                packet["implementation_start"]["worker_role_provenance"]["role"] = "loyal-opposition"
+            elif failure == "attestation_role":
+                packet["implementation_start"]["role_attestation"]["role"] = (
+                    "loyal-opposition"
+                )
+                packet["packet_hash"] = module.packet_hash(packet)
+            elif failure == "attestation_source":
+                packet["implementation_start"]["role_attestation"]["source_event"] = (
+                    "owner_role_change"
+                )
+                packet["packet_hash"] = module.packet_hash(packet)
+            elif failure == "claim_envelope":
+                packet["implementation_start"]["work_intent_claim"][
+                    "session_envelope_id"
+                ] = "SENV-other"
+                packet["packet_hash"] = module.packet_hash(packet)
+            elif failure == "claim_attestation":
+                packet["implementation_start"]["work_intent_claim"][
+                    "acting_role_attestation"
+                ] = "role-attestation:SENV-other:1:fedcba9876543210"
                 packet["packet_hash"] = module.packet_hash(packet)
             elif failure == "claim_project":
-                packet["implementation_start"]["work_intent_claim"]["project_id"] = "PROJECT-OTHER"
+                packet["implementation_start"]["work_intent_claim"]["project_id"] = (
+                    "PROJECT-OTHER"
+                )
                 packet["packet_hash"] = module.packet_hash(packet)
             else:
                 packet["target_path_globs"] = ["scripts/bridge_lifecycle_resolver.py"]
-                packet["implementation_start"]["target_path_globs"] = packet["target_path_globs"]
+                packet["implementation_start"]["target_path_globs"] = packet[
+                    "target_path_globs"
+                ]
                 packet["packet_hash"] = module.packet_hash(packet)
             packet_path.write_text(json.dumps(packet), encoding="utf-8")
 
     monkeypatch.setattr(module, "list_named_packets", lambda root: [])
-    monkeypatch.setattr(module, "run_bridge_compliance_audit", lambda **kwargs: {"decision": "pass"})
-    monkeypatch.setattr(module, "validate_verdict_evidence_anchors", lambda content, project_root: [])
+    monkeypatch.setattr(
+        module, "run_bridge_compliance_audit", lambda **kwargs: {"decision": "pass"}
+    )
+    monkeypatch.setattr(
+        module, "validate_verdict_evidence_anchors", lambda content, project_root: []
+    )
 
     result = module.evaluate(tmp_path)
 
     assert result["status"] == "fail"
     assert any(
-        finding.get("path") == verdict and any(expected in error for error in finding.get("evidence_errors", []))
+        finding.get("path") == verdict
+        and any(expected in error for error in finding.get("evidence_errors", []))
         for finding in result["findings"]
     )
 
@@ -1659,14 +1922,19 @@ def test_explicit_paths_mode_never_grants_transaction_local_authority(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module = _load_module()
-    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    selected_paths, report, verdict = _write_transaction_chain(
+        tmp_path, module, monkeypatch
+    )
     _stage_transaction(tmp_path, selected_paths, report, verdict)
     monkeypatch.setattr(module, "list_named_packets", lambda root: [])
 
     result = module.evaluate(tmp_path, paths=selected_paths)
 
     assert result["status"] == "fail"
-    assert all(item.get("evidence") != "transaction_local_verified_manifest" for item in result["cleared"])
+    assert all(
+        item.get("evidence") != "transaction_local_verified_manifest"
+        for item in result["cleared"]
+    )
 
 
 def test_cli_rejects_staged_and_explicit_paths_together() -> None:
@@ -1682,8 +1950,12 @@ def test_index_snapshot_includes_deletions_and_both_rename_paths(
 ) -> None:
     module = _load_module()
     _init_committed_paths(tmp_path, ["scripts/delete.py", "scripts/old.py"])
-    subprocess.run(["git", "rm", "-q", "--", "scripts/delete.py"], cwd=tmp_path, check=True)
-    subprocess.run(["git", "mv", "scripts/old.py", "scripts/new.py"], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "rm", "-q", "--", "scripts/delete.py"], cwd=tmp_path, check=True
+    )
+    subprocess.run(
+        ["git", "mv", "scripts/old.py", "scripts/new.py"], cwd=tmp_path, check=True
+    )
 
     with module._index_snapshot(tmp_path) as snapshot:
         assert set(snapshot.selected_paths) == {
@@ -1777,12 +2049,18 @@ def test_raw_index_inventory_rejects_links_gitlinks_modes_and_unmerged_entries(
         module._parse_index_inventory(raw)
 
 
-def test_raw_index_materialization_bypasses_smudge_and_eol_filters(tmp_path: Path) -> None:
+def test_raw_index_materialization_bypasses_smudge_and_eol_filters(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     (tmp_path / ".gitattributes").write_text("*.txt text eol=crlf\n", encoding="utf-8")
     (tmp_path / "authority.txt").write_bytes(b"authority\n")
-    subprocess.run(["git", "add", "--", ".gitattributes", "authority.txt"], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "add", "--", ".gitattributes", "authority.txt"],
+        cwd=tmp_path,
+        check=True,
+    )
     hooks = tmp_path / "empty-hooks"
     hooks.mkdir()
     subprocess.run(
@@ -1804,7 +2082,9 @@ def test_raw_index_materialization_bypasses_smudge_and_eol_filters(tmp_path: Pat
 
     with (
         module._index_snapshot(tmp_path) as index_snapshot,
-        module._bridge_snapshot(tmp_path, "gtkb-unused", index_snapshot) as bridge_snapshot,
+        module._bridge_snapshot(
+            tmp_path, "gtkb-unused", index_snapshot
+        ) as bridge_snapshot,
     ):
         assert (bridge_snapshot.root / "authority.txt").read_bytes() == b"authority\n"
 
@@ -1865,7 +2145,9 @@ def test_raw_materialization_ignores_replace_refs_and_git_environment_injection(
 
     with (
         module._index_snapshot(tmp_path) as index_snapshot,
-        module._bridge_snapshot(tmp_path, "gtkb-unused", index_snapshot) as bridge_snapshot,
+        module._bridge_snapshot(
+            tmp_path, "gtkb-unused", index_snapshot
+        ) as bridge_snapshot,
     ):
         assert index_snapshot.object_format == "sha1"
         assert (bridge_snapshot.root / "authority.txt").read_bytes() == original_bytes
@@ -1884,11 +2166,15 @@ def test_raw_materialization_ignores_replace_refs_and_git_environment_injection(
         b"scripts/CON.txt",
     ],
 )
-def test_raw_index_inventory_rejects_noncanonical_platform_paths(raw_path: bytes) -> None:
+def test_raw_index_inventory_rejects_noncanonical_platform_paths(
+    raw_path: bytes,
+) -> None:
     module = _load_module()
     raw = b"100644 " + (b"0" * 40) + b" 0\t" + raw_path + b"\0"
 
-    with pytest.raises(module.GateError, match="non-canonical|unsafe|platform-reserved"):
+    with pytest.raises(
+        module.GateError, match="non-canonical|unsafe|platform-reserved"
+    ):
         module._parse_index_inventory(raw)
 
 
@@ -1899,7 +2185,9 @@ def test_raw_index_inventory_rejects_noncanonical_platform_paths(raw_path: bytes
         ("scripts/\u00e9.py", "scripts/e\u0301.py"),
     ],
 )
-def test_raw_index_inventory_rejects_casefold_and_unicode_collisions(first: str, second: str) -> None:
+def test_raw_index_inventory_rejects_casefold_and_unicode_collisions(
+    first: str, second: str
+) -> None:
     module = _load_module()
     records = [
         f"100644 {'0' * 40} 0\t{first}".encode(),
@@ -1926,7 +2214,9 @@ def test_raw_materialization_exempts_oversized_blob_in_ledger(
 
     with (
         module._index_snapshot(tmp_path) as index_snapshot,
-        module._bridge_snapshot(tmp_path, "gtkb-unused", index_snapshot) as bridge_snapshot,
+        module._bridge_snapshot(
+            tmp_path, "gtkb-unused", index_snapshot
+        ) as bridge_snapshot,
     ):
         entry = bridge_snapshot.ledger["authority.txt"]
         assert entry.content_exempt is True
@@ -1999,7 +2289,9 @@ def test_copied_index_cannot_be_replaced_between_consumers(tmp_path: Path) -> No
         module._index_entries(tmp_path, snapshot)
         with pytest.raises(OSError):
             os.replace(replacement, snapshot.index_file)
-        assert module._staged_text(tmp_path, "authority.txt", snapshot).startswith("# baseline")
+        assert module._staged_text(tmp_path, "authority.txt", snapshot).startswith(
+            "# baseline"
+        )
 
 
 def test_committed_terminal_snapshot_blocks_transient_substitution(
@@ -2007,7 +2299,9 @@ def test_committed_terminal_snapshot_blocks_transient_substitution(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module = _load_module()
-    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    selected_paths, report, verdict = _write_transaction_chain(
+        tmp_path, module, monkeypatch
+    )
     _stage_transaction(tmp_path, selected_paths, report, verdict)
     subprocess.run(
         [
@@ -2049,7 +2343,9 @@ def test_committed_terminal_snapshot_blocks_transient_substitution(
         return original_resolver(snapshot_root, bridge_id)
 
     monkeypatch.setattr(module, "resolve_bridge_lifecycle", attack_snapshot)
-    evidence, errors, count = module._load_verified_evidence(tmp_path, head_oid=head_oid)
+    evidence, errors, count = module._load_verified_evidence(
+        tmp_path, head_oid=head_oid
+    )
 
     assert count == 1
     assert not errors
@@ -2057,7 +2353,9 @@ def test_committed_terminal_snapshot_blocks_transient_substitution(
     assert attempts == ["entry", "root"]
 
 
-def test_snapshot_hardlink_race_fails_closed_on_link_count_drift(tmp_path: Path) -> None:
+def test_snapshot_hardlink_race_fails_closed_on_link_count_drift(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     bridge_id = "gtkb-hardlink-race-fixture"
     rel_path = f"bridge/{bridge_id}-001.md"
@@ -2150,13 +2448,18 @@ def test_wi5657_exact_slug_matching_prefix_sharing_not_sibling() -> None:
 def test_wi5657_non_versioned_or_none_snapshot_is_never_superseded() -> None:
     module = _load_module()
     snap = _wi5657_snap(["bridge/slug-a-007.md"])
-    assert module._superseded_versioned_bridge("bridge/not-a-versioned-file.md", snap) is False
+    assert (
+        module._superseded_versioned_bridge("bridge/not-a-versioned-file.md", snap)
+        is False
+    )
     assert module._superseded_versioned_bridge("scripts/foo.py", snap) is False
     # A None snapshot (non-transaction context) never marks anything superseded.
     assert module._superseded_versioned_bridge("bridge/slug-a-004.md", None) is False
 
 
-def test_wi5657_untracked_worktree_higher_sibling_does_not_supersede_staged_latest(tmp_path: Path) -> None:
+def test_wi5657_untracked_worktree_higher_sibling_does_not_supersede_staged_latest(
+    tmp_path: Path,
+) -> None:
     # Regression guard (adversarial-review finding): an untracked/parked higher-numbered
     # same-slug file in the worktree must NOT mark a STAGED genuine latest VERIFIED as
     # superseded. Supersession is scoped to the staged transaction only.
@@ -2166,13 +2469,17 @@ def test_wi5657_untracked_worktree_higher_sibling_does_not_supersede_staged_late
     _wi5657_git_init_stage(tmp_path, [v6])
     _wi5657_write_bridge(tmp_path, slug, 7, "NEW")  # untracked parked draft, NOT staged
     with module._index_snapshot(tmp_path) as snap:
-        _evidence, errors, candidate_path = module._load_transaction_verified_evidence(tmp_path, [], snap)
+        _evidence, errors, candidate_path = module._load_transaction_verified_evidence(
+            tmp_path, [], snap
+        )
     assert "found 2" not in " ".join(errors)
     # -006 is NOT superseded by the untracked -007; it remains the sole live candidate.
     assert candidate_path == v6
 
 
-def test_wi5657_superseded_verified_yields_no_finalization_finding(tmp_path: Path) -> None:
+def test_wi5657_superseded_verified_yields_no_finalization_finding(
+    tmp_path: Path,
+) -> None:
     # Superseded predecessor (-004) with a higher STAGED sibling (-007) -> no finding.
     module = _load_module()
     v4 = _wi5657_write_bridge(tmp_path, "slug-b", 4, "VERIFIED")
@@ -2186,15 +2493,23 @@ def test_wi5657_superseded_verified_yields_no_finalization_finding(tmp_path: Pat
     assert "Commit Finalization Evidence" in finding["reason"]
 
 
-def test_wi5657_non_superseded_terminal_verified_without_evidence_yields_finding(tmp_path: Path) -> None:
+def test_wi5657_non_superseded_terminal_verified_without_evidence_yields_finding(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
-    _wi5657_write_bridge(tmp_path, "slug-c", 4, "VERIFIED")  # sole latest, lacks evidence
-    finding = module._verified_bridge_finalization_finding(tmp_path, "bridge/slug-c-004.md", None)
+    _wi5657_write_bridge(
+        tmp_path, "slug-c", 4, "VERIFIED"
+    )  # sole latest, lacks evidence
+    finding = module._verified_bridge_finalization_finding(
+        tmp_path, "bridge/slug-c-004.md", None
+    )
     assert finding is not None
     assert "Commit Finalization Evidence" in finding["reason"]
 
 
-def test_wi5657_superseded_plus_latest_yields_single_candidate_not_found_two(tmp_path: Path) -> None:
+def test_wi5657_superseded_plus_latest_yields_single_candidate_not_found_two(
+    tmp_path: Path,
+) -> None:
     # Case 1: -004 VERIFIED (superseded) + -005 NO-GO + -007 VERIFIED (latest), all staged.
     module = _load_module()
     slug = "gtkb-wi5657-fixture-case1"
@@ -2203,12 +2518,18 @@ def test_wi5657_superseded_plus_latest_yields_single_candidate_not_found_two(tmp
     v7 = _wi5657_write_bridge(tmp_path, slug, 7, "VERIFIED")
     _wi5657_git_init_stage(tmp_path, [v4, v5, v7])
     with module._index_snapshot(tmp_path) as snap:
-        _evidence, errors, candidate_path = module._load_transaction_verified_evidence(tmp_path, [], snap)
-    assert "found 2" not in " ".join(errors), f"superseded -004 must be excluded from candidate count: {errors}"
+        _evidence, errors, candidate_path = module._load_transaction_verified_evidence(
+            tmp_path, [], snap
+        )
+    assert "found 2" not in " ".join(errors), (
+        f"superseded -004 must be excluded from candidate count: {errors}"
+    )
     assert candidate_path == v7
 
 
-def test_wi5657_only_superseded_verified_with_latest_nogo_yields_zero_candidates(tmp_path: Path) -> None:
+def test_wi5657_only_superseded_verified_with_latest_nogo_yields_zero_candidates(
+    tmp_path: Path,
+) -> None:
     # Case 3: -004 VERIFIED superseded by staged -005 NO-GO; no live VERIFIED candidate remains.
     module = _load_module()
     slug = "gtkb-wi5657-fixture-case3"
@@ -2244,7 +2565,9 @@ def test_wi5658_run_git_times_out_fails_closed(monkeypatch, tmp_path: Path) -> N
     assert "timed out" in result.stderr
 
 
-def test_wi5658_committed_bridge_entries_by_id_groups_by_exact_slug(tmp_path: Path) -> None:
+def test_wi5658_committed_bridge_entries_by_id_groups_by_exact_slug(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     _init_committed_paths(
         tmp_path,
@@ -2256,26 +2579,43 @@ def test_wi5658_committed_bridge_entries_by_id_groups_by_exact_slug(tmp_path: Pa
             "bridge/not-a-versioned-file.md",
         ],
     )
-    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True).stdout.strip()
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True
+    ).stdout.strip()
     grouped = module._committed_bridge_entries_by_id(tmp_path, head)
-    assert {e.rel_path for e in grouped.get("slug-a", ())} == {"bridge/slug-a-001.md", "bridge/slug-a-002.md"}
+    assert {e.rel_path for e in grouped.get("slug-a", ())} == {
+        "bridge/slug-a-001.md",
+        "bridge/slug-a-002.md",
+    }
     # Exact-slug: slug-a-v2 is a DIFFERENT chain, not folded into slug-a.
-    assert {e.rel_path for e in grouped.get("slug-a-v2", ())} == {"bridge/slug-a-v2-001.md"}
+    assert {e.rel_path for e in grouped.get("slug-a-v2", ())} == {
+        "bridge/slug-a-v2-001.md"
+    }
     assert {e.rel_path for e in grouped.get("slug-b", ())} == {"bridge/slug-b-001.md"}
     # Non-versioned bridge files are excluded.
-    assert all("not-a-versioned-file" not in e.rel_path for entries in grouped.values() for e in entries)
+    assert all(
+        "not-a-versioned-file" not in e.rel_path
+        for entries in grouped.values()
+        for e in entries
+    )
 
 
-def test_wi5658_load_verified_evidence_enumerates_committed_bridge_once(monkeypatch, tmp_path: Path) -> None:
+def test_wi5658_load_verified_evidence_enumerates_committed_bridge_once(
+    monkeypatch, tmp_path: Path
+) -> None:
     # Core perf property: for N packets, the committed bridge tree is enumerated via
     # ls-tree exactly ONCE (not once per packet, which was the O(packets x files) hang).
     module = _load_module()
     _init_committed_paths(tmp_path, ["bridge/seed-001.md"])
-    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True).stdout.strip()
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True
+    ).stdout.strip()
     pkt_dir = tmp_path / ".gtkb-state" / "implementation-authorizations" / "by-bridge"
     pkt_dir.mkdir(parents=True, exist_ok=True)
     for i in range(5):
-        (pkt_dir / f"slug-{i}.json").write_text(json.dumps({"bridge_id": f"slug-{i}"}), encoding="utf-8")
+        (pkt_dir / f"slug-{i}.json").write_text(
+            json.dumps({"bridge_id": f"slug-{i}"}), encoding="utf-8"
+        )
 
     ls_tree_calls = {"n": 0}
     real_run_git = module._run_git
@@ -2329,32 +2669,45 @@ def _wi5659_write_packet(root: Path, bridge_id: str, globs: list[str]) -> None:
     pkt_dir = root / ".gtkb-state" / "implementation-authorizations" / "by-bridge"
     pkt_dir.mkdir(parents=True, exist_ok=True)
     (pkt_dir / f"{bridge_id}.json").write_text(
-        json.dumps({"bridge_id": bridge_id, "target_path_globs": list(globs)}), encoding="utf-8"
+        json.dumps({"bridge_id": bridge_id, "target_path_globs": list(globs)}),
+        encoding="utf-8",
     )
 
 
 def _wi5659_head(root: Path) -> str:
     return subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True, check=True
+        ["git", "rev-parse", "HEAD"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.strip()
 
 
-def _wi5659_spy_snapshot(module, monkeypatch: pytest.MonkeyPatch, reached: list[str]) -> None:
+def _wi5659_spy_snapshot(
+    module, monkeypatch: pytest.MonkeyPatch, reached: list[str]
+) -> None:
     monkeypatch.setattr(
         module,
         "_bridge_snapshot",
-        lambda root, bridge_id, *a, **k: _Wi5659RaisingSnapshot(reached, bridge_id, module.GateError("wi5659-spy")),
+        lambda root, bridge_id, *a, **k: _Wi5659RaisingSnapshot(
+            reached, bridge_id, module.GateError("wi5659-spy")
+        ),
     )
 
 
-def test_wi5659_prefilter_resolves_only_matching_packets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_wi5659_prefilter_resolves_only_matching_packets(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     module = _load_module()
     _init_committed_paths(tmp_path, ["bridge/seed-001.md"])
     head = _wi5659_head(tmp_path)
     # Exact-match globs so relevance does not depend on wildcard semantics; the
     # pre-filter reuses the same path_authorized predicate as authorization.
     _wi5659_write_packet(tmp_path, "rel-exact", ["scripts/target.py"])
-    _wi5659_write_packet(tmp_path, "rel-multi", ["scripts/unrelated.py", "scripts/target.py"])
+    _wi5659_write_packet(
+        tmp_path, "rel-multi", ["scripts/unrelated.py", "scripts/target.py"]
+    )
     _wi5659_write_packet(tmp_path, "irr-exact", ["scripts/other.py"])
     _wi5659_write_packet(tmp_path, "irr-docs", ["docs/readme.md"])
     _wi5659_write_packet(tmp_path, "irr-noglobs", [])
@@ -2374,18 +2727,26 @@ def test_wi5659_prefilter_resolves_only_matching_packets(monkeypatch: pytest.Mon
     assert len(errors) == 2
 
 
-def test_wi5659_prefilter_none_is_full_scan(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_wi5659_prefilter_none_is_full_scan(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     module = _load_module()
     _init_committed_paths(tmp_path, ["bridge/seed-001.md"])
     head = _wi5659_head(tmp_path)
-    for bid, globs in (("a", ["scripts/a.py"]), ("b", ["docs/b.md"]), ("c", ["x/c.py"])):
+    for bid, globs in (
+        ("a", ["scripts/a.py"]),
+        ("b", ["docs/b.md"]),
+        ("c", ["x/c.py"]),
+    ):
         _wi5659_write_packet(tmp_path, bid, globs)
     reached: list[str] = []
     _wi5659_spy_snapshot(module, monkeypatch, reached)
 
     # protected_paths=None preserves legacy full-scan behavior: every packet is
     # expensively resolved (backward compatibility for callers that omit it).
-    _evidence, _errors, count = module._load_verified_evidence(tmp_path, head_oid=head, protected_paths=None)
+    _evidence, _errors, count = module._load_verified_evidence(
+        tmp_path, head_oid=head, protected_paths=None
+    )
 
     assert set(reached) == {"a", "b", "c"}
     assert count == 3
@@ -2410,20 +2771,31 @@ def test_wi5659_prefilter_preserves_authorization_outcome() -> None:
     pre_evidence = [
         entry
         for entry in full_evidence
-        if any(module.path_authorized({"target_path_globs": entry[1]}, rel) for rel in staged_protected)
+        if any(
+            module.path_authorized({"target_path_globs": entry[1]}, rel)
+            for rel in staged_protected
+        )
     ]
     # Only the two entries authorizing scripts/target.py survive the pre-filter.
     assert {entry[0] for entry in pre_evidence} == {"t-target", "t-multi"}
     for rel in staged_protected:
         full_res = module._verified_authorization(full_evidence, [], rel)
         pre_res = module._verified_authorization(pre_evidence, [], rel)
-        assert (full_res[0], full_res[1]) == (pre_res[0], pre_res[1]), f"authorization outcome differs for {rel}"
+        assert (full_res[0], full_res[1]) == (pre_res[0], pre_res[1]), (
+            f"authorization outcome differs for {rel}"
+        )
     # Non-trivial: one staged path is authorized, the other is not.
-    assert module._verified_authorization(pre_evidence, [], "scripts/target.py")[0] is True
-    assert module._verified_authorization(pre_evidence, [], "scripts/nope.py")[0] is False
+    assert (
+        module._verified_authorization(pre_evidence, [], "scripts/target.py")[0] is True
+    )
+    assert (
+        module._verified_authorization(pre_evidence, [], "scripts/nope.py")[0] is False
+    )
 
 
-def test_wi5659_prefilter_scales_past_pre_commit_budget(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_wi5659_prefilter_scales_past_pre_commit_budget(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     import time
 
     module = _load_module()
@@ -2451,7 +2823,9 @@ def test_wi5659_prefilter_scales_past_pre_commit_budget(monkeypatch: pytest.Monk
     assert elapsed < 20.0, f"pre-filter scan took {elapsed:.2f}s"
 
 
-def test_wi5659_prefilter_integrated_real_chain_equivalence(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_wi5659_prefilter_integrated_real_chain_equivalence(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     # End-to-end proof (real resolution, NOT mocked) that the pre-filter is
     # outcome-preserving. A genuine committed VERIFIED chain resolves to real
     # evidence via _bridge_snapshot + resolve_bridge_lifecycle + the
@@ -2462,7 +2836,9 @@ def test_wi5659_prefilter_integrated_real_chain_equivalence(monkeypatch: pytest.
     # stays total in both cases. This is the test the adversarial-review lens
     # flagged as missing; it exercises the binding invariant the safety rests on.
     module = _load_module()
-    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    selected_paths, report, verdict = _write_transaction_chain(
+        tmp_path, module, monkeypatch
+    )
     _stage_transaction(tmp_path, selected_paths, report, verdict)
     subprocess.run(
         [
@@ -2481,15 +2857,23 @@ def test_wi5659_prefilter_integrated_real_chain_equivalence(monkeypatch: pytest.
         check=True,
     )
     head = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True, check=True
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.strip()
 
     # Baseline full scan: the committed chain resolves to REAL VERIFIED evidence.
-    ev_full, err_full, count_full = module._load_verified_evidence(tmp_path, head_oid=head)
+    ev_full, err_full, count_full = module._load_verified_evidence(
+        tmp_path, head_oid=head
+    )
     assert count_full == 1
     assert err_full == []
     assert ev_full, "committed VERIFIED chain must resolve to evidence in the full scan"
-    a_target = selected_paths[0]  # a path the chain's proposal (and packet globs) authorize
+    a_target = selected_paths[
+        0
+    ]  # a path the chain's proposal (and packet globs) authorize
     assert any(a_target in globs for _bid, globs in ev_full)
 
     # (a) Staged protected path MATCHES the chain -> byte-identical real evidence.
@@ -2562,26 +2946,42 @@ def test_wi5659_batch_ledger_matches_per_entry_reference(tmp_path: Path) -> None
     with module._index_snapshot(tmp_path) as snap:
         entries = module._index_entries(tmp_path, snap)
         batch = module._materialize_entries(
-            tmp_path, batch_root, entries, env=snap.env, object_format=snap.object_format
+            tmp_path,
+            batch_root,
+            entries,
+            env=snap.env,
+            object_format=snap.object_format,
         )
         reference: dict[str, object] = {}
         for entry in entries:
             destination = ref_root / entry.rel_path
             destination.parent.mkdir(parents=True, exist_ok=True)
             reference[entry.rel_path] = module._blob_ledger_entry(
-                tmp_path, destination, entry, env=snap.env, object_format=snap.object_format
+                tmp_path,
+                destination,
+                entry,
+                env=snap.env,
+                object_format=snap.object_format,
             )
 
     assert set(batch) == set(reference)
     assert batch, "fixture must materialize at least one entry"
     for rel_path, ref_entry in reference.items():
         got = batch[rel_path]
-        assert (got.mode, got.sha256, got.size) == (ref_entry.mode, ref_entry.sha256, ref_entry.size), rel_path
+        assert (got.mode, got.sha256, got.size) == (
+            ref_entry.mode,
+            ref_entry.sha256,
+            ref_entry.size,
+        ), rel_path
         # Materialized bytes are byte-identical between the two paths.
-        assert (batch_root / rel_path).read_bytes() == (ref_root / rel_path).read_bytes(), rel_path
+        assert (batch_root / rel_path).read_bytes() == (
+            ref_root / rel_path
+        ).read_bytes(), rel_path
 
 
-def test_wi5659_batch_uses_one_process_for_all_entries(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_wi5659_batch_uses_one_process_for_all_entries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Deterministic proof of the perf mechanism: N entries cost ONE cat-file
     # process, not 2N spawns (the 159.4 ms/entry -> ~1 ms/entry change).
     module = _load_module()
@@ -2605,7 +3005,9 @@ def test_wi5659_batch_uses_one_process_for_all_entries(tmp_path: Path, monkeypat
         )
 
     assert len(ledger) == len(entries) >= 12
-    assert spawns["n"] == 1, f"batch materialization must spawn exactly one cat-file process; got {spawns['n']}"
+    assert spawns["n"] == 1, (
+        f"batch materialization must spawn exactly one cat-file process; got {spawns['n']}"
+    )
 
 
 def _wi5659_run_batch_with_payload(module, tmp_path: Path, monkeypatch, payload: bytes):
@@ -2614,21 +3016,31 @@ def _wi5659_run_batch_with_payload(module, tmp_path: Path, monkeypatch, payload:
     out_root.mkdir(exist_ok=True)
     with module._index_snapshot(tmp_path) as snap:
         entries = module._index_entries(tmp_path, snap)
-        monkeypatch.setattr(module.subprocess, "Popen", lambda *a, **k: _FakeBatchProcess(payload))
-        return module._materialize_entries(tmp_path, out_root, entries, env=snap.env, object_format=snap.object_format)
+        monkeypatch.setattr(
+            module.subprocess, "Popen", lambda *a, **k: _FakeBatchProcess(payload)
+        )
+        return module._materialize_entries(
+            tmp_path, out_root, entries, env=snap.env, object_format=snap.object_format
+        )
 
 
-def test_wi5659_batch_missing_object_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_wi5659_batch_missing_object_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # `<oid> missing` (and `<oid> ambiguous`) are 2-field headers -> GateError.
     module = _load_module()
     _init_committed_paths(tmp_path, ["only.txt"])
     with module._index_snapshot(tmp_path) as snap:
         oid = module._index_entries(tmp_path, snap)[0].oid
     with pytest.raises(module.GateError, match="could not read raw index blob"):
-        _wi5659_run_batch_with_payload(module, tmp_path, monkeypatch, f"{oid} missing\n".encode("ascii"))
+        _wi5659_run_batch_with_payload(
+            module, tmp_path, monkeypatch, f"{oid} missing\n".encode("ascii")
+        )
 
 
-def test_wi5659_batch_hash_mismatch_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_wi5659_batch_hash_mismatch_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Defense in depth: content that does not hash to the indexed object id must
     # fail closed even though a real content-addressed git could not produce it.
     module = _load_module()
@@ -2641,14 +3053,18 @@ def test_wi5659_batch_hash_mismatch_fails_closed(tmp_path: Path, monkeypatch: py
         _wi5659_run_batch_with_payload(module, tmp_path, monkeypatch, payload)
 
 
-def test_wi5659_batch_malformed_terminator_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_wi5659_batch_malformed_terminator_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # A record whose trailing newline is missing must not be silently accepted.
     module = _load_module()
     _init_committed_paths(tmp_path, ["only.txt"])
     with module._index_snapshot(tmp_path) as snap:
         entry = module._index_entries(tmp_path, snap)[0]
     content = (tmp_path / entry.rel_path).read_bytes()
-    payload = f"{entry.oid} blob {len(content)}\n".encode("ascii") + content  # no trailing b"\n"
+    payload = (
+        f"{entry.oid} blob {len(content)}\n".encode("ascii") + content
+    )  # no trailing b"\n"
     with pytest.raises(module.GateError, match="malformed batch record terminator"):
         _wi5659_run_batch_with_payload(module, tmp_path, monkeypatch, payload)
 
@@ -2681,7 +3097,13 @@ def test_wi5659_batch_exempts_oversized_blob_and_enforces_tree_limit(
     with module._index_snapshot(tmp_path) as snap:
         entries = module._index_entries(tmp_path, snap)
         with pytest.raises(module.GateError, match="prospective tree exceeds"):
-            module._materialize_entries(tmp_path, out_root2, entries, env=snap.env, object_format=snap.object_format)
+            module._materialize_entries(
+                tmp_path,
+                out_root2,
+                entries,
+                env=snap.env,
+                object_format=snap.object_format,
+            )
 
 
 # --- WI-5659 mechanism 3 (in-ledger) + mechanism 4: ledger exemption + scope ---
@@ -2720,7 +3142,9 @@ def _wi5659_grow_and_commit(tmp_path: Path, rel: str, nbytes: int) -> None:
 def _wi5659_materialize_all(module, tmp_path: Path, out_root: Path):
     with module._index_snapshot(tmp_path) as snap:
         entries = module._index_entries(tmp_path, snap)
-        return module._materialize_entries(tmp_path, out_root, entries, env=snap.env, object_format=snap.object_format)
+        return module._materialize_entries(
+            tmp_path, out_root, entries, env=snap.env, object_format=snap.object_format
+        )
 
 
 def test_wi5659_exempt_entry_recorded_in_ledger_absent_from_disk(
@@ -2759,7 +3183,9 @@ def test_wi5659_exempt_blob_streaming_hash_mismatch_fails_closed(
         _wi5659_run_batch_with_payload(module, tmp_path, monkeypatch, payload)
 
 
-def test_wi5659_content_file_at_exempt_path_is_drift(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_wi5659_content_file_at_exempt_path_is_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _load_module()
     _init_committed_paths(tmp_path, ["big.txt"])
     _wi5659_grow_and_commit(tmp_path, "big.txt", 4096)
@@ -2770,11 +3196,17 @@ def test_wi5659_content_file_at_exempt_path_is_drift(tmp_path: Path, monkeypatch
     assert ledger["big.txt"].content_exempt is True
     # Planting a content file at the exempt path must fail closed.
     (out_root / "big.txt").write_bytes(b"smuggled")
-    with pytest.raises(module.GateError, match="must not exist on disk|file set drifted"):
-        module._verify_snapshot_ledger(module._BridgeSnapshot(root=out_root, ledger=ledger))
+    with pytest.raises(
+        module.GateError, match="must not exist on disk|file set drifted"
+    ):
+        module._verify_snapshot_ledger(
+            module._BridgeSnapshot(root=out_root, ledger=ledger)
+        )
 
 
-def test_wi5659_tracked_gtkb_state_files_are_verified_not_skipped(tmp_path: Path) -> None:
+def test_wi5659_tracked_gtkb_state_files_are_verified_not_skipped(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     tracked_state = ".gtkb-state/tracked-evidence.json"
     _init_committed_paths(tmp_path, [tracked_state, "normal.txt"])
@@ -2799,7 +3231,9 @@ def test_wi5659_audit_scratch_subtree_is_still_ignored(tmp_path: Path) -> None:
     module._verify_snapshot_ledger(module._BridgeSnapshot(root=out_root, ledger=ledger))
 
 
-def test_wi5659_unexpected_gtkb_state_file_outside_scratch_is_drift(tmp_path: Path) -> None:
+def test_wi5659_unexpected_gtkb_state_file_outside_scratch_is_drift(
+    tmp_path: Path,
+) -> None:
     # LO verdict -021 P1: mechanism 4 must NOT ignore every non-ledger `.gtkb-state/`
     # path. An unexpected untracked file outside the authorized compliance-audit
     # scratch boundary must still be caught as file-set drift.
@@ -2812,10 +3246,14 @@ def test_wi5659_unexpected_gtkb_state_file_outside_scratch_is_drift(tmp_path: Pa
     sneaky.parent.mkdir(parents=True)
     sneaky.write_text("sneaky", encoding="utf-8")
     with pytest.raises(module.GateError, match="file set drifted"):
-        module._verify_snapshot_ledger(module._BridgeSnapshot(root=out_root, ledger=ledger))
+        module._verify_snapshot_ledger(
+            module._BridgeSnapshot(root=out_root, ledger=ledger)
+        )
 
 
-def test_wi5659_tampering_with_tracked_gtkb_state_file_is_detected(tmp_path: Path) -> None:
+def test_wi5659_tampering_with_tracked_gtkb_state_file_is_detected(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     tracked_state = ".gtkb-state/tracked-evidence.json"
     _init_committed_paths(tmp_path, [tracked_state])
@@ -2824,7 +3262,9 @@ def test_wi5659_tampering_with_tracked_gtkb_state_file_is_detected(tmp_path: Pat
     ledger = _wi5659_materialize_all(module, tmp_path, out_root)
     (out_root / tracked_state).write_text("tampered payload", encoding="utf-8")
     with pytest.raises(module.GateError):
-        module._verify_snapshot_ledger(module._BridgeSnapshot(root=out_root, ledger=ledger))
+        module._verify_snapshot_ledger(
+            module._BridgeSnapshot(root=out_root, ledger=ledger)
+        )
 
 
 def test_registry_commit_accepts_coherent_journal_bound_member(tmp_path: Path) -> None:
@@ -2834,12 +3274,16 @@ def test_registry_commit_accepts_coherent_journal_bound_member(tmp_path: Path) -
     assert module._registry_commit_findings(tmp_path, ["registered.txt"], None) == []
 
 
-def test_registry_commit_reports_stale_registered_content_without_blocking(tmp_path: Path) -> None:
+def test_registry_commit_reports_stale_registered_content_without_blocking(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     member = _seed_registered_commit_fixture(tmp_path)
     member.write_text("changed without observation\n", encoding="utf-8")
 
-    findings, audit_gaps = module._registry_commit_assessment(tmp_path, ["registered.txt"], None)
+    findings, audit_gaps = module._registry_commit_assessment(
+        tmp_path, ["registered.txt"], None
+    )
 
     assert findings == []
     assert any(gap["path"] == "registered.txt" for gap in audit_gaps)
@@ -2880,7 +3324,9 @@ def test_registry_commit_blocks_registered_identity_change(tmp_path: Path) -> No
     ]
 
 
-@pytest.mark.parametrize("status", ["A", "M", "C-source", "C-destination", "R-source", "R-destination"])
+@pytest.mark.parametrize(
+    "status", ["A", "M", "C-source", "C-destination", "R-source", "R-destination"]
+)
 def test_registry_commit_rejects_transient_index_recurrence(
     tmp_path: Path,
     status: str,
@@ -2900,7 +3346,9 @@ def test_registry_commit_rejects_transient_index_recurrence(
     ]
 
 
-def test_registry_commit_allows_only_coherently_unregistered_transient_deletion(tmp_path: Path) -> None:
+def test_registry_commit_allows_only_coherently_unregistered_transient_deletion(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     _seed_registered_commit_fixture(tmp_path)
     transient = ".gtkb-index-hl705ij2/index"
@@ -2925,7 +3373,9 @@ def test_registry_commit_blocks_registered_transient_deletion(tmp_path: Path) ->
     ]
 
 
-def test_registry_commit_blocks_transient_deletion_without_registry_authority(tmp_path: Path) -> None:
+def test_registry_commit_blocks_transient_deletion_without_registry_authority(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     transient = ".gtkb-index-hl705ij2/index"
     snapshot = SimpleNamespace(status_by_path={transient: "D"})
@@ -2940,7 +3390,9 @@ def test_registry_commit_blocks_transient_deletion_without_registry_authority(tm
     ]
 
 
-def test_staged_transient_add_and_unregistered_delete_follow_recurrence_rule(tmp_path: Path) -> None:
+def test_staged_transient_add_and_unregistered_delete_follow_recurrence_rule(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     transient = ".gtkb-index-hl705ij2/index"
     _init_committed_paths(tmp_path, ["baseline.txt"])
@@ -2954,7 +3406,12 @@ def test_staged_transient_add_and_unregistered_delete_follow_recurrence_rule(tmp
         assert snapshot.status_by_path[transient] == "A"
         assert module._registry_commit_findings(tmp_path, [transient], snapshot)
 
-    subprocess.run(["git", "reset", "--hard", "HEAD"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "reset", "--hard", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
     target.parent.mkdir(parents=True)
     target.write_text("transient\n", encoding="utf-8")
     subprocess.run(["git", "add", "--", transient], cwd=tmp_path, check=True)
@@ -2981,7 +3438,9 @@ def test_staged_transient_add_and_unregistered_delete_follow_recurrence_rule(tmp
         assert module._registry_commit_findings(tmp_path, [transient], snapshot) == []
 
 
-def test_registry_commit_rejects_mismatched_capability_start_packet(tmp_path: Path) -> None:
+def test_registry_commit_rejects_mismatched_capability_start_packet(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     member = _seed_registered_commit_fixture(tmp_path)
     capability = mint_observation_capability(
@@ -3021,18 +3480,24 @@ def test_registry_commit_rejects_mismatched_capability_start_packet(tmp_path: Pa
     finally:
         conn.close()
 
-    findings, audit_gaps = module._registry_commit_assessment(tmp_path, ["registered.txt"], None)
+    findings, audit_gaps = module._registry_commit_assessment(
+        tmp_path, ["registered.txt"], None
+    )
 
     assert findings == []
     assert any("lacks automatic observation" in gap["reason"] for gap in audit_gaps)
 
 
-def _staged_registry_findings(module, root: Path, rel_paths: list[str]) -> list[dict[str, object]]:
+def _staged_registry_findings(
+    module, root: Path, rel_paths: list[str]
+) -> list[dict[str, object]]:
     with module._index_snapshot(root) as snapshot:
         return module._registry_commit_findings(root, rel_paths, snapshot)
 
 
-def test_registry_commit_accepts_consumed_bridge_publication_after_mint_ttl(tmp_path: Path) -> None:
+def test_registry_commit_accepts_consumed_bridge_publication_after_mint_ttl(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     rel_path = "bridge/gtkb-publication-fixture-001.md"
     _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])
@@ -3040,15 +3505,21 @@ def test_registry_commit_accepts_consumed_bridge_publication_after_mint_ttl(tmp_
     assert _staged_registry_findings(module, tmp_path, [rel_path]) == []
 
 
-def test_registry_commit_accepts_twelve_exact_bridge_publication_predecessors(tmp_path: Path) -> None:
+def test_registry_commit_accepts_twelve_exact_bridge_publication_predecessors(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
-    rel_paths = [f"bridge/gtkb-publication-chain-{version:03d}.md" for version in range(1, 13)]
+    rel_paths = [
+        f"bridge/gtkb-publication-chain-{version:03d}.md" for version in range(1, 13)
+    ]
     _seed_bridge_publication_commit_fixture(tmp_path, rel_paths)
 
     assert _staged_registry_findings(module, tmp_path, rel_paths) == []
 
 
-def test_newest_aggregate_revision_cannot_authorize_predecessor_without_exact_capability(tmp_path: Path) -> None:
+def test_newest_aggregate_revision_cannot_authorize_predecessor_without_exact_capability(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     rel_paths = [
         "bridge/gtkb-publication-predecessor-001.md",
@@ -3075,14 +3546,18 @@ def test_newest_aggregate_revision_cannot_authorize_predecessor_without_exact_ca
     ]
 
 
-@pytest.mark.parametrize("mutation", ["missing", "minted", "expired", "compensated", "failed"])
+@pytest.mark.parametrize(
+    "mutation", ["missing", "minted", "expired", "compensated", "failed"]
+)
 def test_registry_commit_rejects_nonterminal_bridge_publication_attempts(
     tmp_path: Path,
     mutation: str,
 ) -> None:
     module = _load_module()
     rel_path = "bridge/gtkb-publication-state-001.md"
-    capability_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[rel_path]
+    capability_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[
+        rel_path
+    ]
     conn = sqlite3.connect(tmp_path / "groundtruth.db")
     try:
         if mutation == "missing":
@@ -3118,14 +3593,24 @@ def test_registry_commit_rejects_nonterminal_bridge_publication_attempts(
     assert len(findings) == 1
     assert findings[0]["path"] == rel_path
     if mutation == "missing":
-        assert findings[0]["reason"] == "registered bridge path lacks exact publication capability evidence"
+        assert (
+            findings[0]["reason"]
+            == "registered bridge path lacks exact publication capability evidence"
+        )
     else:
         assert "publication" in str(findings[0]["reason"])
 
 
 @pytest.mark.parametrize(
     "mutation",
-    ["target_path", "aggregate_entry_id", "capability_hash", "revision_id", "bridge_id", "content_digest"],
+    [
+        "target_path",
+        "aggregate_entry_id",
+        "capability_hash",
+        "revision_id",
+        "bridge_id",
+        "content_digest",
+    ],
 )
 def test_registry_commit_rejects_bridge_publication_binding_mismatch(
     tmp_path: Path,
@@ -3133,7 +3618,9 @@ def test_registry_commit_rejects_bridge_publication_binding_mismatch(
 ) -> None:
     module = _load_module()
     rel_path = "bridge/gtkb-publication-binding-001.md"
-    capability_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[rel_path]
+    capability_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[
+        rel_path
+    ]
     conn = sqlite3.connect(tmp_path / "groundtruth.db")
     conn.row_factory = sqlite3.Row
     try:
@@ -3184,10 +3671,14 @@ def test_registry_commit_rejects_bridge_publication_binding_mismatch(
     assert findings[0]["path"] == rel_path
 
 
-def test_registry_commit_uses_newest_bridge_publication_attempt_before_filtering(tmp_path: Path) -> None:
+def test_registry_commit_uses_newest_bridge_publication_attempt_before_filtering(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     rel_path = "bridge/gtkb-publication-retry-001.md"
-    original_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[rel_path]
+    original_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[
+        rel_path
+    ]
     conn = sqlite3.connect(tmp_path / "groundtruth.db")
     conn.row_factory = sqlite3.Row
     try:
@@ -3197,7 +3688,10 @@ def test_registry_commit_uses_newest_bridge_publication_attempt_before_filtering
         ).fetchone()
         assert original is not None
         columns = [
-            column[1] for column in conn.execute("PRAGMA table_info(sot_registry_bridge_publication_capabilities)")
+            column[1]
+            for column in conn.execute(
+                "PRAGMA table_info(sot_registry_bridge_publication_capabilities)"
+            )
         ]
         columns.remove("rowid")
         newer = {column: original[column] for column in columns}
@@ -3221,14 +3715,23 @@ def test_registry_commit_uses_newest_bridge_publication_attempt_before_filtering
 
     findings = _staged_registry_findings(module, tmp_path, [rel_path])
 
-    assert findings == [{"path": rel_path, "reason": "bridge publication capability was compensated or failed"}]
+    assert findings == [
+        {
+            "path": rel_path,
+            "reason": "bridge publication capability was compensated or failed",
+        }
+    ]
 
 
-def test_bridge_publication_digest_uses_index_when_worktree_differs(tmp_path: Path) -> None:
+def test_bridge_publication_digest_uses_index_when_worktree_differs(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     rel_path = "bridge/gtkb-publication-index-001.md"
     _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])
-    (tmp_path / rel_path).write_text("NEW\n# Worktree-only replacement\n", encoding="utf-8")
+    (tmp_path / rel_path).write_text(
+        "NEW\n# Worktree-only replacement\n", encoding="utf-8"
+    )
 
     conn = sqlite3.connect(tmp_path / "groundtruth.db")
     conn.row_factory = sqlite3.Row
@@ -3247,8 +3750,12 @@ def test_bridge_publication_digest_uses_index_when_worktree_differs(tmp_path: Pa
     assert decision == (True, "")
 
 
-def test_real_git_commit_accepts_exact_bridge_publication_capabilities(tmp_path: Path) -> None:
-    rel_paths = [f"bridge/gtkb-publication-commit-{version:03d}.md" for version in range(1, 4)]
+def test_real_git_commit_accepts_exact_bridge_publication_capabilities(
+    tmp_path: Path,
+) -> None:
+    rel_paths = [
+        f"bridge/gtkb-publication-commit-{version:03d}.md" for version in range(1, 4)
+    ]
     _seed_bridge_publication_commit_fixture(tmp_path, rel_paths)
     hook = tmp_path / ".git" / "hooks" / "pre-commit"
     hook.write_text(
@@ -3290,7 +3797,12 @@ def test_real_git_commit_accepts_exact_bridge_publication_capabilities(tmp_path:
 
 @pytest.mark.parametrize(
     "operation",
-    ("bridge_publication_compensation", "wi5441_bridge_aggregate_recovery", "amend", "register"),
+    (
+        "bridge_publication_compensation",
+        "wi5441_bridge_aggregate_recovery",
+        "amend",
+        "register",
+    ),
 )
 def test_exact_publication_evidence_survives_unrelated_aggregate_head(
     tmp_path: Path,
@@ -3307,7 +3819,10 @@ def test_exact_publication_evidence_survives_unrelated_aggregate_head(
             ("bridge-versioned-files",),
         ).fetchone()
         assert latest is not None
-        columns = [column[1] for column in conn.execute("PRAGMA table_info(sot_artifact_revisions)")]
+        columns = [
+            column[1]
+            for column in conn.execute("PRAGMA table_info(sot_artifact_revisions)")
+        ]
         columns.remove("rowid")
         successor = {column: latest[column] for column in columns}
         successor.update(
@@ -3333,10 +3848,14 @@ def test_exact_publication_evidence_survives_unrelated_aggregate_head(
     assert _staged_registry_findings(module, tmp_path, [rel_path]) == []
 
 
-def test_near_match_publication_path_never_authorizes_exact_staged_path(tmp_path: Path) -> None:
+def test_near_match_publication_path_never_authorizes_exact_staged_path(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     rel_path = "bridge/gtkb-publication-near-match-001.md"
-    capability_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[rel_path]
+    capability_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[
+        rel_path
+    ]
     conn = sqlite3.connect(tmp_path / "groundtruth.db")
     try:
         conn.execute(
@@ -3357,7 +3876,9 @@ def test_near_match_publication_path_never_authorizes_exact_staged_path(tmp_path
     ]
 
 
-def test_report_verdict_hash_passes_before_and_after_candidate_materialization(tmp_path: Path) -> None:
+def test_report_verdict_hash_passes_before_and_after_candidate_materialization(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     root = tmp_path
     bridge_id = "gtkb-schema-v2-index-fixture"
@@ -3376,7 +3897,9 @@ def test_report_verdict_hash_passes_before_and_after_candidate_materialization(t
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO_ROOT / rel_path, target)
 
-    (root / "groundtruth.toml").write_text('[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8")
+    (root / "groundtruth.toml").write_text(
+        '[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8"
+    )
     (root / ".gitignore").write_text("groundtruth.db\n.gtkb-state/\n", encoding="utf-8")
     config = root / "config" / "governance" / "spec-applicability.toml"
     config.parent.mkdir(parents=True)
@@ -3466,7 +3989,9 @@ applies_when_doc_matches = ["gtkb-schema-v2-index-fixture"]
     db_path = root / "groundtruth.db"
     conn = sqlite3.connect(db_path)
     try:
-        conn.execute("CREATE TABLE current_specifications (id TEXT PRIMARY KEY, title TEXT, status TEXT, type TEXT)")
+        conn.execute(
+            "CREATE TABLE current_specifications (id TEXT PRIMARY KEY, title TEXT, status TEXT, type TEXT)"
+        )
         conn.execute(
             "INSERT INTO current_specifications VALUES (?, ?, ?, ?)",
             (
@@ -3546,7 +4071,10 @@ applies_when_doc_matches = ["gtkb-schema-v2-index-fixture"]
         module._bridge_snapshot(root, bridge_id, index_snapshot) as bridge_snapshot,
     ):
         assert not (bridge_snapshot.root / "groundtruth.db").exists()
-        assert gate._canonical_project_root(bridge_snapshot.root / "bridge") == bridge_snapshot.root.resolve()
+        assert (
+            gate._canonical_project_root(bridge_snapshot.root / "bridge")
+            == bridge_snapshot.root.resolve()
+        )
         snapshot_audit = module._run_snapshot_compliance_audit(
             snapshot=bridge_snapshot,
             candidate_path=candidate_rel,
@@ -3570,7 +4098,9 @@ applies_when_doc_matches = ["gtkb-schema-v2-index-fixture"]
     source.write_text(source_content, encoding="utf-8")
     candidate_mutation = candidate + "\nCandidate mutation.\n"
     candidate_path.write_text(candidate_mutation, encoding="utf-8")
-    subprocess.run(["git", "add", "--", source_rel, candidate_rel], cwd=root, check=True)
+    subprocess.run(
+        ["git", "add", "--", source_rel, candidate_rel], cwd=root, check=True
+    )
     with (
         module._index_snapshot(root) as index_snapshot,
         module._bridge_snapshot(root, bridge_id, index_snapshot) as bridge_snapshot,
@@ -3609,7 +4139,9 @@ def _wi5824_capability_row(**overrides: object) -> dict[str, object]:
     return row
 
 
-def _wi5824_clearance(module, tmp_path: Path, row: dict[str, object]) -> tuple[bool, str]:
+def _wi5824_clearance(
+    module, tmp_path: Path, row: dict[str, object]
+) -> tuple[bool, str]:
     return module._bridge_publication_capability_clearance(
         None,
         root=tmp_path,
@@ -3620,7 +4152,9 @@ def _wi5824_clearance(module, tmp_path: Path, row: dict[str, object]) -> tuple[b
     )
 
 
-def test_capability_clearance_denies_cleanly_on_null_consumed_at(tmp_path: Path) -> None:
+def test_capability_clearance_denies_cleanly_on_null_consumed_at(
+    tmp_path: Path,
+) -> None:
     """WI-5824 (a): recovery_required + consumed_at NULL is a clean state deny.
 
     The r2b-008 incident shape: parse_iso(None) raised AttributeError and
@@ -3636,12 +4170,16 @@ def test_capability_clearance_denies_cleanly_on_null_consumed_at(tmp_path: Path)
     )
 
     assert allowed is False
-    assert reason == "bridge publication capability is not consumed ('recovery_required')"
+    assert (
+        reason == "bridge publication capability is not consumed ('recovery_required')"
+    )
 
     # End-to-end through the staged registry assessment: the same row shape in
     # a real fixture database must yield a finding, never a traceback.
     rel_path = "bridge/gtkb-publication-nullsafe-001.md"
-    capability_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[rel_path]
+    capability_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[
+        rel_path
+    ]
     conn = sqlite3.connect(tmp_path / "groundtruth.db")
     try:
         conn.execute(
@@ -3657,7 +4195,10 @@ def test_capability_clearance_denies_cleanly_on_null_consumed_at(tmp_path: Path)
 
     assert len(findings) == 1
     assert findings[0]["path"] == rel_path
-    assert findings[0]["reason"] == "bridge publication capability is not consumed ('recovery_required')"
+    assert (
+        findings[0]["reason"]
+        == "bridge publication capability is not consumed ('recovery_required')"
+    )
 
 
 def test_capability_clearance_checks_state_before_consumed_timestamp(
@@ -3680,19 +4221,25 @@ def test_capability_clearance_checks_state_before_consumed_timestamp(
         allowed, reason = _wi5824_clearance(
             module,
             tmp_path,
-            _wi5824_capability_row(capability_state=state, consumed_at="SENTINEL-NEVER-PARSED"),
+            _wi5824_capability_row(
+                capability_state=state, consumed_at="SENTINEL-NEVER-PARSED"
+            ),
         )
         assert allowed is False
         assert reason == f"bridge publication capability is not consumed ({state!r})"
         assert "SENTINEL-NEVER-PARSED" not in parsed_values
 
 
-def test_capability_clearance_consumed_row_normal_path_unchanged(tmp_path: Path) -> None:
+def test_capability_clearance_consumed_row_normal_path_unchanged(
+    tmp_path: Path,
+) -> None:
     """WI-5824 (a): consumed rows with valid timestamps clear exactly as before,
     including the staged-digest match against the copied index."""
     module = _load_module()
     rel_path = "bridge/gtkb-publication-normal-001.md"
-    capability_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[rel_path]
+    capability_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[
+        rel_path
+    ]
     conn = sqlite3.connect(tmp_path / "groundtruth.db")
     conn.row_factory = sqlite3.Row
     try:
@@ -3743,7 +4290,9 @@ def test_capability_clearance_non_string_timestamps_deny_cleanly(
     )
 
     assert allowed is False
-    assert reason == "bridge publication capability has incomplete or invalid timestamps"
+    assert (
+        reason == "bridge publication capability has incomplete or invalid timestamps"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -3753,14 +4302,28 @@ def test_capability_clearance_non_string_timestamps_deny_cleanly(
 def _wi5824_mock_content_validators(module, monkeypatch: pytest.MonkeyPatch) -> None:
     """Neutralize verdict content-quality validators (same convention as the
     existing transaction-local e2e test); packet and chain validation stay real."""
-    monkeypatch.setattr(module, "run_bridge_compliance_audit", lambda **kwargs: {"decision": "pass"})
-    monkeypatch.setattr(module, "validate_verdict_evidence_anchors", lambda content, project_root: [])
-    monkeypatch.setattr(module, "verdict_self_review_reason", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        module, "run_bridge_compliance_audit", lambda **kwargs: {"decision": "pass"}
+    )
+    monkeypatch.setattr(
+        module, "validate_verdict_evidence_anchors", lambda content, project_root: []
+    )
+    monkeypatch.setattr(
+        module, "verdict_self_review_reason", lambda *args, **kwargs: None
+    )
 
 
-def _wi5824_rewrite_packet_expiry(module, tmp_path: Path, bridge_id: str, expires_at: str) -> None:
+def _wi5824_rewrite_packet_expiry(
+    module, tmp_path: Path, bridge_id: str, expires_at: str
+) -> None:
     """Re-time the fixture packet with the schema-v2/v3 hash dance intact."""
-    packet_path = tmp_path / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / f"{bridge_id}.json"
+    packet_path = (
+        tmp_path
+        / ".gtkb-state"
+        / "implementation-authorizations"
+        / "by-bridge"
+        / f"{bridge_id}.json"
+    )
     packet = json.loads(packet_path.read_text(encoding="utf-8"))
     start = packet.pop("implementation_start")
     packet.pop("packet_hash")
@@ -3792,14 +4355,18 @@ def test_finalize_verified_same_transaction_phase_evaluation_passes(
     ("implementation phase ... closed") never denies the transaction.
     """
     module = _load_module()
-    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    selected_paths, report, verdict = _write_transaction_chain(
+        tmp_path, module, monkeypatch
+    )
     _stage_transaction(tmp_path, selected_paths, report, verdict)
     _wi5824_mock_content_validators(module, monkeypatch)
     bridge_id = "gtkb-wi5629-fixture"
     if packet_expired:
         # Live at implementation (finalized 2026-07-19T00:00:00Z <= expiry),
         # expired long before the finalize-verified evaluation runs.
-        _wi5824_rewrite_packet_expiry(module, tmp_path, bridge_id, "2026-07-19T02:00:00Z")
+        _wi5824_rewrite_packet_expiry(
+            module, tmp_path, bridge_id, "2026-07-19T02:00:00Z"
+        )
 
     packets, errors, scanned = module._load_live_go_evidence(tmp_path)
     assert packets == []
@@ -3807,7 +4374,10 @@ def test_finalize_verified_same_transaction_phase_evaluation_passes(
     if packet_expired:
         assert any("has expired" in error for error in errors)
     else:
-        assert any("implementation phase for this proposal is closed" in error for error in errors)
+        assert any(
+            "implementation phase for this proposal is closed" in error
+            for error in errors
+        )
 
     result = module.evaluate(tmp_path)
 
@@ -3819,7 +4389,10 @@ def test_finalize_verified_same_transaction_phase_evaluation_passes(
         "scripts/bridge_lifecycle_resolver.py",
         "platform_tests/scripts/test_bridge_lifecycle_resolver.py",
     ):
-        assert cleared_by_path[rel_path]["evidence"] == "transaction_local_verified_manifest"
+        assert (
+            cleared_by_path[rel_path]["evidence"]
+            == "transaction_local_verified_manifest"
+        )
         assert cleared_by_path[rel_path]["source"] == bridge_id
 
 
@@ -3831,7 +4404,9 @@ def test_committed_terminal_thread_still_denies_new_mutations(
     newly staged post-terminal mutations of its target paths (wi4894-002
     denial class) when no clearing evidence exists."""
     module = _load_module()
-    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    selected_paths, report, verdict = _write_transaction_chain(
+        tmp_path, module, monkeypatch
+    )
     _stage_transaction(tmp_path, selected_paths, report, verdict)
     subprocess.run(
         [
@@ -3849,16 +4424,28 @@ def test_committed_terminal_thread_still_denies_new_mutations(
         cwd=tmp_path,
         check=True,
     )
-    packet_path = tmp_path / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / "gtkb-wi5629-fixture.json"
+    packet_path = (
+        tmp_path
+        / ".gtkb-state"
+        / "implementation-authorizations"
+        / "by-bridge"
+        / "gtkb-wi5629-fixture.json"
+    )
     packet_path.unlink()
     mutated = tmp_path / "scripts" / "bridge_lifecycle_resolver.py"
     mutated.write_text("# post-terminal mutation\n", encoding="utf-8")
-    subprocess.run(["git", "add", "--", "scripts/bridge_lifecycle_resolver.py"], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "add", "--", "scripts/bridge_lifecycle_resolver.py"],
+        cwd=tmp_path,
+        check=True,
+    )
 
     result = module.evaluate(tmp_path)
 
     assert result["status"] == "fail"
-    assert [finding["path"] for finding in result["findings"]] == ["scripts/bridge_lifecycle_resolver.py"]
+    assert [finding["path"] for finding in result["findings"]] == [
+        "scripts/bridge_lifecycle_resolver.py"
+    ]
     assert result["findings"][0]["reason"].startswith("protected path lacks")
 
 
@@ -3869,7 +4456,9 @@ def test_transaction_local_multiple_verified_candidates_denied(
     """WI-5824 (b) fail-closed floor: two live VERIFIED candidates in one
     transaction are denied by the exactly-one-candidate rule."""
     module = _load_module()
-    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    selected_paths, report, verdict = _write_transaction_chain(
+        tmp_path, module, monkeypatch
+    )
     _stage_transaction(tmp_path, selected_paths, report, verdict)
     second_verdict = "bridge/gtkb-wi5824-second-thread-002.md"
     (tmp_path / second_verdict).write_text(
@@ -3909,10 +4498,14 @@ def test_transaction_local_manifest_mismatch_denied(
 ) -> None:
     """WI-5824 (b) fail-closed floor: manifest != staged set stays a deny."""
     module = _load_module()
-    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    selected_paths, report, verdict = _write_transaction_chain(
+        tmp_path, module, monkeypatch
+    )
     verdict_path = tmp_path / verdict
     verdict_path.write_text(
-        verdict_path.read_text(encoding="utf-8").replace("- `scripts/bridge_lifecycle_resolver.py`\n", ""),
+        verdict_path.read_text(encoding="utf-8").replace(
+            "- `scripts/bridge_lifecycle_resolver.py`\n", ""
+        ),
         encoding="utf-8",
     )
     _stage_transaction(tmp_path, selected_paths, report, verdict)
@@ -3936,11 +4529,19 @@ def test_transaction_local_unbound_packet_denied(
     a transaction-local candidate without a bound finalized packet is denied,
     and a packet that was never live at implementation is denied."""
     module = _load_module()
-    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    selected_paths, report, verdict = _write_transaction_chain(
+        tmp_path, module, monkeypatch
+    )
     _stage_transaction(tmp_path, selected_paths, report, verdict)
     _wi5824_mock_content_validators(module, monkeypatch)
     bridge_id = "gtkb-wi5629-fixture"
-    packet_path = tmp_path / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / f"{bridge_id}.json"
+    packet_path = (
+        tmp_path
+        / ".gtkb-state"
+        / "implementation-authorizations"
+        / "by-bridge"
+        / f"{bridge_id}.json"
+    )
     original_packet = packet_path.read_text(encoding="utf-8")
     packet_path.unlink()
 
@@ -3971,13 +4572,17 @@ def test_transaction_local_unbound_packet_denied(
 # WI-6183: invocation-local PAUTH read snapshot for copied-root audits.
 
 
-def _wi6183_seed_authority_db(module, root: Path, *, omit_relation: str | None = None) -> None:
+def _wi6183_seed_authority_db(
+    module, root: Path, *, omit_relation: str | None = None
+) -> None:
     conn = sqlite3.connect(root / "groundtruth.db")
     try:
         for relation, columns in module.PAUTH_READ_SNAPSHOT_RELATIONS:
             if relation == omit_relation:
                 continue
-            schema = ", ".join(f'"{column}" {declared_type}' for column, declared_type in columns)
+            schema = ", ".join(
+                f'"{column}" {declared_type}' for column, declared_type in columns
+            )
             conn.execute(f'CREATE TABLE "{relation}" ({schema})')
         if omit_relation != "current_specifications":
             conn.execute(
@@ -4040,7 +4645,12 @@ def _wi6183_bridge_snapshot(module, root: Path, *, oversized_db_entry: bool = Fa
     snapshot_root.mkdir(parents=True)
     config = snapshot_root / "groundtruth.toml"
     config.write_text('[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8")
-    taxonomy_source = REPO_ROOT / "config" / "governance" / "project-authorization-operation-taxonomy.toml"
+    taxonomy_source = (
+        REPO_ROOT
+        / "config"
+        / "governance"
+        / "project-authorization-operation-taxonomy.toml"
+    )
     live_taxonomy = root / "config" / "governance" / taxonomy_source.name
     live_taxonomy.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(taxonomy_source, live_taxonomy)
@@ -4049,7 +4659,9 @@ def _wi6183_bridge_snapshot(module, root: Path, *, oversized_db_entry: bool = Fa
     shutil.copy2(live_taxonomy, taxonomy)
     ledger = {
         "groundtruth.toml": _wi6183_ledger_entry(module, config),
-        taxonomy.relative_to(snapshot_root).as_posix(): _wi6183_ledger_entry(module, taxonomy),
+        taxonomy.relative_to(snapshot_root).as_posix(): _wi6183_ledger_entry(
+            module, taxonomy
+        ),
     }
     if oversized_db_entry:
         ledger["groundtruth.db"] = module._LedgerEntry(
@@ -4065,16 +4677,20 @@ def _wi6183_bridge_snapshot(module, root: Path, *, oversized_db_entry: bool = Fa
     return module._BridgeSnapshot(root=snapshot_root, ledger=ledger)
 
 
-def _wi6183_pauth_packet(root: Path, *, target_path: str = "scripts/check_protected_commit_authorization.py"):
+def _wi6183_pauth_packet(
+    root: Path, *, target_path: str = "scripts/check_protected_commit_authorization.py"
+):
     row = implementation_authorization._project_authorization_row(root, "PAUTH-TEST")
-    project_authorization = implementation_authorization.validate_project_authorization_row(
-        root,
-        row,
-        proposal_project_id="PROJECT-TEST",
-        work_item_id="WI-TEST",
-        spec_links=["SPEC-TEST"],
-        target_paths=[target_path],
-        requested_operations=["protected_mutation"],
+    project_authorization = (
+        implementation_authorization.validate_project_authorization_row(
+            root,
+            row,
+            proposal_project_id="PROJECT-TEST",
+            work_item_id="WI-TEST",
+            spec_links=["SPEC-TEST"],
+            target_paths=[target_path],
+            requested_operations=["protected_mutation"],
+        )
     )
     return {
         "schema_version": 3,
@@ -4088,7 +4704,9 @@ def _wi6183_assert_projection_absent(snapshot_root: Path) -> None:
         assert not Path(str(snapshot_root / "groundtruth.db") + suffix).exists()
 
 
-def _wi6183_prepare_verdict_in_snapshot(snapshot_root: Path, candidate_path: str, content: str) -> str:
+def _wi6183_prepare_verdict_in_snapshot(
+    snapshot_root: Path, candidate_path: str, content: str
+) -> str:
     """Prepare verdict bytes with the exact modules and PAUTH projection under audit."""
 
     wrapper = r"""
@@ -4111,7 +4729,16 @@ sys.stdout.write(
 )
 """
     prepared = subprocess.run(
-        [sys.executable, "-I", "-B", "-S", "-c", wrapper, str(snapshot_root), candidate_path],
+        [
+            sys.executable,
+            "-I",
+            "-B",
+            "-S",
+            "-c",
+            wrapper,
+            str(snapshot_root),
+            candidate_path,
+        ],
         cwd=snapshot_root,
         input=content,
         text=True,
@@ -4122,7 +4749,9 @@ sys.stdout.write(
     return prepared.stdout
 
 
-def test_wi6183_pauth_snapshot_projects_exact_relations_and_real_evaluator_consumes_it(tmp_path: Path) -> None:
+def test_wi6183_pauth_snapshot_projects_exact_relations_and_real_evaluator_consumes_it(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     _wi6183_seed_authority_db(module, tmp_path)
     snapshot = _wi6183_bridge_snapshot(module, tmp_path, oversized_db_entry=True)
@@ -4139,7 +4768,9 @@ def test_wi6183_pauth_snapshot_projects_exact_relations_and_real_evaluator_consu
     source = tmp_path / source_rel
     source.parent.mkdir()
     source.write_text(source_text, encoding="utf-8")
-    applicability_config = tmp_path / "config" / "governance" / "spec-applicability.toml"
+    applicability_config = (
+        tmp_path / "config" / "governance" / "spec-applicability.toml"
+    )
     applicability_config.write_text(
         f'[[rules]]\nspec_id = "SPEC-TEST"\nseverity = "required"\napplies_when_doc_matches = ["{bridge_id}"]\n',
         encoding="utf-8",
@@ -4149,7 +4780,9 @@ def test_wi6183_pauth_snapshot_projects_exact_relations_and_real_evaluator_consu
         projected_path = snapshot.root / rel_path
         projected_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(live_path, projected_path)
-        snapshot.ledger[rel_path.as_posix()] = _wi6183_ledger_entry(module, projected_path)
+        snapshot.ledger[rel_path.as_posix()] = _wi6183_ledger_entry(
+            module, projected_path
+        )
     live_applicability = applicability_preflight.build_packet(
         bridge_id=bridge_id,
         bridge_dir=tmp_path / "bridge",
@@ -4158,15 +4791,19 @@ def test_wi6183_pauth_snapshot_projects_exact_relations_and_real_evaluator_consu
         content_file=source,
     )
     target_paths = ["scripts/check_protected_commit_authorization.py"]
-    source_row = implementation_authorization._project_authorization_row(tmp_path, "PAUTH-TEST")
-    project_authorization = implementation_authorization.validate_project_authorization_row(
-        tmp_path,
-        source_row,
-        proposal_project_id="PROJECT-TEST",
-        work_item_id="WI-TEST",
-        spec_links=["SPEC-TEST"],
-        target_paths=target_paths,
-        requested_operations=["protected_mutation"],
+    source_row = implementation_authorization._project_authorization_row(
+        tmp_path, "PAUTH-TEST"
+    )
+    project_authorization = (
+        implementation_authorization.validate_project_authorization_row(
+            tmp_path,
+            source_row,
+            proposal_project_id="PROJECT-TEST",
+            work_item_id="WI-TEST",
+            spec_links=["SPEC-TEST"],
+            target_paths=target_paths,
+            requested_operations=["protected_mutation"],
+        )
     )
     packet = {
         "schema_version": 3,
@@ -4196,11 +4833,16 @@ def test_wi6183_pauth_snapshot_projects_exact_relations_and_real_evaluator_consu
         projected_applicability = applicability_preflight.build_packet(
             bridge_id=bridge_id,
             bridge_dir=effective.root / "bridge",
-            config_path=effective.root / "config" / "governance" / "spec-applicability.toml",
+            config_path=effective.root
+            / "config"
+            / "governance"
+            / "spec-applicability.toml",
             db_path=projection,
             content_file=effective.root / source_rel,
         )
-        assert projected_applicability["packet_hash"] == live_applicability["packet_hash"]
+        assert (
+            projected_applicability["packet_hash"] == live_applicability["packet_hash"]
+        )
         decision = implementation_authorization.validate_packet_project_authorization_operation(
             effective.root,
             packet,
@@ -4221,10 +4863,20 @@ def test_wi6183_non_pauth_route_does_not_open_or_project_authority(
     module = _load_module()
     snapshot = _wi6183_bridge_snapshot(module, tmp_path)
     calls: list[object] = []
-    monkeypatch.setattr(module, "_pauth_read_snapshot", lambda *args, **kwargs: calls.append((args, kwargs)))
+    monkeypatch.setattr(
+        module,
+        "_pauth_read_snapshot",
+        lambda *args, **kwargs: calls.append((args, kwargs)),
+    )
 
-    assert module._requires_pauth_read_snapshot("VERIFIED", "Project: PROJECT-TEST") is False
-    assert module._requires_pauth_read_snapshot("NEW", "Project Authorization: PAUTH-TEST") is False
+    assert (
+        module._requires_pauth_read_snapshot("VERIFIED", "Project: PROJECT-TEST")
+        is False
+    )
+    assert (
+        module._requires_pauth_read_snapshot("NEW", "Project Authorization: PAUTH-TEST")
+        is False
+    )
     assert calls == []
     _wi6183_assert_projection_absent(snapshot.root)
 
@@ -4316,13 +4968,17 @@ def test_wi6183_operation_time_authority_state_denies(
         ),
     ],
 )
-def test_wi6183_relevant_authority_drift_denies_and_cleans(tmp_path: Path, sql: str) -> None:
+def test_wi6183_relevant_authority_drift_denies_and_cleans(
+    tmp_path: Path, sql: str
+) -> None:
     module = _load_module()
     _wi6183_seed_authority_db(module, tmp_path)
     snapshot = _wi6183_bridge_snapshot(module, tmp_path)
 
     with (
-        pytest.raises(module.GateError, match="changed during protected-commit evaluation"),
+        pytest.raises(
+            module.GateError, match="changed during protected-commit evaluation"
+        ),
         module._pauth_read_snapshot(tmp_path, snapshot),
     ):
         conn = sqlite3.connect(tmp_path / "groundtruth.db")
@@ -4339,7 +4995,9 @@ def test_wi6183_relevant_authority_drift_denies_and_cleans(tmp_path: Path, sql: 
     ("source_observation", "expected"),
     [
         pytest.param(2, "changed while constructing", id="post-copy"),
-        pytest.param(3, "changed during protected-commit evaluation", id="post-evaluation"),
+        pytest.param(
+            3, "changed during protected-commit evaluation", id="post-evaluation"
+        ),
     ],
 )
 def test_wi6183_relation_drift_at_each_snapshot_boundary_denies_and_cleans(
@@ -4356,7 +5014,9 @@ def test_wi6183_relation_drift_at_each_snapshot_boundary_denies_and_cleans(
 
     def drifting_observation(conn, *, projection: bool, include_rows: bool = False):
         nonlocal source_calls
-        observation, rows = real_observe(conn, projection=projection, include_rows=include_rows)
+        observation, rows = real_observe(
+            conn, projection=projection, include_rows=include_rows
+        )
         if not projection:
             source_calls += 1
             if source_calls == source_observation:
@@ -4395,9 +5055,15 @@ def test_wi6183_source_identity_omits_whole_database_bytes_and_copying() -> None
     module = _load_module()
     source = SCRIPT_PATH.read_text(encoding="utf-8")
     identity_body = source[
-        source.index("def _pauth_source_identity(") : source.index("def _verify_pauth_source_identity(")
+        source.index("def _pauth_source_identity(") : source.index(
+            "def _verify_pauth_source_identity("
+        )
     ]
-    projection_body = source[source.index("def _pauth_read_snapshot(") : source.index("def _observe_projection_path(")]
+    projection_body = source[
+        source.index("def _pauth_read_snapshot(") : source.index(
+            "def _observe_projection_path("
+        )
+    ]
 
     assert tuple(module._PAuthSourceIdentity.__dataclass_fields__) == (
         "resolved_path",
@@ -4425,7 +5091,9 @@ def test_wi6183_projection_tamper_denies_and_cleans(tmp_path: Path) -> None:
         projection = effective.root / "groundtruth.db"
         conn = sqlite3.connect(projection)
         try:
-            conn.execute("UPDATE current_projects SET status = 'retired' WHERE id = 'PROJECT-TEST'")
+            conn.execute(
+                "UPDATE current_projects SET status = 'retired' WHERE id = 'PROJECT-TEST'"
+            )
             conn.commit()
         finally:
             conn.close()
@@ -4439,8 +5107,14 @@ def test_wi6183_projection_tamper_denies_and_cleans(tmp_path: Path) -> None:
         pytest.param("missing", "source is unavailable", id="missing"),
         pytest.param("unreadable", "access denied", id="unreadable"),
         pytest.param("locked", "database is locked", id="locked"),
-        pytest.param("malformed", "authority relations are unreadable|not a readable", id="malformed"),
-        pytest.param("schema-incomplete", "current_specifications", id="schema-incomplete"),
+        pytest.param(
+            "malformed",
+            "authority relations are unreadable|not a readable",
+            id="malformed",
+        ),
+        pytest.param(
+            "schema-incomplete", "current_specifications", id="schema-incomplete"
+        ),
     ],
 )
 def test_wi6183_canonical_source_failures_deny_and_clean(
@@ -4453,7 +5127,9 @@ def test_wi6183_canonical_source_failures_deny_and_clean(
     _wi6183_seed_authority_db(
         module,
         tmp_path,
-        omit_relation="current_specifications" if failure == "schema-incomplete" else None,
+        omit_relation="current_specifications"
+        if failure == "schema-incomplete"
+        else None,
     )
     snapshot = _wi6183_bridge_snapshot(module, tmp_path)
     source = tmp_path / "groundtruth.db"
@@ -4467,7 +5143,9 @@ def test_wi6183_canonical_source_failures_deny_and_clean(
 
         def failing_source_connect(database, *args, **kwargs):
             if str(database).startswith(source.as_uri()) and "mode=ro" in str(database):
-                message = "access denied" if failure == "unreadable" else "database is locked"
+                message = (
+                    "access denied" if failure == "unreadable" else "database is locked"
+                )
                 raise sqlite3.OperationalError(message)
             return real_connect(database, *args, **kwargs)
 
@@ -4492,11 +5170,19 @@ def test_wi6183_canonical_source_failures_deny_and_clean(
         ),
         pytest.param("file-hash", "bytes drifted", id="file-hash"),
         pytest.param("file-size", "identity drifted", id="file-size"),
-        pytest.param("source-identity", "source identity changed", id="source-identity"),
+        pytest.param(
+            "source-identity", "source identity changed", id="source-identity"
+        ),
         pytest.param("schema-digest", "logical contents differ", id="schema-digest"),
         pytest.param("row-count", "logical contents differ", id="row-count"),
-        pytest.param("typed-row-digest", "logical contents differ", id="typed-row-digest"),
-        pytest.param("construction-version", "construction version is unsupported", id="construction-version"),
+        pytest.param(
+            "typed-row-digest", "logical contents differ", id="typed-row-digest"
+        ),
+        pytest.param(
+            "construction-version",
+            "construction version is unsupported",
+            id="construction-version",
+        ),
     ],
 )
 def test_wi6183_derived_ledger_tamper_denies_and_cleans(
@@ -4516,33 +5202,51 @@ def test_wi6183_derived_ledger_tamper_denies_and_cleans(
         evidence = entry.pauth_read_snapshot
         assert evidence is not None
         if tamper == "path":
-            effective.ledger["redirected/groundtruth.db"] = effective.ledger.pop("groundtruth.db")
+            effective.ledger["redirected/groundtruth.db"] = effective.ledger.pop(
+                "groundtruth.db"
+            )
             module._verify_snapshot_ledger(effective)
         elif tamper == "file-hash":
             effective.ledger["groundtruth.db"] = module.replace(entry, sha256="0" * 64)
             module._verify_snapshot_ledger(effective)
         elif tamper == "file-size":
-            effective.ledger["groundtruth.db"] = module.replace(entry, size=entry.size + 1)
+            effective.ledger["groundtruth.db"] = module.replace(
+                entry, size=entry.size + 1
+            )
             module._verify_snapshot_ledger(effective)
         elif tamper == "source-identity":
-            tampered_identity = module.replace(evidence.source_identity, inode=evidence.source_identity.inode + 1)
-            tampered_evidence = module.replace(evidence, source_identity=tampered_identity)
-            effective.ledger["groundtruth.db"] = module.replace(entry, pauth_read_snapshot=tampered_evidence)
+            tampered_identity = module.replace(
+                evidence.source_identity, inode=evidence.source_identity.inode + 1
+            )
+            tampered_evidence = module.replace(
+                evidence, source_identity=tampered_identity
+            )
+            effective.ledger["groundtruth.db"] = module.replace(
+                entry, pauth_read_snapshot=tampered_evidence
+            )
             module._verify_snapshot_ledger(effective)
         elif tamper == "construction-version":
-            tampered_evidence = module.replace(evidence, construction_version=evidence.construction_version + 1)
-            effective.ledger["groundtruth.db"] = module.replace(entry, pauth_read_snapshot=tampered_evidence)
+            tampered_evidence = module.replace(
+                evidence, construction_version=evidence.construction_version + 1
+            )
+            effective.ledger["groundtruth.db"] = module.replace(
+                entry, pauth_read_snapshot=tampered_evidence
+            )
             module._verify_snapshot_ledger(effective)
         else:
             relations = list(evidence.relations)
             if tamper == "schema-digest":
                 relations[0] = module.replace(relations[0], schema_sha256="0" * 64)
             elif tamper == "row-count":
-                relations[0] = module.replace(relations[0], row_count=relations[0].row_count + 1)
+                relations[0] = module.replace(
+                    relations[0], row_count=relations[0].row_count + 1
+                )
             else:
                 relations[0] = module.replace(relations[0], rows_sha256="0" * 64)
             tampered_evidence = module.replace(evidence, relations=tuple(relations))
-            effective.ledger["groundtruth.db"] = module.replace(entry, pauth_read_snapshot=tampered_evidence)
+            effective.ledger["groundtruth.db"] = module.replace(
+                entry, pauth_read_snapshot=tampered_evidence
+            )
             module._verify_snapshot_ledger(effective)
 
     _wi6183_assert_projection_absent(snapshot.root)
@@ -4573,9 +5277,16 @@ def test_wi6183_canonical_source_binding_attacks_cannot_redirect_projection(
 
     if attack in {"source-symlink", "source-junction", "source-reparse"}:
         real_linklike = module._path_is_linklike
-        monkeypatch.setattr(module, "_path_is_linklike", lambda path: path == source or real_linklike(path))
+        monkeypatch.setattr(
+            module,
+            "_path_is_linklike",
+            lambda path: path == source or real_linklike(path),
+        )
         with (
-            pytest.raises(module.GateError, match="symlinked, junctioned, or reparse-point redirected"),
+            pytest.raises(
+                module.GateError,
+                match="symlinked, junctioned, or reparse-point redirected",
+            ),
             module._pauth_read_snapshot(tmp_path, snapshot),
         ):
             pytest.fail("a redirected canonical source must not yield")
@@ -4587,7 +5298,11 @@ def test_wi6183_canonical_source_binding_attacks_cannot_redirect_projection(
             nonlocal identity_calls
             identity_calls += 1
             identity = real_source_identity(root, path)
-            return module.replace(identity, inode=identity.inode + 1) if identity_calls > 1 else identity
+            return (
+                module.replace(identity, inode=identity.inode + 1)
+                if identity_calls > 1
+                else identity
+            )
 
         monkeypatch.setattr(module, "_pauth_source_identity", replaced_source_identity)
         with (
@@ -4596,7 +5311,9 @@ def test_wi6183_canonical_source_binding_attacks_cannot_redirect_projection(
         ):
             pytest.fail("a replaced canonical source must not yield")
     elif attack in {"nested-root", "caller-substitution"}:
-        substitute_root = tmp_path / ("nested" if attack == "nested-root" else "foreign")
+        substitute_root = tmp_path / (
+            "nested" if attack == "nested-root" else "foreign"
+        )
         substitute_root.mkdir()
         substitute = substitute_root / "groundtruth.db"
         shutil.copy2(source, substitute)
@@ -4620,13 +5337,18 @@ def test_wi6183_canonical_source_binding_attacks_cannot_redirect_projection(
         foreign_hash = hashlib.sha256(foreign.read_bytes()).hexdigest()
         monkeypatch.setenv("GT_DB_PATH", str(foreign))
         with module._pauth_read_snapshot(tmp_path, snapshot) as effective:
-            assert implementation_authorization.groundtruth_db_path(effective.root) == effective.root / "groundtruth.db"
+            assert (
+                implementation_authorization.groundtruth_db_path(effective.root)
+                == effective.root / "groundtruth.db"
+            )
         assert hashlib.sha256(foreign.read_bytes()).hexdigest() == foreign_hash
 
     _wi6183_assert_projection_absent(snapshot.root)
 
 
-def test_wi6183_sqlite_sidecar_guards_block_injection_and_are_cleaned(tmp_path: Path) -> None:
+def test_wi6183_sqlite_sidecar_guards_block_injection_and_are_cleaned(
+    tmp_path: Path,
+) -> None:
     module = _load_module()
     _wi6183_seed_authority_db(module, tmp_path)
     snapshot = _wi6183_bridge_snapshot(module, tmp_path)
@@ -4669,7 +5391,9 @@ def test_wi6183_linklike_destination_and_sidecar_are_rejected_without_chmod(
         module._create_exclusive_pauth_projection_placeholder(destination)
     linklike_paths.clear()
     linklike_paths.add(sidecar)
-    with pytest.raises(module.GateError, match="sidecar path is already occupied or redirected"):
+    with pytest.raises(
+        module.GateError, match="sidecar path is already occupied or redirected"
+    ):
         module._create_pauth_projection_sidecar_guards(destination)
     with pytest.raises(module.GateError, match="redirected cleanup artifact"):
         module._remove_pauth_projection(destination)
@@ -4688,7 +5412,11 @@ def test_wi6183_effective_tree_limit_counts_projection_at_exact_boundary(
     snapshot = _wi6183_bridge_snapshot(module, tmp_path)
 
     with module._pauth_read_snapshot(tmp_path, snapshot) as effective:
-        exact_size = sum(entry.size for entry in effective.ledger.values() if not entry.content_exempt)
+        exact_size = sum(
+            entry.size
+            for entry in effective.ledger.values()
+            if not entry.content_exempt
+        )
 
     monkeypatch.setattr(module, "MAX_TREE_BYTES", exact_size)
     with module._pauth_read_snapshot(tmp_path, snapshot):
@@ -4707,7 +5435,9 @@ def test_wi6183_effective_tree_limit_counts_projection_at_exact_boundary(
     ("mismatch", "expected"),
     [
         pytest.param("root", "configuration resolves outside", id="root"),
-        pytest.param("allowlist", "relation allowlist mismatch", id="relation-allowlist"),
+        pytest.param(
+            "allowlist", "relation allowlist mismatch", id="relation-allowlist"
+        ),
         pytest.param("schema", "missing required column", id="schema"),
         pytest.param("digest", "logical contents differ", id="digest"),
         pytest.param("version", "construction identity mismatch", id="version"),
@@ -4724,7 +5454,9 @@ def test_wi6183_producer_consumer_mismatch_denies_without_fallback(
     snapshot = _wi6183_bridge_snapshot(module, tmp_path)
 
     if mismatch == "root":
-        monkeypatch.setattr(module, "groundtruth_db_path", lambda _root: tmp_path / "groundtruth.db")
+        monkeypatch.setattr(
+            module, "groundtruth_db_path", lambda _root: tmp_path / "groundtruth.db"
+        )
         with (
             pytest.raises(module.GateError, match=expected),
             module._pauth_read_snapshot(tmp_path, snapshot),
@@ -4738,7 +5470,9 @@ def test_wi6183_producer_consumer_mismatch_denies_without_fallback(
             projection = effective.root / "groundtruth.db"
             evidence = effective.ledger["groundtruth.db"].pauth_read_snapshot
             assert evidence is not None
-            probe = effective.root / ".gtkb-state" / "compliance-audit" / f"{mismatch}.db"
+            probe = (
+                effective.root / ".gtkb-state" / "compliance-audit" / f"{mismatch}.db"
+            )
             probe.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(projection, probe)
             probe.chmod(0o600)
@@ -4747,11 +5481,17 @@ def test_wi6183_producer_consumer_mismatch_denies_without_fallback(
                 if mismatch == "allowlist":
                     conn.execute("CREATE TABLE unexpected_authority (id TEXT)")
                 elif mismatch == "schema":
-                    conn.execute("ALTER TABLE current_projects DROP COLUMN parent_project_id")
+                    conn.execute(
+                        "ALTER TABLE current_projects DROP COLUMN parent_project_id"
+                    )
                 elif mismatch == "digest":
-                    conn.execute("UPDATE current_projects SET status = 'retired' WHERE id = 'PROJECT-TEST'")
+                    conn.execute(
+                        "UPDATE current_projects SET status = 'retired' WHERE id = 'PROJECT-TEST'"
+                    )
                 else:
-                    conn.execute(f"PRAGMA user_version={module.PAUTH_READ_SNAPSHOT_VERSION + 1}")
+                    conn.execute(
+                        f"PRAGMA user_version={module.PAUTH_READ_SNAPSHOT_VERSION + 1}"
+                    )
                 conn.commit()
             finally:
                 conn.close()
@@ -4764,7 +5504,9 @@ def test_wi6183_producer_consumer_mismatch_denies_without_fallback(
     _wi6183_assert_projection_absent(snapshot.root)
 
 
-def test_wi6183_cleanup_failure_is_terminal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_wi6183_cleanup_failure_is_terminal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _load_module()
     _wi6183_seed_authority_db(module, tmp_path)
     snapshot = _wi6183_bridge_snapshot(module, tmp_path)
@@ -4787,16 +5529,26 @@ def test_wi6183_cleanup_failure_is_terminal(tmp_path: Path, monkeypatch: pytest.
 @pytest.mark.parametrize(
     ("exit_kind", "exception"),
     [
-        pytest.param("evaluator-denial", lambda module: module.GateError("injected evaluator denial"), id="denial"),
         pytest.param(
-            "evaluator-exception", lambda _module: RuntimeError("injected evaluator exception"), id="exception"
+            "evaluator-denial",
+            lambda module: module.GateError("injected evaluator denial"),
+            id="denial",
+        ),
+        pytest.param(
+            "evaluator-exception",
+            lambda _module: RuntimeError("injected evaluator exception"),
+            id="exception",
         ),
         pytest.param(
             "evaluator-timeout",
             lambda _module: subprocess.TimeoutExpired("injected evaluator", 1),
             id="timeout",
         ),
-        pytest.param("outer-exception", lambda _module: ValueError("injected outer exception"), id="outer-exception"),
+        pytest.param(
+            "outer-exception",
+            lambda _module: ValueError("injected outer exception"),
+            id="outer-exception",
+        ),
     ],
 )
 def test_wi6183_all_consumer_exits_run_complete_cleanup(
@@ -4840,13 +5592,19 @@ def _wi6183_transaction_fixture(root: Path, module) -> tuple[str, str]:
     ]
     authority_paths.extend(
         path.relative_to(REPO_ROOT).as_posix()
-        for path in sorted((REPO_ROOT / "groundtruth-kb" / "src" / "groundtruth_kb" / "governance").glob("*.py"))
+        for path in sorted(
+            (
+                REPO_ROOT / "groundtruth-kb" / "src" / "groundtruth_kb" / "governance"
+            ).glob("*.py")
+        )
     )
     for rel_path in authority_paths:
         target = root / rel_path
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO_ROOT / rel_path, target)
-    (root / "groundtruth.toml").write_text('[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8")
+    (root / "groundtruth.toml").write_text(
+        '[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8"
+    )
     (root / ".gitignore").write_text("groundtruth.db\n.gtkb-state/\n", encoding="utf-8")
     applicability_config = root / "config" / "governance" / "spec-applicability.toml"
     applicability_config.write_text(
@@ -5000,14 +5758,16 @@ pytest platform_tests/scripts/test_check_protected_commit_authorization.py
     verdict.write_text(prepared_candidate, encoding="utf-8")
 
     row = implementation_authorization._project_authorization_row(root, "PAUTH-TEST")
-    project_authorization = implementation_authorization.validate_project_authorization_row(
-        root,
-        row,
-        proposal_project_id="PROJECT-TEST",
-        work_item_id="WI-TEST",
-        spec_links=["SPEC-TEST"],
-        target_paths=[target_rel],
-        requested_operations=["protected_mutation"],
+    project_authorization = (
+        implementation_authorization.validate_project_authorization_row(
+            root,
+            row,
+            proposal_project_id="PROJECT-TEST",
+            work_item_id="WI-TEST",
+            spec_links=["SPEC-TEST"],
+            target_paths=[target_rel],
+            requested_operations=["protected_mutation"],
+        )
     )
     packet = {
         "bridge_id": bridge_id,
@@ -5025,7 +5785,7 @@ pytest platform_tests/scripts/test_check_protected_commit_authorization.py
     pre_start_hash = packet.pop("packet_hash")
     packet["schema_version"] = 3
     packet["implementation_start"] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "bridge_id": bridge_id,
         "finalized_at": "2026-08-11T00:00:00Z",
         "session_id": "wi6183-worker-session",
@@ -5036,18 +5796,33 @@ pytest platform_tests/scripts/test_check_protected_commit_authorization.py
             "session_id": "wi6183-worker-session",
             "claim_kind": "go_implementation",
             "acting_role": "prime-builder",
+            "session_envelope_id": "SENV-wi6183-worker-session",
+            "acting_role_attestation": "role-attestation:SENV-wi6183-worker-session:1:0123456789abcdef",
             "project_id": "PROJECT-TEST",
         },
-        "worker_role_provenance": {
+        "role_attestation": {
             "schema_version": 1,
-            "session_id": "wi6183-worker-session",
+            "invoking_context": "wi6183-worker-session",
+            "session_envelope_id": "SENV-wi6183-worker-session",
+            "subject": "gtkb",
+            "init_command_digest": "test-init-command-digest",
+            "binding_created_at": "2026-08-11T00:00:00Z",
             "role": "prime-builder",
-            "harness_id": "A",
+            "source_event": "exact_init",
+            "issuer": "test/exact-init",
+            "attested_at": "2026-08-11T00:00:00Z",
+            "evidence_reference": "role-attestation:SENV-wi6183-worker-session:1:0123456789abcdef",
         },
         "project_authorization_decision": {"allowed": True},
     }
     packet["packet_hash"] = module.packet_hash(packet)
-    packet_path = root / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / f"{bridge_id}.json"
+    packet_path = (
+        root
+        / ".gtkb-state"
+        / "implementation-authorizations"
+        / "by-bridge"
+        / f"{bridge_id}.json"
+    )
     packet_path.parent.mkdir(parents=True, exist_ok=True)
     packet_path.write_text(json.dumps(packet), encoding="utf-8")
     subprocess.run(["git", "add", "--", verdict_rel], cwd=root, check=True)
@@ -5068,9 +5843,17 @@ def test_wi6183_transaction_uses_one_effective_snapshot_for_compliance_and_pauth
     def recording_audit(*, snapshot, candidate_path: str, content: str):
         assert snapshot.ledger["groundtruth.db"].pauth_read_snapshot is not None
         consumer_roots.append(("compliance", snapshot.root))
-        return real_audit(snapshot=snapshot, candidate_path=candidate_path, content=content)
+        return real_audit(
+            snapshot=snapshot, candidate_path=candidate_path, content=content
+        )
 
-    def recording_validate(root: Path, packet: dict, *, requested_operations: list[str], target_paths: list[str]):
+    def recording_validate(
+        root: Path,
+        packet: dict,
+        *,
+        requested_operations: list[str],
+        target_paths: list[str],
+    ):
         assert (root / "groundtruth.db").is_file()
         consumer_roots.append(("pauth", root))
         result = real_validate(
@@ -5083,8 +5866,12 @@ def test_wi6183_transaction_uses_one_effective_snapshot_for_compliance_and_pauth
         return result
 
     monkeypatch.setattr(module, "_run_snapshot_compliance_audit", recording_audit)
-    monkeypatch.setattr(module, "validate_packet_project_authorization_operation", recording_validate)
-    monkeypatch.setattr(module, "validate_verdict_evidence_anchors", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        module, "validate_packet_project_authorization_operation", recording_validate
+    )
+    monkeypatch.setattr(
+        module, "validate_verdict_evidence_anchors", lambda *args, **kwargs: []
+    )
 
     with module._index_snapshot(tmp_path) as snapshot:
         evidence, errors, candidate_path = module._load_transaction_verified_evidence(
@@ -5122,7 +5909,9 @@ def test_wi6183_transaction_consumer_failures_clean_projection_and_sidecars(
         real_cleanup(path, identity, sidecar_identities)
 
     monkeypatch.setattr(module, "_remove_pauth_projection", recording_cleanup)
-    monkeypatch.setattr(module, "validate_verdict_evidence_anchors", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        module, "validate_verdict_evidence_anchors", lambda *args, **kwargs: []
+    )
     if exit_kind != "outer-exception":
         if exit_kind == "evaluator-denial":
             injected = module.BridgeComplianceError("injected evaluator denial")
@@ -5136,19 +5925,26 @@ def test_wi6183_transaction_consumer_failures_clean_projection_and_sidecars(
 
         monkeypatch.setattr(module, "_run_snapshot_compliance_audit", faulting_audit)
         with module._index_snapshot(tmp_path) as snapshot:
-            evidence, errors, candidate_path = module._load_transaction_verified_evidence(
-                tmp_path,
-                [target_rel],
-                snapshot,
+            evidence, errors, candidate_path = (
+                module._load_transaction_verified_evidence(
+                    tmp_path,
+                    [target_rel],
+                    snapshot,
+                )
             )
         assert evidence is None
         assert candidate_path == f"bridge/{bridge_id}-004.md"
-        assert any("VERIFIED candidate bridge-compliance audit failed" in error for error in errors)
+        assert any(
+            "VERIFIED candidate bridge-compliance audit failed" in error
+            for error in errors
+        )
     else:
         monkeypatch.setattr(
             module,
             "_load_finalized_packet",
-            lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("injected outer exception")),
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                RuntimeError("injected outer exception")
+            ),
         )
         with (
             module._index_snapshot(tmp_path) as snapshot,
@@ -5167,14 +5963,20 @@ def test_wi6183_non_pauth_transaction_does_not_open_projection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module = _load_module()
-    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    selected_paths, report, verdict = _write_transaction_chain(
+        tmp_path, module, monkeypatch
+    )
     _stage_transaction(tmp_path, selected_paths, report, verdict)
 
     def unexpected_pauth_snapshot(*args, **kwargs):
-        raise AssertionError("non-PAUTH transaction must not open a PAUTH read snapshot")
+        raise AssertionError(
+            "non-PAUTH transaction must not open a PAUTH read snapshot"
+        )
 
     monkeypatch.setattr(module, "_pauth_read_snapshot", unexpected_pauth_snapshot)
-    monkeypatch.setattr(module, "validate_verdict_evidence_anchors", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        module, "validate_verdict_evidence_anchors", lambda *args, **kwargs: []
+    )
 
     with module._index_snapshot(tmp_path) as snapshot:
         _evidence, _errors, candidate_path = module._load_transaction_verified_evidence(
@@ -5231,17 +6033,23 @@ def _verify_outcome(module, snapshot, workers):
 @pytest.mark.parametrize("workers", _WORKER_COUNTS)
 def test_clean_ledger_verifies_at_every_worker_count(tmp_path, workers):
     module = _load_module()
-    snapshot = _ledger_snapshot(module, tmp_path, {f"f{i}.txt": f"payload-{i}".encode() for i in range(24)})
+    snapshot = _ledger_snapshot(
+        module, tmp_path, {f"f{i}.txt": f"payload-{i}".encode() for i in range(24)}
+    )
     assert _verify_outcome(module, snapshot, workers) is None
 
 
 @pytest.mark.parametrize("workers", _WORKER_COUNTS)
-@pytest.mark.parametrize("drift", ["bytes", "size", "inode", "link_count", "missing", "exempt_metadata"])
+@pytest.mark.parametrize(
+    "drift", ["bytes", "size", "inode", "link_count", "missing", "exempt_metadata"]
+)
 def test_each_drift_class_still_fails_closed(tmp_path, workers, drift):
     module = _load_module()
     root = tmp_path / drift
     root.mkdir()
-    snapshot = _ledger_snapshot(module, root, {f"f{i}.txt": f"payload-{i}".encode() for i in range(12)})
+    snapshot = _ledger_snapshot(
+        module, root, {f"f{i}.txt": f"payload-{i}".encode() for i in range(12)}
+    )
     entry = snapshot.ledger["f5.txt"]
 
     if drift == "bytes":
@@ -5261,7 +6069,9 @@ def test_each_drift_class_still_fails_closed(tmp_path, workers, drift):
         entry.oid = ""
 
     message = _verify_outcome(module, snapshot, workers)
-    assert message is not None, f"drift class {drift!r} was not detected at {workers} worker(s)"
+    assert message is not None, (
+        f"drift class {drift!r} was not detected at {workers} worker(s)"
+    )
 
 
 def test_parallel_outcome_matches_serial_for_every_drift_class(tmp_path):
@@ -5273,7 +6083,9 @@ def test_parallel_outcome_matches_serial_for_every_drift_class(tmp_path):
         outcomes = []
         for root, workers in ((serial_root, 1), (parallel_root, 8)):
             root.mkdir()
-            snapshot = _ledger_snapshot(module, root, {f"f{i}.txt": f"payload-{i}".encode() for i in range(16)})
+            snapshot = _ledger_snapshot(
+                module, root, {f"f{i}.txt": f"payload-{i}".encode() for i in range(16)}
+            )
             if drift == "bytes":
                 (root / "f3.txt").write_bytes(b"different-bytes-entirely")
             elif drift == "size":
@@ -5302,17 +6114,27 @@ def test_reported_failure_is_deterministic_across_workers_and_runs(tmp_path):
         for workers in _WORKER_COUNTS:
             root = tmp_path / f"multi-{run}-{workers}"
             root.mkdir()
-            snapshot = _ledger_snapshot(module, root, {f"f{i:02d}.txt": f"payload-{i}".encode() for i in range(20)})
+            snapshot = _ledger_snapshot(
+                module,
+                root,
+                {f"f{i:02d}.txt": f"payload-{i}".encode() for i in range(20)},
+            )
             for rel in ("f03.txt", "f11.txt", "f17.txt"):
                 snapshot.ledger[rel].size += 3
             messages.add(_verify_outcome(module, snapshot, workers))
-    assert len(messages) == 1, f"failure report was not deterministic; saw {sorted(messages)}"
-    assert "f03.txt" in messages.pop(), "the earliest drifting ledger entry should be the reported one"
+    assert len(messages) == 1, (
+        f"failure report was not deterministic; saw {sorted(messages)}"
+    )
+    assert "f03.txt" in messages.pop(), (
+        "the earliest drifting ledger entry should be the reported one"
+    )
 
 
 def test_worker_count_is_derived_capped_and_overridable():
     module = _load_module()
     assert module._ledger_verify_worker_count(1) == 1
-    assert module._ledger_verify_worker_count(100_000) == module._LEDGER_VERIFY_WORKER_CAP
+    assert (
+        module._ledger_verify_worker_count(100_000) == module._LEDGER_VERIFY_WORKER_CAP
+    )
     assert module._ledger_verify_worker_count(100_000, 1) == 1
     assert module._ledger_verify_worker_count(4) <= 4

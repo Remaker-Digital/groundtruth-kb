@@ -29,7 +29,9 @@ def _load_cli():
         sys.modules.pop(spec.name, None)
 
 
-def _run_cli(tmp_path: Path, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+def _run_cli(
+    tmp_path: Path, *args: str, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     run_env = os.environ.copy()
     for key in (
         "GTKB_BRIDGE_POLLER_RUN_ID",
@@ -56,17 +58,31 @@ def _run_cli(tmp_path: Path, *args: str, env: dict[str, str] | None = None) -> s
 def _write_go_thread(root: Path, slug: str) -> None:
     bridge = root / "bridge"
     bridge.mkdir(parents=True, exist_ok=True)
-    (bridge / f"{slug}-001.md").write_text("NEW\n\nFixture proposal.\n", encoding="utf-8")
+    (bridge / f"{slug}-001.md").write_text(
+        "NEW\n\nFixture proposal.\n\nProject: PROJECT-X\nWork Item: WI-0000\n",
+        encoding="utf-8",
+    )
     (bridge / f"{slug}-002.md").write_text("GO\n\nFixture verdict.\n", encoding="utf-8")
 
 
 def _write_new_thread(root: Path, slug: str) -> None:
     bridge = root / "bridge"
     bridge.mkdir(parents=True, exist_ok=True)
-    (bridge / f"{slug}-001.md").write_text("NEW\n\nFixture proposal.\n", encoding="utf-8")
+    (bridge / f"{slug}-001.md").write_text(
+        "NEW\n\nFixture proposal.\n\nProject: PROJECT-X\nWork Item: WI-0000\n",
+        encoding="utf-8",
+    )
 
 
 def _write_prime_marker(root: Path, session_id: str) -> None:
+    from groundtruth_kb.session.attestation.service import bind_exact_init
+
+    bind_exact_init(
+        root / "groundtruth.db",
+        invoking_context=session_id,
+        init_command="::init gtkb pb",
+        issuer="test/exact-init",
+    )
     marker_dir = root / ".claude" / "session"
     marker_dir.mkdir(parents=True, exist_ok=True)
     (marker_dir / f"role-{session_id}.json").write_text(
@@ -97,7 +113,13 @@ def _write_prime_marker(root: Path, session_id: str) -> None:
             "dispatch_run_id": None,
         },
     }
-    envelope_path = root / "harness-state" / harness_name / "session-envelopes" / f"{session_id}.json"
+    envelope_path = (
+        root
+        / "harness-state"
+        / harness_name
+        / "session-envelopes"
+        / f"{session_id}.json"
+    )
     envelope_path.parent.mkdir(parents=True, exist_ok=True)
     envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
 
@@ -113,7 +135,9 @@ def _open_host_bound_prime_envelope(root: Path, session_id: str) -> None:
         json.dumps(
             {
                 "schema_version": 1,
-                "harnesses": [{"id": "A", "harness_name": "codex", "role": ["loyal-opposition"]}],
+                "harnesses": [
+                    {"id": "A", "harness_name": "codex", "role": ["loyal-opposition"]}
+                ],
             }
         ),
         encoding="utf-8",
@@ -139,6 +163,14 @@ def _open_host_bound_prime_envelope(root: Path, session_id: str) -> None:
     )
     assert opened.exit_code == 0, opened.output
     assert json.loads(opened.output)["session_id"] == session_id
+    from groundtruth_kb.session.attestation.service import bind_exact_init
+
+    bind_exact_init(
+        root / "groundtruth.db",
+        invoking_context=session_id,
+        init_command="::init gtkb pb",
+        issuer="test/exact-init",
+    )
 
 
 def test_resolve_session_id_uses_harness_neutral_fallbacks(monkeypatch) -> None:
@@ -263,7 +295,9 @@ def test_claim_release_status_round_trip_with_codex_env(tmp_path: Path) -> None:
     assert cleared.stdout.strip() == "null"
 
 
-def test_claim_go_implementation_uses_versioned_bridge_files_without_index(tmp_path: Path) -> None:
+def test_claim_go_implementation_uses_versioned_bridge_files_without_index(
+    tmp_path: Path,
+) -> None:
     slug = "gtkb-go-thread"
     session_id = "codex-thread-123"
     _write_go_thread(tmp_path, slug)
@@ -278,7 +312,9 @@ def test_claim_go_implementation_uses_versioned_bridge_files_without_index(tmp_p
     assert not (tmp_path / "bridge" / "INDEX.md").exists()
 
 
-def test_claim_go_implementation_uses_host_bound_cli_envelope_provenance(tmp_path: Path) -> None:
+def test_claim_go_implementation_uses_host_bound_cli_envelope_provenance(
+    tmp_path: Path,
+) -> None:
     slug = "gtkb-host-bound-go-thread"
     session_id = "codex-thread-123"
     _write_go_thread(tmp_path, slug)
@@ -294,10 +330,17 @@ def test_claim_go_implementation_uses_host_bound_cli_envelope_provenance(tmp_pat
 
 
 def test_claim_refused_when_other_session_holds_slug(tmp_path: Path) -> None:
-    first = _run_cli(tmp_path, "claim", "gtkb-demo-thread", env={"CLAUDE_SESSION_ID": "session-a"})
+    first = _run_cli(
+        tmp_path, "claim", "gtkb-demo-thread", env={"CLAUDE_SESSION_ID": "session-a"}
+    )
     assert first.returncode == 0, first.stderr
 
-    second = _run_cli(tmp_path, "claim", "gtkb-demo-thread", env={"GTKB_INHERITED_SESSION_ID": "session-b"})
+    second = _run_cli(
+        tmp_path,
+        "claim",
+        "gtkb-demo-thread",
+        env={"GTKB_INHERITED_SESSION_ID": "session-b"},
+    )
     assert second.returncode == 2
     holder = json.loads(second.stdout)
     assert holder["session_id"] == "session-a"
@@ -314,7 +357,9 @@ def test_claim_go_implementation_preempts_lingering_draft_claim(tmp_path: Path) 
     assert first.returncode == 0, first.stderr
     assert json.loads(first.stdout)["claim_kind"] == "draft"
 
-    (tmp_path / "bridge" / f"{slug}-002.md").write_text("GO\n\nFixture verdict.\n", encoding="utf-8")
+    (tmp_path / "bridge" / f"{slug}-002.md").write_text(
+        "GO\n\nFixture verdict.\n", encoding="utf-8"
+    )
     _write_prime_marker(tmp_path, prime_session)
 
     second = _run_cli(tmp_path, "claim", slug, env={"CODEX_THREAD_ID": prime_session})
@@ -371,3 +416,19 @@ def test_session_env_vars_aliases_shared_bridge_order() -> None:
 
     cli = _load_cli()
     assert tuple(cli.SESSION_ENV_VARS) == tuple(BRIDGE_WORK_INTENT_ORDER)
+
+
+def test_claim_refused_when_other_session_holds_same_work_item(tmp_path: Path) -> None:
+    _write_go_thread(tmp_path, "wi-collision-a")
+    _write_go_thread(tmp_path, "wi-collision-b")
+    _write_prime_marker(tmp_path, "session-a")
+    _write_prime_marker(tmp_path, "session-b")
+
+    first = _run_cli(tmp_path, "claim", "wi-collision-a", "--session-id", "session-a")
+    assert first.returncode == 0, first.stderr
+    second = _run_cli(tmp_path, "claim", "wi-collision-b", "--session-id", "session-b")
+    assert second.returncode == 2, second.stderr + second.stdout
+    payload = json.loads(second.stdout)
+    assert payload["error"] == "work_item_claim_collision"
+    assert payload["holder_thread_slug"] == "wi-collision-a"
+    assert payload["work_item_id"] == "WI-0000"
