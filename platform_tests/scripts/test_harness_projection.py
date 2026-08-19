@@ -111,7 +111,9 @@ def test_projected_hooks_registration_is_native():
 
 def test_unresolved_token_is_projector_gap(tmp_path, monkeypatch):
     plan = project_harness.Plan()
-    result = project_harness.substitute("path is {{HARNESS_UNKNOWN_TOKEN}}", {"HARNESS_NAME": "x"}, "f.md", plan.gaps)
+    result = project_harness.substitute(
+        "path is {{HARNESS_UNKNOWN_TOKEN}}", {"HARNESS_NAME": "x"}, "f.md", plan.gaps
+    )
     assert "{{HARNESS_UNKNOWN_TOKEN}}" in result
     assert plan.gaps and "unresolved token" in plan.gaps[0]
 
@@ -119,3 +121,56 @@ def test_unresolved_token_is_projector_gap(tmp_path, monkeypatch):
 def test_pending_profile_fails_closed():
     with pytest.raises(project_harness.ProjectionError):
         project_harness.build_plan("cursor")
+
+
+def test_normalize_planned_rel_strips_dot_slash_without_lstripping_baseline_dot():
+    assert (
+        project_harness.normalize_planned_rel(
+            "./.harness-baseline-configuration/skills/x.md"
+        )
+        == ".harness-baseline-configuration/skills/x.md"
+    )
+    assert (
+        project_harness.normalize_planned_rel(
+            ".harness-baseline-configuration\\skills\\x.md"
+        )
+        == ".harness-baseline-configuration/skills/x.md"
+    )
+    assert not project_harness.is_baseline_destination(
+        "scripts/harness_projection/project_harness.py"
+    )
+
+
+def test_write_mode_rejects_baseline_destination_and_writes_nothing(
+    tmp_path, monkeypatch
+):
+    plan = project_harness.Plan()
+    dest = ".harness-baseline-configuration/skills/wi6539-injected.md"
+    plan.writes[dest] = "should-not-land\n"
+    monkeypatch.setattr(project_harness, "build_plan", lambda harness: plan)
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    with pytest.raises(
+        project_harness.ProjectionError, match="harness-baseline-configuration"
+    ):
+        project_harness.run("goose", "write")
+    assert not (tmp_path / dest).exists()
+
+
+def test_write_mode_rejects_dot_slash_and_backslash_baseline_destinations(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    for dest in (
+        "./.harness-baseline-configuration/skills/wi6539-dot-slash.md",
+        ".harness-baseline-configuration\\skills\\wi6539-backslash.md",
+    ):
+        plan = project_harness.Plan()
+        plan.writes[dest] = "should-not-land\n"
+        monkeypatch.setattr(
+            project_harness, "build_plan", lambda harness, _plan=plan: _plan
+        )
+        with pytest.raises(
+            project_harness.ProjectionError, match="harness-baseline-configuration"
+        ):
+            project_harness.run("goose", "write")
+        assert not (tmp_path / project_harness.normalize_planned_rel(dest)).exists()

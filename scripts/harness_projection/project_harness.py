@@ -55,6 +55,42 @@ class ProjectionError(RuntimeError):
     pass
 
 
+BASELINE_ROOT_NAME = ".harness-baseline-configuration"
+
+
+def normalize_planned_rel(rel: str) -> str:
+    """Normalize a planned write path for destination checks.
+
+    Replace ``\\`` with ``/`` and strip a leading ``./`` prefix. Do not use
+    ``str.lstrip("./")``: that would also strip the leading ``.`` from
+    ``.harness-baseline-configuration``.
+    """
+    text = str(rel).replace("\\", "/")
+    while text.startswith("./"):
+        text = text[2:]
+    return text
+
+
+def is_baseline_destination(rel: str) -> bool:
+    """Return True when a planned write would land inside the baseline tree."""
+    normalized = normalize_planned_rel(rel)
+    return normalized == BASELINE_ROOT_NAME or normalized.startswith(
+        f"{BASELINE_ROOT_NAME}/"
+    )
+
+
+def reject_baseline_destinations(plan: Plan) -> None:
+    """Fail closed if any planned write path is inside the baseline tree."""
+    blocked = sorted(rel for rel in plan.writes if is_baseline_destination(rel))
+    if not blocked:
+        return
+    raise ProjectionError(
+        "refusing to project into .harness-baseline-configuration "
+        "(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 2); blocked: "
+        + ", ".join(blocked)
+    )
+
+
 @dataclass
 class Plan:
     writes: dict[str, str] = field(default_factory=dict)  # rel path -> content
@@ -102,7 +138,9 @@ def ruff_format(text: str, rel: str, gaps: list[str]) -> str:
         gaps.append(f"{rel}: ruff format unavailable ({exc})")
         return text
     if proc.returncode != 0:
-        gaps.append(f"{rel}: ruff format failed: {proc.stderr.decode('utf-8', 'replace')[:120]}")
+        gaps.append(
+            f"{rel}: ruff format failed: {proc.stderr.decode('utf-8', 'replace')[:120]}"
+        )
         return text
     return proc.stdout.decode("utf-8")
 
@@ -169,7 +207,9 @@ def render_hooks_registration(
         for hook in manifest.get("hook", []):
             native_event = profile.get("hook_events", {}).get(hook["event"])
             if native_event is None:
-                gaps.append(f"hook {hook['script']}: no native event for {hook['event']}")
+                gaps.append(
+                    f"hook {hook['script']}: no native event for {hook['event']}"
+                )
                 continue
             if hook.get("script_root") == "project_scripts":
                 command = f"python scripts/{hook['script']}"
@@ -194,7 +234,9 @@ def render_hooks_registration(
         for hook in manifest.get("hook", []):
             native_event = profile.get("hook_events", {}).get(hook["event"])
             if native_event is None:
-                gaps.append(f"hook {hook['script']}: no native event for {hook['event']}")
+                gaps.append(
+                    f"hook {hook['script']}: no native event for {hook['event']}"
+                )
                 continue
             intents = hook.get("intents", ["all"])
             matcher = "|".join(m for m in (matchers.get(i, "") for i in intents) if m)
@@ -208,7 +250,11 @@ def render_hooks_registration(
             entry = {"type": "command", "command": command}
             if hook.get("timeout_seconds"):
                 entry["timeout"] = hook["timeout_seconds"]
-            group = {"matcher": matcher, "hooks": [entry]} if matcher else {"hooks": [entry]}
+            group = (
+                {"matcher": matcher, "hooks": [entry]}
+                if matcher
+                else {"hooks": [entry]}
+            )
             events_out.setdefault(native_event, []).append(group)
         payload = {
             "_comment": "PROJECTION, NOT CANONICAL - rendered from the baseline hooks/manifest.toml by the GT-KB projection engine; edit the baseline and re-project.",
@@ -237,10 +283,16 @@ def build_plan(harness: str) -> Plan:
     if not base.is_dir():
         raise ProjectionError(f"baseline root missing: {base}")
     tokens = token_map(profile, baseline_cfg)
-    stamp_text = profiles["stamp"]["text"].format(baseline_root=baseline_cfg["root"], harness=harness)
+    stamp_text = profiles["stamp"]["text"].format(
+        baseline_root=baseline_cfg["root"], harness=harness
+    )
     plan = Plan()
 
-    surfaces = {"skills": profile["skills_dir"], "rules": profile["rules_dir"], "hooks": profile["hooks_dir"]}
+    surfaces = {
+        "skills": profile["skills_dir"],
+        "rules": profile["rules_dir"],
+        "hooks": profile["hooks_dir"],
+    }
     for src_name, dst_root in surfaces.items():
         src_root = base / src_name
         if not src_root.is_dir():
@@ -258,7 +310,9 @@ def build_plan(harness: str) -> Plan:
                 text = apply_stamp(rel_out, text, stamp_text)
                 if src_name == "skills" and rel_in_surface.endswith("SKILL.md"):
                     source_rel = f"{baseline_cfg['root']}/{src_name}/{rel_in_surface}"
-                    block = adapter_metadata_block(profile["name"], source_rel, source_text)
+                    block = adapter_metadata_block(
+                        profile["name"], source_rel, source_text
+                    )
                     text = text + "\n<!--\n" + block + "-->\n"
                 if rel_out.endswith(".py"):
                     # Token substitution changes line lengths, so a
@@ -278,7 +332,9 @@ def build_plan(harness: str) -> Plan:
         if rendered is not None:
             plan.writes[rendered[0]] = rendered[1]
 
-    ownership = sorted(plan.writes) + [f"{profile['config_dir']}/.projection-manifest.json"]
+    ownership = sorted(plan.writes) + [
+        f"{profile['config_dir']}/.projection-manifest.json"
+    ]
     plan.writes[f"{profile['config_dir']}/.projection-manifest.json"] = (
         json.dumps(
             {
@@ -292,11 +348,13 @@ def build_plan(harness: str) -> Plan:
         )
         + "\n"
     )
+    reject_baseline_destinations(plan)
     return plan
 
 
 def run(harness: str, mode: str) -> int:
     plan = build_plan(harness)
+    reject_baseline_destinations(plan)
     if plan.gaps:
         print("PROJECTOR GAPS (obligation 6 - file or extend a work item):")
         for gap in plan.gaps:
@@ -317,7 +375,9 @@ def run(harness: str, mode: str) -> int:
                 drift.append(f"missing: {rel}")
             elif (
                 hashlib.sha256(target.read_bytes()).hexdigest()
-                != hashlib.sha256(content.encode("utf-8", errors="surrogateescape")).hexdigest()
+                != hashlib.sha256(
+                    content.encode("utf-8", errors="surrogateescape")
+                ).hexdigest()
             ):
                 drift.append(f"differs: {rel}")
         print(f"CHECK {harness}: {len(drift)} drifted of {len(plan.writes)} managed")
@@ -327,7 +387,9 @@ def run(harness: str, mode: str) -> int:
     for rel, content in plan.writes.items():
         target = PROJECT_ROOT / rel
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8", errors="surrogateescape", newline="\n")
+        target.write_text(
+            content, encoding="utf-8", errors="surrogateescape", newline="\n"
+        )
     print(f"PROJECTED {harness}: {len(plan.writes)} files")
     return 0
 
