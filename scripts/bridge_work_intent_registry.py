@@ -9,7 +9,7 @@ import re
 import sqlite3
 import time
 import tomllib
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -17,12 +17,18 @@ from typing import Any, Final
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 SLUG_RE: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)$"
+# WI-6541: the module-local status-token regex was removed. It duplicated the
+# canonical token list owned by
+# ``groundtruth_kb.bridge.versioned_files._CANONICAL_STATUS_TOKENS`` and its
+# anchored ``$`` rejected a status line carrying trailing descriptive text.
+# Status parsing now has exactly one home: ``parse_bridge_header_block``.
+BRIDGE_PROJECT_RE: Final[re.Pattern[str]] = re.compile(
+    r"^Project:\s*(\S+)\s*$", re.MULTILINE
 )
-BRIDGE_PROJECT_RE: Final[re.Pattern[str]] = re.compile(r"^Project:\s*(\S+)\s*$", re.MULTILINE)
 
-DEFAULT_DRAFT_TTL_SECONDS: Final[int] = int(os.environ.get("GTKB_WORK_INTENT_TTL_SECONDS") or "600")
+DEFAULT_DRAFT_TTL_SECONDS: Final[int] = int(
+    os.environ.get("GTKB_WORK_INTENT_TTL_SECONDS") or "600"
+)
 GO_IMPLEMENTATION_DEADLINE_SECONDS: Final[int] = 30 * 60
 GO_IMPLEMENTATION_EXTENSION_SECONDS: Final[int] = 30 * 60
 GO_IMPLEMENTATION_MAX_HOLD_SECONDS: Final[int] = 2 * 60 * 60
@@ -32,7 +38,9 @@ GO_IMPLEMENTATION_GRACE_SECONDS: Final[int] = 10 * 60
 # implementation deadline drops below this threshold, so a long build is
 # rescued without extending on every single edit. Defaulting to the grace
 # window keeps the behavior bounded and aligned with the existing timebox.
-GO_IMPLEMENTATION_AUTO_EXTEND_THRESHOLD_SECONDS: Final[int] = GO_IMPLEMENTATION_GRACE_SECONDS
+GO_IMPLEMENTATION_AUTO_EXTEND_THRESHOLD_SECONDS: Final[int] = (
+    GO_IMPLEMENTATION_GRACE_SECONDS
+)
 
 # WI-5784: write contention is retried inside one bounded total deadline.  A
 # short per-attempt SQLite wait leaves room to reopen the connection, re-read
@@ -48,7 +56,9 @@ CLAIM_KIND_GO_IMPLEMENTATION: Final[str] = "go_implementation"
 # Explicit non-implementation claim for Prime NO-ACTION corrections after
 # Loyal Opposition GO/NO-GO verdicts.
 CLAIM_KIND_NO_ACTION_CORRECTION: Final[str] = "no_action_correction"
-CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP: Final[str] = "project_authorization_bootstrap"
+CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP: Final[str] = (
+    "project_authorization_bootstrap"
+)
 BOOTSTRAP_REQUIRED_CARRIER_TARGET: Final[str] = "groundtruth.db"
 BRIDGE_WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(
     r"^(?:Work Item|Work Item ID|Backlog Item|Backlog Item ID):\s*`?([^`\s]+)`?\s*$",
@@ -58,6 +68,24 @@ BRIDGE_WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(
 
 class WorkIntentRegistryError(RuntimeError):
     """Raised when a work-intent registry operation cannot be completed."""
+
+
+class WorkIntentWorkItemCollisionError(WorkIntentRegistryError):
+    """Raised when a live claim already holds the same work item under another slug."""
+
+    def __init__(self, message: str, *, holder: Mapping[str, Any]) -> None:
+        super().__init__(message)
+        self.holder = dict(holder)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "error": "work_item_claim_collision",
+            "holder_thread_slug": self.holder.get("thread_slug"),
+            "holder_session_id": self.holder.get("session_id"),
+            "work_item_id": self.holder.get("work_item_id"),
+            "claim_kind": self.holder.get("claim_kind"),
+            "ttl_expires_at": self.holder.get("ttl_expires_at"),
+        }
 
 
 class WorkIntentDatabaseError(WorkIntentRegistryError):
@@ -154,7 +182,9 @@ def now_utc() -> datetime:
 
 
 def _iso(value: datetime) -> str:
-    return value.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        value.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
 
 
 def _parse_iso(value: str | None) -> datetime | None:
@@ -183,7 +213,9 @@ def _database_path(project_root: Path | None = None) -> Path:
         try:
             data = tomllib.loads(config_path.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
-            raise WorkIntentRegistryError(f"Could not read GroundTruth configuration {config_path}: {exc}") from exc
+            raise WorkIntentRegistryError(
+                f"Could not read GroundTruth configuration {config_path}: {exc}"
+            ) from exc
         configured = data.get("groundtruth", {}).get("db_path")
         if isinstance(configured, str) and configured.strip():
             path = Path(configured)
@@ -211,7 +243,10 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         );
         """
     )
-    columns = {row[1] for row in conn.execute("PRAGMA table_info(work_intent_claims)").fetchall()}
+    columns = {
+        row[1]
+        for row in conn.execute("PRAGMA table_info(work_intent_claims)").fetchall()
+    }
     additive_columns = {
         "claim_kind": "TEXT",
         "implementation_deadline": "TEXT",
@@ -220,6 +255,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         "extension_cap_seconds": "INTEGER",
         "extension_capped": "INTEGER DEFAULT 0",
         "acting_role": "TEXT",
+        "session_envelope_id": "TEXT",
+        "acting_role_attestation": "TEXT",
         "project_id": "TEXT",
         "bootstrap_owner_decision_id": "TEXT",
         "bootstrap_project_id": "TEXT",
@@ -227,14 +264,24 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         "bootstrap_authorization_id": "TEXT",
         "bootstrap_carrier_targets": "TEXT",
         "bootstrap_consumed_at": "TEXT",
+        "work_item_id": "TEXT",
     }
     for name, column_type in additive_columns.items():
         if name not in columns:
-            conn.execute(f"ALTER TABLE work_intent_claims ADD COLUMN {name} {column_type}")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_work_intent_claims_slug ON work_intent_claims(thread_slug);")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_work_intent_claims_kind ON work_intent_claims(claim_kind);")
+            conn.execute(
+                f"ALTER TABLE work_intent_claims ADD COLUMN {name} {column_type}"
+            )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_work_intent_claims_slug ON work_intent_claims(thread_slug);"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_work_intent_claims_kind ON work_intent_claims(claim_kind);"
+    )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_work_intent_claims_role_project ON work_intent_claims(acting_role, project_id);"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_work_intent_claims_work_item ON work_intent_claims(work_item_id);"
     )
     conn.commit()
 
@@ -430,7 +477,11 @@ def _database_error(
     contention_exhausted: bool = False,
 ) -> WorkIntentDatabaseError:
     code, name = _sqlite_error_fields(exc)
-    error_type = WorkIntentWriteContentionError if contention_exhausted else WorkIntentDatabaseError
+    error_type = (
+        WorkIntentWriteContentionError
+        if contention_exhausted
+        else WorkIntentDatabaseError
+    )
     return error_type(
         str(exc),
         operation=operation,
@@ -526,7 +577,9 @@ def _get_conn(
                 started_at=started_at,
                 database_path=db_path,
             ) from exc
-        raise WorkIntentRegistryError(f"Could not open database {db_path}: {exc}") from exc
+        raise WorkIntentRegistryError(
+            f"Could not open database {db_path}: {exc}"
+        ) from exc
 
 
 def _row_to_record(row: sqlite3.Row) -> dict[str, Any]:
@@ -542,10 +595,14 @@ def _is_expired(record: dict[str, Any], *, now: datetime | None = None) -> bool:
     return bool(expires_at and expires_at <= (now or now_utc()))
 
 
-def _is_lapsed_go_implementation(record: dict[str, Any], *, now: datetime | None = None) -> bool:
+def _is_lapsed_go_implementation(
+    record: dict[str, Any], *, now: datetime | None = None
+) -> bool:
     if record.get("claim_kind") != CLAIM_KIND_GO_IMPLEMENTATION:
         return False
-    grace_expires_at = _parse_iso(str(record.get("implementation_grace_expires_at") or ""))
+    grace_expires_at = _parse_iso(
+        str(record.get("implementation_grace_expires_at") or "")
+    )
     return bool(grace_expires_at and grace_expires_at <= (now or now_utc()))
 
 
@@ -558,28 +615,51 @@ def _version_from_path(rel_path: str, thread_slug: str) -> int | None:
 
 def _bridge_file_status(path: Path) -> str:
     try:
-        lines = path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
+        text = path.read_text(encoding="utf-8-sig", errors="replace")
     except (OSError, ValueError) as exc:
         raise WorkIntentRegistryError(f"Bridge file is unreadable: {path}") from exc
-    for raw_line in lines:
-        line = raw_line.strip()
-        if not line:
-            continue
-        if BRIDGE_FILE_STATUS_RE.fullmatch(line):
-            return line
+
+    # WI-6541: header parsing is delegated to the packaged accessor, which
+    # reads the leading header block as a unit and identifies ``::init``,
+    # ``::open``, and the status token by pattern rather than by position.
+    # The former mirror implementation here matched the status line with
+    # ``fullmatch``, so a status line carrying trailing descriptive text was
+    # rejected as malformed; folding in WI-6591, the token is now taken from
+    # the line and such a version is no longer skipped.
+    #
+    # Imported lazily, matching this module's existing lazy-import of
+    # ``groundtruth_kb``: this module is imported at load time by the
+    # dispatcher and harness surfaces, and a module-level package import would
+    # make those surfaces fail to import wherever the package is not on path.
+    from groundtruth_kb.bridge.versioned_files import parse_bridge_header_block
+
+    header = parse_bridge_header_block(text)
+    if header.status is not None:
+        return header.status
+    if not header.raw_lines:
         raise MalformedBridgeStatusError(
-            f"Bridge file has unrecognized status line: {path}: {line!r}",
+            f"Bridge file is empty: {path}",
             path=path,
-            offending_line=line,
+            offending_line=None,
         )
+    offending = next(
+        (
+            line
+            for line in header.raw_lines
+            if not line.lower().startswith(("::init", "::open"))
+        ),
+        header.raw_lines[0],
+    )
     raise MalformedBridgeStatusError(
-        f"Bridge file is empty: {path}",
+        f"Bridge file has unrecognized status line: {path}: {offending!r}",
         path=path,
-        offending_line=None,
+        offending_line=offending,
     )
 
 
-def _thread_version_entries(thread_slug: str, *, project_root: Path | None = None) -> list[tuple[int, str, str]]:
+def _thread_version_entries(
+    thread_slug: str, *, project_root: Path | None = None
+) -> list[tuple[int, str, str]]:
     root = _root(project_root)
     bridge_dir = root / "bridge"
     if not bridge_dir.is_dir():
@@ -607,7 +687,10 @@ def _thread_version_entries(thread_slug: str, *, project_root: Path | None = Non
                 f"Duplicate bridge version {version:03d} for {thread_slug}: {prior}, {rel_path}"
             )
         by_version[version] = (status, rel_path)
-    return [(version, status, rel_path) for version, (status, rel_path) in sorted(by_version.items(), reverse=True)]
+    return [
+        (version, status, rel_path)
+        for version, (status, rel_path) in sorted(by_version.items(), reverse=True)
+    ]
 
 
 def _latest_status(thread_slug: str, *, project_root: Path | None = None) -> str | None:
@@ -615,25 +698,46 @@ def _latest_status(thread_slug: str, *, project_root: Path | None = None) -> str
     return entries[0][1] if entries else None
 
 
-def _approved_proposal_path_for_go(thread_slug: str, *, project_root: Path | None = None) -> str | None:
+def _approved_proposal_path_for_go(
+    thread_slug: str, *, project_root: Path | None = None
+) -> str | None:
     entries = _thread_version_entries(thread_slug, project_root=project_root)
-    go_index = next((index for index, entry in enumerate(entries) if entry[1] == "GO"), None)
+    go_index = next(
+        (index for index, entry in enumerate(entries) if entry[1] == "GO"), None
+    )
     if go_index is None:
         return None
-    return next((entry[2] for entry in entries[go_index + 1 :] if entry[1] in {"NEW", "REVISED"}), None)
+    return next(
+        (
+            entry[2]
+            for entry in entries[go_index + 1 :]
+            if entry[1] in {"NEW", "REVISED"}
+        ),
+        None,
+    )
 
 
-def _approved_proposal_text_for_go(thread_slug: str, *, project_root: Path | None = None) -> str:
-    proposal_path = _approved_proposal_path_for_go(thread_slug, project_root=project_root)
+def _approved_proposal_text_for_go(
+    thread_slug: str, *, project_root: Path | None = None
+) -> str:
+    proposal_path = _approved_proposal_path_for_go(
+        thread_slug, project_root=project_root
+    )
     if proposal_path is None:
-        raise WorkIntentRegistryError(f"Bridge {thread_slug!r} has no approved proposal before GO")
+        raise WorkIntentRegistryError(
+            f"Bridge {thread_slug!r} has no approved proposal before GO"
+        )
     try:
         return (_root(project_root) / proposal_path).read_text(encoding="utf-8-sig")
     except (OSError, UnicodeError) as exc:
-        raise WorkIntentRegistryError(f"Could not read approved proposal {proposal_path}: {exc}") from exc
+        raise WorkIntentRegistryError(
+            f"Could not read approved proposal {proposal_path}: {exc}"
+        ) from exc
 
 
-def project_id_for_thread(thread_slug: str, *, project_root: Path | None = None) -> str | None:
+def project_id_for_thread(
+    thread_slug: str, *, project_root: Path | None = None
+) -> str | None:
     """Return the bridge proposal ``Project:`` metadata for ``thread_slug``.
 
     The project-level guard is advisory and fail-open. Missing or unreadable
@@ -655,13 +759,87 @@ def project_id_for_thread(thread_slug: str, *, project_root: Path | None = None)
     return None
 
 
-def _work_item_for_thread(thread_slug: str, *, project_root: Path | None = None) -> str | None:
+def _work_item_ids_from_text(text: str) -> list[str]:
+    found: list[str] = []
+    seen: set[str] = set()
+    for match in BRIDGE_WORK_ITEM_RE.finditer(text):
+        value = match.group(1).strip()
+        if value and value not in seen:
+            seen.add(value)
+            found.append(value)
+    return found
+
+
+def _operative_proposal_text(
+    thread_slug: str, *, project_root: Path | None = None
+) -> str | None:
+    """Return the proposal text that currently identifies the thread's work item."""
+
+    entries = _thread_version_entries(thread_slug, project_root=project_root)
+    if not entries:
+        return None
+    latest_status = entries[0][1]
+    if latest_status == "GO":
+        try:
+            return _approved_proposal_text_for_go(
+                thread_slug, project_root=project_root
+            )
+        except WorkIntentRegistryError:
+            return None
+    for _version, status, rel_path in entries:
+        if status not in {"NEW", "REVISED"}:
+            continue
+        try:
+            return (_root(project_root) / rel_path).read_text(encoding="utf-8-sig")
+        except (OSError, UnicodeError) as exc:
+            raise WorkIntentRegistryError(
+                f"Could not read operative proposal {rel_path}: {exc}"
+            ) from exc
+    return None
+
+
+def _work_item_for_thread(
+    thread_slug: str, *, project_root: Path | None = None
+) -> str | None:
     try:
         text = _approved_proposal_text_for_go(thread_slug, project_root=project_root)
     except WorkIntentRegistryError:
         return None
-    match = BRIDGE_WORK_ITEM_RE.search(text)
-    return match.group(1).strip() if match else None
+    ids = _work_item_ids_from_text(text)
+    return ids[0] if len(ids) == 1 else None
+
+
+def _resolve_ordinary_work_item_id(
+    thread_slug: str,
+    *,
+    claim_kind: str,
+    project_root: Path | None = None,
+) -> str | None:
+    """Bind an ordinary claim to the operative proposal's exact work-item identity.
+
+    Implementation-bearing claims fail closed when that identity is absent or
+    ambiguous. Pre-proposal drafts and GO fixtures with no approved proposal
+    remain unbound so they cannot collide on a fabricated identity.
+    """
+
+    text = _operative_proposal_text(thread_slug, project_root=project_root)
+    if text is None:
+        return None
+    ids = _work_item_ids_from_text(text)
+    if len(ids) > 1:
+        raise WorkIntentRegistryError(
+            f"Work-item metadata for {thread_slug!r} is ambiguous: {ids!r}"
+        )
+    if not ids:
+        if claim_kind in {
+            CLAIM_KIND_GO_IMPLEMENTATION,
+            CLAIM_KIND_NO_ACTION_CORRECTION,
+        }:
+            raise WorkIntentRegistryError(
+                f"Implementation-bearing claim for {thread_slug!r} is missing Work Item metadata"
+            )
+        return None
+    return ids[0]
 
 
 def _bootstrap_carrier_list(raw_targets: Any) -> list[str]:
@@ -730,20 +908,26 @@ def _validate_bootstrap_authority_request(
     bootstrap_authority: dict[str, Any] | None,
 ) -> dict[str, Any]:
     if _latest_status(slug, project_root=project_root) != "GO":
-        raise WorkIntentRegistryError(f"Project-authorization bootstrap claim requires latest GO for {slug!r}")
+        raise WorkIntentRegistryError(
+            f"Project-authorization bootstrap claim requires latest GO for {slug!r}"
+        )
     if acting_role != "prime-builder":
         raise WorkIntentRegistryError(
-            f"Project-authorization bootstrap claim requires prime-builder worker provenance; "
+            f"Project-authorization bootstrap claim requires a Prime Builder role attestation; "
             f"session resolves to {acting_role or '<missing>'}"
         )
     if not isinstance(bootstrap_authority, dict):
-        raise WorkIntentRegistryError("Project-authorization bootstrap claim requires explicit authority metadata")
+        raise WorkIntentRegistryError(
+            "Project-authorization bootstrap claim requires explicit authority metadata"
+        )
 
     owner_decision_id = str(bootstrap_authority.get("owner_decision_id") or "").strip()
     requested_project_id = str(bootstrap_authority.get("project_id") or "").strip()
     work_item_id = str(bootstrap_authority.get("work_item_id") or "").strip()
     authorization_id = str(bootstrap_authority.get("authorization_id") or "").strip()
-    carrier_targets = _bootstrap_carrier_list(bootstrap_authority.get("carrier_targets"))
+    carrier_targets = _bootstrap_carrier_list(
+        bootstrap_authority.get("carrier_targets")
+    )
     missing = [
         name
         for name, value in (
@@ -756,12 +940,17 @@ def _validate_bootstrap_authority_request(
     ]
     if missing:
         raise WorkIntentRegistryError(
-            "Project-authorization bootstrap claim is missing required field(s): " + ", ".join(missing)
+            "Project-authorization bootstrap claim is missing required field(s): "
+            + ", ".join(missing)
         )
     if not owner_decision_id.startswith("DELIB-"):
-        raise WorkIntentRegistryError("Project-authorization bootstrap owner decision must cite a DELIB-* record")
+        raise WorkIntentRegistryError(
+            "Project-authorization bootstrap owner decision must cite a DELIB-* record"
+        )
     if not authorization_id.startswith("PAUTH-"):
-        raise WorkIntentRegistryError("Project-authorization bootstrap authorization id must cite a PAUTH-* id")
+        raise WorkIntentRegistryError(
+            "Project-authorization bootstrap authorization id must cite a PAUTH-* id"
+        )
     if BOOTSTRAP_REQUIRED_CARRIER_TARGET not in carrier_targets:
         raise WorkIntentRegistryError(
             f"Project-authorization bootstrap carrier targets must include {BOOTSTRAP_REQUIRED_CARRIER_TARGET!r}"
@@ -780,8 +969,13 @@ def _validate_bootstrap_authority_request(
 
     proposal = _approved_proposal_text_for_go(slug, project_root=project_root)
     marker_text = proposal.lower().replace("-", "_")
-    if "project_authorization_bootstrap" not in marker_text and "project authorization bootstrap" not in marker_text:
-        raise WorkIntentRegistryError("Approved proposal does not declare a project-authorization bootstrap marker")
+    if (
+        "project_authorization_bootstrap" not in marker_text
+        and "project authorization bootstrap" not in marker_text
+    ):
+        raise WorkIntentRegistryError(
+            "Approved proposal does not declare a project-authorization bootstrap marker"
+        )
     return {
         "owner_decision_id": owner_decision_id,
         "project_id": requested_project_id,
@@ -805,28 +999,40 @@ def _validate_no_action_correction_request(
         )
     if acting_role != "prime-builder":
         raise WorkIntentRegistryError(
-            f"NO-ACTION correction claim requires prime-builder worker provenance; "
+            f"NO-ACTION correction claim requires a Prime Builder role attestation; "
             f"session resolves to {acting_role or '<missing>'}"
         )
 
 
-def _bootstrap_metadata_matches(existing: dict[str, Any], incoming: dict[str, Any]) -> bool:
+def _bootstrap_metadata_matches(
+    existing: dict[str, Any], incoming: dict[str, Any]
+) -> bool:
     if existing.get("claim_kind") != CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP:
         return True
     existing_payload = _bootstrap_claim_payload(existing)
     incoming_payload = _bootstrap_claim_payload(incoming)
     return all(
         existing_payload.get(key) == incoming_payload.get(key)
-        for key in ("owner_decision_id", "project_id", "work_item_id", "authorization_id", "carrier_targets")
+        for key in (
+            "owner_decision_id",
+            "project_id",
+            "work_item_id",
+            "authorization_id",
+            "carrier_targets",
+        )
     )
 
 
-def current_holder(thread_slug: str, *, project_root: Path | None = None) -> dict[str, Any] | None:
+def current_holder(
+    thread_slug: str, *, project_root: Path | None = None
+) -> dict[str, Any] | None:
     """Return the unexpired holder record for ``thread_slug``, if present."""
     slug = _validate_slug(thread_slug)
     conn = _get_conn(project_root)
     try:
-        row = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)
+        ).fetchone()
         if row is None:
             return None
         record = _row_to_record(row)
@@ -834,12 +1040,16 @@ def current_holder(thread_slug: str, *, project_root: Path | None = None) -> dic
             return None
         return record
     except sqlite3.Error as exc:
-        raise WorkIntentRegistryError(f"Database error during current_holder: {exc}") from exc
+        raise WorkIntentRegistryError(
+            f"Database error during current_holder: {exc}"
+        ) from exc
     finally:
         conn.close()
 
 
-def current_claimed_bridge_id(session_id: str, *, project_root: Path | None = None) -> str | None:
+def current_claimed_bridge_id(
+    session_id: str, *, project_root: Path | None = None
+) -> str | None:
     """Return the bridge thread slug currently claimed by ``session_id``, or None.
 
     WI-4443: the implementation-start gate uses this to resolve the packet for
@@ -860,7 +1070,9 @@ def current_claimed_bridge_id(session_id: str, *, project_root: Path | None = No
             (session_id,),
         ).fetchall()
     except sqlite3.Error as exc:
-        raise WorkIntentRegistryError(f"Database error during current_claimed_bridge_id: {exc}") from exc
+        raise WorkIntentRegistryError(
+            f"Database error during current_claimed_bridge_id: {exc}"
+        ) from exc
     finally:
         conn.close()
 
@@ -868,7 +1080,9 @@ def current_claimed_bridge_id(session_id: str, *, project_root: Path | None = No
     active: list[dict[str, Any]] = []
     for row in rows:
         record = _row_to_record(row)
-        if _is_expired(record, now=now) or _is_lapsed_go_implementation(record, now=now):
+        if _is_expired(record, now=now) or _is_lapsed_go_implementation(
+            record, now=now
+        ):
             continue
         active.append(record)
     if not active:
@@ -876,7 +1090,11 @@ def current_claimed_bridge_id(session_id: str, *, project_root: Path | None = No
     active.sort(
         key=lambda rec: (
             1
-            if rec.get("claim_kind") in {CLAIM_KIND_GO_IMPLEMENTATION, CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP}
+            if rec.get("claim_kind")
+            in {
+                CLAIM_KIND_GO_IMPLEMENTATION,
+                CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
+            }
             else 0,
             str(rec.get("acquired_at") or ""),
         ),
@@ -885,23 +1103,29 @@ def current_claimed_bridge_id(session_id: str, *, project_root: Path | None = No
     return str(active[0]["thread_slug"])
 
 
-def claim_status(thread_slug: str, *, project_root: Path | None = None) -> dict[str, Any] | None:
+def claim_status(
+    thread_slug: str, *, project_root: Path | None = None
+) -> dict[str, Any] | None:
     """Return the raw claim record, including expired/lapsed claims."""
     slug = _validate_slug(thread_slug)
     conn = _get_conn(project_root)
     try:
-        row = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)
+        ).fetchone()
         if row is None:
             return None
         record = _row_to_record(row)
         record["latest_bridge_status"] = _latest_status(slug, project_root=project_root)
         record["expired"] = _is_expired(record)
-        record["lapsed_go_implementation"] = record["latest_bridge_status"] == "GO" and _is_lapsed_go_implementation(
-            record
-        )
+        record["lapsed_go_implementation"] = record[
+            "latest_bridge_status"
+        ] == "GO" and _is_lapsed_go_implementation(record)
         return record
     except sqlite3.Error as exc:
-        raise WorkIntentRegistryError(f"Database error during claim_status: {exc}") from exc
+        raise WorkIntentRegistryError(
+            f"Database error during claim_status: {exc}"
+        ) from exc
     finally:
         conn.close()
 
@@ -915,117 +1139,61 @@ def _normalize_claim_role(role: str | None) -> str | None:
     return normalized or None
 
 
-def _worker_harness_selector(project_root: Path | None = None) -> str | None:
-    """Return a harness name only as a worker-document selector.
+def _resolve_role_attestation(
+    session_id: str,
+    *,
+    project_root: Path | None,
+) -> tuple[str | None, str | None, str | None, str]:
+    """Resolve exact-init binding and role attestation for a role-sensitive claim.
 
-    The selector narrows the canonical envelope lookup; it never supplies a
-    role. A headless dispatch must not inherit the parent harness selector, so
-    it falls back to the resolver's ambiguity check unless the dispatcher
-    explicitly supplies ``GTKB_HARNESS_NAME`` or a durable harness id.
-
-    Precedence:
-    1. Nonblank ``GTKB_HARNESS_NAME`` (explicit document selector).
-    2. ``GTKB_BRIDGE_POLLER_RUN_ID`` returns ``None`` so dispatched work
-       cannot inherit the parent harness identity.
-    3. ``GTKB_HARNESS_ID`` or ``GTKB_AUTHOR_HARNESS_ID`` maps the unique
-       durable id through the canonical identity reader
-       (``groundtruth_kb.harness_projection.read_identity``). If both are
-       present and disagree, the id is unknown or non-unique, or the canonical
-       projection is unavailable or malformed, this fails closed (raises
-       ``ValueError``) rather than choosing a harness by guess or registration
-       order.
-    4. No generic id: legacy live markers — ``CLAUDE_CODE_SESSION_ID`` or
-       ``CLAUDECODE`` selects Claude, ``CODEX_THREAD_ID`` selects Codex.
-    5. Otherwise ``None`` (no justified selector; the canonical envelope
-       resolver's exact-match/ambiguity checks govern).
-    """
-    configured = os.environ.get("GTKB_HARNESS_NAME", "").strip()
-    if configured:
-        return configured
-    if os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID"):
-        return None
-
-    durable_a = os.environ.get("GTKB_HARNESS_ID", "").strip()
-    durable_b = os.environ.get("GTKB_AUTHOR_HARNESS_ID", "").strip()
-    if durable_a or durable_b:
-        if durable_a and durable_b and durable_a != durable_b:
-            raise ValueError("harness selector conflict: GTKB_HARNESS_ID and GTKB_AUTHOR_HARNESS_ID disagree")
-        supplied = durable_a or durable_b
-        name = _harness_name_for_durable_id(supplied, project_root)
-        if name is not None:
-            return name
-        raise ValueError(f"harness selector: no registered harness with durable id {supplied!r}")
-
-    if os.environ.get("CLAUDE_CODE_SESSION_ID") or os.environ.get("CLAUDECODE"):
-        return "claude"
-    if os.environ.get("CODEX_THREAD_ID"):
-        return "codex"
-    return None
-
-
-def _harness_name_for_durable_id(harness_id: str, project_root: Path | None) -> str | None:
-    """Map a durable harness id to its canonical harness name via the identity SoT.
-
-    Returns ``None`` when the id is not registered. Raises ``ValueError`` when
-    the canonical identity projection is unavailable, malformed, or the id maps
-    to more than one harness (non-unique), per WI-5841 fail-closed contract.
+    Harness identity, registry role, worker-session documents, markers,
+    environment role values, and current pointers do not participate. The
+    invoking session-context identifier is only a lookup key for the canonical
+    immutable binding; possession of it supplies no role or authorization.
     """
     try:
-        from groundtruth_kb.harness_projection import read_identity
-    except ImportError as exc:  # pragma: no cover - install failure is fail-closed
-        raise ValueError(f"harness selector: identity projection unavailable: {exc}") from exc
-    try:
-        identities = read_identity(project_root)
-    except Exception as exc:  # noqa: BLE001 - fail closed on any projection error
-        raise ValueError(f"harness selector: identity SoT unreadable: {exc}") from exc
-    harnesses = identities.get("harnesses")
-    if not isinstance(harnesses, dict):
-        raise ValueError("harness selector: identity SoT is missing a harness mapping")
-    matches: list[str] = []
-    for name, record in harnesses.items():
-        if isinstance(record, dict) and str(record.get("id") or "") == harness_id:
-            matches.append(str(name))
-    if not matches:
-        return None
-    if len(matches) > 1:
-        raise ValueError(f"harness selector: durable id {harness_id!r} is not unique")
-    return matches[0]
-
-
-def _resolve_worker_role(session_id: str, *, project_root: Path | None) -> tuple[str | None, str]:
-    """Resolve the worker role from the exact validated session document.
-
-    Dispatch metadata and interactive marker files remain useful to their own
-    routing/lifecycle surfaces, but they are not claim-role authority. The
-    canonical envelope resolver validates the document's identity, open state,
-    provenance, and role before this registry can use it.
-    """
-    try:
-        from groundtruth_kb.session.envelope import EnvelopeError, resolve_worker_role_provenance
-    except ImportError as exc:  # pragma: no cover - installation failure is fail-closed
-        return None, f"worker session document resolver unavailable: {exc}"
-
-    try:
-        provenance = resolve_worker_role_provenance(
-            _root(project_root),
-            current_session_id=session_id,
-            harness_name=_worker_harness_selector(project_root),
+        from groundtruth_kb.session.attestation.service import (
+            RoleAttestationError,
+            resolve_effective_role_for_context,
         )
-    except EnvelopeError as exc:
-        return None, f"worker session document rejected: {exc}"
-    except (OSError, ValueError) as exc:  # pragma: no cover - defensive fail-closed path
-        return None, f"worker session document could not be read: {exc}"
+    except ImportError as exc:  # pragma: no cover - installation failure is fail-closed
+        return None, None, None, f"role-attestation service unavailable: {exc}"
 
-    role = provenance.get("role")
-    if not isinstance(role, str) or role not in {"prime-builder", "loyal-opposition"}:
-        return None, f"worker session document contains unsupported role {role!r}"
-    return role, f"worker session document role {role!r}"
+    try:
+        binding, attestation = resolve_effective_role_for_context(
+            _database_path(project_root),
+            invoking_context=session_id,
+        )
+    except RoleAttestationError as exc:
+        return None, None, None, f"{exc.code}: {exc}"
+    except (
+        OSError,
+        sqlite3.Error,
+        ValueError,
+    ) as exc:  # pragma: no cover - defensive fail-closed path
+        return None, None, None, f"role-attestation service failed: {exc}"
 
-
-def _resolve_acting_role(session_id: str, *, project_root: Path | None) -> str | None:
-    """Resolve the document-authoritative role to persist with a claim."""
-    role, _detail = _resolve_worker_role(session_id, project_root=project_root)
-    return _normalize_claim_role(role)
+    role = (attestation.role or "").strip().lower()
+    if role not in {"prime-builder", "loyal-opposition"}:
+        return (
+            None,
+            binding.envelope_id,
+            attestation.evidence_reference,
+            f"unsupported attested role {role!r}",
+        )
+    if attestation.source_event != "exact_init":
+        return (
+            None,
+            binding.envelope_id,
+            attestation.evidence_reference,
+            f"unsupported role-attestation source event {attestation.source_event!r}; exact_init is required",
+        )
+    return (
+        role,
+        binding.envelope_id,
+        attestation.evidence_reference,
+        (f"role attestation {attestation.evidence_reference!r} resolves {role!r}"),
+    )
 
 
 def _claim_values(
@@ -1039,7 +1207,27 @@ def _claim_values(
     bootstrap_authority: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     acquired_at = now
-    acting_role = _resolve_acting_role(session_id, project_root=project_root)
+    latest_status = _latest_status(slug, project_root=project_root)
+    role_sensitive = claim_kind in {
+        CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
+        CLAIM_KIND_NO_ACTION_CORRECTION,
+    } or (claim_kind is None and latest_status == "GO")
+    if role_sensitive:
+        acting_role, envelope_id, attestation_ref, role_detail = (
+            _resolve_role_attestation(
+                session_id,
+                project_root=project_root,
+            )
+        )
+    else:
+        acting_role, envelope_id, attestation_ref = None, None, None
+        role_detail = "role attestation is not required for a drafting claim"
+    role_fields = {
+        "acting_role": acting_role,
+        "session_envelope_id": envelope_id,
+        "acting_role_attestation": attestation_ref,
+        "_role_resolution_detail": role_detail,
+    }
     project_id = project_id_for_thread(slug, project_root=project_root)
     if claim_kind is not None:
         if claim_kind == CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP:
@@ -1057,7 +1245,7 @@ def _claim_values(
                 "acquired_at": _iso(acquired_at),
                 "ttl_expires_at": _iso(ttl_expires_at),
                 "claim_kind": CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
-                "acting_role": acting_role,
+                **role_fields,
                 "project_id": project_id,
                 "implementation_deadline": None,
                 "implementation_grace_expires_at": None,
@@ -1068,8 +1256,11 @@ def _claim_values(
                 "bootstrap_project_id": bootstrap["project_id"],
                 "bootstrap_work_item_id": bootstrap["work_item_id"],
                 "bootstrap_authorization_id": bootstrap["authorization_id"],
-                "bootstrap_carrier_targets": json.dumps(bootstrap["carrier_targets"], sort_keys=True),
+                "bootstrap_carrier_targets": json.dumps(
+                    bootstrap["carrier_targets"], sort_keys=True
+                ),
                 "bootstrap_consumed_at": None,
+                "work_item_id": bootstrap["work_item_id"],
             }
         if claim_kind == CLAIM_KIND_NO_ACTION_CORRECTION:
             _validate_no_action_correction_request(
@@ -1084,7 +1275,7 @@ def _claim_values(
                 "acquired_at": _iso(acquired_at),
                 "ttl_expires_at": _iso(ttl_expires_at),
                 "claim_kind": CLAIM_KIND_NO_ACTION_CORRECTION,
-                "acting_role": acting_role,
+                **role_fields,
                 "project_id": project_id,
                 "implementation_deadline": None,
                 "implementation_grace_expires_at": None,
@@ -1097,10 +1288,16 @@ def _claim_values(
                 "bootstrap_authorization_id": None,
                 "bootstrap_carrier_targets": None,
                 "bootstrap_consumed_at": None,
+                "work_item_id": _resolve_ordinary_work_item_id(
+                    slug,
+                    claim_kind=CLAIM_KIND_NO_ACTION_CORRECTION,
+                    project_root=project_root,
+                ),
             }
-        else:
-            raise WorkIntentRegistryError(f"Unsupported explicit claim kind: {claim_kind!r}")
-    if _latest_status(slug, project_root=project_root) == "GO":
+        raise WorkIntentRegistryError(
+            f"Unsupported explicit claim kind: {claim_kind!r}"
+        )
+    if latest_status == "GO":
         deadline = acquired_at + timedelta(seconds=GO_IMPLEMENTATION_DEADLINE_SECONDS)
         grace_expires = deadline + timedelta(seconds=GO_IMPLEMENTATION_GRACE_SECONDS)
         return {
@@ -1109,7 +1306,7 @@ def _claim_values(
             "acquired_at": _iso(acquired_at),
             "ttl_expires_at": _iso(grace_expires),
             "claim_kind": CLAIM_KIND_GO_IMPLEMENTATION,
-            "acting_role": acting_role,
+            **role_fields,
             "project_id": project_id,
             "implementation_deadline": _iso(deadline),
             "implementation_grace_expires_at": _iso(grace_expires),
@@ -1122,6 +1319,11 @@ def _claim_values(
             "bootstrap_authorization_id": None,
             "bootstrap_carrier_targets": None,
             "bootstrap_consumed_at": None,
+            "work_item_id": _resolve_ordinary_work_item_id(
+                slug,
+                claim_kind=CLAIM_KIND_GO_IMPLEMENTATION,
+                project_root=project_root,
+            ),
         }
     ttl_expires_at = acquired_at + timedelta(seconds=ttl_seconds)
     return {
@@ -1130,7 +1332,7 @@ def _claim_values(
         "acquired_at": _iso(acquired_at),
         "ttl_expires_at": _iso(ttl_expires_at),
         "claim_kind": CLAIM_KIND_DRAFT,
-        "acting_role": acting_role,
+        **role_fields,
         "project_id": project_id,
         "implementation_deadline": None,
         "implementation_grace_expires_at": None,
@@ -1143,25 +1345,82 @@ def _claim_values(
         "bootstrap_authorization_id": None,
         "bootstrap_carrier_targets": None,
         "bootstrap_consumed_at": None,
+        "work_item_id": _resolve_ordinary_work_item_id(
+            slug,
+            claim_kind=CLAIM_KIND_DRAFT,
+            project_root=project_root,
+        ),
     }
 
 
-def _resolve_go_implementation_eligibility(session_id: str, *, project_root: Path | None) -> tuple[bool, str]:
-    """Resolve whether ``session_id`` may hold a go_implementation claim."""
-    role, detail = _resolve_worker_role(session_id, project_root=project_root)
-    return role == "prime-builder", detail
+def _live_work_item_collision(
+    conn: sqlite3.Connection,
+    *,
+    work_item_id: str,
+    thread_slug: str,
+    session_id: str,
+    now: datetime,
+) -> dict[str, Any] | None:
+    rows = conn.execute(
+        "SELECT * FROM work_intent_claims WHERE work_item_id = ? AND thread_slug != ?",
+        (work_item_id, thread_slug),
+    ).fetchall()
+    for row in rows:
+        record = _row_to_record(row)
+        if record.get("session_id") == session_id:
+            continue
+        if _is_expired(record, now=now) or _is_lapsed_go_implementation(
+            record, now=now
+        ):
+            continue
+        return record
+    return None
 
 
-def _go_implementation_eligible(session_id: str, *, project_root: Path | None = None) -> bool:
-    """Return True iff ``session_id`` may hold a go_implementation claim.
+def _reject_work_item_identity_change(
+    existing: dict[str, Any] | None, incoming: dict[str, Any]
+) -> None:
+    if existing is None:
+        return
+    previous = str(existing.get("work_item_id") or "").strip()
+    incoming_id = str(incoming.get("work_item_id") or "").strip()
+    if previous and incoming_id and previous != incoming_id:
+        raise WorkIntentRegistryError(
+            f"Work-item identity changed from {previous!r} to {incoming_id!r}; release first"
+        )
 
-    Document-authoritative role-eligibility guard (WI-5189); see
-    ``_resolve_go_implementation_eligibility`` for the resolution contract.
-    """
-    return _resolve_go_implementation_eligibility(session_id, project_root=project_root)[0]
+
+def _reject_work_item_collision(
+    conn: sqlite3.Connection,
+    incoming: dict[str, Any],
+    *,
+    now: datetime,
+) -> None:
+    work_item_id = str(incoming.get("work_item_id") or "").strip()
+    if not work_item_id:
+        return
+    holder = _live_work_item_collision(
+        conn,
+        work_item_id=work_item_id,
+        thread_slug=str(incoming["thread_slug"]),
+        session_id=str(incoming["session_id"]),
+        now=now,
+    )
+    if holder is None:
+        return
+    raise WorkIntentWorkItemCollisionError(
+        (
+            f"Work item {work_item_id} is already claimed on thread "
+            f"{holder.get('thread_slug')!r} by session {holder.get('session_id')!r} "
+            f"(claim_kind={holder.get('claim_kind')}, expires {holder.get('ttl_expires_at')})"
+        ),
+        holder=holder,
+    )
 
 
-def _can_preempt_lingering_draft(existing: dict[str, Any], incoming: dict[str, Any]) -> bool:
+def _can_preempt_lingering_draft(
+    existing: dict[str, Any], incoming: dict[str, Any]
+) -> bool:
     """Return true when a GO implementation claim may replace a draft claim."""
     return (
         incoming.get("claim_kind") == CLAIM_KIND_GO_IMPLEMENTATION
@@ -1169,23 +1428,31 @@ def _can_preempt_lingering_draft(existing: dict[str, Any], incoming: dict[str, A
     )
 
 
-def _read_claim_without_schema(thread_slug: str, *, project_root: Path | None) -> dict[str, Any] | None:
+def _read_claim_without_schema(
+    thread_slug: str, *, project_root: Path | None
+) -> dict[str, Any] | None:
     """Read a claim without creating a database, table, column, or index."""
     db_path = _database_path(project_root)
     if not db_path.is_file():
         return None
     try:
-        conn = sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True, timeout=10)
+        conn = sqlite3.connect(
+            f"{db_path.resolve().as_uri()}?mode=ro", uri=True, timeout=10
+        )
         conn.row_factory = sqlite3.Row
         try:
-            row = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (thread_slug,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM work_intent_claims WHERE thread_slug = ?", (thread_slug,)
+            ).fetchone()
         except sqlite3.OperationalError as exc:
             if "no such table" in str(exc).lower():
                 return None
             raise
         return _row_to_record(row) if row is not None else None
     except sqlite3.Error as exc:
-        raise WorkIntentRegistryError(f"Database error during pre-mutation claim read: {exc}") from exc
+        raise WorkIntentRegistryError(
+            f"Database error during pre-mutation claim read: {exc}"
+        ) from exc
     finally:
         if "conn" in locals():
             conn.close()
@@ -1198,9 +1465,15 @@ def _claim_operation(
     session_id: str,
     now: datetime,
 ) -> str | None:
-    if existing is None or _is_expired(existing, now=now) or _is_lapsed_go_implementation(existing, now=now):
+    if (
+        existing is None
+        or _is_expired(existing, now=now)
+        or _is_lapsed_go_implementation(existing, now=now)
+    ):
         return "work_intent_acquire"
-    if existing["session_id"] != session_id and not _can_preempt_lingering_draft(existing, incoming):
+    if existing["session_id"] != session_id and not _can_preempt_lingering_draft(
+        existing, incoming
+    ):
         return None
     if existing.get("claim_kind") != incoming.get("claim_kind"):
         return "work_intent_reclassify"
@@ -1364,29 +1637,49 @@ def acquire(
     if operation is None:
         return False
     if existing is not None and not _bootstrap_metadata_matches(existing, values):
-        raise WorkIntentRegistryError("Existing project-authorization bootstrap claim metadata differs; release first")
+        raise WorkIntentRegistryError(
+            "Existing project-authorization bootstrap claim metadata differs; release first"
+        )
+    _reject_work_item_identity_change(existing, values)
     if values["claim_kind"] == CLAIM_KIND_GO_IMPLEMENTATION:
-        eligible, detail = _resolve_go_implementation_eligibility(session_id, project_root=project_root)
-        if not eligible:
+        if (
+            values.get("acting_role") != "prime-builder"
+            or not values.get("session_envelope_id")
+            or not values.get("acting_role_attestation")
+        ):
             raise WorkIntentRegistryError(
-                f"go_implementation claim requires a prime-builder harness; "
-                f"session {session_id!r} resolves to {detail} (not prime-eligible)"
+                "go_implementation claim requires an exact-init Prime Builder role attestation; "
+                f"session {session_id!r} resolves to {values.get('_role_resolution_detail')} "
+                "(not prime-eligible)"
             )
-    if operation == "work_intent_renew" and values["claim_kind"] == CLAIM_KIND_GO_IMPLEMENTATION:
+    if (
+        operation == "work_intent_renew"
+        and values["claim_kind"] == CLAIM_KIND_GO_IMPLEMENTATION
+    ):
         return True
 
     def write_claim(conn: sqlite3.Connection) -> bool:
-        row = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)
+        ).fetchone()
         transaction_existing = _row_to_record(row) if row is not None else None
-        transaction_operation = _claim_operation(transaction_existing, values, session_id=session_id, now=now)
+        transaction_operation = _claim_operation(
+            transaction_existing, values, session_id=session_id, now=now
+        )
         if transaction_operation is None:
             return False
-        if transaction_existing is not None and not _bootstrap_metadata_matches(transaction_existing, values):
+        if transaction_existing is not None and not _bootstrap_metadata_matches(
+            transaction_existing, values
+        ):
             raise WorkIntentRegistryError(
                 "Existing project-authorization bootstrap claim metadata differs; release first"
             )
+        _reject_work_item_identity_change(transaction_existing, values)
+        _reject_work_item_collision(conn, values, now=now)
         if transaction_operation != operation:
-            raise WorkIntentRegistryError("Work-intent claim changed during authorization; retry the operation")
+            raise WorkIntentRegistryError(
+                "Work-intent claim changed during authorization; retry the operation"
+            )
         if operation == "work_intent_renew":
             conn.execute(
                 "UPDATE work_intent_claims SET ttl_expires_at = ? WHERE thread_slug = ? AND session_id = ?",
@@ -1397,24 +1690,28 @@ def acquire(
             """
             INSERT INTO work_intent_claims
             (thread_slug, session_id, acquired_at, ttl_expires_at, claim_kind,
-             acting_role, project_id,
+             acting_role, session_envelope_id, acting_role_attestation, project_id,
              implementation_deadline, implementation_grace_expires_at,
              extensions_used, extension_cap_seconds, extension_capped,
              bootstrap_owner_decision_id, bootstrap_project_id, bootstrap_work_item_id,
-             bootstrap_authorization_id, bootstrap_carrier_targets, bootstrap_consumed_at)
+             bootstrap_authorization_id, bootstrap_carrier_targets, bootstrap_consumed_at,
+             work_item_id)
             VALUES
             (:thread_slug, :session_id, :acquired_at, :ttl_expires_at, :claim_kind,
-             :acting_role, :project_id,
+             :acting_role, :session_envelope_id, :acting_role_attestation, :project_id,
              :implementation_deadline, :implementation_grace_expires_at,
              :extensions_used, :extension_cap_seconds, :extension_capped,
              :bootstrap_owner_decision_id, :bootstrap_project_id, :bootstrap_work_item_id,
-             :bootstrap_authorization_id, :bootstrap_carrier_targets, :bootstrap_consumed_at)
+             :bootstrap_authorization_id, :bootstrap_carrier_targets, :bootstrap_consumed_at,
+             :work_item_id)
             ON CONFLICT(thread_slug) DO UPDATE SET
                 session_id = excluded.session_id,
                 acquired_at = excluded.acquired_at,
                 ttl_expires_at = excluded.ttl_expires_at,
                 claim_kind = excluded.claim_kind,
                 acting_role = excluded.acting_role,
+                session_envelope_id = excluded.session_envelope_id,
+                acting_role_attestation = excluded.acting_role_attestation,
                 project_id = excluded.project_id,
                 implementation_deadline = excluded.implementation_deadline,
                 implementation_grace_expires_at = excluded.implementation_grace_expires_at,
@@ -1426,13 +1723,16 @@ def acquire(
                 bootstrap_work_item_id = excluded.bootstrap_work_item_id,
                 bootstrap_authorization_id = excluded.bootstrap_authorization_id,
                 bootstrap_carrier_targets = excluded.bootstrap_carrier_targets,
-                bootstrap_consumed_at = excluded.bootstrap_consumed_at
+                bootstrap_consumed_at = excluded.bootstrap_consumed_at,
+                work_item_id = excluded.work_item_id
             """,
             values,
         )
         return True
 
-    return bool(_run_write_transaction("acquire", write_claim, project_root=project_root))
+    return bool(
+        _run_write_transaction("acquire", write_claim, project_root=project_root)
+    )
 
 
 def extend(
@@ -1448,34 +1748,48 @@ def extend(
     conn = _get_conn(project_root)
     try:
         conn.execute("BEGIN IMMEDIATE")
-        row = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)
+        ).fetchone()
         if row is None:
             raise WorkIntentRegistryError(f"No active work-intent claim for {slug!r}")
         record = _row_to_record(row)
         if record["session_id"] != session_id:
-            raise WorkIntentRegistryError(f"Thread {slug!r} is claimed by {record['session_id']!r}")
+            raise WorkIntentRegistryError(
+                f"Thread {slug!r} is claimed by {record['session_id']!r}"
+            )
         if _latest_status(slug, project_root=project_root) != "GO":
             raise WorkIntentRegistryError(
                 f"Thread {slug!r} is not implementation-actionable; implementation timer no longer applies"
             )
         if record.get("claim_kind") != CLAIM_KIND_GO_IMPLEMENTATION:
-            raise WorkIntentRegistryError(f"Thread {slug!r} is not a GO-implementation claim")
+            raise WorkIntentRegistryError(
+                f"Thread {slug!r} is not a GO-implementation claim"
+            )
 
         now = now_utc()
         if _is_lapsed_go_implementation(record, now=now):
-            raise WorkIntentRegistryError(f"Thread {slug!r} is lapsed past grace and must be reacquired")
+            raise WorkIntentRegistryError(
+                f"Thread {slug!r} is lapsed past grace and must be reacquired"
+            )
         acquired_at = _parse_iso(str(record["acquired_at"]))
         current_deadline = _parse_iso(str(record.get("implementation_deadline") or ""))
         if acquired_at is None or current_deadline is None:
-            raise WorkIntentRegistryError(f"Thread {slug!r} has an invalid GO-implementation deadline")
+            raise WorkIntentRegistryError(
+                f"Thread {slug!r} has an invalid GO-implementation deadline"
+            )
         cap_at = acquired_at + timedelta(seconds=GO_IMPLEMENTATION_MAX_HOLD_SECONDS)
-        new_deadline = current_deadline + timedelta(seconds=GO_IMPLEMENTATION_EXTENSION_SECONDS)
+        new_deadline = current_deadline + timedelta(
+            seconds=GO_IMPLEMENTATION_EXTENSION_SECONDS
+        )
         if new_deadline > cap_at:
             raise WorkIntentRegistryError(
                 f"Extension cap reached for {slug!r}; maximum total hold is "
                 f"{GO_IMPLEMENTATION_MAX_HOLD_SECONDS // 60} minutes"
             )
-        grace_expires = new_deadline + timedelta(seconds=GO_IMPLEMENTATION_GRACE_SECONDS)
+        grace_expires = new_deadline + timedelta(
+            seconds=GO_IMPLEMENTATION_GRACE_SECONDS
+        )
         conn.execute(
             """
             UPDATE work_intent_claims
@@ -1495,7 +1809,9 @@ def extend(
             ),
         )
         conn.commit()
-        updated = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)).fetchone()
+        updated = conn.execute(
+            "SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)
+        ).fetchone()
         return _row_to_record(updated)
     except sqlite3.Error as exc:
         conn.rollback()
@@ -1571,7 +1887,9 @@ def maybe_auto_extend(
         return None
 
 
-def release(thread_slug: str, session_id: str, *, project_root: Path | None = None) -> None:
+def release(
+    thread_slug: str, session_id: str, *, project_root: Path | None = None
+) -> None:
     """Release a per-thread work-intent record when held by ``session_id``."""
     slug = _validate_slug(thread_slug)
 
@@ -1592,7 +1910,9 @@ def release(thread_slug: str, session_id: str, *, project_root: Path | None = No
     _run_write_transaction("release", delete_exact_holder, project_root=project_root)
 
 
-def lapsed_go_implementation_claims(*, project_root: Path | None = None) -> list[dict[str, Any]]:
+def lapsed_go_implementation_claims(
+    *, project_root: Path | None = None
+) -> list[dict[str, Any]]:
     """Return GO-latest implementation claims lapsed past deadline+grace."""
     conn = _get_conn(project_root)
     try:
@@ -1612,7 +1932,9 @@ def lapsed_go_implementation_claims(*, project_root: Path | None = None) -> list
                 lapsed.append(record)
         return lapsed
     except sqlite3.Error as exc:
-        raise WorkIntentRegistryError(f"Database error during lapsed_go_implementation_claims: {exc}") from exc
+        raise WorkIntentRegistryError(
+            f"Database error during lapsed_go_implementation_claims: {exc}"
+        ) from exc
     finally:
         conn.close()
 
@@ -1644,26 +1966,36 @@ def same_role_project_holder(
             (canonical_role, normalized_project, session_id),
         ).fetchall()
     except sqlite3.Error as exc:
-        raise WorkIntentRegistryError(f"Database error during same_role_project_holder: {exc}") from exc
+        raise WorkIntentRegistryError(
+            f"Database error during same_role_project_holder: {exc}"
+        ) from exc
     finally:
         conn.close()
 
     now = now_utc()
     for row in rows:
         record = _row_to_record(row)
-        if _is_expired(record, now=now) or _is_lapsed_go_implementation(record, now=now):
+        if _is_expired(record, now=now) or _is_lapsed_go_implementation(
+            record, now=now
+        ):
             continue
         return record
     return None
 
 
-def revalidate_thread_version(thread_slug: str, project_root: Path) -> dict[str, int | str | bool]:
+def revalidate_thread_version(
+    thread_slug: str, project_root: Path
+) -> dict[str, int | str | bool]:
     """Read live bridge state and report the next version target."""
     slug = _validate_slug(thread_slug)
     root = _root(project_root)
-    versions = [version for version, _, _ in _thread_version_entries(slug, project_root=root)]
+    versions = [
+        version for version, _, _ in _thread_version_entries(slug, project_root=root)
+    ]
     if not versions:
-        raise WorkIntentRegistryError(f"Document {slug!r} not found in versioned bridge files")
+        raise WorkIntentRegistryError(
+            f"Document {slug!r} not found in versioned bridge files"
+        )
     latest_version = max(versions)
     next_version = latest_version + 1
     next_rel_path = f"bridge/{slug}-{next_version:03d}.md"

@@ -44,7 +44,9 @@ def _write_version(
         return path
     if responds_to is None and version > 1:
         responds_to = f"bridge/{bridge_id}-{version - 1:03d}.md"
-    version_value = metadata_version if metadata_version is not None else f"{version:03d}"
+    version_value = (
+        metadata_version if metadata_version is not None else f"{version:03d}"
+    )
     lines = [status]
     if include_author_identity:
         lines.append(f"author_identity: {author_identity or _role_for(status)}")
@@ -152,7 +154,9 @@ def test_post_go_report_verified_is_terminal(tmp_path: Path) -> None:
     assert result.implementation_verdict is None
 
 
-def test_post_go_report_no_go_retains_resumable_implementation_pair(tmp_path: Path) -> None:
+def test_post_go_report_no_go_retains_resumable_implementation_pair(
+    tmp_path: Path,
+) -> None:
     slug = "report-no-go"
     _simple_go(tmp_path, slug)
     _write_version(tmp_path, slug, 3, "NEW")
@@ -165,7 +169,9 @@ def test_post_go_report_no_go_retains_resumable_implementation_pair(tmp_path: Pa
     assert result.implementation_verdict.version == 2
 
 
-def test_post_go_report_awaiting_review_exposes_only_review_artifact(tmp_path: Path) -> None:
+def test_post_go_report_awaiting_review_exposes_only_review_artifact(
+    tmp_path: Path,
+) -> None:
     slug = "report-awaiting"
     _simple_go(tmp_path, slug)
     _write_version(tmp_path, slug, 3, "NEW")
@@ -177,7 +183,9 @@ def test_post_go_report_awaiting_review_exposes_only_review_artifact(tmp_path: P
     assert result.implementation_verdict is None
 
 
-def test_owner_deferred_post_go_report_can_be_followed_by_revised_proposal(tmp_path: Path) -> None:
+def test_owner_deferred_post_go_report_can_be_followed_by_revised_proposal(
+    tmp_path: Path,
+) -> None:
     """A deferred report can hand off to a newly reviewed corrective proposal."""
 
     slug = "deferred-report-reproposal"
@@ -199,7 +207,9 @@ def test_owner_deferred_post_go_report_can_be_followed_by_revised_proposal(tmp_p
     assert approved.implementation_verdict.version == 5
 
 
-def test_no_go_on_owner_deferred_corrective_proposal_does_not_resume_old_go(tmp_path: Path) -> None:
+def test_no_go_on_owner_deferred_corrective_proposal_does_not_resume_old_go(
+    tmp_path: Path,
+) -> None:
     """The old GO cannot authorize work after the new proposal receives NO-GO."""
 
     slug = "deferred-report-reproposal-no-go"
@@ -234,7 +244,9 @@ def test_pending_correction_is_reviewable_non_authorizing_and_not_quarantined(
     assert result.implementation_artifact is None
     assert result.implementation_verdict is None
     assert result.quarantined_paths == ()
-    assert tuple(item.code for item in result.blocking_diagnostics) == (PENDING_CORRECTION_DIAGNOSTIC,)
+    assert tuple(item.code for item in result.blocking_diagnostics) == (
+        PENDING_CORRECTION_DIAGNOSTIC,
+    )
     assert malformed.relative_to(tmp_path).as_posix() not in result.quarantined_paths
 
 
@@ -392,7 +404,13 @@ def test_corrected_tail_does_not_accept_decorated_version_metadata(
 
 @pytest.mark.parametrize(
     "alias_key",
-    ["Reviewed", "Responds-To", "Responds to GO", "Responds to NO-GO", "revised_document"],
+    [
+        "Reviewed",
+        "Responds-To",
+        "Responds to GO",
+        "Responds to NO-GO",
+        "revised_document",
+    ],
 )
 def test_wi5827_enumerated_responds_to_synonyms_resolve(
     tmp_path: Path,
@@ -459,7 +477,10 @@ def test_wi5827_strips_trailing_annotation_on_responds_to(tmp_path: Path) -> Non
     report = _write_version(tmp_path, slug, 5, "NEW")
     content = report.read_text(encoding="utf-8-sig")
     report.write_text(
-        content.replace(f"Responds to: bridge/{slug}-004.md", f"Responds to: bridge/{slug}-004.md (NO-ACTION)"),
+        content.replace(
+            f"Responds to: bridge/{slug}-004.md",
+            f"Responds to: bridge/{slug}-004.md (NO-ACTION)",
+        ),
         encoding="utf-8-sig",
     )
 
@@ -476,7 +497,9 @@ def test_wi5827_does_not_mask_wrong_responds_to_predecessor(tmp_path: Path) -> N
     report = _write_version(tmp_path, slug, 5, "NEW")
     content = report.read_text(encoding="utf-8-sig")
     report.write_text(
-        content.replace(f"Responds to: bridge/{slug}-004.md", "Responds to: bridge/wrong-003.md"),
+        content.replace(
+            f"Responds to: bridge/{slug}-004.md", "Responds to: bridge/wrong-003.md"
+        ),
         encoding="utf-8-sig",
     )
 
@@ -770,7 +793,9 @@ def test_legacy_non_operative_verdict_is_grandfathered(tmp_path: Path) -> None:
     assert result.audit_versions[1].classification == "legacy"
 
 
-def test_roleless_identity_non_operative_verdict_is_grandfathered(tmp_path: Path) -> None:
+def test_roleless_identity_non_operative_verdict_is_grandfathered(
+    tmp_path: Path,
+) -> None:
     """A present but role-unreadable historical identity remains audit-only."""
 
     slug = "roleless-grandfathered"
@@ -829,7 +854,9 @@ def test_present_roleless_identity_is_legacy_not_malformed(tmp_path: Path) -> No
     assert roleless.author_role is None
 
 
-def test_roleless_terminal_verified_after_strict_report_fails_closed(tmp_path: Path) -> None:
+def test_roleless_terminal_verified_after_strict_report_fails_closed(
+    tmp_path: Path,
+) -> None:
     """A present-but-roleless terminal verdict is never grandfathered.
 
     The proposal, GO, and post-implementation report are strict.  A terminal
@@ -932,7 +959,9 @@ def test_corrected_go_operative_verdict_legacy_fails_closed_via_role_check(
     assert caught.value.code == "MALFORMED_CORRECTION_INVALID_VERDICT"
 
 
-def test_corrected_go_roleless_predecessor_fails_closed_via_role_check(tmp_path: Path) -> None:
+def test_corrected_go_roleless_predecessor_fails_closed_via_role_check(
+    tmp_path: Path,
+) -> None:
     slug = "corrected-roleless-proposal"
     _write_version(tmp_path, slug, 1, "NEW", author_identity="codex/A")
     _write_malformed(tmp_path, slug, 2)
@@ -944,7 +973,9 @@ def test_corrected_go_roleless_predecessor_fails_closed_via_role_check(tmp_path:
     assert caught.value.code == "MALFORMED_CORRECTION_WRONG_PREDECESSOR"
 
 
-def test_corrected_go_roleless_no_action_fails_closed_via_role_check(tmp_path: Path) -> None:
+def test_corrected_go_roleless_no_action_fails_closed_via_role_check(
+    tmp_path: Path,
+) -> None:
     slug = "corrected-roleless-no-action"
     _write_version(tmp_path, slug, 1, "NEW")
     _write_malformed(tmp_path, slug, 2)
@@ -956,7 +987,9 @@ def test_corrected_go_roleless_no_action_fails_closed_via_role_check(tmp_path: P
     assert caught.value.code == "MALFORMED_CORRECTION_MISSING_NO_ACTION"
 
 
-def test_corrected_go_roleless_verdict_fails_closed_via_role_check(tmp_path: Path) -> None:
+def test_corrected_go_roleless_verdict_fails_closed_via_role_check(
+    tmp_path: Path,
+) -> None:
     slug = "corrected-roleless-verdict"
     _write_version(tmp_path, slug, 1, "NEW")
     _write_malformed(tmp_path, slug, 2)
@@ -966,3 +999,41 @@ def test_corrected_go_roleless_verdict_fails_closed_via_role_check(tmp_path: Pat
     with pytest.raises(BridgeLifecycleResolutionError) as caught:
         resolve_bridge_lifecycle(tmp_path, slug)
     assert caught.value.code == "MALFORMED_CORRECTION_INVALID_VERDICT"
+
+
+def test_envelope_first_prime_revised_is_not_malformed(tmp_path: Path) -> None:
+    slug = "envelope-first-revised"
+    _write_version(tmp_path, slug, 1, "NEW")
+    _write_version(tmp_path, slug, 2, "NO-GO")
+    path = tmp_path / "bridge" / f"{slug}-003.md"
+    path.write_text(
+        "\n".join(
+            (
+                "::init gtkb pb",
+                "::open build",
+                "REVISED",
+                "author_identity: prime-builder/codex",
+                f"Document: {slug}",
+                "Version: 003",
+                f"Responds to: bridge/{slug}-002.md",
+                "",
+            )
+        ),
+        encoding="utf-8-sig",
+    )
+    _write_version(tmp_path, slug, 4, "GO")
+
+    result = resolve_bridge_lifecycle(tmp_path, slug)
+    revised = result.audit_versions[2]
+    assert revised.status == "REVISED"
+    assert revised.classification != "malformed"
+    assert result.latest_strict_state.status == "GO"
+
+
+def test_shared_thread_file_reader_matches_header_block(tmp_path: Path) -> None:
+    from scripts.bridge_thread_files import status_from_bridge_file as thread_status
+
+    path = tmp_path / "bridge" / "shared-reader-001.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("::open spec\nNEW\n::init gtkb lo\n", encoding="utf-8")
+    assert thread_status(path) == "NEW"

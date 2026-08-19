@@ -8,15 +8,25 @@ files must not affect latest-status or post-dispatch verdict reconciliation.
 from __future__ import annotations
 
 import re
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSIONED_BRIDGE_FILE_RE = re.compile(r"^(?P<slug>[A-Za-z0-9_.-]+)-(?P<version>\d{3})\.md$")
-BRIDGE_STATUS_LINE_RE = re.compile(
-    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|PAUSED|ACCEPTED|RETIRED|SUPERSEDED)\b",
-    re.IGNORECASE,
+_PACKAGE_SRC = Path(__file__).resolve().parent.parent / "groundtruth-kb" / "src"
+if str(_PACKAGE_SRC) not in sys.path:
+    sys.path.insert(0, str(_PACKAGE_SRC))
+
+from groundtruth_kb.bridge.versioned_files import status_from_bridge_text  # noqa: E402
+
+VERSIONED_BRIDGE_FILE_RE = re.compile(
+    r"^(?P<slug>[A-Za-z0-9_.-]+)-(?P<version>\d{3})\.md$"
 )
+# WI-6541: the module-local status-token regex was removed. It duplicated the
+# canonical token list owned by
+# ``groundtruth_kb.bridge.versioned_files._CANONICAL_STATUS_TOKENS`` and had
+# already drifted from it (the local copy omitted ``BLOCKED``). Status parsing
+# now has exactly one home: ``parse_bridge_header_block``.
 
 
 @dataclass(frozen=True)
@@ -58,7 +68,9 @@ def candidate_thread_slugs(slug: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(slugs))
 
 
-def index_bridge_thread_files(project_root: Path) -> dict[str, list[VersionedBridgeFile]]:
+def index_bridge_thread_files(
+    project_root: Path,
+) -> dict[str, list[VersionedBridgeFile]]:
     """Index all exact versioned bridge files by slug."""
 
     bridge_dir = Path(project_root) / "bridge"
@@ -70,7 +82,9 @@ def index_bridge_thread_files(project_root: Path) -> dict[str, list[VersionedBri
         if parsed is None:
             continue
         slug, version = parsed
-        index.setdefault(slug, []).append(VersionedBridgeFile(path=path, slug=slug, version=version))
+        index.setdefault(slug, []).append(
+            VersionedBridgeFile(path=path, slug=slug, version=version)
+        )
     for files in index.values():
         files.sort(key=lambda item: (item.version, item.path.name))
     return index
@@ -87,7 +101,11 @@ def versioned_bridge_files(
     slugs = candidate_thread_slugs(slug)
     if not slugs:
         return []
-    index = file_index if file_index is not None else index_bridge_thread_files(project_root)
+    index = (
+        file_index
+        if file_index is not None
+        else index_bridge_thread_files(project_root)
+    )
     records: list[VersionedBridgeFile] = []
     for candidate_slug in slugs:
         records.extend(index.get(candidate_slug, ()))
@@ -96,19 +114,24 @@ def versioned_bridge_files(
 
 
 def status_from_bridge_file(path: Path) -> str | None:
-    """Return the first canonical bridge status token from ``path``."""
+    """Return the canonical bridge status token from ``path``."""
 
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            continue
-        match = BRIDGE_STATUS_LINE_RE.match(stripped)
-        return match.group(1).upper() if match else None
-    return None
+    token = status_from_bridge_text(text)
+    if token is not None:
+        return token
+    # WI-6541: this wrapper holds no parsing logic of its own. The former
+    # fallback re-implemented the status-token regex here, which is the
+    # duplicate-parser defect the work item removes. Leniency toward a
+    # historically tolerated lowercase status token is preserved by retrying
+    # the same packaged accessor against a case-normalized copy, rather than
+    # by keeping a second parser. Uppercasing is safe for the envelope markers
+    # because the accessor lowercases each line before its ``::init`` /
+    # ``::open`` prefix test.
+    return status_from_bridge_text(text.upper())
 
 
 def latest_bridge_status_for_thread(
@@ -155,7 +178,11 @@ def find_bridge_verdict_after(
             continue
         status = read_status(path)
         if status in verdict_statuses:
-            candidates.append(BridgeVerdictFile(path=path, status=str(status), version=version, mtime=mtime))
+            candidates.append(
+                BridgeVerdictFile(
+                    path=path, status=str(status), version=version, mtime=mtime
+                )
+            )
     if not candidates:
         return None
     candidates.sort(key=lambda item: (item.mtime, item.version, item.path.name))

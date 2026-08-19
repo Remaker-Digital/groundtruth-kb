@@ -6,7 +6,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-from groundtruth_kb.bridge.versioned_files import _CANONICAL_STATUS_TOKENS, _line_status_token
+from groundtruth_kb.bridge.versioned_files import (
+    _CANONICAL_STATUS_TOKENS,
+    _line_status_token,
+    parse_bridge_header_block,
+)
 from groundtruth_kb.project.lifecycle import _WORK_ITEM_LINE_RE
 
 WORK_ITEM_LINE_RE = _WORK_ITEM_LINE_RE
@@ -32,14 +36,20 @@ def _version_match(path: Path) -> re.Match[str] | None:
     return _BRIDGE_FILE_RE.match(path.name)
 
 
-def _first_nonblank_line(path: Path) -> str | None:
-    try:
-        with path.open("r", encoding="utf-8", errors="replace") as handle:
-            for raw in handle:
-                if raw.strip():
-                    return raw.strip()
-    except OSError:
-        return None
+def _first_non_marker_line(raw_lines: tuple[str, ...]) -> str | None:
+    """Return the first header line that is not an ``::init`` / ``::open`` marker.
+
+    WI-6541: the header block is order-immaterial, so the non-canonical status
+    fallback below must select the line it inspects by pattern rather than by
+    position. Reading ``raw_lines[0]`` unconditionally meant a marker-first
+    header reported no status at all, because ``_RAW_TOKEN_RE`` cannot match a
+    leading ``::``.
+    """
+
+    for line in raw_lines:
+        if line.lower().startswith(("::init", "::open")):
+            continue
+        return line
     return None
 
 
@@ -60,8 +70,16 @@ def _version_entry(path: Path, project_root: Path) -> dict[str, Any] | None:
     match = _version_match(path)
     if match is None:
         return None
-    first_line = _first_nonblank_line(path)
-    status, canonical = _status_from_first_line(first_line)
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    parsed = parse_bridge_header_block(text)
+    first_line = parsed.raw_lines[0] if parsed.raw_lines else None
+    if parsed.status is not None:
+        status, canonical = parsed.status, True
+    else:
+        status, canonical = _status_from_first_line(_first_non_marker_line(parsed.raw_lines))
     return {
         "version": int(match.group("version")),
         "path": _relative_path(path, project_root),
@@ -129,8 +147,16 @@ def threads_for_work_item(project_root: Path, wi_id: str, *, compact: bool = Fal
                 continue
             slug = match.group("slug")
             version = int(match.group("version"))
-            first_line = _first_nonblank_line(path)
-            status, canonical = _status_from_first_line(first_line)
+            try:
+                text = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            parsed = parse_bridge_header_block(text)
+            first_line = parsed.raw_lines[0] if parsed.raw_lines else None
+            if parsed.status is not None:
+                status, canonical = parsed.status, True
+            else:
+                status, canonical = _status_from_first_line(_first_non_marker_line(parsed.raw_lines))
             rel_path = _relative_path(path, project_root)
             row = grouped.setdefault(
                 slug,
@@ -149,10 +175,6 @@ def threads_for_work_item(project_root: Path, wi_id: str, *, compact: bool = Fal
                     "first_line": first_line,
                 }
             )
-            try:
-                text = path.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                continue
             matches = {match.group(1) for match in WORK_ITEM_LINE_RE.finditer(text)}
             if matches:
                 row["work_items"].update(matches)

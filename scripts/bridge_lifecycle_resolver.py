@@ -12,6 +12,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from groundtruth_kb.bridge.versioned_files import parse_bridge_header_block
+
 CANONICAL_STATUSES = frozenset(
     {
         "NEW",
@@ -69,7 +71,7 @@ POST_GO_REPORT_AUGMENTATIONS: dict[str, frozenset[str]] = {
 }
 
 _PRIME_AUTHORED_STATUSES = PRIME_STATUSES | {"DEFERRED", "WITHDRAWN"}
-_LOYAL_AUTHORED_STATUSES = LOYAL_OPPOSITION_STATUSES | {"ADVISORY"}
+_LOYAL_AUTHORED_STATUSES = LOYAL_OPPOSITION_STATUSES
 _OWNER_AUTHORED_STATUSES = frozenset({"ACCEPTED", "BLOCKED"})
 _METADATA_FIELDS = ("author_identity", "Document", "Version", "Responds to")
 
@@ -84,8 +86,8 @@ _METADATA_KEY_SYNONYMS: dict[str, tuple[str, ...]] = {
     "Responds to": (
         "Reviewed",
         "Responds-To",
-        "Responds to GO",
         "Responds to NO-GO",
+        "Responds to GO",
         "revised_document",
     ),
 }
@@ -193,7 +195,9 @@ def _fail(
     raise BridgeLifecycleResolutionError(code, message, path=path, version=version)
 
 
-def _exact_version_paths(project_root: Path, bridge_id: str) -> list[tuple[int, Path, str]]:
+def _exact_version_paths(
+    project_root: Path, bridge_id: str
+) -> list[tuple[int, Path, str]]:
     if not _BRIDGE_ID_RE.fullmatch(bridge_id) or bridge_id in {".", ".."}:
         _fail("INVALID_BRIDGE_ID", f"Invalid bridge id: {bridge_id!r}")
 
@@ -233,7 +237,10 @@ def _exact_version_paths(project_root: Path, bridge_id: str) -> list[tuple[int, 
             f"Exact bridge versions must be contiguous from 001; found {actual_versions}, expected {expected_versions}",
         )
 
-    return [(version, by_version[version][0], by_version[version][1]) for version in actual_versions]
+    return [
+        (version, by_version[version][0], by_version[version][1])
+        for version in actual_versions
+    ]
 
 
 def _read_strict_utf8(path: Path, rel_path: str, version: int) -> str:
@@ -334,8 +341,18 @@ def _validate_author_role(
     rel_path: str,
     version: int,
 ) -> None:
-    if status in _PRIME_AUTHORED_STATUSES:
-        allowed = {"prime-builder", "owner"} if status in {"DEFERRED", "WITHDRAWN"} else {"prime-builder"}
+    if status == "ADVISORY":
+        # ADVISORY is informational, non-authoritative, and non-dispatchable.
+        # Owner canon permits any operating role to author one; unlike a Prime
+        # proposal or Loyal Opposition verdict, it carries no role-owned
+        # lifecycle authority.
+        allowed = {"prime-builder", "loyal-opposition", "owner"}
+    elif status in _PRIME_AUTHORED_STATUSES:
+        allowed = (
+            {"prime-builder", "owner"}
+            if status in {"DEFERRED", "WITHDRAWN"}
+            else {"prime-builder"}
+        )
     elif status in _LOYAL_AUTHORED_STATUSES:
         allowed = {"loyal-opposition"}
     else:
@@ -347,6 +364,45 @@ def _validate_author_role(
             path=rel_path,
             version=version,
         )
+
+
+_ENVELOPE_HEAD_PREFIXES = ("::init", "::open")
+
+
+def _artifact_head_lines(lines):
+    """Yield lines with any leading ``::init`` / ``::open`` envelope removed.
+
+    The canonical bridge artifact head is ``::init gtkb <pb|lo>`` / ``::open
+    <activity>`` / ``<status token>``; the legacy order put the status token
+    first. Skipping leading envelope markers makes both orders resolve to the
+    same status token.
+    """
+    index = 0
+    while index < len(lines) and lines[index].strip().startswith(
+        _ENVELOPE_HEAD_PREFIXES
+    ):
+        index += 1
+    return lines[index:]
+
+
+def _artifact_head_status(text):
+    """Return the header-block status line used for strict vs malformed classification.
+
+    Exact status tokens found anywhere in the first three non-blank lines
+    (order immaterial) are returned as the bare token. A status line with
+    trailing text is returned whole so the decorated-verdict malformation
+    path stays intact.
+    """
+    parsed = parse_bridge_header_block(text)
+    if parsed.status is not None and parsed.status_line_exact:
+        return parsed.status
+    if parsed.status_line:
+        return parsed.status_line
+    for line in _artifact_head_lines(text.splitlines()):
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
 
 
 def _parse_version(
@@ -369,7 +425,7 @@ def _parse_version(
 
     content = _read_strict_utf8(path, rel_path, version)
     lines = content.splitlines()
-    line_one = lines[0] if lines else ""
+    line_one = _artifact_head_status(content)
     if line_one not in CANONICAL_STATUSES:
         observed_match = _OBSERVED_STATUS_RE.match(line_one)
         observed_status = observed_match.group("status") if observed_match else None
@@ -418,7 +474,9 @@ def _parse_version(
     raw_responds_to = responds_values[0] if responds_values else None
     # WI-5827 N2: normalize a single trailing parenthetical annotation on the
     # Responds to value before the exact comparison; preserve the raw value.
-    responds_to = _strip_trailing_annotation(raw_responds_to) if raw_responds_to else None
+    responds_to = (
+        _strip_trailing_annotation(raw_responds_to) if raw_responds_to else None
+    )
 
     if document != bridge_id:
         _fail(
@@ -435,7 +493,9 @@ def _parse_version(
             version=version,
         )
 
-    expected_response = None if version == 1 else f"bridge/{bridge_id}-{version - 1:03d}.md"
+    expected_response = (
+        None if version == 1 else f"bridge/{bridge_id}-{version - 1:03d}.md"
+    )
     if responds_to != expected_response:
         _fail(
             "WRONG_RESPONDS_TO_LINK",
@@ -646,7 +706,10 @@ def _correction_resolution(
         )
 
     proposal = versions[malformed_index - 1]
-    if proposal.status not in {"NEW", "REVISED"} or proposal.author_role != "prime-builder":
+    if (
+        proposal.status not in {"NEW", "REVISED"}
+        or proposal.author_role != "prime-builder"
+    ):
         _fail(
             "MALFORMED_CORRECTION_WRONG_PREDECESSOR",
             f"Malformed correction must immediately follow a strict Prime NEW or REVISED: {malformed.path}",
@@ -693,7 +756,10 @@ def _correction_resolution(
         )
 
     corrected = tail[1]
-    if corrected.status not in LOYAL_OPPOSITION_STATUSES or corrected.author_role != "loyal-opposition":
+    if (
+        corrected.status not in LOYAL_OPPOSITION_STATUSES
+        or corrected.author_role != "loyal-opposition"
+    ):
         _fail(
             "MALFORMED_CORRECTION_INVALID_VERDICT",
             "Completed correction requires a strict role-correct GO, NO-GO, or VERIFIED",
@@ -755,7 +821,11 @@ def resolve_bridge_lifecycle(
         _parse_version(root, bridge_id, version, path, rel_path)
         for version, path, rel_path in _exact_version_paths(root, bridge_id)
     )
-    malformed_indexes = [index for index, bridge_version in enumerate(parsed) if bridge_version.is_malformed]
+    malformed_indexes = [
+        index
+        for index, bridge_version in enumerate(parsed)
+        if bridge_version.is_malformed
+    ]
     if not malformed_indexes:
         return _ordinary_resolution(bridge_id, parsed)
     if len(malformed_indexes) != 1:
