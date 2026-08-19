@@ -6150,6 +6150,17 @@ class KnowledgeDB:
                 change_reason,
             ),
         )
+        # WI-6453: an active insert of version N>1 must leave exactly one
+        # selectable-current stored row. Prior rows for this id are marked
+        # superseded in the same transaction; payload columns stay intact.
+        if version > 1 and str(status or "").strip().lower() == "active":
+            conn.execute(
+                """UPDATE project_authorizations
+                   SET status = 'superseded',
+                       superseded_by = ?
+                   WHERE id = ? AND version < ?""",
+                (json.dumps([authorization_id]), authorization_id, version),
+            )
         if commit:
             conn.commit()
         return self.get_project_authorization(authorization_id)
