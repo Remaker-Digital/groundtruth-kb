@@ -35,9 +35,10 @@ _NULL_SINKS = frozenset({"/dev/null", "/dev/stdout", "/dev/stderr", "nul"})
 _MSYS_PATH_RE = re.compile(r"^/([a-zA-Z])/(.*)$")
 _COMMAND_SEGMENT_RE = re.compile(r"(?:&&|\|\||[;|\r\n])")
 _COMMAND_TOKEN_RE = re.compile(r"\"([^\"]*)\"|'([^']*)'|([^\s]+)")
-# WI-6026: options whose values are free text, drawn from the governed CLI
-# surfaces that carry prose. A path-shaped token inside one of these values is
-# being described, not operated on, so it is excluded from boundary checking.
+# WI-6026 / WI-6674: options whose values are free text, regex patterns, or
+# inline scripts drawn from governed CLI and standard shell tools. A path-shaped
+# token inside one of these values is being described or evaluated as pattern/code,
+# not operated on as a filesystem path, so it is excluded from boundary checking.
 _FREE_TEXT_OPTIONS = frozenset(
     {
         "--description",
@@ -51,6 +52,13 @@ _FREE_TEXT_OPTIONS = frozenset(
         "--scope",
         "-m",
         "--message",
+        "-e",
+        "--expression",
+        "--regexp",
+        "-c",
+        "--command",
+        "-E",
+        "-P",
     }
 )
 _ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S+)$")
@@ -131,6 +139,10 @@ def _classify_path_token(token: str) -> str | None:
             return None
         return token
     if token.startswith("/"):  # rooted-driveless -> project-root-relative
+        # WI-6674: regex patterns and address expressions (e.g. /pattern/, /[^/]+/, /[a-z]/)
+        # are not filesystem paths.
+        if any(c in token for c in "^$*+?|{}[]\\") or (token.count("/") >= 2 and token.endswith("/")):
+            return None
         if token.lower().startswith(("/etc/", "/home/")):
             return token
         return token.lstrip("/")
@@ -360,8 +372,17 @@ def check_bash_command(command: str, project_root: Path) -> tuple[bool, str]:
     # operand is still refused.
     for raw_segment in _COMMAND_SEGMENT_RE.split(command):
         skip_next_token = False
-        for match in _COMMAND_TOKEN_RE.finditer(raw_segment):
-            token = next(group for group in match.groups() if group is not None)
+        tokens = _drop_leading_assignments(_command_tokens(raw_segment))
+        if not tokens:
+            continue
+        cmd_head = _command_name(tokens[0])
+        is_pattern_cmd = cmd_head in {"sed", "awk", "grep", "egrep", "fgrep", "rg"}
+        has_explicit_script_flag = any(
+            t in {"-e", "-f", "--expression", "--file", "--regexp"} or t.startswith(("-e", "-f")) for t in tokens[1:]
+        )
+        pattern_arg_consumed = has_explicit_script_flag
+
+        for token in tokens[1:]:
             if skip_next_token:
                 skip_next_token = False
                 continue
@@ -371,6 +392,12 @@ def check_bash_command(command: str, project_root: Path) -> tuple[bool, str]:
             option_name, separator, _ = token.partition("=")
             if separator and option_name in _FREE_TEXT_OPTIONS:
                 continue
+            if token.startswith("-"):
+                continue
+            if is_pattern_cmd and not pattern_arg_consumed:
+                pattern_arg_consumed = True
+                continue
+
             for path_match in PATH_DELIMITER_RE.finditer(token):
                 classified = _classify_path_token(path_match.group(1))
                 if classified is None:
