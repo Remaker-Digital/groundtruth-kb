@@ -218,7 +218,33 @@ def _ensure_utf8_streams() -> None:
             reconfigure(encoding="utf-8", errors="backslashreplace")
 
 
-@click.group()
+class _NoWindowsExpandGroup(click.Group):
+    """Click Group that defaults windows_expand_args to False (WI-6697).
+
+    Prevents Click on Windows from expanding glob-like CLI arguments into
+    arbitrary file lists when taking arguments from sys.argv.
+    """
+
+    def main(
+        self,
+        args: Any = None,
+        prog_name: str | None = None,
+        complete_var: str | None = None,
+        standalone_mode: bool = True,
+        windows_expand_args: bool = False,
+        **extra: Any,
+    ) -> Any:
+        return super().main(
+            args=args,
+            prog_name=prog_name,
+            complete_var=complete_var,
+            standalone_mode=standalone_mode,
+            windows_expand_args=windows_expand_args,
+            **extra,
+        )
+
+
+@click.group(cls=_NoWindowsExpandGroup)
 @click.version_option(version=__version__, prog_name="gt")
 @click.option("--config", "config_path", type=click.Path(exists=True), default=None, help="Path to groundtruth.toml")
 @click.pass_context
@@ -11154,4 +11180,4 @@ def harness_show(ctx: click.Context, harness_id: str) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(windows_expand_args=False)
