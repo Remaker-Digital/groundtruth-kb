@@ -2,10 +2,10 @@
   "collector": {
     "name": "GT-KB development environment inventory collector",
     "script": "scripts/collect_dev_environment_inventory.py",
-    "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
+    "script_hash": "sha256:189a9b41f309033b71290c425cd21464bbd593522d003762811fcd4a78c0b115",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-08-14T19:05:49Z",
+  "generated_at": "2026-08-20T06:40:11Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -173,7 +173,7 @@
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 33,
+      "count": 35,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/advisory-router-scan.py",
@@ -186,6 +186,7 @@
         ".claude/hooks/delib-search-gate.py",
         ".claude/hooks/delib-search-tracker.py",
         ".claude/hooks/destructive-gate.py",
+        ".claude/hooks/directive-enforcement-adapter.py",
         ".claude/hooks/directive-enforcement-claude-adapter.py",
         ".claude/hooks/document_author_provenance_gate.py",
         ".claude/hooks/formal-artifact-approval-gate.py",
@@ -200,6 +201,7 @@
         ".claude/hooks/owner-decision-tracker.py",
         ".claude/hooks/project-completion-surface.py",
         ".claude/hooks/scanner-safe-writer.py",
+        ".claude/hooks/session-init-binding.py",
         ".claude/hooks/session-start-governance.py",
         ".claude/hooks/session-topic-envelope-router.py",
         ".claude/hooks/session_start_dispatch.py",
@@ -212,7 +214,7 @@
     },
     "codex_hooks": {
       "classification": "public_safe",
-      "count": 29,
+      "count": 31,
       "items": [
         ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.py",
         ".codex/gtkb-hooks/bridge-compliance-gate-bash-adapter.py",
@@ -223,6 +225,7 @@
         ".codex/gtkb-hooks/project-completion-surface.py",
         ".codex/gtkb-hooks/run_cmd_no_window.py",
         ".codex/gtkb-hooks/run_py_no_window.py",
+        ".codex/gtkb-hooks/session-init-binding.py",
         ".codex/gtkb-hooks/session_start_dispatch.py",
         ".codex/gtkb-hooks/session_stop_dispatch.py",
         ".codex/gtkb-hooks/session_wrapup_trigger_dispatch.py",
@@ -234,6 +237,7 @@
         ".codex/gtkb-hooks/code-quality-baseline-proposal-check.cmd",
         ".codex/gtkb-hooks/codex-mcp-worker-guard.cmd",
         ".codex/gtkb-hooks/credential-scan.cmd",
+        ".codex/gtkb-hooks/cursor-hook-env.cmd",
         ".codex/gtkb-hooks/destructive-gate.cmd",
         ".codex/gtkb-hooks/directive-enforcement.cmd",
         ".codex/gtkb-hooks/formal-artifact-approval.cmd",
@@ -291,7 +295,7 @@
     },
     "rules": {
       "classification": "public_safe",
-      "count": 37,
+      "count": 48,
       "items": [
         ".claude/rules/acting-prime-builder.md",
         ".claude/rules/active-workspace.md",
@@ -311,12 +315,19 @@
         ".claude/rules/codex-session-bootstrap.md",
         ".claude/rules/codex-standing-priorities.md",
         ".claude/rules/codex-way-of-working.md",
+        ".claude/rules/counterpart-review-gate.md",
+        ".claude/rules/dead-ends-and-false-positives.md",
+        ".claude/rules/decision-ledger.md",
         ".claude/rules/deliberation-protocol.md",
         ".claude/rules/dispatcher-daemon-substrate-rollback-runbook.md",
         ".claude/rules/file-bridge-protocol.md",
         ".claude/rules/governance-emergency-bootstrap-protocol.md",
+        ".claude/rules/governance-principles.md",
         ".claude/rules/groundtruth-kb-vision.md",
         ".claude/rules/gtkb-capability-import-policy.md",
+        ".claude/rules/loyal-opposition-knowledge-base-index.md",
+        ".claude/rules/loyal-opposition-review-checklists.md",
+        ".claude/rules/loyal-opposition-runbook.md",
         ".claude/rules/loyal-opposition.md",
         ".claude/rules/operating-model.md",
         ".claude/rules/operating-role.md",
@@ -327,9 +338,13 @@
         ".claude/rules/project-root-boundary.md",
         ".claude/rules/report-depth-prime-builder-context.md",
         ".claude/rules/report-depth.md",
+        ".claude/rules/review-operating-contract.md",
+        ".claude/rules/session-bootstrap.md",
         ".claude/rules/sot-read-discipline.md",
+        ".claude/rules/standing-priorities.md",
         ".claude/rules/template-code-review.md",
-        ".claude/rules/template-decision-memo.md"
+        ".claude/rules/template-decision-memo.md",
+        ".claude/rules/way-of-working.md"
       ]
     },
     "skills": {
@@ -399,7 +414,7 @@
           "status": "unknown"
         },
         "canonical_terminology_load": {
-          "evidence": ".claude/rules/canonical-terminology.md",
+          "evidence": ".harness-baseline-configuration/rules/canonical-terminology.md",
           "status": "configured"
         },
         "command_support": {
@@ -476,7 +491,7 @@
           "status": "runtime_provided"
         },
         "canonical_terminology_load": {
-          "evidence": ".claude/rules/canonical-terminology.md",
+          "evidence": ".harness-baseline-configuration/rules/canonical-terminology.md",
           "status": "configured"
         },
         "command_support": {
@@ -553,7 +568,7 @@
           "status": "unknown"
         },
         "canonical_terminology_load": {
-          "evidence": ".claude/rules/canonical-terminology.md",
+          "evidence": ".harness-baseline-configuration/rules/canonical-terminology.md",
           "status": "configured"
         },
         "command_support": {
@@ -630,7 +645,7 @@
           "status": "runtime_provided"
         },
         "canonical_terminology_load": {
-          "evidence": ".claude/rules/canonical-terminology.md",
+          "evidence": ".harness-baseline-configuration/rules/canonical-terminology.md",
           "status": "configured"
         },
         "command_support": {
