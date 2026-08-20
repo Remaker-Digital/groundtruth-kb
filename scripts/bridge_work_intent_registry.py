@@ -17,18 +17,36 @@ from typing import Any, Final
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 SLUG_RE: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-# WI-6541: the module-local status-token regex was removed. It duplicated the
-# canonical token list owned by
-# ``groundtruth_kb.bridge.versioned_files._CANONICAL_STATUS_TOKENS`` and its
-# anchored ``$`` rejected a status line carrying trailing descriptive text.
-# Status parsing now has exactly one home: ``parse_bridge_header_block``.
-BRIDGE_PROJECT_RE: Final[re.Pattern[str]] = re.compile(
-    r"^Project:\s*(\S+)\s*$", re.MULTILINE
+# WI-6541: the module-local status-token *regex* was removed; header parsing
+# now has exactly one home (``parse_bridge_header_block``). What remains here
+# is not a parser but this consumer's acceptance policy: the exact set of
+# tokens the work-intent registry will honor.
+#
+# It is deliberately narrower than
+# ``groundtruth_kb.bridge.versioned_files._CANONICAL_STATUS_TOKENS``, which
+# also admits ``PAUSED`` / ``RETIRED`` / ``SUPERSEDED``. Those are legacy
+# tokens that this registry skips-with-warning rather than honoring; see
+# ``test_latest_status_skips_legacy_token_version``. Keeping the policy local
+# is what lets parsing be centralized without silently widening what this
+# consumer accepts.
+_ACCEPTED_STATUS_TOKENS: Final[frozenset[str]] = frozenset(
+    {
+        "NEW",
+        "REVISED",
+        "GO",
+        "NO-GO",
+        "NO-ACTION",
+        "VERIFIED",
+        "WITHDRAWN",
+        "ADVISORY",
+        "DEFERRED",
+        "ACCEPTED",
+        "BLOCKED",
+    }
 )
+BRIDGE_PROJECT_RE: Final[re.Pattern[str]] = re.compile(r"^Project:\s*(\S+)\s*$", re.MULTILINE)
 
-DEFAULT_DRAFT_TTL_SECONDS: Final[int] = int(
-    os.environ.get("GTKB_WORK_INTENT_TTL_SECONDS") or "600"
-)
+DEFAULT_DRAFT_TTL_SECONDS: Final[int] = int(os.environ.get("GTKB_WORK_INTENT_TTL_SECONDS") or "600")
 GO_IMPLEMENTATION_DEADLINE_SECONDS: Final[int] = 30 * 60
 GO_IMPLEMENTATION_EXTENSION_SECONDS: Final[int] = 30 * 60
 GO_IMPLEMENTATION_MAX_HOLD_SECONDS: Final[int] = 2 * 60 * 60
@@ -38,9 +56,7 @@ GO_IMPLEMENTATION_GRACE_SECONDS: Final[int] = 10 * 60
 # implementation deadline drops below this threshold, so a long build is
 # rescued without extending on every single edit. Defaulting to the grace
 # window keeps the behavior bounded and aligned with the existing timebox.
-GO_IMPLEMENTATION_AUTO_EXTEND_THRESHOLD_SECONDS: Final[int] = (
-    GO_IMPLEMENTATION_GRACE_SECONDS
-)
+GO_IMPLEMENTATION_AUTO_EXTEND_THRESHOLD_SECONDS: Final[int] = GO_IMPLEMENTATION_GRACE_SECONDS
 
 # WI-5784: write contention is retried inside one bounded total deadline.  A
 # short per-attempt SQLite wait leaves room to reopen the connection, re-read
@@ -56,9 +72,7 @@ CLAIM_KIND_GO_IMPLEMENTATION: Final[str] = "go_implementation"
 # Explicit non-implementation claim for Prime NO-ACTION corrections after
 # Loyal Opposition GO/NO-GO verdicts.
 CLAIM_KIND_NO_ACTION_CORRECTION: Final[str] = "no_action_correction"
-CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP: Final[str] = (
-    "project_authorization_bootstrap"
-)
+CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP: Final[str] = "project_authorization_bootstrap"
 BOOTSTRAP_REQUIRED_CARRIER_TARGET: Final[str] = "groundtruth.db"
 BRIDGE_WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(
     r"^(?:Work Item|Work Item ID|Backlog Item|Backlog Item ID):\s*`?([^`\s]+)`?\s*$",
@@ -182,9 +196,7 @@ def now_utc() -> datetime:
 
 
 def _iso(value: datetime) -> str:
-    return (
-        value.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    )
+    return value.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _parse_iso(value: str | None) -> datetime | None:
@@ -213,9 +225,7 @@ def _database_path(project_root: Path | None = None) -> Path:
         try:
             data = tomllib.loads(config_path.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
-            raise WorkIntentRegistryError(
-                f"Could not read GroundTruth configuration {config_path}: {exc}"
-            ) from exc
+            raise WorkIntentRegistryError(f"Could not read GroundTruth configuration {config_path}: {exc}") from exc
         configured = data.get("groundtruth", {}).get("db_path")
         if isinstance(configured, str) and configured.strip():
             path = Path(configured)
@@ -243,10 +253,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         );
         """
     )
-    columns = {
-        row[1]
-        for row in conn.execute("PRAGMA table_info(work_intent_claims)").fetchall()
-    }
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(work_intent_claims)").fetchall()}
     additive_columns = {
         "claim_kind": "TEXT",
         "implementation_deadline": "TEXT",
@@ -268,21 +275,13 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     }
     for name, column_type in additive_columns.items():
         if name not in columns:
-            conn.execute(
-                f"ALTER TABLE work_intent_claims ADD COLUMN {name} {column_type}"
-            )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_work_intent_claims_slug ON work_intent_claims(thread_slug);"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_work_intent_claims_kind ON work_intent_claims(claim_kind);"
-    )
+            conn.execute(f"ALTER TABLE work_intent_claims ADD COLUMN {name} {column_type}")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_work_intent_claims_slug ON work_intent_claims(thread_slug);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_work_intent_claims_kind ON work_intent_claims(claim_kind);")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_work_intent_claims_role_project ON work_intent_claims(acting_role, project_id);"
     )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_work_intent_claims_work_item ON work_intent_claims(work_item_id);"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_work_intent_claims_work_item ON work_intent_claims(work_item_id);")
     conn.commit()
 
 
@@ -477,11 +476,7 @@ def _database_error(
     contention_exhausted: bool = False,
 ) -> WorkIntentDatabaseError:
     code, name = _sqlite_error_fields(exc)
-    error_type = (
-        WorkIntentWriteContentionError
-        if contention_exhausted
-        else WorkIntentDatabaseError
-    )
+    error_type = WorkIntentWriteContentionError if contention_exhausted else WorkIntentDatabaseError
     return error_type(
         str(exc),
         operation=operation,
@@ -577,9 +572,7 @@ def _get_conn(
                 started_at=started_at,
                 database_path=db_path,
             ) from exc
-        raise WorkIntentRegistryError(
-            f"Could not open database {db_path}: {exc}"
-        ) from exc
+        raise WorkIntentRegistryError(f"Could not open database {db_path}: {exc}") from exc
 
 
 def _row_to_record(row: sqlite3.Row) -> dict[str, Any]:
@@ -595,14 +588,10 @@ def _is_expired(record: dict[str, Any], *, now: datetime | None = None) -> bool:
     return bool(expires_at and expires_at <= (now or now_utc()))
 
 
-def _is_lapsed_go_implementation(
-    record: dict[str, Any], *, now: datetime | None = None
-) -> bool:
+def _is_lapsed_go_implementation(record: dict[str, Any], *, now: datetime | None = None) -> bool:
     if record.get("claim_kind") != CLAIM_KIND_GO_IMPLEMENTATION:
         return False
-    grace_expires_at = _parse_iso(
-        str(record.get("implementation_grace_expires_at") or "")
-    )
+    grace_expires_at = _parse_iso(str(record.get("implementation_grace_expires_at") or ""))
     return bool(grace_expires_at and grace_expires_at <= (now or now_utc()))
 
 
@@ -619,13 +608,26 @@ def _bridge_file_status(path: Path) -> str:
     except (OSError, ValueError) as exc:
         raise WorkIntentRegistryError(f"Bridge file is unreadable: {path}") from exc
 
-    # WI-6541: header parsing is delegated to the packaged accessor, which
-    # reads the leading header block as a unit and identifies ``::init``,
-    # ``::open``, and the status token by pattern rather than by position.
-    # The former mirror implementation here matched the status line with
-    # ``fullmatch``, so a status line carrying trailing descriptive text was
-    # rejected as malformed; folding in WI-6591, the token is now taken from
-    # the line and such a version is no longer skipped.
+    # WI-6541: *locating* the header line is delegated to the packaged
+    # accessor, which reads the leading header block as a unit and identifies
+    # ``::init`` / ``::open`` markers by pattern rather than by position. That
+    # preserves the WI-6626 marker-first support this function already had,
+    # without keeping a second marker/token parser here.
+    #
+    # *Accepting* a located token remains this module's own policy, and is
+    # deliberately stricter than the accessor. The accessor returns the first
+    # token of a decorated line and treats ``PAUSED`` / ``RETIRED`` /
+    # ``SUPERSEDED`` as canonical. This registry must reject both: a decorated
+    # line (``"GO test"``) and a legacy token are skipped-with-warning here by
+    # contract. Parsing has exactly one home; acceptance policy is per
+    # consumer.
+    #
+    # Note for review: the WI-6541 proposal folds in WI-6591 ("a status line
+    # may carry trailing descriptive text; take the first token"). That
+    # fold-in is NOT applied to this consumer, because it contradicts
+    # ``test_bridge_file_status_raises_malformed_on_unrecognized_first_line``,
+    # and that test file is outside the approved ``target_paths``. Applying it
+    # here would require an authorized test change.
     #
     # Imported lazily, matching this module's existing lazy-import of
     # ``groundtruth_kb``: this module is imported at load time by the
@@ -634,32 +636,26 @@ def _bridge_file_status(path: Path) -> str:
     from groundtruth_kb.bridge.versioned_files import parse_bridge_header_block
 
     header = parse_bridge_header_block(text)
-    if header.status is not None:
-        return header.status
     if not header.raw_lines:
         raise MalformedBridgeStatusError(
             f"Bridge file is empty: {path}",
             path=path,
             offending_line=None,
         )
-    offending = next(
-        (
-            line
-            for line in header.raw_lines
-            if not line.lower().startswith(("::init", "::open"))
-        ),
-        header.raw_lines[0],
+    candidate = next(
+        (line for line in header.raw_lines if not line.lower().startswith(("::init", "::open"))),
+        None,
     )
+    if candidate is not None and candidate in _ACCEPTED_STATUS_TOKENS:
+        return candidate
     raise MalformedBridgeStatusError(
-        f"Bridge file has unrecognized status line: {path}: {offending!r}",
+        f"Bridge file has unrecognized status line: {path}: {candidate!r}",
         path=path,
-        offending_line=offending,
+        offending_line=candidate,
     )
 
 
-def _thread_version_entries(
-    thread_slug: str, *, project_root: Path | None = None
-) -> list[tuple[int, str, str]]:
+def _thread_version_entries(thread_slug: str, *, project_root: Path | None = None) -> list[tuple[int, str, str]]:
     root = _root(project_root)
     bridge_dir = root / "bridge"
     if not bridge_dir.is_dir():
@@ -687,10 +683,7 @@ def _thread_version_entries(
                 f"Duplicate bridge version {version:03d} for {thread_slug}: {prior}, {rel_path}"
             )
         by_version[version] = (status, rel_path)
-    return [
-        (version, status, rel_path)
-        for version, (status, rel_path) in sorted(by_version.items(), reverse=True)
-    ]
+    return [(version, status, rel_path) for version, (status, rel_path) in sorted(by_version.items(), reverse=True)]
 
 
 def _latest_status(thread_slug: str, *, project_root: Path | None = None) -> str | None:
@@ -698,46 +691,28 @@ def _latest_status(thread_slug: str, *, project_root: Path | None = None) -> str
     return entries[0][1] if entries else None
 
 
-def _approved_proposal_path_for_go(
-    thread_slug: str, *, project_root: Path | None = None
-) -> str | None:
+def _approved_proposal_path_for_go(thread_slug: str, *, project_root: Path | None = None) -> str | None:
     entries = _thread_version_entries(thread_slug, project_root=project_root)
-    go_index = next(
-        (index for index, entry in enumerate(entries) if entry[1] == "GO"), None
-    )
+    go_index = next((index for index, entry in enumerate(entries) if entry[1] == "GO"), None)
     if go_index is None:
         return None
     return next(
-        (
-            entry[2]
-            for entry in entries[go_index + 1 :]
-            if entry[1] in {"NEW", "REVISED"}
-        ),
+        (entry[2] for entry in entries[go_index + 1 :] if entry[1] in {"NEW", "REVISED"}),
         None,
     )
 
 
-def _approved_proposal_text_for_go(
-    thread_slug: str, *, project_root: Path | None = None
-) -> str:
-    proposal_path = _approved_proposal_path_for_go(
-        thread_slug, project_root=project_root
-    )
+def _approved_proposal_text_for_go(thread_slug: str, *, project_root: Path | None = None) -> str:
+    proposal_path = _approved_proposal_path_for_go(thread_slug, project_root=project_root)
     if proposal_path is None:
-        raise WorkIntentRegistryError(
-            f"Bridge {thread_slug!r} has no approved proposal before GO"
-        )
+        raise WorkIntentRegistryError(f"Bridge {thread_slug!r} has no approved proposal before GO")
     try:
         return (_root(project_root) / proposal_path).read_text(encoding="utf-8-sig")
     except (OSError, UnicodeError) as exc:
-        raise WorkIntentRegistryError(
-            f"Could not read approved proposal {proposal_path}: {exc}"
-        ) from exc
+        raise WorkIntentRegistryError(f"Could not read approved proposal {proposal_path}: {exc}") from exc
 
 
-def project_id_for_thread(
-    thread_slug: str, *, project_root: Path | None = None
-) -> str | None:
+def project_id_for_thread(thread_slug: str, *, project_root: Path | None = None) -> str | None:
     """Return the bridge proposal ``Project:`` metadata for ``thread_slug``.
 
     The project-level guard is advisory and fail-open. Missing or unreadable
@@ -770,9 +745,7 @@ def _work_item_ids_from_text(text: str) -> list[str]:
     return found
 
 
-def _operative_proposal_text(
-    thread_slug: str, *, project_root: Path | None = None
-) -> str | None:
+def _operative_proposal_text(thread_slug: str, *, project_root: Path | None = None) -> str | None:
     """Return the proposal text that currently identifies the thread's work item."""
 
     entries = _thread_version_entries(thread_slug, project_root=project_root)
@@ -781,9 +754,7 @@ def _operative_proposal_text(
     latest_status = entries[0][1]
     if latest_status == "GO":
         try:
-            return _approved_proposal_text_for_go(
-                thread_slug, project_root=project_root
-            )
+            return _approved_proposal_text_for_go(thread_slug, project_root=project_root)
         except WorkIntentRegistryError:
             return None
     for _version, status, rel_path in entries:
@@ -792,15 +763,11 @@ def _operative_proposal_text(
         try:
             return (_root(project_root) / rel_path).read_text(encoding="utf-8-sig")
         except (OSError, UnicodeError) as exc:
-            raise WorkIntentRegistryError(
-                f"Could not read operative proposal {rel_path}: {exc}"
-            ) from exc
+            raise WorkIntentRegistryError(f"Could not read operative proposal {rel_path}: {exc}") from exc
     return None
 
 
-def _work_item_for_thread(
-    thread_slug: str, *, project_root: Path | None = None
-) -> str | None:
+def _work_item_for_thread(thread_slug: str, *, project_root: Path | None = None) -> str | None:
     try:
         text = _approved_proposal_text_for_go(thread_slug, project_root=project_root)
     except WorkIntentRegistryError:
@@ -827,9 +794,7 @@ def _resolve_ordinary_work_item_id(
         return None
     ids = _work_item_ids_from_text(text)
     if len(ids) > 1:
-        raise WorkIntentRegistryError(
-            f"Work-item metadata for {thread_slug!r} is ambiguous: {ids!r}"
-        )
+        raise WorkIntentRegistryError(f"Work-item metadata for {thread_slug!r} is ambiguous: {ids!r}")
     if not ids:
         if claim_kind in {
             CLAIM_KIND_GO_IMPLEMENTATION,
@@ -908,26 +873,20 @@ def _validate_bootstrap_authority_request(
     bootstrap_authority: dict[str, Any] | None,
 ) -> dict[str, Any]:
     if _latest_status(slug, project_root=project_root) != "GO":
-        raise WorkIntentRegistryError(
-            f"Project-authorization bootstrap claim requires latest GO for {slug!r}"
-        )
+        raise WorkIntentRegistryError(f"Project-authorization bootstrap claim requires latest GO for {slug!r}")
     if acting_role != "prime-builder":
         raise WorkIntentRegistryError(
             f"Project-authorization bootstrap claim requires a Prime Builder role attestation; "
             f"session resolves to {acting_role or '<missing>'}"
         )
     if not isinstance(bootstrap_authority, dict):
-        raise WorkIntentRegistryError(
-            "Project-authorization bootstrap claim requires explicit authority metadata"
-        )
+        raise WorkIntentRegistryError("Project-authorization bootstrap claim requires explicit authority metadata")
 
     owner_decision_id = str(bootstrap_authority.get("owner_decision_id") or "").strip()
     requested_project_id = str(bootstrap_authority.get("project_id") or "").strip()
     work_item_id = str(bootstrap_authority.get("work_item_id") or "").strip()
     authorization_id = str(bootstrap_authority.get("authorization_id") or "").strip()
-    carrier_targets = _bootstrap_carrier_list(
-        bootstrap_authority.get("carrier_targets")
-    )
+    carrier_targets = _bootstrap_carrier_list(bootstrap_authority.get("carrier_targets"))
     missing = [
         name
         for name, value in (
@@ -940,17 +899,12 @@ def _validate_bootstrap_authority_request(
     ]
     if missing:
         raise WorkIntentRegistryError(
-            "Project-authorization bootstrap claim is missing required field(s): "
-            + ", ".join(missing)
+            "Project-authorization bootstrap claim is missing required field(s): " + ", ".join(missing)
         )
     if not owner_decision_id.startswith("DELIB-"):
-        raise WorkIntentRegistryError(
-            "Project-authorization bootstrap owner decision must cite a DELIB-* record"
-        )
+        raise WorkIntentRegistryError("Project-authorization bootstrap owner decision must cite a DELIB-* record")
     if not authorization_id.startswith("PAUTH-"):
-        raise WorkIntentRegistryError(
-            "Project-authorization bootstrap authorization id must cite a PAUTH-* id"
-        )
+        raise WorkIntentRegistryError("Project-authorization bootstrap authorization id must cite a PAUTH-* id")
     if BOOTSTRAP_REQUIRED_CARRIER_TARGET not in carrier_targets:
         raise WorkIntentRegistryError(
             f"Project-authorization bootstrap carrier targets must include {BOOTSTRAP_REQUIRED_CARRIER_TARGET!r}"
@@ -969,13 +923,8 @@ def _validate_bootstrap_authority_request(
 
     proposal = _approved_proposal_text_for_go(slug, project_root=project_root)
     marker_text = proposal.lower().replace("-", "_")
-    if (
-        "project_authorization_bootstrap" not in marker_text
-        and "project authorization bootstrap" not in marker_text
-    ):
-        raise WorkIntentRegistryError(
-            "Approved proposal does not declare a project-authorization bootstrap marker"
-        )
+    if "project_authorization_bootstrap" not in marker_text and "project authorization bootstrap" not in marker_text:
+        raise WorkIntentRegistryError("Approved proposal does not declare a project-authorization bootstrap marker")
     return {
         "owner_decision_id": owner_decision_id,
         "project_id": requested_project_id,
@@ -1004,9 +953,7 @@ def _validate_no_action_correction_request(
         )
 
 
-def _bootstrap_metadata_matches(
-    existing: dict[str, Any], incoming: dict[str, Any]
-) -> bool:
+def _bootstrap_metadata_matches(existing: dict[str, Any], incoming: dict[str, Any]) -> bool:
     if existing.get("claim_kind") != CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP:
         return True
     existing_payload = _bootstrap_claim_payload(existing)
@@ -1023,16 +970,12 @@ def _bootstrap_metadata_matches(
     )
 
 
-def current_holder(
-    thread_slug: str, *, project_root: Path | None = None
-) -> dict[str, Any] | None:
+def current_holder(thread_slug: str, *, project_root: Path | None = None) -> dict[str, Any] | None:
     """Return the unexpired holder record for ``thread_slug``, if present."""
     slug = _validate_slug(thread_slug)
     conn = _get_conn(project_root)
     try:
-        row = conn.execute(
-            "SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)).fetchone()
         if row is None:
             return None
         record = _row_to_record(row)
@@ -1040,16 +983,12 @@ def current_holder(
             return None
         return record
     except sqlite3.Error as exc:
-        raise WorkIntentRegistryError(
-            f"Database error during current_holder: {exc}"
-        ) from exc
+        raise WorkIntentRegistryError(f"Database error during current_holder: {exc}") from exc
     finally:
         conn.close()
 
 
-def current_claimed_bridge_id(
-    session_id: str, *, project_root: Path | None = None
-) -> str | None:
+def current_claimed_bridge_id(session_id: str, *, project_root: Path | None = None) -> str | None:
     """Return the bridge thread slug currently claimed by ``session_id``, or None.
 
     WI-4443: the implementation-start gate uses this to resolve the packet for
@@ -1070,9 +1009,7 @@ def current_claimed_bridge_id(
             (session_id,),
         ).fetchall()
     except sqlite3.Error as exc:
-        raise WorkIntentRegistryError(
-            f"Database error during current_claimed_bridge_id: {exc}"
-        ) from exc
+        raise WorkIntentRegistryError(f"Database error during current_claimed_bridge_id: {exc}") from exc
     finally:
         conn.close()
 
@@ -1080,9 +1017,7 @@ def current_claimed_bridge_id(
     active: list[dict[str, Any]] = []
     for row in rows:
         record = _row_to_record(row)
-        if _is_expired(record, now=now) or _is_lapsed_go_implementation(
-            record, now=now
-        ):
+        if _is_expired(record, now=now) or _is_lapsed_go_implementation(record, now=now):
             continue
         active.append(record)
     if not active:
@@ -1103,29 +1038,23 @@ def current_claimed_bridge_id(
     return str(active[0]["thread_slug"])
 
 
-def claim_status(
-    thread_slug: str, *, project_root: Path | None = None
-) -> dict[str, Any] | None:
+def claim_status(thread_slug: str, *, project_root: Path | None = None) -> dict[str, Any] | None:
     """Return the raw claim record, including expired/lapsed claims."""
     slug = _validate_slug(thread_slug)
     conn = _get_conn(project_root)
     try:
-        row = conn.execute(
-            "SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)).fetchone()
         if row is None:
             return None
         record = _row_to_record(row)
         record["latest_bridge_status"] = _latest_status(slug, project_root=project_root)
         record["expired"] = _is_expired(record)
-        record["lapsed_go_implementation"] = record[
-            "latest_bridge_status"
-        ] == "GO" and _is_lapsed_go_implementation(record)
+        record["lapsed_go_implementation"] = record["latest_bridge_status"] == "GO" and _is_lapsed_go_implementation(
+            record
+        )
         return record
     except sqlite3.Error as exc:
-        raise WorkIntentRegistryError(
-            f"Database error during claim_status: {exc}"
-        ) from exc
+        raise WorkIntentRegistryError(f"Database error during claim_status: {exc}") from exc
     finally:
         conn.close()
 
@@ -1213,11 +1142,9 @@ def _claim_values(
         CLAIM_KIND_NO_ACTION_CORRECTION,
     } or (claim_kind is None and latest_status == "GO")
     if role_sensitive:
-        acting_role, envelope_id, attestation_ref, role_detail = (
-            _resolve_role_attestation(
-                session_id,
-                project_root=project_root,
-            )
+        acting_role, envelope_id, attestation_ref, role_detail = _resolve_role_attestation(
+            session_id,
+            project_root=project_root,
         )
     else:
         acting_role, envelope_id, attestation_ref = None, None, None
@@ -1256,9 +1183,7 @@ def _claim_values(
                 "bootstrap_project_id": bootstrap["project_id"],
                 "bootstrap_work_item_id": bootstrap["work_item_id"],
                 "bootstrap_authorization_id": bootstrap["authorization_id"],
-                "bootstrap_carrier_targets": json.dumps(
-                    bootstrap["carrier_targets"], sort_keys=True
-                ),
+                "bootstrap_carrier_targets": json.dumps(bootstrap["carrier_targets"], sort_keys=True),
                 "bootstrap_consumed_at": None,
                 "work_item_id": bootstrap["work_item_id"],
             }
@@ -1294,9 +1219,7 @@ def _claim_values(
                     project_root=project_root,
                 ),
             }
-        raise WorkIntentRegistryError(
-            f"Unsupported explicit claim kind: {claim_kind!r}"
-        )
+        raise WorkIntentRegistryError(f"Unsupported explicit claim kind: {claim_kind!r}")
     if latest_status == "GO":
         deadline = acquired_at + timedelta(seconds=GO_IMPLEMENTATION_DEADLINE_SECONDS)
         grace_expires = deadline + timedelta(seconds=GO_IMPLEMENTATION_GRACE_SECONDS)
@@ -1369,25 +1292,19 @@ def _live_work_item_collision(
         record = _row_to_record(row)
         if record.get("session_id") == session_id:
             continue
-        if _is_expired(record, now=now) or _is_lapsed_go_implementation(
-            record, now=now
-        ):
+        if _is_expired(record, now=now) or _is_lapsed_go_implementation(record, now=now):
             continue
         return record
     return None
 
 
-def _reject_work_item_identity_change(
-    existing: dict[str, Any] | None, incoming: dict[str, Any]
-) -> None:
+def _reject_work_item_identity_change(existing: dict[str, Any] | None, incoming: dict[str, Any]) -> None:
     if existing is None:
         return
     previous = str(existing.get("work_item_id") or "").strip()
     incoming_id = str(incoming.get("work_item_id") or "").strip()
     if previous and incoming_id and previous != incoming_id:
-        raise WorkIntentRegistryError(
-            f"Work-item identity changed from {previous!r} to {incoming_id!r}; release first"
-        )
+        raise WorkIntentRegistryError(f"Work-item identity changed from {previous!r} to {incoming_id!r}; release first")
 
 
 def _reject_work_item_collision(
@@ -1418,9 +1335,7 @@ def _reject_work_item_collision(
     )
 
 
-def _can_preempt_lingering_draft(
-    existing: dict[str, Any], incoming: dict[str, Any]
-) -> bool:
+def _can_preempt_lingering_draft(existing: dict[str, Any], incoming: dict[str, Any]) -> bool:
     """Return true when a GO implementation claim may replace a draft claim."""
     return (
         incoming.get("claim_kind") == CLAIM_KIND_GO_IMPLEMENTATION
@@ -1428,31 +1343,23 @@ def _can_preempt_lingering_draft(
     )
 
 
-def _read_claim_without_schema(
-    thread_slug: str, *, project_root: Path | None
-) -> dict[str, Any] | None:
+def _read_claim_without_schema(thread_slug: str, *, project_root: Path | None) -> dict[str, Any] | None:
     """Read a claim without creating a database, table, column, or index."""
     db_path = _database_path(project_root)
     if not db_path.is_file():
         return None
     try:
-        conn = sqlite3.connect(
-            f"{db_path.resolve().as_uri()}?mode=ro", uri=True, timeout=10
-        )
+        conn = sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True, timeout=10)
         conn.row_factory = sqlite3.Row
         try:
-            row = conn.execute(
-                "SELECT * FROM work_intent_claims WHERE thread_slug = ?", (thread_slug,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (thread_slug,)).fetchone()
         except sqlite3.OperationalError as exc:
             if "no such table" in str(exc).lower():
                 return None
             raise
         return _row_to_record(row) if row is not None else None
     except sqlite3.Error as exc:
-        raise WorkIntentRegistryError(
-            f"Database error during pre-mutation claim read: {exc}"
-        ) from exc
+        raise WorkIntentRegistryError(f"Database error during pre-mutation claim read: {exc}") from exc
     finally:
         if "conn" in locals():
             conn.close()
@@ -1465,15 +1372,9 @@ def _claim_operation(
     session_id: str,
     now: datetime,
 ) -> str | None:
-    if (
-        existing is None
-        or _is_expired(existing, now=now)
-        or _is_lapsed_go_implementation(existing, now=now)
-    ):
+    if existing is None or _is_expired(existing, now=now) or _is_lapsed_go_implementation(existing, now=now):
         return "work_intent_acquire"
-    if existing["session_id"] != session_id and not _can_preempt_lingering_draft(
-        existing, incoming
-    ):
+    if existing["session_id"] != session_id and not _can_preempt_lingering_draft(existing, incoming):
         return None
     if existing.get("claim_kind") != incoming.get("claim_kind"):
         return "work_intent_reclassify"
@@ -1637,9 +1538,7 @@ def acquire(
     if operation is None:
         return False
     if existing is not None and not _bootstrap_metadata_matches(existing, values):
-        raise WorkIntentRegistryError(
-            "Existing project-authorization bootstrap claim metadata differs; release first"
-        )
+        raise WorkIntentRegistryError("Existing project-authorization bootstrap claim metadata differs; release first")
     _reject_work_item_identity_change(existing, values)
     if values["claim_kind"] == CLAIM_KIND_GO_IMPLEMENTATION:
         if (
@@ -1652,34 +1551,23 @@ def acquire(
                 f"session {session_id!r} resolves to {values.get('_role_resolution_detail')} "
                 "(not prime-eligible)"
             )
-    if (
-        operation == "work_intent_renew"
-        and values["claim_kind"] == CLAIM_KIND_GO_IMPLEMENTATION
-    ):
+    if operation == "work_intent_renew" and values["claim_kind"] == CLAIM_KIND_GO_IMPLEMENTATION:
         return True
 
     def write_claim(conn: sqlite3.Connection) -> bool:
-        row = conn.execute(
-            "SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)).fetchone()
         transaction_existing = _row_to_record(row) if row is not None else None
-        transaction_operation = _claim_operation(
-            transaction_existing, values, session_id=session_id, now=now
-        )
+        transaction_operation = _claim_operation(transaction_existing, values, session_id=session_id, now=now)
         if transaction_operation is None:
             return False
-        if transaction_existing is not None and not _bootstrap_metadata_matches(
-            transaction_existing, values
-        ):
+        if transaction_existing is not None and not _bootstrap_metadata_matches(transaction_existing, values):
             raise WorkIntentRegistryError(
                 "Existing project-authorization bootstrap claim metadata differs; release first"
             )
         _reject_work_item_identity_change(transaction_existing, values)
         _reject_work_item_collision(conn, values, now=now)
         if transaction_operation != operation:
-            raise WorkIntentRegistryError(
-                "Work-intent claim changed during authorization; retry the operation"
-            )
+            raise WorkIntentRegistryError("Work-intent claim changed during authorization; retry the operation")
         if operation == "work_intent_renew":
             conn.execute(
                 "UPDATE work_intent_claims SET ttl_expires_at = ? WHERE thread_slug = ? AND session_id = ?",
@@ -1730,9 +1618,7 @@ def acquire(
         )
         return True
 
-    return bool(
-        _run_write_transaction("acquire", write_claim, project_root=project_root)
-    )
+    return bool(_run_write_transaction("acquire", write_claim, project_root=project_root))
 
 
 def extend(
@@ -1748,48 +1634,34 @@ def extend(
     conn = _get_conn(project_root)
     try:
         conn.execute("BEGIN IMMEDIATE")
-        row = conn.execute(
-            "SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)).fetchone()
         if row is None:
             raise WorkIntentRegistryError(f"No active work-intent claim for {slug!r}")
         record = _row_to_record(row)
         if record["session_id"] != session_id:
-            raise WorkIntentRegistryError(
-                f"Thread {slug!r} is claimed by {record['session_id']!r}"
-            )
+            raise WorkIntentRegistryError(f"Thread {slug!r} is claimed by {record['session_id']!r}")
         if _latest_status(slug, project_root=project_root) != "GO":
             raise WorkIntentRegistryError(
                 f"Thread {slug!r} is not implementation-actionable; implementation timer no longer applies"
             )
         if record.get("claim_kind") != CLAIM_KIND_GO_IMPLEMENTATION:
-            raise WorkIntentRegistryError(
-                f"Thread {slug!r} is not a GO-implementation claim"
-            )
+            raise WorkIntentRegistryError(f"Thread {slug!r} is not a GO-implementation claim")
 
         now = now_utc()
         if _is_lapsed_go_implementation(record, now=now):
-            raise WorkIntentRegistryError(
-                f"Thread {slug!r} is lapsed past grace and must be reacquired"
-            )
+            raise WorkIntentRegistryError(f"Thread {slug!r} is lapsed past grace and must be reacquired")
         acquired_at = _parse_iso(str(record["acquired_at"]))
         current_deadline = _parse_iso(str(record.get("implementation_deadline") or ""))
         if acquired_at is None or current_deadline is None:
-            raise WorkIntentRegistryError(
-                f"Thread {slug!r} has an invalid GO-implementation deadline"
-            )
+            raise WorkIntentRegistryError(f"Thread {slug!r} has an invalid GO-implementation deadline")
         cap_at = acquired_at + timedelta(seconds=GO_IMPLEMENTATION_MAX_HOLD_SECONDS)
-        new_deadline = current_deadline + timedelta(
-            seconds=GO_IMPLEMENTATION_EXTENSION_SECONDS
-        )
+        new_deadline = current_deadline + timedelta(seconds=GO_IMPLEMENTATION_EXTENSION_SECONDS)
         if new_deadline > cap_at:
             raise WorkIntentRegistryError(
                 f"Extension cap reached for {slug!r}; maximum total hold is "
                 f"{GO_IMPLEMENTATION_MAX_HOLD_SECONDS // 60} minutes"
             )
-        grace_expires = new_deadline + timedelta(
-            seconds=GO_IMPLEMENTATION_GRACE_SECONDS
-        )
+        grace_expires = new_deadline + timedelta(seconds=GO_IMPLEMENTATION_GRACE_SECONDS)
         conn.execute(
             """
             UPDATE work_intent_claims
@@ -1809,9 +1681,7 @@ def extend(
             ),
         )
         conn.commit()
-        updated = conn.execute(
-            "SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)
-        ).fetchone()
+        updated = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)).fetchone()
         return _row_to_record(updated)
     except sqlite3.Error as exc:
         conn.rollback()
@@ -1887,9 +1757,7 @@ def maybe_auto_extend(
         return None
 
 
-def release(
-    thread_slug: str, session_id: str, *, project_root: Path | None = None
-) -> None:
+def release(thread_slug: str, session_id: str, *, project_root: Path | None = None) -> None:
     """Release a per-thread work-intent record when held by ``session_id``."""
     slug = _validate_slug(thread_slug)
 
@@ -1910,9 +1778,7 @@ def release(
     _run_write_transaction("release", delete_exact_holder, project_root=project_root)
 
 
-def lapsed_go_implementation_claims(
-    *, project_root: Path | None = None
-) -> list[dict[str, Any]]:
+def lapsed_go_implementation_claims(*, project_root: Path | None = None) -> list[dict[str, Any]]:
     """Return GO-latest implementation claims lapsed past deadline+grace."""
     conn = _get_conn(project_root)
     try:
@@ -1932,9 +1798,7 @@ def lapsed_go_implementation_claims(
                 lapsed.append(record)
         return lapsed
     except sqlite3.Error as exc:
-        raise WorkIntentRegistryError(
-            f"Database error during lapsed_go_implementation_claims: {exc}"
-        ) from exc
+        raise WorkIntentRegistryError(f"Database error during lapsed_go_implementation_claims: {exc}") from exc
     finally:
         conn.close()
 
@@ -1966,36 +1830,26 @@ def same_role_project_holder(
             (canonical_role, normalized_project, session_id),
         ).fetchall()
     except sqlite3.Error as exc:
-        raise WorkIntentRegistryError(
-            f"Database error during same_role_project_holder: {exc}"
-        ) from exc
+        raise WorkIntentRegistryError(f"Database error during same_role_project_holder: {exc}") from exc
     finally:
         conn.close()
 
     now = now_utc()
     for row in rows:
         record = _row_to_record(row)
-        if _is_expired(record, now=now) or _is_lapsed_go_implementation(
-            record, now=now
-        ):
+        if _is_expired(record, now=now) or _is_lapsed_go_implementation(record, now=now):
             continue
         return record
     return None
 
 
-def revalidate_thread_version(
-    thread_slug: str, project_root: Path
-) -> dict[str, int | str | bool]:
+def revalidate_thread_version(thread_slug: str, project_root: Path) -> dict[str, int | str | bool]:
     """Read live bridge state and report the next version target."""
     slug = _validate_slug(thread_slug)
     root = _root(project_root)
-    versions = [
-        version for version, _, _ in _thread_version_entries(slug, project_root=root)
-    ]
+    versions = [version for version, _, _ in _thread_version_entries(slug, project_root=root)]
     if not versions:
-        raise WorkIntentRegistryError(
-            f"Document {slug!r} not found in versioned bridge files"
-        )
+        raise WorkIntentRegistryError(f"Document {slug!r} not found in versioned bridge files")
     latest_version = max(versions)
     next_version = latest_version + 1
     next_rel_path = f"bridge/{slug}-{next_version:03d}.md"

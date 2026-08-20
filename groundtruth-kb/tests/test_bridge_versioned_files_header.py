@@ -73,6 +73,22 @@ def test_trailing_status_line_text_still_yields_token() -> None:
     assert parsed.status_line_exact is False
 
 
+def test_markers_without_status_yield_no_status() -> None:
+    """Envelope markers alone are not a status; the strict accessor returns None.
+
+    This is the verification-plan row that keeps the accessor honest: making
+    order immaterial must not make a *missing* status token resolve to some
+    incidental value.
+    """
+
+    parsed = parse_bridge_header_block("\n".join((INIT, OPEN, "Document: x", "")))
+    assert parsed.status is None
+    assert parsed.status_line is None
+    assert parsed.init_line == INIT
+    assert parsed.open_line == OPEN
+    assert status_from_bridge_text("\n".join((INIT, OPEN, ""))) is None
+
+
 def test_package_readers_agree_on_envelope_first_file(tmp_path: Path) -> None:
     path = tmp_path / "bridge" / "shared-001.md"
     path.parent.mkdir(parents=True)
