@@ -901,10 +901,44 @@ def _is_safe_command(command: str) -> bool:
     verb_index = _shell_verb_index(tokens)
     if verb_index is None:
         return False
-    normalized = " ".join(_clean_shell_token(token).lower() for token in tokens[verb_index:])
+    normalized_tokens = [_clean_shell_token(token).lower() for token in tokens[verb_index:]]
+    if _requests_help_output_only(scan_command, normalized_tokens):
+        return True
+    normalized = " ".join(normalized_tokens)
     return any(
         normalized == prefix.strip() or normalized.startswith(prefix.strip() + " ") for prefix in SAFE_COMMAND_PREFIXES
     )
+
+
+# WI-6674: help output is read-only, but the WI-3291 prefix allowlist cannot
+# express it. That allowlist enumerates command VERBS, and a help request is
+# identified by its FLAG -- the verb is an arbitrary governed CLI. Every such
+# invocation therefore fell through to `<unknown-mutating-target>` and was
+# denied.
+_HELP_ONLY_FLAGS = frozenset({"--help", "--usage"})
+
+# Redirection is checked here rather than inherited: the caller's
+# `_has_disqualifying_control_marker` models chaining and command substitution
+# but NOT redirection, so `<cli> --help > out.txt` would otherwise write a file
+# under a read-only exemption.
+_REDIRECTION_MARKERS = (">", ">>")
+
+
+def _requests_help_output_only(command: str, normalized_tokens: list[str]) -> bool:
+    """True iff this single stage only asks a command to print its usage text.
+
+    Deliberately narrow. Only the unambiguous long flags qualify; ``-h`` is
+    excluded because it is a real operation modifier for some verbs (``chown
+    -h``, ``chmod -h``) and admitting it would exempt genuine mutations.
+
+    Chaining, execution markers, and multi-stage commands are already rejected
+    by the caller before this runs, so those guards are inherited rather than
+    re-implemented. Redirection is not, and is rejected here.
+    """
+    if not any(token in _HELP_ONLY_FLAGS for token in normalized_tokens):
+        return False
+    redirect_view = _mask_quoted_spans(command, mask_double=True)
+    return not any(marker in redirect_view for marker in _REDIRECTION_MARKERS)
 
 
 def _mask_quoted_spans(command: str, *, mask_double: bool) -> str:
