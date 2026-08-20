@@ -44,9 +44,7 @@ def _write_version(
         return path
     if responds_to is None and version > 1:
         responds_to = f"bridge/{bridge_id}-{version - 1:03d}.md"
-    version_value = (
-        metadata_version if metadata_version is not None else f"{version:03d}"
-    )
+    version_value = metadata_version if metadata_version is not None else f"{version:03d}"
     lines = [status]
     if include_author_identity:
         lines.append(f"author_identity: {author_identity or _role_for(status)}")
@@ -244,9 +242,7 @@ def test_pending_correction_is_reviewable_non_authorizing_and_not_quarantined(
     assert result.implementation_artifact is None
     assert result.implementation_verdict is None
     assert result.quarantined_paths == ()
-    assert tuple(item.code for item in result.blocking_diagnostics) == (
-        PENDING_CORRECTION_DIAGNOSTIC,
-    )
+    assert tuple(item.code for item in result.blocking_diagnostics) == (PENDING_CORRECTION_DIAGNOSTIC,)
     assert malformed.relative_to(tmp_path).as_posix() not in result.quarantined_paths
 
 
@@ -497,9 +493,7 @@ def test_wi5827_does_not_mask_wrong_responds_to_predecessor(tmp_path: Path) -> N
     report = _write_version(tmp_path, slug, 5, "NEW")
     content = report.read_text(encoding="utf-8-sig")
     report.write_text(
-        content.replace(
-            f"Responds to: bridge/{slug}-004.md", "Responds to: bridge/wrong-003.md"
-        ),
+        content.replace(f"Responds to: bridge/{slug}-004.md", "Responds to: bridge/wrong-003.md"),
         encoding="utf-8-sig",
     )
 
@@ -615,23 +609,36 @@ def test_status_must_be_exact_physical_line_one(tmp_path: Path, line_one: str) -
 @pytest.mark.parametrize(
     ("versions", "code"),
     [
-        ((2,), "NONCONTIGUOUS_BRIDGE_VERSIONS"),
         ((1, 3), "NONCONTIGUOUS_BRIDGE_VERSIONS"),
-        ((0, 1), "NONCONTIGUOUS_BRIDGE_VERSIONS"),
+        ((2, 4), "NONCONTIGUOUS_BRIDGE_VERSIONS"),
+        ((0, 1), "INVALID_BRIDGE_VERSION_FLOOR"),
+        ((0,), "INVALID_BRIDGE_VERSION_FLOOR"),
     ],
 )
-def test_exact_versions_must_be_contiguous_from_one(
+def test_exact_versions_must_be_contiguous_and_ge_one(
     tmp_path: Path,
     versions: tuple[int, ...],
     code: str,
 ) -> None:
     slug = "gapped"
     for version in versions:
-        _write_version(tmp_path, slug, version, "NEW" if version in {0, 1} else "GO")
+        _write_version(tmp_path, slug, version, "NEW" if version in {0, 1, 2} else "GO")
 
     with pytest.raises(BridgeLifecycleResolutionError) as caught:
         resolve_bridge_lifecycle(tmp_path, slug)
     assert caught.value.code == code
+
+
+def test_swept_prefix_resolves_from_lowest_present(tmp_path: Path) -> None:
+    slug = "swept-prefix"
+    _write_version(tmp_path, slug, 2, "NEW")
+    _write_version(tmp_path, slug, 3, "GO")
+
+    result = resolve_bridge_lifecycle(tmp_path, slug)
+    assert result.bridge_id == slug
+    assert tuple(item.version for item in result.audit_versions) == (2, 3)
+    assert result.implementation_artifact.version == 2
+    assert result.implementation_verdict.version == 3
 
 
 @pytest.mark.parametrize(
@@ -1062,9 +1069,7 @@ def test_work_intent_registry_reads_marker_first_status(tmp_path: Path) -> None:
 
     from scripts.bridge_work_intent_registry import _bridge_file_status
 
-    path = _write_header(
-        tmp_path, "marker-first-001.md", "::init gtkb lo\n::open build\nNEW\n"
-    )
+    path = _write_header(tmp_path, "marker-first-001.md", "::init gtkb lo\n::open build\nNEW\n")
     assert _bridge_file_status(path) == "NEW"
 
 
@@ -1108,9 +1113,7 @@ def test_work_intent_registry_still_fails_closed_without_status(tmp_path: Path) 
         _bridge_file_status,
     )
 
-    path = _write_header(
-        tmp_path, "no-status-001.md", "::init gtkb lo\n::open build\nDocument: x\n"
-    )
+    path = _write_header(tmp_path, "no-status-001.md", "::init gtkb lo\n::open build\nDocument: x\n")
     with pytest.raises(MalformedBridgeStatusError) as excinfo:
         _bridge_file_status(path)
     # The offending line reported must be the first non-marker line, not a marker.
@@ -1163,12 +1166,11 @@ def test_lo_batch_publish_reads_marker_first_via_packaged_accessor(
 
     import inspect
 
-    import scripts.lo_batch_publish as lo_batch_publish
     from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 
-    path = _write_header(
-        tmp_path, "batch-marker-001.md", "::init gtkb lo\n::open build\nNEW\n"
-    )
+    import scripts.lo_batch_publish as lo_batch_publish
+
+    path = _write_header(tmp_path, "batch-marker-001.md", "::init gtkb lo\n::open build\nNEW\n")
     assert status_from_bridge_file(path) == "NEW"
     source = inspect.getsource(lo_batch_publish.publish_one)
     assert "status_from_bridge_file" in source
