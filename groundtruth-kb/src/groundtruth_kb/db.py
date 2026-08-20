@@ -24,6 +24,7 @@ import os
 import re
 import sqlite3
 import threading
+import time
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -40,6 +41,27 @@ if TYPE_CHECKING:
 # Default DB path — overridden by GTConfig.db_path or constructor arg
 DB_PATH = Path("./groundtruth.db")
 DEFAULT_SQLITE_BUSY_TIMEOUT_MS = 30_000
+
+#: Schema generation stamped into ``PRAGMA user_version`` once
+#: :meth:`KnowledgeDB._ensure_schema` has applied ``SCHEMA_SQL`` and every
+#: migration in :meth:`KnowledgeDB._migrate_schema`.
+#:
+#: WI-6609: before this existed, every ``KnowledgeDB`` construction ran
+#: ``executescript(SCHEMA_SQL)`` plus all migrations unconditionally, taking a
+#: database-wide write lock at connect time even for read-only queries. Any two
+#: overlapping invocations contended and the loser raised ``database is locked``
+#: attributed to its own operation rather than to the migration pass.
+#:
+#: Bump this whenever a migration is added to ``_migrate_schema``, or the new
+#: migration will never run on an already-stamped database.
+#: ``test_schema_version_matches_migration_count`` fails CI if the two drift.
+SCHEMA_VERSION = 14
+
+#: Bounded retry for the one-time schema upgrade. The upgrade takes a write
+#: lock, so a concurrent upgrade can legitimately collide; the common path is
+#: read-only and never reaches this.
+_SCHEMA_UPGRADE_MAX_ATTEMPTS = 5
+_SCHEMA_UPGRADE_BACKOFF_SECONDS = 0.2
 _VALID_APPLICATION_SCOPES = frozenset({"gtkb_platform", "agent_red_application"})
 
 
@@ -1762,11 +1784,70 @@ class KnowledgeDB:
             self._conn.execute(f"PRAGMA busy_timeout={DEFAULT_SQLITE_BUSY_TIMEOUT_MS}")
         return self._conn
 
+    @staticmethod
+    def _schema_version(conn: sqlite3.Connection) -> int:
+        row = conn.execute("PRAGMA user_version").fetchone()
+        return int(row[0]) if row is not None else 0
+
     def _ensure_schema(self) -> None:
+        """Apply ``SCHEMA_SQL`` and migrations only when the database is stale.
+
+        WI-6609: the common path is a single ``PRAGMA user_version`` read. An
+        up-to-date database performs no write here and therefore takes no
+        write lock, so concurrent constructions stop contending and read-only
+        callers stop failing with ``database is locked``.
+
+        Bootstrapping: databases created before ``SCHEMA_VERSION`` existed report
+        version 0 even though they are fully migrated. Their first construction
+        after this change re-runs the whole pass once and then stamps. That is
+        safe because every migration is idempotent -- ``CREATE ... IF NOT
+        EXISTS`` for tables and indexes, ``ALTER TABLE`` behind
+        ``PRAGMA table_info`` column checks, and the only unconditional writes
+        (migration 2) are ``UPDATE ... WHERE type = 'requirement'``, which no-op
+        once applied.
+        """
         conn = self._get_conn()
-        conn.executescript(SCHEMA_SQL)
-        conn.commit()
-        self._migrate_schema()
+        if self._schema_version(conn) == SCHEMA_VERSION:
+            return
+        self._upgrade_schema(conn)
+
+    def _upgrade_schema(self, conn: sqlite3.Connection) -> None:
+        """Run the one-time schema/migration pass with bounded retry.
+
+        Deliberately not wrapped in ``BEGIN IMMEDIATE``: ``_migrate_schema``
+        issues its own ``conn.commit()`` calls, so an enclosing explicit
+        transaction would either fail outright or be silently ended mid-pass,
+        giving false atomicity. Serialization is unnecessary here because the
+        migrations are idempotent (see :meth:`_ensure_schema`), so two
+        processes racing an un-stamped database converge on the same result;
+        the cost is one redundant pass, not corruption.
+
+        Retry exists because this path does take a write lock and can therefore
+        collide with a concurrent upgrade. Failure is raised naming the schema
+        upgrade, so the error stops being misattributed to whatever query the
+        caller was actually trying to run.
+        """
+        last_error: sqlite3.OperationalError | None = None
+        for attempt in range(_SCHEMA_UPGRADE_MAX_ATTEMPTS):
+            try:
+                conn.executescript(SCHEMA_SQL)
+                conn.commit()
+                self._migrate_schema()
+                # Re-check before stamping so a concurrent upgrade that already
+                # completed is not double-stamped with a different generation.
+                conn.execute(f"PRAGMA user_version = {int(SCHEMA_VERSION)}")
+                conn.commit()
+                return
+            except sqlite3.OperationalError as exc:
+                last_error = exc
+                if attempt == _SCHEMA_UPGRADE_MAX_ATTEMPTS - 1:
+                    break
+                time.sleep(_SCHEMA_UPGRADE_BACKOFF_SECONDS * (2**attempt))
+        raise sqlite3.OperationalError(
+            "GT-KB schema upgrade failed after "
+            f"{_SCHEMA_UPGRADE_MAX_ATTEMPTS} attempts on {self.db_path}: {last_error}. "
+            "This is the schema/migration pass, not the caller's query."
+        ) from last_error
 
     def _migrate_schema(self) -> None:
         """Apply incremental migrations that cannot be expressed as CREATE IF NOT EXISTS."""
@@ -5955,7 +6036,7 @@ class KnowledgeDB:
         column is heterogeneous descriptive metadata, not an authorization
         discriminator.
         """
-        approved_lifecycle = {"specified", "implemented", "verified"}
+        approved_lifecycle = {"active", "specified", "implemented", "verified"}
         if not included_spec_ids:
             raise ValueError(
                 "Project authorization status='active' requires at least one "
@@ -9130,7 +9211,7 @@ class KnowledgeDB:
         counts = conn.execute("SELECT status, COUNT(*) as cnt FROM current_specifications GROUP BY status").fetchall()
         status_map = {r["status"]: r["cnt"] for r in counts}
         retired = status_map.get("retired", 0)
-        active = sum(status_map.get(s, 0) for s in ("specified", "implemented", "verified"))
+        active = sum(status_map.get(s, 0) for s in ("active", "specified", "implemented", "verified"))
         denom = retired + active
         if denom == 0:
             return self._metric(None, numerator=0, denominator=0, unit="ratio", status="not_applicable")
