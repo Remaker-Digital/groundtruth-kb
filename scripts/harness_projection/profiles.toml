@@ -101,7 +101,22 @@ config_dir = ".codex"
 status = "profile_pending"
 [harnesses.cursor]
 config_dir = ".cursor"
-status = "profile_pending"
+skills_dir = ".cursor/skills"
+rules_dir = ".cursor/rules"
+hooks_dir = ".cursor/hooks"
+project_dir_var = "CURSOR_PROJECT_DIR"
+session_id_var = "CURSOR_SESSION_ID"
+skill_body = "adapter_script"
+rules_projection = true
+hooks_projection = "hooks_json"
+hooks_json_path = ".cursor/hooks.json"
+adapter_generator = "scripts/generate_cursor_skill_adapters.py"
+[harnesses.cursor.hook_events]
+pre_tool_use = "beforeShellExecution"
+post_tool_use = "afterShellExecution"
+prompt_submit = "beforeSubmitPrompt"
+session_start = "sessionStart"
+turn_end = "sessionStop"
 [harnesses.antigravity]
 config_dir = ".agent"
 status = "profile_pending"

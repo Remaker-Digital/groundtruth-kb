@@ -186,6 +186,14 @@ COMMIT_FINALIZATION_HEADING_RE = re.compile(
     re.IGNORECASE,
 )
 SAME_TRANSACTION_PATH_SET_RE = re.compile(r"\bsame-transaction\s+path\s+set\b", re.IGNORECASE)
+# WI-6365: post-commit finalization evidence. Under owner canon the commit of the
+# work product IS the terminal state and PRECEDES the VERIFIED verdict, so a
+# canonical verdict can never carry same-transaction evidence -- the commit it
+# attests already happened. It cites that commit instead.
+WORK_PRODUCT_COMMIT_RE = re.compile(
+    r"\bwork-product\s+commit\s*:\s*`?[0-9a-f]{7,40}`?",
+    re.IGNORECASE,
+)
 FINALIZATION_PATH_BULLET_RE = re.compile(r"(?m)^\s*[-*]\s+`[^`]+`\s*$")
 PREFLIGHT_PACKET_HASH_RE = re.compile(
     r"\bpacket_hash\s*:\s*`?sha256:[0-9a-f]{64}`?",
@@ -667,11 +675,34 @@ def _latest_bridge_statuses(project_root: Path) -> dict[str, str]:
     return {slug: values[0][1] for slug, values in _versioned_bridge_entries(project_root).items() if values}
 
 
+_ENVELOPE_HEAD_PREFIXES = ("::init", "::open")
+
+
 def _first_nonblank_line(content: str) -> str:
+    """Return the first non-blank line that is not an artifact-head envelope marker.
+
+    The canonical bridge header is::
+
+        ::init gtkb <pb|lo>
+        ::open <activity>
+        <status token>
+
+    (owner directive 2026-08-16; the ``::init`` / ``::open`` lines may be null
+    only when the status is ``ADVISORY``). The status token is therefore not
+    necessarily the first non-blank line of the file. Leading envelope markers
+    are skipped here so that every status-dependent check in this module reads
+    the true status token through this single accessor rather than each
+    re-deriving it. Markers that appear after the status token are the envelope
+    validator's concern, not this function's: iteration stops at the first
+    non-marker line.
+    """
     for line in content.splitlines():
         stripped = line.strip()
-        if stripped:
-            return stripped
+        if not stripped:
+            continue
+        if stripped.startswith(_ENVELOPE_HEAD_PREFIXES):
+            continue
+        return stripped
     return ""
 
 
@@ -798,8 +829,11 @@ def _ondisk_first_nonblank_line(file_path: str) -> str | None:
         with path.open("r", encoding="utf-8-sig") as handle:
             for raw_line in handle:
                 stripped = raw_line.strip()
-                if stripped:
-                    return stripped
+                if not stripped:
+                    continue
+                if stripped.startswith(_ENVELOPE_HEAD_PREFIXES):
+                    continue
+                return stripped
         return ""
     except OSError:
         return None
@@ -1066,7 +1100,13 @@ def _has_commit_finalization_evidence(content: str) -> bool:
     if start is None:
         return False
     section = "\n".join(_collect_section_lines(lines, start))
-    return bool(SAME_TRANSACTION_PATH_SET_RE.search(section) and FINALIZATION_PATH_BULLET_RE.search(section))
+    # WI-6365: both accepted forms require the committed path set. What differs is
+    # how the commit is identified -- same-transaction (legacy atomic helper) or a
+    # work-product commit reference (canonical commit-then-verdict ordering).
+    # Evidence must still be present and substantive; an empty section fails.
+    if not FINALIZATION_PATH_BULLET_RE.search(section):
+        return False
+    return bool(SAME_TRANSACTION_PATH_SET_RE.search(section) or WORK_PRODUCT_COMMIT_RE.search(section))
 
 
 def _synthetic_session_context_id_for_content(content: str) -> str | None:
@@ -2294,11 +2334,14 @@ def _deny_reason_for_content(
     if _is_bridge_markdown_file(file_path) and content:
         if _body_status_token_violation(file_path, content):
             return (
-                "[Governance] Versioned bridge files (bridge/<slug>-NNN.md) must begin with a "
-                "canonical status token on the first non-blank line: one of NEW, REVISED, GO, "
-                "NO-GO, VERIFIED, NO-ACTION, ADVISORY, DEFERRED, WITHDRAWN. The first non-blank line was "
-                f"{_first_nonblank_line(content)!r}. Put the status token on line 1 (headings "
-                "and prose follow it). Existing files with a non-canonical first line are "
+                "[Governance] Versioned bridge files (bridge/<slug>-NNN.md) must carry a "
+                "canonical status token in the artifact head: one of NEW, REVISED, GO, "
+                "NO-GO, VERIFIED, NO-ACTION, ADVISORY, DEFERRED, WITHDRAWN. The first "
+                "non-envelope line was "
+                f"{_first_nonblank_line(content)!r}. The canonical header is '::init gtkb "
+                "<pb|lo>' then '::open <activity>' then the status token (the ::init/::open "
+                "lines may be null only for ADVISORY); a bare status token on line 1 also "
+                "remains accepted. Existing files with a non-canonical head are "
                 "grandfathered. (Hard-block per GTKB-GOV-PROPOSAL-STANDARDS Slice 1 "
                 "body-status-token rule; see {{HARNESS_RULES_DIR}}/file-bridge-protocol.md "
                 "section 'Body Status-Token Rule'.)"
@@ -2363,9 +2406,10 @@ def _deny_reason_for_content(
             )
         if first_line == "VERIFIED" and not _has_commit_finalization_evidence(content):
             return (
-                "[Governance] VERIFIED bridge verdicts must include Commit Finalization Evidence "
-                "with a Same-transaction path set. Use the atomic VERIFIED finalization helper "
-                "instead of writing terminal VERIFIED bridge files directly. "
+                "[Governance] VERIFIED bridge verdicts must include a Commit Finalization Evidence "
+                "section carrying the committed path set as `-` bullets, plus ONE of: "
+                "(a) 'Work-product commit: <sha>' -- the canonical form, where the commit precedes "
+                "the verdict; or (b) 'Same-transaction path set' -- the legacy atomic-helper form. "
                 "(Hard-block per the Mandatory VERIFIED Commit-Finalization Gate.)"
             )
         if first_line in {"NO-GO", "VERIFIED"}:

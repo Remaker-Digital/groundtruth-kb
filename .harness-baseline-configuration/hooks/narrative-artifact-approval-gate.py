@@ -91,16 +91,12 @@ def _emit_block(reason: str) -> None:
 
 
 def _record_gate_denial(pattern_id: str, subject: str, reason: str) -> None:
-    path = Path(
-        os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl")
-    )
+    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl"))
     if not path.is_absolute():
         path = _project_root() / path
     record = {
         "schema_version": 1,
-        "timestamp_utc": _dt.datetime.now(tz=_dt.UTC)
-        .isoformat()
-        .replace("+00:00", "Z"),
+        "timestamp_utc": _dt.datetime.now(tz=_dt.UTC).isoformat().replace("+00:00", "Z"),
         "gate": "narrative-artifact-approval-gate",
         "pattern_id": pattern_id,
         "command_hash": hashlib.sha256(subject.encode("utf-8")).hexdigest(),
@@ -162,9 +158,7 @@ def _is_protected(rel_path: str, config: dict[str, Any]) -> bool:
     return not (exempted_patterns and _matches_any(exempted_patterns, rel_path))
 
 
-def _resolve_packet_path(
-    tool_input: dict[str, Any], config: dict[str, Any], root: Path
-) -> str | None:
+def _resolve_packet_path(tool_input: dict[str, Any], config: dict[str, Any], root: Path) -> str | None:
     detection = config.get("hook_detection", {}) or {}
     env_names = detection.get("env_var_names", []) or []
     for name in env_names:
@@ -178,9 +172,7 @@ def _resolve_packet_path(
     return None
 
 
-def _load_packet(
-    packet_ref: str, root: Path
-) -> tuple[dict[str, Any] | None, str | None]:
+def _load_packet(packet_ref: str, root: Path) -> tuple[dict[str, Any] | None, str | None]:
     try:
         path = Path(packet_ref).expanduser()
         if not path.is_absolute():
@@ -231,9 +223,7 @@ def _validate_packet(
     # in tool_input; we only enforce when content is present. The comparison is
     # LF-normalized so a Windows Write carrying CRLF bytes still matches the
     # LF-normalized owner-approved packet (WI-6012).
-    if new_content is not None and _normalize_lf(new_content) != _normalize_lf(
-        full_content
-    ):
+    if new_content is not None and _normalize_lf(new_content) != _normalize_lf(full_content):
         return (
             "approval packet full_content does not match the proposed Write/Edit content "
             "(packet must be regenerated when the content changes)"
@@ -264,11 +254,7 @@ def _reconstruct_edit_content(file_path: str, tool_input: dict[str, Any]) -> str
     """
     old_string = tool_input.get("old_string")
     new_string = tool_input.get("new_string")
-    if (
-        not isinstance(old_string, str)
-        or not old_string
-        or not isinstance(new_string, str)
-    ):
+    if not isinstance(old_string, str) or not old_string or not isinstance(new_string, str):
         return None
     try:
         current = Path(file_path).read_text(encoding="utf-8")
@@ -285,9 +271,7 @@ def _reconstruct_edit_content(file_path: str, tool_input: dict[str, Any]) -> str
     return current.replace(old_string, new_string, 1)
 
 
-def _autodiscover_packet(
-    root: Path, rel_path: str, new_content: str | None
-) -> str | None:
+def _autodiscover_packet(root: Path, rel_path: str, new_content: str | None) -> str | None:
     """HYG-047 (FAB-14): find an owner-approved packet on disk matching THIS write.
 
     Scans .groundtruth/formal-artifact-approvals/*.json newest-first for a packet
@@ -395,9 +379,7 @@ def main() -> None:
 
     packet, parse_error = _load_packet(packet_ref, root)
     if parse_error or packet is None:
-        _emit_block(
-            _block_reason(rel_path, parse_error or "approval packet did not load")
-        )
+        _emit_block(_block_reason(rel_path, parse_error or "approval packet did not load"))
         return
 
     error = _validate_packet(packet, rel_path, new_content)
