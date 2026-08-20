@@ -160,19 +160,26 @@ reproduce or exceed the review depth.
 
 ## VERIFIED Commit Finalization
 
-For post-implementation verification, `VERIFIED` is valid only when Loyal
-Opposition uses the verification finalization helper to create the local commit
-that contains the verified work and the new `VERIFIED` verdict artifact:
+For post-implementation verification, Loyal Opposition commits the verified work
+product first and emits `VERIFIED` second:
 
-```text
-python scripts/skill-helpers/gtkb-verify/write_verdict.py --slug <document-name> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [--include <verified-path> ...]
-```
+1. Verify the work product against the linked specifications.
+2. Create the local git commit containing the verified work. The commit message
+   MUST cite every work item it retires, in the form `(WI-NNNN)`.
+3. Only after that commit succeeds, write the `VERIFIED` verdict as the next
+   numbered bridge file, excluded from the commit created in step 2, carrying
+   the resulting commit SHA as post-commit evidence.
 
-If the helper cannot create the commit, Loyal Opposition must fail closed and
-must not leave a terminal `VERIFIED` file in the bridge chain. The verdict may
-record intended commit subject and staged path evidence before the commit; the
-final commit SHA is reported by the helper after success and is not embedded in
-the committed verdict file.
+The work item becomes terminal at step 2. Step 3 signals that the verified work
+is already committed and releases the locks and holds on the work item and the
+bridge thread.
+
+If the commit in step 2 fails, Loyal Opposition fails closed and leaves no
+terminal `VERIFIED` file in the bridge chain.
+
+A tool or workflow that writes `VERIFIED` before the work-product commit, or
+that places the verdict inside that commit, is defective and must be repaired
+rather than worked around.
 
 ## Required Focus Areas
 

@@ -56,7 +56,7 @@ records `GO`, and the implementation-start packet is created from that GO.
 The hook `scripts/implementation_start_gate.py` must deny protected source,
 test, script, hook, configuration, deployment, repository-state, and KB-mutation
 work when the packet is missing, corrupt, expired, stale relative to
-TAFE/dispatcher bridge state, or outside the GO'd proposal's `target_paths`.
+bridge state, or outside the GO'd proposal's `target_paths`.
 
 Implementation proposals filed after this gate lands must include a
 `Requirement Sufficiency` subsection. It must state either that existing
@@ -134,11 +134,11 @@ If Loyal Opposition is verifying an implementation:
    `Clause Applicability` section in any `VERIFIED` verdict.
 7. Issue `NO-GO` instead of `VERIFIED` for any untested linked specification or
    blocking-gap clause unless an explicit owner waiver is documented.
-8. Record `VERIFIED` only through the atomic finalization helper:
-   `python scripts/skill-helpers/gtkb-verify/write_verdict.py --slug <document-name> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [...]`.
-   The helper must create the local commit containing the verified paths and the
-   verdict artifact. If commit creation fails, Loyal Opposition must fail closed
-   and must not leave the bridge thread terminal.
+8. Commit the verified work product first, with a message citing every work item
+   it retires in the form `(WI-NNNN)`. Only after that commit succeeds, record
+   `VERIFIED` as the next numbered bridge file, excluded from that commit and
+   carrying the resulting commit SHA as post-commit evidence. If the commit
+   fails, fail closed and leave the bridge thread non-terminal.
 
 This applies even when:
 - The change "seems too small to review"

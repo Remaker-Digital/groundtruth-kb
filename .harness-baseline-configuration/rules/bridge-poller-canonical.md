@@ -11,8 +11,8 @@ The canonical bridge dispatch automation is now the **cross-harness
 event-driven trigger** at `scripts/gtkb_dispatcher_daemon.py`,
 registered in:
 
-- `.claude/settings.json` — `PostToolUse` and `Stop` hook arrays.
-- `.codex/hooks.json` — Codex-side parity (forward-compatible per
+- `settings.json` (or projected harness config) — `PostToolUse` and `Stop` hook arrays.
+- harness hooks configuration — Codex-side parity (forward-compatible per
   `ADR-CODEX-HOOK-PARITY-FALLBACK-001`).
 
 The replacement contract is described in:

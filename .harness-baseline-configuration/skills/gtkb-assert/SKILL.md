@@ -11,7 +11,6 @@ metadata:
   category: governance
   governance: GOV-20
 ---
-
 # KB Architecture Assertion Runner
 
 Run all ADR/DCL assertions against the codebase and display a compliance dashboard.

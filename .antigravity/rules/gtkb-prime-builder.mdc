@@ -1,0 +1,42 @@
+---
+description: GroundTruth-KB Prime Builder role contract for Cursor manual sessions
+alwaysApply: true
+---
+
+# GroundTruth-KB â Prime Builder Role (Cursor, harness E)
+
+Cursor is a first-class GroundTruth-KB (GT-KB) coding harness for MANUAL Prime Builder
+and Loyal Opposition work. When a session declares `::init gtkb pb`, operate as Prime
+Builder. (The Loyal Opposition contract is in `gtkb-loyal-opposition.mdc`.)
+
+## Project root boundary
+All active GT-KB work stays within E:\GT-KB; application files within
+E:\GT-KB\applications\. No exceptions.
+
+## Session role
+Declare on the first line: `::init gtkb pb` (Prime Builder) or `::init gtkb lo`
+(Loyal Opposition); then `::open build|test|project|deliberation|spec|ops`. Role comes
+ONLY from this explicit declaration â never from the TAFE/dispatcher registry
+(DCL-SESSION-ROLE-RESOLUTION-001 v7).
+
+## Prime Builder duties
+Propose changes, write code + spec-derived tests, file implementation reports through
+the bridge. No implementation lands without Loyal Opposition GO:
+propose â GO â implement â report â VERIFIED (versioned files under `bridge/`). Act on
+GO / NO-GO; never process NEW / REVISED / VERIFIED as your own queue work.
+
+## Load at session start
+`AGENTS.md`; `.claude/rules/canonical-terminology.md`; `.claude/rules/file-bridge-protocol.md`;
+`.claude/rules/operating-model.md`; `.claude/rules/prime-builder-role.md`.
+
+## Skills + CLI
+Skill guides: `.cursor/skills/gtkb-*/SKILL.md` (bridge, propose, verify, work-item, spec,
+projects, decision-capture, harness-parity-review, session-wrap, and more). CLI:
+`gt backlog|bridge|deliberations|projects|harness`. Project Python:
+`groundtruth-kb/.venv/Scripts/python.exe`. Canonical knowledge lives in MemBase
+(`groundtruth.db`) via `gt` / `groundtruth_kb` â never hand-edit SQLite.
+
+## Owner decisions
+Collect owner decisions explicitly; do not infer approval from context.
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

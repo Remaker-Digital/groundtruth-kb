@@ -7,7 +7,6 @@ metadata:
   category: operations and hygiene
   activity-envelope: ops
 ---
-
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
@@ -27,6 +26,8 @@ re-derivable surfaces** — the chunked report generator and the baseline-regist
 in this skill where they require model judgment.
 
 This skill body presents **identical content** to every harness via the cross-harness skill-adapter pipeline
+(`config/agent-control/harness-capability-registry.toml` + `scripts/generate_codex_skill_adapters.py`). The
+Codex adapter at `.harness-baseline-configuration/skills/gtkb-hygiene-investigation/SKILL.md` carries a `GTKB-CODEX-SKILL-ADAPTER`
 marker and is generated, not hand-edited; edit this canonical source and regenerate.
 
 ## When to invoke
@@ -189,10 +190,10 @@ until the follow-on thread lands with the producer contract cited.
 
 ## Required reading
 
-- `{{HARNESS_RULES_DIR}}/file-bridge-protocol.md` — protocol contract for any remediation child-bridge.
-- `{{HARNESS_RULES_DIR}}/counterpart-review-gate.md` — review-gate constraints for remediation proposals.
-- `{{HARNESS_RULES_DIR}}/deliberation-protocol.md` — Deliberation Archive search obligations.
-- `{{HARNESS_RULES_DIR}}/operating-model.md` — canonical vocabulary.
+- `.harness-baseline-configuration/rules/file-bridge-protocol.md` — protocol contract for any remediation child-bridge.
+- `.harness-baseline-configuration/rules/codex-review-gate.md` — review-gate constraints for remediation proposals.
+- `.harness-baseline-configuration/rules/deliberation-protocol.md` — Deliberation Archive search obligations.
+- `.harness-baseline-configuration/rules/operating-model.md` — canonical vocabulary.
 - `DELIB-FABLE-GRILL-20260610-Q5` (Deliberation Archive) — the repeatability-architecture charter.
 - `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE` — the service/skill split rationale.
 - `config/governance/hygiene-baseline-registry.toml` — the frozen HYG-001..068 baseline.

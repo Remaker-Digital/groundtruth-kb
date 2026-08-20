@@ -10,14 +10,13 @@ metadata:
   project: groundtruth-kb
   category: investigation
 ---
-
 # Alternatives Investigation
 
 Investigate distinct solution paths and recommend the best option under the real project constraints.
 
 ## Default Deliverable
 
-Use `{{HARNESS_RULES_DIR}}/template-decision-memo.md`.
+Use `.harness-baseline-configuration/rules/template-decision-memo.md`.
 
 ## Required Comparison Dimensions
 
@@ -41,4 +40,3 @@ Check each option for:
 ---
 
 Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-

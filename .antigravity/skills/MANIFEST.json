@@ -1,0 +1,267 @@
+{
+  "adapter_contract": "full behavioral adapter; no harness-state side effects",
+  "adapters": [
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-adr/SKILL.md",
+      "canonical_name": "gtkb-adr",
+      "capability_id": "skill.kb-adr",
+      "source_relative_path": ".agents/skills/gtkb-adr/SKILL.md",
+      "source_sha256": "4b1ec3c66407daa82cd66a84eefe1e2ed6e8d83cc4a4d7e0f7383bb7dd03b969"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-alternatives-investigation/SKILL.md",
+      "canonical_name": "gtkb-alternatives-investigation",
+      "capability_id": "skill.alternatives-investigation",
+      "source_relative_path": ".agents/skills/gtkb-alternatives-investigation/SKILL.md",
+      "source_sha256": "44b7fd37bc51973b7f045c492fb71064f64678a9f3fbd487cf76a5fef0d1f706"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-arch-audit/SKILL.md",
+      "canonical_name": "gtkb-arch-audit",
+      "capability_id": "skill.arch-audit",
+      "source_relative_path": ".agents/skills/gtkb-arch-audit/SKILL.md",
+      "source_sha256": "0c933f48c14c2f068a8fadca6a8b2727a489265c916a372338676772c1bd7453"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-assert/SKILL.md",
+      "canonical_name": "gtkb-assert",
+      "capability_id": "skill.kb-assert",
+      "source_relative_path": ".agents/skills/gtkb-assert/SKILL.md",
+      "source_sha256": "21efa5bb54ede144061770a326b29632a6139d935c85e0fa3d6d4aefb85cbcdf"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-assertion-triage/SKILL.md",
+      "canonical_name": "gtkb-assertion-triage",
+      "capability_id": "skill.assertion-triage",
+      "source_relative_path": ".agents/skills/gtkb-assertion-triage/SKILL.md",
+      "source_sha256": "d43e7a58978173c7b877652ba31b7e5a4be4d7f2c1d5973fddca19e31739b5df"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-batch/SKILL.md",
+      "canonical_name": "gtkb-batch",
+      "capability_id": "skill.kb-batch",
+      "source_relative_path": ".agents/skills/gtkb-batch/SKILL.md",
+      "source_sha256": "e3269505c142a81126c6615619d06b9f1156253b1cf88bbb71d272e42fd2df7c"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-benchmarks/SKILL.md",
+      "canonical_name": "gtkb-benchmarks",
+      "capability_id": "skill.gtkb-benchmarks",
+      "source_relative_path": ".agents/skills/gtkb-benchmarks/SKILL.md",
+      "source_sha256": "31a83117293b282f51310b01c097559e0c6d4b91c91d90b6ca19aa8a1b837d79"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-bridge-config/SKILL.md",
+      "canonical_name": "gtkb-bridge-config",
+      "capability_id": "skill.bridge-config",
+      "source_relative_path": ".agents/skills/gtkb-bridge-config/SKILL.md",
+      "source_sha256": "3e87f3b153c970444157317520d93279c195b9566b9e011aa7965e38e54245fb"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-bridge-propose/SKILL.md",
+      "canonical_name": "gtkb-bridge-propose",
+      "capability_id": "skill.bridge-propose",
+      "source_relative_path": ".agents/skills/gtkb-bridge-propose/SKILL.md",
+      "source_sha256": "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-bridge-reconciliation/SKILL.md",
+      "canonical_name": "gtkb-bridge-reconciliation",
+      "capability_id": "skill.bridge-reconciliation",
+      "source_relative_path": ".agents/skills/gtkb-bridge-reconciliation/SKILL.md",
+      "source_sha256": "04150ef93b4c545eb5a41310e03593b8fdd564d0bf13bf4db425661cb0b6808b"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-bridge/SKILL.md",
+      "canonical_name": "gtkb-bridge",
+      "capability_id": "skill.bridge",
+      "source_relative_path": ".agents/skills/gtkb-bridge/SKILL.md",
+      "source_sha256": "c046c9ce665251909efad7999265eb0032efcc6b610b9aaf3c45275407db5810"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-check-deliberations/SKILL.md",
+      "canonical_name": "gtkb-check-deliberations",
+      "capability_id": "skill.check-deliberations",
+      "source_relative_path": ".agents/skills/gtkb-check-deliberations/SKILL.md",
+      "source_sha256": "c0366f647fb36d34171c336bade6157dcf4c8ba33bb3a8ad82f6e0ef778526e2"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-code-review-audit/SKILL.md",
+      "canonical_name": "gtkb-code-review-audit",
+      "capability_id": "skill.code-review-audit",
+      "source_relative_path": ".agents/skills/gtkb-code-review-audit/SKILL.md",
+      "source_sha256": "5e16702bbb66c6667fcc69505d254b07912288ec5538a9d932f4039a9a87be54"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-decision-capture/SKILL.md",
+      "canonical_name": "gtkb-decision-capture",
+      "capability_id": "skill.decision-capture",
+      "source_relative_path": ".agents/skills/gtkb-decision-capture/SKILL.md",
+      "source_sha256": "24d8335416edce0e9a7676250a868fed7373f79d7d6eb20fbbdc2c0397f2777b"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-dispatcher-control/SKILL.md",
+      "canonical_name": "gtkb-dispatcher-control",
+      "capability_id": "skill.dispatcher-control",
+      "source_relative_path": ".agents/skills/gtkb-dispatcher-control/SKILL.md",
+      "source_sha256": "3ba260c4f6698a1d46c0031699984f5d8464549d74252cc675830c2dac30d6c2"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-grill-me-for-clarification/SKILL.md",
+      "canonical_name": "gtkb-grill-me-for-clarification",
+      "capability_id": "skill.grill-me-for-clarification",
+      "source_relative_path": ".agents/skills/gtkb-grill-me-for-clarification/SKILL.md",
+      "source_sha256": "781e7752a6cdd0332b99971534b64b36cad4d10652926d520b54e83c02678c08"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-harness-parity-review/SKILL.md",
+      "canonical_name": "gtkb-harness-parity-review",
+      "capability_id": "skill.harness-parity-review",
+      "source_relative_path": ".agents/skills/gtkb-harness-parity-review/SKILL.md",
+      "source_sha256": "609a37f9545de53b3f65e1566e1e7509a0d0bd55ddab59e4c2bf563de7f295d1"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-hygiene-investigation/SKILL.md",
+      "canonical_name": "gtkb-hygiene-investigation",
+      "capability_id": "skill.gtkb-hygiene-investigation",
+      "source_relative_path": ".agents/skills/gtkb-hygiene-investigation/SKILL.md",
+      "source_sha256": "4474b3c97a78fd01896fc2c02dec4a36b1d3d158f43e8f1d97a97ea14b832e94"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-hygiene-sweep/SKILL.md",
+      "canonical_name": "gtkb-hygiene-sweep",
+      "capability_id": "skill.gtkb-hygiene-sweep",
+      "source_relative_path": ".agents/skills/gtkb-hygiene-sweep/SKILL.md",
+      "source_sha256": "97ccc96744186df7ddb9a7548d15b64dc413c42cbde5909d99f87ab9ceb7465c"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-lo-hygiene-assessment/SKILL.md",
+      "canonical_name": "gtkb-lo-hygiene-assessment",
+      "capability_id": "skill.loyal-opposition-hygiene-assessment",
+      "source_relative_path": ".agents/skills/gtkb-lo-hygiene-assessment/SKILL.md",
+      "source_sha256": "69d66578cd14cbe3e807cd6a6a93c973e08dc8566a3734cfd773568bc7feaa9c"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-lo-opportunity-radar/SKILL.md",
+      "canonical_name": "gtkb-lo-opportunity-radar",
+      "capability_id": "skill.lo-opportunity-radar",
+      "source_relative_path": ".agents/skills/gtkb-lo-opportunity-radar/SKILL.md",
+      "source_sha256": "a47bfabea763756f69c20d4b4536f98eef0e408a6db115f616272d2099839d1f"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-loyal-opposition-report/SKILL.md",
+      "canonical_name": "gtkb-loyal-opposition-report",
+      "capability_id": "skill.codex-report",
+      "source_relative_path": ".agents/skills/gtkb-loyal-opposition-report/SKILL.md",
+      "source_sha256": "b30bff47d12c25c1ee2d684d95920562c47d03d2695b96efa0236b77b10054f7"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-projects/SKILL.md",
+      "canonical_name": "gtkb-projects",
+      "capability_id": "skill.projects",
+      "source_relative_path": ".agents/skills/gtkb-projects/SKILL.md",
+      "source_sha256": "17a2b01dd84becb7fe48487ef8ddff092f7b4897a16092406fb9b956f1394c2e"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-promote/SKILL.md",
+      "canonical_name": "gtkb-promote",
+      "capability_id": "skill.kb-promote",
+      "source_relative_path": ".agents/skills/gtkb-promote/SKILL.md",
+      "source_sha256": "5dab12bd288a3ce3d126c30d2670322617121432fcd7d0a38b7fdc93bed2e7cb"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-proposal-review/SKILL.md",
+      "canonical_name": "gtkb-proposal-review",
+      "capability_id": "skill.proposal-review",
+      "source_relative_path": ".agents/skills/gtkb-proposal-review/SKILL.md",
+      "source_sha256": "127b55f6e266ba9b92eff6ca71a9c669566957cf1de37c3da65a6d9a978a1367"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-propose/SKILL.md",
+      "canonical_name": "gtkb-propose",
+      "capability_id": "skill.gtkb-propose",
+      "source_relative_path": ".agents/skills/gtkb-propose/SKILL.md",
+      "source_sha256": "ed037162b4091af7814529100eb84aa3f902e8904038bdf884a2f74eb0f028a2"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-query/SKILL.md",
+      "canonical_name": "gtkb-query",
+      "capability_id": "skill.kb-query",
+      "source_relative_path": ".agents/skills/gtkb-query/SKILL.md",
+      "source_sha256": "f694720b346a85a5c239cb5aa03c01b18f819b33aa10a43aaff76eb46b8d1ca5"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-release-candidate-gate/SKILL.md",
+      "canonical_name": "gtkb-release-candidate-gate",
+      "capability_id": "skill.release-candidate-gate",
+      "source_relative_path": ".agents/skills/gtkb-release-candidate-gate/SKILL.md",
+      "source_sha256": "dc064edf4e9d291b640d0261bbd2293b24f37093f7bbc59127ed90ac997287b9"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-send-review/SKILL.md",
+      "canonical_name": "gtkb-send-review",
+      "capability_id": "skill.send-review",
+      "source_relative_path": ".agents/skills/gtkb-send-review/SKILL.md",
+      "source_sha256": "aa6437097d9fdcbb5b2368367e48b93b805b7082703edcc0fe4f720ae98eb7b2"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-session-wrap-scan/SKILL.md",
+      "canonical_name": "gtkb-session-wrap-scan",
+      "capability_id": "skill.kb-session-wrap-scan",
+      "source_relative_path": ".agents/skills/gtkb-session-wrap-scan/SKILL.md",
+      "source_sha256": "9468768273e151445af117755950d0467a8bd19d1e0357e61639cf41c2dfd83e"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-session-wrap/SKILL.md",
+      "canonical_name": "gtkb-session-wrap",
+      "capability_id": "skill.kb-session-wrap",
+      "source_relative_path": ".agents/skills/gtkb-session-wrap/SKILL.md",
+      "source_sha256": "6680210122f77b617608d543ebc53e0674a89dc418f552bbe09976d893166575"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-spec-intake/SKILL.md",
+      "canonical_name": "gtkb-spec-intake",
+      "capability_id": "skill.spec-intake",
+      "source_relative_path": ".agents/skills/gtkb-spec-intake/SKILL.md",
+      "source_sha256": "aa9090907a86ca0c1a05844ce51e509c66bdfe013ffa95b4ba4d5a3cf48ca111"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-spec/SKILL.md",
+      "canonical_name": "gtkb-spec",
+      "capability_id": "skill.kb-spec",
+      "source_relative_path": ".agents/skills/gtkb-spec/SKILL.md",
+      "source_sha256": "7430be6a9e5c424a3f27a71fe2b9f7580085f59858bcb1176252a095b67755ac"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-structural-hygiene-review/SKILL.md",
+      "canonical_name": "gtkb-structural-hygiene-review",
+      "capability_id": "skill.structural-hygiene-review",
+      "source_relative_path": ".agents/skills/gtkb-structural-hygiene-review/SKILL.md",
+      "source_sha256": "13de9e2f85addc7faa602baf9312bf00538d5bb33e4270036146052da0b1309b"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-sweep-commit/SKILL.md",
+      "canonical_name": "gtkb-sweep-commit",
+      "capability_id": "skill.gtkb-sweep-commit",
+      "source_relative_path": ".agents/skills/gtkb-sweep-commit/SKILL.md",
+      "source_sha256": "fc4b1626c9eeeb2eee79565165160453668a6236f91f9582828873283ac679ef"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-verify/SKILL.md",
+      "canonical_name": "gtkb-verify",
+      "capability_id": "skill.verify",
+      "source_relative_path": ".agents/skills/gtkb-verify/SKILL.md",
+      "source_sha256": "4472d09d17bed20105c5c862d86e6d73541d01c60d66707d24fee29bf0fc9eeb"
+    },
+    {
+      "adapter_relative_path": ".cursor/skills/gtkb-work-item/SKILL.md",
+      "canonical_name": "gtkb-work-item",
+      "capability_id": "skill.kb-work-item",
+      "source_relative_path": ".agents/skills/gtkb-work-item/SKILL.md",
+      "source_sha256": "b3b4a36c21530da6cc31470583a8baf3a9d1f4da19c579941d6df76085cee015"
+    }
+  ],
+  "generated_by": "scripts/generate_cursor_skill_adapters.py",
+  "schema_version": 1,
+  "source_of_truth": ".agents/skills/*/SKILL.md"
+}

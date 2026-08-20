@@ -6,7 +6,6 @@ metadata:
   category: specifications and governance
   license: "Proprietary - (c) 2026 Remaker Digital"
 ---
-
 This skill implements the governed requirement-intake path for
 ``groundtruth_kb.intake``. It is the skill-level wrapper that pairs
 confirm-before-mutate ergonomics with audit-trail differentiation

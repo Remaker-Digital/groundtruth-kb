@@ -13,7 +13,6 @@ metadata:
     - references/audit-checklist.md
     - references/handoff-template.md
 ---
-
 # Session Wrap-Up
 
 Run the mutating GT-KB session wrap-up. The purpose is knowledge collection first: preserve what future agents need to know, where the canonical state now lives, what evidence supports it, and what remains blocked.

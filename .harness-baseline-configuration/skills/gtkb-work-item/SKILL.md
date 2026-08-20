@@ -1,7 +1,7 @@
 ---
 name: gtkb-work-item
 description: Create a work item with automatic test creation and backlog assignment. Enforces GOV-12 (WI triggers tests) and GOV-13 (phase assignment) in a single invocation.
-argument-hint: [title] [--spec SPEC-ID] [--origin regression|defect|new|hygiene]
+argument-hint: "[title] [--spec SPEC-ID] [--origin regression|defect|new|hygiene]"
 allowed-tools: Bash, Read, Grep
 compatibility:
   - claude-code >= 1.0
@@ -14,7 +14,6 @@ metadata:
   license: "Proprietary - (c) 2026 Remaker Digital"
   activity-envelope: build, ops, project, deliberation, specification
 ---
-
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
@@ -41,7 +40,7 @@ wi = db.insert_work_item(
     id=f"WI-{next_wi}", title="...",
     origin="new", component="...",
     resolution_status="open",
-    changed_by="<active-harness-attribution>", change_reason="SXXX: ...",
+    changed_by="Claude", change_reason="SXXX: ...",
     description="...", source_spec_id="SPEC-XXXX",
     priority="medium",
 )
@@ -58,7 +57,7 @@ test = db.insert_test(
     id=f"TEST-{next_test}", title="Verify: ...",
     spec_id="SPEC-XXXX", test_type="assertion",
     expected_outcome="...",
-    changed_by="<active-harness-attribution>", change_reason=f"GOV-12: Test for WI-{next_wi}",
+    changed_by="Claude", change_reason=f"GOV-12: Test for WI-{next_wi}",
 )
 ```
 

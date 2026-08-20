@@ -5,7 +5,6 @@ metadata:
   project: groundtruth-kb
   category: implementation and planning
 ---
-
 This skill is the **composer** front-end to the `gtkb-bridge-propose`
 **writer**. It produces a gate-compliant draft; `gtkb-bridge-propose` performs
 the credential-scanned no-index bridge write and dispatcher/TAFE state

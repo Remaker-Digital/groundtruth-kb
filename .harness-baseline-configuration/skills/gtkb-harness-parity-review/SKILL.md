@@ -2,7 +2,6 @@
 name: gtkb-harness-parity-review
 description: Use when reviewing or correcting parity across GT-KB harnesses (Claude, Codex, Cursor, Antigravity, Ollama, OpenRouter), including skills, hooks, roles, commands, plugins, MCP tools, startup context, permissions, role-specific capabilities, or harness capability drift.
 ---
-
 # Harness Parity Review
 
 ## Goal
@@ -23,13 +22,13 @@ Read:
 
 - `harness-state/harness-registry.json` — durable harness IDs, status, and role sets
 - `config/agent-control/harness-capability-registry.toml` — capability matrix + `[[parity_waivers]]`
-- `.claude/skills/*/SKILL.md` — canonical project skills
+- `.harness-baseline-configuration/skills/*/SKILL.md` — canonical project skills
 - Harness-specific surfaces as needed:
-  - Claude: `.claude/settings.json`, `.claude/hooks/`
-  - Codex: `.codex/hooks.json`, `.codex/config.toml`, `.codex/gtkb-hooks/`
-  - Cursor: `.cursor/hooks.json`, `.cursor/skills/`
-  - Antigravity: `.agent/skills/`
-  - Ollama / OpenRouter: `.api-harness/skills/`, provider wrappers
+  - Claude: `settings.json`, `.harness-baseline-configuration/hooks/`
+  - Codex: `hooks.json`, `config.toml`, `gtkb-hooks/`
+  - Cursor: `.cursor/hooks.json`, `.harness-baseline-configuration/skills/`
+  - Antigravity: Antigravity skills directory
+  - Ollama / OpenRouter: API harness skills directory, provider wrappers
 
 ## Workflow
 
@@ -88,7 +87,7 @@ python scripts/parity_discovery_diff.py --project-root . --markdown
 
 ## Rules
 
-- Do not assume `.claude/skills` are native Codex skills.
+- Do not assume baseline skills are directly executable in other harnesses without projection or adaptation.
 - Do not assume Codex plugin skills are available to Claude Code.
 - Skill adapter manifests do **not** prove hook parity for API/provider harnesses.
 - Missing role-critical capability blocks normal role work unless the registry marks an
@@ -118,8 +117,8 @@ Include:
 
 | Harness | Generator Script | Adapter Surface |
 |---|---|---|
-| Claude Code | (canonical source — no generator needed) | `.claude/skills/` |
-| Codex | `scripts/generate_codex_skill_adapters.py` | `.codex/skills/` |
+| Claude Code | (canonical source — no generator needed) | `.harness-baseline-configuration/skills/` |
+| Codex | `scripts/generate_codex_skill_adapters.py` | `.harness-baseline-configuration/skills/` |
 | Antigravity | **No generator** — inline loading | N/A |
 | Cursor | **No generator** — Claude-compatible loading | N/A |
 | Goose | **No generator** — inline loading | N/A |

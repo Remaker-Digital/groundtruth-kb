@@ -7923,3 +7923,1770 @@ Entries were harvested to the Deliberation Archive before rotation.
   resolved_at: 2026-05-28T17:17:40.941114Z
   answer: "Your questions have been answered: \"Codex NO-GO P1-001 on env-SoT: the cited PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING (fast-lane) doesn't authorize formal governance/specification authoring. The WI-3427 origin is `improvement` (not defect/regression), the work creates new/revised specs, and the PAUTH's allowed_mutation_classes = [source, test_addition, hook_upgrade] omits spec mutation. What's the right authorization path?\"=\"New project + PAUTH (Recommended)\". You can now continue with these answers in mind."
   notes: ""
+
+- id: DECISION-0745
+  asked_at: 2026-05-28T17:28:55.419044Z
+  question: "Codex NO-GO on platform-tests-ruff-cleanup -002: 42-file existing-test lint cleanup (66 ruff violations) exceeds reliability fast-lane size envelope (~3 source files / 150 net lines guide); PAUTH allowed_mutation_classes = [source, test_addition, hook_upgrade] omits test_modification. The lint defect is real and WI-3423 exists. What's the right authorization path?"
+  options:
+    - "WI-specific PAUTH for WI-3423 (Recommended)"
+    - "Standard project PAUTH"
+    - "Scope reduction to fast-lane"
+    - "Governance clarification first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cb922c2c218ae86e
+  resolved_at: 2026-05-28T17:28:55.419044Z
+  answer: "Your questions have been answered: \"Codex NO-GO on platform-tests-ruff-cleanup -002: 42-file existing-test lint cleanup (66 ruff violations) exceeds reliability fast-lane size envelope (~3 source files / 150 net lines guide); PAUTH allowed_mutation_classes = [source, test_addition, hook_upgrade] omits test_modification. The lint defect is real and WI-3423 exists. What's the right authorization path?\"=\"WI-specific PAUTH for WI-3423 (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0746
+  asked_at: 2026-05-28T19:08:45.667056Z
+  question: "Env-SoT Step 0-A DELIB #1 capture: approve formal-artifact-approval packet for DELIB-S365-ENV-SOT-FORMALIZATION-TRACK insertion? Proposed content: title='S365 Owner AUQ Answer - env-SoT Formalization Track Choice'; source_type=owner_conversation; source_ref='AskUserQuestion answer 2026-05-28'; session_id=S365; outcome=owner_decision; detected_via=ask_user_question; summary='Owner selected ADR + DCL + revision (Recommended) as the formalization track for env-SoT topology + CLI-enforcement principle. Per GOV-20 architecture decision workflow: author ADR-ENV-SOT-TOPOLOGY-001, DCL-ENV-CLI-ENFORCEMENT-001, and revise GOV-ENV-LOCAL-AUTHORITY-001 to v2. Three new/revised artifacts.'; linked_to=WI-3427."
+  options:
+    - "Approve as proposed"
+    - "Revise content"
+    - "Reject this DELIB"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 16d2e9fb1f6a56a8
+  resolved_at: 2026-05-28T19:08:45.667056Z
+  answer: "Your questions have been answered: \"Env-SoT Step 0-A DELIB #1 capture: approve formal-artifact-approval packet for DELIB-S365-ENV-SOT-FORMALIZATION-TRACK insertion? Proposed content: title='S365 Owner AUQ Answer - env-SoT Formalization Track Choice'; source_type=owner_conversation; source_ref='AskUserQuestion answer 2026-05-28'; session_id=S365; outcome=owner_decision; detected_via=ask_user_question; summary='Owner selected ADR + DCL + revision (Recommended) as the formalization track for env-SoT topology + CLI-enforcement principle. Per GOV-20 architecture decision workflow: author ADR-ENV-SOT-TOPOLOGY-001, DCL-ENV-CLI-ENFORCEMENT-001, and revise GOV-ENV-LOCAL-AUTHORITY-001 to v2. Three new/revised artifacts.'; linked_to=WI-3427.\"=\"Approve as proposed\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0747
+  asked_at: 2026-05-28T19:08:56.156536Z
+  question: "Work-intent finally GO at -012 after 5 NO-GO cycles, but 2 of 6 target paths show uncommitted sibling-thread (quiesce-window) modifications. Inventory + sonar both VERIFIED. Many GO'd scoping threads in queue (likely already auto-dispatched). How to proceed?"
+  options:
+    - "Implement work-intent IP-0 only (new CLI; pure additive, zero contention) (Recommended)"
+    - "Implement work-intent IP-0 + IP-2 + IP-4 (all 3 clean IPs)"
+    - "Don't start work-intent; pick a different actionable thread"
+    - "File a small follow-on slice: pre-commit drift gate venv-routing fix"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f29d6328eddc8d4f
+  resolved_at: 2026-05-28T19:08:56.156536Z
+  answer: "Your questions have been answered: \"Work-intent finally GO at -012 after 5 NO-GO cycles, but 2 of 6 target paths show uncommitted sibling-thread (quiesce-window) modifications. Inventory + sonar both VERIFIED. Many GO'd scoping threads in queue (likely already auto-dispatched). How to proceed?\"=\"Implement work-intent IP-0 only (new CLI; pure additive, zero contention) (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0748
+  asked_at: 2026-05-28T19:30:17.926391Z
+  question: "Per-artifact approval for DELIB packet (GOV-ARTIFACT-APPROVAL-001). Inserts DELIB-S366-PLATFORM-TESTS-RUFF-PAUTH-PATH into MemBase, capturing your S366 AUQ answer 'WI-specific PAUTH for WI-3423' as durable owner-decision evidence. Full content sha256: `b9e4e0d364cd58ef8d39378fecc8b15d843d12544a79782b512c544ce0ed7df7`. Approve as-shown in preview, approve with edits you'll describe, or reject?"
+  options:
+    - "Approve as-shown"
+    - "Approve with edits I will describe"
+    - "Reject — reconsider thread direction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 76412a8572fc26b2
+  resolved_at: 2026-05-28T19:30:17.926391Z
+  answer: "Your questions have been answered: \"Per-artifact approval for DELIB packet (GOV-ARTIFACT-APPROVAL-001). Inserts DELIB-S366-PLATFORM-TESTS-RUFF-PAUTH-PATH into MemBase, capturing your S366 AUQ answer 'WI-specific PAUTH for WI-3423' as durable owner-decision evidence. Full content sha256: `b9e4e0d364cd58ef8d39378fecc8b15d843d12544a79782b512c544ce0ed7df7`. Approve as-shown in preview, approve with edits you'll describe, or reject?\"=\"Approve as-shown\" selected preview: # Deliberation Capture - DELIB-S366-PLATFORM-TESTS-RUFF-PAUTH-PATH  ## Capture  Insert a new deliberation row at DELIB-S366-PLATFORM-TESTS-RUFF-PAUTH-PATH into MemBase, capturing the owner S366 AskUserQuestion answer authorizing the WI-specific PAUTH path for WI-3423 (platform-tests-ruff cleanup).  ## Owner Decision Captured  - session_id: S366 - detected_via: ask_user_question - source_type: owner_conversation - outcome: owner_decision - work_item_id: WI-3423  Owner was asked (S366 AUQ, 2026-05-28) how to authorize the 42-file platform_tests/ ruff lint cleanup, given that Codex -002 NO-GO found PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING scope-incompatible (fast-lane envelope: ~3 files / ~150 LoC guide; mutation classes [source, test_addition, hook_upgrade] without test_modification). Four options were presented: (a) narrow scope to fast-lane slice, (b) WI-specific PAUTH for WI-3423, (c) move to broader project authorization, (d) withdraw entirely. Owner selected option (b) WI-specific PAUTH for WI-3423 (Recommended).  This DELIB row captures the durable owner-decision evidence for downstream artifacts (PAUTH-WI-3423-PLATFORM-TESTS-RUFF-001 will cite this DELIB ID as its owner_decision_deliberation_id).  The owner decision authorizes:  1. Creating PAUTH-WI-3423-PLATFORM-TESTS-RUFF-001 (separate per-artifact approval packet). 2. With allowed_mutation_classes including test_modification to cover existing test-file modifications. 3. Scoped to WI-3423 only (platform_tests/**/*.py cleanup). 4. Under PROJECT-GTKB-RELIABILITY-FIXES parent project (via existing WI-3423 membership).  The PAUTH-creation work itself is scoped through bridge/gtkb-wi-3423-pauth-creation (this bridge thread) under spec_intake bridge_kind, GO at -002. The future cleanup implementation is OUT OF SCOPE for this PAUTH-creation thread and will refile separately as implementation_proposal once the PAUTH exists in MemBase.  ## Owner Approval  Approved by the owner via AskUserQuestion in session S366 (2026-05-28). The owner selected WI-specific PAUTH for WI-3423 (Recommended) from a 4-option AUQ presenting fast-lane-narrowing vs WI-specific PAUTH vs broader-project vs withdrawal paths.  ## Governing Constraint  GOV-CHAT-DERIVED-SPEC-APPROVAL-001 and SPEC-AUQ-POLICY-ENGINE-001 require owner-AUQ-derived governance decisions be captured as deliberation records before downstream artifacts (e.g., PAUTHs) cite them as owner-decision evidence.  GOV-ARTIFACT-APPROVAL-001, PB-ARTIFACT-APPROVAL-001, and DCL-ARTIFACT-APPROVAL-HOOK-001 require an owner-approved formal-artifact-approval packet for any MemBase governance-artifact mutation. This packet is that evidence; it is cited by path in the change_reason of the deliberations INSERT operation.. You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0749
+  asked_at: 2026-05-28T19:30:17.926391Z
+  question: "Per-artifact approval for PAUTH packet (GOV-ARTIFACT-APPROVAL-001). Creates PAUTH-WI-3423-PLATFORM-TESTS-RUFF-001 v1 in MemBase: WI-specific PAUTH for the 42-file platform_tests/ ruff cleanup with `test_modification` class included, cites DELIB-S366-PLATFORM-TESTS-RUFF-PAUTH-PATH (just inserted) as owner-decision evidence. Full content sha256: `072dc09832e8be06f9603db7427768485d148791716c44d3de0124b8e3e17cc3`. Approve as-shown, approve with edits, or reject?"
+  options:
+    - "Approve as-shown"
+    - "Approve with edits I will describe"
+    - "Reject — stop PAUTH creation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 738257413d95f64a
+  resolved_at: 2026-05-28T19:30:17.926391Z
+  answer: "Your questions have been answered: \"Per-artifact approval for PAUTH packet (GOV-ARTIFACT-APPROVAL-001). Creates PAUTH-WI-3423-PLATFORM-TESTS-RUFF-001 v1 in MemBase: WI-specific PAUTH for the 42-file platform_tests/ ruff cleanup with `test_modification` class included, cites DELIB-S366-PLATFORM-TESTS-RUFF-PAUTH-PATH (just inserted) as owner-decision evidence. Full content sha256: `072dc09832e8be06f9603db7427768485d148791716c44d3de0124b8e3e17cc3`. Approve as-shown, approve with edits, or reject?\"=\"Approve as-shown\" selected preview: # Project Authorization Creation - PAUTH-WI-3423-PLATFORM-TESTS-RUFF-001  ## Creation  Insert a new project authorization at PAUTH-WI-3423-PLATFORM-TESTS-RUFF-001 (version 1) into MemBase project_authorizations table. This WI-specific PAUTH authorizes the bounded platform_tests/ ruff lint cleanup work for WI-3423 only, with a mutation-class set explicitly covering existing test-file modification.  ## PAUTH Fields  - id: PAUTH-WI-3423-PLATFORM-TESTS-RUFF-001 - version: 1 (initial creation) - project_id: PROJECT-GTKB-RELIABILITY-FIXES - status: active - authorization_name: WI-3423 platform-tests ruff cleanup authorization - owner_decision_deliberation_id: DELIB-S366-PLATFORM-TESTS-RUFF-PAUTH-PATH (just inserted) - scope_summary: platform_tests/ ruff lint cleanup: 66 violations across 42 files; bounded to platform_tests/**/*.py; per S366 AUQ; explicitly NOT GOV-RELIABILITY-FAST-LANE-001 eligible. - allowed_mutation_classes: [source, test_addition, test_modification, hook_upgrade] - forbidden_operations: [deploy, git_push_force, spec_deletion] - included_work_item_ids: [WI-3423] - included_spec_ids: [GOV-RELIABILITY-FAST-LANE-001] (cited explicitly to document non-fast-lane scope) - expires_at: none  ## Rationale  The cleanup is too large for PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING (42 files vs ~3 file fast-lane envelope) AND requires test_modification class which the standing PAUTH does not enumerate. Codex -002 NO-GO articulated both findings; -004 NO-GO articulated the impl-auth packet binding requirement (PAUTH must be cited in implementation_proposal metadata, which spec_intake bridge_kind cannot bind).  The WI-specific PAUTH explicitly authorizes: 1. The 42-file scope of platform_tests/**/*.py 2. test_modification mutation class (alongside source, test_addition, hook_upgrade) 3. Single WI-3423 scope (no other WIs ride along) 4. Standing under the existing PROJECT-GTKB-RELIABILITY-FIXES parent  The companion bridge thread (gtkb-platform-tests-ruff-cleanup) will refile post-VERIFIED here as bridge_kind: implementation_proposal citing this PAUTH in Project Authorization: metadata.  ## Owner Approval  Approved by the owner via AskUserQuestion in session S368 (2026-05-28). The owner selected Approve as-shown from a 3-option AUQ presenting per-artifact approval of the full PAUTH content.  The underlying owner-decision authorizing the WI-specific PAUTH path was given in S366 AUQ (2026-05-28; option (b) WI-specific PAUTH for WI-3423 Recommended) and is captured in DELIB-S366-PLATFORM-TESTS-RUFF-PAUTH-PATH (also inserted under S368 per-artifact AUQ approval).  ## Governing Constraint  GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001 + DCL-PROJECT-AUTHORIZATION-ENVELOPE-001 require PAUTHs satisfy the envelope-field requirements (project_id, owner_decision_deliberation_id, scope_summary, allowed_mutation_classes, etc.).  PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001 requires PAUTHs be created through bridge-approved workflows. This PAUTH is created under bridge/gtkb-wi-3423-pauth-creation (GO at -002).  GOV-ARTIFACT-APPROVAL-001 + PB-ARTIFACT-APPROVAL-001 + DCL-ARTIFACT-APPROVAL-HOOK-001 require an owner-approved formal-artifact-approval packet for any MemBase governance-artifact mutation. This packet is that evidence; it is cited by path in the change_reason of the project_authorizations INSERT operation.. You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0750
+  asked_at: 2026-05-28T19:37:33.081649Z
+  question: "Both GO'd governance threads need 8 formal-artifact-approval packets, each capturing a decision you already made via S365/S366 AUQ (DELIB #2-4 + ADR/DCL/GOV-v2 for env-SoT; DELIB-S366 + PAUTH for WI-3423). Both GOs say approve 'one at a time'. Per .claude/rules/acting-prime-builder.md you can instead activate a scoped auto-approval state for this exact bounded set, which still writes + displays every packet in the transcript (audit preserved) but collapses 8 approval clicks into this one decision. How should I proceed?"
+  options:
+    - "Scoped auto-approval (Recommended)"
+    - "One at a time (strict GO)"
+    - "Auto-approve env-SoT only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0e658cef106ce3a0
+  resolved_at: 2026-05-28T19:37:33.081649Z
+  answer: "Your questions have been answered: \"Both GO'd governance threads need 8 formal-artifact-approval packets, each capturing a decision you already made via S365/S366 AUQ (DELIB #2-4 + ADR/DCL/GOV-v2 for env-SoT; DELIB-S366 + PAUTH for WI-3423). Both GOs say approve 'one at a time'. Per .claude/rules/acting-prime-builder.md you can instead activate a scoped auto-approval state for this exact bounded set, which still writes + displays every packet in the transcript (audit preserved) but collapses 8 approval clicks into this one decision. How should I proceed?\"=\"Scoped auto-approval (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0751
+  asked_at: 2026-05-28T19:49:27.070922Z
+  question: "WI-3420 (gtkb-hygiene-sweep-cli) is VERIFIED at -004 but uncommitted since S365 — 5 files in the working tree (3 untracked: hygiene-sweep-patterns.toml, hygiene/__init__.py, hygiene/sweep.py, test_hygiene_sweep_cli.py; 1 modified: cli.py). Working tree has 547 status lines of parallel-session noise; 0 currently staged. WI-3421's REVISED-2 just filed at -003 and is awaiting Codex GO at -004. How should I handle the WI-3420 commit window?"
+  options:
+    - "Commit WI-3420 now (pathspec-scoped)"
+    - "Defer until WI-3421 also VERIFIED; bundle 3420+3421"
+    - "Defer through this session entirely"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9197bc3da4dfaae4
+  resolved_at: 2026-05-28T19:49:27.070922Z
+  answer: "Your questions have been answered: \"WI-3420 (gtkb-hygiene-sweep-cli) is VERIFIED at -004 but uncommitted since S365 — 5 files in the working tree (3 untracked: hygiene-sweep-patterns.toml, hygiene/__init__.py, hygiene/sweep.py, test_hygiene_sweep_cli.py; 1 modified: cli.py). Working tree has 547 status lines of parallel-session noise; 0 currently staged. WI-3421's REVISED-2 just filed at -003 and is awaiting Codex GO at -004. How should I handle the WI-3420 commit window?\"=\"Defer until WI-3421 also VERIFIED; bundle 3420+3421\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0752
+  asked_at: 2026-05-28T20:10:38.876487Z
+  question: "env-SoT post-impl can't reach VERIFIED: the spec-derived runner is fail-closed and 23 of 24 cited tokens are prose governance/context specs with no executable derived tests (e.g. GOV-08, GOV-FILE-BRIDGE-AUTHORITY-001, the new ADR/DCL/GOV whose tests await the gt env CLI). The artifacts are ALREADY live in MemBase; only the bridge thread's VERIFIED close is pending. The DCL-VERIFIED-SPEC-DERIVED-TESTING gate explicitly permits owner-approved coverage waivers. How should we clear it?"
+  options:
+    - "Coverage-waiver now + capture tooling fix (Recommended)"
+    - "Defer close; fix tooling first"
+    - "Coverage-waiver only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e1beef9e957ceae1
+  resolved_at: 2026-05-28T20:10:38.876487Z
+  answer: "Your questions have been answered: \"env-SoT post-impl can't reach VERIFIED: the spec-derived runner is fail-closed and 23 of 24 cited tokens are prose governance/context specs with no executable derived tests (e.g. GOV-08, GOV-FILE-BRIDGE-AUTHORITY-001, the new ADR/DCL/GOV whose tests await the gt env CLI). The artifacts are ALREADY live in MemBase; only the bridge thread's VERIFIED close is pending. The DCL-VERIFIED-SPEC-DERIVED-TESTING gate explicitly permits owner-approved coverage waivers. How should we clear it?\"=\"Coverage-waiver now + capture tooling fix (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0753
+  asked_at: 2026-05-28T21:25:21.189369Z
+  question: "WI-3349 Gemini substrate: your S364 choice (registry stores absolute path) was NO-GO'd because command_path 'C:\\Users\\micha\\AppData\\Roaming\\npm\\gemini.CMD' is out-of-root and project-root-boundary.md forbids GT-KB artifacts depending on paths outside E:\\GT-KB (no exceptions beyond the sandbox case). Note: the registry already stores bare 'gemini'/'codex'/'claude' argv resolved via PATH — invoking external CLIs is fine; only STORING the absolute out-of-root path is the violation. How should I revise?"
+  options:
+    - "Dispatch enriches PATH (Recommended)"
+    - "Amend root-boundary rule for external harnesses"
+    - "In-root governed launcher surface"
+    - "Defer WI-3349 again"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4c55f0a6d00d72c2
+  resolved_at: 2026-05-28T21:25:21.189369Z
+  answer: "Your questions have been answered: \"WI-3349 Gemini substrate: your S364 choice (registry stores absolute path) was NO-GO'd because command_path 'C:\\Users\\micha\\AppData\\Roaming\\npm\\gemini.CMD' is out-of-root and project-root-boundary.md forbids GT-KB artifacts depending on paths outside E:\\GT-KB (no exceptions beyond the sandbox case). Note: the registry already stores bare 'gemini'/'codex'/'claude' argv resolved via PATH — invoking external CLIs is fine; only STORING the absolute out-of-root path is the violation. How should I revise?\"=\"Dispatch enriches PATH (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0754
+  asked_at: 2026-05-28T21:51:44.883267Z
+  question: "I scoped the outstanding bridge work and have 4 high-value action paths. Each is sized at ~30-60 min of Prime work (drafting + filing + preflights + INDEX update). Which should I tackle this session? (Multi-select OK.)"
+  options:
+    - "Address 3 clear-path NO-GOs (Recommended)"
+    - "Tackle work-intent-registry landmine"
+    - "AUQ-resolve gtkb-headless-gemini-lo-dispatch-verification"
+    - "Stand down, wait for Codex -010 on ruff thread"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4fcc9ca369a3fff9
+  resolved_at: 2026-05-28T21:51:44.883267Z
+  answer: "Your questions have been answered: \"I scoped the outstanding bridge work and have 4 high-value action paths. Each is sized at ~30-60 min of Prime work (drafting + filing + preflights + INDEX update). Which should I tackle this session? (Multi-select OK.)\"=\"Address 3 clear-path NO-GOs (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0755
+  asked_at: 2026-05-28T22:09:18.486119Z
+  question: "WI-3420's test file (platform_tests/scripts/test_hygiene_sweep_cli.py) is destroyed in the live workspace — never committed (per S365 deferral + S367 bundle-defer decision), wiped by parallel-session cleanup. WI-3420 remained VERIFIED at -004 with 23 tests passing at verification time; the verdict file is in bridge/ but its evidence file is gone. WI-3421 is intact (5 files including its test file restored this turn). The owner-authorized bundle commit is now incomplete on the WI-3420 side. How to proceed?"
+  options:
+    - "Rebuild WI-3420 test file + commit full bundle (Recommended)"
+    - "Commit incomplete bundle now; track test gap in backlog"
+    - "Defer commit pending recovery investigation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5c6df476bdc3fc0d
+  resolved_at: 2026-05-28T22:09:18.486119Z
+  answer: "Your questions have been answered: \"WI-3420's test file (platform_tests/scripts/test_hygiene_sweep_cli.py) is destroyed in the live workspace — never committed (per S365 deferral + S367 bundle-defer decision), wiped by parallel-session cleanup. WI-3420 remained VERIFIED at -004 with 23 tests passing at verification time; the verdict file is in bridge/ but its evidence file is gone. WI-3421 is intact (5 files including its test file restored this turn). The owner-authorized bundle commit is now incomplete on the WI-3420 side. How to proceed?\"=\"Rebuild WI-3420 test file + commit full bundle (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0756
+  asked_at: 2026-05-28T22:09:55.657506Z
+  question: "WI-3349 (headless Gemini dispatch) is blocked at a deeper level than mechanism: BOTH your S364 (store path) and S366 (derive path) choices failed the SAME rule — project-root-boundary.md forbids routing harness/verification work to home-directory paths, no exceptions. But gemini.CMD genuinely lives out-of-root (npm-global), so ANY resolution mechanism touches a home-dir location. Note: the registry already dispatches codex/claude via ambient-PATH resolution of out-of-root CLIs — so the rule as written already conflicts with existing working behavior. How do you want to resolve this?"
+  options:
+    - "Amend root-boundary rule (Recommended)"
+    - "Defer/park WI-3349"
+    - "Investigate root-contained design first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 61ebe2d4d024d2a6
+  resolved_at: 2026-05-28T22:09:55.657506Z
+  answer: "Your questions have been answered: \"WI-3349 (headless Gemini dispatch) is blocked at a deeper level than mechanism: BOTH your S364 (store path) and S366 (derive path) choices failed the SAME rule — project-root-boundary.md forbids routing harness/verification work to home-directory paths, no exceptions. But gemini.CMD genuinely lives out-of-root (npm-global), so ANY resolution mechanism touches a home-dir location. Note: the registry already dispatches codex/claude via ambient-PATH resolution of out-of-root CLIs — so the rule as written already conflicts with existing working behavior. How do you want to resolve this?\"=\"Amend root-boundary rule (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0757
+  asked_at: 2026-05-29T00:02:05.330549Z
+  question: "How should I clear the protected-write quarantine cluster (6 files; helper + 2 SKILL.md edits + MANIFEST.json mixed-diff + the -005 report + -006 NO-GO verdict)?"
+  options:
+    - "Revert and drop the work"
+    - "File REVISED-007 to land it"
+    - "Stash the cluster for later"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5b244fbc4421378a
+  resolved_at: 2026-05-29T00:02:05.330549Z
+  answer: "Your questions have been answered: \"How should I clear the protected-write quarantine cluster (6 files; helper + 2 SKILL.md edits + MANIFEST.json mixed-diff + the -005 report + -006 NO-GO verdict)?\"=\"Revert and drop the work\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0759
+  asked_at: 2026-05-29T00:14:17.531775Z
+  question: "Given the 529-entry uncommitted backlog and the coupled-state risks I flagged, how should this session proceed?"
+  options:
+    - "Start the triage now"
+    - "Hold for a different session"
+    - "Pick a single thread cluster to land"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e5fb144c3716c3ae
+  resolved_at: 2026-05-29T00:14:17.531775Z
+  answer: "Your questions have been answered: \"Given the 529-entry uncommitted backlog and the coupled-state risks I flagged, how should this session proceed?\"=\"Start the triage now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0760
+  asked_at: 2026-05-29T00:14:17.531775Z
+  question: "Start with Phase 0 (gitignore patch), or take a different first step?"
+  options:
+    - "Phase 0: gitignore patch"
+    - "Phase 1: bridge audit trail"
+    - "Triage NO-GO/GO disposition first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2ac2b181be80dd53
+  resolved_at: 2026-05-29T00:14:17.531775Z
+  answer: "Your questions have been answered: \"Start with Phase 0 (gitignore patch), or take a different first step?\"=\"[User dismissed — do not proceed, wait for next instruction]\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0761
+  asked_at: 2026-05-29T00:41:25.040530Z
+  question: "Codex GO at -002. Which structural approach should Slice 2 implement?"
+  options:
+    - "A: Default-GT-KB + carve-out"
+    - "B: Per-section scope markers"
+    - "C: Split (recommended)"
+    - "D: Defer to triad-wide proposal"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0476cac3de761114
+  resolved_at: 2026-05-29T00:41:25.040530Z
+  answer: "Your questions have been answered: \"Codex GO at -002. Which structural approach should Slice 2 implement?\"=\"C: Split (recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0762
+  asked_at: 2026-05-29T00:41:25.040530Z
+  question: "ISOLATION-018 already planned CLAUDE.md correction as part of sub-slices 18.I + 18.K (umbrella WITHDRAWN; no sub-slices filed). How should Slice 2 relate?"
+  options:
+    - "Continue Slice 2 narrowly"
+    - "Reframe as 18.I sub-slice"
+    - "Withdraw Slice 1; restart umbrella"
+    - "Expand Slice 2 to 18.I scope"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c76ee993ba65a265
+  resolved_at: 2026-05-29T00:41:25.040530Z
+  answer: "Your questions have been answered: \"ISOLATION-018 already planned CLAUDE.md correction as part of sub-slices 18.I + 18.K (umbrella WITHDRAWN; no sub-slices filed). How should Slice 2 relate?\"=\"Expand Slice 2 to 18.I scope\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0763
+  asked_at: 2026-05-29T01:09:41.960148Z
+  question: "F1: How should the REVISED address the bridge_kind/implementation-metadata mismatch?"
+  options:
+    - "Create PROJECT/WI/PAUTH + add metadata"
+    - "Reframe Slice 2 as governance review"
+    - "Use existing reliability fast-lane"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: dae55ed661f2fbfa
+  resolved_at: 2026-05-29T01:09:41.960148Z
+  answer: "Your questions have been answered: \"F1: How should the REVISED address the bridge_kind/implementation-metadata mismatch?\"=\"Reframe Slice 2 as governance review\", \"F4: How should the REVISED handle the protected-artifact registry gap for new applications/Agent_Red/* files?\"=\"Expand registry to protect app-side files\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0764
+  asked_at: 2026-05-29T01:09:41.960148Z
+  question: "F4: How should the REVISED handle the protected-artifact registry gap for new applications/Agent_Red/* files?"
+  options:
+    - "Expand registry to protect app-side files"
+    - "Document app-side files as non-authoritative"
+    - "Hybrid: keep root stubs as protected authority"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7ce551645eb4e421
+  resolved_at: 2026-05-29T01:09:41.960148Z
+  answer: "Your questions have been answered: \"F1: How should the REVISED address the bridge_kind/implementation-metadata mismatch?\"=\"Reframe Slice 2 as governance review\", \"F4: How should the REVISED handle the protected-artifact registry gap for new applications/Agent_Red/* files?\"=\"Expand registry to protect app-side files\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0765
+  asked_at: 2026-05-29T01:31:27.901900Z
+  question: "Slice 2 closed at GO. What's the next move for this session?"
+  options:
+    - "Start Slice 3 setup"
+    - "Pivot back to triage"
+    - "Wrap up session"
+    - "Address DECISION-0758 first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 019e647956540871
+  resolved_at: 2026-05-29T01:31:27.901900Z
+  answer: "Your questions have been answered: \"Slice 2 closed at GO. What's the next move for this session?\"=\"Start Slice 3 setup\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0766
+  asked_at: 2026-05-29T02:59:41.377677Z
+  question: "Slice 3 REVISED-003 is filed and preflight-clean, awaiting Codex verdict. What should I do while waiting?"
+  options:
+    - "Wait passively for Codex"
+    - "Address DECISION-0758 + start triage"
+    - "Wrap up the session"
+    - "Verify dispatch state"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d183e96e8904909b
+  resolved_at: 2026-05-29T02:59:41.377677Z
+  answer: "Your questions have been answered: \"Slice 3 REVISED-003 is filed and preflight-clean, awaiting Codex verdict. What should I do while waiting?\"=\"bridge/gtkb-claude-md-scope-clarification-slice-3-implementation-005.md\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0767
+  asked_at: 2026-05-29T04:20:15.184438Z
+  question: "Slice 3 state is now: -009 VERIFIED (reviewer error per Codex) + -010 corrective NO-GO, AND the project was auto-retired at 03:34:47Z + PAUTH V2 marked completed (so impl-start gate blocks the F1/F2/F3 fixes). How do you want to proceed before the broader 599-entry triage starts?"
+  options:
+    - "Re-activate PAUTH/project + fix"
+    - "Accept -009 VERIFIED, commit Slice 3 as-is"
+    - "Pivot: triage everything EXCEPT Slice 3"
+    - "Fix the v3 trigger first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6ccfed267f2c67bc
+  resolved_at: 2026-05-29T04:20:15.184438Z
+  answer: "Your questions have been answered: \"Slice 3 state is now: -009 VERIFIED (reviewer error per Codex) + -010 corrective NO-GO, AND the project was auto-retired at 03:34:47Z + PAUTH V2 marked completed (so impl-start gate blocks the F1/F2/F3 fixes). How do you want to proceed before the broader 599-entry triage starts?\"=\"Re-activate PAUTH/project + fix\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0768
+  asked_at: 2026-05-29T05:45:37.879117Z
+  question: "Approve inserting DELIB-2500 (the refined-design deliberation above) into the Deliberation Archive as presented?"
+  options:
+    - "Approve & insert (Recommended)"
+    - "Edit first"
+    - "Hold — don't insert yet"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: bfeaf254c869f2c9
+  resolved_at: 2026-05-29T05:45:37.879117Z
+  answer: "Your questions have been answered: \"Approve inserting DELIB-2500 (the refined-design deliberation above) into the Deliberation Archive as presented?\"=\"Approve & insert (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0769
+  asked_at: 2026-05-29T05:56:01.226027Z
+  question: "Codex's -006 NO-GO requires explicit native-format owner approval of the PAUTH V3 envelope content (per GOV-ARTIFACT-APPROVAL-001 v3) — the S371 path-choice AUQ doesn't cover the artifact content. The exact envelope is presented above. How do you want to proceed?"
+  options:
+    - "Approve envelope as proposed"
+    - "Approve with adjustments (specify in chat)"
+    - "Pivot: triage everything EXCEPT Slice 3"
+    - "Bigger pivot: stop, fix v3 trigger first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 52807b4cedd6d685
+  resolved_at: 2026-05-29T05:56:01.226027Z
+  answer: "Your questions have been answered: \"Codex's -006 NO-GO requires explicit native-format owner approval of the PAUTH V3 envelope content (per GOV-ARTIFACT-APPROVAL-001 v3) — the S371 path-choice AUQ doesn't cover the artifact content. The exact envelope is presented above. How do you want to proceed?\"=\"Approve envelope as proposed\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0770
+  asked_at: 2026-05-29T06:24:52.379807Z
+  question: "A second Prime session is actively editing INDEX.md and the slice-3 thread right now (likely an auto-dispatched worker), with 596 files staged. Given that, how should I proceed on the ~13 genuinely-actionable threads?"
+  options:
+    - "Non-contended threads, no commits (Recommended)"
+    - "Isolated-only for now"
+    - "Hold all mutation until it clears"
+    - "That session is unexpected — I'll pause"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4734641ff8fa2030
+  resolved_at: 2026-05-29T06:24:52.379807Z
+  answer: "Your questions have been answered: \"A second Prime session is actively editing INDEX.md and the slice-3 thread right now (likely an auto-dispatched worker), with 596 files staged. Given that, how should I proceed on the ~13 genuinely-actionable threads?\"=\"Non-contended threads, no commits (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0771
+  asked_at: 2026-05-29T07:02:45.929370Z
+  question: "Codex's -017 NO-GO on the reauth post-impl report has two findings. F2 (append-only rollback text) is a straightforward fix. F1 is structural: my -014 proposal defined V5 ('impl-start gate accepts the Slice 3 implementation thread') as an acceptance criterion, but V5 can't actually pass until the implementation thread's GO'd proposal at -006 is revised to cite PAUTH V3 — that requires a SEPARATE bridge cycle on the implementation thread. Codex offered two valid paths to close F1. How do you want to proceed?"
+  options:
+    - "Owner waiver — close reauth thread first"
+    - "Run implementation thread cycle first"
+    - "Pivot — accept current state, defer both threads"
+    - "Other (specify)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 116c0d9f3216879f
+  resolved_at: 2026-05-29T07:02:45.929370Z
+  answer: "Your questions have been answered: \"Codex's -017 NO-GO on the reauth post-impl report has two findings. F2 (append-only rollback text) is a straightforward fix. F1 is structural: my -014 proposal defined V5 ('impl-start gate accepts the Slice 3 implementation thread') as an acceptance criterion, but V5 can't actually pass until the implementation thread's GO'd proposal at -006 is revised to cite PAUTH V3 — that requires a SEPARATE bridge cycle on the implementation thread. Codex offered two valid paths to close F1. How do you want to proceed?\"=\"Owner waiver — close reauth thread first\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0772
+  asked_at: 2026-05-29T13:54:48.030636Z
+  question: "Root cause pinned: scripts/project_verified_completion_scanner.py:verified_work_items() counts a WI as 'VERIFIED' if ANY VERIFIED bridge thread cites it in 'Work Item:' metadata — not just the WI's implementation thread. The reauth thread cited WI-3438 and reached VERIFIED, so it auto-completed PAUTH V3 + re-retired the project (3rd v3 misfire this session; WI-3438 is actually still open/backlogged). It's a loop: any reauth thread re-retires on its own VERIFIED. This also spuriously affects every other active project platform-wide. How should I proceed?"
+  options:
+    - "Fix the scanner (v4) first, then Slice 3"
+    - "Workaround: close Slice 3 without the v4 fix"
+    - "Pivot away from Slice 3 entirely"
+    - "Other (specify)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ed56242dca37a85d
+  resolved_at: 2026-05-29T13:54:48.030636Z
+  answer: "Your questions have been answered: \"Root cause pinned: scripts/project_verified_completion_scanner.py:verified_work_items() counts a WI as 'VERIFIED' if ANY VERIFIED bridge thread cites it in 'Work Item:' metadata — not just the WI's implementation thread. The reauth thread cited WI-3438 and reached VERIFIED, so it auto-completed PAUTH V3 + re-retired the project (3rd v3 misfire this session; WI-3438 is actually still open/backlogged). It's a loop: any reauth thread re-retires on its own VERIFIED. This also spuriously affects every other active project platform-wide. How should I proceed?\"=\"Fix the scanner (v4) first, then Slice 3\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0773
+  asked_at: 2026-05-29T13:54:48.030636Z
+  question: "The fix touches scripts/project_verified_completion_scanner.py AND lifecycle.py (duplicate _verified_work_items), plus a regression test. The authorization vehicle hinges on framing. Spec v3 ALREADY says completion triggers on 'the bridge thread ADDRESSING the work item' reaching VERIFIED — and the reauth thread doesn't address WI-3438, it only cites it for authorization linkage. So the code arguably already violates v3 (a code bug), not a spec gap. Which vehicle do you want? (All options deliver the same correct fix + Codex review + test; they differ in governance ceremony, and the discriminator design still needs Codex review either way.)"
+  options:
+    - "Code-bug fix via reliability fast-lane"
+    - "Formal v4 spec bump (heavyweight)"
+    - "Design-scoping round first"
+    - "Other (specify)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2cdf16697e3baeca
+  resolved_at: 2026-05-29T13:54:48.030636Z
+  answer: "Your questions have been answered: \"The fix touches scripts/project_verified_completion_scanner.py AND lifecycle.py (duplicate _verified_work_items), plus a regression test. The authorization vehicle hinges on framing. Spec v3 ALREADY says completion triggers on 'the bridge thread ADDRESSING the work item' reaching VERIFIED — and the reauth thread doesn't address WI-3438, it only cites it for authorization linkage. So the code arguably already violates v3 (a code bug), not a spec gap. Which vehicle do you want? (All options deliver the same correct fix + Codex review + test; they differ in governance ceremony, and the discriminator design still needs Codex review either way.)\"=\"Design-scoping round first\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0774
+  asked_at: 2026-05-29T15:22:57.552473Z
+  question: "gtkb-s358-w1-retirement-machinery-correction is at GO -019 (Prime owes corrected impl report) implementing **v3** — the very over-broad behavior the v4 fix is meant to replace. Both threads cite WI-3365. How should the v4 follow-on relate to the in-flight v3 thread?"
+  options:
+    - "Supersede v3 (Recommended)"
+    - "Finish v3 first, then v4"
+    - "Merge into single thread"
+    - "Don't file v4 yet — surface to owner via deliberation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7edefa61c490fcdc
+  resolved_at: 2026-05-29T15:22:57.552473Z
+  answer: "Your questions have been answered: \"gtkb-s358-w1-retirement-machinery-correction is at GO -019 (Prime owes corrected impl report) implementing **v3** — the very over-broad behavior the v4 fix is meant to replace. Both threads cite WI-3365. How should the v4 follow-on relate to the in-flight v3 thread?\"=\"Supersede v3 (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0775
+  asked_at: 2026-05-29T15:22:57.552473Z
+  question: "Parallel session filed gtkb-project-completion-scanner-addressing-thread-fix-implementation (WI-3443 + reliability project, NO-GO'd at -002). I have a not-yet-INDEX'd draft (WI-3365 + S358 governance project + explicit s358-w1 supersession) that addresses Codex's -002 NO-GO. Which framing wins?"
+  options:
+    - "Use mine (WI-3365 + S358 + supersession)"
+    - "Use parallel session's (WI-3443 + reliability)"
+    - "Merge: REVISED on theirs, citing my draft"
+    - "Pause both — surface to owner for re-scoping"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 979d1c37c2d72f12
+  resolved_at: 2026-05-29T15:22:57.552473Z
+  answer: "Your questions have been answered: \"Parallel session filed gtkb-project-completion-scanner-addressing-thread-fix-implementation (WI-3443 + reliability project, NO-GO'd at -002). I have a not-yet-INDEX'd draft (WI-3365 + S358 governance project + explicit s358-w1 supersession) that addresses Codex's -002 NO-GO. Which framing wins?\"=\"Use mine (WI-3365 + S358 + supersession)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0776
+  asked_at: 2026-05-29T15:24:15.842218Z
+  question: "My assessment surfaced four distinct triage workstreams. Which scope should I start?"
+  options:
+    - "Implementation gaps (Recommended)"
+    - "Retire-ready projects (53)"
+    - "Orphan WIs (92)"
+    - "Active-work priority (231 open)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ff85fdd8de38fbfe
+  resolved_at: 2026-05-29T15:24:15.842218Z
+  answer: "Your questions have been answered: \"My assessment surfaced four distinct triage workstreams. Which scope should I start?\"=\"Implementation gaps (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0777
+  asked_at: 2026-05-29T15:24:15.842218Z
+  question: "Gap 5 (deterministic `gt backlog status` CLI) is the leverage-aligned next filing. What scope and timing do you want?"
+  options:
+    - "File slice-2 scoping now (Recommended)"
+    - "File broader Slice 2 scoping (status + projects + memberships)"
+    - "Defer Gap 5; file Gap 2 (doubled-prefix bug) instead"
+    - "Stand down for this session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9447c4fb970d7f37
+  resolved_at: 2026-05-29T15:24:15.842218Z
+  answer: "Your questions have been answered: \"Gap 5 (deterministic `gt backlog status` CLI) is the leverage-aligned next filing. What scope and timing do you want?\"=\"File slice-2 scoping now (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0779
+  asked_at: 2026-05-29T15:40:09.128427Z
+  question: "My S373 implementation thread was superseded by a parallel Claude desktop session. Canonical thread is at NO-GO @ -002 with autonomously-fixable findings. What should I do this turn?"
+  options:
+    - "Take over canonical thread: file REVISED -003 (Recommended)"
+    - "Cleanup my orphans first, then canonical"
+    - "Cleanup orphans only; let canonical wait"
+    - "Stop and pivot to a different focus area"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9c7952302c2c5471
+  resolved_at: 2026-05-29T15:40:09.128427Z
+  answer: "Your questions have been answered: \"My S373 implementation thread was superseded by a parallel Claude desktop session. Canonical thread is at NO-GO @ -002 with autonomously-fixable findings. What should I do this turn?\"=\"Take over canonical thread: file REVISED -003 (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0780
+  asked_at: 2026-05-29T15:40:09.128427Z
+  question: "Canonical -003 REVISED is filed and awaiting Codex review. What's the next focus this turn?"
+  options:
+    - "Pause: let Codex review -003, surface state (Recommended)"
+    - "Orphan cleanup: WI-3443 retire + PAUTH revoke"
+    - "Investigate classifier-fix INDEX oddity"
+    - "Resume triage umbrella: index it for review"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8c55607d9bb81ec6
+  resolved_at: 2026-05-29T15:40:09.128427Z
+  answer: "Your questions have been answered: \"Canonical -003 REVISED is filed and awaiting Codex review. What's the next focus this turn?\"=\"Pause: let Codex review -003, surface state (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0781
+  asked_at: 2026-05-29T15:40:52.864778Z
+  question: "Approve insertion of GOV-LO-ADVISORY-OWNER-GRILLING-GATE-001 with the body shown above?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Approve with revisions — I'll specify them"
+    - "Reject — do not insert GOV, fall back to rule-only amendment"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7562064a1fd052ab
+  resolved_at: 2026-05-29T15:40:52.864778Z
+  answer: "Your questions have been answered: \"Approve insertion of GOV-LO-ADVISORY-OWNER-GRILLING-GATE-001 with the body shown above?\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0782
+  asked_at: 2026-05-29T15:40:52.864778Z
+  question: "Approve insertion of DCL-LO-ADVISORY-OWNER-GRILLING-GATE-001 with the body shown above?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Approve with revisions — I'll specify them"
+    - "Reject — hold DCL until lint design is firmer"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f32a302a5c0c2e02
+  resolved_at: 2026-05-29T15:40:52.864778Z
+  answer: "Your questions have been answered: \"Approve insertion of DCL-LO-ADVISORY-OWNER-GRILLING-GATE-001 with the body shown above?\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0783
+  asked_at: 2026-05-29T16:23:23.576410Z
+  question: "Once an interactive session has been declared as a specific role (via init keyword), how should the session-stated role behave across the rest of that session and across mid-session SessionStart events (compaction, resume, etc.)?"
+  options:
+    - "Per-prompt declaration only — keyword binds the current owner-turn; subsequent turns revert to durable unless re-stated"
+    - "Session-scoped lifetime — keyword declares for the rest of this session, no persistence file"
+    - "Session-scoped + persistent session-state file (survives compaction/resume)"
+    - "Different model — let me describe it"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 39b39d2fc3be849f
+  resolved_at: 2026-05-29T16:23:23.576410Z
+  answer: "Your questions have been answered: \"Once an interactive session has been declared as a specific role (via init keyword), how should the session-stated role behave across the rest of that session and across mid-session SessionStart events (compaction, resume, etc.)?\"=\"Session-scoped lifetime — keyword declares for the rest of this session, no persistence file\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0784
+  asked_at: 2026-05-29T16:23:23.576410Z
+  question: "What mechanism(s) should interactive sessions use to declare or switch the session-stated role? (Headless dispatch via cross-harness trigger continues to use the canonical init keyword unchanged.)"
+  options:
+    - "Canonical init keyword only — `::init gtkb (pb|lo)` is the single declarator"
+    - "Init keyword + conversational aliases (mirror the work-subject pattern)"
+    - "Init keyword + an explicit CLI/skill command"
+    - "Different model — let me describe it"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4de4d04808f5fe23
+  resolved_at: 2026-05-29T16:23:23.576410Z
+  answer: "Your questions have been answered: \"What mechanism(s) should interactive sessions use to declare or switch the session-stated role? (Headless dispatch via cross-harness trigger continues to use the canonical init keyword unchanged.)\"=\"Canonical init keyword only — `::init gtkb (pb|lo)` is the single declarator\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0785
+  asked_at: 2026-05-29T16:23:23.576410Z
+  question: "How should this correction be packaged and landed? It touches at minimum: SessionStart cache writer, UserPromptSubmit init-keyword matcher, AXIS 2 surface hook, workstream-focus, MemBase attribution module, doctor topology checks, ~6 rule files, and 2 existing specs (init-keyword syntax + receiver-side assertion)."
+  options:
+    - "Architecture-first — ADR + DCL + GOV scoping bridge, then implementation slices"
+    - "Single scoping bridge — then sliced implementation"
+    - "Project + work-item authorization — standing project with sliced WIs"
+    - "Different path — let me describe it"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e9595d8b6c83f6de
+  resolved_at: 2026-05-29T16:23:23.576410Z
+  answer: "Your questions have been answered: \"How should this correction be packaged and landed? It touches at minimum: SessionStart cache writer, UserPromptSubmit init-keyword matcher, AXIS 2 surface hook, workstream-focus, MemBase attribution module, doctor topology checks, ~6 rule files, and 2 existing specs (init-keyword syntax + receiver-side assertion).\"=\"Architecture-first — ADR + DCL + GOV scoping bridge, then implementation slices\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0786
+  asked_at: 2026-05-29T16:23:23.576410Z
+  question: "When an interactive session has overridden its role via the init keyword (e.g., harness B / durable PB declared as LO this session), how should the rendered startup disclosure surface the durable role assignment?"
+  options:
+    - "Session role only — show \"Role being assumed: Loyal Opposition\"; durable role not mentioned"
+    - "Session role + durable role both shown — e.g., \"Role being assumed: Loyal Opposition (session override of durable role: Prime Builder)\""
+    - "Session role primary, durable role only in a metadata footer"
+    - "Different model — let me describe it"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: fb4e4ca4da5539db
+  resolved_at: 2026-05-29T16:23:23.576410Z
+  answer: "Your questions have been answered: \"When an interactive session has overridden its role via the init keyword (e.g., harness B / durable PB declared as LO this session), how should the rendered startup disclosure surface the durable role assignment?\"=\"Session role only — show \"Role being assumed: Loyal Opposition\"; durable role not mentioned\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0787
+  asked_at: 2026-05-29T16:25:41.048331Z
+  question: "The `gt backlog status` implementation proposal is filed NEW and awaiting Codex review. What should I do next?"
+  options:
+    - "Pick up Gap 2 (doubled-prefix fix)"
+    - "Wait for auto-dispatch"
+    - "Run a Bridge scan"
+    - "Wrap up the session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7c616524e3cf04a0
+  resolved_at: 2026-05-29T16:25:41.048331Z
+  answer: "Your questions have been answered: \"The `gt backlog status` implementation proposal is filed NEW and awaiting Codex review. What should I do next?\"=\"Pick up Gap 2 (doubled-prefix fix)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0788
+  asked_at: 2026-05-29T16:25:41.048331Z
+  question: "Two implementation proposals (Gap 2 prefix fix + discoverability CLI) are filed and review-clean, awaiting Codex GO. No code is written yet. What's next?"
+  options:
+    - "Wrap up the session (Recommended)"
+    - "Wait for the two Codex reviews"
+    - "Pick up another triage gap"
+    - "Show full bridge queue state"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 363df0ba8804e0e3
+  resolved_at: 2026-05-29T16:25:41.048331Z
+  answer: "Your questions have been answered: \"Two implementation proposals (Gap 2 prefix fix + discoverability CLI) are filed and review-clean, awaiting Codex GO. No code is written yet. What's next?\"=\"Wrap up the session (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0789
+  asked_at: 2026-05-29T16:30:19.013547Z
+  question: "The PB startup-disclosure cache failed its freshness contract. How should I proceed?"
+  options:
+    - "Diagnose first (read-only)"
+    - "Regenerate the startup payload"
+    - "Proceed minimal — accept PB role, skip disclosure"
+    - "Stand down — do nothing this turn"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: fa4569386c20cc4e
+  resolved_at: 2026-05-29T16:30:19.013547Z
+  answer: "Your questions have been answered: \"The PB startup-disclosure cache failed its freshness contract. How should I proceed?\"=\"Proceed minimal — accept PB role, skip disclosure\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0790
+  asked_at: 2026-05-29T16:40:21.689898Z
+  question: "Codex NO-GO -004 requires an active project authorization (PAUTH) before the implementation-targeting bridge proposal can be approved. Authorize PROJECT-LO-ADVISORY-OWNER-GRILLING-GATE-001 for implementation? The PAUTH scope: allowed mutations = narrative/rule-file edits, skill-doc edits, script creation, hook/config registration, test creation (matching the project's scope_note); forbidden = files outside the project scope, credential changes, release/deploy. Which work-item scope?"
+  options:
+    - "Authorize all 3 WIs (whole project) (Recommended)"
+    - "Authorize WI-3444 only (Slice 1)"
+    - "Don't authorize — reconsider the approach"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 825f689dc1fc7618
+  resolved_at: 2026-05-29T16:40:21.689898Z
+  answer: "Your questions have been answered: \"Codex NO-GO -004 requires an active project authorization (PAUTH) before the implementation-targeting bridge proposal can be approved. Authorize PROJECT-LO-ADVISORY-OWNER-GRILLING-GATE-001 for implementation? The PAUTH scope: allowed mutations = narrative/rule-file edits, skill-doc edits, script creation, hook/config registration, test creation (matching the project's scope_note); forbidden = files outside the project scope, credential changes, release/deploy. Which work-item scope?\"=\"Authorize all 3 WIs (whole project) (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0791
+  asked_at: 2026-05-29T17:01:18.949213Z
+  question: "The tool-output channel is corrupting results this turn (4 impossible reads in a row, while import/field-count/clean-Read all agree the source files are actually fine). I won't perform the protected, sha256-validated root-boundary rule edit under unreliable file reads. How do you want to proceed?"
+  options:
+    - "Restart session, then resume (Recommended)"
+    - "Wrap the session now"
+    - "Proceed cautiously anyway"
+    - "Switch to read-only work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d14eade5e2feaff3
+  resolved_at: 2026-05-29T17:01:18.949213Z
+  answer: "Your questions have been answered: \"The tool-output channel is corrupting results this turn (4 impossible reads in a row, while import/field-count/clean-Read all agree the source files are actually fine). I won't perform the protected, sha256-validated root-boundary rule edit under unreliable file reads. How do you want to proceed?\"=\"Restart session, then resume (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0792
+  asked_at: 2026-05-29T17:13:14.012276Z
+  question: "Approve the exact text above for insertion into the protected narrative file .claude/rules/peer-solution-advisory-loop.md? This is the per-protected-path content approval required by the narrative-artifact-approval gate (GO + PAUTH don't substitute for it). It matches the GO'd -005 Implementation Plan verbatim."
+  options:
+    - "Approve content as shown (Recommended)"
+    - "Approve with revisions — I'll specify them"
+    - "Hold — don't edit the rule file yet"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5961b9c8f8bd3fcc
+  resolved_at: 2026-05-29T17:13:14.012276Z
+  answer: "Your questions have been answered: \"Approve the exact text above for insertion into the protected narrative file .claude/rules/peer-solution-advisory-loop.md? This is the per-protected-path content approval required by the narrative-artifact-approval gate (GO + PAUTH don't substitute for it). It matches the GO'd -005 Implementation Plan verbatim.\"=\"Approve content as shown (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0793
+  asked_at: 2026-05-29T17:29:32.121859Z
+  question: "7 of 49 phantom memberships have a RETIRED canonical umbrella (5 Bridge-Scheduler slices, 1 CLAUDE-MD Slice 3, 1 PUSH-GATE master — at least PUSH-GATE is documented as auto-retired prematurely per MEMORY.md S368). How should reconciliation dispose of those 7 WIs?"
+  options:
+    - "Re-link to retired canonical (Recommended)"
+    - "Make them orphans"
+    - "Reactivate canonical + re-link"
+    - "Per-canonical decision (4 sub-AUQs)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: df4b3d8550ba1de0
+  resolved_at: 2026-05-29T17:29:32.121859Z
+  answer: "Your questions have been answered: \"7 of 49 phantom memberships have a RETIRED canonical umbrella (5 Bridge-Scheduler slices, 1 CLAUDE-MD Slice 3, 1 PUSH-GATE master — at least PUSH-GATE is documented as auto-retired prematurely per MEMORY.md S368). How should reconciliation dispose of those 7 WIs?\"=\"Re-link to retired canonical (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0794
+  asked_at: 2026-05-29T17:34:36.318486Z
+  question: "Gaps 3/6/7 sit at three different lifecycle stages (Gap 3 already GO-scoped → implement; Gap 6 net-new → scope; Gap 7 overlaps TOP-priority GTKB-GOV-004 → needs direction). How should I advance them this session?"
+  options:
+    - "Gap 6 first: scope orphan-WI Slice 2 (Recommended)"
+    - "Gap 3 first: implement under the existing GO"
+    - "Capture-and-triage all three, file nothing yet"
+    - "Decide Gap 7 direction first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: eee2d77751de1489
+  resolved_at: 2026-05-29T17:34:36.318486Z
+  answer: "Your questions have been answered: \"Gaps 3/6/7 sit at three different lifecycle stages (Gap 3 already GO-scoped → implement; Gap 6 net-new → scope; Gap 7 overlaps TOP-priority GTKB-GOV-004 → needs direction). How should I advance them this session?\"=\"Gap 6 first: scope orphan-WI Slice 2 (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0795
+  asked_at: 2026-05-29T17:50:05.694718Z
+  question: "Gap 3 (kb-work-item/kb-batch bypass CLI) is 'Slice 3+' in the GO'd skill-modernization scope, which sequences the skill-health checker (Slice 0) first and requires a fresh per-slice PAUTH for PROJECT-GTKB-SKILL-MODERNIZATION. Where do you want to enter?"
+  options:
+    - "Slice 0 first: skill-health checker (Recommended)"
+    - "Jump to the kb-work-item migration slice (direct Gap 3 fix)"
+    - "File a Gap-3-specific slice-scoping for kb-work-item + kb-batch"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7ad3569acd5a071c
+  resolved_at: 2026-05-29T17:50:05.694718Z
+  answer: "Your questions have been answered: \"Gap 3 (kb-work-item/kb-batch bypass CLI) is 'Slice 3+' in the GO'd skill-modernization scope, which sequences the skill-health checker (Slice 0) first and requires a fresh per-slice PAUTH for PROJECT-GTKB-SKILL-MODERNIZATION. Where do you want to enter?\"=\"Slice 0 first: skill-health checker (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0796
+  asked_at: 2026-05-29T17:50:05.694718Z
+  question: "Authorize PROJECT-GTKB-SKILL-MODERNIZATION for Slice 0 implementation (WI-3451)? The GO'd scoping requires a fresh per-slice PAUTH. Slice 0's core is scripts/check_skill_health.py + tests; the scoping flagged that refreshing config/agent-control/harness-capability-registry.toml is optional and must be explicitly authorized if included."
+  options:
+    - "Authorize checker + tests only (Recommended)"
+    - "Authorize checker + tests + registry refresh"
+    - "Hold — don't authorize yet"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0079f4859c22e5d9
+  resolved_at: 2026-05-29T17:50:05.694718Z
+  answer: "Your questions have been answered: \"Authorize PROJECT-GTKB-SKILL-MODERNIZATION for Slice 0 implementation (WI-3451)? The GO'd scoping requires a fresh per-slice PAUTH. Slice 0's core is scripts/check_skill_health.py + tests; the scoping flagged that refreshing config/agent-control/harness-capability-registry.toml is optional and must be explicitly authorized if included.\"=\"Authorize checker + tests only (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0797
+  asked_at: 2026-05-29T18:10:09.413356Z
+  question: "The missing object is fully restored and fsck is clean (non-destructively, no history rewrite). Root cause: Google Drive is syncing `.git/` (it was excluded for `.db` files after the S311 corruption, but `.git/` was missed). Now that auto-gc is unblocked, the next commit will trigger a large repack while Drive syncs `.git` — the same race. How should I proceed with recurrence-prevention and the ~50 MB tmp_pack cleanup?"
+  options:
+    - "Fix root cause + clean up"
+    - "Root-cause fix only"
+    - "Report only — I'll handle Drive"
+    - "Route changes via bridge first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 22fd76321aa7f635
+  resolved_at: 2026-05-29T18:10:09.413356Z
+  answer: "<tool_use_error>Cancelled: parallel tool call Bash(# Clean up the throwaway recovery clone …) errored</tool_use_error>"
+  notes: ""
+- id: DECISION-0798
+  asked_at: 2026-05-29T18:10:09.413356Z
+  question: "The missing object is fully restored and fsck is clean (non-destructive, no history rewrite). Root cause: Google Drive is syncing `.git/` — it was excluded for `.db` files after the S311 corruption, but `.git/` was missed (confirmed: `.driveignore` is tracked and has no `.git` entry). Now that auto-gc is unblocked, the next commit triggers a large repack while Drive syncs `.git` — the same race. How should I proceed with recurrence-prevention and the ~50 MB stale-tmp_pack cleanup?"
+  options:
+    - "Fix root cause + clean up"
+    - "Root-cause fix only"
+    - "Report only — I'll handle Drive"
+    - "Route changes via bridge first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8b7b4b37e6bf8bda
+  resolved_at: 2026-05-29T18:10:09.413356Z
+  answer: "Your questions have been answered: \"The missing object is fully restored and fsck is clean (non-destructive, no history rewrite). Root cause: Google Drive is syncing `.git/` — it was excluded for `.db` files after the S311 corruption, but `.git/` was missed (confirmed: `.driveignore` is tracked and has no `.git` entry). Now that auto-gc is unblocked, the next commit triggers a large repack while Drive syncs `.git` — the same race. How should I proceed with recurrence-prevention and the ~50 MB stale-tmp_pack cleanup?\"=\"Fix root cause + clean up\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0799
+  asked_at: 2026-05-29T18:10:53.394911Z
+  question: "Codex NO-GO'd the post-impl report — but it's an environment artifact (Codex's gh CLI is config-broken, 'Access is denied', flipping non-version gh.status which the fix intentionally still gates), NOT a code defect. Your harness: gh works, drift False both interpreters, freeze resolved. Push sends 8 commits to origin/develop (clean fast-forward). How do you want to proceed with the push given the NO-GO?"
+  options:
+    - "Push now, revise report after"
+    - "Hold push; get VERIFIED first"
+    - "Push + broaden fix to status"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3d3b60921427fab2
+  resolved_at: 2026-05-29T18:10:53.394911Z
+  answer: "Your questions have been answered: \"Codex NO-GO'd the post-impl report — but it's an environment artifact (Codex's gh CLI is config-broken, 'Access is denied', flipping non-version gh.status which the fix intentionally still gates), NOT a code defect. Your harness: gh works, drift False both interpreters, freeze resolved. Push sends 8 commits to origin/develop (clean fast-forward). How do you want to proceed with the push given the NO-GO?\"=\"Push now, revise report after\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0800
+  asked_at: 2026-05-29T20:23:54.281796Z
+  question: "Gap 3 Slice 0 (detector) is VERIFIED. The actual kb-work-item fix needs a new `gt` verb (WI+linked-test+phase chain) before the skill can become a thin wrapper — net-new, needs its own PAUTH. What next?"
+  options:
+    - "Scope the kb-work-item migration slice (Recommended)"
+    - "Decide Gap 7 direction instead"
+    - "Pause — Slice 0 is a clean milestone"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 06bb02c1e03a0e94
+  resolved_at: 2026-05-29T20:23:54.281796Z
+  answer: "Your questions have been answered: \"Gap 3 Slice 0 (detector) is VERIFIED. The actual kb-work-item fix needs a new `gt` verb (WI+linked-test+phase chain) before the skill can become a thin wrapper — net-new, needs its own PAUTH. What next?\"=\"Scope the kb-work-item migration slice (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0801
+  asked_at: 2026-05-29T21:46:38.102575Z
+  question: "Reconciliation created an 8th active-on-retired canonical link (WI-3434 → retired PROJECT-GTKB-EXTERNAL-HARNESS-EXEC-BOUNDARY) beyond the GO's enumerated 7. A parallel session retired that canonical between proposal-authoring and --apply, moving WI-3434 from the redundant-active branch into the retired-canonical branch. WI-3434 is an OPEN, in-flight work item (the external-harness-exec-exception thread). How should I resolve the over-scope?"
+  options:
+    - "Accept the 8th link"
+    - "Revert the 8th link"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4225ac6d1b5734c5
+  resolved_at: 2026-05-29T21:46:38.102575Z
+  answer: "Your questions have been answered: \"Reconciliation created an 8th active-on-retired canonical link (WI-3434 → retired PROJECT-GTKB-EXTERNAL-HARNESS-EXEC-BOUNDARY) beyond the GO's enumerated 7. A parallel session retired that canonical between proposal-authoring and --apply, moving WI-3434 from the redundant-active branch into the retired-canonical branch. WI-3434 is an OPEN, in-flight work item (the external-harness-exec-exception thread). How should I resolve the over-scope?\"=\"Accept the 8th link\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0802
+  asked_at: 2026-05-29T22:10:17.204461Z
+  question: "Slice 1 is implemented (15/15 tests green) and its post-implementation report (-006) is filed and gate-clean, awaiting Codex VERIFIED from the active counterpart session. Slice 2 is sequenced behind Slice 1 in the GO'd 10-slice plan. How should I proceed while Slice 1 verification is in the counterpart's hands?"
+  options:
+    - "Hold for Slice 1 VERIFIED, then file Slice 2"
+    - "Pre-stage Slice 2 NEW now, in parallel"
+    - "Commit the Slice 1 work now"
+    - "Pause — wrap up the session here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a70ce99f9b3b8447
+  resolved_at: 2026-05-29T22:10:17.204461Z
+  answer: "Your questions have been answered: \"Slice 1 is implemented (15/15 tests green) and its post-implementation report (-006) is filed and gate-clean, awaiting Codex VERIFIED from the active counterpart session. Slice 2 is sequenced behind Slice 1 in the GO'd 10-slice plan. How should I proceed while Slice 1 verification is in the counterpart's hands?\"=\"Hold for Slice 1 VERIFIED, then file Slice 2\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0803
+  asked_at: 2026-05-29T22:13:14.351565Z
+  question: "The kb-work-item skill rewrite cascades to the Codex + Antigravity generated adapters + both registry source-hashes (parity is mechanically gated, baseline PASS:70). The current Slice-3 PAUTH forbids config_registry_edit, so the skill-rewrite half is under-authorized. How should I proceed?"
+  options:
+    - "Expand the PAUTH — full parity-preserving slice (Recommended)"
+    - "Split — verb now (in-scope), skill rewrite as a follow-on"
+    - "Pause the kb-work-item slice entirely"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: fd2cb085bae9ab37
+  resolved_at: 2026-05-29T22:13:14.351565Z
+  answer: "Your questions have been answered: \"The kb-work-item skill rewrite cascades to the Codex + Antigravity generated adapters + both registry source-hashes (parity is mechanically gated, baseline PASS:70). The current Slice-3 PAUTH forbids config_registry_edit, so the skill-rewrite half is under-authorized. How should I proceed?\"=\"Expand the PAUTH — full parity-preserving slice (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0804
+  asked_at: 2026-05-29T22:26:52.754978Z
+  question: "The phantom-reconciliation thread is VERIFIED, but its CLI registration lives in cli.py, which is entangled with 3 uncommitted, in-flight, non-mine work-streams (hygiene/ pkg [WI-3420], cli_approval_packet.py, cli_bridge_propose.py). Committing cli.py alone would break develop's imports; committing it safely means bundling those 3 other work-streams. You flagged 'see parallel S373 umbrella before committing.' How should I handle the commit?"
+  options:
+    - "Defer the commit to S373"
+    - "Commit self-contained artifacts only"
+    - "Bundle-commit cli.py + 3 modules"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 81a1a1fe04c7961d
+  resolved_at: 2026-05-29T22:26:52.754978Z
+  answer: "Your questions have been answered: \"The phantom-reconciliation thread is VERIFIED, but its CLI registration lives in cli.py, which is entangled with 3 uncommitted, in-flight, non-mine work-streams (hygiene/ pkg [WI-3420], cli_approval_packet.py, cli_bridge_propose.py). Committing cli.py alone would break develop's imports; committing it safely means bundling those 3 other work-streams. You flagged 'see parallel S373 umbrella before committing.' How should I handle the commit?\"=\"Defer the commit to S373\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0805
+  asked_at: 2026-05-29T22:44:39.799132Z
+  question: "All 3 bridge threads are VERIFIED. Working tree has 723 dirty paths (parallel-session pollution) + fragile .git (Drive-sync corruption history). How should I land the commits?"
+  options:
+    - "Thread #3 only, scoped (Rec.)"
+    - "All 3 threads, scoped per-thread"
+    - "Defer all commits"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3ee428eb74fa0692
+  resolved_at: 2026-05-29T22:44:39.799132Z
+  answer: "Your questions have been answered: \"All 3 bridge threads are VERIFIED. Working tree has 723 dirty paths (parallel-session pollution) + fragile .git (Drive-sync corruption history). How should I land the commits?\"=\"All 3 threads, scoped per-thread\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0806
+  asked_at: 2026-05-29T22:44:42.269340Z
+  question: "All three NOT-DEFERRED gaps are now GO'd under parallel programs (3, 6) or migration-blocked (7). This conversation's directly-assigned implementable work is done. The GO'd threads belong to other parallel workstreams' projects/PAUTHs, so I shouldn't unilaterally barge in. What should this conversation do next?"
+  options:
+    - "Stand down / wrap"
+    - "Implement Gap 6 impl proposal"
+    - "Implement Gap 3 (skill→CLI)"
+    - "Take Gap 7 disposition"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b21d99d158b8134d
+  resolved_at: 2026-05-29T22:44:42.269340Z
+  answer: "Your questions have been answered: \"All three NOT-DEFERRED gaps are now GO'd under parallel programs (3, 6) or migration-blocked (7). This conversation's directly-assigned implementable work is done. The GO'd threads belong to other parallel workstreams' projects/PAUTHs, so I shouldn't unilaterally barge in. What should this conversation do next?\"=\"Implement Gap 6 impl proposal\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0807
+  asked_at: 2026-05-29T22:47:42.622769Z
+  question: "The kb-work-item verb + 7 tests are implemented and clean. But the skill rewrite's adapter regeneration (--update-registry, all-skills by design) caught up 2+ parallel sessions' drifted skills into the shared MANIFEST/registry — so a cleanly-scoped, parity-passing commit of the skill half is impossible until the dirty tree is cleared. How should I proceed?"
+  options:
+    - "Verb-only post-impl now; defer skill rewrite to clean tree (Recommended)"
+    - "Proceed + document the full slice (mixed diff)"
+    - "Pause the slice until the tree is clean"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6135d342d130f7da
+  resolved_at: 2026-05-29T22:47:42.622769Z
+  answer: "Your questions have been answered: \"The kb-work-item verb + 7 tests are implemented and clean. But the skill rewrite's adapter regeneration (--update-registry, all-skills by design) caught up 2+ parallel sessions' drifted skills into the shared MANIFEST/registry — so a cleanly-scoped, parity-passing commit of the skill half is impossible until the dirty tree is cleared. How should I proceed?\"=\"Verb-only post-impl now; defer skill rewrite to clean tree (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0808
+  asked_at: 2026-05-29T23:15:32.800121Z
+  question: "Two NO-GO findings need resolution. P1-001: standing reliability PAUTH doesn't authorize this work (WI-3450 origin=\"new\", introduces new CLI surface; fails GOV-RELIABILITY-FAST-LANE-001 eligibility). P1-002: proposal claims deterministic retire/exclude service routing but no per-WI retire service exists. How should I revise?"
+  options:
+    - "Per-WI PAUTH + assign-only scope"
+    - "Per-WI PAUTH + full retire/exclude in scope"
+    - "Defer this, switch to Gap 3"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 85e060ce77d1030a
+  resolved_at: 2026-05-29T23:15:32.800121Z
+  answer: "Your questions have been answered: \"Two NO-GO findings need resolution. P1-001: standing reliability PAUTH doesn't authorize this work (WI-3450 origin=\"new\", introduces new CLI surface; fails GOV-RELIABILITY-FAST-LANE-001 eligibility). P1-002: proposal claims deterministic retire/exclude service routing but no per-WI retire service exists. How should I revise?\"=\"Per-WI PAUTH + assign-only scope\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0809
+  asked_at: 2026-05-29T23:52:35.852664Z
+  question: "Phase-2 scoping is GO'd, but the implementation mutates project_artifact_links (data), which the standing reliability PAUTH (source/test/hook only) does NOT cover. A dedicated PAUTH is an owner decision. How to proceed?"
+  options:
+    - "Authorize dedicated PAUTH + proceed"
+    - "Defer Phase-2 (Rec.)"
+    - "Push the 3 committed threads instead"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ec6a930e4b9f86c1
+  resolved_at: 2026-05-29T23:52:35.852664Z
+  answer: "Your questions have been answered: \"Phase-2 scoping is GO'd, but the implementation mutates project_artifact_links (data), which the standing reliability PAUTH (source/test/hook only) does NOT cover. A dedicated PAUTH is an owner decision. How to proceed?\"=\"Authorize dedicated PAUTH + proceed\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0810
+  asked_at: 2026-05-30T00:52:33.375588Z
+  question: "The session is wrapped: both this conversation's threads (phantom reconciliation WI-3355, orphan-WI Slice 2 WI-3450) are VERIFIED, commits are deferred to the S373 umbrella, and DA harvest is deferred to the last-wrapping conversation. The remaining board (48 GO / 49 NO-GO) is parallel-owned and auto-dispatched. How should this conversation proceed?"
+  options:
+    - "Hold — the wrap stands"
+    - "Take on new non-conflicting work"
+    - "Land the deferred commits now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5fab14ab839b0638
+  resolved_at: 2026-05-30T00:52:33.375588Z
+  answer: "Your questions have been answered: \"The session is wrapped: both this conversation's threads (phantom reconciliation WI-3355, orphan-WI Slice 2 WI-3450) are VERIFIED, commits are deferred to the S373 umbrella, and DA harvest is deferred to the last-wrapping conversation. The remaining board (48 GO / 49 NO-GO) is parallel-owned and auto-dispatched. How should this conversation proceed?\"=\"Hold — the wrap stands\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0811
+  asked_at: 2026-05-30T03:53:19.798977Z
+  question: "The auto-completion scanner (GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001) retired PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE at 02:18 because Slices 1-3 all reached VERIFIED while Slices 4-10 weren't yet filed as members - so it looked complete. The PAUTH is completed, the project retired, and Slice 4's bridge is now blocked. The same misfire will recur after each future slice. How should I recover (all paths continue the owner-authorized 10-slice plan under DELIB-2507)?"
+  options:
+    - "Reactivate + pre-bind all remaining slices (Recommended)"
+    - "Reactivate for Slice 4 only; re-authorize per slice"
+    - "Pause Slice 4; fix the scanner first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1edecf7493036dac
+  resolved_at: 2026-05-30T03:53:19.798977Z
+  answer: "Your questions have been answered: \"The auto-completion scanner (GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001) retired PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE at 02:18 because Slices 1-3 all reached VERIFIED while Slices 4-10 weren't yet filed as members - so it looked complete. The PAUTH is completed, the project retired, and Slice 4's bridge is now blocked. The same misfire will recur after each future slice. How should I recover (all paths continue the owner-authorized 10-slice plan under DELIB-2507)?\"=\"Reactivate + pre-bind all remaining slices (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0812
+  asked_at: 2026-05-30T04:21:21.579117Z
+  question: "The full S372 arc is complete (3 threads + Phase-2 VERIFIED, committed, pushed; FQDN dispositioned). My actionable queue is empty and the session was already wrapped. What would you like next?"
+  options:
+    - "Start WI-3473 (formatter gate)"
+    - "Start WI-3471 (Phase-3 ambiguous)"
+    - "End the session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 691fb67e52abdef3
+  resolved_at: 2026-05-30T04:21:21.579117Z
+  answer: "Your questions have been answered: \"The full S372 arc is complete (3 threads + Phase-2 VERIFIED, committed, pushed; FQDN dispositioned). My actionable queue is empty and the session was already wrapped. What would you like next?\"=\"Start WI-3473 (formatter gate)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0813
+  asked_at: 2026-05-30T04:21:21.579117Z
+  question: "WI-3473: where should the `ruff format --check` enforcement live? (Root cause: nothing runs it at Prime's pre-file moment; every existing surface fires after the report is filed.)"
+  options:
+    - "Both: guardrail + checklist (Rec.)"
+    - "Checklist only (minimal)"
+    - "Pre-commit guardrail only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 10ad401fa7a5c617
+  resolved_at: 2026-05-30T04:21:21.579117Z
+  answer: "Your questions have been answered: \"WI-3473: where should the `ruff format --check` enforcement live? (Root cause: nothing runs it at Prime's pre-file moment; every existing surface fires after the report is filed.)\"=\"Both: guardrail + checklist (Rec.)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0814
+  asked_at: 2026-05-30T05:01:09.142383Z
+  question: "WI-3473's checklist half (edit the bridge skill) is blocked: regenerating the Codex adapter would bundle 3 parallel-session skill adapters into my commit (they're already drifted). The guardrail half is clean. How should the checklist be delivered?"
+  options:
+    - "Checklist in file-bridge-protocol rule (Rec.)"
+    - "Guardrail-only now; defer checklist"
+    - "Regenerate-all + disclose"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 31c18c74fce33e0d
+  resolved_at: 2026-05-30T05:01:09.142383Z
+  answer: "Your questions have been answered: \"WI-3473's checklist half (edit the bridge skill) is blocked: regenerating the Codex adapter would bundle 3 parallel-session skill adapters into my commit (they're already drifted). The guardrail half is clean. How should the checklist be delivered?\"=\"Checklist in file-bridge-protocol rule (Rec.)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0815
+  asked_at: 2026-05-30T05:01:46.263352Z
+  question: "Investigating Slice 5 (the GO'd plan said 'make scripts/workstream_focus.py focus-menu generation follow the resolved role'), I found the premise is wrong: the PB/LO focus menu lives in session_self_initialization.py's build_startup_model(role_profile=...), which already branches by role (_is_loyal_opposition_model / _render_loyal_opposition_startup_task). Slice 1's dual-cache already generates a role-correct -pb and -lo disclosure (proven: -lo.md is 17.2KB with the LO startup task vs -pb.md 11.3KB). workstream_focus.py only renders the role-agnostic work-subject block. So Slice 5's intended behavior is already delivered by Slice 1. How should I dispose of Slice 5 (WI-3475)?"
+  options:
+    - "Verify-and-close (Recommended)"
+    - "Close with no new test"
+    - "Re-investigate for a real change"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 80974c8239400bd6
+  resolved_at: 2026-05-30T05:01:46.263352Z
+  answer: "Your questions have been answered: \"Investigating Slice 5 (the GO'd plan said 'make scripts/workstream_focus.py focus-menu generation follow the resolved role'), I found the premise is wrong: the PB/LO focus menu lives in session_self_initialization.py's build_startup_model(role_profile=...), which already branches by role (_is_loyal_opposition_model / _render_loyal_opposition_startup_task). Slice 1's dual-cache already generates a role-correct -pb and -lo disclosure (proven: -lo.md is 17.2KB with the LO startup task vs -pb.md 11.3KB). workstream_focus.py only renders the role-agnostic work-subject block. So Slice 5's intended behavior is already delivered by Slice 1. How should I dispose of Slice 5 (WI-3475)?\"=\"Verify-and-close (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0816
+  asked_at: 2026-05-30T05:45:49.892976Z
+  question: "Approve the narrative-artifact packet for the protected edit to .claude/rules/file-bridge-protocol.md (adds the 'Pre-File Code-Quality Gates' subsection) per the content + sha256 shown above?"
+  options:
+    - "Approve as shown"
+    - "Approve with edits"
+    - "Reject"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 822c04d176d13065
+  resolved_at: 2026-05-30T05:45:49.892976Z
+  answer: "Your questions have been answered: \"Approve the narrative-artifact packet for the protected edit to .claude/rules/file-bridge-protocol.md (adds the 'Pre-File Code-Quality Gates' subsection) per the content + sha256 shown above?\"=\"Approve as shown\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0817
+  asked_at: 2026-05-30T13:34:03.645464Z
+  question: "Investigating before committing Slices 1-4, I found the worktree carries substantial UNCOMMITTED PRIOR-SESSION work entangled with my changes: the SessionStart dispatchers (.claude + .codex) and scripts/workstream_focus.py contain the entire startup-relay-cache / init-keyword disclosure foundation (e.g., _write_role_scoped_startup_relay_caches, _STARTUP_CACHE_READ_COMMAND_RE) that is NOT in HEAD (0e19d2e6) and was authored in prior sessions, never committed. Slices 1-4 are small additions on top. git add -p (interactive staging to separate them) is unavailable here, and the new test files can't be committed alone (they'd fail on a fresh checkout without the source). How should I proceed?"
+  options:
+    - "Commit all 10 files as one feature commit (Recommended)"
+    - "Hold; coordinate the foundation commit first"
+    - "Commit only the pure-new resolver + tests"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 19f0b72ddd69b845
+  resolved_at: 2026-05-30T13:34:03.645464Z
+  answer: "Your questions have been answered: \"Investigating before committing Slices 1-4, I found the worktree carries substantial UNCOMMITTED PRIOR-SESSION work entangled with my changes: the SessionStart dispatchers (.claude + .codex) and scripts/workstream_focus.py contain the entire startup-relay-cache / init-keyword disclosure foundation (e.g., _write_role_scoped_startup_relay_caches, _STARTUP_CACHE_READ_COMMAND_RE) that is NOT in HEAD (0e19d2e6) and was authored in prior sessions, never committed. Slices 1-4 are small additions on top. git add -p (interactive staging to separate them) is unavailable here, and the new test files can't be committed alone (they'd fail on a fresh checkout without the source). How should I proceed?\"=\"Commit all 10 files as one feature commit (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0818
+  asked_at: 2026-05-30T14:50:21.737257Z
+  question: "My -007 post-impl report is awaiting Codex review, but auto-dispatch is suppressed because this interactive Prime session is active. How do you want to get it reviewed?"
+  options:
+    - "Trigger Codex manually"
+    - "I stand by; you'll end this session"
+    - "Start a non-colliding backlog item"
+    - "Stop for now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: fcf71cff0b0dccaf
+  resolved_at: 2026-05-30T14:50:21.737257Z
+  answer: "Your questions have been answered: \"My -007 post-impl report is awaiting Codex review, but auto-dispatch is suppressed because this interactive Prime session is active. How do you want to get it reviewed?\"=\"Trigger Codex manually\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0819
+  asked_at: 2026-05-30T14:59:32.045489Z
+  question: "The -010 GO'd plan can't run as written (phantom IP-4 tests; helpers uncommitted; file in 375-line multi-feature uncommitted state; commit freeze). The startup symptom is already resolved. How do you want to proceed?"
+  options:
+    - "Stand down + file drift REVISED (Recommended)"
+    - "Proceed adapted, no commit"
+    - "Capture findings as backlog, move on"
+    - "Investigate freeze/ownership first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4ccf49dd87cf6d46
+  resolved_at: 2026-05-30T14:59:32.045489Z
+  answer: "Your questions have been answered: \"The -010 GO'd plan can't run as written (phantom IP-4 tests; helpers uncommitted; file in 375-line multi-feature uncommitted state; commit freeze). The startup symptom is already resolved. How do you want to proceed?\"=\"Stand down + file drift REVISED (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0820
+  asked_at: 2026-05-30T15:07:55.802319Z
+  question: "Commit the 5 VERIFIED Slice 5-7 files now, and at what granularity?"
+  options:
+    - "Single bundled commit (Recommended)"
+    - "Three separate commits (one per slice)"
+    - "Defer commit — proceed to Slice 8 first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 866568fe2763cedd
+  resolved_at: 2026-05-30T15:07:55.802319Z
+  answer: "Your questions have been answered: \"Commit the 5 VERIFIED Slice 5-7 files now, and at what granularity?\"=\"Single bundled commit (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0821
+  asked_at: 2026-05-30T15:26:35.784727Z
+  question: "Current-state monitoring ran (overall WARN; 3 verified actionable hygiene findings). How should I handle them, given the active commit freeze?"
+  options:
+    - "Capture all 3 as backlog WIs (Recommended)"
+    - "Investigate the stale role sentinel"
+    - "Restore the missing companion doc"
+    - "Report only — stand by"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4dc3e9005809dfc7
+  resolved_at: 2026-05-30T15:26:35.784727Z
+  answer: "Your questions have been answered: \"Current-state monitoring ran (overall WARN; 3 verified actionable hygiene findings). How should I handle them, given the active commit freeze?\"=\"Capture all 3 as backlog WIs (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0822
+  asked_at: 2026-05-30T15:42:50.510785Z
+  question: "Promote candidate INTAKE-a815f782 to a canonical SPEC? (It's implementation-bearing, so confirming also creates one linked MemBase work item for the future narrow lease-substitution thread. Implementation still requires its own proposal/GO/tests — this only makes the requirement canonical.)"
+  options:
+    - "Confirm — promote to SPEC + work item"
+    - "Keep as deferred candidate"
+    - "Reject the candidate"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b5183c4469b1a34c
+  resolved_at: 2026-05-30T15:42:50.510785Z
+  answer: "Your questions have been answered: \"Promote candidate INTAKE-a815f782 to a canonical SPEC? (It's implementation-bearing, so confirming also creates one linked MemBase work item for the future narrow lease-substitution thread. Implementation still requires its own proposal/GO/tests — this only makes the requirement canonical.)\"=\"Confirm — promote to SPEC + work item\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0823
+  asked_at: 2026-05-30T16:24:23.074824Z
+  question: "A parallel session filed a Slice 7-prime physical-deletion proposal on the same project family. My Slice 2A REVISED -003 is written but not yet INDEX-inserted (dormant). How should I sequence?"
+  options:
+    - "Insert REVISED -003 — both proceed in parallel"
+    - "Stand down Slice 2A; let Slice 7-prime land first"
+    - "Withdraw Slice 2A thread entirely"
+    - "Flag both threads to owner via a coordination bridge"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9739a8b877ee9d3d
+  resolved_at: 2026-05-30T16:24:23.074824Z
+  answer: "Your questions have been answered: \"A parallel session filed a Slice 7-prime physical-deletion proposal on the same project family. My Slice 2A REVISED -003 is written but not yet INDEX-inserted (dormant). How should I sequence?\"=\"Insert REVISED -003 — both proceed in parallel\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0824
+  asked_at: 2026-05-30T16:25:16.258958Z
+  question: "Bridge scan shows 46 latest-GO + 52 latest-NO-GO, but the counts are inflated by stale entries (auto-retire gap). What next?"
+  options:
+    - "Triage GO/NO-GO for staleness (Recommended)"
+    - "Proceed with freshest live GO"
+    - "Work the top NO-GOs"
+    - "Report only — stand by"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f1875484a62629d4
+  resolved_at: 2026-05-30T16:25:16.258958Z
+  answer: "Your questions have been answered: \"Bridge scan shows 46 latest-GO + 52 latest-NO-GO, but the counts are inflated by stale entries (auto-retire gap). What next?\"=\"Triage GO/NO-GO for staleness (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0825
+  asked_at: 2026-05-30T16:25:16.258958Z
+  question: "Staleness triage done: 55 live, ~42 stale (≈39 withdrawn-not-deindexed). How to proceed?"
+  options:
+    - "Capture the de-index gap as a WI + save live list (Recommended)"
+    - "Deeper triage of the 55 live"
+    - "Show me the full 55 live list"
+    - "Report only — stand by"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5f69a5f39f8637c7
+  resolved_at: 2026-05-30T16:25:16.258958Z
+  answer: "Your questions have been answered: \"Staleness triage done: 55 live, ~42 stale (≈39 withdrawn-not-deindexed). How to proceed?\"=\"Capture the de-index gap as a WI + save live list (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0826
+  asked_at: 2026-05-30T16:27:51.399232Z
+  question: "The lease-substitution edit is blocked until cross_harness_bridge_trigger.py's VERIFIED-but-uncommitted parallel work (quiesce + rotation) commits. A parallel session is actively committing. How should I clear it to hit 'ASAP'?"
+  options:
+    - "Drive proposal now, let collision self-clear"
+    - "I commit the VERIFIED parallel work now"
+    - "Worktree-isolate the implementation"
+    - "Set up governance only; pause before proposal"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b59a2b84cac89365
+  resolved_at: 2026-05-30T16:27:51.399232Z
+  answer: "Your questions have been answered: \"The lease-substitution edit is blocked until cross_harness_bridge_trigger.py's VERIFIED-but-uncommitted parallel work (quiesce + rotation) commits. A parallel session is actively committing. How should I clear it to hit 'ASAP'?\"=\"Drive proposal now, let collision self-clear\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0827
+  asked_at: 2026-05-30T16:41:18.948759Z
+  question: "Working tree is 779 files across many workstreams, with parallel Codex sessions actively writing. What scope should I commit?"
+  options:
+    - "Scoped bridge-state checkpoint (Recommended)"
+    - "Sweeping checkpoint (all 779)"
+    - "Bridge + operational files"
+    - "Hold — coordinate first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 43282f2915186487
+  resolved_at: 2026-05-30T16:41:18.948759Z
+  answer: "Your questions have been answered: \"Working tree is 779 files across many workstreams, with parallel Codex sessions actively writing. What scope should I commit?\"=\"Scoped bridge-state checkpoint (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0829
+  asked_at: 2026-05-30T16:49:32.167193Z
+  question: "The collision file can't be cleanly committed: it's an inconsistent partial assembly of 4 VERIFIED threads (permission-profile's code is present but its test update is missing → red test), and a parallel session is mid-git-surgery (active stash). How should I proceed?"
+  options:
+    - "Stand down; let parallel sessions settle"
+    - "I repair the tree, then commit + implement"
+    - "Worktree off clean HEAD"
+    - "Stand down entirely for now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 941530ab5428d23d
+  resolved_at: 2026-05-30T16:49:32.167193Z
+  answer: "Your questions have been answered: \"The collision file can't be cleanly committed: it's an inconsistent partial assembly of 4 VERIFIED threads (permission-profile's code is present but its test update is missing → red test), and a parallel session is mid-git-surgery (active stash). How should I proceed?\"=\"Stand down; let parallel sessions settle\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0830
+  asked_at: 2026-05-30T16:50:11.702162Z
+  question: "Bridge updates reported (4 new parallel-owned GO threads; de-index gap steady; freshness -013 deferred). What next?"
+  options:
+    - "Stand by (Recommended)"
+    - "Inspect a newly-GO thread"
+    - "Pick up implementable work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b80835203878fae4
+  resolved_at: 2026-05-30T16:50:11.702162Z
+  answer: "Your questions have been answered: \"Bridge updates reported (4 new parallel-owned GO threads; de-index gap steady; freshness -013 deferred). What next?\"=\"Stand by (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0832
+  asked_at: 2026-05-30T16:56:16.087290Z
+  question: "The continuation prompt is ready. Do you want me to also run session wrap-up procedures, given the working tree is mid-surgery by parallel sessions?"
+  options:
+    - "Leave wrap here"
+    - "Deliberation harvest only"
+    - "Full /kb-session-wrap S373"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 789d9fe87860655b
+  resolved_at: 2026-05-30T16:56:16.087290Z
+  answer: "Your questions have been answered: \"The continuation prompt is ready. Do you want me to also run session wrap-up procedures, given the working tree is mid-surgery by parallel sessions?\"=\"Leave wrap here\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0833
+  asked_at: 2026-05-30T17:04:21.882851Z
+  question: "DECISION-0831: How should I handle session wrap-up given Slice 4 is at NEW-006 awaiting Codex verdict?"
+  options:
+    - "Hold until Slice 4 VERIFIED, then wrap (Recommended)"
+    - "Run wrap-up now (don't wait for verdict)"
+    - "Partial wrap now (memory only, defer DA harvest)"
+    - "Skip wrap-up entirely for this session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6eac724af1bd072f
+  resolved_at: 2026-05-30T17:04:21.882851Z
+  answer: "Your questions have been answered: \"DECISION-0831: How should I handle session wrap-up given Slice 4 is at NEW-006 awaiting Codex verdict?\"=\"Hold until Slice 4 VERIFIED, then wrap (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0834
+  asked_at: 2026-05-30T17:38:41.608868Z
+  question: "How should I handle the live contamination of 10 fixture DELIB records (DELIB-2511..DELIB-2520) + 10 approval packet files caused by Slice 4 tests?"
+  options:
+    - "Governed retraction: new DELIB versions + per-record approval packets (Recommended)"
+    - "Single-deliberation remediation entry + bulk reference"
+    - "Owner-approved ad-hoc deletion (governance waiver)"
+    - "Defer remediation; fix the bug first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4c8a0e680c2ceaed
+  resolved_at: 2026-05-30T17:38:41.608868Z
+  answer: "Your questions have been answered: \"How should I handle the live contamination of 10 fixture DELIB records (DELIB-2511..DELIB-2520) + 10 approval packet files caused by Slice 4 tests?\"=\"Governed retraction: new DELIB versions + per-record approval packets (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0835
+  asked_at: 2026-05-30T18:40:07.674952Z
+  question: "REVISED-2 (-013) is filed and awaiting Codex's -014 verdict. What should I focus on next?"
+  options:
+    - "Stand by for Codex"
+    - "cli.py coord commit"
+    - "Commit bridge trail now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 630aa79de49e2a9e
+  resolved_at: 2026-05-30T18:40:07.674952Z
+  answer: "Your questions have been answered: \"REVISED-2 (-013) is filed and awaiting Codex's -014 verdict. What should I focus on next?\"=\"Stand by for Codex\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0836
+  asked_at: 2026-05-30T18:45:09.233190Z
+  question: "Hygiene NO-GO F1 is a real authorization-model question: PAUTH-001 v3's allowed_mutation_classes is [source_code, tests, rule_files, doctor_checks, parity_checks, hook_scripts] and explicitly excludes backlog_bulk_ops. Which authorization path do you want me to take for the WI-3474..3477 hygiene backfill?"
+  options:
+    - "Amend PAUTH-001 to add backlog_metadata_hygiene class"
+    - "Use PROJECT-GTKB-RELIABILITY-FIXES standing auth"
+    - "Defer hygiene to a later session"
+    - "Generate formal-artifact-approval packet for the cleanup"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5c275524a04ba533
+  resolved_at: 2026-05-30T18:45:09.233190Z
+  answer: "Your questions have been answered: \"Hygiene NO-GO F1 is a real authorization-model question: PAUTH-001 v3's allowed_mutation_classes is [source_code, tests, rule_files, doctor_checks, parity_checks, hook_scripts] and explicitly excludes backlog_bulk_ops. Which authorization path do you want me to take for the WI-3474..3477 hygiene backfill?\"=\"Use PROJECT-GTKB-RELIABILITY-FIXES standing auth\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0837
+  asked_at: 2026-05-30T19:03:56.882404Z
+  question: "How should the 3 untracked loyal-opposition-hygiene-assessment SKILL.md files be handled as part of the work_list.md deletion thread?"
+  options:
+    - "Edit in place; keep untracked (Recommended)"
+    - "Edit AND commit them as canonical"
+    - "Leave skill files alone; tighten gate only"
+    - "Spin off a separate skill-migration thread first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ff5931d89ff9d8b6
+  resolved_at: 2026-05-30T19:03:56.882404Z
+  answer: "Your questions have been answered: \"How should the 3 untracked loyal-opposition-hygiene-assessment SKILL.md files be handled as part of the work_list.md deletion thread?\"=\"Edit in place; keep untracked (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0838
+  asked_at: 2026-05-30T19:04:04.625368Z
+  question: "Codex -013 NO-GO has a single P1 finding (multi-target/tuple-target enum syntax bypass — Codex's 4th iteration finding deeper escape hatches in the AST-based closed-vocabulary checker). How do you want to sequence this session?"
+  options:
+    - "Implement v4 fix now (Recommended)"
+    - "Pivot to hygiene fast-lane first"
+    - "Reconsider Slice 8 mechanism"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5b24924bef0ebdc7
+  resolved_at: 2026-05-30T19:04:04.625368Z
+  answer: "Your questions have been answered: \"Codex -013 NO-GO has a single P1 finding (multi-target/tuple-target enum syntax bypass — Codex's 4th iteration finding deeper escape hatches in the AST-based closed-vocabulary checker). How do you want to sequence this session?\"=\"Implement v4 fix now (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0839
+  asked_at: 2026-05-30T19:20:35.552557Z
+  question: "A parallel S375 session already filed REVISED-3 (-015) for the work_list.md-retirement thread and got your AUQ, but its evidence claims 3 skill files reference work_list.md when only 1 (.claude) exists in the main tree (.codex/.agent SKILL.md are absent). Two harness-B sessions are now on this thread. How should this session proceed?"
+  options:
+    - "Stand down; you relay"
+    - "I append a correction note"
+    - "I take over with corrected -015"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: fe168b734ee8ae58
+  resolved_at: 2026-05-30T19:20:35.552557Z
+  answer: "Your questions have been answered: \"A parallel S375 session already filed REVISED-3 (-015) for the work_list.md-retirement thread and got your AUQ, but its evidence claims 3 skill files reference work_list.md when only 1 (.claude) exists in the main tree (.codex/.agent SKILL.md are absent). Two harness-B sessions are now on this thread. How should this session proceed?\"=\"Stand down; you relay\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0840
+  asked_at: 2026-05-30T20:33:45.438915Z
+  question: "Codex GO'd Slice 7-prime (-018). Implementation edits 5 protected narrative artifacts (CLAUDE.md + canonical-terminology / operating-model / peer-solution-advisory-loop / acting-prime-builder rules) and deletes memory/work_list.md — all formal-artifact-approval / destructive-action gated. How should I proceed?"
+  options:
+    - "Scoped auto-approval + implement now"
+    - "Implement now, per-packet approval"
+    - "Defer implementation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8fb75c9fd92f0c22
+  resolved_at: 2026-05-30T20:33:45.438915Z
+  answer: "Your questions have been answered: \"Codex GO'd Slice 7-prime (-018). Implementation edits 5 protected narrative artifacts (CLAUDE.md + canonical-terminology / operating-model / peer-solution-advisory-loop / acting-prime-builder rules) and deletes memory/work_list.md — all formal-artifact-approval / destructive-action gated. How should I proceed?\"=\"Scoped auto-approval + implement now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0841
+  asked_at: 2026-05-30T20:33:45.438915Z
+  question: "When memory/work_list.md is deleted, what happens to the `gt backlog migrate-work-list` migration tooling (the cli.py command + backlog.py parse/migrate backend + 2 test_cli.py tests) that functionally reads it? This determines the -019 REVISED scope."
+  options:
+    - "Retire the migration tooling"
+    - "Preserve as legacy tool"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ac40f79fe1e5d15b
+  resolved_at: 2026-05-30T20:33:45.438915Z
+  answer: "Your questions have been answered: \"When memory/work_list.md is deleted, what happens to the `gt backlog migrate-work-list` migration tooling (the cli.py command + backlog.py parse/migrate backend + 2 test_cli.py tests) that functionally reads it? This determines the -019 REVISED scope.\"=\"Retire the migration tooling\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0842
+  asked_at: 2026-05-30T20:38:49.617750Z
+  question: "What should this S374 session focus on?"
+  options:
+    - "Retraction follow-on (workflow)"
+    - "Retraction follow-on (single-thread)"
+    - "Pick from startup focus menu"
+    - "Different work entirely"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: da814fb503ad8e2a
+  resolved_at: 2026-05-30T20:38:49.617750Z
+  answer: "Your questions have been answered: \"What should this S374 session focus on?\"=\"Retraction follow-on (workflow)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0843
+  asked_at: 2026-05-30T21:00:35.676487Z
+  question: "DECISION-0834 authorized governed retraction of 10 records but the probe evidence narrows the polluted set to 7 (DELIB-2514..2520; DELIB-2511..2513 are legitimate with in-flight dependents). Approve the narrowed scope and file the proposal?"
+  options:
+    - "Approve narrowed scope; file as drafted"
+    - "Approve narrowed scope + include provenance DELIB"
+    - "Keep DECISION-0834's wider scope (all 10)"
+    - "Show me the full draft text first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cefcdaf77e7bd44f
+  resolved_at: 2026-05-30T21:00:35.676487Z
+  answer: "Your questions have been answered: \"DECISION-0834 authorized governed retraction of 10 records but the probe evidence narrows the polluted set to 7 (DELIB-2514..2520; DELIB-2511..2513 are legitimate with in-flight dependents). Approve the narrowed scope and file the proposal?\"=\"Approve narrowed scope; file as drafted\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0844
+  asked_at: 2026-05-30T21:04:50.967032Z
+  question: "You stated a standing principle — fresh reads of the source-of-truth over cached copies/summaries. Beyond the WI-3500 reporting fix I just captured, how far should I operationalize it now?"
+  options:
+    - "Formalize + audit WI (Recommended)"
+    - "Audit WI only"
+    - "WI-3500 only for now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: fb289040c99ac74c
+  resolved_at: 2026-05-30T21:04:50.967032Z
+  answer: "Your questions have been answered: \"You stated a standing principle — fresh reads of the source-of-truth over cached copies/summaries. Beyond the WI-3500 reporting fix I just captured, how far should I operationalize it now?\"=\"Formalize + audit WI (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0845
+  asked_at: 2026-05-30T22:13:18.929547Z
+  question: "Codex NO-GO F3: the retraction proposal needs project-linkage metadata (Project Authorization / Project / Work Item) UNLESS reclassified to an exempt bridge_kind. How should the REVISED be classified? (F1/F2/F4 mechanical fixes happen regardless.)"
+  options:
+    - "governance_review (exempt)"
+    - "implementation_proposal + new WI"
+    - "Let me see both REVISED drafts"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 15abb8cfab3c31ab
+  resolved_at: 2026-05-30T22:13:18.929547Z
+  answer: "Your questions have been answered: \"Codex NO-GO F3: the retraction proposal needs project-linkage metadata (Project Authorization / Project / Work Item) UNLESS reclassified to an exempt bridge_kind. How should the REVISED be classified? (F1/F2/F4 mechanical fixes happen regardless.)\"=\"governance_review (exempt)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0846
+  asked_at: 2026-05-30T23:30:28.564883Z
+  question: "WI-3506 captures a real rule-vs-MemBase drift: three narrative rule files (canonical-terminology.md:414, operating-model.md:25, prime-builder-role.md:48) cite GOV-CHAT-DERIVED-SPEC-APPROVAL-001 as a live governing spec, but it does not exist in MemBase. The live equivalent is GOV-SPEC-CAPTURE-TRANSPARENCY-001. How should this be remediated? (This is captured as backlog WI-3506; it does NOT block the in-flight -005 re-review.)"
+  options:
+    - "Re-point citations (Recommended)"
+    - "Create the missing spec"
+    - "Leave as backlog only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7ff2f5ec92f25a2c
+  resolved_at: 2026-05-30T23:30:28.564883Z
+  answer: "Your questions have been answered: \"WI-3506 captures a real rule-vs-MemBase drift: three narrative rule files (canonical-terminology.md:414, operating-model.md:25, prime-builder-role.md:48) cite GOV-CHAT-DERIVED-SPEC-APPROVAL-001 as a live governing spec, but it does not exist in MemBase. The live equivalent is GOV-SPEC-CAPTURE-TRANSPARENCY-001. How should this be remediated? (This is captured as backlog WI-3506; it does NOT block the in-flight -005 re-review.)\"=\"Re-point citations (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0847
+  asked_at: 2026-05-30T23:31:54.276385Z
+  question: "Slice 8 reached VERIFIED at -017 (recommended commit type `feat`). The 2 code files are clean (+662 additions, no parallel contamination), but the tree has 275 churned files from parallel Codex sessions, HEAD has advanced twice, and bridge/INDEX.md has interleaved multi-thread edits. How should I commit the VERIFIED Slice 8?"
+  options:
+    - "Code only, scoped feat: (Recommended)"
+    - "Code + Slice 8 bridge chain + INDEX"
+    - "Hold all commits"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1f0bb7d4e5e88153
+  resolved_at: 2026-05-30T23:31:54.276385Z
+  answer: "Your questions have been answered: \"Slice 8 reached VERIFIED at -017 (recommended commit type `feat`). The 2 code files are clean (+662 additions, no parallel contamination), but the tree has 275 churned files from parallel Codex sessions, HEAD has advanced twice, and bridge/INDEX.md has interleaved multi-thread edits. How should I commit the VERIFIED Slice 8?\"=\"Code only, scoped feat: (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0848
+  asked_at: 2026-05-30T23:43:27.452794Z
+  question: "Retiring work_list.md (DELIB-S337) — does the scope cover ONLY the platform's own memory/work_list.md, or ALSO the adopter-facing work_list.md surfaces (scaffold seeding + the `isolation:work-list-no-product-entries` adopter doctor check + adopter upgrade gate/tests/fixtures/docs)? DELIB-S337 is platform-scoped, but the GO'd acceptance grep sweeps adopter surfaces whose removal cascades to files outside the approved target_paths."
+  options:
+    - "Platform-only (preserve adopter)"
+    - "Platform + adopter (clean sweep)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1809ec59af2c4f5c
+  resolved_at: 2026-05-30T23:43:27.452794Z
+  answer: "Your questions have been answered: \"Retiring work_list.md (DELIB-S337) — does the scope cover ONLY the platform's own memory/work_list.md, or ALSO the adopter-facing work_list.md surfaces (scaffold seeding + the `isolation:work-list-no-product-entries` adopter doctor check + adopter upgrade gate/tests/fixtures/docs)? DELIB-S337 is platform-scoped, but the GO'd acceptance grep sweeps adopter surfaces whose removal cascades to files outside the approved target_paths.\"=\"Platform + adopter (clean sweep)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0849
+  asked_at: 2026-05-31T04:34:33.790535Z
+  question: "The retraction is complete + verified and parked at NEW:-006 awaiting Codex. But this turn's tool channel is unreliable (contaminated Bash output, blank Read/Grep) so I can't safely verify INDEX integrity or do further writes. How should we proceed?"
+  options:
+    - "Restart session (clean channel)"
+    - "I'll retry the check here"
+    - "Stop here; nothing more needed"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 84c840dfdb67463b
+  resolved_at: 2026-05-31T04:34:33.790535Z
+  answer: "Your questions have been answered: \"The retraction is complete + verified and parked at NEW:-006 awaiting Codex. But this turn's tool channel is unreliable (contaminated Bash output, blank Read/Grep) so I can't safely verify INDEX integrity or do further writes. How should we proceed?\"=\"Restart session (clean channel)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0850
+  asked_at: 2026-05-31T04:34:33.790535Z
+  question: "Correction: the channel is actually clean and the retraction is VERIFIED/terminal — no recovery needed. The only open item is committing the VERIFIED change set (7 v2 packets + -006 + -007 + INDEX + MEMORY, fix:). How do you want to proceed?"
+  options:
+    - "Commit now, then restart"
+    - "Restart without committing"
+    - "Commit now, stay in session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 11bc3af246bd523e
+  resolved_at: 2026-05-31T04:34:33.790535Z
+  answer: "Your questions have been answered: \"Correction: the channel is actually clean and the retraction is VERIFIED/terminal — no recovery needed. The only open item is committing the VERIFIED change set (7 v2 packets + -006 + -007 + INDEX + MEMORY, fix:). How do you want to proceed?\"=\"Commit now, then restart\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0851
+  asked_at: 2026-05-31T04:53:02.014822Z
+  question: "Approve the DELIB body shown above for insertion into MemBase? Per GOV-SPEC-CAPTURE-TRANSPARENCY-001, the full proposed text is shown verbatim in the chat transcript above; your decision is captured as approved_by=owner + transcript_captured=true in the approval packet."
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Approve with edits"
+    - "Reject"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e6d09dee7427e179
+  resolved_at: 2026-05-31T04:53:02.014822Z
+  answer: "Your questions have been answered: \"Approve the DELIB body shown above for insertion into MemBase? Per GOV-SPEC-CAPTURE-TRANSPARENCY-001, the full proposed text is shown verbatim in the chat transcript above; your decision is captured as approved_by=owner + transcript_captured=true in the approval packet.\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0852
+  asked_at: 2026-05-31T04:53:02.014822Z
+  question: "Approve the GOV body shown above for insertion into MemBase as GOV-SOURCE-OF-TRUTH-FRESHNESS-001 (type=governance, status=specified)? Per GOV-SPEC-CAPTURE-TRANSPARENCY-001, the full proposed text is shown verbatim in the chat transcript above; your decision is captured as approved_by=owner + transcript_captured=true in the approval packet."
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Approve with edits"
+    - "Reject"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 71712d8a887b2e49
+  resolved_at: 2026-05-31T04:53:02.014822Z
+  answer: "Your questions have been answered: \"Approve the GOV body shown above for insertion into MemBase as GOV-SOURCE-OF-TRUTH-FRESHNESS-001 (type=governance, status=specified)? Per GOV-SPEC-CAPTURE-TRANSPARENCY-001, the full proposed text is shown verbatim in the chat transcript above; your decision is captured as approved_by=owner + transcript_captured=true in the approval packet.\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0853
+  asked_at: 2026-05-31T04:53:02.014822Z
+  question: "Approve the DCL body shown above for insertion into MemBase as DCL-REPORTING-SURFACE-FRESH-READ-001 (type=design_constraint, status=specified, affected_by GOV-SOURCE-OF-TRUTH-FRESHNESS-001)? Per GOV-SPEC-CAPTURE-TRANSPARENCY-001, the full proposed text is shown verbatim in the chat transcript above; your decision is captured as approved_by=owner + transcript_captured=true in the approval packet."
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Approve with edits"
+    - "Reject"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7a6662bd6096aa1c
+  resolved_at: 2026-05-31T04:53:02.014822Z
+  answer: "Your questions have been answered: \"Approve the DCL body shown above for insertion into MemBase as DCL-REPORTING-SURFACE-FRESH-READ-001 (type=design_constraint, status=specified, affected_by GOV-SOURCE-OF-TRUTH-FRESHNESS-001)? Per GOV-SPEC-CAPTURE-TRANSPARENCY-001, the full proposed text is shown verbatim in the chat transcript above; your decision is captured as approved_by=owner + transcript_captured=true in the approval packet.\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0854
+  asked_at: 2026-05-31T05:16:47.675243Z
+  question: "Codex GO'd the final clean-sweep plan (-024). The remaining implementation is ~40 file edits + 6 approval packets + the work_list.md deletion + full verification. This is a multi-hour sweep in a session that's been running long. How should I proceed?"
+  options:
+    - "Continue in this session (Recommended)"
+    - "Wrap up and hand off to next session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 33b7c1dd0a8f3b4d
+  resolved_at: 2026-05-31T05:16:47.675243Z
+  answer: "Your questions have been answered: \"Codex GO'd the final clean-sweep plan (-024). The remaining implementation is ~40 file edits + 6 approval packets + the work_list.md deletion + full verification. This is a multi-hour sweep in a session that's been running long. How should I proceed?\"=\"Continue in this session (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0855
+  asked_at: 2026-05-31T05:16:47.675243Z
+  question: "Phase 2 (all non-protected edits) is complete. Phases 3-6 are the governed approval packets + protected edits + work_list.md deletion + verification. Continue now or wrap for S377?"
+  options:
+    - "Wrap for S377 (Recommended)"
+    - "Continue now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3f61b48f30ba8203
+  resolved_at: 2026-05-31T05:16:47.675243Z
+  answer: "Your questions have been answered: \"Phase 2 (all non-protected edits) is complete. Phases 3-6 are the governed approval packets + protected edits + work_list.md deletion + verification. Continue now or wrap for S377?\"=\"Wrap for S377 (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0856
+  asked_at: 2026-05-31T06:07:10.777771Z
+  question: "Startup disclosure was not rendered — how should I proceed on this turn?"
+  options:
+    - "Investigate cache vs sidecar"
+    - "Skip disclosure, take direction"
+    - "Stand down, restart session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 411da3f74ea8b45a
+  resolved_at: 2026-05-31T06:07:10.777771Z
+  answer: "Your questions have been answered: \"Startup disclosure was not rendered — how should I proceed on this turn?\"=\"Skip disclosure, take direction\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0857
+  asked_at: 2026-05-31T06:17:54.870744Z
+  question: "Slice 9 is VERIFIED, but 2 of the 5 files collide with a parallel claude-md-scope-clarification session: CLAUDE.md is stale against a committed restructure (committing reverts 101 lines), and canonical-terminology.md has a mixed-in parallel edit. The other 3 files are clean + current. How should I commit Slice 9?"
+  options:
+    - "Commit 3 clean; rebase 2 (Recommended)"
+    - "Hold all Slice 9 commits"
+    - "Commit 3 clean; leave 2 in tree"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 54abe18e4dc05076
+  resolved_at: 2026-05-31T06:17:54.870744Z
+  answer: "Your questions have been answered: \"Slice 9 is VERIFIED, but 2 of the 5 files collide with a parallel claude-md-scope-clarification session: CLAUDE.md is stale against a committed restructure (committing reverts 101 lines), and canonical-terminology.md has a mixed-in parallel edit. The other 3 files are clean + current. How should I commit Slice 9?\"=\"Commit 3 clean; rebase 2 (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0858
+  asked_at: 2026-05-31T06:17:54.870744Z
+  question: "Slice 9's 3 clean files are committed (736a158d). Step 2 (rebase CLAUDE.md + canonical-terminology.md) is blocked: canonical-terminology.md has a parallel session's UNCOMMITTED edit interleaved with mine in the shared working tree, and CLAUDE.md was restructured to 301 lines in HEAD (my anchor gone, at the GOV-01 cap). How should I handle the 2 remaining files?"
+  options:
+    - "Defer Step 2; leave tree as-is (Recommended)"
+    - "Clean up my 2 uncommitted edits now"
+    - "Attempt the rebase now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1a9b38d8de6b12b0
+  resolved_at: 2026-05-31T06:17:54.870744Z
+  answer: "Your questions have been answered: \"Slice 9's 3 clean files are committed (736a158d). Step 2 (rebase CLAUDE.md + canonical-terminology.md) is blocked: canonical-terminology.md has a parallel session's UNCOMMITTED edit interleaved with mine in the shared working tree, and CLAUDE.md was restructured to 301 lines in HEAD (my anchor gone, at the GOV-01 cap). How should I handle the 2 remaining files?\"=\"Defer Step 2; leave tree as-is (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0859
+  asked_at: 2026-05-31T07:32:41.916810Z
+  question: "Codex NO-GO'd -026 (F1): the 2 scaffold-golden memory/work_list.md deletions are outside the GO'd -023 target_paths. You approved that removal in S377, but the in-session AUQ didn't expand the bridge GO envelope. How should I remediate?"
+  options:
+    - "Restore + resubmit (in-scope)"
+    - "Scope-expand via new GO"
+    - "Spin the fixture regen now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ed482a369f2bf4b1
+  resolved_at: 2026-05-31T07:32:41.916810Z
+  answer: "Your questions have been answered: \"Codex NO-GO'd -026 (F1): the 2 scaffold-golden memory/work_list.md deletions are outside the GO'd -023 target_paths. You approved that removal in S377, but the in-session AUQ didn't expand the bridge GO envelope. How should I remediate?\"=\"Restore + resubmit (in-scope)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0862
+  asked_at: 2026-05-31T07:54:48.969564Z
+  question: "Slice 7-prime is complete and committed (174f8900 on develop, not pushed). What would you like next?"
+  options:
+    - "Stop here"
+    - "Push 174f8900"
+    - "Triage bridge queue"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 29916eb7f69c0851
+  resolved_at: 2026-05-31T07:54:48.969564Z
+  answer: "Your questions have been answered: \"Slice 7-prime is complete and committed (174f8900 on develop, not pushed). What would you like next?\"=\"Push 174f8900\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0863
+  asked_at: 2026-05-31T07:54:55.092227Z
+  question: "Authorize the freshness-governance commit with the explicit-pathspec scope shown above (12 bridge files + INDEX + groundtruth.db + 3 packets + 4 scratch files)? The proposal's Implementation Plan step 6 covers the commit, but explicit owner approval is appropriate given the contaminated tree and the visible-state nature of the operation."
+  options:
+    - "Approve commit as scoped (Recommended)"
+    - "Approve, but exclude INDEX.md"
+    - "Hold commit until tree stabilizes"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ad7947e9da2566dc
+  resolved_at: 2026-05-31T07:54:55.092227Z
+  answer: "Your questions have been answered: \"Authorize the freshness-governance commit with the explicit-pathspec scope shown above (12 bridge files + INDEX + groundtruth.db + 3 packets + 4 scratch files)? The proposal's Implementation Plan step 6 covers the commit, but explicit owner approval is appropriate given the contaminated tree and the visible-state nature of the operation.\"=\"Approve commit as scoped (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0864
+  asked_at: 2026-05-31T08:27:40.407823Z
+  question: "The CLAUSE-IN-ROOT fix is VERIFIED by Codex (clean, scope-confirmed). How should I land it?"
+  options:
+    - "Commit locally, scoped"
+    - "Commit locally + push"
+    - "Hold — don't commit"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 56e81b236d69d79a
+  resolved_at: 2026-05-31T08:27:40.407823Z
+  answer: "Your questions have been answered: \"The CLAUSE-IN-ROOT fix is VERIFIED by Codex (clean, scope-confirmed). How should I land it?\"=\"Commit locally + push\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0865
+  asked_at: 2026-05-31T08:30:18.306856Z
+  question: "Startup-relay cache mismatch on this `::init gtkb pb` session — the canonical Prime Builder startup disclosure cannot be presented. How should I proceed?"
+  options:
+    - "Diagnose cache (Recommended)"
+    - "Resume freshness-contract impl"
+    - "Skip disclosure, do ordinary work"
+    - "Stand down"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f1f3e298e6250270
+  resolved_at: 2026-05-31T08:30:18.306856Z
+  answer: "Your questions have been answered: \"Startup-relay cache mismatch on this `::init gtkb pb` session — the canonical Prime Builder startup disclosure cannot be presented. How should I proceed?\"=\"Stand down\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0866
+  asked_at: 2026-05-31T08:33:05.627196Z
+  question: "Startup-relay failed (cache↔sidecar mismatch on last-user-visible-startup-pb.md; SessionStart freshness contract also failed). How should I proceed?"
+  options:
+    - "Investigate root cause (Recommended)"
+    - "End session, restart fresh"
+    - "Force-regenerate startup payload now"
+    - "Proceed without disclosure"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 00ddd550cb33fe4e
+  resolved_at: 2026-05-31T08:33:05.627196Z
+  answer: "Your questions have been answered: \"Startup-relay failed (cache↔sidecar mismatch on last-user-visible-startup-pb.md; SessionStart freshness contract also failed). How should I proceed?\"=\"Proceed without disclosure\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0867
+  asked_at: 2026-05-31T14:51:16.150581Z
+  question: "Slice 10 is VERIFIED at -010 and ready to commit, but the inventory-drift gate blocks because harness C \"antigravity\" was added as prime-builder in harness-state (parallel-session uncommitted work in this shared tree). My Slice 10 changes are scope-clean. How should I proceed?"
+  options:
+    - "Hold Slice 10 here (Recommended)"
+    - "File an inventory-regen chore thread now"
+    - "Bundle inventory regen into Slice 10 commit"
+    - "Investigate harness C first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 19b499ffdff3b6b6
+  resolved_at: 2026-05-31T14:51:16.150581Z
+  answer: "Your questions have been answered: \"Slice 10 is VERIFIED at -010 and ready to commit, but the inventory-drift gate blocks because harness C \"antigravity\" was added as prime-builder in harness-state (parallel-session uncommitted work in this shared tree). My Slice 10 changes are scope-clean. How should I proceed?\"=\"File an inventory-regen chore thread now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0868
+  asked_at: 2026-05-31T14:51:16.150581Z
+  question: "The inventory drift turns out to wrap an active multi-harness topology transition (live harness-state shows Codex demoted to LO-only, Claude reactivated as PB-only, Antigravity activated as PB; harness-registry version bumps 15→17, 13→16, 2→...). VERIFIED thread `gtkb-antigravity-harness-registration` (DELIB-2198/2213) is in the audit trail. How should I structure the chore?"
+  options:
+    - "Bundled chore: topology + inventory regen (Recommended)"
+    - "Two separate chore threads"
+    - "Owner-authorized --no-verify on Slice 10"
+    - "Stop here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6b0d628bfc85120a
+  resolved_at: 2026-05-31T14:51:16.150581Z
+  answer: "Your questions have been answered: \"The inventory drift turns out to wrap an active multi-harness topology transition (live harness-state shows Codex demoted to LO-only, Claude reactivated as PB-only, Antigravity activated as PB; harness-registry version bumps 15→17, 13→16, 2→...). VERIFIED thread `gtkb-antigravity-harness-registration` (DELIB-2198/2213) is in the audit trail. How should I structure the chore?\"=\"Bundled chore: topology + inventory regen (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0869
+  asked_at: 2026-05-31T15:12:32.321006Z
+  question: "Codex NO-GO P1: PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING's `allowed_mutation_classes` = ['source', 'test_addition', 'hook_upgrade']. My chore's targets are harness-state/*.json + .groundtruth/inventory/*. No active PAUTH I queried (~30) covers inventory/harness-state/governance-state mutation classes. How should I authorize the chore?"
+  options:
+    - "Archive S378 AUQ as DELIB, refile with DELIB-only auth (Recommended)"
+    - "Owner extends reliability PAUTH mutation classes"
+    - "Owner-authorized --no-verify on Slice 10 (skip chore)"
+    - "Stop here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0fab5fe9c0f442db
+  resolved_at: 2026-05-31T15:12:32.321006Z
+  answer: "Your questions have been answered: \"Codex NO-GO P1: PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING's `allowed_mutation_classes` = ['source', 'test_addition', 'hook_upgrade']. My chore's targets are harness-state/*.json + .groundtruth/inventory/*. No active PAUTH I queried (~30) covers inventory/harness-state/governance-state mutation classes. How should I authorize the chore?\"=\"Archive S378 AUQ as DELIB, refile with DELIB-only auth (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0871
+  asked_at: 2026-05-31T19:59:10.958472Z
+  question: "Another agent's uncommitted INDEX changes (-226 lines + new dispatch-scoping thread entry) got bundled into the staging. How should I commit?"
+  options:
+    - "Restore INDEX to HEAD + add only my 2 lines (Recommended)"
+    - "Commit the broader INDEX state as-is"
+    - "Hold the commit until the other agent commits separately"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8b35eebf03a1356e
+  resolved_at: 2026-05-31T19:59:10.958472Z
+  answer: "Your questions have been answered: \"Another agent's uncommitted INDEX changes (-226 lines + new dispatch-scoping thread entry) got bundled into the staging. How should I commit?\"=\"Restore INDEX to HEAD + add only my 2 lines (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0872
+  asked_at: 2026-05-31T21:17:51.433043Z
+  question: "What status taxonomy should the new ADR codify for harness dispatch eligibility? (Background: your S378 directive named active/inactive/suspended. The existing WI-3339 four-state FSM at `groundtruth-kb/src/groundtruth_kb/harness_lifecycle.py:36-43` uses registered/active/suspended/retired.)"
+  options:
+    - "4-state owner-aligned (Recommended)"
+    - "3-state minimal (S378 verbatim)"
+    - "4-state FSM as-is"
+    - "5-state superset"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 188a4f90a37967f1
+  resolved_at: 2026-05-31T21:17:51.433043Z
+  answer: "Your questions have been answered: \"What status taxonomy should the new ADR codify for harness dispatch eligibility? (Background: your S378 directive named active/inactive/suspended. The existing WI-3339 four-state FSM at `groundtruth-kb/src/groundtruth_kb/harness_lifecycle.py:36-43` uses registered/active/suspended/retired.)\"=\"4-state owner-aligned (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0873
+  asked_at: 2026-05-31T21:17:51.433043Z
+  question: "What ADR shape should Slice 1 use to codify the role/status orthogonality model? (Background: `ADR-SINGLE-HARNESS-OPERATING-MODE-001` is the existing ADR that established the role-set wire form and the single-PB invariant. Your S378 directive supersedes the single-PB clause but preserves the single-harness mode capability.)"
+  options:
+    - "New successor ADR + amend old (Recommended)"
+    - "v2 of existing ADR"
+    - "Two new ADRs + retire old entirely"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: af7ef552c709a931
+  resolved_at: 2026-05-31T21:17:51.433043Z
+  answer: "Your questions have been answered: \"What ADR shape should Slice 1 use to codify the role/status orthogonality model? (Background: `ADR-SINGLE-HARNESS-OPERATING-MODE-001` is the existing ADR that established the role-set wire form and the single-PB invariant. Your S378 directive supersedes the single-PB clause but preserves the single-harness mode capability.)\"=\"New successor ADR + amend old (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0874
+  asked_at: 2026-05-31T21:27:11.297740Z
+  question: "Approve the proposed groupings of 19 orphan work items into 9 existing projects (table presented in chat above)?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Approve most, change WI-3352"
+    - "Approve most, change specific items"
+    - "Reject; re-propose"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d385f5c388b8f796
+  resolved_at: 2026-05-31T21:27:11.297740Z
+  answer: "Your questions have been answered: \"Approve the proposed groupings of 19 orphan work items into 9 existing projects (table presented in chat above)?\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0875
+  asked_at: 2026-05-31T21:31:39.776386Z
+  question: "Now that threads are identified + gate-satisfaction mechanism is known, how to proceed?"
+  options:
+    - "Re-attempt protected commits with bridge evidence (Recommended)"
+    - "Stop here — accept that the 27 remaining are bridge-thread work for proper sessions"
+    - "Re-attempt just the VERIFIED threads' files; defer NO-GO/GO threads"
+    - "Show me the specific commit plan first, then I decide per-cluster"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b2ba2c643ea59ecf
+  resolved_at: 2026-05-31T21:31:39.776386Z
+  answer: "Your questions have been answered: \"Now that threads are identified + gate-satisfaction mechanism is known, how to proceed?\"=\"Re-attempt protected commits with bridge evidence (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0876
+  asked_at: 2026-05-31T21:37:14.274903Z
+  question: "Approve the AGENTS.md Antigravity Standing Exception Retraction (per the displayed full diff)?"
+  options:
+    - "Approve — generate packet and commit (Recommended)"
+    - "Approve with auto-approval scope (acknowledge)"
+    - "Edit-and-approve — you want changes to the displayed content first"
+    - "Reject — revert AGENTS.md to HEAD; don't commit the change"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f0d3745fb63ed971
+  resolved_at: 2026-05-31T21:37:14.274903Z
+  answer: "Your questions have been answered: \"Approve the AGENTS.md Antigravity Standing Exception Retraction (per the displayed full diff)?\"=\"Approve — generate packet and commit (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0877
+  asked_at: 2026-05-31T22:10:04.907460Z
+  question: "Approve `ADR-ROLE-STATUS-ORTHOGONALITY-001` v1 as drafted above for insertion into MemBase?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Request revisions"
+    - "Withdraw"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1647d6b2525a42a6
+  resolved_at: 2026-05-31T22:10:04.907460Z
+  answer: "Your questions have been answered: \"Approve `ADR-ROLE-STATUS-ORTHOGONALITY-001` v1 as drafted above for insertion into MemBase?\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0878
+  asked_at: 2026-05-31T22:10:04.907460Z
+  question: "Approve `DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001` v1 as drafted above for insertion into MemBase?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Request revisions"
+    - "Withdraw"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c47828bcce37fa1d
+  resolved_at: 2026-05-31T22:10:04.907460Z
+  answer: "Your questions have been answered: \"Approve `DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001` v1 as drafted above for insertion into MemBase?\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0879
+  asked_at: 2026-05-31T22:10:04.907460Z
+  question: "Approve `ADR-SINGLE-HARNESS-OPERATING-MODE-001` v3 (= v2 verbatim + the appended supersession-citation extension shown above) for insertion into MemBase?"
+  options:
+    - "Approve as drafted (Recommended)"
+    - "Request revisions"
+    - "Withdraw"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3abb999d0361f84c
+  resolved_at: 2026-05-31T22:10:04.907460Z
+  answer: "Your questions have been answered: \"Approve `ADR-SINGLE-HARNESS-OPERATING-MODE-001` v3 (= v2 verbatim + the appended supersession-citation extension shown above) for insertion into MemBase?\"=\"Approve as drafted (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0880
+  asked_at: 2026-05-31T22:25:56.473000Z
+  question: "Closing the ADR-0001 storage gap: I found ADR-0001 was already authored AND Codex-VERIFIED in S297 (2026-04-17) via the `gtkb-adr-memory-architecture` thread (6 versions, 006=VERIFIED). But it only ever lived in the OLD root's gitignored MemBase (E:\\Claude-Playground\\...) and never migrated when the project moved to E:\\GT-KB. The exact 4920-char verified body + metadata is recoverable from that archived DB right now. How should I close the gap?"
+  options:
+    - "Migrate exact verified content"
+    - "Author fresh, status=specified"
+    - "Migrate body, reset to specified"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0e763322be84afc3
+  resolved_at: 2026-05-31T22:25:56.473000Z
+  answer: "Your questions have been answered: \"Closing the ADR-0001 storage gap: I found ADR-0001 was already authored AND Codex-VERIFIED in S297 (2026-04-17) via the `gtkb-adr-memory-architecture` thread (6 versions, 006=VERIFIED). But it only ever lived in the OLD root's gitignored MemBase (E:\\Claude-Playground\\...) and never migrated when the project moved to E:\\GT-KB. The exact 4920-char verified body + metadata is recoverable from that archived DB right now. How should I close the gap?\"=\"Migrate exact verified content\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-0758
+  asked_at: 2026-05-29T00:07:09.078651Z
+  question: "want me to start that triage, or hold the question of \"what to do with the backlog\" for a different session focus?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: aa3ef31a55eded8f
+  resolved_at: 2026-05-29T14:39:04.826196Z
+  answer: "start the triage"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0778
+  asked_at: 2026-05-29T15:40:04.660408Z
+  question: "Want me to leave it for the auto-dispatch, or run a `Bridge scan` to surface review state, or pick up another triage ..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 6bfd08669e11b151
+  resolved_at: 2026-05-29T15:46:02.844872Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0828
+  asked_at: 2026-05-30T16:45:02.177448Z
+  question: "Want me to dig into any specific thread, or stand by?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: f09c43e5a23a7fd6
+  resolved_at: 2026-05-30T16:53:23.970033Z
+  answer: "File Slice 7-prime REVISED -011"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-0831
+  asked_at: 2026-05-30T16:55:08.573559Z
+  question: "Want me to also run the full `/kb-session-wrap S373` (MemBase session record, deliberation harvest), or leave wrap-up..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: f353dfb2c1bbf5ef
+  resolved_at: 2026-05-30T17:07:39.745805Z
+  answer: "run wrap-up"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"

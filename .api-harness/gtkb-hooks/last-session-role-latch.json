@@ -1,0 +1,9 @@
+{
+  "authority_mode": "interactive_transcript",
+  "current_envelope_role": "prime-builder",
+  "durable_registry_role": null,
+  "harness_name": "codex",
+  "interactive_resolved_role": "loyal-opposition",
+  "interactive_role_source": "marker",
+  "opened_envelope": false
+}

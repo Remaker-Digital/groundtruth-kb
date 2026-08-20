@@ -2,7 +2,6 @@
 name: gtkb-advisory-proposal
 description: Draft Loyal Opposition ADVISORY bridge entries from reusable external or peer solutions while preserving owner confirmation and non-approval semantics.
 ---
-
 # /advisory-proposal
 
 Use this skill when Loyal Opposition, advisory mode, or a review session finds a
@@ -94,6 +93,17 @@ When this skill is implemented or used in a governed workflow, preserve:
   approval.
 - Any proposed next artifact route and the governance gate that still applies to
   that route.
+
+## Cross-Harness Disposition
+
+- Claude Code: canonical managed-skill source lives at
+  `.harness-baseline-configuration/skills/advisory-proposal/SKILL.md`.
+- Codex: generated adapter lives at
+  `.harness-baseline-configuration/skills/advisory-proposal/SKILL.md` and is declared in
+  `.harness-baseline-configuration/skills/MANIFEST.json`.
+- Antigravity, Cursor, and API harnesses: no direct skill adapter surface is
+  created by WI-5055. Projection to additional harnesses requires a separate
+  target-path-covered proposal or typed parity disposition.
 
 ## Non-Goals
 

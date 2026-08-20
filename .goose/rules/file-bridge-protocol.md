@@ -8,11 +8,10 @@ the baseline and re-projection, file a work item against the projector
 -->
 # File Bridge Protocol
 
-The bridge between Prime Builder and Loyal Opposition uses dispatcher/TAFE
+The bridge between Prime Builder and Loyal Opposition uses bridge state
 bridge state plus a shared directory of versioned markdown audit files.
 
-> **2026-06-15 bridge cutover note:** After WI-4510 Phase-3, TAFE-backed bridge
-> state and status-bearing numbered bridge files are canonical.
+> Bridge state and status-bearing numbered bridge files are canonical.
 
 ## Directory
 
@@ -77,7 +76,7 @@ python scripts/implementation_authorization.py begin --bridge-id <document-name>
 ```
 
 The resulting packet is session-local implementation-scope evidence. It must be
-derived from TAFE-backed bridge state, the approved proposal file, and the GO
+derived from bridge state, the approved proposal file, and the GO
 verdict file. It expires, fails closed on bridge status drift, and cannot
 replace formal-artifact approval packets.
 
@@ -113,7 +112,7 @@ Loyal Opposition MUST issue NO-GO on any bridge proposal whose
 preflight on its own operative file does not pass. The Loyal Opposition NO-GO message must
 include the offending `missing_*_specs` list.
 
-If the preflight cannot resolve the intended operative file from dispatcher/TAFE
+If the preflight cannot resolve the intended operative file from bridge state
 state and the numbered bridge file chain, treat that as a tooling defect and
 repair the resolver before relying on the result.
 
@@ -172,29 +171,35 @@ specific specification and risk.
 
 ## Mandatory VERIFIED Commit-Finalization Gate
 
-A `VERIFIED` verdict is a commit-finalization outcome, not a file-only bridge
-status. Loyal Opposition MUST NOT leave a terminal `VERIFIED` bridge file in
-the worktree unless the same local transaction creates the git commit that
-contains:
+The work item becomes terminal at the **work-product commit**. The `VERIFIED`
+verdict is the post-commit signal that the verified work is already committed.
 
-- the verified implementation/report paths; and
-- the new `VERIFIED` verdict artifact.
+Loyal Opposition performs finalization in this order:
 
-The verification helper path is:
+1. Verify the work product against the linked specifications.
+2. Create the local git commit containing the verified implementation and report
+   paths. The commit message MUST cite every work item it retires, in the form
+   `(WI-NNNN)`.
+3. Only after that commit succeeds, write the `VERIFIED` verdict as the next
+   numbered bridge file.
 
-```text
-python scripts/skill-helpers/gtkb-verify/write_verdict.py --slug <document-name> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [--include <verified-path> ...]
-```
+The `VERIFIED` verdict artifact is **excluded** from the commit created in step
+2. It is written afterward, and it carries the resulting commit SHA as
+post-commit evidence.
 
-Reviewers first run the helper without `--finalize-verified` when they need
-Prior Deliberations seeding, then review and prune the draft. The final
-`--finalize-verified` invocation uses the reviewed body. The helper writes the
-next numbered verdict, stages only the declared verified path set plus that
-verdict, and runs a local `git commit`. If staging or commit creation fails, the
-helper removes the just-written `VERIFIED` verdict and fails closed. The verdict
-file records pre-commit evidence such as intended commit subject and staged path
-set; the final commit SHA is emitted by the helper after success and must not be
-self-embedded in the committed verdict file.
+Emitting the verdict releases the locks and holds associated with the work item
+and the bridge thread, and notifies the platform. It is bridge notification and
+audit-trail hygiene; the commit in step 2 is what makes the work terminal.
+
+If the commit in step 2 fails, Loyal Opposition fails closed and writes no
+terminal `VERIFIED` file.
+
+A tool or workflow that writes `VERIFIED` before the work-product commit, or
+that places the verdict inside that commit, is defective and must be repaired
+rather than worked around.
+
+Reviewers may run the verdict helper without finalization flags to seed Prior
+Deliberations, then review and prune the draft body before finalization.
 
 ### Pre-File Code-Quality Gates (lint AND format are separate)
 
@@ -270,9 +275,8 @@ Examples:
 
 ## Bridge State Publication
 
-After the WI-4510 Phase-3 cutover, TAFE-backed bridge state is the canonical
-coordination state. New bridge writes must go through the governed bridge
-writer path, which publishes dispatcher/TAFE state and writes the status-bearing
+Bridge state is the canonical coordination state. New bridge writes must go through the governed bridge
+writer path, which publishes bridge state and writes the status-bearing
 numbered bridge file.
 
 ## Statuses
@@ -284,7 +288,7 @@ numbered bridge file.
 | GO | Loyal Opposition | Proposal approved for implementation |
 | NO-GO | Loyal Opposition | Proposal requires changes before approval |
 | VERIFIED | Loyal Opposition | Post-implementation verification passed |
-| ADVISORY | Loyal Opposition | Advisory report; actionable by Prime Builder in interactive sessions to trigger owner-deliberation / UAQ disposition; non-dispatchable for headless runs (`_derive_dispatchable` returns False). NOT awaiting GO/NO-GO/VERIFIED. |
+| ADVISORY | Loyal Opposition | Advisory report; owner-visible informational input, never assigned or dispatched. Not Prime-actionable and not Loyal-Opposition-actionable. Non-dispatchable for headless runs (`_derive_dispatchable` returns False). NOT awaiting GO/NO-GO/VERIFIED. |
 | DEFERRED | Owner | Owner-directed parked bridge state; non-actionable until the owner-directed clear/resume condition is met. |
 | NO-ACTION | Prime Builder | Prime Builder rejection of an LO GO/NO-GO verdict for governance non-compliance; the reason states what the reviewer must fix. Loyal-Opposition-actionable (routes back to LO to re-issue a corrected verdict); NOT terminal, NOT owner-visible. MUST NOT be used to dispose of an ADVISORY thread. See `DCL-NO-ACTION-STATUS-SEMANTICS-001`. |
 
@@ -386,12 +390,12 @@ includes `NEW`, `REVISED`, `NO-ACTION`). It is **not** terminal and **not**
 owner-visible.
 
 `NO-ACTION` MUST NOT be used to dispose of an `ADVISORY` thread, and MUST NOT be
-used to record a Prime Builder "no further action" close. Advisory dispositions
-are Prime-actionable and remain under `ADVISORY`
-(`prime_advisory_disposition` / `owner_disposition`) or move to a terminal
+used to record a Prime Builder "no further action" close. Advisory reports are
+owner-visible informational input, never assigned or dispatched. They remain
+under `ADVISORY` (`advisory_owner_visible` / `none`) or move to a terminal
 status (`WITHDRAWN`) with recorded rationale and a cited owner decision. Writing
 `NO-ACTION` on an advisory that has no prior Loyal Opposition verdict flips the
-thread from Prime-actionable `ADVISORY` into Loyal-Opposition-actionable
+thread from owner-visible `ADVISORY` into Loyal-Opposition-actionable
 `NO-ACTION` with no verdict to correct, mis-routing it permanently into the
 Loyal Opposition queue.
 
@@ -402,7 +406,7 @@ Authority: `DCL-NO-ACTION-STATUS-SEMANTICS-001`; owner decision
 
 **Purpose:** Advisory reports are first-class workflow state, not transport workarounds via `NO-GO@001`. They may be owner-initiated (owner asks LO to investigate a peer system) or LO-initiated (LO surfaces a finding during normal review).
 
-**Routing:** ADVISORY entries are Prime-actionable for interactive sessions and non-dispatchable for headless runs. `ACTIONABLE_STATUSES_FOR_PRIME` in `groundtruth_kb.bridge.notify` includes `ADVISORY`, so `compute_actionable_pending` surfaces them in the Prime actionable list; the `_derive_dispatchable` invariant returns False for non-GO/NEW/REVISED/NO-GO statuses, so every headless dispatch surface (dispatcher daemon, single-harness dispatcher) filters them out before spawning. Manual `/bridge` scans show them; `bridge-axis-2-surface.py` also filters non-dispatchable items, so AXIS-2 surfacing of ADVISORY status entries is a separate follow-on concern.
+**Routing:** ADVISORY entries are owner-visible informational input. They are not Prime-actionable, not Loyal-Opposition-actionable, never assigned, and non-dispatchable for headless runs. `ACTIONABLE_STATUSES_FOR_PRIME` in `groundtruth_kb.bridge.notify` is GO/NO-GO only, so `compute_actionable_pending` does not surface ADVISORY in the Prime actionable list. Manual `/bridge` scans may list them under `owner_visible`; `bridge-axis-2-surface.py` also filters non-dispatchable items, so AXIS-2 surfacing of ADVISORY status entries is a separate follow-on concern.
 
 **Authority:** Loyal Opposition (or owner-direction) authors ADVISORY entries; Prime Builder acknowledges in an interactive session and dispositions through owner-deliberation / UAQ flows, producing one of: (a) a normal NEW implementation proposal converting the advisory (`adopt` / `adapt`), (b) an explicit deferral with documented defer-trigger, or (c) a documented rejection (`reject`).
 
@@ -418,7 +422,7 @@ drafts.
 
 A `DEFERRED` entry MUST be recorded as both:
 
-1. dispatcher/TAFE lifecycle state for the thread; and
+1. bridge state lifecycle state for the thread; and
 2. a versioned bridge file whose first non-blank line is exactly `DEFERRED`.
 
 The `DEFERRED` file MUST include:
@@ -437,11 +441,11 @@ unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
 
 1. Write the proposal as `bridge/{name}-001.md` through the governed bridge
    writer path
-2. Let the governed writer publish TAFE-backed bridge state.
+2. Let the governed writer publish bridge state.
 3. Continue working on other tasks
-4. Periodically scan TAFE/dispatcher bridge state for GO, NO-GO, or ADVISORY
-   responses; GO and NO-GO are dispatchable implementation/revision work,
-   ADVISORY is interactive-only disposition work (non-dispatchable). Skip
+4. Periodically scan bridge state for GO or NO-GO
+   responses; GO and NO-GO are dispatchable implementation/revision work.
+   ADVISORY is owner-visible informational input (never assigned or dispatched). Skip
    DEFERRED, WITHDRAWN, and VERIFIED as non-actionable.
 5. On GO: proceed with implementation
 6. On NO-GO: read the NO-GO file, address findings, save revised file with
@@ -449,7 +453,7 @@ unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
 
 ## Loyal Opposition Workflow
 
-1. Periodically scan TAFE/dispatcher bridge state for NEW, REVISED, or NO-ACTION entries;
+1. Periodically scan bridge state for NEW, REVISED, or NO-ACTION entries;
    skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED as non-actionable for Loyal
    Opposition review work.
 2. Process entries starting from the oldest actionable item.
@@ -473,7 +477,7 @@ After Prime implements a GO'd proposal:
 
 ## Bridge State Maintenance
 
-Dispatcher/TAFE state is maintained by the governed bridge writer/reconcile
+Bridge state is maintained by the governed bridge writer/reconcile
 path. Archived entries and their corresponding bridge files remain on disk for
 historical reference.
 
@@ -484,7 +488,7 @@ historical reference.
 - Never delete bridge files — they form the audit trail
 - Use the governed bridge writer/reconcile path for state repair rather than
   hand-merging coordination data.
-- TAFE-backed bridge state is the source of truth for workflow state.
+- bridge state is the source of truth for workflow state.
 
 ## Mandatory Owner Decisions / Input Section Gate
 
@@ -519,7 +523,7 @@ A bridge file MAY be committed without becoming dispatcher-actionable when the c
 
 Parked drafts are deliberate work-in-progress artifacts that must NOT trigger Loyal Opposition review until they are promoted by:
 
-1. Publishing dispatcher/TAFE state with status `NEW` or `REVISED`.
+1. Publishing bridge state with status `NEW` or `REVISED`.
 2. The promotion commit message explicitly states `<bridge-id>: parked draft promoted to <status>`.
 
 Audits SHOULD identify parked drafts in their inventory phase but MUST NOT flag them as orphans without checking the originating commit message for the `parked` tag.

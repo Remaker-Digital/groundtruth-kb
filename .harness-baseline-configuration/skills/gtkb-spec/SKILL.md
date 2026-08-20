@@ -1,7 +1,7 @@
 ---
 name: gtkb-spec
 description: Create or update a specification in the Knowledge Database. Enforces GOV-01 (spec-first), validates ID format, checks for duplicates, and ensures all required fields are present.
-argument-hint: [new|update] [SPEC-ID]
+argument-hint: "[new|update] [SPEC-ID]"
 allowed-tools: Bash, Read, Grep, Glob
 license: "Proprietary - (c) 2026 Remaker Digital"
 compatibility:
@@ -15,7 +15,6 @@ metadata:
   license: "Proprietary - (c) 2026 Remaker Digital"
   activity-envelope: deliberation, specification
 ---
-
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
@@ -42,7 +41,7 @@ Search existing specs with similar titles via `db.list_specs(search="<KEYWORDS>"
 | `id` | Yes | Format: `SPEC-NNNN` (auto-incremented) |
 | `title` | Yes | Concise, descriptive, under 120 chars |
 | `status` | Yes | `specified`, `implemented`, `verified`, `retired` |
-| `changed_by` | Yes | Active harness/role attribution (e.g., `"prime-builder"`) or `"Owner"` |
+| `changed_by` | Yes | `"Claude"` or `"Owner"` |
 | `change_reason` | Yes | Session reference, e.g., `"S189: Rate limit redesign"` |
 
 Optional: `description`, `priority`, `scope`, `section`, `handle`, `tags`, `assertions`, `type`.
@@ -56,7 +55,7 @@ spec = db.insert_spec(
     id="SPEC-NNNN", title="...", status="specified",
     description="...", priority="medium", scope="...",
     assertions=[...],
-    changed_by="<active-harness-attribution>", change_reason="SXXX: ...",
+    changed_by="Claude", change_reason="SXXX: ...",
 )
 ```
 
@@ -80,7 +79,7 @@ spec = db.insert_spec(
 
 ### Step 3: Apply Update
 ```python
-db.update_spec("SPEC-XXXX", changed_by="<active-harness-attribution>", change_reason="SXXX: ...", status="implemented")
+db.update_spec("SPEC-XXXX", changed_by="Claude", change_reason="SXXX: ...", status="implemented")
 ```
 
 ### Step 4: Verify Assertions (if promoting)

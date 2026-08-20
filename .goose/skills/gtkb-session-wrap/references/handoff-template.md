@@ -63,7 +63,7 @@ db = KnowledgeDB("groundtruth.db")
 db.insert_session_prompt(
     session_id="<NEXT_SESSION_ID>",
     prompt_text=prompt_text,
-    changed_by="<active-harness attribution>",
+    changed_by="codex",
     change_reason="<SESSION_ID>: session wrap handoff",
 )
 ```

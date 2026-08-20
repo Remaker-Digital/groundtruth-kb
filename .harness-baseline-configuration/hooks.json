@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\.cursor\\gtkb-hooks\\session_start_dispatch.py",
+        "timeout": 180
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_cmd_no_window.py E:\\GT-KB\\.cursor\\gtkb-hooks\\workstream-focus.cmd",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\.codex\\gtkb-hooks\\session_wrapup_trigger_dispatch.py",
+        "timeout": 60
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\.claude\\hooks\\spec-classifier.py",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\.codex\\gtkb-hooks\\glossary-expansion.py",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\.codex\\gtkb-hooks\\project-completion-surface.py",
+        "timeout": 5
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\destructive-gate.py",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\credential-scan.py",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_cmd_no_window.py E:\\GT-KB\\.cursor\\gtkb-hooks\\workstream-focus.cmd",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\formal-artifact-approval-gate.py",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\bridge-compliance-gate.py",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\code-quality-baseline-proposal-check.py",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\bridge-proposal-wi-id-collision-gate.py",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\implementation-start-gate.py",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\directive-enforcement-claude-adapter.py",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\lo-file-safety-gate.py",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\sot-read-discipline.py",
+        "timeout": 5
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\destructive-gate.py",
+        "matcher": "Shell",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\credential-scan.py",
+        "matcher": "Shell",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\bridge-compliance-gate.py",
+        "matcher": "Write",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\scripts\\dispatch_blackbox_gate.py",
+        "matcher": "Write",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\bridge-proposal-wi-id-collision-gate.py",
+        "matcher": "Write",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\narrative-artifact-approval-gate.py",
+        "matcher": "Write",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\code-quality-baseline-proposal-check.py",
+        "matcher": "Write",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\document_author_provenance_gate.py",
+        "matcher": "Write",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\lo-file-safety-gate.py",
+        "matcher": "Write",
+        "timeout": 5
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\implementation-start-gate.py",
+        "matcher": "Write",
+        "timeout": 5
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\.claude\\hooks\\spec-event-surfacer.py",
+        "timeout": 5
+      }
+    ],
+    "stop": [
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\.claude\\hooks\\advisory-router-scan.py",
+        "timeout": 10
+      },
+      {
+        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\advisory_grilling_gate_lint.py --stop-hook",
+        "timeout": 10
+      }
+    ]
+  }
+}

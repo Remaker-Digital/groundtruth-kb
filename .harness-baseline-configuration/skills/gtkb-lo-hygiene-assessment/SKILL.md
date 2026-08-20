@@ -7,7 +7,6 @@ metadata:
   category: operations and hygiene
   activity-envelope: build, ops
 ---
-
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
@@ -48,12 +47,12 @@ There are no other modes in v1.
 
 Read the smallest relevant set:
 
-- `{{HARNESS_RULES_DIR}}/canonical-terminology.md`
-- `{{HARNESS_RULES_DIR}}/operating-model.md`
-- `{{HARNESS_SKILLS_DIR}}/gtkb-structural-hygiene-review/SKILL.md`
-- `{{HARNESS_SKILLS_DIR}}/gtkb-check-deliberations/SKILL.md`
-- `{{HARNESS_SKILLS_DIR}}/gtkb-session-wrap-scan/SKILL.md`
-- `{{HARNESS_SKILLS_DIR}}/gtkb-harness-parity-review/SKILL.md`
+- `.harness-baseline-configuration/rules/canonical-terminology.md`
+- `.harness-baseline-configuration/rules/operating-model.md`
+- `.harness-baseline-configuration/skills/gtkb-structural-hygiene-review/SKILL.md`
+- `.harness-baseline-configuration/skills/gtkb-check-deliberations/SKILL.md`
+- `.harness-baseline-configuration/skills/gtkb-session-wrap-scan/SKILL.md`
+- `.harness-baseline-configuration/skills/gtkb-harness-parity-review/SKILL.md`
 - `config/agent-control/harness-capability-registry.toml`
 - `config/agent-control/system-interface-map.toml`
 - Bridge dispatcher status/health CLI and TAFE-backed bridge-state surfaces
@@ -70,7 +69,7 @@ Read the smallest relevant set:
 | 2. Branch cleanup | identify stale branches / worktree noise; require dry-run evidence before any cleanup | perform branch cleanup only with safe scope, never `git push --force` to main/master |
 | 3. Bridge double-version | audit `bridge/` parser behavior, aggregate-queue assumptions, and version ambiguity before any fix | repair only if verified defect exists; never edit a filed bridge file in place |
 | 4. `REPOSITORY-STRUCTURE.md` | identify current structure / source-of-truth gaps | draft or update documentation |
-| 5. Terminology drift | map drift against `{{HARNESS_RULES_DIR}}/canonical-terminology.md` | update docs / schema / API / tests as needed |
+| 5. Terminology drift | map drift against `.harness-baseline-configuration/rules/canonical-terminology.md` | update docs / schema / API / tests as needed |
 | 6. Duplicate specs | identify candidate duplicate specifications and authority conflicts | merge / retire only through the governed spec process (formal-artifact approval) |
 | 7. Gitignore + scripts triage | identify noisy / generated / unowned artifacts and stale scripts | mechanical cleanup with verification; never script deletion without bridge-tracked approval |
 | 8. Naming consistency | identify invasive rename clusters and risk boundaries | execute in narrow slices after other phases stabilize |
@@ -82,7 +81,7 @@ Read the smallest relevant set:
 2. Read the smallest relevant input set for the chosen mode.
 3. For each in-scope hygiene phase, run the relevant existing skill / scanner as a read-only orchestration step. Examples:
    - Phase 1: `python scripts/check_deliberation_archive_health.py` or the equivalent skill.
-   - Phase 4-5: orchestrate `structural-hygiene-review` and `check-deliberations` outputs.
+   - Phase 4-5: orchestrate `gtkb-structural-hygiene-review` and `gtkb-check-deliberations` outputs.
    - Phase 9: `python scripts/check_harness_parity.py --all --markdown` for adapter / parity residuals.
 4. Synthesize findings into the standard report format (next section).
 5. File the report as an Advisory Proposal bridge entry (ADVISORY status) or a
@@ -147,7 +146,7 @@ If the assessment finds a defect that requires mutation, the report MUST list it
 ## Report Destination
 
 `independent-progress-assessments/` is retired (contents deleted by owner
-directive); reports do NOT go there. Per `{{HARNESS_RULES_DIR}}/loyal-opposition.md`
+directive); reports do NOT go there. Per `.harness-baseline-configuration/rules/loyal-opposition.md`
 storage convention, file the report as an Advisory Proposal bridge entry
 (ADVISORY status; see `gtkb-bridge-advisory-status-001`, VERIFIED) or a
 Deliberation Archive record (`gt deliberations record`), per content.
@@ -156,10 +155,10 @@ Deliberation Archive record (`gt deliberations record`), per content.
 
 This skill **orchestrates** rather than replaces:
 
-- `structural-hygiene-review` - structural drift, naming, artifact authority, glossary alignment.
-- `check-deliberations` - Deliberation Archive population, linkage, conflict, redaction, duplicates.
-- `kb-session-wrap-scan` - W1 (transcript snapshot) + W2 (cross-artifact consistency) scanners.
-- `harness-parity-review` - cross-harness skill / adapter parity drift.
+- `gtkb-structural-hygiene-review` - structural drift, naming, artifact authority, glossary alignment.
+- `gtkb-check-deliberations` - Deliberation Archive population, linkage, conflict, redaction, duplicates.
+- `gtkb-session-wrap-scan` - W1 (transcript snapshot) + W2 (cross-artifact consistency) scanners.
+- `gtkb-harness-parity-review` - cross-harness skill / adapter parity drift.
 - `arch-audit` - architecture compliance audit when a phase touches ADR / DCL.
 
 The orchestration value is in synthesizing those outputs into a single Prime-facing action plan with consistent classification (`prime-action` / `peer-prime-candidate` / `lo-verification`) and a phase-indexed ordering recommendation.

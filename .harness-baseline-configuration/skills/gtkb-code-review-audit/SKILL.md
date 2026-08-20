@@ -10,14 +10,13 @@ metadata:
   project: groundtruth-kb
   category: review
 ---
-
 # Code Review Audit
 
 Review code with a bug-finding and regression-finding mindset.
 
 ## Default Deliverable
 
-Use `{{HARNESS_RULES_DIR}}/template-code-review.md` unless the owner asks for inline comments or a shorter note.
+Use `.harness-baseline-configuration/rules/template-code-review.md` unless the owner asks for inline comments or a shorter note.
 
 ## Required Review Order
 
@@ -44,4 +43,3 @@ Use `{{HARNESS_RULES_DIR}}/template-code-review.md` unless the owner asks for in
 ---
 
 Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-

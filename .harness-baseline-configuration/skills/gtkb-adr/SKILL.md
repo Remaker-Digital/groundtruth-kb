@@ -11,7 +11,6 @@ metadata:
   category: specifications and governance
   activity-envelope: deliberation, specification
 ---
-
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
@@ -135,7 +134,7 @@ db.insert_spec(
     id=adr_id,
     title="[Decision Title]",
     status="implemented",
-    changed_by="[active-harness attribution]",
+    changed_by="Claude",
     change_reason="New architecture decision record (GOV-20)",
     description="[formatted description from Step 2]",
     tags=["architecture", "adr"],

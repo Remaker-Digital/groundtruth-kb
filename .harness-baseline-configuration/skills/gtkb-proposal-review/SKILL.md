@@ -10,14 +10,13 @@ metadata:
   project: groundtruth-kb
   category: review
 ---
-
 # Proposal Review
 
 Review the target proposal or plan with an evidence-first, decision-support posture.
 
 ## Default Deliverable
 
-Use `{{HARNESS_RULES_DIR}}/template-decision-memo.md` unless the owner asks for a different format.
+Use `.harness-baseline-configuration/rules/template-decision-memo.md` unless the owner asks for a different format.
 
 ## Required Review Pass
 
@@ -43,12 +42,12 @@ Prefer:
 
 - code/config/docs in the repo
 - Knowledge Database facts where relevant
-- prior durable review findings (Deliberation Archive records / Advisory Proposal bridge entries) for repeated issues
+- prior `CODEX-INSIGHT-DROPBOX/` findings for repeated issues
 
 ## Bridge Verdicts
 
 When this review produces a bridge `GO`/`NO-GO` verdict, run
-`python scripts/skill-helpers/gtkb-verify/write_verdict.py --slug <slug> --body-file <draft-body-file>`
+`python .harness-baseline-configuration/skills/gtkb-verify/helpers/write_verdict.py --slug <slug> --body-file <draft-body-file>`
 before filing so the draft's `## Prior Deliberations` section is seeded. Review
 and prune the helper-suggested candidates; if you opt out, keep an explicit
 `_No prior deliberations: <reason>._` line in the verdict.
@@ -56,4 +55,3 @@ and prune the helper-suggested candidates; if you opt out, keep an explicit
 ---
 
 Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-

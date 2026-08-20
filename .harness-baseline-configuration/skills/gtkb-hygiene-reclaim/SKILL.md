@@ -8,7 +8,6 @@ metadata:
   category: operations and hygiene
   activity-envelope: ops
 ---
-
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope (e.g., 'ops', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity>`,do not act on this skill request and informt eh user that this skill is only availablewithin the specified activity envelope.
@@ -240,7 +239,7 @@ This skill must never perform or recommend:
 - credential creation, reading, changing, rotation, upload, or disclosure.
 
 The skill does not mutate the SoT registry, Git roots, bridge history, audit
-history, generated harness skill adapters, manifest, capability registry, or scenario
+history, generated Codex adapter, manifest, capability registry, or scenario
 router. Route any needed correction or integration through its separately
 authorized owner.
 

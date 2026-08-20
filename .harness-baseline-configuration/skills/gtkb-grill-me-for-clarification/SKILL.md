@@ -4,7 +4,6 @@ description: Interview the owner relentlessly about a plan or design until reach
 argument-hint: [plan or design or scope to grill]
 allowed-tools: Bash, Read, Grep, Glob, AskUserQuestion, Skill, Agent
 ---
-
 # /grill-me-for-clarification
 
 Conduct a structured, dependency-ordered clarification interview of the owner

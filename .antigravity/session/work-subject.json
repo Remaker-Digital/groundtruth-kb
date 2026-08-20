@@ -1,0 +1,12 @@
+{
+  "application_id": null,
+  "current_subject": "gtkb_infrastructure",
+  "gtkb_root": null,
+  "project_root": "E:\\GT-KB",
+  "role_slot": "shared",
+  "schema_version": 1,
+  "source": "startup init keyword",
+  "topology_mode": "multi_harness",
+  "updated_at": "2026-08-18T16:23:29.805905Z",
+  "updated_by": "startup_init_keyword"
+}

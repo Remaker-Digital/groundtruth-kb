@@ -1,0 +1,16 @@
+# Azure remote state backend configuration — EXAMPLE template.
+#
+# FAB-02 / WI-4414; HYG-019 remediation.
+#
+# Copy this file to `backend.hcl` (gitignored + Drive-excluded) and fill in the
+# values for your Terraform state Storage account, then run the migration in
+# STATE-MIGRATION-RUNBOOK.md. The real backend.hcl is never committed and never
+# Drive-synced; only this .example template is tracked.
+#
+# Supplied at init time:
+#   terraform init -migrate-state -backend-config=backend.hcl
+
+resource_group_name  = "<state-resource-group>"
+storage_account_name = "<state-storage-account>"
+container_name       = "<state-container, e.g. tfstate>"
+key                  = "agent-red/terraform.tfstate"

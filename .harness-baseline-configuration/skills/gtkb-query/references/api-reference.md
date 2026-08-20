@@ -140,24 +140,24 @@ The KB is append-only. Every mutation creates a new version.
 # Create a spec
 db.insert_spec(
     id="SPEC-XXXX", title="...", status="specified",
-    description="...", changed_by="<active-harness attribution>", change_reason="S189: ..."
+    description="...", changed_by="Claude", change_reason="S189: ..."
 )
 
 # Update a spec (creates new version)
 db.update_spec(
-    "SPEC-XXXX", changed_by="<active-harness attribution>", change_reason="...",
+    "SPEC-XXXX", changed_by="Claude", change_reason="...",
     status="implemented"
 )
 
 # Create a work item
 db.insert_work_item(
     id="WI-XXXX", title="...", origin="defect", component="...",
-    resolution_status="open", changed_by="<active-harness attribution>", change_reason="..."
+    resolution_status="open", changed_by="Claude", change_reason="..."
 )
 
 # Record test result
 db.update_test(
-    "TEST-XXXX", changed_by="<active-harness attribution>", change_reason="...",
+    "TEST-XXXX", changed_by="Claude", change_reason="...",
     last_result="pass", last_executed_at="2026-03-16T00:00:00Z"
 )
 ```

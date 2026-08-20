@@ -125,7 +125,7 @@
     ],
     "Stop": [
       {
-        "command": "python .goose/hooks/owner-decision-tracker.py",
+        "command": "python .goose/hooks/owner-decision-tracker.py --mode stop",
         "timeout": 5,
         "blocking": true
       },
@@ -152,6 +152,10 @@
     ],
     "UserPromptSubmit": [
       {
+        "command": "python .goose/hooks/session-init-binding.py",
+        "timeout": 5
+      },
+      {
         "command": "python .goose/hooks/workstream-focus.py",
         "timeout": 5
       },
@@ -165,7 +169,7 @@
         "command": "python .goose/hooks/gov09-capture.py"
       },
       {
-        "command": "python .goose/hooks/owner-decision-tracker.py",
+        "command": "python .goose/hooks/owner-decision-tracker.py --mode user-prompt-submit",
         "timeout": 5
       },
       {

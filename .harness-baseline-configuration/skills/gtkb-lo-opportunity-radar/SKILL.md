@@ -7,7 +7,6 @@ metadata:
   project: groundtruth-kb
   category: operations and hygiene
 ---
-
 # /gtkb-lo-opportunity-radar
 
 Apply a structured "opportunity radar" pass to Loyal Opposition review work.

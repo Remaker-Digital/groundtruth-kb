@@ -9,7 +9,6 @@ metadata:
   project: groundtruth-kb
   category: bridge-reconciliation
 ---
-
 # Bridge Reconciliation Operator Skill + Runbook
 
 Use this skill to reconcile **bridge thread state** against the **MemBase backlog**

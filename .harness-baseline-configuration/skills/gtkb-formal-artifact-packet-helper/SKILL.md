@@ -7,7 +7,6 @@ metadata:
   category: hygiene-reclaim
   activity-envelope: build, ops, project, deliberation
 ---
-
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity>`,do not act on this skill request and informt eh user that this skill is only availablewithin the specified activity envelope.
@@ -23,7 +22,7 @@ duplicating or replacing the canonical gate schema.
 ## Authority and Scope
 
 - The **sole canonical schema authority** for formal-artifact approval packets
-  is `{{HARNESS_HOOKS_DIR}}/formal-artifact-approval-gate.py` (the live gate). This
+  is `.harness-baseline-configuration/hooks/formal-artifact-approval-gate.py` (the live gate). This
   skill is a helper wrapper, not a competing source of truth.
 - The canonical CLI validator `scripts/validate_formal_artifact_packet.py`
   loads the live gate module at runtime and applies the same validation that the
@@ -47,7 +46,7 @@ duplicating or replacing the canonical gate schema.
 - Do not use this skill to create a packet without following the governed
   formal-artifact approval workflow (bridge, owner AUQ, formal-artifact gate).
 - Do not use this skill to replace, shadow, or override
-  `{{HARNESS_HOOKS_DIR}}/formal-artifact-approval-gate.py` or
+  `.harness-baseline-configuration/hooks/formal-artifact-approval-gate.py` or
   `scripts/validate_formal_artifact_packet.py`.
 - Do not use this skill to bypass root-boundary, credential-safety, or
   bridge-authority gates.
@@ -72,7 +71,7 @@ duplicating or replacing the canonical gate schema.
 ### Packet Generation
 
 1. Identify the canonical required fields from the live gate
-   (`{{HARNESS_HOOKS_DIR}}/formal-artifact-approval-gate.py` constants:
+   (`.harness-baseline-configuration/hooks/formal-artifact-approval-gate.py` constants:
    `REQUIRED_PACKET_FIELDS`, `VALID_ARTIFACT_TYPES`, `VALID_APPROVAL_MODES`).
 2. Construct the packet JSON with LF-only line endings (no CR, no CRLF).
    Normalize all string values to LF line endings before writing.
@@ -98,7 +97,7 @@ duplicating or replacing the canonical gate schema.
 - The canonical packet validation authority (the live gate hook and the CLI
   validator) is Python-based and harness-agnostic. No per-harness adapter
   variation is needed.
-- All registered harnesses execute the same validator
+- Codex, Antigravity, Cursor, and API harnesses all execute the same validator
   and gate; this skill's guidance applies uniformly.
 
 ## Verification Checklist

@@ -6,7 +6,6 @@ metadata:
   project: groundtruth-kb
   category: implementation and planning
 ---
-
 This skill implements the Deliberation Archive (DA) tier of ADR-0001: Three-Tier Memory Architecture.
 
 # /gtkb-decision-capture

@@ -11,7 +11,6 @@ metadata:
   category: measurement
   governance: SPEC-1662
 ---
-
 # GT-KB Benchmark Suite
 
 Read-only measurement benchmarks for the GT-KB platform. Each benchmark

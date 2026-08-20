@@ -12,7 +12,6 @@ metadata:
   category: session-management
   owner-only: true
 ---
-
 # Session Wrap-Up Scan (Slice 1: W0 + W1 + W2)
 
 Run the three Slice 1 wrap-up scanners and emit reports. **Non-mutating** —

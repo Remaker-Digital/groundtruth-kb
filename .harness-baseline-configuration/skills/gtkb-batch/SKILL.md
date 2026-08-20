@@ -12,7 +12,6 @@ metadata:
   governance: GOV-02, GOV-15
   owner-only: false
 ---
-
 # KB Batch Operations
 
 Perform bulk Knowledge Database operations with strong safety controls.

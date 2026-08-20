@@ -1,0 +1,5 @@
+{
+  "patch": "{\"cwd\": \"E:\\\\GT-KB\", \"tool_input\": {}, \"tool_name\": \"apply_patch\"}",
+  "reason": "no apply_patch envelope found",
+  "skipped": true
+}

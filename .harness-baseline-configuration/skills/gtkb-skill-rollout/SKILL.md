@@ -12,7 +12,7 @@ Playbook for renaming or adding canonical skills in the GT-KB platform.
 
 When renaming a canonical skill directory:
 
-1. **Rename the canonical skill directory** under `.claude/skills/`
+1. **Rename the canonical skill directory** under `.harness-baseline-configuration/skills/`
 2. **Update `config/agent-control/skill-rename-map.toml`** — add/update the `[[skills]]` entry with the new `dir` and `canonical_name`; set `registry_old_name` if the old name is still referenced
 3. **Fix `canonical_source`/`surface` paths** in the renamed SKILL.md frontmatter
 4. **Fix frontmatter** — update `name:` to match the new canonical name
@@ -25,7 +25,7 @@ When renaming a canonical skill directory:
 
 When adding a new canonical skill:
 
-1. **Create the skill directory** under `.claude/skills/<name>/`
+1. **Create the skill directory** under `.harness-baseline-configuration/skills/<name>/`
 2. **Write SKILL.md** with correct frontmatter (`name:`, `description:`, etc.)
 3. **Update `config/agent-control/skill-rename-map.toml`** — add a new `[[skills]]` entry
 4. **Regenerate adapters** — run `python scripts/generate_codex_skill_adapters.py --update-registry`

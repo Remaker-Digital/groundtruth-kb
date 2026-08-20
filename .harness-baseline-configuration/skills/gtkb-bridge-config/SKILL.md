@@ -9,7 +9,6 @@ metadata:
   project: groundtruth-kb
   category: bridge-dispatch
 ---
-
 # Bridge Dispatch Configuration
 
 Use this skill when you need to inspect or diagnose the bridge dispatch topology without mutating project state.

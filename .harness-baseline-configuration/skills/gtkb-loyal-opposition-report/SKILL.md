@@ -11,7 +11,6 @@ metadata:
   category: loyal-opposition
   governance: report-depth-prime-builder-context
 ---
-
 # Loyal Opposition Report Generator
 
 Generate a Loyal Opposition report following the mandatory report quality standard.

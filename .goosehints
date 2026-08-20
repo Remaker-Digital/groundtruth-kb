@@ -18,11 +18,11 @@ Your session role comes ONLY from this explicit declaration — NEVER from the
 TAFE/dispatcher registry configuration (DCL-SESSION-ROLE-RESOLUTION-001 v7).
 
 ## Load this governance at session start
-- `AGENTS.md` (root) — GT-KB operating contract (Goose reads this hierarchically).
-- `.claude/rules/canonical-terminology.md` — glossary.
-- `.claude/rules/file-bridge-protocol.md` — Prime Builder ↔ Loyal Opposition bridge.
-- `.claude/rules/operating-model.md` — operating model.
-- `.claude/rules/prime-builder-role.md`, `.claude/rules/loyal-opposition.md` — role contracts.
+- `.goose/AGENTS.md` (root) — GT-KB operating contract (Goose reads this hierarchically).
+- `.goose/rules/canonical-terminology.md` — glossary.
+- `.goose/rules/file-bridge-protocol.md` — Prime Builder ↔ Loyal Opposition bridge.
+- `.goose/rules/operating-model.md` — operating model.
+- `.goose/rules/prime-builder-role.md`, `.goose/rules/loyal-opposition.md` — role contracts.
 
 ## Skills
 GT-KB workflow guides live in `.goose/skills/gtkb-*/SKILL.md` (bridge, propose, verify,

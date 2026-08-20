@@ -14,7 +14,6 @@ metadata:
     - references/validation-rules.md
   activity-envelope: build, ops, project
 ---
-
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
@@ -67,7 +66,7 @@ if not non_stale:
 If all validations pass:
 ```python
 updated = db.update_spec(
-    "$0", changed_by="<active-role attribution per scripts/_kb_attribution.py>",
+    "$0", changed_by="Claude",
     change_reason="SXXX: Promoted to <status> -- all assertions pass, N tests pass",
     status="<target_status>",
 )

@@ -11,7 +11,6 @@ metadata:
   category: release-readiness
   governance: production-release, GroundTruth-KB, Deliberation-Archive, MemBase
 ---
-
 # Release Candidate Gate
 
 Use this skill before calling a build production-ready. The gate is non-deploying:

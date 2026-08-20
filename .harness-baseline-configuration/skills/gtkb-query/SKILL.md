@@ -1,7 +1,7 @@
 ---
 name: gtkb-query
 description: Query the Knowledge Database for specs, tests, work items, procedures, and documents. Use when looking up project knowledge, checking spec status, finding open work items, or reviewing test coverage.
-argument-hint: [query-type] [filter]
+argument-hint: "[query-type] [filter]"
 allowed-tools: Bash, Read
 license: "Proprietary - (c) 2026 Remaker Digital"
 compatibility:
@@ -12,9 +12,8 @@ metadata:
   references:
     - references/api-reference.md
   scripts:
-    - scripts/skill-helpers/gtkb-query/kb_init.py
+    - scripts/kb_init.py
 ---
-
 # Knowledge Database Query
 
 Query the Agent Red Knowledge Database (`groundtruth.db`) using the Python API.
@@ -39,7 +38,7 @@ Query the Agent Red Knowledge Database (`groundtruth.db`) using the Python API.
 
 ## Initialization
 
-Use `scripts/skill-helpers/gtkb-query/kb_init.py` for quick CLI queries, or
+Use `.harness-baseline-configuration/skills/gtkb-query/SKILL.md` for quick CLI queries, or
 initialize inline. Per S307 hardcoded-path directive, discover the repo root
 via git or env var rather than a machine-local literal:
 
@@ -71,4 +70,4 @@ See `references/api-reference.md` for the complete Python API including: summary
 
 - **GOV-08:** All project knowledge lives in the KB -- not in markdown files.
 - **Never** use UPDATE/DELETE SQL directly -- always use `db.*` API methods.
-- The active Prime Builder harness is the **sole writer**; owner observes via read-only UI at `localhost:8090`.
+- Claude is the **sole writer**; owner observes via read-only UI at `localhost:8090`.

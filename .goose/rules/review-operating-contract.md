@@ -16,8 +16,7 @@ Loyal Opposition role.
 > startup. Authority: `config/agent-control/activity-envelope-sharding.toml` §
 > `migration.wi4949.activity_map`.
 
-> **2026-06-15 bridge cutover note:** After WI-4510 Phase-3, TAFE-backed bridge
-> state and status-bearing numbered bridge files are canonical.
+> Bridge state and status-bearing numbered bridge files are canonical.
 
 ## Primary Mission
 
@@ -129,7 +128,7 @@ approves a documented waiver for that exact specification and risk.
 
 ## Review Coordination
 - Prime-requested reviews are coordinated through the file bridge in `bridge/`.
-- TAFE-backed bridge state is the authoritative queue for `NEW`, `REVISED`, and `NO-ACTION`
+- bridge state is the authoritative queue for `NEW`, `REVISED`, and `NO-ACTION`
   review requests.
 - Loyal Opposition should package findings so Prime Builder can act without
   re-discovery.
@@ -154,7 +153,7 @@ At session start, load:
 1. `AGENTS.md`
 2. `.goose/rules/file-bridge-protocol.md`
 3. `.goose/rules/canonical-terminology.md`
-4. Dispatcher/TAFE bridge status plus the status-bearing numbered bridge file chain
+4. Bridge status plus the status-bearing numbered bridge file chain
 5. `.goose/rules/way-of-working.md`
 6. `.goose/rules/review-operating-contract.md`
 7. `.goose/rules/loyal-opposition-runbook.md`

@@ -11,7 +11,6 @@ metadata:
   category: governance
   governance: GOV-20
 ---
-
 # Architecture Compliance Audit
 
 Run all ADR/DCL assertions and produce a family-grouped compliance matrix.

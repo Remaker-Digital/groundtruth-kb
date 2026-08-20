@@ -7,7 +7,6 @@ metadata:
   category: deliberation and specification
   activity-envelope: deliberation, specification
 ---
-
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
@@ -110,6 +109,17 @@ When this skill is implemented or used in a governed workflow, preserve:
   deferral artifact path.
 - Proof that ADVISORY intake did not start protected edits before child proposal
   `GO` and implementation-start authorization.
+
+## Cross-Harness Disposition
+
+- Claude Code: canonical managed-skill source lives at
+  `.harness-baseline-configuration/skills/advisory-intake/SKILL.md`.
+- Codex: generated adapter lives at
+  `.harness-baseline-configuration/skills/advisory-intake/SKILL.md` and is declared in
+  `.harness-baseline-configuration/skills/MANIFEST.json`.
+- Antigravity, Cursor, and API harnesses: no direct skill adapter surface is
+  created by WI-5056. Projection to additional harnesses requires a separate
+  target-path-covered proposal or typed parity disposition.
 
 ## Non-Goals
 

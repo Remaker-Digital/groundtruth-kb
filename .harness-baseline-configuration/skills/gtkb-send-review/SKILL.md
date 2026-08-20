@@ -12,7 +12,6 @@ metadata:
   governance: file-bridge-protocol
   activity-envelope: build, ops
 ---
-
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
@@ -38,8 +37,8 @@ not create or restore aggregate queue artifacts.
    plan.
 
 3. **File through `gtkb-bridge-propose`.** Use the helper-mediated bridge writer
-   described in `{{HARNESS_SKILLS_DIR}}/gtkb-bridge-propose/SKILL.md`. The helper performs
-   credential scanning, bridge-compliance validation for the reviewing harness's paths, proposal
+   described in `.harness-baseline-configuration/skills/gtkb-bridge-propose/SKILL.md`. The helper performs
+   credential scanning, bridge-compliance validation for Codex paths, proposal
    file creation, author metadata insertion, and dispatcher/TAFE bridge-state
    publication via `gtkb-bridge-propose`.
 

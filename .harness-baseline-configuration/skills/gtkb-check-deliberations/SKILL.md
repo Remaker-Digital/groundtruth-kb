@@ -10,7 +10,6 @@ metadata:
   category: governance
   spec: SPEC-2098
 ---
-
 # Deliberation Archive Health Check
 
 Run the 5-metric health check for the deliberation archive.

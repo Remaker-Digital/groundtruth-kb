@@ -7,7 +7,6 @@ metadata:
   category: implementation
   activity-envelope: build, ops
 ---
-
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
@@ -57,8 +56,8 @@ This is an **activity-envelope-only** skill. Use it only after the current worke
 
 - [ ] Are all target paths declared in the proposal?
 - [ ] Do the target paths include:
-  - Canonical source path (for skills: the harness-neutral baseline `skills/` directory)
-  - Projected per-harness paths (for skills: each registered harness's skills directory, manifest)
+  - Canonical source path (for skills: `.harness-baseline-configuration/skills/...`)
+  - Generated adapter paths (for skills: `.harness-baseline-configuration/skills/...`, manifest)
   - Registry update paths (capability registry, manifests)
   - Platform test paths
 - [ ] Is every target path inside the GT-KB project root?
@@ -71,7 +70,7 @@ This is an **activity-envelope-only** skill. Use it only after the current worke
   replaced?
 - [ ] Does the proposal reference a bridge thread, DELIB, or authorization that
   has been superseded?
-- [ ] Does the proposal assume a specific harness deployment that
+- [ ] Does the proposal assume a harness deployment (e.g., Codex, Cursor) that
   may not yet have the artifact class enabled?
 - [ ] Does the proposal conflict with a newer owner decision or governing
   specification?

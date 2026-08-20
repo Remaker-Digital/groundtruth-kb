@@ -7,7 +7,6 @@ metadata:
   category: operations and hygiene
   activity-envelope: build, ops
 ---
-
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
@@ -17,7 +16,7 @@ This is an **activity-envelope-only** skill. Use it only after the current worke
 
 This skill orchestrates the deterministic `gt hygiene sweep` CLI (companion CLI shipped under WI-3420; VERIFIED via `bridge/gtkb-hygiene-sweep-cli-004.md`) and walks operator + owner through the classify-decide-file workflow that the CLI's deterministic enumeration enables.
 
-This skill body presents **identical content** to every registered harness via the harness-neutral baseline projection. Operations described here behave the same way regardless of which harness invokes the skill.
+This skill body presents **identical content** to both Claude Code and Codex agents via the cross-harness skill-adapter pipeline (per `config/agent-control/harness-capability-registry.toml` + `scripts/generate_codex_skill_adapters.py`). Operations described here behave the same way regardless of which harness invokes the skill.
 
 The deterministic-services-principle split (per `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE`) places enumeration logic in the CLI and operator judgment + AskUserQuestion routing + remediation bridge guidance in this skill.
 
@@ -63,7 +62,7 @@ Before invoking the CLI:
 5. **File child-bridges** for the owner-approved options ONLY. Each child-bridge:
    - Cites this skill invocation's `run_id` in the proposal's `Prior Deliberations` section.
    - Cites the originating CLI finding's class and lifecycle trigger category in the `Specification Links` evidence.
-   - Includes the standard `Specification Links`, `Owner Decisions / Input`, spec-derived verification plan, and acceptance criteria sections per `{{HARNESS_RULES_DIR}}/file-bridge-protocol.md`.
+   - Includes the standard `Specification Links`, `Owner Decisions / Input`, spec-derived verification plan, and acceptance criteria sections per `.harness-baseline-configuration/rules/file-bridge-protocol.md`.
 
 **Per `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`, this skill never silently transitions artifact lifecycle states. Every state transition (e.g., `unresolved-new -> deferred`) flows through an explicit owner-decision capture via AskUserQuestion.**
 
@@ -114,13 +113,13 @@ Per skill invocation, surfaces:
 
 Before any operation:
 
-- `{{HARNESS_RULES_DIR}}/file-bridge-protocol.md` — protocol root contract.
-- `{{HARNESS_RULES_DIR}}/counterpart-review-gate.md` — review-gate constraints for child-bridge proposals.
-- `{{HARNESS_RULES_DIR}}/deliberation-protocol.md` — Deliberation Archive search obligations.
-- `{{HARNESS_RULES_DIR}}/operating-model.md` — canonical vocabulary.
+- `.harness-baseline-configuration/rules/file-bridge-protocol.md` — protocol root contract.
+- `.harness-baseline-configuration/rules/codex-review-gate.md` — review-gate constraints for child-bridge proposals.
+- `.harness-baseline-configuration/rules/deliberation-protocol.md` — Deliberation Archive search obligations.
+- `.harness-baseline-configuration/rules/operating-model.md` — canonical vocabulary.
 - `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` (in MemBase) — lifecycle trigger category definitions and required confirmation flows.
 - `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE` — service-layer/skill-layer split rationale.
-- For Prime Builder: `{{HARNESS_RULES_DIR}}/prime-builder-role.md`.
+- For Prime Builder: `.harness-baseline-configuration/rules/prime-builder-role.md`.
 
 ## Companion CLI
 
@@ -142,6 +141,8 @@ markdown ledger evidence for follow-on remediation work.
 
 ## Cross-harness implementation notes
 
+- The skill body is identical across Claude Code and Codex via the `scripts/generate_codex_skill_adapters.py` adapter pipeline. The Codex adapter at `.harness-baseline-configuration/skills/gtkb-hygiene-sweep/SKILL.md` carries a `` marker; do NOT edit the adapter directly. Edit the canonical at `.harness-baseline-configuration/skills/gtkb-hygiene-sweep/SKILL.md` and regenerate via `python scripts/generate_codex_skill_adapters.py --update-registry`.
+- Hook-layer behavior differs between harnesses by necessity (different schemas: harness settings JSON). Hook handler scripts are shared regardless. This skill does not depend on hook-layer behavior; it operates entirely through CLI invocation + AskUserQuestion + bridge-proposal filing.
 
 ## Copyright
 

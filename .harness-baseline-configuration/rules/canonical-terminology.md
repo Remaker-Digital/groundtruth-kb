@@ -360,7 +360,7 @@ of truth (the canonical `work_items` table), surfaced through
 no transitional markdown view persists.
 
 **Resource-selection rule:** A current owner instruction that names `backlog`
-selects this MemBase resource, even when the requested work is bridge-, TAFE-,
+selects this MemBase resource, even when the requested work is bridge-
 or harness-related. Those words qualify the backlog items; they do not replace
 the backlog with the bridge queue. Current literal resource terms outrank
 activity defaults, startup order, prior context, notes, and conjecture.
@@ -479,7 +479,7 @@ canonical dispatcher or bridge-state authority. Implementation never proceeds wi
 
 **Not to be confused with:** "the Bridge" as a generic concept (use
 "file bridge" in canonical text); the backlog; cross-system message bridges.
-Bare `bridge`, `bridge work`, `bridge-related`, `TAFE`, or `harness` topic
+Bare `bridge`, `bridge work`, `bridge-related`, or `harness` topic
 language does not by itself select the bridge queue.
 
 **Source:** bridge-state surfaces; `{{HARNESS_RULES_DIR}}/file-bridge-protocol.md`
@@ -903,30 +903,32 @@ information updates canonical source-of-truth artifacts.
 
 ### smart poller
 
-**Definition:** The (now-retired) bridge-poller automation that scanned
-the legacy bridge index periodically and dispatched the appropriate harness
-when a recipient's actionable queue signature changed. The smart poller was
-monitoring/dispatch infrastructure only. Historical references saying
-aggregate queue artifacts were canonical describe superseded behavior. Bridge
-dispatch is now governed by the `dispatcher daemon` and the dispatcher
-configuration/status/health CLI (see entry below).
+**Definition:** A retired bridge-poller automation that scanned the legacy
+bridge index periodically and dispatched a harness when a recipient's
+actionable queue signature changed. Retired, along with every dispatch
+substrate that succeeded it. Bridge dispatch is now **manual owner
+assignment**; see `dispatcher` below.
 
 *Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#smart-poller).*
 
-### dispatcher daemon
+### dispatcher
 
-**Canonical alias:** bridge dispatch trigger; dispatcher daemon.
+**Definition:** The mechanism by which bridge work is assigned to a harness.
+There is currently **no automated dispatcher**: the owner assigns bridge work
+manually.
 
-**Definition:** The current canonical bridge-dispatch automation, replacing
-the retired smart poller. Implemented as
-`scripts/gtkb_dispatcher_daemon.py` and kept alive by the headless dispatcher
-supervisor path. The daemon inspects bridge state on bounded
-cycles and dispatches the appropriate counterpart harness when actionable work
-changes.
-Aggregate queue artifacts must not be cited as canonical dispatcher topology,
-dispatch health, target-selection, or bridge-state authority.
+**Dispatcher Next** is the single future dispatcher. It is an active
+pre-release objective and is not yet activated. Until then, no script,
+scheduled task, hook, or poller may act as a dispatcher, and none may be
+described as one.
 
-*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#dispatcher-daemon).*
+**Not to be confused with:** any retired dispatch mechanism. Where older
+artifacts describe an automated dispatcher, a dispatch trigger, or dispatch
+health and topology surfaces, they describe removed mechanisms and carry no
+current authority.
+
+**Source:** owner directive, 2026-08-16 (legacy dispatcher disabled and being
+purged); `{{HARNESS_RULES_DIR}}/bridge-essential.md` § Operational Mode.
 
 ### role set
 
@@ -967,8 +969,7 @@ topology context).
 operating mode. A host-platform scheduled task (Windows Task Scheduler /
 launchd / cron per ``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001``) wakes
 the dispatcher routine on a fixed interval. The dispatcher reads
-bridge state, computes a per-role actionable signature using
-the same kind-aware-routing path as the dispatcher daemon, and
+bridge state, computes a per-role actionable signature, and
 spawns subprocess workers for each role whose actionable signature has
 changed. Workers receive the canonical init keyword ``::init gtkb <mode>``
 as the prompt's first line plus the ``GTKB_BRIDGE_POLLER_RUN_ID`` and
@@ -981,7 +982,7 @@ as the prompt's first line plus the ``GTKB_BRIDGE_POLLER_RUN_ID`` and
 **Definition:** The retired bridge-poller class (Windows scheduled tasks
 `AgentRedFileBridgeIndexScan-*`, `AgentRedBridgeLivenessAlert`,
 `AgentRedPollerLivenessWatcher`; the foreground watchdog; the
-`.claude/hooks/poller-freshness.py` hook; the in-session `CronCreate`
+`.harness-baseline-configuration/hooks/poller-freshness.py` hook; the in-session `CronCreate`
 poller). All members of this class were halted 2026-04-25 per owner
 directive because each fixed-interval tick spent an expensive resource â€”
 waking a harness into a full investigation â€” unconditionally, with no cheap
@@ -1011,7 +1012,7 @@ without writing `{{HARNESS_CONFIG_DIR}}/session/active-session-role.json`.
 
 **Definition:** The GT-KB diagnostic surface (typically invoked as
 `gt platform doctor` or equivalent) that runs structured health checks
-against platform infrastructure: dispatcher-daemon health, bridge state,
+against platform infrastructure: bridge state,
 scaffold drift, KB integrity, dashboard reachability, and other configured
 checks. The doctor is the canonical predicate for several rule-cited
 conditions.
@@ -1268,10 +1269,10 @@ Term, definition, not-to-be-confused-with, source, implementation pointer. -->
 **Definition:** The fourth GT-KB coding harness (identity `D`), adopted in
 Phase 1 of `PROJECT-GTKB-OLLAMA-INTEGRATION`. The upstream Ollama platform
 CLI/server (`http://localhost:11434`) is local-capable, but the GT-KB harness
-currently routes all skills to cloud model ids via `.api-harness/routing.toml`
+currently routes all skills to cloud model ids via `routing.toml` (in api-harness)
 (current route: `kimi-k2-7-code-cloud` â€” cloud-backed, not local inference).
 Integrated through `scripts/ollama_harness.py` (a framework-free Python
-tool-calling shim) and `.api-harness/routing.toml` (static routing).
+tool-calling shim) and `routing.toml` (in api-harness) (static routing).
 
 **Canonical alias:** ollama harness.
 
@@ -1279,7 +1280,7 @@ tool-calling shim) and `.api-harness/routing.toml` (static routing).
 
 ### routing.toml
 
-**Definition:** The static TOML routing config at `.api-harness/routing.toml`. Maps
+**Definition:** The static TOML routing config at `routing.toml` (in api-harness). Maps
 harness skills to model ids within the Ollama harness's routing configuration.
 The current default route (`kimi-k2-7-code-cloud`) is cloud-backed via cloud
 API, not a locally-served Ollama model; the upstream Ollama platform CLI/server
@@ -1293,7 +1294,7 @@ at least one `[models.<key>]` table, a `[routing]` table with `default_model`).
 
 **Definition:** The GT-KB pattern binding skill/task contexts to specific models
 within a single harness's model pool. In Phase 1 this is expressed via
-`.api-harness/routing.toml` (`[routing].default_model`, with optional
+`routing.toml` (in api-harness) (`[routing].default_model`, with optional
 `[routing.skills]` overrides reserved for Phase 2+).
 
 *Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#task-to-model-routing).*

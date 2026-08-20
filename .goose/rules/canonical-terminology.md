@@ -209,7 +209,7 @@ Platform (IDP) that supports the application lifecycle.
 **Not to be confused with:** hosted application (the platform manages
 applications, is not one); cloud platform (e.g., AWS) which is unrelated.
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "platform";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "platform";
 `DELIB-GTKB-IDP-TERMINOLOGY`.
 
 ### application
@@ -223,7 +223,7 @@ when GT-KB is the active application.
 application; see "project" below); platform (GT-KB itself; see above);
 hosted application (an application in service).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "application".
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "application".
 
 ### hosted application
 
@@ -234,7 +234,7 @@ of an application (vs. the lifecycle record managed by GT-KB).
 **Not to be confused with:** application (the lifecycle object); platform
 (GT-KB itself).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "hosted application".
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "hosted application".
 
 ### Agent Red
 
@@ -311,7 +311,7 @@ workstream/program grouping; not the hosted application.
 applications contain projects); platform (GT-KB itself); work item (the
 atomic known-work unit).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "project"; owner
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "project"; owner
 clarification, 2026-05-06.
 
 ### project authorization
@@ -347,7 +347,7 @@ grouping, and continuation context.
 **Not to be confused with:** project or sub-project (groupings of work
 items); external issue or ticket records.
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "work item";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "work item";
 `work_items` table in MemBase; owner clarification, 2026-05-06.
 
 ### backlog
@@ -368,7 +368,7 @@ of truth (the canonical `work_items` table), surfaced through
 no transitional markdown view persists.
 
 **Resource-selection rule:** A current owner instruction that names `backlog`
-selects this MemBase resource, even when the requested work is bridge-, TAFE-,
+selects this MemBase resource, even when the requested work is bridge-
 or harness-related. Those words qualify the backlog items; they do not replace
 the backlog with the bridge queue. Current literal resource terms outrank
 activity defaults, startup order, prior context, notes, and conjecture.
@@ -386,7 +386,7 @@ read with `gt bridge state-report`); ignore list or deprecated work (forbidden
 uses per operating-model Â§2); backlog snapshot (point-in-time export);
 a separate `backlog_items` conceptual class distinct from work items.
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "backlog";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "backlog";
 `GOV-STANDING-BACKLOG-001` (governance contract); owner clarification,
 2026-05-06.
 
@@ -399,7 +399,7 @@ recorded in MemBase as one of the spec subtypes (`SPEC-NNNN`, `GOV-NNN`,
 **Not to be confused with:** technical-design document; implementation
 proposal (a different bridge artifact); test (a verification artifact).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "specification";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "specification";
 `specifications` table in MemBase.
 
 ### requirement
@@ -413,7 +413,7 @@ requires owner-visible confirmation per `GOV-SPEC-CAPTURE-TRANSPARENCY-001`.
 behavior (must not be silently promoted to requirement per
 operating-model Â§1).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "requirement".
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "requirement".
 
 ### implementation proposal
 
@@ -427,7 +427,7 @@ criteria, and risk/rollback per
 **Not to be confused with:** specification (a different artifact type);
 implementation report (post-implementation; below).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "implementation proposal";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "implementation proposal";
 `.goose/rules/file-bridge-protocol.md`.
 
 ### implementation report
@@ -443,7 +443,7 @@ Verification Gate.
 **Not to be confused with:** implementation proposal (pre-implementation);
 test (an independent artifact).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "implementation report";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "implementation report";
 `.goose/rules/file-bridge-protocol.md`.
 
 ### verification
@@ -458,7 +458,7 @@ that a specification exists or has been claimed.
 verification can require many tests); validation (testing against
 real-world use; verification is internal-spec compliance).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "verification".
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "verification".
 
 ### dashboard
 
@@ -472,7 +472,7 @@ access to MemBase.
 **Not to be confused with:** static documentation (dashboard implies
 live data + interaction); non-interactive README-style views.
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "dashboard";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "dashboard";
 `GTKB-DASHBOARD-002` (slice progression).
 
 ### bridge
@@ -482,22 +482,21 @@ live data + interaction); non-interactive README-style views.
 **Definition:** The Prime Builder â†” Loyal Opposition coordination
 protocol implemented through dispatcher-backed bridge state and versioned
 markdown audit files under `bridge/`. Statuses: NEW, REVISED, GO, NO-GO,
-VERIFIED, ADVISORY, DEFERRED, WITHDRAWN. After the 2026-06-15
-TAFE/dispatcher cutover, aggregate queue artifacts are not canonical dispatcher
-or bridge-state authority. Implementation never proceeds without GO.
+VERIFIED, ADVISORY, DEFERRED, WITHDRAWN. Aggregate queue artifacts are not
+canonical dispatcher or bridge-state authority. Implementation never proceeds without GO.
 
 **Not to be confused with:** "the Bridge" as a generic concept (use
 "file bridge" in canonical text); the backlog; cross-system message bridges.
-Bare `bridge`, `bridge work`, `bridge-related`, `TAFE`, or `harness` topic
+Bare `bridge`, `bridge work`, `bridge-related`, or `harness` topic
 language does not by itself select the bridge queue.
 
-**Source:** dispatcher/TAFE bridge-state surfaces; `.goose/rules/file-bridge-protocol.md`
+**Source:** bridge-state surfaces; `.goose/rules/file-bridge-protocol.md`
 for legacy helper behavior; `AGENTS.md` (cross-harness rule surface).
 
 ### bridge queue
 
 **Definition:** The current file-bridge handoff and review workload derived from
-TAFE/dispatcher state plus the status-bearing numbered files under `bridge/`.
+bridge state plus the status-bearing numbered files under `bridge/`.
 Read it with `gt bridge state-report`. Approved explicit resource terms are
 `bridge queue` and `review queue`.
 
@@ -912,30 +911,32 @@ information updates canonical source-of-truth artifacts.
 
 ### smart poller
 
-**Definition:** The (now-retired) bridge-poller automation that scanned
-the legacy bridge index periodically and dispatched the appropriate harness
-when a recipient's actionable queue signature changed. The smart poller was
-monitoring/dispatch infrastructure only. Historical references saying
-aggregate queue artifacts were canonical describe pre-cutover behavior. Bridge
-dispatch is now governed by the `dispatcher daemon` and the dispatcher
-configuration/status/health CLI (see entry below).
+**Definition:** A retired bridge-poller automation that scanned the legacy
+bridge index periodically and dispatched a harness when a recipient's
+actionable queue signature changed. Retired, along with every dispatch
+substrate that succeeded it. Bridge dispatch is now **manual owner
+assignment**; see `dispatcher` below.
 
 *Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#smart-poller).*
 
-### dispatcher daemon
+### dispatcher
 
-**Canonical alias:** bridge dispatch trigger; dispatcher daemon.
+**Definition:** The mechanism by which bridge work is assigned to a harness.
+There is currently **no automated dispatcher**: the owner assigns bridge work
+manually.
 
-**Definition:** The current canonical bridge-dispatch automation, replacing
-the retired smart poller. Implemented as
-`scripts/gtkb_dispatcher_daemon.py` and kept alive by the headless dispatcher
-supervisor path. The daemon inspects dispatcher/TAFE bridge state on bounded
-cycles and dispatches the appropriate counterpart harness when actionable work
-changes.
-Aggregate queue artifacts must not be cited as canonical dispatcher topology,
-dispatch health, target-selection, or bridge-state authority.
+**Dispatcher Next** is the single future dispatcher. It is an active
+pre-release objective and is not yet activated. Until then, no script,
+scheduled task, hook, or poller may act as a dispatcher, and none may be
+described as one.
 
-*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#dispatcher-daemon).*
+**Not to be confused with:** any retired dispatch mechanism. Where older
+artifacts describe an automated dispatcher, a dispatch trigger, or dispatch
+health and topology surfaces, they describe removed mechanisms and carry no
+current authority.
+
+**Source:** owner directive, 2026-08-16 (legacy dispatcher disabled and being
+purged); `.goose/rules/bridge-essential.md` § Operational Mode.
 
 ### role set
 
@@ -976,8 +977,7 @@ topology context).
 operating mode. A host-platform scheduled task (Windows Task Scheduler /
 launchd / cron per ``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001``) wakes
 the dispatcher routine on a fixed interval. The dispatcher reads
-dispatcher/TAFE bridge state, computes a per-role actionable signature using
-the same kind-aware-routing path as the dispatcher daemon, and
+bridge state, computes a per-role actionable signature, and
 spawns subprocess workers for each role whose actionable signature has
 changed. Workers receive the canonical init keyword ``::init gtkb <mode>``
 as the prompt's first line plus the ``GTKB_BRIDGE_POLLER_RUN_ID`` and
@@ -990,7 +990,7 @@ as the prompt's first line plus the ``GTKB_BRIDGE_POLLER_RUN_ID`` and
 **Definition:** The retired bridge-poller class (Windows scheduled tasks
 `AgentRedFileBridgeIndexScan-*`, `AgentRedBridgeLivenessAlert`,
 `AgentRedPollerLivenessWatcher`; the foreground watchdog; the
-`.claude/hooks/poller-freshness.py` hook; the in-session `CronCreate`
+`.harness-baseline-configuration/hooks/poller-freshness.py` hook; the in-session `CronCreate`
 poller). All members of this class were halted 2026-04-25 per owner
 directive because each fixed-interval tick spent an expensive resource â€”
 waking a harness into a full investigation â€” unconditionally, with no cheap
@@ -1020,7 +1020,7 @@ without writing `.goose/session/active-session-role.json`.
 
 **Definition:** The GT-KB diagnostic surface (typically invoked as
 `gt platform doctor` or equivalent) that runs structured health checks
-against platform infrastructure: dispatcher-daemon health, bridge state,
+against platform infrastructure: bridge state,
 scaffold drift, KB integrity, dashboard reachability, and other configured
 checks. The doctor is the canonical predicate for several rule-cited
 conditions.
@@ -1277,10 +1277,10 @@ Term, definition, not-to-be-confused-with, source, implementation pointer. -->
 **Definition:** The fourth GT-KB coding harness (identity `D`), adopted in
 Phase 1 of `PROJECT-GTKB-OLLAMA-INTEGRATION`. The upstream Ollama platform
 CLI/server (`http://localhost:11434`) is local-capable, but the GT-KB harness
-currently routes all skills to cloud model ids via `.api-harness/routing.toml`
+currently routes all skills to cloud model ids via `routing.toml` (in api-harness)
 (current route: `kimi-k2-7-code-cloud` â€” cloud-backed, not local inference).
 Integrated through `scripts/ollama_harness.py` (a framework-free Python
-tool-calling shim) and `.api-harness/routing.toml` (static routing).
+tool-calling shim) and `routing.toml` (in api-harness) (static routing).
 
 **Canonical alias:** ollama harness.
 
@@ -1288,7 +1288,7 @@ tool-calling shim) and `.api-harness/routing.toml` (static routing).
 
 ### routing.toml
 
-**Definition:** The static TOML routing config at `.api-harness/routing.toml`. Maps
+**Definition:** The static TOML routing config at `routing.toml` (in api-harness). Maps
 harness skills to model ids within the Ollama harness's routing configuration.
 The current default route (`kimi-k2-7-code-cloud`) is cloud-backed via cloud
 API, not a locally-served Ollama model; the upstream Ollama platform CLI/server
@@ -1302,7 +1302,7 @@ at least one `[models.<key>]` table, a `[routing]` table with `default_model`).
 
 **Definition:** The GT-KB pattern binding skill/task contexts to specific models
 within a single harness's model pool. In Phase 1 this is expressed via
-`.api-harness/routing.toml` (`[routing].default_model`, with optional
+`routing.toml` (in api-harness) (`[routing].default_model`, with optional
 `[routing.skills]` overrides reserved for Phase 2+).
 
 *Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#task-to-model-routing).*

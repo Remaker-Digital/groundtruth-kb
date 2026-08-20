@@ -81,10 +81,7 @@ change.
   target ranking are configured in `config/dispatcher/rules.toml` and projected
   through `can_receive_dispatch`, `can_fire_events`, cost, quality,
   availability, and precedence fields.
-- If startup finds no harness recorded as Prime Builder (no role set contains
-  `prime-builder`), the starting harness assumes Prime Builder and updates
-  the registry (via `gt mode set-role`) with the appropriate role set for the
-  topology.
+- **Role Resolution & Immutability:** There is never a registry-fallback resolution for role: no registry has authority over the role of an agent. Role authority is carried solely in a bridge item header (`::init gtkb <pb|lo>`) in dispatched contexts or as direct input from the owner (`::init gtkb (pb|lo)`) during an interactive session. Once resolved, the role is immutable for the lifetime of the session context.
 
 The role assignment attaches to the harness ID, not to a model, vendor name, or
 transient session.
@@ -154,14 +151,13 @@ the dispatcher daemon consults the dispatcher role set to choose the recipient h
 and compose the dispatched init keyword, and the receiver-side `STRICT_DROP`
 gate enforces dispatcher role-set membership for headless dispatch. This is unchanged.
 
-An **interactive session** (no `GTKB_BRIDGE_POLLER_RUN_ID` env-var) MAY override
-the dispatcher/default role metadata for in-session surfaces when the owner gives explicit role
-direction in the transcript, including the canonical init keyword
-`::init gtkb (pb|lo)` on an owner prompt. When declared, the transcript-defined
-role governs SessionStart disclosure rendering, the AXIS 2 harness-native surface
-filter, the workstream-focus menu shape, MemBase `changed_by` attribution, and
-AUQ-keyed routing for the rest of the interactive context. An interactive
-session with no explicit role direction falls back to the registry role. See
+An **interactive session** (no `GTKB_BRIDGE_POLLER_RUN_ID` env-var) resolves
+its operating role strictly from explicit role direction in the transcript,
+specifically the canonical init keyword `::init gtkb (pb|lo)` on an owner prompt.
+When declared, the transcript-defined role governs SessionStart disclosure rendering,
+the AXIS 2 harness-native surface filter, the workstream-focus menu shape, MemBase
+`changed_by` attribution, and AUQ-keyed routing for the interactive context.
+There is never a registry-fallback resolution for role. See
 `GOV-SESSION-ROLE-AUTHORITY-001` (authority split),
 `DCL-SESSION-ROLE-RESOLUTION-001` (deterministic resolution table),
 `ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001` (decision + rejected alternatives),

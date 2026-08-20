@@ -7,7 +7,6 @@ metadata:
   category: implementation and planning
   activity-envelope: build, ops, project
 ---
-
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
@@ -141,6 +140,17 @@ An implementation report using this skill should include:
   implementation started before Loyal Opposition `GO`.
 - For no-op or deferred routes, the concrete evidence or trigger condition that
   makes the route appropriate.
+
+## Cross-Harness Disposition
+
+- Claude Code: canonical managed-skill source lives at
+  `.harness-baseline-configuration/skills/advisory-disposition/SKILL.md`.
+- Codex: generated adapter lives at
+  `.harness-baseline-configuration/skills/advisory-disposition/SKILL.md` and is declared in
+  `.harness-baseline-configuration/skills/MANIFEST.json`.
+- Antigravity, Cursor, and API harnesses: no direct skill adapter surface is
+  created by WI-4840. Projection to additional harnesses requires a separate
+  target-path-covered proposal or typed parity disposition.
 
 ## Non-Goals
 

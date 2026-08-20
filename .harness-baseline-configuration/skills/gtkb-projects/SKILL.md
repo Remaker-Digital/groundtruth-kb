@@ -6,7 +6,6 @@ metadata:
   project: groundtruth-kb
   category: implementation and planning
 ---
-
 # gtkb-Projects
 
 Use this skill when work needs deterministic project lifecycle operations through
@@ -17,8 +16,8 @@ the `gt projects` CLI surface.
 Project, sub-project, work item, backlog, MemBase, implementation proposal,
 implementation report, and verification meanings come from:
 
-- `{{HARNESS_RULES_DIR}}/operating-model.md`
-- `{{HARNESS_RULES_DIR}}/canonical-terminology.md`
+- `.harness-baseline-configuration/rules/operating-model.md`
+- `.harness-baseline-configuration/rules/canonical-terminology.md`
 
 This skill does not redefine those terms. Projects organize known work in the
 MemBase backlog; they do not replace `current_work_items` or create a separate
@@ -187,6 +186,7 @@ python -m pytest platform_tests/scripts/test_project_authorization.py -q
 python -m pytest platform_tests/scripts/test_cli_backlog_list.py -q
 python -m pytest groundtruth-kb/tests/test_project_dependency_ordering.py platform_tests/scripts/test_projects_cli.py -q
 python scripts/check_project_dependency_ordering.py --json
+python scripts/generate_codex_skill_adapters.py --check --update-registry
 python -m pytest platform_tests/scripts/test_projects_skill_adapter.py -q
 python -m pytest platform_tests/scripts/test_check_harness_parity.py -q
 ```
