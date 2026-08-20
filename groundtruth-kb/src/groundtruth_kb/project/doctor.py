@@ -917,7 +917,7 @@ def _orphan_citation_severity(target: Path) -> Literal["warning", "fail"]:
     try:
         import tomllib
 
-        data = tomllib.loads(toml_path.read_text(encoding="utf-8"))
+        data = tomllib.loads(_require_utf8_text(toml_path))
     except Exception:  # intentional-catch: quality gate waiver
         return "warning"
     doctor_config = data.get("doctor", {}) if isinstance(data, dict) else {}
@@ -1107,7 +1107,7 @@ def _check_harness_metadata_freshness(target: Path) -> ToolCheck:
         )
 
     try:
-        routing_data = tomllib.loads(routing_path.read_text(encoding="utf-8"))
+        routing_data = tomllib.loads(_require_utf8_text(routing_path))
     except (OSError, tomllib.TOMLDecodeError) as exc:
         return ToolCheck(
             name=check_name,
@@ -1117,7 +1117,7 @@ def _check_harness_metadata_freshness(target: Path) -> ToolCheck:
             message=f".api-harness/routing.toml unreadable: {exc}",
         )
     try:
-        dispatch_data = tomllib.loads(dispatch_path.read_text(encoding="utf-8"))
+        dispatch_data = tomllib.loads(_require_utf8_text(dispatch_path))
     except (OSError, tomllib.TOMLDecodeError) as exc:
         return ToolCheck(
             name=check_name,
@@ -1130,7 +1130,7 @@ def _check_harness_metadata_freshness(target: Path) -> ToolCheck:
     route_to_harness_id: dict[str, str] = {"ollama": "D", "openrouter": "F"}
     if registry_path.is_file():
         try:
-            registry = json.loads(registry_path.read_text(encoding="utf-8"))
+            registry = json.loads(_require_utf8_text(registry_path))
         except (OSError, json.JSONDecodeError) as exc:
             warnings.append(f"harness registry unreadable: {exc}")
         else:
@@ -1188,7 +1188,7 @@ def _check_harness_metadata_freshness(target: Path) -> ToolCheck:
             warnings.append(f"{rel} missing; narrative freshness not checked")
             continue
         try:
-            canonical_texts[rel] = path.read_text(encoding="utf-8")
+            canonical_texts[rel] = _require_utf8_text(path)
         except OSError as exc:
             warnings.append(f"{rel} unreadable: {exc}")
 
@@ -1333,7 +1333,7 @@ def _check_harness_model_pin_reconfirmation(target: Path) -> ToolCheck:
     findings: list[str] = []
     if config_found:
         try:
-            config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+            config = tomllib.loads(_require_utf8_text(config_path))
         except (OSError, tomllib.TOMLDecodeError) as exc:
             findings.append(f"{_HARNESS_MODEL_PIN_CONFIRMATIONS_REL.as_posix()} unreadable: {exc}")
             config = {}
@@ -1425,7 +1425,7 @@ def _parse_model_pin_confirmed_at(value: Any) -> datetime | None:
 
 def _json_file_contains_hook(path: Path, expected: str) -> bool:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(_require_utf8_text(path))
     except (OSError, json.JSONDecodeError):
         return False
     return expected in json.dumps(data, sort_keys=True)
@@ -1453,7 +1453,7 @@ def _check_dispatcher_config_cli_only_guard(target: Path) -> ToolCheck:
     claude_settings_path = target / ".claude" / "settings.json"
 
     try:
-        gate_text = gate_path.read_text(encoding="utf-8")
+        gate_text = _require_utf8_text(gate_path)
     except OSError as exc:
         findings.append(f"implementation-start gate unreadable: {exc}")
         gate_text = ""
@@ -1461,7 +1461,7 @@ def _check_dispatcher_config_cli_only_guard(target: Path) -> ToolCheck:
         findings.append("implementation-start gate lacks dispatcher config CLI-only denial marker")
 
     try:
-        guard_text = guard_path.read_text(encoding="utf-8")
+        guard_text = _require_utf8_text(guard_path)
     except OSError as exc:
         findings.append(f"protected mutation guard unreadable: {exc}")
         guard_text = ""
@@ -1474,7 +1474,7 @@ def _check_dispatcher_config_cli_only_guard(target: Path) -> ToolCheck:
         findings.append(".claude/settings.json does not register implementation-start-gate.py")
 
     try:
-        transaction_text = transactions_path.read_text(encoding="utf-8")
+        transaction_text = _require_utf8_text(transactions_path)
     except OSError as exc:
         findings.append(f"bridge dispatch transaction module unreadable: {exc}")
         transaction_text = ""
@@ -1605,7 +1605,7 @@ def _check_ollama_harness(target: Path) -> ToolCheck:
         findings.append("L4: .ollama/routing.toml missing")
     else:
         try:
-            routing_data = tomllib.loads(routing_path.read_text(encoding="utf-8"))
+            routing_data = tomllib.loads(_require_utf8_text(routing_path))
         except (OSError, tomllib.TOMLDecodeError) as exc:
             findings.append(f"L4: routing TOML unreadable: {exc}")
         else:
@@ -1803,7 +1803,7 @@ def _check_alibaba_cloud_studio_harness(target: Path) -> ToolCheck:
     # Layer 4: routing and wrapper source only name the approved env keys.
     routing_path = target / ".api-harness" / "routing.toml"
     try:
-        routing = tomllib.loads(routing_path.read_text(encoding="utf-8"))
+        routing = tomllib.loads(_require_utf8_text(routing_path))
     except (OSError, tomllib.TOMLDecodeError) as exc:
         findings.append(f"L4: routing TOML unreadable: {exc}")
     else:
@@ -1825,7 +1825,7 @@ def _check_alibaba_cloud_studio_harness(target: Path) -> ToolCheck:
 
     wrapper_path = target / "scripts" / "alibaba_cloud_studio_harness.py"
     try:
-        wrapper_source = wrapper_path.read_text(encoding="utf-8")
+        wrapper_source = _require_utf8_text(wrapper_path)
     except OSError as exc:
         findings.append(f"L4: Alibaba wrapper unreadable: {exc}")
     else:
@@ -2119,7 +2119,7 @@ def _check_settings_classifiers(target: Path) -> ToolCheck:
         )
 
     try:
-        raw = settings_path.read_text(encoding="utf-8")
+        raw = _require_utf8_text(settings_path)
         data = json.loads(raw)
     except (OSError, json.JSONDecodeError) as exc:
         return ToolCheck(
@@ -2321,7 +2321,7 @@ def _check_spec_classifier_settings_registered(target: Path) -> ToolCheck:
         )
 
     try:
-        data = _json.loads(settings_path.read_text(encoding="utf-8"))
+        data = _json.loads(_require_utf8_text(settings_path))
     except (OSError, _json.JSONDecodeError) as exc:
         return ToolCheck(
             name="spec-classifier tracked settings",
@@ -2384,7 +2384,7 @@ def _check_registered_hooks_tracked(target: Path) -> ToolCheck:
         )
 
     try:
-        data = _json.loads(settings_path.read_text(encoding="utf-8"))
+        data = _json.loads(_require_utf8_text(settings_path))
     except (OSError, _json.JSONDecodeError) as exc:
         return ToolCheck(
             name=name,
@@ -2493,7 +2493,7 @@ def _check_untracked_terminal_verified_verdicts(target: Path) -> ToolCheck:
         if not rel.endswith(".md"):
             continue
         try:
-            content = (target / rel).read_text(encoding="utf-8")
+            content = _require_utf8_text(target / rel)
         except OSError:
             continue
         first_nonblank = ""
@@ -2743,7 +2743,7 @@ def _check_raw_written_close_intent_no_action(target: Path) -> ToolCheck:
         if rel.count("/") != 1:
             continue
         try:
-            content = (target / rel).read_text(encoding="utf-8")
+            content = _require_utf8_text(target / rel)
         except OSError:
             continue
         try:
@@ -2999,7 +2999,7 @@ def _check_spec_classifier_codex_parity(target: Path) -> ToolCheck:
         )
 
     try:
-        data = _json.loads(codex_path.read_text(encoding="utf-8"))
+        data = _json.loads(_require_utf8_text(codex_path))
     except (OSError, _json.JSONDecodeError) as exc:
         return ToolCheck(
             name="spec-classifier Codex parity",
@@ -3404,7 +3404,7 @@ def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
             if vf.name in known_historical_offenders:
                 continue
             try:
-                content = vf.read_text(encoding="utf-8")
+                content = _require_utf8_text(vf)
             except OSError:
                 continue
             effective_datetime = bridge_file_effective_datetime(vf, content)
@@ -3516,7 +3516,7 @@ def _check_scanner_safe_writer_drift(target: Path, profile_name: str) -> ToolChe
     registered = False
     if settings_path.exists():
         try:
-            data: object = json.loads(settings_path.read_text(encoding="utf-8"))
+            data: object = json.loads(_require_utf8_text(settings_path))
         except (OSError, json.JSONDecodeError):
             registered = False
         else:
@@ -3545,7 +3545,7 @@ def _check_scanner_safe_writer_drift(target: Path, profile_name: str) -> ToolChe
     log_ignored = False
     if gitignore.exists():
         try:
-            gi_text = gitignore.read_text(encoding="utf-8")
+            gi_text = _require_utf8_text(gitignore)
             log_ignored = gitignore_record.pattern in gi_text
         except OSError:
             log_ignored = False
@@ -3618,7 +3618,7 @@ def _check_capture_hook_stub_status(target: Path) -> ToolCheck:
             missing.append(hook_name)
             continue
         try:
-            content = hook_path.read_text(encoding="utf-8")
+            content = _require_utf8_text(hook_path)
         except OSError:
             missing.append(hook_name)
             continue
@@ -3677,7 +3677,7 @@ def _is_command_registered_in_event(settings_path: Path, event: str, hook_filena
     if not settings_path.exists():
         return False
     try:
-        data: object = json.loads(settings_path.read_text(encoding="utf-8"))
+        data: object = json.loads(_require_utf8_text(settings_path))
     except (OSError, json.JSONDecodeError):
         return False
     if not isinstance(data, dict):
@@ -3814,7 +3814,7 @@ def _check_managed_artifact_drift(target: Path, profile_name: str) -> ToolCheck:
         if isinstance(artifact, GitignorePattern):
             gitignore = target / ".gitignore"
             try:
-                gitignore_text = gitignore.read_text(encoding="utf-8") if gitignore.is_file() else ""
+                gitignore_text = _require_utf8_text(gitignore) if gitignore.is_file() else ""
             except OSError as exc:
                 record("gitignore-missing", artifact.id, "fail", f"could not read .gitignore: {exc}")
                 continue
@@ -4001,7 +4001,7 @@ def _check_sot_read_discipline(target: Path) -> ToolCheck:
     # Layer 3: Claude registration
     if claude_settings.is_file():
         try:
-            claude_data = json.loads(claude_settings.read_text(encoding="utf-8"))
+            claude_data = json.loads(_require_utf8_text(claude_settings))
         except (OSError, json.JSONDecodeError) as exc:
             warnings.append(f"Claude settings.json unreadable: {exc}")
             claude_data = {}
@@ -4031,7 +4031,7 @@ def _check_sot_read_discipline(target: Path) -> ToolCheck:
     # Layer 4: Codex registration (anti-false-green)
     if codex_hooks.is_file():
         try:
-            codex_data = json.loads(codex_hooks.read_text(encoding="utf-8"))
+            codex_data = json.loads(_require_utf8_text(codex_hooks))
         except (OSError, json.JSONDecodeError) as exc:
             warnings.append(f".codex/hooks.json unreadable: {exc}")
             codex_data = {}
@@ -4441,7 +4441,7 @@ def _check_codex_skill_load_health(target: Path) -> ToolCheck:
         checked += 1
         rel_path = skill_file.relative_to(target).as_posix()
         try:
-            text = skill_file.read_text(encoding="utf-8")
+            text = _require_utf8_text(skill_file)
         except OSError as exc:
             failures.append(f"{rel_path}: unreadable: {exc}")
             continue
@@ -5189,7 +5189,7 @@ def _check_dispatcher_daemon_substrate_readiness(target: Path) -> ToolCheck:
     substrate = DISPATCHER_DAEMON_SUBSTRATE
     if sub_path.is_file():
         try:
-            sub_doc = json.loads(sub_path.read_text(encoding="utf-8"))
+            sub_doc = json.loads(_require_utf8_text(sub_path))
             if isinstance(sub_doc, dict):
                 raw = sub_doc.get("substrate")
                 if isinstance(raw, str) and raw.strip():
@@ -5480,7 +5480,7 @@ def _dispatcher_daemon_task_skip_check(target: Path, *, check_name: str, compone
     substrate = DISPATCHER_DAEMON_SUBSTRATE
     if sub_path.is_file():
         try:
-            sub_doc = json.loads(sub_path.read_text(encoding="utf-8"))
+            sub_doc = json.loads(_require_utf8_text(sub_path))
             if isinstance(sub_doc, dict):
                 raw = sub_doc.get("substrate")
                 if isinstance(raw, str) and raw.strip():
@@ -5627,7 +5627,7 @@ def _check_dispatcher_only_bridge_automation(target: Path) -> ToolCheck:
         if not hook_path.exists():
             continue
         try:
-            payload = json.loads(hook_path.read_text(encoding="utf-8"))
+            payload = json.loads(_require_utf8_text(hook_path))
         except (OSError, json.JSONDecodeError) as exc:
             return ToolCheck(
                 name=check_name,
@@ -5892,6 +5892,86 @@ _CANONICAL_AUTHORITY_CARRIER_RE = re.compile(
 )
 
 
+class DoctorCheckReadError(Exception):
+    """Raised when a doctor check cannot read a file as strict UTF-8.
+
+    ``_require_utf8_text`` converts helper findings into this exception so
+    expression-shaped call sites can stay one line. ToolCheck-returning
+    functions catch it and emit a named FAIL instead of aborting ``run_doctor``.
+    """
+
+    def __init__(self, finding: str) -> None:
+        super().__init__(finding)
+        self.finding = finding
+
+
+def _read_text_for_check(path: Path, rel_text: str) -> tuple[str | None, str | None]:
+    """Read ``path`` as strict UTF-8, turning any failure into a named finding.
+
+    Returns ``(text, None)`` on success and ``(None, finding)`` on failure, so a
+    caller appends the finding and continues instead of aborting the run.
+
+    Strict decoding is deliberate (WI-6681). ``DELIB-202667656`` (WI-5688)
+    rejected lossy ``errors="replace"`` decoding in doctor checks: silent
+    character replacement masks unreadable input and can turn a broken health
+    surface into a false ``PASS``. An undecodable file must therefore become an
+    explicit, named failure -- never a silent skip, and never a pass.
+
+    ``UnicodeDecodeError`` subclasses ``ValueError``, not ``OSError``. Call
+    sites that guarded only ``OSError`` therefore let a decode error escape and
+    abort the whole ``gt project doctor`` run; that is the WI-6681 defect.
+    """
+
+    try:
+        return path.read_text(encoding="utf-8"), None
+    except UnicodeDecodeError as exc:
+        return None, (f"{rel_text} is not valid UTF-8 (byte 0x{exc.object[exc.start]:02x} at offset {exc.start})")
+    except (OSError, ValueError) as exc:
+        return None, f"{rel_text} unreadable: {exc}"
+
+
+def _require_utf8_text(path: Path, rel_text: str | None = None) -> str:
+    """Strict UTF-8 read for remaining doctor sites that used unguarded ``read_text``.
+
+    Success returns the decoded text. Failure raises ``DoctorCheckReadError``
+    carrying the helper's named finding so the check can FAIL instead of aborting.
+    """
+
+    rel = rel_text if rel_text is not None else path.as_posix()
+    text, error = _read_text_for_check(path, rel)
+    if error is not None:
+        raise DoctorCheckReadError(error)
+    if text is None:
+        raise DoctorCheckReadError(f"{rel} unreadable")
+    return text
+
+
+def _toolcheck_from_utf8_error(fn_name: str, exc: DoctorCheckReadError) -> ToolCheck:
+    """Convert a UTF-8 read finding into a named doctor FAIL."""
+
+    return ToolCheck(
+        name=fn_name.removeprefix("_check_").replace("_", " "),
+        required=True,
+        found=True,
+        status="fail",
+        message=exc.finding,
+    )
+
+
+def _utf8_named_fail(fn):  # type: ignore[no-untyped-def]
+    """Wrap a ToolCheck producer so undecodable files become FAIL, not abort."""
+
+    def wrapped(*args, **kwargs):  # type: ignore[no-untyped-def]
+        try:
+            return fn(*args, **kwargs)
+        except DoctorCheckReadError as exc:
+            return _toolcheck_from_utf8_error(fn.__name__, exc)
+
+    wrapped.__name__ = fn.__name__
+    wrapped.__doc__ = fn.__doc__
+    return wrapped
+
+
 def _check_harness_local_scratchpad_boundary(target: Path) -> ToolCheck:
     """Verify harness-local scratchpads cannot become GT-KB authority.
 
@@ -5910,10 +5990,9 @@ def _check_harness_local_scratchpad_boundary(target: Path) -> ToolCheck:
         if not path.is_file():
             findings.append(f"{rel_text} missing")
             continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError as exc:
-            findings.append(f"{rel_text} unreadable: {exc}")
+        text, read_error = _read_text_for_check(path, rel_text)
+        if read_error is not None:
+            findings.append(read_error)
             continue
 
         lowered = text.lower()
@@ -6203,7 +6282,7 @@ def _check_external_harness_exec_boundary(target: Path) -> ToolCheck:
             ),
         )
     try:
-        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        registry = json.loads(_require_utf8_text(registry_path))
     except (OSError, json.JSONDecodeError) as exc:
         return ToolCheck(
             name=check_name,
@@ -6261,7 +6340,7 @@ def _check_external_harness_exec_boundary(target: Path) -> ToolCheck:
     violations: list[str] = []
     for path in scan_paths:
         try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
+            tree = ast.parse(_require_utf8_text(path))
         except (OSError, SyntaxError) as exc:
             return ToolCheck(
                 name=check_name,
@@ -6359,7 +6438,7 @@ def _read_session_role_marker(target: Path) -> tuple[dict[str, Any] | None, str 
     if not marker_path.is_file():
         return None, None
     try:
-        body = json.loads(marker_path.read_text(encoding="utf-8"))
+        body = json.loads(_require_utf8_text(marker_path))
     except (OSError, json.JSONDecodeError) as exc:
         return None, f"unreadable or malformed JSON: {exc}"
     if not isinstance(body, dict):
@@ -6545,7 +6624,7 @@ def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
         )
 
     try:
-        registry_doc = json.loads(registry_path.read_text(encoding="utf-8"))
+        registry_doc = json.loads(_require_utf8_text(registry_path))
     except (OSError, json.JSONDecodeError) as exc:
         return ToolCheck(
             name=check_name,
@@ -7666,6 +7745,18 @@ def _check_agent_red_app_root_minimization(target: Path) -> ToolCheck:
         status="fail",
         message=f"Agent Red app-root minimization failed: {result.first_error_message()}",
     )
+
+
+def _guard_doctor_utf8_checks() -> None:
+    """Wrap ToolCheck producers so remaining UTF-8 findings cannot abort doctor."""
+
+    for name, obj in list(globals().items()):
+        if not name.startswith("_check_") or not callable(obj):
+            continue
+        globals()[name] = _utf8_named_fail(obj)
+
+
+_guard_doctor_utf8_checks()
 
 
 def run_doctor(
