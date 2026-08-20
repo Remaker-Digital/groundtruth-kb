@@ -559,7 +559,19 @@ def _validate_ordinary_transitions(versions: tuple[BridgeVersion, ...]) -> None:
         _fail("EMPTY_BRIDGE_LIFECYCLE", "Bridge lifecycle contains no versions")
 
     first = versions[0]
-    if first.status not in {"NEW", "REVISED", "ADVISORY"}:
+    # WI-6706: apply the initial-status rule only to a chain that genuinely
+    # starts at 001. Under the WI-6530 ephemerality policy a thread legitimately
+    # loses early versions after a terminal VERIFIED, so a healthy chain can
+    # begin at 002 or later with a verdict as its first *surviving* version. For
+    # such a chain the original first version is gone and unknowable, so the
+    # rule asks a question the surviving evidence cannot answer; failing closed
+    # on it froze the thread against every further filing, including the
+    # WITHDRAWN that would close it.
+    #
+    # The two statements below already seed post-GO augmentation and terminal
+    # detection from a first version that is a GO or a terminal status, so the
+    # loop has always handled the shape this guard forbade.
+    if first.version == 1 and first.status not in {"NEW", "REVISED", "ADVISORY"}:
         _fail(
             "INVALID_INITIAL_BRIDGE_STATUS",
             f"Initial bridge status must be NEW, REVISED, or ADVISORY; found {first.status}",

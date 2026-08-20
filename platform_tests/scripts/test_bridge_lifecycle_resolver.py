@@ -1175,3 +1175,114 @@ def test_lo_batch_publish_reads_marker_first_via_packaged_accessor(
     source = inspect.getsource(lo_batch_publish.publish_one)
     assert "status_from_bridge_file" in source
     assert "splitlines()[0]" not in source
+
+
+# --- WI-6706: initial-status rule applies only to chains that start at 001 ---
+#
+# Under the WI-6530 ephemerality policy a thread legitimately loses early
+# versions after a terminal VERIFIED, so a healthy chain can begin at 002+ with
+# a verdict as its first surviving version. The rule must still bind chains that
+# genuinely start at 001.
+
+
+def test_swept_prefix_starting_at_go_clears_initial_status_but_hits_prime_artifact(
+    tmp_path: Path,
+) -> None:
+    """Scope boundary of WI-6706, asserted rather than assumed.
+
+    A swept chain whose surviving prefix begins with a GO no longer fails
+    ``INVALID_INITIAL_BRIDGE_STATUS``. It fails one predicate later, at
+    ``_nearest_prime_artifact``, because the NEW/REVISED that authorized the GO
+    was swept with the prefix. That is a separate barrier requiring its own
+    proposal; this slice deliberately does not touch it.
+    """
+    slug = "swept-go-first"
+    _write_version(tmp_path, slug, 2, "GO")
+    _write_version(tmp_path, slug, 3, "NEW")
+    _write_version(tmp_path, slug, 4, "NO-GO")
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code != "INVALID_INITIAL_BRIDGE_STATUS"
+    assert caught.value.code == "GO_WITHOUT_PRIME_ARTIFACT"
+
+
+def test_swept_prefix_starting_at_no_go_resolves(tmp_path: Path) -> None:
+    slug = "swept-nogo-first"
+    _write_version(tmp_path, slug, 3, "NO-GO")
+    _write_version(tmp_path, slug, 4, "REVISED")
+
+    result = resolve_bridge_lifecycle(tmp_path, slug)
+
+    assert result.latest_strict_state.status == "REVISED"
+
+
+def test_swept_prefix_starting_at_no_action_clears_initial_status(tmp_path: Path) -> None:
+    """NO-ACTION first: the initial-status rule no longer fires.
+
+    A later GO in the same chain still needs a surviving prime artifact, so this
+    fixture stops at the same downstream barrier as the GO-first case. What is
+    asserted here is the WI-6706 contract: the *initial-status* refusal is gone.
+    """
+    slug = "swept-noaction-first"
+    _write_version(tmp_path, slug, 2, "NO-ACTION")
+    _write_version(tmp_path, slug, 3, "GO")
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code != "INVALID_INITIAL_BRIDGE_STATUS"
+
+
+def test_genuine_first_version_still_requires_a_proposal(tmp_path: Path) -> None:
+    """The rule must keep binding the case it correctly protects."""
+    slug = "genuine-go-first"
+    _write_version(tmp_path, slug, 1, "GO")
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "INVALID_INITIAL_BRIDGE_STATUS"
+
+
+def test_swept_prefix_still_validates_pairwise_transitions(tmp_path: Path) -> None:
+    """Exempting the first-status check must not exempt the transition table."""
+    slug = "swept-bad-transition"
+    _write_version(tmp_path, slug, 2, "NO-GO")
+    _write_version(tmp_path, slug, 3, "VERIFIED")
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "INVALID_BRIDGE_TRANSITION"
+
+
+def test_swept_prefix_preserves_prior_go_seeding(tmp_path: Path) -> None:
+    """prior_go_seen is seeded from a GO first version, so NEW is a lawful successor."""
+    slug = "swept-go-seeding"
+    _write_version(tmp_path, slug, 2, "GO")
+    _write_version(tmp_path, slug, 3, "NEW")
+
+    result = resolve_bridge_lifecycle(tmp_path, slug)
+
+    assert result.latest_strict_state.status == "NEW"
+
+
+def test_swept_prefix_preserves_terminal_seeding(tmp_path: Path) -> None:
+    """terminal_seen is seeded from a terminal first version and still fails closed."""
+    slug = "swept-terminal-seeding"
+    _write_version(tmp_path, slug, 2, "VERIFIED")
+    _write_version(tmp_path, slug, 3, "NEW")
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "VERSION_AFTER_TERMINAL_STATUS"
+
+
+def test_interior_gap_still_fails_closed(tmp_path: Path) -> None:
+    """WI-6706 exempts a swept prefix only; an interior gap remains anomalous."""
+    slug = "swept-interior-gap"
+    _write_version(tmp_path, slug, 2, "NEW")
+    _write_version(tmp_path, slug, 3, "GO")
+    _write_version(tmp_path, slug, 5, "NEW")
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "NONCONTIGUOUS_BRIDGE_VERSIONS"
