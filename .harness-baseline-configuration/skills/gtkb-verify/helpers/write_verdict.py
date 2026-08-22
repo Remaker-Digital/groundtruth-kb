@@ -469,6 +469,17 @@ def _assert_predecessor_chain_committed(
             continue
         tracked = _run_git(["ls-files", "--error-unmatch", "--", rel_path], cwd=project_root, check=False)
         if tracked.returncode != 0:
+            # WI-6530 reclassified `bridge/` as ephemeral runtime state and added the
+            # matching `git add -f` staging below, but left this check asserting the
+            # pre-WI-6530 tracked-artifact model -- making VERIFIED unreachable for
+            # every multi-version thread. An IGNORED predecessor present on disk
+            # satisfies chain integrity: the chain is complete, and tracked-ness is
+            # not a meaningful signal for a path class governance declared ephemeral.
+            # An untracked predecessor that is NOT ignored remains a real gap and
+            # still fails closed.
+            ignored = _run_git(["check-ignore", "-q", "--", rel_path], cwd=project_root, check=False)
+            if ignored.returncode == 0:
+                continue
             problems.append(f"{rel_path} is not git-tracked and is not included in the VERIFIED transaction")
             continue
         status = _run_git(["status", "--porcelain", "--", rel_path], cwd=project_root, check=True).stdout.strip()
