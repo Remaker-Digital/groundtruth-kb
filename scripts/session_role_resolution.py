@@ -164,7 +164,7 @@ def resolve_interactive_session_role(
     the dispatcher/default registry role. The registry role is headless-dispatch
     routing authority; substituting it for a missing, invalid, or stale
     interactive marker silently mislabels the session's role, which is a
-    review-integrity defect under ``.claude/rules/file-bridge-protocol.md``
+    review-integrity defect under ``.harness-baseline-configuration/rules/file-bridge-protocol.md``
     section Review Independence Boundary. Absent valid explicit evidence this
     function now fails closed with ``role_profile = None``; callers MUST
     suppress rather than assume a role.

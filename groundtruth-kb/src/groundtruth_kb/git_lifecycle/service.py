@@ -1087,19 +1087,26 @@ class GitLifecycleService:
         packet, packet_path = self._authority_packet(bridge_id)
         start = packet.get("implementation_start")
         embedded_pauth = packet.get("project_authorization")
-        if not isinstance(start, dict) or start.get("schema_version") != 1 or not isinstance(embedded_pauth, dict):
+        if (
+            not isinstance(start, dict)
+            or start.get("schema_version") not in {1, 2}
+            or not isinstance(embedded_pauth, dict)
+        ):
             raise OperationDenied(
                 "implementation_start_invalid", "implementation-start authority envelope is incomplete"
             )
         if start.get("bridge_id") != bridge_id:
             raise OperationDenied("implementation_start_invalid", "implementation-start bridge binding is inconsistent")
         session_id = start.get("session_id")
-        provenance = start.get("worker_role_provenance")
+        provenance = start.get("worker_role_provenance") or start.get("role_attestation")
+        prov_session = (
+            provenance.get("session_id") or provenance.get("invoking_context") if isinstance(provenance, dict) else None
+        )
         if (
             not isinstance(session_id, str)
             or not isinstance(provenance, dict)
             or provenance.get("role") != "prime-builder"
-            or provenance.get("session_id") != session_id
+            or prov_session != session_id
         ):
             raise OperationDenied(
                 "implementation_start_invalid", "implementation-start PB session provenance is invalid"
@@ -1118,7 +1125,10 @@ class GitLifecycleService:
         if (
             canonical_provenance.get("role") != "prime-builder"
             or canonical_provenance.get("session_id") != session_id
-            or canonical_provenance.get("harness_id") != provenance.get("harness_id")
+            or (
+                provenance.get("harness_id") is not None
+                and canonical_provenance.get("harness_id") != provenance.get("harness_id")
+            )
         ):
             raise OperationDenied(
                 "implementation_start_invalid",

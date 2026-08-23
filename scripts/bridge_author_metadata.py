@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,8 @@ REQUIRED_AUTHOR_METADATA_FIELDS: tuple[str, ...] = (
     "author_model_configuration",
 )
 OPTIONAL_AUTHOR_METADATA_FIELDS: tuple[str, ...] = (
+    "author_session_envelope_id",
+    "author_role_attestation",
     "author_model_context_window",
     "author_metadata_source",
 )
@@ -55,7 +58,8 @@ _EXACT_SESSION_METADATA_SOURCE_BY_HARNESS: dict[str, str] = {
 ENV_VAR_HARNESS_NAME = "GTKB_HARNESS_NAME"
 
 FIELD_ENV_NAMES: dict[str, tuple[str, ...]] = {
-    "author_identity": ("GTKB_AUTHOR_IDENTITY", "GTKB_AUTHOR_NAME", "GTKB_HARNESS_NAME"),
+    # GTKB_HARNESS_NAME is a harness-identity hint, never an author-role source.
+    "author_identity": ("GTKB_AUTHOR_IDENTITY", "GTKB_AUTHOR_NAME"),
     "author_harness_id": ("GTKB_AUTHOR_HARNESS_ID", "GTKB_HARNESS_ID", "CODEX_HARNESS_ID", "CLAUDE_HARNESS_ID"),
     "author_session_context_id": (
         "GTKB_AUTHOR_SESSION_CONTEXT_ID",
@@ -100,6 +104,8 @@ FIELD_ALIASES: dict[str, tuple[str, ...]] = {
         "session_context_id",
         "session_id",
     ),
+    "author_session_envelope_id": ("author_session_envelope_id", "session_envelope_id"),
+    "author_role_attestation": ("author_role_attestation", "acting_role_attestation"),
     "author_model": ("author_model", "model", "model_name"),
     "author_model_version": ("author_model_version", "model_version", "version"),
     "author_model_configuration": (
@@ -158,34 +164,20 @@ class BridgeAuthorMetadataError(RuntimeError):
     """Raised when required bridge author metadata is absent or not credible."""
 
 
-def resolve_author_metadata() -> dict[str, str]:
-    """Resolve all author-metadata fields from environment variables.
-
-    Iterates over REQUIRED_AUTHOR_METADATA_FIELDS and OPTIONAL_AUTHOR_METADATA_FIELDS,
-    checking FIELD_ENV_NAMES for each. Returns a dict of {field: value} for
-    all fields that resolve from the environment.
-    """
-    result: dict[str, str] = {}
-    all_fields = list(REQUIRED_AUTHOR_METADATA_FIELDS) + list(OPTIONAL_AUTHOR_METADATA_FIELDS)
-    for field_name in all_fields:
-        env_names = FIELD_ENV_NAMES.get(field_name, ())
-        for env_name in env_names:
-            value = os.environ.get(env_name, "").strip()
-            if value:
-                result[field_name] = value
-                break
-    return result
+def resolve_author_metadata(project_root: Path | None = None) -> dict[str, str]:
+    """Resolve author metadata through the exact-init authority boundary."""
+    return load_author_metadata(project_root)
 
 
-def _emit_metadata() -> int:
+def _emit_metadata(project_root: Path | None = None) -> int:
     """CLI mode: emit resolved metadata as YAML-like frontmatter lines."""
-    resolved = resolve_author_metadata()
-    missing = [f for f in REQUIRED_AUTHOR_METADATA_FIELDS if f not in resolved]
+    try:
+        resolved = resolve_author_metadata(project_root)
+    except BridgeAuthorMetadataError as exc:
+        print(f"bridge author metadata unavailable: {exc}", file=sys.stderr)
+        return 1
     for field_name in sorted(resolved):
         print(f"{field_name}: {resolved[field_name]}")
-    if missing:
-        print(f"# Missing required fields: {', '.join(missing)}", file=sys.stderr)
-        return 1
     return 0
 
 
@@ -255,6 +247,12 @@ def author_metadata_gaps(metadata: Mapping[str, Any]) -> list[str]:
                 gaps.append(field)
             else:
                 gaps.append(f"{field} (placeholder/invalid)")
+    identity = normalized.get("author_identity")
+    if identity:
+        from scripts.bridge_lifecycle_resolver import _author_role
+
+        if _author_role(identity) not in {"prime-builder", "loyal-opposition"}:
+            gaps.append("author_identity (missing exact session role)")
     return gaps
 
 
@@ -327,11 +325,7 @@ def _metadata_from_exact_session_envelope(
     identity_fields: Mapping[str, str],
 ) -> dict[str, str]:
     """Load author model metadata only from the exact validated session document."""
-    from groundtruth_kb.session.envelope import (
-        EnvelopeError,
-        load_worker_session,
-        resolve_worker_role_provenance,
-    )
+    from groundtruth_kb.session.envelope import EnvelopeError, load_worker_session
 
     session_id = explicit.get("author_session_context_id") or _runtime_session_context_id(environ)
     harness_name = (environ.get(ENV_VAR_HARNESS_NAME) or "").strip().lower()
@@ -358,11 +352,6 @@ def _metadata_from_exact_session_envelope(
             raise BridgeAuthorMetadataError(
                 f"exact session author metadata is not attested by {expected_metadata_source}"
             )
-        resolve_worker_role_provenance(
-            project_root,
-            current_session_id=session_id,
-            harness_name=harness_name,
-        )
     except EnvelopeError as exc:
         raise BridgeAuthorMetadataError(f"exact session author metadata is invalid: {exc}") from exc
 
@@ -387,13 +376,6 @@ def _replace_author_metadata_value(content: str, field: str, value: str) -> str:
     return pattern.sub(replacement, content, count=1)
 
 
-def _record_can_receive_dispatch(record: Mapping[str, object]) -> bool:
-    """Return dispatchability for a projected harness role record."""
-    if "can_receive_dispatch" in record:
-        return record.get("can_receive_dispatch") is True
-    return record.get("event_driven_hooks") is True
-
-
 def _dispatch_harness_id_from_run_id(value: object) -> str | None:
     """Return the durable harness id from a dispatcher run id, if well-formed."""
     if not metadata_value_is_valid(value):
@@ -404,53 +386,33 @@ def _dispatch_harness_id_from_run_id(value: object) -> str | None:
     return match.group("harness_id").upper()
 
 
-def _resolve_durable_identity_fields(
+def _declared_harness_name(author_identity: str) -> str:
+    """Extract only a harness label from caller-declared author identity."""
+
+    value = str(author_identity or "").strip().strip("`")
+    if not value:
+        return ""
+    parts = [part.strip() for part in value.split("/") if part.strip()]
+    if parts and parts[0].lower() in {"prime-builder", "loyal-opposition", "acting-prime-builder"}:
+        return parts[1].lower() if len(parts) > 1 else ""
+    return value.lower()
+
+
+def _resolve_harness_identity_fields(
     project_root: Path,
     *,
     env: Mapping[str, str] | None = None,
+    declared_identity: str = "",
+    declared_harness_id: str = "",
 ) -> dict[str, str]:
-    """Resolve ONLY the two durable author-metadata fields from the harness registry.
+    """Resolve the acting harness name/ID without consulting any role field."""
 
-    Returns ``{"author_identity": "<role>/<harness_name>", "author_harness_id":
-    "<id>"}`` resolved per call from the filing harness's own durable identity,
-    using the same ``<role>/<harness_name>`` label form as
-    ``scripts/_kb_attribution.resolve_changed_by``. The filing harness is
-    resolved with a three-source priority — ``GTKB_HARNESS_NAME`` env, a
-    well-formed dispatcher ``GTKB_BRIDGE_POLLER_RUN_ID``, then the active Prime
-    Builder fallback in the registry projection at ``project_root``. If
-    multiple active Prime Builders exist, fallback metadata resolves only when
-    exactly one is dispatchable. ``project_root`` is threaded through the
-    projection-backed loaders so callers (and tests) read the intended registry
-    rather than a module-global root.
-
-    Returns ``{}`` (never ``None``) when the filing harness cannot be resolved
-    unambiguously — no ``GTKB_HARNESS_NAME`` and no unambiguous dispatch/run-id
-    or active Prime Builder fallback, no registry id for the resolved name, or
-    no role assignment — so it contributes nothing rather than a wrong value,
-    and an incomplete merged set fails closed in ``validate_author_metadata``
-    instead of inheriting another harness's values.
-
-    It NEVER returns the four per-session runtime fields
-    (``author_session_context_id``, ``author_model``, ``author_model_version``,
-    ``author_model_configuration``): those have no durable GT-KB store and can
-    only come from the filing harness's own runtime envelope (env/explicit).
-    """
-    # Local imports avoid a module import cycle (mirrors `_kb_attribution.py`).
     from scripts.harness_identity import load_harness_identities
-    from scripts.harness_roles import (
-        ROLE_ACTING_PRIME_BUILDER,
-        ROLE_LOYAL_OPPOSITION,
-        ROLE_PRIME_BUILDER,
-        _normalize_role_field,
-        is_prime_builder,
-        load_role_assignments,
-    )
 
     environ = env if env is not None else os.environ
-    assignments = load_role_assignments(project_root).get("harnesses", {})
     identities = load_harness_identities(project_root).get("harnesses", {})
 
-    harness_name = (environ.get(ENV_VAR_HARNESS_NAME) or "").strip()
+    harness_name = (environ.get(ENV_VAR_HARNESS_NAME) or "").strip().lower()
     if not harness_name and environ.get("CURSOR_AGENT") == "1" and environ.get("CURSOR_CONVERSATION_ID"):
         harness_name = "cursor"
     if not harness_name:
@@ -467,46 +429,96 @@ def _resolve_durable_identity_fields(
             if not harness_name:
                 return {}
 
+    declared_harness_name = _declared_harness_name(declared_identity)
+    if harness_name and declared_harness_name and declared_harness_name != harness_name:
+        raise BridgeAuthorMetadataError(
+            f"declared author harness {declared_harness_name!r} conflicts with the acting harness {harness_name!r}"
+        )
     if not harness_name:
-        prime_ids = [
-            hid for hid, record in assignments.items() if isinstance(record, dict) and is_prime_builder(record)
-        ]
-        if len(prime_ids) > 1:
-            prime_ids = [
-                hid
-                for hid in prime_ids
-                if isinstance(assignments.get(hid), dict) and _record_can_receive_dispatch(assignments[hid])
-            ]
-        if len(prime_ids) != 1:
-            return {}
+        harness_name = declared_harness_name
+
+    if not harness_name and declared_harness_id:
         harness_name = next(
             (
                 name
                 for name, record in identities.items()
-                if isinstance(record, dict) and record.get("id") == prime_ids[0]
+                if isinstance(record, dict) and record.get("id") == declared_harness_id
             ),
             "",
         )
-        if not harness_name:
+
+    if not harness_name:
+        try:
+            from groundtruth_kb.session.envelope import EnvelopeError, resolve_acting_harness_identity
+
+            harness_name, _resolved_harness_id = resolve_acting_harness_identity(project_root)
+        except (EnvelopeError, ImportError):
             return {}
 
     identity_record = identities.get(harness_name)
     harness_id = identity_record.get("id") if isinstance(identity_record, dict) else None
     if not isinstance(harness_id, str) or not harness_id:
+        harness_id = declared_harness_id
+    if not harness_id:
         return {}
+    if declared_harness_id and declared_harness_id != harness_id:
+        raise BridgeAuthorMetadataError(
+            f"declared author_harness_id {declared_harness_id!r} conflicts with "
+            f"the owner-assigned identity {harness_id!r} for {harness_name!r}"
+        )
 
-    role_record = assignments.get(harness_id)
-    if not isinstance(role_record, dict):
-        return {}
-    role_set = _normalize_role_field(role_record.get("role"))
-    if ROLE_PRIME_BUILDER in role_set or ROLE_ACTING_PRIME_BUILDER in role_set:
-        role = ROLE_PRIME_BUILDER
-    elif ROLE_LOYAL_OPPOSITION in role_set:
-        role = ROLE_LOYAL_OPPOSITION
-    else:
-        return {}
+    return {"harness_name": harness_name, "author_harness_id": harness_id}
 
-    return {"author_identity": f"{role}/{harness_name}", "author_harness_id": harness_id}
+
+def _resolve_attested_authority_fields(
+    project_root: Path,
+    *,
+    session_context_id: str,
+    harness_name: str,
+    supplied: Mapping[str, str],
+) -> dict[str, str]:
+    """Resolve author role only from this context's immutable exact-init attestation."""
+
+    try:
+        from groundtruth_kb.session.attestation.service import (
+            RoleAttestationError,
+            resolve_effective_role_for_context,
+        )
+
+        binding, attestation = resolve_effective_role_for_context(
+            project_root / "groundtruth.db",
+            invoking_context=session_context_id,
+        )
+    except (ImportError, RoleAttestationError) as exc:
+        raise BridgeAuthorMetadataError(f"exact-init author role attestation is unavailable: {exc}") from exc
+    if attestation.source_event != "exact_init":
+        raise BridgeAuthorMetadataError(
+            "bridge authorship requires the immutable exact-init role attestation; "
+            f"got source_event={attestation.source_event or '<missing>'}"
+        )
+    role = str(attestation.role or "").strip().lower()
+    if role not in {"prime-builder", "loyal-opposition"}:
+        raise BridgeAuthorMetadataError(f"unsupported exact-init author role: {role or '<missing>'}")
+
+    declared_identity = str(supplied.get("author_identity") or "").strip()
+    if declared_identity and "/" in declared_identity:
+        declared_role = declared_identity.split("/", 1)[0].strip().lower()
+        if declared_role != role:
+            raise BridgeAuthorMetadataError(
+                f"declared author role {declared_role!r} conflicts with exact-init role {role!r}"
+            )
+
+    resolved = {
+        "author_identity": f"{role}/{harness_name}",
+        "author_session_context_id": session_context_id,
+        "author_session_envelope_id": binding.envelope_id,
+        "author_role_attestation": attestation.evidence_reference,
+    }
+    for field in ("author_session_envelope_id", "author_role_attestation"):
+        declared = str(supplied.get(field) or "").strip()
+        if declared and declared != resolved[field]:
+            raise BridgeAuthorMetadataError(f"declared {field} conflicts with exact-init attestation evidence")
+    return resolved
 
 
 def load_author_metadata(
@@ -515,24 +527,46 @@ def load_author_metadata(
     explicit: Mapping[str, Any] | None = None,
     env: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
-    """Load required author metadata from the filing harness's own context.
+    """Load author metadata with role fixed by the exact-init attestation.
 
-    Precedence is explicit > environment runtime envelope > exact validated
-    per-session envelope > durable identity. The shared current-session
-    projection and the retired shared author-metadata baseline are never read as
-    author authority. A missing or invalid exact session source therefore fails
-    closed rather than inheriting another session's values.
+    Harness identity and model data remain attribution inputs. Neither can
+    supply, override, or repair the running session's role.
     """
     root = project_root or Path.cwd()
     environ = env or os.environ
     merged: dict[str, Any] = {}
     explicit_metadata = normalize_author_metadata(explicit)
     environment_metadata = _metadata_from_env(environ)
-    identity_fields = _resolve_durable_identity_fields(root, env=environ)
 
     supplied_runtime_fields = {
         **environment_metadata,
         **explicit_metadata,
+    }
+    session_context_id = str(supplied_runtime_fields.get("author_session_context_id") or "").strip()
+    if not session_context_id:
+        session_context_id = _runtime_session_context_id(environ)
+    declared_identity = str(supplied_runtime_fields.get("author_identity") or "").strip()
+    declared_harness_id = str(supplied_runtime_fields.get("author_harness_id") or "").strip()
+    harness_identity = _resolve_harness_identity_fields(
+        root,
+        env=environ,
+        declared_identity=declared_identity,
+        declared_harness_id=declared_harness_id,
+    )
+    harness_name = str(harness_identity.get("harness_name") or "").strip()
+    if not session_context_id or not harness_name:
+        raise BridgeAuthorMetadataError(
+            "exact bridge author context requires both an invoking session id and acting harness identity"
+        )
+    authority_fields = _resolve_attested_authority_fields(
+        root,
+        session_context_id=session_context_id,
+        harness_name=harness_name,
+        supplied=supplied_runtime_fields,
+    )
+    identity_fields = {
+        "author_identity": authority_fields["author_identity"],
+        "author_harness_id": harness_identity["author_harness_id"],
     }
     runtime_fields = {
         "author_session_context_id",
@@ -571,6 +605,10 @@ def load_author_metadata(
         )
     merged.update(environment_metadata)
     merged.update(explicit_metadata)
+    # Caller/env values can describe model or harness identity, but never role,
+    # session binding, or attestation evidence.
+    merged.update(identity_fields)
+    merged.update(authority_fields)
     return validate_author_metadata(merged)
 
 
@@ -582,6 +620,33 @@ def render_author_metadata_lines(metadata: Mapping[str, Any]) -> list[str]:
         if metadata_value_is_valid(value):
             lines.append(f"{field}: {value}\n")
     return lines
+
+
+def _insert_missing_optional_metadata(
+    content: str,
+    *,
+    existing: Mapping[str, str],
+    explicit: Mapping[str, Any] | None,
+) -> str:
+    """Add trusted optional fields to otherwise-complete existing metadata."""
+
+    supplied = normalize_author_metadata(explicit)
+    additions = [
+        (field, supplied[field])
+        for field in OPTIONAL_AUTHOR_METADATA_FIELDS
+        if field in supplied and not metadata_value_is_valid(existing.get(field))
+    ]
+    if not additions:
+        return content
+
+    lines = content.splitlines(keepends=True)
+    metadata_indices = [
+        index for index, line in enumerate(lines) if AUTHOR_METADATA_LINE_RE.fullmatch(line.rstrip("\r\n")) is not None
+    ]
+    insert_idx = max(metadata_indices) + 1 if metadata_indices else 1
+    newline = "\r\n" if "\r\n" in content else "\n"
+    lines[insert_idx:insert_idx] = [f"{field}: {value}{newline}" for field, value in additions]
+    return "".join(lines)
 
 
 def ensure_author_metadata(
@@ -608,8 +673,9 @@ def ensure_author_metadata(
             session_context_id = existing.get("author_session_context_id")
             runtime_session_id = _runtime_session_context_id(env or os.environ)
             if is_synthetic_session_context_id(session_context_id) and runtime_session_id:
-                return _replace_author_metadata_value(content, "author_session_context_id", runtime_session_id)
-            return content
+                content = _replace_author_metadata_value(content, "author_session_context_id", runtime_session_id)
+                existing = extract_author_metadata(content)
+            return _insert_missing_optional_metadata(content, existing=existing, explicit=explicit)
         raise BridgeAuthorMetadataError(
             "bridge artifact contains partial or invalid author metadata: " + ", ".join(gaps)
         )
@@ -634,6 +700,4 @@ def ensure_author_metadata(
 
 
 if __name__ == "__main__":
-    import sys
-
     raise SystemExit(_emit_metadata())

@@ -2220,25 +2220,13 @@ def write_named_packet(project_root: Path, packet: dict[str, Any], bridge_id: st
     return path
 
 
-def _worker_harness_selector(project_root: Path | None = None) -> str | None:
-    """Delegate to the single canonical registry-derived harness selector.
-
-    WI-5841 removes the second behavioral copy: implementation-start packet
-    finalization uses the exact selector implemented in
-    ``bridge_work_intent_registry._worker_harness_selector`` so the two
-    operational consumers cannot drift. Precedence, durable-id mapping, and
-    fail-closed behavior are owned by that registry implementation.
-    """
-    return bridge_work_intent_registry._worker_harness_selector(project_root)
-
-
 def finalize_implementation_start_packet(
     project_root: Path,
     packet: dict[str, Any],
     *,
     session_id: str,
 ) -> dict[str, Any]:
-    """Bind live PAUTH, claim, and worker-role evidence before durable start."""
+    """Bind live PAUTH, claim, and exact-init role evidence before start."""
     if packet_hash(packet) != packet.get("packet_hash"):
         raise AuthorizationError("Cannot finalize an implementation-start packet with a hash mismatch")
     bridge_id = str(packet.get("bridge_id") or "")
@@ -2276,21 +2264,48 @@ def finalize_implementation_start_packet(
         )
 
     try:
-        from groundtruth_kb.session.envelope import EnvelopeError, resolve_worker_role_provenance
+        from groundtruth_kb.session.attestation.service import (
+            RoleAttestationError,
+            resolve_effective_role_for_context,
+        )
 
-        provenance = resolve_worker_role_provenance(
-            project_root,
-            current_session_id=session_id,
-            harness_name=_worker_harness_selector(project_root),
+        binding, attestation = resolve_effective_role_for_context(
+            project_root / "groundtruth.db",
+            invoking_context=session_id,
         )
-    except (EnvelopeError, OSError, ValueError) as exc:
-        raise AuthorizationError(f"Could not validate worker-session provenance for {session_id!r}: {exc}") from exc
-    if provenance.get("role") != "prime-builder":
+    except (RoleAttestationError, OSError, sqlite3.Error) as exc:
+        raise AuthorizationError(f"Could not validate exact-init role attestation for {session_id!r}: {exc}") from exc
+    if attestation.role != "prime-builder":
         raise AuthorizationError(
-            f"Implementation start requires prime-builder worker provenance, found {provenance.get('role')!r}"
+            f"Implementation start requires a prime-builder exact-init role attestation, found {attestation.role!r}"
         )
-    if holder.get("acting_role") != provenance.get("role"):
-        raise AuthorizationError("Work-intent acting role does not match the validated worker-session provenance")
+    if attestation.source_event != "exact_init":
+        raise AuthorizationError(
+            "Implementation start requires the immutable exact-init role attestation; later role-change events do not qualify"
+        )
+    if resumption_authority is None:
+        if holder.get("acting_role") != attestation.role:
+            raise AuthorizationError("Work-intent acting role does not match the exact-init role attestation")
+        if holder.get("session_envelope_id") != binding.envelope_id:
+            raise AuthorizationError("Work-intent session envelope does not match the exact-init session binding")
+        if holder.get("acting_role_attestation") != attestation.evidence_reference:
+            raise AuthorizationError(
+                "Work-intent role-attestation reference is not current for the exact-init session binding"
+            )
+
+    role_attestation_evidence = {
+        "schema_version": 1,
+        "invoking_context": binding.invoking_context,
+        "session_envelope_id": binding.envelope_id,
+        "subject": binding.subject,
+        "init_command_digest": binding.command_digest,
+        "binding_created_at": binding.created_at,
+        "role": attestation.role,
+        "source_event": attestation.source_event,
+        "issuer": attestation.issuer,
+        "attested_at": attestation.created_at,
+        "evidence_reference": attestation.evidence_reference,
+    }
 
     target_paths = [str(path) for path in packet.get("target_path_globs", [])]
     current_authorization = validate_packet_project_authorization_operation(
@@ -2307,6 +2322,8 @@ def finalize_implementation_start_packet(
         "ttl_expires_at",
         "claim_kind",
         "acting_role",
+        "session_envelope_id",
+        "acting_role_attestation",
         "project_id",
         "implementation_deadline",
         "implementation_grace_expires_at",
@@ -2331,14 +2348,14 @@ def finalize_implementation_start_packet(
         bootstrap_authority["work_intent_claim"] = {field: holder.get(field) for field in claim_fields}
         finalized["bootstrap_authority"] = bootstrap_authority
     finalized["implementation_start"] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "finalized_at": now_iso(),
         "bridge_id": bridge_id,
         "session_id": session_id,
         "pre_start_packet_hash": pre_start_packet_hash,
         "target_path_globs": target_paths,
         "work_intent_claim": {field: holder.get(field) for field in claim_fields},
-        "worker_role_provenance": dict(provenance),
+        "role_attestation": role_attestation_evidence,
         "project_authorization_decision": (
             current_authorization.get("operation_time_decisions", [None])[0]
             if current_authorization is not None
