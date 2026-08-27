@@ -119,7 +119,14 @@ session_start = "sessionStart"
 turn_end = "sessionStop"
 [harnesses.antigravity]
 config_dir = ".agent"
-status = "profile_pending"
+skills_dir = ".agent/skills"
+rules_dir = ".agent/rules"
+hooks_dir = ".agent/hooks"
+project_dir_var = "ANTIGRAVITY_PROJECT_DIR"
+session_id_var = "ANTIGRAVITY_SESSION_ID"
+# Full native skill bodies, as for Goose: Antigravity loads SKILL.md directly.
+skill_body = "full"
+rules_projection = true
 [harnesses.ollama]
 config_dir = ".api-harness"
 status = "profile_pending"

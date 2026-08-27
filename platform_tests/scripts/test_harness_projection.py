@@ -85,6 +85,31 @@ def test_projection_idempotent():
     assert not plan_a.gaps, f"projector gaps present: {plan_a.gaps}"
 
 
+def test_antigravity_projection_idempotent_and_clean() -> None:
+    plan_a = project_harness.build_plan("antigravity")
+    plan_b = project_harness.build_plan("antigravity")
+    assert plan_a.writes, "antigravity plan rendered no files"
+    assert not plan_a.gaps, f"projector gaps present: {plan_a.gaps}"
+    assert plan_a.writes == plan_b.writes, "antigravity projection is not byte-idempotent"
+
+    bridge_rule = plan_a.writes.get(".agent/rules/bridge-essential.md")
+    assert bridge_rule is not None, "antigravity bridge rule not rendered"
+    for token in ("{{HARNESS_RULES_DIR}}", "{{HARNESS_CONFIG_DIR}}"):
+        assert token not in bridge_rule, (
+            f"{token} survived substitution in the antigravity bridge rule "
+            "(ADR-RULE-PROJECTION-FLOW-INVERSION-001: the projection carries no "
+            "unsubstituted harness tokens)"
+        )
+    assert ".agent/rules/" in bridge_rule, (
+        "antigravity bridge rule is not self-referential; it must point at its own "
+        "projection root (ADR-ISOLATION-APPLICATION-PLACEMENT-001)"
+    )
+    assert ".claude/" not in bridge_rule, (
+        "antigravity bridge rule emits a foreign harness root; each projection "
+        "references only its own config surface (ADR-CROSS-HARNESS-PARITY-001)"
+    )
+
+
 def test_projected_markdown_stamped_after_frontmatter():
     plan = project_harness.build_plan("goose")
     skill_paths = [p for p in plan.writes if p.endswith("SKILL.md")]
