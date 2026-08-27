@@ -233,6 +233,40 @@ def _target_paths(report_content: str) -> tuple[list[str] | None, str]:
         return None, f"target_paths parse error: {exc}"
 
 
+def _target_paths_from_chain(slug: str, verdict_rel: str, report_rel: str) -> tuple[list[str] | None, str]:
+    """Resolve declared ``target_paths`` from a thread's own numbered chain.
+
+    Report-first: a report carrying its own declaration wins, because it is the
+    artifact the verdict responds to. Otherwise walk backward through the
+    thread's earlier versions, since a proposal often declares the cohort that
+    its report only narrates.
+
+    The walk never leaves ``slug``'s own files. A declaration belonging to a
+    different thread is not authority for this one, so a chain with no
+    declaration of its own reports a distinct reason rather than borrowing one.
+    """
+    if _slug_of(verdict_rel) != slug or _slug_of(report_rel) != slug:
+        return None, f"chain artifacts do not belong to {slug}"
+
+    report_content = _read(report_rel)
+    if report_content is not None:
+        targets, _why = _target_paths(report_content)
+        if targets:
+            return targets, "report"
+
+    match = _VERSION_RE.search(Path(report_rel).name)
+    # Walk strictly below the report; the report itself was just checked.
+    for version in range(int(match.group(1)) - 1 if match else 0, 0, -1):
+        content = _read(f"bridge/{slug}-{version:03d}.md")
+        if content is None:
+            continue
+        targets, _why = _target_paths(content)
+        if targets:
+            return targets, f"backward-walk v{version:03d}"
+
+    return None, "no target_paths anywhere in chain"
+
+
 def _canonical_verdict_skip_reason(verdict_rel: str, verdict_content: str) -> str | None:
     try:
         from write_verdict import VerifiedFinalizationError, validate_verified_body  # type: ignore[import-not-found]
