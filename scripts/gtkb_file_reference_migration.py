@@ -469,6 +469,21 @@ def load_policy(root: Path, policy_path: Path) -> tuple[Path, dict[str, Any]]:
     return resolved, payload
 
 
+def native_rule_projection_count(policy: dict[str, Any]) -> int:
+    """Return the single policy-owned native rule-projection count."""
+
+    retention = policy.get("retention")
+    if not isinstance(retention, dict):
+        raise MigrationError("RETENTION_POLICY_DRIFT", "Policy is missing [retention]")
+    raw = retention.get("native_rule_projection_count")
+    if not isinstance(raw, int) or raw < 1:
+        raise MigrationError(
+            "RETENTION_POLICY_DRIFT",
+            "retention.native_rule_projection_count must be a positive integer",
+        )
+    return raw
+
+
 def load_manifest(root: Path, policy: dict[str, Any]) -> list[MappingRow]:
     manifest = root / str(policy.get("manifest_path") or "")
     try:
@@ -515,7 +530,8 @@ def load_manifest(root: Path, policy: dict[str, Any]) -> list[MappingRow]:
         if not destination_path.is_file():
             raise MigrationError("MANIFEST_DESTINATION_MISSING", f"Manifest destination is missing: {destination}")
         rows.append(MappingRow(f"M{index:03d}", category, source, destination))
-    if counts != {"hooks": 33, "rules": 38, "agent-control": 19}:
+    expected_rules = native_rule_projection_count(policy)
+    if counts != {"hooks": 33, "rules": expected_rules, "agent-control": 19}:
         raise MigrationError("MANIFEST_CATEGORY_COUNTS", f"Unexpected manifest category counts: {counts}")
     collisions = source_ids & destination_ids
     if collisions:
@@ -735,9 +751,11 @@ def validate_policy_contract(policy: dict[str, Any], mappings: list[MappingRow])
     declared_rules = {
         (str(row.get("source") or ""), str(row.get("canonical") or "")) for row in rule_rows if isinstance(row, dict)
     }
-    if len(rule_rows) != 38 or declared_rules != expected_rules:
+    expected_rule_count = native_rule_projection_count(policy)
+    if len(rule_rows) != expected_rule_count or declared_rules != expected_rules:
         raise MigrationError(
-            "RULE_PROJECTION_POLICY_DRIFT", "Rule projection ledger does not equal the 38 manifest rule rows"
+            "RULE_PROJECTION_POLICY_DRIFT",
+            "Rule projection ledger does not equal the policy-owned manifest rule rows",
         )
     reconciliation = policy.get("content_reconciliation", [])
     if len(reconciliation) != 25:
@@ -831,10 +849,11 @@ def validate_policy_contract(policy: dict[str, Any], mappings: list[MappingRow])
                 "The non-waiving WI-5178 residual evidence drifted",
             )
     retention = policy.get("retention", {})
+    expected_rule_count = native_rule_projection_count(policy)
     if (
         retention.get("retain_all_old_paths") is not True
         or retention.get("inert_source_count") != 52
-        or retention.get("native_rule_projection_count") != 38
+        or retention.get("native_rule_projection_count") != expected_rule_count
         or any(
             retention.get(key) is not False for key in ("allow_delete", "allow_move", "allow_rename", "allow_unlink")
         )

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Generate retained ``.claude/rules`` compatibility projections.
+"""Read-only rule-projection policy/coupling diagnostic (WI-6329).
 
-Canonical rule content lives under ``config/agent-control/gtkb-*``.  This
-generator is intentionally one-way: it never reads a retained projection as
-authority and never mutates a canonical file.
+Canonical rule content lives under ``config/agent-control/gtkb-*``. This
+script no longer writes ``.claude/rules`` compatibility projections.
+``scripts/harness_projection/project_harness.py`` is the sole harness-neutral
+projector. ``--check`` remains a read-only drift diagnostic.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ import sys
 import tomllib
 import unicodedata
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -24,9 +25,31 @@ DEFAULT_POLICY = Path("config/file-reference-migration/wi5640.toml")
 _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
-from _wrap_io import _atomic_write_bytes  # noqa: E402
 
 _MARKDOWN_RELATIVE_LINK_RE = re.compile(r"(?P<head>\]\()(?P<target>[^)#?]+)(?P<tail>(?:[?#][^)]*)?\))")
+RETIRED_WRITE_DIAGNOSTIC = (
+    "Rule compatibility write/apply is retired. Use "
+    "scripts/harness_projection/project_harness.py as the sole harness-neutral projector."
+)
+COMPARATOR_SUNSET_DIAGNOSTIC = (
+    "comparator deprecated; mirrors are scheduled for terminal purge under "
+    "PROJECT-GTKB-OBSOLETE-REFERENCE-PURGE / WI-6448 / WI-6386; "
+    "this informational mode retires when those land"
+)
+
+# Policy-row source roots this loader accepts (WI-6329, Option A).
+#
+# The baseline root is the authoritative rule source; the legacy .claude/rules
+# root is retained because the policy still carries one row there. Accepting the
+# baseline root is only safe because the write/apply path above is retired: the
+# hazard the original single-root restriction guarded against was overwriting a
+# curated projection with stale baseline content, which is a property of writing.
+# With no writer left in this module, the restriction protects nothing and only
+# blocks the read-only --check diagnostic from seeing the real source of truth.
+ALLOWED_SOURCE_ROOTS = (
+    ".harness-baseline-configuration/rules/",
+    ".claude/rules/",
+)
 
 
 class RuleProjectionError(ValueError):
@@ -62,6 +85,24 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def lf_normalize(data: bytes) -> bytes:
+    """LF-normalize so line-ending-only differences are not treated as drift."""
+
+    return data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+
+
+def native_rule_projection_count(policy: dict[str, Any]) -> int:
+    """Return the single policy-owned native rule-projection count."""
+
+    retention = policy.get("retention")
+    if not isinstance(retention, dict):
+        raise RuleProjectionError("Policy is missing [retention]")
+    raw = retention.get("native_rule_projection_count")
+    if not isinstance(raw, int) or raw < 1:
+        raise RuleProjectionError("retention.native_rule_projection_count must be a positive integer")
+    return raw
+
+
 def load_policy(project_root: Path, policy_path: Path = DEFAULT_POLICY) -> dict[str, Any]:
     resolved = policy_path if policy_path.is_absolute() else project_root / policy_path
     try:
@@ -90,8 +131,9 @@ def projection_rows(policy: dict[str, Any]) -> list[RuleProjection]:
             raise RuleProjectionError(f"rule_projections row {index} has an empty required field")
         source = values["source"]
         canonical = values["canonical"]
-        if not source.startswith(".claude/rules/"):
-            raise RuleProjectionError(f"Projection source is outside .claude/rules: {source}")
+        if not source.startswith(ALLOWED_SOURCE_ROOTS):
+            allowed = ", ".join(ALLOWED_SOURCE_ROOTS)
+            raise RuleProjectionError(f"Projection source is outside the accepted rule roots ({allowed}): {source}")
         if not canonical.startswith("config/agent-control/gtkb-"):
             raise RuleProjectionError(f"Canonical rule is outside gtkb agent-control paths: {canonical}")
         source_key = unicodedata.normalize("NFC", source).casefold()
@@ -101,12 +143,24 @@ def projection_rows(policy: dict[str, Any]) -> list[RuleProjection]:
         seen_source.add(source_key)
         seen_canonical.add(canonical_key)
         rows.append(RuleProjection(source, canonical, lifecycle_class, load_policy))
-    if len(rows) != 38:
-        raise RuleProjectionError(f"Expected 38 rule projections, found {len(rows)}")
+    expected = native_rule_projection_count(policy)
+    if len(rows) != expected:
+        raise RuleProjectionError(f"Expected {expected} rule projections, found {len(rows)}")
     return rows
 
 
 def _manifest_rule_sources(project_root: Path, policy: dict[str, Any]) -> set[str]:
+    """Return the rule file names the migration manifest accounts for.
+
+    Names, not paths (WI-6329, Option A). The manifest is a ledger of where each
+    rule lived at migration time, so it still records the pre-migration
+    ``.claude/rules`` home, while policy rows now point at the authoritative
+    baseline root. Comparing whole paths would report that root difference as a
+    ledger disagreement on every row, which is a false positive: the invariant
+    this check exists to protect is that no rule is silently added to or dropped
+    from the projection set, and that invariant is carried by the name set.
+    """
+
     manifest_rel = str(policy.get("manifest_path") or "").strip()
     if not manifest_rel:
         raise RuleProjectionError("Policy is missing manifest_path")
@@ -116,21 +170,21 @@ def _manifest_rule_sources(project_root: Path, policy: dict[str, Any]) -> set[st
             rows = list(csv.DictReader(handle))
     except (OSError, UnicodeError, csv.Error) as exc:
         raise RuleProjectionError(f"Cannot read migration manifest {manifest_path}: {exc}") from exc
-    sources: set[str] = set()
+    names: set[str] = set()
     for row in rows:
         home = str(row.get("Current home directory:") or "").replace("\\", "/").rstrip("/")
         name = str(row.get("Current file name:") or "").strip()
         if home.casefold().endswith("/.claude/rules") and name:
-            sources.add(f".claude/rules/{name}")
-    return sources
+            names.add(name)
+    return names
 
 
 def validate_policy_against_manifest(project_root: Path, policy: dict[str, Any], rows: list[RuleProjection]) -> None:
-    declared = {row.source for row in rows}
+    declared = {PurePosixPath(row.source).name: row.source for row in rows}
     manifest = _manifest_rule_sources(project_root, policy)
-    if declared != manifest:
-        missing = sorted(manifest - declared)
-        extra = sorted(declared - manifest)
+    if set(declared) != manifest:
+        missing = sorted(manifest - set(declared))
+        extra = sorted(declared[name] for name in set(declared) - manifest)
         raise RuleProjectionError(f"Rule projection ledger disagrees with manifest; missing={missing}, extra={extra}")
 
 
@@ -258,6 +312,8 @@ def generate(
     policy_path: Path = DEFAULT_POLICY,
     check: bool = False,
 ) -> list[ProjectionResult]:
+    if not check:
+        raise RuleProjectionError(RETIRED_WRITE_DIAGNOSTIC)
     root = project_root.resolve()
     rows, outputs = render_outputs(root, policy_path=policy_path)
     results: list[ProjectionResult] = []
@@ -267,10 +323,7 @@ def generate(
         canonical_bytes = canonical_path.read_bytes()
         projected = outputs[row.source]
         existing = source_path.read_bytes() if source_path.is_file() else None
-        changed = existing != projected
-        if changed and not check:
-            source_path.parent.mkdir(parents=True, exist_ok=True)
-            _atomic_write_bytes(source_path, projected)
+        changed = existing is None or lf_normalize(existing) != lf_normalize(projected)
         results.append(
             ProjectionResult(
                 source=row.source,
@@ -289,18 +342,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--policy", type=Path, default=DEFAULT_POLICY)
     parser.add_argument("--check", action="store_true", help="Report drift without writing files.")
     args = parser.parse_args(argv)
+    if not args.check:
+        print(f"Rule compatibility projections: FAIL ({RETIRED_WRITE_DIAGNOSTIC})", file=sys.stderr)
+        return 2
     try:
-        results = generate(args.project_root, policy_path=args.policy, check=args.check)
+        results = generate(args.project_root, policy_path=args.policy, check=True)
     except RuleProjectionError as exc:
         print(f"Rule compatibility projections: FAIL ({exc})", file=sys.stderr)
         return 2
     changed = [result.source for result in results if result.changed]
     if changed:
-        action = "would update" if args.check else "updated"
-        print(f"Rule compatibility projections: {action} {len(changed)} file(s)")
+        print(
+            f"content drift detected: {len(changed)} file(s) would be regenerated by "
+            "scripts/harness_projection/project_harness.py"
+        )
+        print(f"({COMPARATOR_SUNSET_DIAGNOSTIC})")
         for path in changed:
             print(f"- {path}")
-        return 1 if args.check else 0
+        return 0
     print(f"Rule compatibility projections: PASS ({len(results)} projections current)")
     return 0
 

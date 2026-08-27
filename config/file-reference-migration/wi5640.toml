@@ -842,49 +842,49 @@ old = "config/agent-control/harness-capability-registry.toml"
 new = "apply every CSV mapping, preserve Unicode, and reject the mojibake destination as authority"
 
 [[rule_projections]]
-source = ".claude/rules/acting-prime-builder.md"
+source = ".harness-baseline-configuration/rules/acting-prime-builder.md"
 canonical = "config/agent-control/gtkb-acting-prime-builder.md"
 class = "projection"
 load_policy = "explicit_query"
 
 [[rule_projections]]
-source = ".claude/rules/active-workspace.md"
+source = ".harness-baseline-configuration/rules/active-workspace.md"
 canonical = "config/agent-control/gtkb-active-workspace.md"
 class = "machine_compatibility"
 load_policy = "machine_only"
 
 [[rule_projections]]
-source = ".claude/rules/auto-finalization-sweep.md"
+source = ".harness-baseline-configuration/rules/auto-finalization-sweep.md"
 canonical = "config/agent-control/gtkb-auto-finalization-sweep.md"
 class = "active_authority"
 load_policy = "activity:ops,build"
 
 [[rule_projections]]
-source = ".claude/rules/backlog-approval-state.md"
+source = ".harness-baseline-configuration/rules/backlog-approval-state.md"
 canonical = "config/agent-control/gtkb-backlog-approval-state.md"
 class = "active_authority"
 load_policy = "activity:project,build"
 
 [[rule_projections]]
-source = ".claude/rules/bridge-essential.md"
+source = ".harness-baseline-configuration/rules/bridge-essential.md"
 canonical = "config/agent-control/gtkb-bridge-essential.md"
 class = "active_authority"
 load_policy = "global_compact"
 
 [[rule_projections]]
-source = ".claude/rules/bridge-permanent-operations-runbook.md"
+source = ".harness-baseline-configuration/rules/bridge-permanent-operations-runbook.md"
 canonical = "config/agent-control/gtkb-bridge-permanent-operations-runbook.md"
 class = "deprecated"
 load_policy = "never_startup"
 
 [[rule_projections]]
-source = ".claude/rules/bridge-poller-canonical.md"
+source = ".harness-baseline-configuration/rules/bridge-poller-canonical.md"
 canonical = "config/agent-control/gtkb-bridge-poller-canonical.md"
 class = "deprecated_template"
 load_policy = "never_startup"
 
 [[rule_projections]]
-source = ".claude/rules/canonical-terminology.md"
+source = ".harness-baseline-configuration/rules/canonical-terminology.md"
 canonical = "config/agent-control/gtkb-canonical-terminology.md"
 class = "canonical_authority"
 load_policy = "global_core"
@@ -896,175 +896,175 @@ class = "canonical_machine_authority"
 load_policy = "machine_only"
 
 [[rule_projections]]
-source = ".claude/rules/codex-dead-ends-and-false-positives.md"
+source = ".harness-baseline-configuration/rules/codex-dead-ends-and-false-positives.md"
 canonical = "config/agent-control/gtkb-dead-ends-and-false-positives.md"
 class = "projection"
 load_policy = "explicit_query"
 
 [[rule_projections]]
-source = ".claude/rules/codex-decision-ledger.md"
+source = ".harness-baseline-configuration/rules/codex-decision-ledger.md"
 canonical = "config/agent-control/gtkb-decision-ledger.md"
 class = "projection"
 load_policy = "explicit_query"
 
 [[rule_projections]]
-source = ".claude/rules/codex-knowledge-base-index.md"
+source = ".harness-baseline-configuration/rules/codex-knowledge-base-index.md"
 canonical = "config/agent-control/gtkb-knowledge-base-index.md"
 class = "projection"
 load_policy = "explicit_query"
 
 [[rule_projections]]
-source = ".claude/rules/codex-loyal-opposition-runbook.md"
+source = ".harness-baseline-configuration/rules/codex-loyal-opposition-runbook.md"
 canonical = "config/agent-control/gtkb-loyal-opposition-runbook.md"
 class = "active_authority"
 load_policy = "activity:test,lo-review;exclude:build"
 
 [[rule_projections]]
-source = ".claude/rules/codex-review-checklists.md"
+source = ".harness-baseline-configuration/rules/codex-review-checklists.md"
 canonical = "config/agent-control/gtkb-review-checklists.md"
 class = "active_authority"
 load_policy = "activity:test"
 
 [[rule_projections]]
-source = ".claude/rules/codex-review-gate.md"
+source = ".harness-baseline-configuration/rules/codex-review-gate.md"
 canonical = "config/agent-control/gtkb-review-gate.md"
 class = "active_authority"
 load_policy = "global_pb_guardrail"
 
 [[rule_projections]]
-source = ".claude/rules/codex-review-operating-contract.md"
+source = ".harness-baseline-configuration/rules/codex-review-operating-contract.md"
 canonical = "config/agent-control/gtkb-review-operating-contract.md"
 class = "active_authority"
 load_policy = "activity:test,lo-review;exclude:build"
 
 [[rule_projections]]
-source = ".claude/rules/codex-session-bootstrap.md"
+source = ".harness-baseline-configuration/rules/codex-session-bootstrap.md"
 canonical = "config/agent-control/gtkb-session-bootstrap.md"
 class = "projection"
 load_policy = "global_restart_pointer"
 
 [[rule_projections]]
-source = ".claude/rules/codex-standing-priorities.md"
+source = ".harness-baseline-configuration/rules/codex-standing-priorities.md"
 canonical = "config/agent-control/gtkb-standing-priorities.md"
 class = "active_authority"
 load_policy = "activity:project"
 
 [[rule_projections]]
-source = ".claude/rules/codex-way-of-working.md"
+source = ".harness-baseline-configuration/rules/codex-way-of-working.md"
 canonical = "config/agent-control/gtkb-way-of-working.md"
 class = "active_authority"
 load_policy = "activity:deliberation"
 
 [[rule_projections]]
-source = ".claude/rules/deliberation-protocol.md"
+source = ".harness-baseline-configuration/rules/deliberation-protocol.md"
 canonical = "config/agent-control/gtkb-deliberation-protocol.md"
 class = "active_authority"
 load_policy = "global_until_separate_optimization"
 
 [[rule_projections]]
-source = ".claude/rules/dispatcher-daemon-substrate-rollback-runbook.md"
+source = ".harness-baseline-configuration/rules/dispatcher-daemon-substrate-rollback-runbook.md"
 canonical = "config/agent-control/gtkb-dispatcher-daemon-substrate-rollback-runbook.md"
 class = "active_authority"
 load_policy = "explicit_query:ops_incident"
 
 [[rule_projections]]
-source = ".claude/rules/file-bridge-protocol.md"
+source = ".harness-baseline-configuration/rules/file-bridge-protocol.md"
 canonical = "config/agent-control/gtkb-file-bridge-protocol.md"
 class = "canonical_authority"
 load_policy = "global"
 
 [[rule_projections]]
-source = ".claude/rules/governance-emergency-bootstrap-protocol.md"
+source = ".harness-baseline-configuration/rules/governance-emergency-bootstrap-protocol.md"
 canonical = "config/agent-control/gtkb-governance-emergency-bootstrap-protocol.md"
 class = "active_authority"
 load_policy = "global_compact"
 
 [[rule_projections]]
-source = ".claude/rules/groundtruth-kb-vision.md"
+source = ".harness-baseline-configuration/rules/groundtruth-kb-vision.md"
 canonical = "config/agent-control/gtkb-vision.md"
 class = "active_authority"
 load_policy = "activity:project"
 
 [[rule_projections]]
-source = ".claude/rules/gtkb-capability-import-policy.md"
+source = ".harness-baseline-configuration/rules/gtkb-capability-import-policy.md"
 canonical = "config/agent-control/gtkb-capability-import-policy.md"
 class = "active_authority"
 load_policy = "activity:build,spec_dependency_import"
 
 [[rule_projections]]
-source = ".claude/rules/loyal-opposition.md"
+source = ".harness-baseline-configuration/rules/loyal-opposition.md"
 canonical = "config/agent-control/gtkb-loyal-opposition.md"
 class = "active_authority"
 load_policy = "role:loyal-opposition"
 
 [[rule_projections]]
-source = ".claude/rules/operating-model.md"
+source = ".harness-baseline-configuration/rules/operating-model.md"
 canonical = "config/agent-control/gtkb-operating-model.md"
 class = "canonical_authority"
 load_policy = "explicit_query:project_requirement"
 
 [[rule_projections]]
-source = ".claude/rules/operating-role.md"
+source = ".harness-baseline-configuration/rules/operating-role.md"
 canonical = "config/agent-control/gtkb-operating-role.md"
 class = "projection"
 load_policy = "global_compact_pointer"
 
 [[rule_projections]]
-source = ".claude/rules/peer-solution-advisory-loop.md"
+source = ".harness-baseline-configuration/rules/peer-solution-advisory-loop.md"
 canonical = "config/agent-control/gtkb-peer-solution-advisory-loop.md"
 class = "active_authority"
 load_policy = "activity:deliberation"
 
 [[rule_projections]]
-source = ".claude/rules/prime-bridge-collaboration-protocol.md"
+source = ".harness-baseline-configuration/rules/prime-bridge-collaboration-protocol.md"
 canonical = "config/agent-control/gtkb-prime-bridge-collaboration-protocol.md"
 class = "projection"
 load_policy = "explicit_query"
 
 [[rule_projections]]
-source = ".claude/rules/prime-builder.md"
+source = ".harness-baseline-configuration/rules/prime-builder.md"
 canonical = "config/agent-control/gtkb-prime-builder.md"
 class = "projection"
 load_policy = "explicit_query;prime-builder-role-wins"
 
 [[rule_projections]]
-source = ".claude/rules/prime-builder-role.md"
+source = ".harness-baseline-configuration/rules/prime-builder-role.md"
 canonical = "config/agent-control/gtkb-prime-builder-role.md"
 class = "active_authority"
 load_policy = "role:prime-builder"
 
 [[rule_projections]]
-source = ".claude/rules/project-root-boundary.md"
+source = ".harness-baseline-configuration/rules/project-root-boundary.md"
 canonical = "config/agent-control/gtkb-project-root-boundary.md"
 class = "active_authority"
 load_policy = "global_compact"
 
 [[rule_projections]]
-source = ".claude/rules/report-depth.md"
+source = ".harness-baseline-configuration/rules/report-depth.md"
 canonical = "config/agent-control/gtkb-report-depth.md"
 class = "active_authority"
 load_policy = "activity:test,build-review"
 
 [[rule_projections]]
-source = ".claude/rules/report-depth-prime-builder-context.md"
+source = ".harness-baseline-configuration/rules/report-depth-prime-builder-context.md"
 canonical = "config/agent-control/gtkb-report-depth-prime-builder-context.md"
 class = "machine_compatibility"
 load_policy = "pointer_only"
 
 [[rule_projections]]
-source = ".claude/rules/sot-read-discipline.md"
+source = ".harness-baseline-configuration/rules/sot-read-discipline.md"
 canonical = "config/agent-control/gtkb-sot-read-discipline.md"
 class = "active_authority"
 load_policy = "machine_enforced;explicit_query:rationale"
 
 [[rule_projections]]
-source = ".claude/rules/template-code-review.md"
+source = ".harness-baseline-configuration/rules/template-code-review.md"
 canonical = "config/agent-control/gtkb-template-code-review.md"
 class = "template"
 load_policy = "activity:test"
 
 [[rule_projections]]
-source = ".claude/rules/template-decision-memo.md"
+source = ".harness-baseline-configuration/rules/template-decision-memo.md"
 canonical = "config/agent-control/gtkb-template-decision-memo.md"
 class = "template"
 load_policy = "activity:test;manifest_entry_required"
