@@ -1170,6 +1170,28 @@ def _project_authorization_row(
 
 def _owner_sufficiency_deliberation_row(project_root: Path, deliberation_id: str) -> sqlite3.Row:
     db_path = groundtruth_db_path(project_root)
+def _live_project_authorization_refusal_hint(project_root: Path, project_id: str) -> str:
+    """Name a sole live authorization without substituting it for the cited id."""
+    conn = sqlite3.connect(groundtruth_db_path(project_root))
+    try:
+        rows = conn.execute(
+            """SELECT id FROM current_project_authorizations
+               WHERE project_id = ? AND status = 'active'
+               ORDER BY id""",
+            (project_id,),
+        ).fetchall()
+    except sqlite3.OperationalError as exc:
+        raise AuthorizationError("GroundTruth DB is missing project authorization schema") from exc
+    finally:
+        conn.close()
+    live_ids = [str(row[0]) for row in rows]
+    if len(live_ids) == 1:
+        return f" Current active authorization for project {project_id}: {live_ids[0]}."
+    if len(live_ids) > 1:
+        return f" Project {project_id} has multiple current active authorizations; none is named as canonical."
+    return ""
+
+
     if not db_path.is_file():
         raise AuthorizationError(f"GroundTruth DB not found for owner sufficiency evidence: {db_path}")
     conn = sqlite3.connect(db_path)
@@ -1369,7 +1391,8 @@ def validate_project_authorization_row(
     authorization_id = str(row["id"])
     project_id = str(row["project_id"])
     if row["status"] != "active":
-        raise AuthorizationError(f"Project authorization {authorization_id} is not active")
+        hint = _live_project_authorization_refusal_hint(project_root, project_id)
+        raise AuthorizationError(f"Project authorization {authorization_id} is not active{hint}")
     try:
         expires_at = parse_optional_iso(row["expires_at"])
     except ValueError as exc:

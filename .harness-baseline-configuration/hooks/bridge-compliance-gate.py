@@ -1480,6 +1480,36 @@ def _has_clean_applicability_preflight(content: str) -> bool:
         if APPLICABILITY_PREFLIGHT_HEADING_RE.match(line.strip()):
             start = idx + 1
             break
+def _live_project_authorization_refusal_hint(cwd_path: Path, project_id: str | None) -> str:
+    """Name a sole live PAUTH for diagnostics; never substitute its authority."""
+    if not project_id:
+        return ""
+    db_path = _canonical_project_root(cwd_path) / "groundtruth.db"
+    if not db_path.is_file():
+        return ""
+    conn: sqlite3.Connection | None = None
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5)
+        rows = conn.execute(
+            """SELECT id FROM current_project_authorizations
+               WHERE project_id = ? AND status = 'active'
+               ORDER BY id""",
+            (project_id,),
+        ).fetchall()
+    except (sqlite3.Error, OSError) as exc:
+        print(f"[Governance] live authorization diagnostic warning: {exc}", file=sys.stderr)
+        return ""
+    finally:
+        if conn is not None:
+            conn.close()
+    live_ids = [str(row[0]) for row in rows]
+    if len(live_ids) == 1:
+        return f" Current active authorization for project {project_id}: {live_ids[0]}."
+    if len(live_ids) > 1:
+        return f" Project {project_id} has multiple current active authorizations; none is named as canonical."
+    return ""
+
+
     if start is None:
         return False
 
@@ -1540,6 +1570,28 @@ def _candidate_evidence_hash(file_path: str, content: str, project_root: Path) -
         lambda match: match.group("prefix") + CANDIDATE_EVIDENCE_HASH_SENTINEL + match.group("suffix"),
         normalized_content,
     )
+def _project_membership_refusal_message(content: str, cwd_path: Path, membership_gap: str) -> str:
+    """Render the stable refusal classification plus an optional live-PAUTH hint."""
+    authorization_id, project_id, work_item_id = _extract_project_metadata(content)
+    live_authorization_hint = (
+        _live_project_authorization_refusal_hint(cwd_path, project_id)
+        if membership_gap in {"authorization-inactive", "authorization-not-found"}
+        else ""
+    )
+    return (
+        "[Governance] Bridge proposal fails the live work-item/project "
+        f"membership check: {membership_gap}. Cited WI={work_item_id}, "
+        f"Project={project_id}, Project Authorization={authorization_id}."
+        f"{live_authorization_hint} "
+        "The cited metadata must resolve to an active project membership and "
+        "an active, unexpired, including authorization in MemBase. "
+        "(Hard-block per DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001/"
+        "CLAUSE-BRIDGE-WI-PROJECT-MEMBERSHIP + "
+        "DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001/"
+        "CLAUSE-PROJECT-AUTH-LIVE-CHECK.)"
+    )
+
+
     if replacements != 1:
         return None
     payload = candidate_path[0] + "\n" + normalized_content
@@ -2469,18 +2521,7 @@ def _deny_reason_for_content(
                 )
             membership_gap = _wi_project_membership_gap(content, cwd_path)
             if membership_gap:
-                authorization_id, project_id, work_item_id = _extract_project_metadata(content)
-                return (
-                    "[Governance] Bridge proposal fails the live work-item/project "
-                    f"membership check: {membership_gap}. Cited WI={work_item_id}, "
-                    f"Project={project_id}, Project Authorization={authorization_id}. "
-                    "The cited metadata must resolve to an active project membership and "
-                    "an active, unexpired, including authorization in MemBase. "
-                    "(Hard-block per DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001/"
-                    "CLAUSE-BRIDGE-WI-PROJECT-MEMBERSHIP + "
-                    "DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001/"
-                    "CLAUSE-PROJECT-AUTH-LIVE-CHECK.)"
-                )
+                return _project_membership_refusal_message(content, cwd_path, membership_gap)
         if (
             first_line in PROJECT_METADATA_STATUSES
             and _bridge_kind_is_implementation_proposal(content)
