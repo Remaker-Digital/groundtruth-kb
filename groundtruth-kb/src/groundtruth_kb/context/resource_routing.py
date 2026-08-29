@@ -18,11 +18,14 @@ _CANONICAL_RESOURCE_CONTRACT: dict[str, Any] = {
     "schema_version": RESOURCE_CONTRACT_SCHEMA_VERSION,
     "precedence": RESOURCE_PRECEDENCE,
     "no_inference": True,
+    # WI-7280: "TAFE" removed. Compact Operating Guidance s10 forbids preserving
+    # the retired substrate as current authority or fallback, and a topic
+    # qualifier is a live routing surface: keeping the token here would keep the
+    # retired name reachable from prompt text.
     "topic_qualifiers": [
         "bridge",
         "bridge work",
         "bridge-related",
-        "TAFE",
         "harness",
         "harness-related",
     ],
@@ -44,7 +47,12 @@ _CANONICAL_RESOURCE_CONTRACT: dict[str, Any] = {
         "bridge_queue": {
             "canonical_term": "bridge queue",
             "accepted_terms": ["bridge queue", "review queue"],
-            "authority": "TAFE/dispatcher bridge state plus status-bearing numbered files under bridge/",
+            # WI-7280: names only the current authority. The prior string cited
+            # TAFE, whose governing spec ADR-TAFE-AUTHORITATIVE-BRIDGE-STATE-001
+            # is retired in MemBase. The envelope is the contract agents read to
+            # resolve where bridge state lives, so a retired citation here
+            # propagated into every session that consulted it.
+            "authority": "status-bearing numbered files under bridge/",
             "read_route": "gt bridge state-report",
             "non_alias": "backlog",
         },

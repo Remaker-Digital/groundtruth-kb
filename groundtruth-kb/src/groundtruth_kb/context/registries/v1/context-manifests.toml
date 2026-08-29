@@ -20,7 +20,7 @@ hard_token_budget = 200000
 schema_version = 1
 precedence = "current_owner_literal > dispatch_provenance > activity_or_startup_default > prior_context_or_notes > conjecture"
 no_inference = true
-topic_qualifiers = ["bridge", "bridge work", "bridge-related", "TAFE", "harness", "harness-related"]
+topic_qualifiers = ["bridge", "bridge work", "bridge-related", "harness", "harness-related"]
 
 [resource_contract.resources.backlog]
 canonical_term = "backlog"
@@ -32,7 +32,7 @@ non_alias = "bridge_queue"
 [resource_contract.resources.bridge_queue]
 canonical_term = "bridge queue"
 accepted_terms = ["bridge queue", "review queue"]
-authority = "TAFE/dispatcher bridge state plus status-bearing numbered files under bridge/"
+authority = "status-bearing numbered files under bridge/"
 read_route = "gt bridge state-report"
 non_alias = "backlog"
 
