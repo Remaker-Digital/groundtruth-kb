@@ -77,7 +77,42 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
 
     def is_synthetic_session_context_id(value: object) -> bool:
         text = str(value or "").strip().strip("`")
-        return bool(re.fullmatch(r"(?:openrouter|ollama)-harness-[a-z]", text, re.IGNORECASE))
+        lowered = text.lower()
+        leading_segment = lowered.split("-", 1)[0]
+        return (
+            lowered
+            in {
+                "",
+                "-",
+                "--",
+                "<tbd>",
+                "<unknown>",
+                "[tbd]",
+                "[unknown]",
+                "n/a",
+                "na",
+                "none",
+                "null",
+                "tbd",
+                "todo",
+                "unknown",
+                "unspecified",
+            }
+            or bool(re.fullmatch(r"(?:openrouter|ollama)-harness-[a-z]", text, re.IGNORECASE))
+            or any(character.isspace() for character in text)
+            or leading_segment
+            in {
+                "absent",
+                "missing",
+                "none",
+                "nosession",
+                "notset",
+                "null",
+                "unavailable",
+                "unknown",
+                "unset",
+            }
+        )
 
 
 try:
@@ -104,6 +139,15 @@ BRIDGE_STATUS_TOKENS = (
     "GO",
     "NO-GO",
     "VERIFIED",
+    # WI-7045: canon section 6 names VERDICT-REJECTED the Prime rejection token and
+    # retires NO-ACTION. gtkb_bridge_writer._write_bridge_file_exclusive already
+    # requires VERDICT-REJECTED for new governed output while this audit rejected it,
+    # so no token was writable and the Prime verdict-rejection route was inoperable.
+    # Additive on purpose: NO-ACTION stays because this tuple also builds
+    # BRIDGE_FILE_STATUS_RE, which resolves the status of files already on disk.
+    # Retiring NO-ACTION/DEFERRED needs a read/write vocabulary split and is tracked
+    # separately. Authority: DELIB-20260825203701 (emergency-bootstrap event).
+    "VERDICT-REJECTED",
     "NO-ACTION",
     "WITHDRAWN",
     "ADVISORY",
@@ -166,6 +210,19 @@ OWNER_DECISIONS_PLACEHOLDER_LINE_RE = re.compile(
 )
 PRIOR_DELIBERATIONS_HEADING_RE = re.compile(
     r"^#{1,6}\s*prior\s+deliberations\s*$",
+    re.IGNORECASE,
+)
+# WI-6741: mandatory Simplification Accounting section on implementation proposals.
+# An explicit "nothing gets smaller" is a complete and valid answer; omission is not.
+# Placeholder set is deliberately NARROWER than the owner-decisions one: "none" and
+# "n/a" are excluded, because "none" is a substantive answer to "what gets smaller"
+# where it is a non-answer to "which owner decisions authorize this".
+SIMPLIFICATION_ACCOUNTING_HEADING_RE = re.compile(
+    r"^#{1,6}\s*Simplification Accounting\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+SIMPLIFICATION_ACCOUNTING_PLACEHOLDER_LINE_RE = re.compile(
+    r"^[\s>*`_\-:]*(?:tbd|todo|fill in|fill this in|\?+)[\s.`_\-:]*$",
     re.IGNORECASE,
 )
 NO_PRIOR_DELIBS_PLACEHOLDER = "_No prior deliberations: <fill in reason before filing>._"
@@ -1146,6 +1203,34 @@ def _has_concrete_owner_decisions_section(content: str) -> bool:
     return any(not OWNER_DECISIONS_PLACEHOLDER_LINE_RE.match(line) for line in nonblank_lines)
 
 
+def _has_concrete_simplification_accounting(content: str) -> bool:
+    """Heading present AND section text non-empty AND not placeholder-only (WI-6741).
+
+    Mirrors ``_has_concrete_owner_decisions_section``. The one deliberate
+    divergence is the placeholder set: an author who writes "nothing gets
+    smaller" has answered the question, so that must pass. Only genuinely
+    unfilled markers -- ``tbd``, ``todo``, ``fill in``, a bare ``?`` -- fail.
+
+    The gate cannot detect an insincere answer, and does not try. Its job is to
+    put the question on the path the author already walks; whether the answer is
+    honest is what the Loyal Opposition simplicity challenge (WI-6742) exists to
+    test.
+    """
+    lines = content.splitlines()
+    start: int | None = None
+    for i, line in enumerate(lines):
+        if SIMPLIFICATION_ACCOUNTING_HEADING_RE.match(line.strip()):
+            start = i + 1
+            break
+    if start is None:
+        return False
+    section = _collect_section_lines(lines, start)
+    if not "\n".join(section).strip():
+        return False
+    nonblank = [line for line in (ln.strip() for ln in section) if line]
+    return any(not SIMPLIFICATION_ACCOUNTING_PLACEHOLDER_LINE_RE.match(line) for line in nonblank)
+
+
 def _target_paths_touch_harness_surface(content: str) -> bool:
     """Return True when any declared target path is a harness-behavioral surface.
 
@@ -1395,6 +1480,36 @@ def _parse_json_id_list(raw: object) -> list[str]:
     return []
 
 
+def _live_project_authorization_refusal_hint(cwd_path: Path, project_id: str | None) -> str:
+    """Name a sole live PAUTH for diagnostics; never substitute its authority."""
+    if not project_id:
+        return ""
+    db_path = _canonical_project_root(cwd_path) / "groundtruth.db"
+    if not db_path.is_file():
+        return ""
+    conn: sqlite3.Connection | None = None
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5)
+        rows = conn.execute(
+            """SELECT id FROM current_project_authorizations
+               WHERE project_id = ? AND status = 'active'
+               ORDER BY id""",
+            (project_id,),
+        ).fetchall()
+    except (sqlite3.Error, OSError) as exc:
+        print(f"[Governance] live authorization diagnostic warning: {exc}", file=sys.stderr)
+        return ""
+    finally:
+        if conn is not None:
+            conn.close()
+    live_ids = [str(row[0]) for row in rows]
+    if len(live_ids) == 1:
+        return f" Current active authorization for project {project_id}: {live_ids[0]}."
+    if len(live_ids) > 1:
+        return f" Project {project_id} has multiple current active authorizations; none is named as canonical."
+    return ""
+
+
 def _wi_project_membership_gap(content: str, cwd_path: Path) -> str | None:
     """Return a specific failed-condition token when the cited Work Item /
     Project / Project Authorization fails the live MemBase membership +
@@ -1455,6 +1570,28 @@ def _wi_project_membership_gap(content: str, cwd_path: Path) -> str | None:
     return None
 
 
+def _project_membership_refusal_message(content: str, cwd_path: Path, membership_gap: str) -> str:
+    """Render the stable refusal classification plus an optional live-PAUTH hint."""
+    authorization_id, project_id, work_item_id = _extract_project_metadata(content)
+    live_authorization_hint = (
+        _live_project_authorization_refusal_hint(cwd_path, project_id)
+        if membership_gap in {"authorization-inactive", "authorization-not-found"}
+        else ""
+    )
+    return (
+        "[Governance] Bridge proposal fails the live work-item/project "
+        f"membership check: {membership_gap}. Cited WI={work_item_id}, "
+        f"Project={project_id}, Project Authorization={authorization_id}."
+        f"{live_authorization_hint} "
+        "The cited metadata must resolve to an active project membership and "
+        "an active, unexpired, including authorization in MemBase. "
+        "(Hard-block per DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001/"
+        "CLAUSE-BRIDGE-WI-PROJECT-MEMBERSHIP + "
+        "DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001/"
+        "CLAUSE-PROJECT-AUTH-LIVE-CHECK.)"
+    )
+
+
 def _advisory_report_template_gaps(content: str) -> list[str]:
     gaps: list[str] = []
     first_line = _first_nonblank_line(content)
@@ -1480,36 +1617,6 @@ def _has_clean_applicability_preflight(content: str) -> bool:
         if APPLICABILITY_PREFLIGHT_HEADING_RE.match(line.strip()):
             start = idx + 1
             break
-def _live_project_authorization_refusal_hint(cwd_path: Path, project_id: str | None) -> str:
-    """Name a sole live PAUTH for diagnostics; never substitute its authority."""
-    if not project_id:
-        return ""
-    db_path = _canonical_project_root(cwd_path) / "groundtruth.db"
-    if not db_path.is_file():
-        return ""
-    conn: sqlite3.Connection | None = None
-    try:
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5)
-        rows = conn.execute(
-            """SELECT id FROM current_project_authorizations
-               WHERE project_id = ? AND status = 'active'
-               ORDER BY id""",
-            (project_id,),
-        ).fetchall()
-    except (sqlite3.Error, OSError) as exc:
-        print(f"[Governance] live authorization diagnostic warning: {exc}", file=sys.stderr)
-        return ""
-    finally:
-        if conn is not None:
-            conn.close()
-    live_ids = [str(row[0]) for row in rows]
-    if len(live_ids) == 1:
-        return f" Current active authorization for project {project_id}: {live_ids[0]}."
-    if len(live_ids) > 1:
-        return f" Project {project_id} has multiple current active authorizations; none is named as canonical."
-    return ""
-
-
     if start is None:
         return False
 
@@ -1570,28 +1677,6 @@ def _candidate_evidence_hash(file_path: str, content: str, project_root: Path) -
         lambda match: match.group("prefix") + CANDIDATE_EVIDENCE_HASH_SENTINEL + match.group("suffix"),
         normalized_content,
     )
-def _project_membership_refusal_message(content: str, cwd_path: Path, membership_gap: str) -> str:
-    """Render the stable refusal classification plus an optional live-PAUTH hint."""
-    authorization_id, project_id, work_item_id = _extract_project_metadata(content)
-    live_authorization_hint = (
-        _live_project_authorization_refusal_hint(cwd_path, project_id)
-        if membership_gap in {"authorization-inactive", "authorization-not-found"}
-        else ""
-    )
-    return (
-        "[Governance] Bridge proposal fails the live work-item/project "
-        f"membership check: {membership_gap}. Cited WI={work_item_id}, "
-        f"Project={project_id}, Project Authorization={authorization_id}."
-        f"{live_authorization_hint} "
-        "The cited metadata must resolve to an active project membership and "
-        "an active, unexpired, including authorization in MemBase. "
-        "(Hard-block per DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001/"
-        "CLAUSE-BRIDGE-WI-PROJECT-MEMBERSHIP + "
-        "DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001/"
-        "CLAUSE-PROJECT-AUTH-LIVE-CHECK.)"
-    )
-
-
     if replacements != 1:
         return None
     payload = candidate_path[0] + "\n" + normalized_content
@@ -2495,6 +2580,19 @@ def _deny_reason_for_content(
         if (
             first_line in PENDING_PREFLIGHT_STATUSES
             and _bridge_kind_is_implementation_proposal(content)
+            and not _has_concrete_simplification_accounting(content)
+        ):
+            return (
+                "[Governance] Implementation proposals must include a non-empty "
+                "`## Simplification Accounting` section stating what gets smaller: "
+                "net artifacts, lines, state locations, concepts. An explicit "
+                '"nothing gets smaller" is a complete answer; omitting the section '
+                "is not. (Hard-block per WI-6741; see "
+                "bridge/gtkb-wi6741-simplification-accounting-section-002.md.)"
+            )
+        if (
+            first_line in PENDING_PREFLIGHT_STATUSES
+            and _bridge_kind_is_implementation_proposal(content)
             and _prior_deliberations_has_unedited_placeholder(content)
         ):
             return (
@@ -2620,9 +2718,9 @@ def _deny_reason_for_content(
             if synthetic_session_context_id:
                 return (
                     "[Governance] Bridge artifacts must include a real author_session_context_id, "
-                    f"not synthetic harness placeholder {synthetic_session_context_id!r}. The authoring "
+                    f"not an unresolvable placeholder {synthetic_session_context_id!r}. The authoring "
                     "session or dispatcher must provide the concrete session context id before the "
-                    "bridge file reaches disk. (Hard-block per WI-4940; "
+                    "bridge file reaches disk. (Hard-block per WI-4940 and WI-7298; "
                     "GOV-DOCUMENT-AUTHOR-PROVENANCE-001.)"
                 )
     return None
@@ -2759,6 +2857,28 @@ def _audit_only(argv: list[str]) -> int:
     return 0
 
 
+def _shell_candidates(payload: dict, root: Path) -> list[dict]:
+    """Native-shaped payloads to judge for one incoming payload (WI-7289).
+
+    A native payload expands to itself, so native handling is byte-for-byte the
+    code that ran before. A shell payload expands to one synthetic Write per
+    recognized write target; an unrecognized command expands to nothing and is
+    therefore allowed.
+    """
+    hooks_dir = str(Path(__file__).resolve().parent)
+    if hooks_dir not in sys.path:
+        sys.path.insert(0, hooks_dir)
+    try:
+        from _shell_payload import expand_shell_payload
+    except ImportError:
+        return [payload]
+    try:
+        return expand_shell_payload(payload, root)
+    except Exception:
+        # Extraction must never harden into a new failure mode for the gate.
+        return [payload]
+
+
 def main() -> None:
     try:
         from groundtruth_kb.governance.output import emit_ask, emit_deny, emit_pass
@@ -2806,49 +2926,54 @@ def main() -> None:
         emit_pass()
         sys.exit(0)
 
-    tool_name = payload.get("tool_name", "")
-    tool_input = payload.get("tool_input", {})
     cwd = payload.get("cwd", ".")
     cwd_path = Path(cwd).resolve()
 
-    if tool_name not in WRITE_TOOLS:
-        emit_pass()
-        sys.exit(0)
+    # WI-7289: now that the baseline manifest declares shell_exec for this gate,
+    # shell commands that write governed files reach it. Expand each recognized
+    # shell write into a native-shaped payload and judge it with the identical
+    # code below, so a shell denial reason matches its native counterpart by
+    # construction rather than by a parallel implementation that can drift.
+    for candidate in _shell_candidates(payload, cwd_path):
+        tool_name = candidate.get("tool_name", "")
+        tool_input = candidate.get("tool_input", {})
 
-    file_path = tool_input.get("file_path", "")
-    if not file_path:
-        emit_pass()
-        sys.exit(0)
+        if tool_name not in WRITE_TOOLS:
+            continue
 
-    work_intent_reason = _bridge_work_intent_deny_reason(cwd_path=cwd_path, file_path=file_path, payload=payload)
-    if work_intent_reason:
-        _record_gate_denial("bridge-compliance", file_path, work_intent_reason, root=cwd_path)
-        emit_deny("PreToolUse", work_intent_reason)
-        sys.exit(0)
+        file_path = tool_input.get("file_path", "")
+        if not file_path:
+            continue
 
-    content = str(tool_input.get("content", ""))
-    reason = _deny_reason_for_content(
-        cwd_path=cwd_path,
-        file_path=file_path,
-        content=content,
-        run_pending_preflight=tool_name == "Write",
-    )
-    if reason:
-        _record_gate_denial("bridge-compliance", file_path, reason, root=cwd_path)
-        emit_deny("PreToolUse", reason)
-        sys.exit(0)
+        work_intent_reason = _bridge_work_intent_deny_reason(cwd_path=cwd_path, file_path=file_path, payload=candidate)
+        if work_intent_reason:
+            _record_gate_denial("bridge-compliance", file_path, work_intent_reason, root=cwd_path)
+            emit_deny("PreToolUse", work_intent_reason)
+            sys.exit(0)
 
-    heading_ask_reason = _ask_reason_for_content(file_path, content)
-    if heading_ask_reason:
-        emit_ask("PreToolUse", heading_ask_reason)
-        sys.exit(0)
+        content = str(tool_input.get("content", ""))
+        reason = _deny_reason_for_content(
+            cwd_path=cwd_path,
+            file_path=file_path,
+            content=content,
+            run_pending_preflight=tool_name == "Write",
+        )
+        if reason:
+            _record_gate_denial("bridge-compliance", file_path, reason, root=cwd_path)
+            emit_deny("PreToolUse", reason)
+            sys.exit(0)
 
-    ask_reason = None
-    if not (_is_bridge_markdown_file(file_path) or _is_lo_verdict_bridge_file(file_path)):
-        ask_reason = _pending_proposal_ask_reason(_canonical_project_root(cwd_path), file_path)
-    if ask_reason:
-        emit_ask("PreToolUse", ask_reason)
-        sys.exit(0)
+        heading_ask_reason = _ask_reason_for_content(file_path, content)
+        if heading_ask_reason:
+            emit_ask("PreToolUse", heading_ask_reason)
+            sys.exit(0)
+
+        ask_reason = None
+        if not (_is_bridge_markdown_file(file_path) or _is_lo_verdict_bridge_file(file_path)):
+            ask_reason = _pending_proposal_ask_reason(_canonical_project_root(cwd_path), file_path)
+        if ask_reason:
+            emit_ask("PreToolUse", ask_reason)
+            sys.exit(0)
 
     emit_pass()
     sys.exit(0)

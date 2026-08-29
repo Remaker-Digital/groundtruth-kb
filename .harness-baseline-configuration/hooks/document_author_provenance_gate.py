@@ -122,6 +122,27 @@ def _candidate_changes(payload: dict[str, Any], project_root: Path) -> list[Cand
     return []
 
 
+def _shell_candidates(payload: dict, root: Path) -> list[dict]:
+    """Native-shaped payloads to judge for one incoming payload (WI-7289).
+
+    A native payload expands to itself, so native handling is unchanged. A shell
+    payload expands to one synthetic Write per recognized write target; an
+    unrecognized command expands to nothing and is therefore allowed.
+    """
+    hooks_dir = str(Path(__file__).resolve().parent)
+    if hooks_dir not in sys.path:
+        sys.path.insert(0, hooks_dir)
+    try:
+        from _shell_payload import expand_shell_payload
+    except ImportError:
+        return [payload]
+    try:
+        return expand_shell_payload(payload, root)
+    except Exception:
+        # Extraction must never harden into a new failure mode for the gate.
+        return [payload]
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -131,7 +152,14 @@ def main() -> int:
         return _emit_pass()
     project_root = Path(payload.get("cwd") or payload.get("project_root") or PROJECT_ROOT).resolve()
     config = load_config(project_root)
-    for candidate in _candidate_changes(payload, project_root):
+    # WI-7289: expand a shell command into the writes it performs so this gate,
+    # now registered on the shell surface, judges them with the same code path.
+    expanded = [
+        change
+        for shell_candidate in _shell_candidates(payload, project_root)
+        for change in _candidate_changes(shell_candidate, project_root)
+    ]
+    for candidate in expanded:
         if not candidate.new_file or not is_governed_document_path(candidate.rel_path, config):
             continue
         result = validate_author_metadata(candidate.content)

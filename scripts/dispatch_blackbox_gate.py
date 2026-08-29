@@ -167,6 +167,27 @@ def _payload_target_path(payload: dict) -> str:
     return ""
 
 
+def _shell_candidates(payload: dict, *, require_content: bool = True) -> list[dict]:
+    """Native-shaped payloads implied by one incoming payload (WI-7289).
+
+    A native payload yields nothing here (the caller has already judged it); a
+    shell payload yields one synthetic Write per recognized write target.
+    """
+    hooks_dir = Path(__file__).resolve().parents[1] / ".harness-baseline-configuration" / "hooks"
+    if str(hooks_dir) not in sys.path:
+        sys.path.insert(0, str(hooks_dir))
+    try:
+        from _shell_payload import expand_shell_payload, is_shell_tool
+    except ImportError:
+        return []
+    if not is_shell_tool(payload.get("tool_name") or payload.get("tool") or ""):
+        return []
+    try:
+        return expand_shell_payload(payload, hooks_dir.parents[0], require_content=require_content)
+    except Exception:
+        return []
+
+
 def main() -> int:
     """PreToolUse entry point: read the hook payload from stdin and emit allow/deny."""
     diagnostic = "--diagnostic" in sys.argv[1:]
@@ -175,6 +196,21 @@ def main() -> int:
     target_path = _payload_target_path(payload)
     bypass = os.environ.get("GTKB_DISPATCH_BLACKBOX_BYPASS") == "1"
     decision = gate_decision(tool_name, target_path, bypass=bypass)
+
+    # WI-7289: the native decision above is computed first and unchanged. Only
+    # when it does not block do we consider the writes a shell command implies,
+    # so shell coverage is strictly additive to existing behavior. This gate is
+    # path-only, so content-less forms (tee, sed -i) are still worth judging.
+    if not decision.block:
+        for candidate in _shell_candidates(payload, require_content=False):
+            candidate_tool = str(candidate.get("tool_name") or "")
+            candidate_path = _payload_target_path(candidate)
+            if not candidate_path:
+                continue
+            candidate_decision = gate_decision(candidate_tool, candidate_path, bypass=bypass)
+            if candidate_decision.block or candidate_decision.bypass_audited:
+                tool_name, target_path, decision = candidate_tool, candidate_path, candidate_decision
+                break
 
     if diagnostic:
         print(
