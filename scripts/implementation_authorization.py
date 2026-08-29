@@ -20,6 +20,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from groundtruth_kb.bridge.versioned_files import parse_bridge_header_block
+
 try:
     from scripts import bridge_lifecycle_resolver, bridge_work_intent_registry, gtkb_session_id
 except ImportError:  # pragma: no cover - direct script execution from scripts/
@@ -1168,8 +1170,6 @@ def _project_authorization_row(
     return row
 
 
-def _owner_sufficiency_deliberation_row(project_root: Path, deliberation_id: str) -> sqlite3.Row:
-    db_path = groundtruth_db_path(project_root)
 def _live_project_authorization_refusal_hint(project_root: Path, project_id: str) -> str:
     """Name a sole live authorization without substituting it for the cited id."""
     conn = sqlite3.connect(groundtruth_db_path(project_root))
@@ -1192,6 +1192,8 @@ def _live_project_authorization_refusal_hint(project_root: Path, project_id: str
     return ""
 
 
+def _owner_sufficiency_deliberation_row(project_root: Path, deliberation_id: str) -> sqlite3.Row:
+    db_path = groundtruth_db_path(project_root)
     if not db_path.is_file():
         raise AuthorizationError(f"GroundTruth DB not found for owner sufficiency evidence: {db_path}")
     conn = sqlite3.connect(db_path)
@@ -2249,7 +2251,7 @@ def finalize_implementation_start_packet(
     *,
     session_id: str,
 ) -> dict[str, Any]:
-    """Bind live PAUTH, claim, and exact-init role evidence before start."""
+    """Bind live PAUTH and claim evidence after re-reading the authored GO role."""
     if packet_hash(packet) != packet.get("packet_hash"):
         raise AuthorizationError("Cannot finalize an implementation-start packet with a hash mismatch")
     bridge_id = str(packet.get("bridge_id") or "")
@@ -2286,49 +2288,21 @@ def finalize_implementation_start_packet(
             "project_authorization_bootstrap claim, or draft claim backed by a fresh report-level NO-GO resume state"
         )
 
+    go_file = packet.get("go_file")
+    if not isinstance(go_file, str) or not go_file.startswith("bridge/"):
+        raise AuthorizationError("DENY_NO_INIT_ROLE: implementation-start packet has no readable authored GO")
+    normalized_go_file = normalize_relative_path(project_root, go_file)
+    if normalized_go_file != go_file.replace("\\", "/"):
+        raise AuthorizationError("DENY_NO_INIT_ROLE: implementation-start GO path is not canonical")
     try:
-        from groundtruth_kb.session.attestation.service import (
-            RoleAttestationError,
-            resolve_effective_role_for_context,
-        )
-
-        binding, attestation = resolve_effective_role_for_context(
-            project_root / "groundtruth.db",
-            invoking_context=session_id,
-        )
-    except (RoleAttestationError, OSError, sqlite3.Error) as exc:
-        raise AuthorizationError(f"Could not validate exact-init role attestation for {session_id!r}: {exc}") from exc
-    if attestation.role != "prime-builder":
+        go_text = (project_root / normalized_go_file).read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError) as exc:
+        raise AuthorizationError("DENY_NO_INIT_ROLE: implementation-start GO is unreadable") from exc
+    go_header = parse_bridge_header_block(go_text)
+    if go_header.status != "GO" or not go_header.status_line_exact or go_header.init_line != "::init gtkb pb":
         raise AuthorizationError(
-            f"Implementation start requires a prime-builder exact-init role attestation, found {attestation.role!r}"
+            "DENY_NO_INIT_ROLE: implementation-start GO must carry the exact authored ::init gtkb pb role source"
         )
-    if attestation.source_event != "exact_init":
-        raise AuthorizationError(
-            "Implementation start requires the immutable exact-init role attestation; later role-change events do not qualify"
-        )
-    if resumption_authority is None:
-        if holder.get("acting_role") != attestation.role:
-            raise AuthorizationError("Work-intent acting role does not match the exact-init role attestation")
-        if holder.get("session_envelope_id") != binding.envelope_id:
-            raise AuthorizationError("Work-intent session envelope does not match the exact-init session binding")
-        if holder.get("acting_role_attestation") != attestation.evidence_reference:
-            raise AuthorizationError(
-                "Work-intent role-attestation reference is not current for the exact-init session binding"
-            )
-
-    role_attestation_evidence = {
-        "schema_version": 1,
-        "invoking_context": binding.invoking_context,
-        "session_envelope_id": binding.envelope_id,
-        "subject": binding.subject,
-        "init_command_digest": binding.command_digest,
-        "binding_created_at": binding.created_at,
-        "role": attestation.role,
-        "source_event": attestation.source_event,
-        "issuer": attestation.issuer,
-        "attested_at": attestation.created_at,
-        "evidence_reference": attestation.evidence_reference,
-    }
 
     target_paths = [str(path) for path in packet.get("target_path_globs", [])]
     current_authorization = validate_packet_project_authorization_operation(
@@ -2344,9 +2318,6 @@ def finalize_implementation_start_packet(
         "acquired_at",
         "ttl_expires_at",
         "claim_kind",
-        "acting_role",
-        "session_envelope_id",
-        "acting_role_attestation",
         "project_id",
         "implementation_deadline",
         "implementation_grace_expires_at",
@@ -2371,14 +2342,13 @@ def finalize_implementation_start_packet(
         bootstrap_authority["work_intent_claim"] = {field: holder.get(field) for field in claim_fields}
         finalized["bootstrap_authority"] = bootstrap_authority
     finalized["implementation_start"] = {
-        "schema_version": 2,
+        "schema_version": 3,
         "finalized_at": now_iso(),
         "bridge_id": bridge_id,
         "session_id": session_id,
         "pre_start_packet_hash": pre_start_packet_hash,
         "target_path_globs": target_paths,
         "work_intent_claim": {field: holder.get(field) for field in claim_fields},
-        "role_attestation": role_attestation_evidence,
         "project_authorization_decision": (
             current_authorization.get("operation_time_decisions", [None])[0]
             if current_authorization is not None
@@ -2917,6 +2887,131 @@ def _packet_cannot_authorize_any(packet: dict[str, Any], candidate_paths: list[s
     if not globs:
         return "pre-filtered: packet declares no target path globs"
     return None
+
+
+def _implementable_thread_slugs(project_root: Path) -> list[str]:
+    """Bridge slugs whose latest status can still authorize implementation.
+
+    A cheap pre-filter over the versioned bridge files: read only the first
+    non-blank line of each thread's highest-numbered file. A thread whose latest
+    status is VERIFIED, NEW, REVISED, DEFERRED, NO-ACTION or WITHDRAWN cannot
+    clear a path (``_post_go_chain_state`` rejects every one of those), so it is
+    excluded before any full lifecycle resolution. Only ``GO`` and a post-GO
+    ``NO-GO`` survive -- the latter because a NO-GO'd implementation report does
+    not revoke the pinned GO, exactly as ``approved_files_for_go`` documents.
+    """
+    latest_by_slug: dict[str, tuple[int, Path]] = {}
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
+        return []
+    for path in bridge_dir.glob("*.md"):
+        match = re.fullmatch(r"(?P<slug>.+)-(?P<version>\d{3})", path.stem)
+        if match is None:
+            continue
+        slug = match.group("slug")
+        version = int(match.group("version"))
+        current = latest_by_slug.get(slug)
+        if current is None or version > current[0]:
+            latest_by_slug[slug] = (version, path)
+
+    slugs: list[str] = []
+    for slug, (_version, path) in sorted(latest_by_slug.items()):
+        try:
+            text = path.read_text(encoding="utf-8-sig", errors="replace")
+        except OSError:
+            continue
+        first = next((line.strip() for line in text.splitlines() if line.strip()), "")
+        if first in {"GO", "NO-GO"}:
+            slugs.append(slug)
+    return slugs
+
+
+def canonical_go_authorizations(
+    project_root: Path, candidate_paths: list[str] | None = None
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Derive live-GO authorization rows from canonical evidence only (WI-7129).
+
+    The named packet cache lives under the forbidden runtime state directory, so
+    it can no longer be the source of clearance. Every fact a packet asserted is
+    already derivable from canonical evidence, and this function derives it:
+
+    * the controlling GO and the approved proposal come from the append-only
+      versioned bridge files through the shared lifecycle resolver
+      (``approved_files_for_go``), which is the same resolution ``_validate_packet``
+      performs when it re-checks a packet against the live chain;
+    * the authorized paths come from the approved proposal's declared
+      ``target_paths`` -- the packet's ``target_path_globs`` were only ever a copy
+      of exactly that list;
+    * the post-GO chain state is evaluated with the same ``_post_go_chain_state``
+      the packet path uses, so a thread awaiting review, terminal, deferred or
+      NO-ACTION clears nothing.
+
+    This deliberately does NOT reconstruct packet expiry. Expiry bounds a cached
+    artifact's lifetime; it is not a canonical fact about the authorization. The
+    canonical equivalent is the chain state above, which is re-read on every call
+    and therefore cannot go stale the way a cached packet can.
+
+    Returns ``(rows, errors)``. A row is shaped like a valid packet row so the
+    clearance check consumes it unchanged. ``errors`` is diagnostic only and
+    never grants clearance -- a thread that fails resolution yields no row, so
+    the result is deny-by-default.
+    """
+    rows: list[dict[str, Any]] = []
+    errors: list[str] = []
+    for slug in _implementable_thread_slugs(project_root):
+        try:
+            entry = bridge_entry(project_root, slug)
+            proposal_rel, go_rel = approved_files_for_go(entry)
+        except AuthorizationError as exc:
+            errors.append(f"{slug}: {exc}")
+            continue
+        except Exception as exc:  # noqa: BLE001 - fail closed per thread, never abort the sweep
+            errors.append(f"{slug}: unresolved bridge chain: {exc}")
+            continue
+
+        statuses_after_go: list[str] = []
+        for status, path in entry.versions:
+            if path == go_rel:
+                break
+            statuses_after_go.append(status)
+        # "latest_is_go": the GO is latest, nothing filed after it.
+        # "resumable": a post-GO NO-GO on an implementation report; the pinned GO
+        # still authorizes the revision, per approved_files_for_go.
+        # Every other state (awaiting_review, terminal, deferred, no_action)
+        # clears nothing, matching the packet path's rejections exactly.
+        state = _post_go_chain_state(statuses_after_go)
+        if state not in {"latest_is_go", "resumable"}:
+            errors.append(f"{slug}: post-GO chain state {state!r} does not authorize implementation")
+            continue
+
+        try:
+            proposal_text = (project_root / proposal_rel).read_text(encoding="utf-8-sig")
+            target_paths = extract_target_paths(proposal_text)
+        except (OSError, AuthorizationError) as exc:
+            errors.append(f"{slug}: could not read approved proposal target_paths: {exc}")
+            continue
+        if not target_paths:
+            errors.append(f"{slug}: approved proposal declares no target_paths")
+            continue
+
+        if candidate_paths is not None and not any(
+            path_authorized_by_target_paths(target_paths, candidate) for candidate in candidate_paths
+        ):
+            continue
+
+        rows.append(
+            {
+                "bridge_id": slug,
+                "proposal_file": proposal_rel,
+                "go_file": go_rel,
+                "latest_status": entry.latest_status,
+                "target_path_globs": target_paths,
+                "valid": True,
+                "error": None,
+                "evidence_source": "canonical_bridge_chain",
+            }
+        )
+    return rows, errors
 
 
 def list_named_packets(project_root: Path, candidate_paths: list[str] | None = None) -> list[dict[str, Any]]:

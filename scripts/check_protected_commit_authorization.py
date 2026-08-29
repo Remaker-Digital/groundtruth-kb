@@ -51,6 +51,7 @@ from scripts.gtkb_session_id import resolve_session_id  # noqa: E402
 from scripts.implementation_authorization import (  # noqa: E402
     PROJECT_AUTHORIZATION_KEYS,
     AuthorizationError,
+    canonical_go_authorizations,
     extract_metadata_value,
     extract_target_paths,
     groundtruth_db_path,
@@ -2293,7 +2294,25 @@ def _load_live_go_evidence(
     clearance. Skipped packets still produce a row and a populated error, so the
     fail-closed reporting surface stays populated.
     """
-    errors: list[str] = []
+    # WI-7129: canonical evidence is the primary authorization source. The named
+    # packet cache lives under the forbidden runtime state directory, so a route
+    # that can only clear from there fails once that surface is purged -- which
+    # is exactly what blocked WI-5183 after it passed every review and test.
+    #
+    # The canonical route derives the same facts from the approved bridge chain
+    # and the approved proposal's declared target_paths, so when it clears a path
+    # the forbidden directory is never read. The packet cache is consulted only
+    # when canonical evidence clears nothing, which keeps transitional flows that
+    # still depend on a minted packet working without making clearance require it.
+    # An unauthorized cohort is denied by both routes: neither invents a row.
+    canonical_rows, canonical_errors = canonical_go_authorizations(root, candidate_paths=candidate_paths)
+    if canonical_rows and (
+        candidate_paths is None
+        or any(path_authorized(row, candidate) for row in canonical_rows for candidate in candidate_paths)
+    ):
+        return canonical_rows, canonical_errors, len(canonical_rows)
+
+    errors: list[str] = list(canonical_errors)
     try:
         if candidate_paths is None:
             packets = list_named_packets(root)
