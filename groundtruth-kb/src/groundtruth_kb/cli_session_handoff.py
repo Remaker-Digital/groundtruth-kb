@@ -24,13 +24,16 @@ from groundtruth_kb.config import GTConfig
 from groundtruth_kb.session.envelope import TOPIC_TYPES
 
 _HOST_SESSION_ID_ENV_BY_HARNESS = {
+    "claude": "CLAUDE_CODE_SESSION_ID",
     "codex": "CODEX_THREAD_ID",
     "cursor": "CURSOR_CONVERSATION_ID",
     "goose": "GOOSE_SESSION_ID",
 }
 _HOST_MODEL_METADATA_SOURCE_BY_HARNESS = {
+    "claude": "claude-code-session-metadata",
     "codex": "x-codex-turn-metadata",
     "cursor": "cursor-conversation-metadata",
+    "goose": "goose-session-envelope-metadata",
 }
 _PLACEHOLDER_TURN_METADATA = {
     "",
@@ -69,6 +72,109 @@ def _host_session_id(harness_name: str) -> str | None:
         return None
     value = os.environ.get(env_name)
     return _required_turn_metadata(value, env_name) if value is not None else None
+
+
+def _acting_harness_name(explicit: str | None = None) -> str:
+    """Resolve the harness this process is actually running under.
+
+    WI-7119: these commands previously defaulted ``--harness-name`` to ``codex``,
+    so on any other harness they silently queried, opened or closed the wrong
+    harness's envelope. That is why ``gt session envelope show`` reported
+    "No current session envelope for harness 'codex'" while running on claude.
+
+    The acting harness is identified by which harness-native session variable the
+    host populated. That is the same signal the envelope already uses to bind a
+    session, so it introduces no new source of truth, and unlike
+    ``harness-state/harness-identities.json`` it is not a path the Compact
+    Operating Guidance forbids reading.
+
+    Fails closed rather than guessing. Silently addressing another harness's
+    envelope is precisely the defect being repaired, so an unresolvable or
+    ambiguous environment must ask the caller rather than pick.
+    """
+    if explicit is not None and explicit.strip():
+        return explicit.strip().lower()
+    detected = sorted(
+        harness
+        for harness, env_name in _HOST_SESSION_ID_ENV_BY_HARNESS.items()
+        if (os.environ.get(env_name) or "").strip()
+    )
+    if len(detected) == 1:
+        return detected[0]
+    if not detected:
+        known = ", ".join(sorted(_HOST_SESSION_ID_ENV_BY_HARNESS.values()))
+        raise click.ClickException(
+            f"Cannot resolve the acting harness: none of {known} is set in the environment. "
+            "Pass --harness-name explicitly."
+        )
+    raise click.ClickException(
+        "Cannot resolve the acting harness: session variables for more than one harness "
+        f"are set ({', '.join(detected)}). Pass --harness-name explicitly."
+    )
+
+
+def _resolve_acting_harness_name(
+    ctx: click.Context,
+    param: click.Parameter,
+    value: str | None,
+) -> str:
+    """Click callback resolving ``--harness-name`` at parse time (WI-7119)."""
+    return _acting_harness_name(value)
+
+
+def _reconcile_with_session_binding(project_root: Path, envelope: dict) -> dict:
+    """Overlay the DB session-init binding onto the envelope read surface.
+
+    WI-7060: the file-backed envelope and the ``session_init_bindings`` table are
+    two stores that disagree. The DB one gates governed writes; the file one is
+    what this command and the startup disclosure report. After ``bind_exact_init``
+    succeeded, the file still reported ``init_keyword: null`` and
+    ``role_resolution_source: session_resolver_fallback``, so an agent inspecting
+    the envelope concluded it was unbound while its writes were in fact working
+    and correctly attributed.
+
+    This corrects the READ surface only. Write gating still resolves from the DB,
+    which is already the authority; nothing here grants or changes authority. Per
+    Compact Operating Guidance section 16, a surface that can read an established
+    source of truth directly should not report a stale cached contradiction of it.
+
+    The literal init keyword is intentionally NOT recoverable: the binding stores
+    a digest, not the command. The binding identity, subject and digest are
+    reported instead, which is what an inspecting agent actually needs to know.
+    """
+    session_id = envelope.get("session_id")
+    if not isinstance(session_id, str) or not session_id.strip():
+        return envelope
+    try:
+        from groundtruth_kb.session.attestation import service as attestation_service
+        from groundtruth_kb.session.envelope import REGISTRY_FALLBACK_ROLE_SOURCES
+
+        binding = attestation_service.binding_for_context(project_root / "groundtruth.db", session_id)
+    except Exception:
+        # No binding, or the attestation store is unavailable. Report the file
+        # surface unchanged rather than inventing provenance.
+        return envelope
+
+    reconciled = dict(envelope)
+    reconciled["session_init_binding"] = {
+        "envelope_id": binding.envelope_id,
+        "subject": binding.subject,
+        "init_command_digest": binding.command_digest,
+        "created_at": binding.created_at,
+        "source": "session_init_bindings (database, authoritative for governed writes)",
+    }
+    provenance = reconciled.get("worker_role_provenance")
+    if isinstance(provenance, dict) and provenance.get("role_resolution_source") in REGISTRY_FALLBACK_ROLE_SOURCES:
+        provenance = dict(provenance)
+        provenance["role_resolution_source"] = "exact_init"
+        provenance["role_resolution_source_corrected_from"] = "session_resolver_fallback"
+        reconciled["worker_role_provenance"] = provenance
+    resolution = reconciled.get("role_resolution")
+    if isinstance(resolution, dict) and resolution.get("interactive_role_source") is None:
+        resolution = dict(resolution)
+        resolution["interactive_role_source"] = "exact_init"
+        reconciled["role_resolution"] = resolution
+    return reconciled
 
 
 @click.group("session")
@@ -115,7 +221,12 @@ def _only_open_worker_envelope(project_root: Path, harness_name: str, harness_id
 
 
 @envelope_group.command("open")
-@click.option("--harness-name", default="codex", show_default=True)
+@click.option(
+    "--harness-name",
+    default=None,
+    callback=_resolve_acting_harness_name,
+    help="Acting harness. Resolved from the harness-native session env var when omitted (WI-7119).",
+)
 @click.option("--harness-id", default=None)
 @click.option("--init-keyword", default=None)
 @click.option("--subject", default=None)
@@ -137,6 +248,7 @@ def envelope_open_cmd(
     from groundtruth_kb.session.envelope import (
         EnvelopeError,
         load_worker_session,
+        normalize_canonical_role,
         open_session,
         parse_canonical_init_keyword,
         resolve_harness_identity,
@@ -153,8 +265,22 @@ def envelope_open_cmd(
     if role is not None:
         if parsed_role is None:
             raise click.ClickException("--role requires a canonical role-bearing --init-keyword.")
-        if role != parsed_role:
-            raise click.ClickException("--role conflicts with the role asserted by --init-keyword.")
+        # WI-7056: compare canonical forms, not spellings. The parsed keyword role
+        # arrives already normalized to its canonical long form, so comparing it
+        # against a raw --role value reported two spellings of the SAME role as a
+        # conflict. The grammar itself stays in the package parser; only the
+        # normalizer is called here.
+        normalized_role = normalize_canonical_role(role)
+        if normalized_role is None:
+            raise click.ClickException(
+                f"--role {role!r} is not a canonical role; use one of: pb, lo, prime-builder, loyal-opposition."
+            )
+        if normalized_role != parsed_role:
+            raise click.ClickException(
+                f"--role {role!r} resolves to {normalized_role!r}, which conflicts with "
+                f"{parsed_role!r} asserted by --init-keyword."
+            )
+        role = normalized_role
     elif parsed_role is not None:
         role = parsed_role
 
@@ -185,21 +311,34 @@ def envelope_open_cmd(
                     raise EnvelopeError("Exact session envelope is not open.")
                 if existing.get("harness_name") != resolved_name or existing.get("harness_id") != resolved_id:
                     raise EnvelopeError("Exact session envelope has mismatched harness identity.")
-                provenance = resolve_worker_role_provenance(
-                    project_root,
-                    current_session_id=host_session_id,
-                    harness_name=resolved_name,
-                )
-                if role is not None and provenance["role"] != role:
-                    raise EnvelopeError("Requested role conflicts with the exact host-bound session envelope.")
-                if subject is not None and existing.get("subject") != subject:
-                    if existing.get("subject_asserted") is not None:
-                        raise EnvelopeError("Requested subject conflicts with the exact host-bound session envelope.")
-                    existing["subject_asserted"] = subject
-                    existing["subject_resolved"] = subject
-                    existing["subject"] = subject
-                    subject_default_upgrade = True
-                envelope = existing
+                try:
+                    provenance = resolve_worker_role_provenance(
+                        project_root,
+                        current_session_id=host_session_id,
+                        harness_name=resolved_name,
+                    )
+                except EnvelopeError:
+                    # A provenance-less envelope can be neither validated nor
+                    # repaired in place. When the caller supplied a role-bearing
+                    # canonical init keyword, fall through to open_session()
+                    # below and re-mint from the transcript-declared role rather
+                    # than failing closed on an unusable record.
+                    if parsed_role is None:
+                        raise
+                    provenance = None
+                if provenance is not None:
+                    if role is not None and provenance["role"] != role:
+                        raise EnvelopeError("Requested role conflicts with the exact host-bound session envelope.")
+                    if subject is not None and existing.get("subject") != subject:
+                        if existing.get("subject_asserted") is not None:
+                            raise EnvelopeError(
+                                "Requested subject conflicts with the exact host-bound session envelope."
+                            )
+                        existing["subject_asserted"] = subject
+                        existing["subject_resolved"] = subject
+                        existing["subject"] = subject
+                        subject_default_upgrade = True
+                    envelope = existing
 
         if envelope is None:
             envelope = open_session(
@@ -224,21 +363,33 @@ def envelope_open_cmd(
 
 
 @envelope_group.command("show")
-@click.option("--harness-name", default="codex", show_default=True)
+@click.option(
+    "--harness-name",
+    default=None,
+    callback=_resolve_acting_harness_name,
+    help="Acting harness. Resolved from the harness-native session env var when omitted (WI-7119).",
+)
 @click.pass_context
 def envelope_show_cmd(ctx: click.Context, harness_name: str) -> None:
     """Print the current per-harness session envelope as JSON."""
     from groundtruth_kb.session.envelope import load_current
 
     config = _resolve_config(ctx)
-    envelope = load_current(Path(config.project_root), harness_name)
+    project_root = Path(config.project_root)
+    envelope = load_current(project_root, harness_name)
     if envelope is None:
         raise click.ClickException(f"No current session envelope for harness {harness_name!r}.")
+    envelope = _reconcile_with_session_binding(project_root, envelope)
     click.echo(json.dumps(envelope, indent=2, sort_keys=True))
 
 
 @envelope_group.command("attest-author-metadata")
-@click.option("--harness-name", default="codex", show_default=True)
+@click.option(
+    "--harness-name",
+    default=None,
+    callback=_resolve_acting_harness_name,
+    help="Acting harness. Resolved from the harness-native session env var when omitted (WI-7119).",
+)
 @click.option("--harness-id", default=None)
 @click.option("--session-id", required=True)
 @click.option("--model", required=True)
@@ -409,30 +560,80 @@ def topic_group() -> None:
 
 @topic_group.command("open")
 @click.argument("topic_type", type=click.Choice(list(TOPIC_TYPES)))
-@click.option("--harness-name", default="codex", show_default=True)
+@click.option(
+    "--harness-name",
+    default=None,
+    callback=_resolve_acting_harness_name,
+    help="Acting harness. Resolved from the harness-native session env var when omitted (WI-7119).",
+)
 @click.option("--harness-id", default=None)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit the raw result payload.")
 @click.pass_context
-def topic_open_cmd(ctx: click.Context, topic_type: str, harness_name: str, harness_id: str | None) -> None:
+def topic_open_cmd(
+    ctx: click.Context,
+    topic_type: str,
+    harness_name: str,
+    harness_id: str | None,
+    json_output: bool,
+) -> None:
     """Open one topic envelope for the given type."""
-    from groundtruth_kb.session.envelope import open_topic
+    from groundtruth_kb.session.topic_router import (
+        TopicCommand,
+        handle_topic_command,
+        render_topic_context,
+    )
 
     config = _resolve_config(ctx)
-    topic = open_topic(Path(config.project_root), topic_type, harness_name=harness_name, harness_id=harness_id)
-    click.echo(json.dumps(topic, indent=2, sort_keys=True))
+    command = TopicCommand(action="open", topic_type=topic_type, raw=f"::open {topic_type}")
+    result = handle_topic_command(
+        Path(config.project_root),
+        command,
+        harness_name=harness_name,
+        harness_id=harness_id,
+    )
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(render_topic_context(result))
 
 
 @topic_group.command("close")
 @click.argument("topic_type", type=click.Choice(list(TOPIC_TYPES)))
-@click.option("--harness-name", default="codex", show_default=True)
+@click.option(
+    "--harness-name",
+    default=None,
+    callback=_resolve_acting_harness_name,
+    help="Acting harness. Resolved from the harness-native session env var when omitted (WI-7119).",
+)
 @click.option("--harness-id", default=None)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit the raw result payload.")
 @click.pass_context
-def topic_close_cmd(ctx: click.Context, topic_type: str, harness_name: str, harness_id: str | None) -> None:
+def topic_close_cmd(
+    ctx: click.Context,
+    topic_type: str,
+    harness_name: str,
+    harness_id: str | None,
+    json_output: bool,
+) -> None:
     """Close one open topic envelope for the given type."""
-    from groundtruth_kb.session.envelope import close_topic
+    from groundtruth_kb.session.topic_router import (
+        TopicCommand,
+        handle_topic_command,
+        render_topic_context,
+    )
 
     config = _resolve_config(ctx)
-    topic = close_topic(Path(config.project_root), topic_type, harness_name=harness_name, harness_id=harness_id)
-    click.echo(json.dumps(topic, indent=2, sort_keys=True))
+    command = TopicCommand(action="close", topic_type=topic_type, raw=f"::close {topic_type}")
+    result = handle_topic_command(
+        Path(config.project_root),
+        command,
+        harness_name=harness_name,
+        harness_id=harness_id,
+    )
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(render_topic_context(result))
 
 
 @session_group.command("wrap")

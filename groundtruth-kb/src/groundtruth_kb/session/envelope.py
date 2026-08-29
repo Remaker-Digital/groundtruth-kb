@@ -30,6 +30,19 @@ from groundtruth_kb.harness_projection import HarnessStateError, read_identity, 
 ENVELOPE_SCHEMA_VERSION = 1
 WORKER_ROLE_PROVENANCE_SCHEMA_VERSION = 1
 TOPIC_TYPES = ("ops", "deliberation", "build", "test", "spec", "project")
+# Canon activity vocabulary accepted as input aliases. They normalize to the
+# canonical stored values above, so persisted topic_type, activity-profile keys,
+# CLI choices, and already-filed bridge headers are unaffected.
+TOPIC_TYPE_ALIASES = {"operations": "ops", "specification": "spec"}
+
+
+def normalize_topic_type(value: str | None) -> str | None:
+    """Map a Canon long-form activity name to its canonical stored value."""
+    if value is None:
+        return None
+    return TOPIC_TYPE_ALIASES.get(value, value)
+
+
 GIT_STATUS_SHORT_LINE_LIMIT = 80
 GIT_PROBE_TIMEOUT_SECONDS = 5
 WORKER_ROLES = frozenset({"prime-builder", "loyal-opposition"})
@@ -134,6 +147,32 @@ def parse_canonical_init_keyword(value: str | None) -> dict[str, str | None] | N
         "subject": subject,
         "role": _CANONICAL_ROLE_BY_TOKEN.get(role_token),
     }
+
+
+def normalize_canonical_role(value: str | None) -> str | None:
+    """Map a role token or canonical role name to its canonical form.
+
+    Accepts both the short init-keyword tokens (``pb``, ``lo``) and the canonical
+    names (``prime-builder``, ``loyal-opposition``), so a caller supplying either
+    form compares equal to a role parsed from an init keyword.
+
+    WI-7056: ``parse_canonical_init_keyword`` already normalizes ``pb`` to
+    ``prime-builder``, but callers compared their raw ``--role`` value against
+    that normalized result, so ``--role pb`` with ``::init gtkb pb`` was reported
+    as a conflict between two spellings of the same role. Both sides must pass
+    through here before comparison.
+
+    Returns ``None`` for anything outside the closed vocabulary; the caller
+    decides whether that is an error.
+    """
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip().lower()
+    if candidate in _CANONICAL_ROLE_BY_TOKEN:
+        return _CANONICAL_ROLE_BY_TOKEN[candidate]
+    if candidate in set(_CANONICAL_ROLE_BY_TOKEN.values()):
+        return candidate
+    return None
 
 
 def utc_now_iso() -> str:
