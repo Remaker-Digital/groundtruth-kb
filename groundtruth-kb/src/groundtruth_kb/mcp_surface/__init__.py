@@ -28,11 +28,7 @@ from groundtruth_kb.mcp_surface.boundary import (
     assert_in_root,
     resolve_safe_path,
 )
-from groundtruth_kb.mcp_surface.roles import (
-    CANONICAL_ROLES,
-    COMPATIBILITY_ROLES,
-    current_role,
-)
+from groundtruth_kb.mcp_surface.roles import CANONICAL_ROLES
 
 __all__ = [
     "AuthorityLabel",
@@ -41,6 +37,4 @@ __all__ = [
     "assert_in_root",
     "resolve_safe_path",
     "CANONICAL_ROLES",
-    "COMPATIBILITY_ROLES",
-    "current_role",
 ]

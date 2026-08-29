@@ -23,7 +23,6 @@ from mcp.server.lowlevel import Server
 from groundtruth_kb.bridge.status_driver import collect_bridge_status
 from groundtruth_kb.mcp_surface.authority import AuthorityLabel, build_envelope
 from groundtruth_kb.mcp_surface.boundary import resolve_safe_path
-from groundtruth_kb.mcp_surface.roles import current_role
 
 SERVER_NAME = "gt-kb-mcp"
 
@@ -89,7 +88,6 @@ def gt_status_summary_payload(project_root: Path) -> dict[str, Any]:
         "membase_row_counts": _membase_row_counts(project_root),
         "project_root": str(project_root),
         "working_tree_clean": _working_tree_clean(project_root),
-        "current_role": current_role(),
     }
 
 

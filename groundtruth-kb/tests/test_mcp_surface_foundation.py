@@ -23,7 +23,6 @@ from groundtruth_kb.mcp_surface.boundary import (
     assert_in_root,
     resolve_safe_path,
 )
-from groundtruth_kb.mcp_surface.roles import CANONICAL_ROLES, current_role
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -100,94 +99,6 @@ def test_t5_resolve_safe_path_resolves_relative_to_root() -> None:
 
 
 # ---------------------------------------------------------------------------
-# T6 - role resolved from the registry projection
-# ---------------------------------------------------------------------------
-
-
-def test_t6_current_role_reads_role_assignments_json(tmp_path: Path) -> None:
-    """WI-3342 IP-4: ``current_role`` resolves the operating role from the
-    DB-backed registry projection ``harness-state/harness-registry.json``,
-    whose ``harnesses`` field is a LIST of unified records (migrated from the
-    retired ``harness-state/role-assignments.json``). The projection ``role``
-    field is the list-valued role-set wire form; ``current_role`` collapses a
-    singleton role-set to its sole canonical scalar role token (WI-3342 C1).
-    Seeded under an isolated ``tmp_path`` so the test never reads the real
-    harness-state.
-    """
-    registry = tmp_path / "harness-registry.json"
-    harnesses = [
-        {"id": "A", "harness_name": "codex", "role": ["loyal-opposition"]},
-        {"id": "B", "harness_name": "claude", "role": ["prime-builder"]},
-    ]
-    registry.write_text(json.dumps({"harnesses": harnesses}), encoding="utf-8")
-    for entry in harnesses:
-        # current_role collapses the singleton role-set wire form to its sole
-        # scalar token -- a canonical role, not the str() of the list (the
-        # latter was the NO-GO -009 F1 defect, closed by WI-3342 C1).
-        resolved = current_role(harness_id=entry["id"], role_map_path=registry)
-        assert resolved == entry["role"][0]
-        assert resolved in CANONICAL_ROLES
-
-
-# ---------------------------------------------------------------------------
-# T6b - multi-element single-harness role-set normalized to primary role
-# ---------------------------------------------------------------------------
-
-
-def test_t6b_current_role_normalizes_multi_role_single_harness_set(
-    tmp_path: Path,
-) -> None:
-    """WI-3342 C1: in single-harness operating mode (per
-    ``ADR-SINGLE-HARNESS-OPERATING-MODE-001``) a single harness id holds the
-    multi-element role-set ``["prime-builder", "loyal-opposition"]``.
-    ``current_role`` collapses that role-set to the deterministic primary role
-    -- ``prime-builder`` -- so the MCP scalar status surface always reports a
-    canonical role token. Seeded under an isolated ``tmp_path``.
-    """
-    registry = tmp_path / "harness-registry.json"
-    registry.write_text(
-        json.dumps(
-            {
-                "harnesses": [
-                    {
-                        "id": "B",
-                        "harness_name": "claude",
-                        "role": ["prime-builder", "loyal-opposition"],
-                    },
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    resolved = current_role(harness_id="B", role_map_path=registry)
-    assert resolved == "prime-builder"
-    assert resolved in CANONICAL_ROLES
-
-
-# ---------------------------------------------------------------------------
-# T7 - acting-prime-builder READ-accepted (compatibility)
-# ---------------------------------------------------------------------------
-
-
-def test_t7_current_role_accepts_acting_prime_builder_on_read(tmp_path: Path) -> None:
-    # WI-3342 IP-4: ``current_role`` reads the registry projection LIST. The
-    # legacy scalar role wire form is still READ-accepted per the Acting-Prime
-    # Compatibility Contract.
-    registry = tmp_path / "harness-registry.json"
-    registry.write_text(
-        json.dumps(
-            {
-                "harnesses": [
-                    {"id": "Z", "harness_name": "claude", "role": "acting-prime-builder"},
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    assert current_role(harness_id="Z", role_map_path=registry) == "acting-prime-builder"
-
-
-# ---------------------------------------------------------------------------
 # T8 - gt_status_summary returns generated-summary envelope
 # ---------------------------------------------------------------------------
 
@@ -215,7 +126,6 @@ def test_t9_gt_status_summary_payload_includes_expected_fields() -> None:
         "membase_row_counts",
         "project_root",
         "working_tree_clean",
-        "current_role",
     }
     assert isinstance(payload["bridge_status_counts"], dict)
     # Live INDEX.md guarantees at least one status is present.
@@ -231,7 +141,6 @@ def test_t9_gt_status_summary_payload_includes_expected_fields() -> None:
     }
     assert payload["project_root"] == str(PROJECT_ROOT)
     assert payload["working_tree_clean"] in (True, False, None)
-    assert isinstance(payload["current_role"], str)
 
 
 # ---------------------------------------------------------------------------
@@ -288,75 +197,6 @@ def test_t11_membase_row_counts_use_current_views_not_base_tables() -> None:
 # ---------------------------------------------------------------------------
 # T12 - default harness id resolves via env-detection + identities map
 #       (F2 closure: no hardcoded 'B' fallback)
-# ---------------------------------------------------------------------------
-
-
-def test_t12_default_harness_id_does_not_hardcode_claude(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Regression for Codex NO-GO at
-    ``bridge/gtkb-mcp-stable-harness-surface-conversion-006.md`` F2.
-
-    With no harness-detection env vars and no explicit ``GTKB_HARNESS_ID``,
-    ``_default_harness_id()`` must fail-closed (return empty string) so
-    ``current_role`` returns ``"unknown"`` rather than silently
-    mis-attributing the role to whichever harness was hardcoded.
-    """
-    from groundtruth_kb.mcp_surface.roles import _default_harness_id
-
-    # Clear all env vars that would trigger harness detection.
-    for name in [
-        "GTKB_HARNESS_ID",
-        "CLAUDE_PROJECT_DIR",
-        "CLAUDE_CODE_SDK",
-        "CODEX_HOME",
-        "CODEX_CONFIG_DIR",
-    ]:
-        monkeypatch.delenv(name, raising=False)
-    # Also strip any other CLAUDE_CODE* / CODEX_* present in the test
-    # environment so the detection logic sees a clean slate.
-    for name in list(__import__("os").environ.keys()):
-        if name.startswith("CLAUDE_CODE") or name.startswith("CODEX_"):
-            monkeypatch.delenv(name, raising=False)
-
-    result = _default_harness_id()
-    assert result == "", (
-        f"_default_harness_id() must return empty string when no harness "
-        f"can be detected (fail-closed); got {result!r}. Hardcoding 'B' (or "
-        f"any other ID) silently mis-attributes the role in a Codex session."
-    )
-
-
-def test_t12b_default_harness_id_resolves_claude_via_claude_project_dir(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """When ``CLAUDE_PROJECT_DIR`` is set, the active harness resolves to the
-    Claude identity (B) via ``harness-state/harness-identities.json``."""
-    from groundtruth_kb.mcp_surface.roles import _default_harness_id
-
-    monkeypatch.delenv("GTKB_HARNESS_ID", raising=False)
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(PROJECT_ROOT))
-
-    assert _default_harness_id() == "B"
-
-
-def test_t12c_default_harness_id_resolves_codex_via_codex_home(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """When ``CODEX_HOME`` is set, the active harness resolves to the Codex
-    identity (A) via ``harness-state/harness-identities.json``, NOT to the
-    hardcoded Claude default (B) that the prior implementation used."""
-    from groundtruth_kb.mcp_surface.roles import _default_harness_id
-
-    monkeypatch.delenv("GTKB_HARNESS_ID", raising=False)
-    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
-    # Strip Claude-detection vars from inherited env.
-    for name in list(__import__("os").environ.keys()):
-        if name.startswith("CLAUDE_CODE"):
-            monkeypatch.delenv(name, raising=False)
-    monkeypatch.setenv("CODEX_HOME", "/tmp/codex-test")
-
-    assert _default_harness_id() == "A"
-
-
 # ---------------------------------------------------------------------------
 # T10 - server scaffold imports + registers cleanly
 # ---------------------------------------------------------------------------
