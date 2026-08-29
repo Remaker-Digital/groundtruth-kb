@@ -66,13 +66,13 @@ _RUNTIME_DIR = str(Path(__file__).resolve().parent)
 if _RUNTIME_DIR not in sys.path:
     sys.path.insert(0, _RUNTIME_DIR)
 
-from bridge_dispatch_concurrency import (  # noqa: E402
+from scripts.bridge_dispatch_concurrency import (  # noqa: E402
     DEFAULT_ROLE_LIMITS as DISPATCH_ROLE_LIMIT_DEFAULTS,
 )
-from bridge_dispatch_concurrency import (  # noqa: E402
+from scripts.bridge_dispatch_concurrency import (  # noqa: E402
     role_limit as configured_dispatch_role_limit,
 )
-from harness_projection_reader import load_harness_projection  # noqa: E402
+from scripts.harness_projection_reader import load_harness_projection  # noqa: E402
 
 # The lazy ``import groundtruth_kb`` calls in the dispatch/detection paths
 # require ``groundtruth-kb/src`` on sys.path. Add the package root alongside the
@@ -218,7 +218,7 @@ def _application_subject_dispatch_suppression(project_root: Path) -> dict[str, A
     }
 
 
-from _env import load_env_local  # noqa: E402, I001
+from scripts._env import load_env_local  # noqa: E402, I001
 from bridge_lease_registry import LeaseHandle, acquire_lease, is_lease_held, release_lease  # noqa: E402, I001
 from bridge_thread_files import (  # noqa: E402, I001
     find_bridge_verdict_after,
@@ -4169,17 +4169,13 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int, p
     selected_text = "\n".join(rows) if rows else "- No selected entries."
     venv_gt = _repo_venv_command("gt")
     venv_python = _repo_venv_command("python")
-    harness_info_line = (
-        f"Your resolved harness ID is {target.harness_id!r} ({target.command_handle!r}) "
-        f"and your active role is {target.needed_role_label!r} (canonical mode: {target.canonical_mode!r})."
-    )
+    harness_info_line = f"Your resolved harness ID is {target.harness_id!r} ({target.command_handle!r})."
     role_line = (
         f"{harness_info_line}\n"
-        "Resolve your durable harness identity from `harness-state/harness-identities.json`, "
-        "then read your assigned role from `harness-state/harness-registry.json` "
-        "through the canonical `groundtruth_kb.harness_projection` reader using "
-        f"`{venv_gt} harness roles`. Do not run `python -m groundtruth_kb.harness_projection` "
-        "as a role reader, and do not use ambient bare `python` or bare `gt` for package-importing commands. "
+        "Your role for this context is established by the `::init gtkb <pb|lo>` line in the "
+        "header of the dispatchable bridge item you were dispatched to process, and it is "
+        "immutable for this context. "
+        "Do not use ambient bare `python` or bare `gt` for package-importing commands. "
         "Process the bridge entries selected below according to your declared role: "
         "Loyal Opposition reviews latest NEW, REVISED, or NO-ACTION entries; "
         "NO-ACTION requires a corrected governance-compliant verdict via review_no_action. "
@@ -5064,7 +5060,7 @@ def _resolve_dispatch_targets(
     identities = _read_harness_identities(project_root)
     id_to_handle = _invert_identities(identities)
 
-    from harness_projection_reader import load_harness_projection
+    from scripts.harness_projection_reader import load_harness_projection
 
     projection = load_harness_projection(project_root)
 
@@ -7227,6 +7223,38 @@ def run_dispatch_cycle(
                             continue
 
                     if target.needed_role_label == "prime-builder" and dispatched_selected:
+                        subject_suppression = _application_subject_dispatch_suppression(project_root)
+                        if subject_suppression is not None:
+                            dispatch_id = _new_dispatch_id(target.dispatch_state_key)
+                            recipient_state["last_suppressed_signature"] = dispatched_signature
+                            recipient_state["last_result"] = WORK_SUBJECT_APPLICATION_SUSPENDED_REASON
+                            recipient_state["work_subject"] = subject_suppression
+                            result = {
+                                "launched": False,
+                                "reason": WORK_SUBJECT_APPLICATION_SUSPENDED_REASON,
+                                "dispatch_id": dispatch_id,
+                                "current_subject": subject_suppression["current_subject"],
+                            }
+                            _record_dispatch_suppression(
+                                state_dir,
+                                {
+                                    "ts": _now_iso(),
+                                    "dispatch_id": dispatch_id,
+                                    "recipient": recipient,
+                                    "launched": False,
+                                    "reason": WORK_SUBJECT_APPLICATION_SUSPENDED_REASON,
+                                    "signature": dispatched_signature,
+                                    "selected_count": len(dispatched_selected),
+                                    "pending_count": len(dispatched_filtered),
+                                    "raw_pending_count": len(items),
+                                    "document_names": [it.document_name for it in dispatched_selected],
+                                    "work_subject": subject_suppression,
+                                },
+                            )
+                            results[recipient] = result
+                            recipients_state[recipient] = recipient_state
+                            continue
+
                         dispatch_id = _new_dispatch_id(target.dispatch_state_key)
                         work_intent_session_id = _work_intent_session_id(dispatch_id)
                         work_intent_filter = _filter_prime_selected_by_work_intent(
@@ -7313,7 +7341,11 @@ def run_dispatch_cycle(
                             _clear_stale_failure_fields(recipient_state)
                             results[recipient] = {"launched": False, "reason": "unchanged"}
                         else:
-                            subject_suppression = _application_subject_dispatch_suppression(project_root)
+                            subject_suppression = (
+                                _application_subject_dispatch_suppression(project_root)
+                                if target.needed_role_label != "prime-builder"
+                                else None
+                            )
                             if subject_suppression is not None:
                                 if dispatch_id is None:
                                     dispatch_id = _new_dispatch_id(target.dispatch_state_key)

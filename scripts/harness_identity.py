@@ -10,12 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-try:
-    from scripts.harness_projection_reader import load_harness_projection
-except ImportError:  # pragma: no cover - direct script execution path
-    from harness_projection_reader import (  # type: ignore[no-redef]
-        load_harness_projection,
-    )
+from scripts.harness_projection_reader import harness_registry_path, load_harness_projection
 
 HARNESS_IDENTITIES_RELATIVE_PATH = Path("harness-state") / "harness-identities.json"
 DEFAULT_HARNESS_IDS = {
@@ -111,6 +106,20 @@ def load_harness_identities(project_root: Path, identity_path: Path | None = Non
             continue
         harnesses[harness_name] = {"id": harness_id}
     document["harnesses"] = harnesses
+    if not harnesses and not harness_registry_path(project_root).is_file():
+        # WI-7526: disclose WHY the document is empty. Fail-soft is deliberate
+        # here, but returning a document whose description reads as though it
+        # were populated makes an absent projection indistinguishable from a
+        # projection that legitimately lists no harness. Downstream callers then
+        # report the wrong cause. The sibling reader that backs `gt harness
+        # roles` already discloses this the same way.
+        document["description"] = (
+            "Harness registry projection absent; no identities resolved. This empty result is "
+            "fail-soft, not evidence that no harness exists. Per "
+            "ADR-ELIMINATE-DURABLE-ROLE-ASSIGNMENT-001 and DCL-NO-DURABLE-ROLE-IN-REGISTRY-001 the "
+            "projection is no longer role or identity authority, so the correction is to resolve "
+            "identity from the canonical source, not to restore this file."
+        )
     return document
 
 
