@@ -12,11 +12,12 @@ Usage:
     python scripts/harness_projection/project_harness.py --harness goose --check
 
 Modes:
-    default   render the projection into the harness config directory
+    default   render the projection into the harness config directory and
+              delete profile leftover_paths / leftover_trees
     --dry-run print the plan (files that would be written/removed), write nothing
-    --check   compare current projection against a fresh render; report drift
-              and unmanaged files as projector gaps (obligation 6); exit 1 on
-              any difference, 0 when clean
+    --check   compare current projection against a fresh render; report write
+              drift and leftover files that still exist; exit 1 on any
+              difference, 0 when clean
 
 The engine renders four surface classes from the baseline:
     skills/   full SKILL.md bodies (plus reference files), token-substituted,
@@ -36,7 +37,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -78,8 +81,8 @@ def is_baseline_destination(rel: str) -> bool:
 
 
 def reject_baseline_destinations(plan: Plan) -> None:
-    """Fail closed if any planned write path is inside the baseline tree."""
-    blocked = sorted(rel for rel in plan.writes if is_baseline_destination(rel))
+    """Fail closed if any planned write or remove path is inside the baseline tree."""
+    blocked = sorted(rel for rel in list(plan.writes) + list(plan.removes) if is_baseline_destination(rel))
     if not blocked:
         return
     raise ProjectionError(
@@ -124,6 +127,153 @@ def substitute(text: str, tokens: dict[str, str], rel: str, gaps: list[str]) -> 
 
 
 _RUFF_CMD: list[str] | None = None
+
+
+VENV_INTERPRETER_DIR = "groundtruth-kb/.venv/Scripts"
+
+
+def projected_interpreter(*, windowless: bool, project_dir_var: str | None = None) -> str:
+    """Return the interpreter token for a projected hook registration.
+
+    Never emits a bare interpreter name. On Windows a bare ``python``,
+    ``python3`` or ``pythonw`` can resolve to a Microsoft Store app-execution
+    alias which prints a diagnostic and exits 0. The harness reads exit 0 as a
+    successful hook run, so a registration that never executed reports success
+    and the whole governance gate stack fails open silently: no credential
+    scan, no destructive-operation gate, no implementation-start
+    authorization, no source-of-truth read discipline.
+
+    The emitted token is a PATH, never a bare name, so the OS never performs
+    a PATH lookup and the Store alias can never be selected. When the
+    harness profile declares a project-directory variable the token is
+    runtime-expanded to an absolute path; otherwise it is project-root
+    relative, matching how that profile already emits its script paths.
+
+    Deliberately performs NO host discovery: no filesystem existence probe,
+    no checkout-root interpolation, no ``sys.executable`` fallback. Output
+    bytes derive only from the baseline and the profile, so two generations
+    from identical declared inputs are byte-identical on any checkout -- the
+    reproducibility contract in ``GOV-HARNESS-NEUTRAL-BASELINE-001``. An
+    earlier revision embedded host-absolute literals and violated it; see F3
+    of ``gtkb-wi5606-hook-interpreter-resolution-002``.
+
+    Source: advisory ``gtkb-advisory-hook-interpreter-fail-open-20260823``.
+    """
+    name = "pythonw.exe" if windowless else "python.exe"
+    relative = f"{VENV_INTERPRETER_DIR}/{name}"
+    if project_dir_var:
+        return f"${project_dir_var}/{relative}"
+    return relative
+
+
+_JUNK_NAMES = frozenset({".ds_store", "thumbs.db"})
+_JUNK_SUFFIXES = {".pyc", ".pyo", ".pyd", ".lock"}
+
+
+def is_projection_junk(path: Path, src_root: Path) -> bool:
+    """Skip bytecode, lock files, and nested session caches from baseline copies."""
+    try:
+        relative = path.relative_to(src_root)
+    except ValueError:
+        relative = path
+    parts = {part.lower() for part in relative.parts}
+    if "__pycache__" in parts:
+        return True
+    if ".claude" in parts and "session" in parts:
+        return True
+    if path.suffix.lower() in _JUNK_SUFFIXES:
+        return True
+    if path.name.lower() in _JUNK_NAMES:
+        return True
+    return False
+
+
+def _native_events_for_hook(profile: dict, hook: dict, gaps: list[str]) -> list[str]:
+    mapped = (profile.get("hook_events") or {}).get(hook["event"])
+    if mapped is None:
+        gaps.append(f"hook {hook.get('script')}: no native event for {hook.get('event')}")
+        return []
+    if isinstance(mapped, str):
+        values = [mapped]
+    elif isinstance(mapped, list):
+        values = [str(item) for item in mapped if str(item).strip()]
+    else:
+        gaps.append(f"hook {hook.get('script')}: event mapping is not a string or list")
+        return []
+    events: list[str] = []
+    seen: set[str] = set()
+    for event in values:
+        if event in seen:
+            continue
+        seen.add(event)
+        events.append(event)
+    return events
+
+
+def _intent_matcher(profile: dict, hook: dict) -> str:
+    matchers = profile.get("intent_matchers") or {}
+    intents = hook.get("intents") or []
+    if not intents or "all" in intents:
+        return ""
+    combined: list[str] = []
+    seen: set[str] = set()
+    for intent in intents:
+        pattern = str(matchers.get(intent) or "")
+        if not pattern or pattern in seen:
+            continue
+        seen.add(pattern)
+        combined.append(pattern)
+    return "|".join(combined)
+
+
+def _projected_timeout(profile: dict, hook: dict) -> int | None:
+    raw = hook.get("timeout_seconds")
+    floor = int(profile.get("hook_timeout_floor_seconds") or 0)
+    if raw is None:
+        return floor if floor > 0 else None
+    timeout_val = int(raw)
+    if floor > 0:
+        timeout_val = max(timeout_val, floor)
+    return timeout_val
+
+
+def _hook_command(profile: dict, hook: dict, tokens: dict[str, str], gaps: list[str]) -> str:
+    windowless = bool(profile.get("windowless_hooks"))
+    interpreter = projected_interpreter(windowless=windowless)
+    if hook.get("script_root") == "project_scripts":
+        target = f"scripts/{hook['script']}"
+    else:
+        target = f"{profile['hooks_dir']}/{hook['script']}"
+    adapter = str(profile.get("stdin_adapter") or "").strip()
+    if adapter:
+        command = f'"{interpreter}" {adapter} {target}'
+    else:
+        command = f'"{interpreter}" {target}'
+    for arg in hook.get("args", []):
+        command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
+    return command
+
+
+def apply_leftover_removes(plan: Plan, profile: dict) -> None:
+    owned = set(plan.writes)
+    seen: set[str] = set()
+    leftovers = list(profile.get("leftover_paths") or []) + list(profile.get("leftover_trees") or [])
+    for rel in leftovers:
+        normalized = normalize_planned_rel(str(rel))
+        if not normalized or normalized in seen or normalized in owned:
+            continue
+        seen.add(normalized)
+        plan.removes.append(normalized)
+
+
+def remove_planned_path(target: Path) -> bool:
+    if target.is_symlink() or target.is_file():
+        target.unlink()
+        return True
+    if target.is_dir():
+        shutil.rmtree(target)
+        return True
+    return False
 
 
 def _get_ruff_cmd() -> list[str]:
@@ -221,15 +371,17 @@ def render_hooks_registration(
             if native_event is None:
                 gaps.append(f"hook {hook['script']}: no native event for {hook['event']}")
                 continue
+            interpreter = projected_interpreter(windowless=False)
             if hook.get("script_root") == "project_scripts":
-                command = f"python scripts/{hook['script']}"
+                command = f'"{interpreter}" scripts/{hook["script"]}'
             else:
-                command = f"python {profile['hooks_dir']}/{hook['script']}"
+                command = f'"{interpreter}" {profile["hooks_dir"]}/{hook["script"]}'
             for arg in hook.get("args", []):
                 command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
             entry: dict = {"command": command}
-            if hook.get("timeout_seconds"):
-                entry["timeout"] = hook["timeout_seconds"]
+            timeout = _projected_timeout(profile, hook)
+            if timeout is not None:
+                entry["timeout"] = timeout
             if hook.get("blocking") and native_event in blocking_ok:
                 entry["blocking"] = True
             events.setdefault(native_event, []).append(entry)
@@ -252,12 +404,14 @@ def render_hooks_registration(
                 script_path = f"${profile['project_dir_var']}/scripts/{hook['script']}"
             else:
                 script_path = f"${profile['project_dir_var']}/{profile['hooks_dir']}/{hook['script']}"
-            command = f'pythonw "{script_path}"'
+            interpreter = projected_interpreter(windowless=True, project_dir_var=profile["project_dir_var"])
+            command = f'"{interpreter}" "{script_path}"'
             for arg in hook.get("args", []):
                 command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
             entry = {"type": "command", "command": command}
-            if hook.get("timeout_seconds"):
-                entry["timeout"] = hook["timeout_seconds"]
+            timeout = _projected_timeout(profile, hook)
+            if timeout is not None:
+                entry["timeout"] = timeout
             group = {"matcher": matcher, "hooks": [entry]} if matcher else {"hooks": [entry]}
             events_out.setdefault(native_event, []).append(group)
         payload = {
@@ -267,20 +421,29 @@ def render_hooks_registration(
         return profile["hooks_json_path"], json.dumps(payload, indent=2) + "\n"
     if mode in {"hooks_json", "cursor_hooks_json"}:
         events_out: dict[str, list[dict]] = {}
+        seen_keys: set[tuple[str, str, str]] = set()
+        fail_closed_ok = set((profile.get("fail_closed_events") or {}).get("supported") or [])
         for hook in manifest.get("hook", []):
-            native_event = profile.get("hook_events", {}).get(hook["event"])
-            if native_event is None:
-                continue
-            if hook.get("script_root") == "project_scripts":
-                command = f"python scripts/{hook['script']}"
-            else:
-                command = f"python {profile['hooks_dir']}/{hook['script']}"
-            for arg in hook.get("args", []):
-                command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
-            entry = {"command": command}
-            if hook.get("timeout_seconds"):
-                entry["timeout"] = hook["timeout_seconds"]
-            events_out.setdefault(native_event, []).append(entry)
+            for native_event in _native_events_for_hook(profile, hook, gaps):
+                command = _hook_command(profile, hook, tokens, gaps)
+                matcher = _intent_matcher(profile, hook)
+                key = (native_event, command, matcher)
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                entry: dict = {"command": command}
+                timeout = _projected_timeout(profile, hook)
+                if timeout is not None:
+                    entry["timeout"] = timeout
+                if matcher:
+                    entry["matcher"] = matcher
+                if (
+                    hook.get("blocking")
+                    and bool(profile.get("fail_closed_on_blocking"))
+                    and native_event in fail_closed_ok
+                ):
+                    entry["failClosed"] = True
+                events_out.setdefault(native_event, []).append(entry)
         payload = {
             "version": 1,
             "_comment": "PROJECTION, NOT CANONICAL - rendered from the baseline hooks/manifest.toml by the GT-KB projection engine; edit the baseline and re-project.",
@@ -310,6 +473,7 @@ def build_plan(harness: str) -> Plan:
         raise ProjectionError(f"baseline root missing: {base}")
     tokens = token_map(profile, baseline_cfg)
     stamp_text = profiles["stamp"]["text"].format(baseline_root=baseline_cfg["root"], harness=harness)
+    deferred_rules = set(baseline_cfg.get("deferred_rules") or [])
     plan = Plan()
 
     surfaces = {}
@@ -326,9 +490,18 @@ def build_plan(harness: str) -> Plan:
         for path in sorted(src_root.rglob("*")):
             if not path.is_file():
                 continue
+            if is_projection_junk(path, src_root):
+                continue
             rel_in_surface = path.relative_to(src_root).as_posix()
             if src_name == "hooks" and rel_in_surface == "manifest.toml":
                 continue  # the registration is rendered natively, below
+            if src_name == "rules" and rel_in_surface in deferred_rules:
+                # Activity-envelope deferral (WI-4949): these load on
+                # ::open <activity>, read from the baseline. A harness rules
+                # dir auto-loads wholesale, so projecting them here would
+                # defeat the deferral and make it advisory only.
+                plan.removes.append(f"{dst_root}/{rel_in_surface}")
+                continue
             rel_out = f"{dst_root}/{rel_in_surface}"
             if path.suffix.lower() in TEXT_SUFFIXES:
                 source_text = path.read_text(encoding="utf-8", errors="surrogateescape")
@@ -370,6 +543,7 @@ def build_plan(harness: str) -> Plan:
         )
         + "\n"
     )
+    apply_leftover_removes(plan, profile)
     reject_baseline_destinations(plan)
     return plan
 
@@ -385,9 +559,11 @@ def run(harness: str, mode: str) -> int:
             print("FAIL: gaps present; nothing written (fail closed)")
             return 2
     if mode == "dry-run":
-        print(f"DRY-RUN plan for {harness}: {len(plan.writes)} files")
+        print(f"DRY-RUN plan for {harness}: {len(plan.writes)} files, {len(plan.removes)} leftovers")
         for rel in sorted(plan.writes):
             print("  write", rel)
+        for rel in plan.removes:
+            print("  remove", rel)
         return 0
     if mode == "check":
         drift: list[str] = []
@@ -400,6 +576,9 @@ def run(harness: str, mode: str) -> int:
                 != hashlib.sha256(content.encode("utf-8", errors="surrogateescape")).hexdigest()
             ):
                 drift.append(f"differs: {rel}")
+        for rel in plan.removes:
+            if (PROJECT_ROOT / rel).exists():
+                drift.append(f"leftover: {rel}")
         print(f"CHECK {harness}: {len(drift)} drifted of {len(plan.writes)} managed")
         for d in drift:
             print("  -", d)
@@ -407,8 +586,15 @@ def run(harness: str, mode: str) -> int:
     for rel, content in plan.writes.items():
         target = PROJECT_ROOT / rel
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(content.encode("utf-8", errors="surrogateescape"))
-    print(f"PROJECTED {harness}: {len(plan.writes)} files")
+        encoded = content.encode("utf-8", errors="surrogateescape")
+        tmp_target = target.with_name(f".{target.name}.tmp")
+        tmp_target.write_bytes(encoded)
+        os.replace(tmp_target, target)
+    removed = 0
+    for rel in plan.removes:
+        if remove_planned_path(PROJECT_ROOT / rel):
+            removed += 1
+    print(f"PROJECTED {harness}: {len(plan.writes)} files, {removed} leftovers removed")
     return 0
 
 

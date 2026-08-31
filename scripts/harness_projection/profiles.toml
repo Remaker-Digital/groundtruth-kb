@@ -29,6 +29,23 @@ tokens = [
 hook_manifest = "hooks/manifest.toml"
 shared_helpers_dir = "scripts/skill-helpers"
 
+# Rules the activity-envelope contract defers to `::open <activity>`.
+# They are NOT projected into harness rules dirs, because those dirs
+# auto-load wholesale -- projecting them would make the deferral advisory
+# only. Consumers read them from the baseline on demand. Kept here rather
+# than in config/agent-control (forbidden runtime dependency).
+deferred_rules = [
+    "standing-priorities.md",
+    "way-of-working.md",
+    "review-operating-contract.md",
+    "loyal-opposition-runbook.md",
+    "loyal-opposition-knowledge-base-index.md",
+    "loyal-opposition-review-checklists.md",
+    "groundtruth-kb-vision.md",
+    "template-code-review.md",
+    "template-decision-memo.md",
+]
+
 [stamp]
 # Obligation 5: every projected artifact declares it is not canonical.
 # Rendered in syntax valid for the file type; for files with YAML
@@ -80,6 +97,30 @@ skill_body = "full"
 rules_projection = true
 hooks_projection = "settings_json"
 hooks_json_path = ".claude/settings.json"
+# Stale surfaces from superseded projections. The engine deletes these on every
+# render; apply_leftover_removes skips anything projector-owned, so this list can
+# never remove a live file. Mirrors the [harnesses.cursor] leftover contract.
+leftover_paths = [
+  ".claude/AGENTS.md",
+  ".claude/config.toml",
+  ".claude/routing.toml",
+  ".claude/hooks.json",
+  ".claude/settings.json.rolegate-bak",
+  ".claude/commands/registry.json",
+  ".claude/rules/codex-dead-ends-and-false-positives.md",
+  ".claude/rules/codex-decision-ledger.md",
+  ".claude/rules/codex-knowledge-base-index.md",
+  ".claude/rules/codex-loyal-opposition-runbook.md",
+  ".claude/rules/codex-review-checklists.md",
+  ".claude/rules/codex-review-gate.md",
+  ".claude/rules/codex-review-operating-contract.md",
+  ".claude/rules/codex-session-bootstrap.md",
+  ".claude/rules/codex-standing-priorities.md",
+  ".claude/rules/codex-way-of-working.md",
+  ".claude/rules/gtkb-loyal-opposition.mdc",
+  ".claude/rules/gtkb-prime-builder.mdc",
+]
+leftover_trees = [".claude/gtkb-hooks"]
 [harnesses.claude.hook_events]
 pre_tool_use = "PreToolUse"
 post_tool_use = "PostToolUse"
@@ -111,12 +152,32 @@ rules_projection = true
 hooks_projection = "hooks_json"
 hooks_json_path = ".cursor/hooks.json"
 adapter_generator = "scripts/generate_cursor_skill_adapters.py"
+stdin_adapter = "scripts/cursor_hook_adapter.py"
+windowless_hooks = false
+hook_timeout_floor_seconds = 30
+fail_closed_on_blocking = true
+leftover_paths = [
+  ".cursor/settings.json",
+  ".cursor/settings.json.rolegate-bak",
+  ".cursor/config.toml",
+  ".cursor/commands/registry.json",
+  ".cursor/hooks.json.off",
+  ".cursor/hooks.json.disabled",
+]
+leftover_trees = [".cursor/gtkb-hooks"]
 [harnesses.cursor.hook_events]
-pre_tool_use = "beforeShellExecution"
-post_tool_use = "afterShellExecution"
+pre_tool_use = "preToolUse"
+post_tool_use = "postToolUse"
 prompt_submit = "beforeSubmitPrompt"
 session_start = "sessionStart"
-turn_end = "sessionStop"
+turn_end = "stop"
+[harnesses.cursor.fail_closed_events]
+supported = ["preToolUse", "beforeSubmitPrompt", "stop", "beforeShellExecution"]
+[harnesses.cursor.intent_matchers]
+file_write = "Write|StrReplace|Edit|MultiEdit|Delete"
+shell_exec = "Shell|Bash"
+read_access = "Read|Grep|Glob"
+all = ""
 [harnesses.antigravity]
 config_dir = ".agent"
 skills_dir = ".agent/skills"
