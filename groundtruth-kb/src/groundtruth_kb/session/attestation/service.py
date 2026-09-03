@@ -1,30 +1,29 @@
-"""Session role-attestation service.
+"""Session init-binding service.
 
-Slice 1 of bridge/gtkb-session-role-attestation-service-slice-1 (GO at -002).
+Implements the single immutable binding `DCL-INIT-BOUND-SESSION-IDENTITY-001`
+v2 defines and the single resolver `DCL-SESSION-ROLE-RESOLUTION-001` v9
+requires: **role resolves only from the immutable session binding**.
 
-Implements the two attestation stores `DCL-INIT-BOUND-SESSION-IDENTITY-001`
-defines and the single canonical resolver `DCL-SESSION-ROLE-RESOLUTION-001` v8
-requires:
+- **Session-init binding** - immutable, exact-init-only record associating one
+  native session context with one opaque GT-KB session-context ID, the exact
+  accepted subject and role, and the minimum idempotency identity of the
+  accepted init command. One binding per native context, ever (a second init
+  is a typed ``session_already_initialized`` rejection).
+- **Resolver** - ``binding_for_context(native_context_id)`` returns the binding
+  or a typed failure. No fallback authority participates: no session
+  documents, no per-harness projection, no registry role, no vendor identity,
+  no marker files.
 
-- **Session-init binding attestation** — immutable, exact-init-only record
-  associating one invoking session context with one opaque session-envelope ID
-  and the exact accepted init command digest. One binding per invoking context,
-  ever (a second init is a typed ``session_already_initialized`` rejection).
-- **Role attestation** — append-only owner/dispatcher role statements carrying
-  the session-envelope ID, normalized role, source event, issuer, timestamp
-  and evidence digest. Deliberately carries NO session lifecycle, activity,
-  claim, implementation, wrap or handoff state.
-- **Resolver** — ``resolve_effective_role(envelope_id, at_time)`` returns the
-  attestation in force at the operation time, or a typed failure. No fallback
-  authority participates: no session documents, no per-harness projection, no
-  registry role, no vendor identity, no marker files.
+Role is a column on the immutable binding row, so it cannot change for the
+lifetime of a session context. There is deliberately no separate attestation
+log, no role-change operation, no sequence chain and no
+"role in force at a point in time" resolution: with an immutable role those
+concepts are vacuous. ``ADR-SESSION-ROLE-ATTESTATION-SERVICE-001`` is retired
+and its retirement forbids retaining that separate attestation log,
+role-change, registry fallback, or migration design.
 
-Storage is the canonical MemBase (`groundtruth.db`), append-only tables with
-no UPDATE/DELETE paths, per the platform's change-control doctrine. The
-binding and the initial role attestation are inserted in ONE SQLite
-transaction (DCL-INIT-BOUND-SESSION-IDENTITY-001 exact-init transaction
-clause 4): a partial transaction rolls back entirely and is recoverable
-without creating a second ID.
+Storage is the canonical MemBase (``groundtruth.db``), append-only with no
+UPDATE/DELETE paths, per the platform's change-control doctrine.
 """
 
 from __future__ import annotations
@@ -41,31 +40,34 @@ VALID_ROLES = frozenset({"prime-builder", "loyal-opposition"})
 
 # The valid exact-init forms carrying a mandatory role token
 # (SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001: subject mandatory, role optional -
-# only role-bearing forms create an initial role attestation).
+# only role-bearing forms create a binding).
 _EXACT_INIT_RE = re.compile(r"^::init (gtkb|application) (pb|lo)$")
 _ROLE_BY_TOKEN = {"pb": "prime-builder", "lo": "loyal-opposition"}
 
+# Mirrors the live canonical table exactly. Column ORDER is load-bearing for
+# nothing here because every statement names its columns, but the shape must
+# match or CREATE TABLE IF NOT EXISTS silently diverges on a fresh install.
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS session_init_bindings (
-    invoking_context TEXT NOT NULL,
-    envelope_id TEXT NOT NULL,
-    command_digest TEXT NOT NULL,
+    native_context_id TEXT NOT NULL,
+    session_context_id TEXT NOT NULL,
     subject TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    UNIQUE(invoking_context),
-    UNIQUE(envelope_id)
-);
-CREATE TABLE IF NOT EXISTS session_role_attestations (
-    envelope_id TEXT NOT NULL,
-    seq INTEGER NOT NULL,
     role TEXT NOT NULL,
-    source_event TEXT NOT NULL,
-    issuer TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    evidence_digest TEXT NOT NULL,
-    UNIQUE(envelope_id, seq)
+    minimum_idempotency_identity TEXT NOT NULL,
+    UNIQUE(native_context_id),
+    UNIQUE(session_context_id)
 );
 """
+
+_BINDING_COLUMNS = (
+    "native_context_id",
+    "session_context_id",
+    "subject",
+    "role",
+    "created_at",
+    "minimum_idempotency_identity",
+)
 
 
 class RoleAttestationError(RuntimeError):
@@ -78,27 +80,19 @@ class RoleAttestationError(RuntimeError):
 
 @dataclass(frozen=True)
 class Binding:
-    invoking_context: str
-    envelope_id: str
-    command_digest: str
+    """One immutable session-init binding. Role is intrinsic and unchangeable."""
+
+    native_context_id: str
+    session_context_id: str
     subject: str
-    created_at: str
-
-
-@dataclass(frozen=True)
-class Attestation:
-    envelope_id: str
-    seq: int
     role: str
-    source_event: str
-    issuer: str
     created_at: str
-    evidence_digest: str
+    minimum_idempotency_identity: str
 
     @property
     def evidence_reference(self) -> str:
         """The persistable evidence reference consumers record."""
-        return f"role-attestation:{self.envelope_id}:{self.seq}:{self.evidence_digest[:16]}"
+        return f"session-binding:{self.session_context_id}:{self.minimum_idempotency_identity[:16]}"
 
 
 def _utc_now() -> str:
@@ -122,17 +116,16 @@ def _connect(db_path: Path) -> sqlite3.Connection:
 def bind_exact_init(
     db_path: Path,
     *,
-    invoking_context: str,
+    native_context_id: str,
     init_command: str,
-    issuer: str,
-) -> tuple[Binding, Attestation]:
-    """The atomic exact-init transaction (DCL clauses 1-6).
+) -> Binding:
+    """The atomic exact-init transaction (DCL-INIT-BOUND-SESSION-IDENTITY-001).
 
     Accepts only the complete canonical role-bearing init message. Creates the
-    binding and the initial role attestation in one transaction, or nothing.
+    one immutable binding, or nothing.
     """
-    if not invoking_context or not invoking_context.strip():
-        raise RoleAttestationError("invalid_invoking_context", "invoking session context is required")
+    if not native_context_id or not native_context_id.strip():
+        raise RoleAttestationError("invalid_native_context_id", "native session context is required")
     match = _EXACT_INIT_RE.match(init_command or "")
     if match is None:
         raise RoleAttestationError(
@@ -143,145 +136,54 @@ def bind_exact_init(
     subject, role_token = match.group(1), match.group(2)
     role = _ROLE_BY_TOKEN[role_token]
     now = _utc_now()
-    envelope_id = f"SENV-{uuid.uuid4().hex}"
-    command_digest = _digest(init_command)
-    evidence_digest = _digest(envelope_id, role, "exact_init", issuer, now, command_digest)
+    session_context_id = f"SENV-{uuid.uuid4().hex}"
+    minimum_idempotency_identity = _digest(init_command)
 
     conn = _connect(db_path)
     try:
-        with conn:  # one atomic transaction: binding + initial attestation
+        with conn:  # one atomic transaction
             existing = conn.execute(
-                "SELECT envelope_id FROM session_init_bindings WHERE invoking_context = ?",
-                (invoking_context,),
+                "SELECT session_context_id FROM session_init_bindings WHERE native_context_id = ?",
+                (native_context_id,),
             ).fetchone()
             if existing is not None:
                 raise RoleAttestationError(
                     "session_already_initialized",
-                    f"invoking context already bound to {existing[0]}; another init creates no ID "
+                    f"native context already bound to {existing[0]}; another init creates no ID "
                     "and changes no role, subject, binding, or context-load state",
                 )
             conn.execute(
-                "INSERT INTO session_init_bindings VALUES (?, ?, ?, ?, ?)",
-                (invoking_context, envelope_id, command_digest, subject, now),
-            )
-            conn.execute(
-                "INSERT INTO session_role_attestations VALUES (?, 1, ?, 'exact_init', ?, ?, ?)",
-                (envelope_id, role, issuer, now, evidence_digest),
+                "INSERT INTO session_init_bindings "
+                "(native_context_id, session_context_id, subject, role, created_at, "
+                "minimum_idempotency_identity) VALUES (?, ?, ?, ?, ?, ?)",
+                (native_context_id, session_context_id, subject, role, now, minimum_idempotency_identity),
             )
     finally:
         conn.close()
-    binding = Binding(invoking_context, envelope_id, command_digest, subject, now)
-    attestation = Attestation(envelope_id, 1, role, "exact_init", issuer, now, evidence_digest)
-    return binding, attestation
+    return Binding(native_context_id, session_context_id, subject, role, now, minimum_idempotency_identity)
 
 
-def binding_for_context(db_path: Path, invoking_context: str) -> Binding:
-    """Resolve the immutable binding for an invoking session context."""
+def binding_for_context(db_path: Path, native_context_id: str) -> Binding:
+    """Resolve the immutable binding, and therefore the role, for a native context."""
     conn = _connect(db_path)
     try:
         row = conn.execute(
-            "SELECT invoking_context, envelope_id, command_digest, subject, created_at "
-            "FROM session_init_bindings WHERE invoking_context = ?",
-            (invoking_context,),
+            f"SELECT {', '.join(_BINDING_COLUMNS)} "  # noqa: S608 - fixed identifier tuple, no user input
+            "FROM session_init_bindings WHERE native_context_id = ?",
+            (native_context_id,),
         ).fetchone()
     finally:
         conn.close()
     if row is None:
         raise RoleAttestationError(
             "no_session_binding",
-            f"no session-init binding exists for invoking context {invoking_context!r}; "
+            f"no session-init binding exists for native context {native_context_id!r}; "
             "run the canonical '::init <subject> <role>' first",
         )
-    return Binding(*row)
-
-
-def attest_role_change(
-    db_path: Path,
-    *,
-    envelope_id: str,
-    role: str,
-    issuer: str,
-    owner_decision_ref: str,
-) -> Attestation:
-    """Append an owner-directed role change (never re-runs init, never mutates).
-
-    The evidence digest chains the prior attestation, so verifiers can always
-    see that the same envelope held the earlier role - an owner role change
-    cannot make one session context an independent reviewer of its own
-    earlier work.
-    """
-    if role not in VALID_ROLES:
-        raise RoleAttestationError("invalid_role", f"role must be one of {sorted(VALID_ROLES)}")
-    if not owner_decision_ref or not owner_decision_ref.strip():
+    binding = Binding(*row)
+    if binding.role not in VALID_ROLES:
         raise RoleAttestationError(
-            "owner_decision_required",
-            "an owner-directed role change requires a durable owner-decision reference",
+            "invalid_role",
+            f"binding for {native_context_id!r} carries unsupported role {binding.role!r}",
         )
-    now = _utc_now()
-    conn = _connect(db_path)
-    try:
-        with conn:
-            bound = conn.execute(
-                "SELECT envelope_id FROM session_init_bindings WHERE envelope_id = ?",
-                (envelope_id,),
-            ).fetchone()
-            if bound is None:
-                raise RoleAttestationError("unknown_envelope_id", f"no binding exists for envelope id {envelope_id!r}")
-            prior = conn.execute(
-                "SELECT seq, evidence_digest FROM session_role_attestations "
-                "WHERE envelope_id = ? ORDER BY seq DESC LIMIT 1",
-                (envelope_id,),
-            ).fetchone()
-            seq = (prior[0] + 1) if prior else 1
-            chain = prior[1] if prior else ""
-            evidence_digest = _digest(envelope_id, role, "owner_role_change", issuer, now, owner_decision_ref, chain)
-            conn.execute(
-                "INSERT INTO session_role_attestations VALUES (?, ?, ?, 'owner_role_change', ?, ?, ?)",
-                (envelope_id, seq, role, issuer, now, evidence_digest),
-            )
-    finally:
-        conn.close()
-    return Attestation(envelope_id, seq, role, "owner_role_change", issuer, now, evidence_digest)
-
-
-def resolve_effective_role(
-    db_path: Path,
-    *,
-    envelope_id: str,
-    at_time: str | None = None,
-) -> Attestation:
-    """The one canonical resolver (DCL-SESSION-ROLE-RESOLUTION-001 v8).
-
-    Returns the attestation in force at ``at_time`` (default: now). No
-    fallback authority of any kind participates; absence is a typed failure,
-    never a default role.
-    """
-    operation_time = at_time or _utc_now()
-    conn = _connect(db_path)
-    try:
-        row = conn.execute(
-            "SELECT envelope_id, seq, role, source_event, issuer, created_at, evidence_digest "
-            "FROM session_role_attestations WHERE envelope_id = ? AND created_at <= ? "
-            "ORDER BY seq DESC LIMIT 1",
-            (envelope_id, operation_time),
-        ).fetchone()
-    finally:
-        conn.close()
-    if row is None:
-        raise RoleAttestationError(
-            "no_role_attestation",
-            f"no role attestation is in force for {envelope_id!r} at {operation_time}; "
-            "no fallback authority participates in role resolution",
-        )
-    return Attestation(*row)
-
-
-def resolve_effective_role_for_context(
-    db_path: Path,
-    *,
-    invoking_context: str,
-    at_time: str | None = None,
-) -> tuple[Binding, Attestation]:
-    """Convenience composition: invoking context -> binding -> effective role."""
-    binding = binding_for_context(db_path, invoking_context)
-    return binding, resolve_effective_role(db_path, envelope_id=binding.envelope_id, at_time=at_time)
+    return binding

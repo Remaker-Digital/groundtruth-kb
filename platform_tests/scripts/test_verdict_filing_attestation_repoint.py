@@ -16,7 +16,6 @@ for _extra in (PROJECT_ROOT, PROJECT_ROOT / "groundtruth-kb" / "src"):
 from groundtruth_kb.bridge import verdict_filing  # noqa: E402
 from groundtruth_kb.session.attestation import (  # noqa: E402
     RoleAttestationError,
-    attest_role_change,
     bind_exact_init,
 )
 
@@ -30,19 +29,15 @@ CONTENT = (
 
 
 def _schema(db_path: Path) -> None:
-    """Create only the two attestation tables the service reads and writes."""
+    """Create the one canonical binding table the service reads and writes."""
     conn = sqlite3.connect(db_path)
     with conn:
         conn.execute(
             "CREATE TABLE IF NOT EXISTS session_init_bindings ("
-            "invoking_context TEXT PRIMARY KEY, envelope_id TEXT, command_digest TEXT, "
-            "subject TEXT, created_at TEXT)"
-        )
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS session_role_attestations ("
-            "envelope_id TEXT, seq INTEGER, role TEXT, source_event TEXT, "
-            "issuer TEXT, created_at TEXT, evidence_digest TEXT, "
-            "PRIMARY KEY (envelope_id, seq))"
+            "native_context_id TEXT NOT NULL, session_context_id TEXT NOT NULL, "
+            "subject TEXT NOT NULL, role TEXT NOT NULL, created_at TEXT NOT NULL, "
+            "minimum_idempotency_identity TEXT NOT NULL, "
+            "UNIQUE(native_context_id), UNIQUE(session_context_id))"
         )
     conn.close()
 
@@ -55,9 +50,8 @@ def bound_root(tmp_path: Path) -> tuple[Path, str]:
     context = "11111111-2222-3333-4444-555555555555"
     bind_exact_init(
         db_path,
-        invoking_context=context,
+        native_context_id=context,
         init_command="::init gtkb pb",
-        issuer="fixture-harness",
     )
     return tmp_path, context
 
@@ -75,8 +69,8 @@ def test_attestation_metadata_persists_the_evidence_reference(bound_root):
     root, context = bound_root
     metadata = verdict_filing._metadata_from_attestation(context, root, CONTENT)
     reference = metadata["author_role_attestation"]
-    assert reference.startswith("role-attestation:SENV-")
-    assert reference.count(":") == 3
+    assert reference.startswith("session-binding:SENV-")
+    assert reference.count(":") == 2
 
 
 def test_attested_role_reflects_the_init_command_not_the_registry(tmp_path):
@@ -86,9 +80,8 @@ def test_attested_role_reflects_the_init_command_not_the_registry(tmp_path):
     context = "99999999-8888-7777-6666-555555555555"
     bind_exact_init(
         db_path,
-        invoking_context=context,
+        native_context_id=context,
         init_command="::init gtkb lo",
-        issuer="fixture-harness",
     )
     metadata = verdict_filing._metadata_from_attestation(context, tmp_path, CONTENT)
     assert metadata["author_identity"].startswith("loyal-opposition/")
@@ -105,17 +98,13 @@ def test_model_fields_come_from_the_artifact_declaration(bound_root):
 
 def test_model_fields_omitted_when_the_artifact_declares_none(bound_root):
     root, context = bound_root
-    metadata = verdict_filing._metadata_from_attestation(
-        context, root, "VERIFIED\n\n# Body\n"
-    )
+    metadata = verdict_filing._metadata_from_attestation(context, root, "VERIFIED\n\n# Body\n")
     assert "author_model" not in metadata
 
 
 def test_unbound_context_fails_closed_without_legacy_fallback(bound_root):
     root, _context = bound_root
-    with pytest.raises(
-        verdict_filing.VerdictFilingError, match="session-init binding exists"
-    ):
+    with pytest.raises(verdict_filing.VerdictFilingError, match="session-init binding exists"):
         verdict_filing._metadata_from_attestation("not-a-bound-context", root, CONTENT)
 
 
@@ -130,7 +119,12 @@ def test_bound_context_with_unresolvable_role_raises_rather_than_falling_through
     root, context = bound_root
     conn = sqlite3.connect(root / "groundtruth.db")
     with conn:
-        conn.execute("DELETE FROM session_role_attestations")
+        # Role lives on the binding now, so the unresolvable case is a bound
+        # row carrying a role outside the canonical set.
+        conn.execute(
+            "UPDATE session_init_bindings SET role = 'owner' WHERE native_context_id = ?",
+            (context,),
+        )
     conn.close()
 
     with pytest.raises((verdict_filing.VerdictFilingError, RoleAttestationError)):
@@ -144,27 +138,26 @@ def test_envelope_entry_point_requires_the_attestation(bound_root):
     assert metadata["author_session_context_id"] == context
 
 
-def test_later_role_change_cannot_authorize_verdict_filing(bound_root):
-    """The owner-corrected model keeps role immutable within one context."""
+def test_role_is_immutable_so_no_later_change_can_authorize_verdict_filing(bound_root):
+    """The owner-corrected model keeps role immutable within one context.
+
+    Role lives on the immutable binding row, so repeated resolution is stable
+    and the service offers no role-change path that could re-authorize filing.
+    """
 
     root, context = bound_root
     initial = verdict_filing._metadata_from_attestation(context, root, CONTENT)
-    attest_role_change(
-        root / "groundtruth.db",
-        envelope_id=initial["author_session_envelope_id"],
-        role="loyal-opposition",
-        issuer="fixture-owner",
-        owner_decision_ref="DELIB-OBSOLETE-ROLE-CHANGE-FIXTURE",
-    )
+    again = verdict_filing._metadata_from_attestation(context, root, CONTENT)
+    assert again == initial
+    assert initial["author_identity"].startswith("prime-builder/")
 
-    with pytest.raises(verdict_filing.VerdictFilingError, match="exact-init"):
-        verdict_filing._metadata_from_attestation(context, root, CONTENT)
+    import groundtruth_kb.session.attestation as attestation_pkg
+
+    assert not hasattr(attestation_pkg, "attest_role_change")
 
 
 def test_harness_id_resolves_from_the_identity_map_not_from_the_name():
     """The name-to-ID mapping is owner-assigned, so it must be read, not derived."""
     assert verdict_filing._harness_id_for("", PROJECT_ROOT) == ""
-    assert (
-        verdict_filing._harness_id_for("definitely-not-a-harness", PROJECT_ROOT) == ""
-    )
+    assert verdict_filing._harness_id_for("definitely-not-a-harness", PROJECT_ROOT) == ""
     assert verdict_filing._harness_id_for("claude", PROJECT_ROOT) == "B"

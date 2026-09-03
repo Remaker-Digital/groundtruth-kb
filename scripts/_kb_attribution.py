@@ -32,9 +32,7 @@ def _current_session_id() -> str:
 
     session_id = resolve_session_id(order=BRIDGE_WORK_INTENT_ORDER)
     if not session_id:
-        raise RuntimeError(
-            "resolve_changed_by: current session id is missing; exact-init role authority is required."
-        )
+        raise RuntimeError("resolve_changed_by: current session id is missing; exact-init role authority is required.")
     return session_id
 
 
@@ -43,9 +41,7 @@ def _resolve_harness_attribution(project_root: Path, harness_name: str | None) -
 
     selected_name = _expected_harness_name(harness_name)
     if not selected_name:
-        raise RuntimeError(
-            "resolve_changed_by: acting harness identity is unavailable."
-        )
+        raise RuntimeError("resolve_changed_by: acting harness identity is unavailable.")
 
     from groundtruth_kb.session.envelope import (
         EnvelopeError,
@@ -86,26 +82,19 @@ def resolve_changed_by(
 
     from groundtruth_kb.session.attestation import (
         RoleAttestationError,
-        resolve_effective_role_for_context,
+        binding_for_context,
     )
 
     try:
-        _binding, attestation = resolve_effective_role_for_context(
+        binding = binding_for_context(
             resolved_project_root / "groundtruth.db",
-            invoking_context=session_id,
+            session_id,
         )
     except RoleAttestationError as exc:
         raise RuntimeError(f"resolve_changed_by: {exc}") from exc
-    if attestation.source_event != "exact_init":
-        raise RuntimeError(
-            "resolve_changed_by: changed_by role requires the immutable exact-init attestation; "
-            f"got source_event={attestation.source_event or '<missing>'}"
-        )
-    if attestation.role not in {"prime-builder", "loyal-opposition"}:
-        raise RuntimeError(
-            f"resolve_changed_by: unsupported exact-init role {attestation.role!r}"
-        )
-    return f"{attestation.role}/{resolved_harness}"
+    if binding.role not in {"prime-builder", "loyal-opposition"}:
+        raise RuntimeError(f"resolve_changed_by: unsupported exact-init role {binding.role!r}")
+    return f"{binding.role}/{resolved_harness}"
 
 
 def resolve_changed_by_or_none(

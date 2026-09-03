@@ -29,18 +29,22 @@ CONTEXT = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
 
 def _schema(db_path: Path) -> None:
+    """Pre-create the CANONICAL binding shape.
+
+    This fixture must mirror the live ``session_init_bindings`` shape exactly.
+    A fixture that pre-creates a stale shape makes the service's
+    ``CREATE TABLE IF NOT EXISTS`` a silent no-op and the subsequent INSERT
+    fail - which is precisely the production incident this suite exists to
+    prevent, reproduced inside the test that should have caught it.
+    """
     conn = sqlite3.connect(db_path)
     with conn:
         conn.execute(
             "CREATE TABLE IF NOT EXISTS session_init_bindings ("
-            "invoking_context TEXT PRIMARY KEY, envelope_id TEXT, command_digest TEXT, "
-            "subject TEXT, created_at TEXT)"
-        )
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS session_role_attestations ("
-            "envelope_id TEXT, seq INTEGER, role TEXT, source_event TEXT, "
-            "issuer TEXT, created_at TEXT, evidence_digest TEXT, "
-            "PRIMARY KEY (envelope_id, seq))"
+            "native_context_id TEXT NOT NULL, session_context_id TEXT NOT NULL, "
+            "subject TEXT NOT NULL, role TEXT NOT NULL, created_at TEXT NOT NULL, "
+            "minimum_idempotency_identity TEXT NOT NULL, "
+            "UNIQUE(native_context_id), UNIQUE(session_context_id))"
         )
     conn.close()
 
@@ -54,7 +58,7 @@ def root(tmp_path: Path) -> Path:
 def test_literal_init_command_creates_a_binding(root):
     reference = ssi._bind_session_role_attestation(root, CONTEXT, "::init gtkb pb", "claude")
     assert reference is not None
-    assert reference.startswith("role-attestation:SENV-")
+    assert reference.startswith("session-binding:SENV-")
     binding = binding_for_context(root / "groundtruth.db", CONTEXT)
     assert binding.subject == "gtkb"
 
@@ -62,7 +66,7 @@ def test_literal_init_command_creates_a_binding(root):
 def test_binding_records_the_role_the_command_states(root):
     ssi._bind_session_role_attestation(root, CONTEXT, "::init gtkb lo", "claude")
     conn = sqlite3.connect(root / "groundtruth.db")
-    role = conn.execute("SELECT role FROM session_role_attestations").fetchone()[0]
+    role = conn.execute("SELECT role FROM session_init_bindings WHERE native_context_id = ?", (CONTEXT,)).fetchone()[0]
     conn.close()
     assert role == "loyal-opposition"
 
@@ -94,10 +98,10 @@ def test_re_entry_is_a_no_op_not_a_failure(root):
     assert second is None
 
     conn = sqlite3.connect(root / "groundtruth.db")
-    roles = [r[0] for r in conn.execute("SELECT role FROM session_role_attestations")]
+    roles = [r[0] for r in conn.execute("SELECT role FROM session_init_bindings")]
     subject = conn.execute("SELECT subject FROM session_init_bindings").fetchone()[0]
     conn.close()
-    assert roles == ["prime-builder"], "re-init must not append a contradicting attestation"
+    assert roles == ["prime-builder"], "re-init must not change the bound role"
     assert subject == "gtkb"
 
 

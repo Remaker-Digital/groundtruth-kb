@@ -1083,15 +1083,15 @@ def _resolve_role_attestation(
     try:
         from groundtruth_kb.session.attestation.service import (
             RoleAttestationError,
-            resolve_effective_role_for_context,
+            binding_for_context,
         )
     except ImportError as exc:  # pragma: no cover - installation failure is fail-closed
-        return None, None, None, f"role-attestation service unavailable: {exc}"
+        return None, None, None, f"session-binding service unavailable: {exc}"
 
     try:
-        binding, attestation = resolve_effective_role_for_context(
+        binding = binding_for_context(
             _database_path(project_root),
-            invoking_context=session_id,
+            session_id,
         )
     except RoleAttestationError as exc:
         return None, None, None, f"{exc.code}: {exc}"
@@ -1102,26 +1102,19 @@ def _resolve_role_attestation(
     ) as exc:  # pragma: no cover - defensive fail-closed path
         return None, None, None, f"role-attestation service failed: {exc}"
 
-    role = (attestation.role or "").strip().lower()
+    role = (binding.role or "").strip().lower()
     if role not in {"prime-builder", "loyal-opposition"}:
         return (
             None,
-            binding.envelope_id,
-            attestation.evidence_reference,
-            f"unsupported attested role {role!r}",
-        )
-    if attestation.source_event != "exact_init":
-        return (
-            None,
-            binding.envelope_id,
-            attestation.evidence_reference,
-            f"unsupported role-attestation source event {attestation.source_event!r}; exact_init is required",
+            binding.session_context_id,
+            binding.evidence_reference,
+            f"unsupported bound role {role!r}",
         )
     return (
         role,
-        binding.envelope_id,
-        attestation.evidence_reference,
-        (f"role attestation {attestation.evidence_reference!r} resolves {role!r}"),
+        binding.session_context_id,
+        binding.evidence_reference,
+        (f"session binding {binding.evidence_reference!r} resolves {role!r}"),
     )
 
 

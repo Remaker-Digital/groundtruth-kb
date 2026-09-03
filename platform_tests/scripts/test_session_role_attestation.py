@@ -1,9 +1,14 @@
-"""Spec-derived tests for the session role-attestation service (Slice 1).
+"""Spec-derived tests for the session init-binding service.
 
-Derived from `DCL-INIT-BOUND-SESSION-IDENTITY-001` (exact-init transaction
-clauses 1-6, binding record boundary) and `DCL-SESSION-ROLE-RESOLUTION-001` v8
-(single resolver, no fallback authority, append-only role change), per
-bridge/gtkb-session-role-attestation-service-slice-1 (GO at -002).
+Derived from `DCL-INIT-BOUND-SESSION-IDENTITY-001` v2 (exact-init transaction,
+binding record boundary) and `DCL-SESSION-ROLE-RESOLUTION-001` v9 ("Role
+resolves only from the immutable session binding").
+
+`ADR-SESSION-ROLE-ATTESTATION-SERVICE-001` is retired. Its retirement forbids
+any test retaining its separate attestation log, role-change, registry
+fallback, or migration design, so the three former owner-role-change tests
+are deleted rather than ported: with role carried on the immutable binding
+row there is no role-change operation to exercise.
 """
 
 from __future__ import annotations
@@ -21,166 +26,136 @@ if str(SRC) not in sys.path:
 
 from groundtruth_kb.session.attestation import (  # noqa: E402
     RoleAttestationError,
-    attest_role_change,
     bind_exact_init,
-    resolve_effective_role,
-    resolve_effective_role_for_context,
+    binding_for_context,
 )
+
+LIVE_BINDING_COLUMNS = [
+    "native_context_id",
+    "session_context_id",
+    "subject",
+    "role",
+    "created_at",
+    "minimum_idempotency_identity",
+]
 
 
 @pytest.fixture()
 def db(tmp_path: Path) -> Path:
-    return tmp_path / "attestation-fixture.db"
+    return tmp_path / "session-binding-fixture.db"
 
 
 def _rows(db_path: Path, table: str) -> list[tuple]:
     conn = sqlite3.connect(str(db_path))
     try:
-        return conn.execute(f"SELECT * FROM {table}").fetchall()
+        return conn.execute(f"SELECT * FROM {table}").fetchall()  # noqa: S608 - fixed test table name
     except sqlite3.OperationalError:
         return []
     finally:
         conn.close()
 
 
-# --- exact-init transaction (DCL clauses 1-6) ---------------------------------
+# --- exact-init transaction ---------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "command,role",
+    "command,subject,role",
     [
-        ("::init gtkb pb", "prime-builder"),
-        ("::init gtkb lo", "loyal-opposition"),
-        ("::init application pb", "prime-builder"),
-        ("::init application lo", "loyal-opposition"),
+        ("::init gtkb pb", "gtkb", "prime-builder"),
+        ("::init gtkb lo", "gtkb", "loyal-opposition"),
+        ("::init application pb", "application", "prime-builder"),
+        ("::init application lo", "application", "loyal-opposition"),
     ],
 )
-def test_valid_exact_init_creates_binding_and_attestation(db, command, role):
-    binding, attestation = bind_exact_init(db, invoking_context="ctx-1", init_command=command, issuer="hook:init")
-    assert binding.envelope_id.startswith("SENV-")
-    assert attestation.role == role
-    assert attestation.seq == 1
-    assert attestation.source_event == "exact_init"
+def test_valid_exact_init_creates_binding_carrying_role(db, command, subject, role):
+    binding = bind_exact_init(db, native_context_id="ctx-1", init_command=command)
+    assert binding.session_context_id.startswith("SENV-")
+    assert binding.native_context_id == "ctx-1"
+    assert binding.subject == subject
+    assert binding.role == role
+    assert binding.minimum_idempotency_identity
     assert len(_rows(db, "session_init_bindings")) == 1
-    assert len(_rows(db, "session_role_attestations")) == 1
 
 
 @pytest.mark.parametrize(
     "bad",
     [
-        "::init gtkb",  # subject-only: no role token, no attestation basis
-        "::init gtkb PB",  # case variant
-        "::init gtkb prime-builder",  # synonym
-        " ::init gtkb pb",  # whitespace variant
-        "::init gtkb pb\n::open build",  # multi-line
-        "init gtkb pb",  # missing marker
-        "::init gtkb pb extra",  # trailing token
         "",
+        "::init gtkb",
+        "::init  gtkb  pb",
+        "::init gtkb pb ",
+        "::INIT gtkb pb",
+        "::init unknown pb",
+        "::init gtkb owner",
+        "::init gtkb pb\n::init gtkb lo",
     ],
 )
 def test_invalid_init_creates_nothing(db, bad):
     with pytest.raises(RoleAttestationError) as exc:
-        bind_exact_init(db, invoking_context="ctx-1", init_command=bad, issuer="hook:init")
+        bind_exact_init(db, native_context_id="ctx-2", init_command=bad)
     assert exc.value.code == "invalid_init_command"
     assert _rows(db, "session_init_bindings") == []
-    assert _rows(db, "session_role_attestations") == []
 
 
 def test_second_init_is_typed_rejection_and_creates_no_second_id(db):
-    binding, _ = bind_exact_init(db, invoking_context="ctx-1", init_command="::init gtkb pb", issuer="hook:init")
+    first = bind_exact_init(db, native_context_id="ctx-3", init_command="::init gtkb pb")
     with pytest.raises(RoleAttestationError) as exc:
-        bind_exact_init(db, invoking_context="ctx-1", init_command="::init gtkb lo", issuer="hook:init")
+        bind_exact_init(db, native_context_id="ctx-3", init_command="::init gtkb lo")
     assert exc.value.code == "session_already_initialized"
-    assert len(_rows(db, "session_init_bindings")) == 1
-    # And the original role is untouched.
-    assert resolve_effective_role(db, envelope_id=binding.envelope_id).role == "prime-builder"
+    rows = _rows(db, "session_init_bindings")
+    assert len(rows) == 1
+    # The immutable binding is unchanged: neither a second ID nor a new role.
+    assert binding_for_context(db, "ctx-3") == first
+    assert binding_for_context(db, "ctx-3").role == "prime-builder"
 
 
-# --- resolver (DCL v8: one resolver, no fallback) ------------------------------
-
-
-def test_resolver_returns_typed_failure_with_no_attestation(db):
+def test_missing_native_context_is_typed_rejection(db):
     with pytest.raises(RoleAttestationError) as exc:
-        resolve_effective_role(db, envelope_id="SENV-nonexistent")
-    assert exc.value.code == "no_role_attestation"
+        bind_exact_init(db, native_context_id="  ", init_command="::init gtkb pb")
+    assert exc.value.code == "invalid_native_context_id"
 
 
-def test_resolver_for_context_requires_binding(db):
+# --- resolution (DCL-SESSION-ROLE-RESOLUTION-001 v9) ---------------------------
+
+
+def test_resolver_requires_binding(db):
     with pytest.raises(RoleAttestationError) as exc:
-        resolve_effective_role_for_context(db, invoking_context="never-bound")
+        binding_for_context(db, "never-bound")
     assert exc.value.code == "no_session_binding"
 
 
-def test_resolver_composes_context_to_role(db):
-    bind_exact_init(db, invoking_context="ctx-9", init_command="::init gtkb lo", issuer="hook:init")
-    binding, attestation = resolve_effective_role_for_context(db, invoking_context="ctx-9")
-    assert binding.invoking_context == "ctx-9"
-    assert attestation.role == "loyal-opposition"
-    assert attestation.evidence_reference.startswith(f"role-attestation:{binding.envelope_id}:1:")
+def test_resolver_returns_role_from_the_binding(db):
+    bind_exact_init(db, native_context_id="ctx-9", init_command="::init gtkb lo")
+    binding = binding_for_context(db, "ctx-9")
+    assert binding.native_context_id == "ctx-9"
+    assert binding.role == "loyal-opposition"
+    assert binding.evidence_reference.startswith(f"session-binding:{binding.session_context_id}:")
 
 
-# --- owner-directed role change (append-only, chained) -------------------------
-
-
-def test_owner_role_change_appends_and_resolves(db):
-    binding, first = bind_exact_init(db, invoking_context="ctx-2", init_command="::init gtkb lo", issuer="hook:init")
-    changed = attest_role_change(
-        db,
-        envelope_id=binding.envelope_id,
-        role="prime-builder",
-        issuer="owner",
-        owner_decision_ref="DELIB-FIXTURE-0001",
-    )
-    assert changed.seq == 2
-    assert resolve_effective_role(db, envelope_id=binding.envelope_id).role == "prime-builder"
-    # Append-only: both attestations persist; the prior one is not rewritten.
-    rows = _rows(db, "session_role_attestations")
-    assert len(rows) == 2
-    # The history keeps the earlier role visible for independence checks.
-    assert resolve_effective_role(db, envelope_id=binding.envelope_id, at_time=first.created_at).role in {
-        "loyal-opposition",
-        "prime-builder",  # same-second change: latest-seq wins, still auditable via rows
-    }
-
-
-def test_owner_role_change_requires_decision_ref_and_valid_role(db):
-    binding, _ = bind_exact_init(db, invoking_context="ctx-3", init_command="::init gtkb pb", issuer="hook:init")
+def test_unsupported_bound_role_is_typed_failure(db):
+    bind_exact_init(db, native_context_id="ctx-10", init_command="::init gtkb pb")
+    conn = sqlite3.connect(str(db))
+    try:
+        conn.execute("UPDATE session_init_bindings SET role = 'owner' WHERE native_context_id = 'ctx-10'")
+        conn.commit()
+    finally:
+        conn.close()
     with pytest.raises(RoleAttestationError) as exc:
-        attest_role_change(
-            db, envelope_id=binding.envelope_id, role="prime-builder", issuer="owner", owner_decision_ref=" "
-        )
-    assert exc.value.code == "owner_decision_required"
-    with pytest.raises(RoleAttestationError) as exc:
-        attest_role_change(
-            db,
-            envelope_id=binding.envelope_id,
-            role="acting-prime-builder",
-            issuer="owner",
-            owner_decision_ref="DELIB-X",
-        )
+        binding_for_context(db, "ctx-10")
     assert exc.value.code == "invalid_role"
-    with pytest.raises(RoleAttestationError) as exc:
-        attest_role_change(
-            db, envelope_id="SENV-unknown", role="prime-builder", issuer="owner", owner_decision_ref="DELIB-X"
-        )
-    assert exc.value.code == "unknown_envelope_id"
 
 
-def test_role_change_digest_chains_prior_attestation(db):
-    binding, first = bind_exact_init(db, invoking_context="ctx-4", init_command="::init gtkb lo", issuer="hook:init")
-    second = attest_role_change(
-        db,
-        envelope_id=binding.envelope_id,
-        role="prime-builder",
-        issuer="owner",
-        owner_decision_ref="DELIB-FIXTURE-0002",
-    )
-    third = attest_role_change(
-        db,
-        envelope_id=binding.envelope_id,
-        role="loyal-opposition",
-        issuer="owner",
-        owner_decision_ref="DELIB-FIXTURE-0003",
-    )
-    assert first.evidence_digest != second.evidence_digest != third.evidence_digest
-    assert second.seq == 2 and third.seq == 3
+# --- schema conformance -------------------------------------------------------
+
+
+def test_created_schema_matches_the_canonical_binding_shape(db):
+    bind_exact_init(db, native_context_id="ctx-11", init_command="::init gtkb pb")
+    conn = sqlite3.connect(str(db))
+    try:
+        columns = [row[1] for row in conn.execute("PRAGMA table_info(session_init_bindings)")]
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    finally:
+        conn.close()
+    assert columns == LIVE_BINDING_COLUMNS
+    # The retired separate attestation log must not be recreated.
+    assert "session_role_attestations" not in tables

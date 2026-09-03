@@ -112,9 +112,8 @@ def main() -> int:
         try:
             bind_exact_init(
                 project_root / "groundtruth.db",
-                invoking_context=session_id,
+                native_context_id=session_id,
                 init_command=init_command,
-                issuer="hook:init",
             )
         except RoleAttestationError as exc:
             # An already-bound context is the expected re-entry case: the binding

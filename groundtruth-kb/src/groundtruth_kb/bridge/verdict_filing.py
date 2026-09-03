@@ -259,28 +259,28 @@ def _metadata_from_attestation(session_id: str, project_root: Path, content: str
     try:
         from groundtruth_kb.session.attestation import (
             RoleAttestationError,
-            resolve_effective_role_for_context,
+            binding_for_context,
         )
     except ImportError:
         return None
 
     try:
-        _binding, attestation = resolve_effective_role_for_context(
+        binding = binding_for_context(
             project_root / "groundtruth.db",
-            invoking_context=session_id,
+            session_id,
         )
     except RoleAttestationError as exc:
         if exc.code == "no_session_binding":
             return None
-        raise VerdictFilingError(f"role attestation unusable for verdict filing: {exc}") from exc
+        raise VerdictFilingError(f"session binding unusable for verdict filing: {exc}") from exc
 
     harness_name = _harness_name(project_root) or ""
     harness_id = _harness_id_for(harness_name, project_root)
     derived = {
-        "author_identity": f"{attestation.role}/{harness_name or 'unknown-harness'}",
+        "author_identity": f"{binding.role}/{harness_name or 'unknown-harness'}",
         "author_harness_id": harness_id,
         "author_session_context_id": session_id,
-        "author_role_attestation": attestation.evidence_reference,
+        "author_role_attestation": binding.evidence_reference,
     }
     derived.update(_declared_model_fields(content))
     return derived

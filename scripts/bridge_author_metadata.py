@@ -477,26 +477,21 @@ def _resolve_attested_authority_fields(
     harness_name: str,
     supplied: Mapping[str, str],
 ) -> dict[str, str]:
-    """Resolve author role only from this context's immutable exact-init attestation."""
+    """Resolve author role only from this context's immutable exact-init binding."""
 
     try:
         from groundtruth_kb.session.attestation.service import (
             RoleAttestationError,
-            resolve_effective_role_for_context,
+            binding_for_context,
         )
 
-        binding, attestation = resolve_effective_role_for_context(
+        binding = binding_for_context(
             project_root / "groundtruth.db",
-            invoking_context=session_context_id,
+            session_context_id,
         )
     except (ImportError, RoleAttestationError) as exc:
-        raise BridgeAuthorMetadataError(f"exact-init author role attestation is unavailable: {exc}") from exc
-    if attestation.source_event != "exact_init":
-        raise BridgeAuthorMetadataError(
-            "bridge authorship requires the immutable exact-init role attestation; "
-            f"got source_event={attestation.source_event or '<missing>'}"
-        )
-    role = str(attestation.role or "").strip().lower()
+        raise BridgeAuthorMetadataError(f"exact-init author session binding is unavailable: {exc}") from exc
+    role = str(binding.role or "").strip().lower()
     if role not in {"prime-builder", "loyal-opposition"}:
         raise BridgeAuthorMetadataError(f"unsupported exact-init author role: {role or '<missing>'}")
 
@@ -511,13 +506,13 @@ def _resolve_attested_authority_fields(
     resolved = {
         "author_identity": f"{role}/{harness_name}",
         "author_session_context_id": session_context_id,
-        "author_session_envelope_id": binding.envelope_id,
-        "author_role_attestation": attestation.evidence_reference,
+        "author_session_envelope_id": binding.session_context_id,
+        "author_role_attestation": binding.evidence_reference,
     }
     for field in ("author_session_envelope_id", "author_role_attestation"):
         declared = str(supplied.get(field) or "").strip()
         if declared and declared != resolved[field]:
-            raise BridgeAuthorMetadataError(f"declared {field} conflicts with exact-init attestation evidence")
+            raise BridgeAuthorMetadataError(f"declared {field} conflicts with exact-init binding evidence")
     return resolved
 
 
