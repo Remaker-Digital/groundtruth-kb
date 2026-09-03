@@ -226,7 +226,14 @@ def resolve_harness_identity(
     harness_name: str | None = None,
     harness_id: str | None = None,
 ) -> tuple[str, str]:
-    name = (harness_name or "codex").strip().lower()
+    name = str(harness_name or "").strip().lower()
+    if not name:
+        # WI-7531: an unresolved harness must not silently become one named
+        # vendor. Defer to the canonical acting-harness resolver, which reads
+        # runtime markers and durable identity and fails closed when neither
+        # supplies an identity. `resolve_acting_harness_identity` re-enters this
+        # function with a non-empty name, so the delegation terminates.
+        return resolve_acting_harness_identity(project_root, harness_name=None, harness_id=harness_id)
     try:
         identity_data = read_identity(project_root)
     except HarnessStateError:
@@ -748,7 +755,7 @@ def _guard_session_id_collision(
 def open_session(
     project_root: Path,
     *,
-    harness_name: str = "codex",
+    harness_name: str | None = None,
     harness_id: str | None = None,
     init_keyword: str | None = None,
     subject: str | None = None,
@@ -1021,7 +1028,7 @@ def _assert_fail_closed_single_context(
 def ensure_current(
     project_root: Path,
     *,
-    harness_name: str = "codex",
+    harness_name: str | None = None,
     harness_id: str | None = None,
     session_id: str | None = None,
 ) -> dict[str, Any]:
@@ -1047,7 +1054,7 @@ def route_prompt_resources(
     project_root: Path,
     prompt: str,
     *,
-    harness_name: str = "codex",
+    harness_name: str | None = None,
     harness_id: str | None = None,
 ) -> dict[str, Any]:
     """Apply explicit current-prompt resource and work-item evidence to an envelope."""
@@ -1083,7 +1090,7 @@ def open_topic(
     project_root: Path,
     topic_type: str,
     *,
-    harness_name: str = "codex",
+    harness_name: str | None = None,
     harness_id: str | None = None,
 ) -> dict[str, Any]:
     if topic_type not in TOPIC_TYPES:
@@ -1143,7 +1150,7 @@ def close_topic(
     project_root: Path,
     topic_type: str,
     *,
-    harness_name: str = "codex",
+    harness_name: str | None = None,
     harness_id: str | None = None,
     close_outcome: str = "closed",
 ) -> dict[str, Any] | None:
@@ -1168,7 +1175,7 @@ def close_topic(
 def close_current_topic(
     project_root: Path,
     *,
-    harness_name: str = "codex",
+    harness_name: str | None = None,
     harness_id: str | None = None,
     close_outcome: str = "closed",
 ) -> dict[str, Any] | None:
@@ -1208,7 +1215,7 @@ def _default_wrap_step_results(
 def close_session(
     project_root: Path,
     *,
-    harness_name: str = "codex",
+    harness_name: str | None = None,
     harness_id: str | None = None,
     wrap_outcome: str = "manual_wrap",
     wrap_step_results: list[dict[str, Any]] | None = None,
