@@ -52,7 +52,7 @@ DEFAULT_SQLITE_BUSY_TIMEOUT_MS = 30_000
 #: re-stamped those databases forward, laundering the omission. The comment here
 #: previously cited ``test_schema_version_matches_migration_count`` as a CI
 #: guard; no such test ever existed. The stamp is no longer trusted alone.
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 17
 
 #: WI-7015: cheap structural canaries checked on the fast path alongside the
 #: ``PRAGMA user_version`` stamp. Each entry is a ``(table, column)`` pair that
@@ -86,6 +86,21 @@ _SENTINEL_REPAIR_DDL: dict[tuple[str, str], str] = {
 _SCHEMA_UPGRADE_MAX_ATTEMPTS = 5
 _SCHEMA_UPGRADE_BACKOFF_SECONDS = 0.2
 _VALID_APPLICATION_SCOPES = frozenset({"gtkb_platform", "agent_red_application"})
+#: WI-7611 / DELIB-20260831060012. Authorization is a field on the project
+#: record holding exactly one of these two values. It carries no expiry,
+#: mutation-class, forbidden-operation, or included/excluded id-list semantics:
+#: those belong to the authorization *object* model this field replaces.
+_VALID_ACTIVATION_STATUSES = frozenset({"authorized", "not authorized"})
+#: The projects whose sole authorization evidence is revoked, and which the
+#: WI-7611 backfill therefore denies. Every other project backfills to
+#: ``authorized`` per the owner decision: "authorized everywhere, deny only the
+#: 2 revoked". Enumerated rather than derived because the derivation reads the
+#: authorization-object tables this correction retires; a migration must not
+#: depend on a model that is being removed.
+_ACTIVATION_STATUS_DENIED_PROJECT_IDS: tuple[str, ...] = (
+    "PROJECT-GTKB-BPR-STAGE-0-DECISION-OBSERVABILITY",
+    "PROJECT-GTKB-DISPATCHER-NEXT-AUTHORED-CONTEXT-CUTOVER",
+)
 
 
 def _validate_application_scope(value: str | None) -> str | None:
@@ -556,6 +571,7 @@ CREATE TABLE IF NOT EXISTS projects (
     notes TEXT,
     source_project_name TEXT,
     source_subproject_name TEXT,
+    activation_status TEXT NOT NULL DEFAULT 'authorized',
     changed_by TEXT NOT NULL,
     changed_at TEXT NOT NULL,
     change_reason TEXT NOT NULL,
@@ -2593,6 +2609,32 @@ class KnowledgeDB:
         conn.commit()
         if added_telemetry_cols:
             _log.debug("Applied migration: TAFE stage attempt telemetry columns %s", added_telemetry_cols)
+
+        # Migration 14: WI-7611 project activation_status field.
+        #
+        # Owner decision DELIB-20260831060012: authorization is a single field on
+        # the project record, holding exactly 'authorized' or 'not authorized',
+        # defaulting to 'authorized' on create.
+        #
+        # The column is deliberately NOT authoritative yet. Nothing reads it as a
+        # grant: GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001 still names the
+        # authorization object as the sole bounded implementation grant, and that
+        # specification is corrected on a later carrier. Adding the field ahead of
+        # that correction is safe precisely because no gate consults it, so it
+        # cannot compete with the clause still in force.
+        project_cols = {row[1] for row in conn.execute("PRAGMA table_info(projects)").fetchall()}
+        if "activation_status" not in project_cols:
+            conn.execute("ALTER TABLE projects ADD COLUMN activation_status TEXT NOT NULL DEFAULT 'authorized'")
+            # Every row backfills to the DEFAULT above; only the enumerated
+            # revoked-evidence projects are denied. Applied to every version row
+            # rather than the latest alone, so no historical version carries a
+            # value the current model cannot express.
+            conn.executemany(
+                "UPDATE projects SET activation_status = 'not authorized' WHERE id = ?",
+                [(project_id,) for project_id in _ACTIVATION_STATUS_DENIED_PROJECT_IDS],
+            )
+            conn.commit()
+            _log.debug("Applied migration: projects.activation_status")
 
     def _backfill_project_artifacts_from_work_items(self) -> None:
         """Backfill project rows from compatibility work-item project strings.
