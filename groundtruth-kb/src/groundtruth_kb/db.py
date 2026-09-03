@@ -42,21 +42,44 @@ if TYPE_CHECKING:
 DB_PATH = Path("./groundtruth.db")
 DEFAULT_SQLITE_BUSY_TIMEOUT_MS = 30_000
 
-#: Schema generation stamped into ``PRAGMA user_version`` once
-#: :meth:`KnowledgeDB._ensure_schema` has applied ``SCHEMA_SQL`` and every
-#: migration in :meth:`KnowledgeDB._migrate_schema`.
-#:
-#: WI-6609: before this existed, every ``KnowledgeDB`` construction ran
-#: ``executescript(SCHEMA_SQL)`` plus all migrations unconditionally, taking a
-#: database-wide write lock at connect time even for read-only queries. Any two
-#: overlapping invocations contended and the loser raised ``database is locked``
-#: attributed to its own operation rather than to the migration pass.
-#:
 #: Bump this whenever a migration is added to ``_migrate_schema``, or the new
 #: migration will never run on an already-stamped database.
-#: ``test_schema_version_matches_migration_count`` fails CI if the two drift.
-SCHEMA_VERSION = 14
+#:
+#: WI-7015: that instruction alone is what produced WI-7063. Commit 36f6c2d88
+#: added ``project_authorizations.owner_decision_deliberation_id`` to
+#: ``SCHEMA_SQL`` with no ``_migrate_schema`` entry, so every database created
+#: before it never received the column -- and each later, unrelated version bump
+#: re-stamped those databases forward, laundering the omission. The comment here
+#: previously cited ``test_schema_version_matches_migration_count`` as a CI
+#: guard; no such test ever existed. The stamp is no longer trusted alone.
+SCHEMA_VERSION = 16
 
+#: WI-7015: cheap structural canaries checked on the fast path alongside the
+#: ``PRAGMA user_version`` stamp. Each entry is a ``(table, column)`` pair that
+#: must exist at the current ``SCHEMA_VERSION``. A stamped database missing any
+#: of them is stale regardless of the stamp. These are ``PRAGMA table_info``
+#: reads, so the WI-6609 property holds: an up-to-date database still takes no
+#: write lock at connect time. Add an entry for any column a migration adds to a
+#: table that already ships rows.
+_SCHEMA_STRUCTURAL_SENTINELS: tuple[tuple[str, str], ...] = (
+    ("project_authorizations", "owner_decision_deliberation_id"),
+)
+#: WI-7063: DDL restoring a missing sentinel column, run BEFORE ``SCHEMA_SQL``
+#: rather than as an ordinary ``_migrate_schema`` entry. Ordering is the point:
+#: ``_upgrade_schema`` executes ``SCHEMA_SQL`` first and only then calls
+#: ``_migrate_schema``, and ``SCHEMA_SQL`` creates an index over
+#: ``project_authorizations(owner_decision_deliberation_id)``. On a database
+#: missing that column, ``executescript`` raises before ``_migrate_schema`` is
+#: reached, so a migration entry cannot repair this class of gap.
+#:
+#: Added NULLABLE deliberately: SQLite cannot add a NOT NULL column without a
+#: default to a populated table, and converging with SCHEMA_SQL would need a
+#: full rebuild -- outside the approved minimal scope (DELIB-20260825231512).
+_SENTINEL_REPAIR_DDL: dict[tuple[str, str], str] = {
+    ("project_authorizations", "owner_decision_deliberation_id"): (
+        "ALTER TABLE project_authorizations ADD COLUMN owner_decision_deliberation_id TEXT"
+    ),
+}
 #: Bounded retry for the one-time schema upgrade. The upgrade takes a write
 #: lock, so a concurrent upgrade can legitimately collide; the common path is
 #: read-only and never reaches this.
@@ -418,6 +441,35 @@ CREATE TABLE IF NOT EXISTS tests (
     change_reason TEXT NOT NULL,
     UNIQUE(id, version)
 );
+
+CREATE TABLE IF NOT EXISTS test_artifact_update_requests (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    idempotency_key TEXT NOT NULL,
+    request_schema_version INTEGER NOT NULL,
+    request_digest TEXT NOT NULL,
+    test_id TEXT NOT NULL,
+    expected_test_version INTEGER NOT NULL,
+    result_test_version INTEGER NOT NULL,
+    result_postimage_digest TEXT NOT NULL,
+    result_payload_json TEXT NOT NULL,
+    result_receipt_digest TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    work_item_id TEXT NOT NULL,
+    bridge_slug TEXT NOT NULL,
+    go_file TEXT NOT NULL,
+    go_sha256 TEXT NOT NULL,
+    actor_session_context_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    changed_by TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(idempotency_key),
+    UNIQUE(test_id, result_test_version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_test_artifact_update_requests_test
+    ON test_artifact_update_requests(test_id, result_test_version);
+CREATE INDEX IF NOT EXISTS idx_test_artifact_update_requests_bridge
+    ON test_artifact_update_requests(bridge_slug, work_item_id);
 
 CREATE TABLE IF NOT EXISTS test_plans (
     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1483,10 +1535,30 @@ CREATE TABLE IF NOT EXISTS work_intent_claims (
     session_id TEXT NOT NULL,
     acquired_at TEXT NOT NULL,
     ttl_expires_at TEXT NOT NULL,
+    claim_kind TEXT,
+    implementation_deadline TEXT,
+    implementation_grace_expires_at TEXT,
+    extensions_used INTEGER DEFAULT 0,
+    extension_cap_seconds INTEGER,
+    extension_capped INTEGER DEFAULT 0,
+    acting_role TEXT,
+    session_envelope_id TEXT,
+    acting_role_attestation TEXT,
+    project_id TEXT,
+    bootstrap_owner_decision_id TEXT,
+    bootstrap_project_id TEXT,
+    bootstrap_work_item_id TEXT,
+    bootstrap_authorization_id TEXT,
+    bootstrap_carrier_targets TEXT,
+    bootstrap_consumed_at TEXT,
+    work_item_id TEXT,
     UNIQUE(thread_slug)
 );
 
 CREATE INDEX IF NOT EXISTS idx_work_intent_claims_slug ON work_intent_claims(thread_slug);
+CREATE INDEX IF NOT EXISTS idx_work_intent_claims_kind ON work_intent_claims(claim_kind);
+CREATE INDEX IF NOT EXISTS idx_work_intent_claims_role_project ON work_intent_claims(acting_role, project_id);
+CREATE INDEX IF NOT EXISTS idx_work_intent_claims_work_item ON work_intent_claims(work_item_id);
 """
 
 
@@ -1807,9 +1879,41 @@ class KnowledgeDB:
         once applied.
         """
         conn = self._get_conn()
-        if self._schema_version(conn) == SCHEMA_VERSION:
+        if self._schema_version(conn) == SCHEMA_VERSION and self._sentinels_present(conn):
             return
         self._upgrade_schema(conn)
+
+    @staticmethod
+    def _sentinels_present(conn: sqlite3.Connection) -> bool:
+        """WI-7015: the stamp is necessary but not sufficient evidence.
+
+        A database can carry a current stamp and still be missing a column,
+        because a later unrelated bump re-stamps it forward. Verify the
+        declared canaries actually exist. Reads only, so the WI-6609
+        no-write-lock fast path is preserved.
+        """
+        for table, column in _SCHEMA_STRUCTURAL_SENTINELS:
+            cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+            if not cols or column not in cols:
+                return False
+        return True
+
+    @staticmethod
+    def _repair_structural_sentinels(conn: sqlite3.Connection) -> None:
+        """WI-7063: restore missing sentinel columns before ``SCHEMA_SQL`` runs.
+
+        Idempotent and additive: guarded by ``PRAGMA table_info``, writes no
+        values, and skips a table that does not exist yet because
+        ``SCHEMA_SQL`` will create that one complete.
+        """
+        for (table, column), ddl in _SENTINEL_REPAIR_DDL.items():
+            rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+            if not rows:
+                continue
+            if column not in {row[1] for row in rows}:
+                conn.execute(ddl)
+                conn.commit()
+                _log.debug("Repaired structural sentinel: %s.%s", table, column)
 
     def _upgrade_schema(self, conn: sqlite3.Connection) -> None:
         """Run the one-time schema/migration pass with bounded retry.
@@ -1830,6 +1934,7 @@ class KnowledgeDB:
         last_error: sqlite3.OperationalError | None = None
         for attempt in range(_SCHEMA_UPGRADE_MAX_ATTEMPTS):
             try:
+                self._repair_structural_sentinels(conn)
                 conn.executescript(SCHEMA_SQL)
                 conn.commit()
                 self._migrate_schema()
@@ -1909,6 +2014,72 @@ class KnowledgeDB:
         conn.commit()
         if added_application_scope_cols:
             _log.debug("Applied migration: application_scope columns %s", added_application_scope_cols)
+
+        # Migration 13: WI-5183 durable idempotency receipts for governed TEST updates.
+        # The same CREATE statements live in SCHEMA_SQL for fresh databases. Keeping
+        # this explicit migration marker makes the schema-version contract visible and
+        # lets older stamped databases converge through the normal upgrade pass.
+        claim_cols = {row[1] for row in conn.execute("PRAGMA table_info(work_intent_claims)").fetchall()}
+        claim_columns = {
+            "claim_kind": "TEXT",
+            "implementation_deadline": "TEXT",
+            "implementation_grace_expires_at": "TEXT",
+            "extensions_used": "INTEGER DEFAULT 0",
+            "extension_cap_seconds": "INTEGER",
+            "extension_capped": "INTEGER DEFAULT 0",
+            "acting_role": "TEXT",
+            "session_envelope_id": "TEXT",
+            "acting_role_attestation": "TEXT",
+            "project_id": "TEXT",
+            "bootstrap_owner_decision_id": "TEXT",
+            "bootstrap_project_id": "TEXT",
+            "bootstrap_work_item_id": "TEXT",
+            "bootstrap_authorization_id": "TEXT",
+            "bootstrap_carrier_targets": "TEXT",
+            "bootstrap_consumed_at": "TEXT",
+            "work_item_id": "TEXT",
+        }
+        for col_name, col_type in claim_columns.items():
+            if col_name not in claim_cols:
+                conn.execute(f"ALTER TABLE work_intent_claims ADD COLUMN {col_name} {col_type}")
+        conn.executescript(
+            """
+            CREATE INDEX IF NOT EXISTS idx_work_intent_claims_kind
+                ON work_intent_claims(claim_kind);
+            CREATE INDEX IF NOT EXISTS idx_work_intent_claims_role_project
+                ON work_intent_claims(acting_role, project_id);
+            CREATE INDEX IF NOT EXISTS idx_work_intent_claims_work_item
+                ON work_intent_claims(work_item_id);
+            CREATE TABLE IF NOT EXISTS test_artifact_update_requests (
+                rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+                idempotency_key TEXT NOT NULL,
+                request_schema_version INTEGER NOT NULL,
+                request_digest TEXT NOT NULL,
+                test_id TEXT NOT NULL,
+                expected_test_version INTEGER NOT NULL,
+                result_test_version INTEGER NOT NULL,
+                result_postimage_digest TEXT NOT NULL,
+                result_payload_json TEXT NOT NULL,
+                result_receipt_digest TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                work_item_id TEXT NOT NULL,
+                bridge_slug TEXT NOT NULL,
+                go_file TEXT NOT NULL,
+                go_sha256 TEXT NOT NULL,
+                actor_session_context_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                changed_by TEXT NOT NULL,
+                change_reason TEXT NOT NULL,
+                UNIQUE(idempotency_key),
+                UNIQUE(test_id, result_test_version)
+            );
+            CREATE INDEX IF NOT EXISTS idx_test_artifact_update_requests_test
+                ON test_artifact_update_requests(test_id, result_test_version);
+            CREATE INDEX IF NOT EXISTS idx_test_artifact_update_requests_bridge
+                ON test_artifact_update_requests(bridge_slug, work_item_id);
+            """
+        )
+        conn.commit()
 
         # Migration 5: lifecycle schema additions.
         cols = {row[1] for row in conn.execute("PRAGMA table_info(specifications)").fetchall()}
