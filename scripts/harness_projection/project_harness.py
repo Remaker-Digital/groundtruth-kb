@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -96,6 +97,67 @@ class Plan:
     writes: dict[str, str] = field(default_factory=dict)  # rel path -> content
     removes: list[str] = field(default_factory=list)
     gaps: list[str] = field(default_factory=list)
+
+
+def adapter_skill_outputs(profile: dict, gaps: list[str]) -> dict[str, str]:
+    """Render an adapter-script harness's skill surface without writing it.
+
+    A profile declaring ``skill_body = "adapter_script"`` opts out of the
+    full-body skill projection above and supplies its own generator in
+    ``adapter_generator``. Before WI-7682 the opt-out existed and the branch
+    that replaces it did not, so ``adapter_generator`` was declared in
+    profiles.toml and referenced nowhere: the harness simply received no
+    skills, silently, and the shortfall did not register as drift because the
+    absent files were never managed.
+
+    The generator is required to expose ``render_outputs(project_root)``
+    returning ``(outputs, adapters, orphans)`` where ``outputs`` maps a
+    repo-relative path to its bytes. That contract is what lets the projector
+    stay the only writer: outputs are merged into the plan and written by the
+    ordinary path, so they are recorded in the ownership manifest and
+    participate in ``--check`` drift detection exactly like every other
+    projected file. A generator that writes the tree itself would produce files
+    the projector does not own and cannot verify.
+    """
+    generator_rel = profile.get("adapter_generator")
+    harness = profile.get("name")
+    if not generator_rel:
+        gaps.append(
+            f"harness {harness!r} declares skill_body='adapter_script' but no adapter_generator; "
+            "the full-body skill path is disabled for it and nothing replaces it"
+        )
+        return {}
+    generator_path = PROJECT_ROOT / generator_rel
+    if not generator_path.is_file():
+        gaps.append(f"harness {harness!r} declares adapter_generator {generator_rel!r}; that file does not exist")
+        return {}
+
+    spec = importlib.util.spec_from_file_location(f"_gtkb_adapter_generator_{harness}", generator_path)
+    if spec is None or spec.loader is None:
+        gaps.append(f"harness {harness!r} adapter_generator {generator_rel!r} is not importable")
+        return {}
+    module = importlib.util.module_from_spec(spec)
+    # Registering before exec is load-bearing, not hygiene: a generator that
+    # defines a dataclass makes dataclasses resolve its class __module__ through
+    # sys.modules, which raises AttributeError on None when the module was built
+    # by module_from_spec and never registered.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+
+    render_outputs = getattr(module, "render_outputs", None)
+    if render_outputs is None:
+        gaps.append(
+            f"harness {harness!r} adapter_generator {generator_rel!r} exposes no render_outputs(project_root); "
+            "the projector will not write outputs it cannot render itself"
+        )
+        return {}
+
+    outputs, _adapters, orphans = render_outputs(PROJECT_ROOT)
+    for orphan in orphans:
+        gaps.append(
+            f"harness {harness!r} adapter generator reports an owned orphan requiring governed cleanup: {orphan}"
+        )
+    return {rel: content.decode("utf-8", errors="surrogateescape") for rel, content in outputs.items()}
 
 
 def load_profiles() -> dict:
@@ -168,10 +230,32 @@ def projected_interpreter(*, windowless: bool, project_dir_var: str | None = Non
 
 _JUNK_NAMES = frozenset({".ds_store", "thumbs.db"})
 _JUNK_SUFFIXES = {".pyc", ".pyo", ".pyd", ".lock"}
+# Projector-produced ownership manifest. If one appears under the baseline it is
+# output that has leaked into source, never projectable configuration (WI-7112).
+_PROJECTION_OUTPUT_NAMES = frozenset({".projection-manifest.json"})
+
+
+def harness_config_dir_names() -> frozenset[str]:
+    """Basenames of every registered harness config directory, lowercased.
+
+    Derived from the profile registry rather than hardcoded, so a nested harness
+    tree under the baseline is recognized for every registered harness instead of
+    only the one that happened to be observed (WI-7112).
+    """
+    try:
+        profiles = load_profiles()
+    except Exception:  # noqa: BLE001 - registry unreadable must not crash the filter
+        return frozenset()
+    names = set()
+    for profile in (profiles.get("harnesses") or {}).values():
+        config_dir = (profile or {}).get("config_dir")
+        if config_dir:
+            names.add(Path(str(config_dir)).name.lower())
+    return frozenset(names)
 
 
 def is_projection_junk(path: Path, src_root: Path) -> bool:
-    """Skip bytecode, lock files, and nested session caches from baseline copies."""
+    """Skip bytecode, lock files, projector output, and nested harness trees."""
     try:
         relative = path.relative_to(src_root)
     except ValueError:
@@ -179,13 +263,16 @@ def is_projection_junk(path: Path, src_root: Path) -> bool:
     parts = {part.lower() for part in relative.parts}
     if "__pycache__" in parts:
         return True
-    if ".claude" in parts and "session" in parts:
+    # A nested harness config directory under the baseline is another harness's
+    # projected tree, not neutral source. Generalized over the registered set so
+    # this is not true for one harness and silently false for the rest.
+    if parts & harness_config_dir_names():
         return True
     if path.suffix.lower() in _JUNK_SUFFIXES:
         return True
     if path.name.lower() in _JUNK_NAMES:
         return True
-    return False
+    return path.name.lower() in _PROJECTION_OUTPUT_NAMES
 
 
 def _native_events_for_hook(profile: dict, hook: dict, gaps: list[str]) -> list[str]:
@@ -520,7 +607,20 @@ def build_plan(harness: str) -> Plan:
                     text = ruff_format(text, rel_out, plan.gaps)
                 plan.writes[rel_out] = text
             else:
-                plan.writes[rel_out] = path.read_bytes().decode("latin-1")
+                # Fail closed on an artifact class the projector does not
+                # recognize, naming the offending material (WI-7112). Silently
+                # copying an unknown class through a latin-1 round-trip is how a
+                # stray artifact reaches every registered harness at once, and a
+                # gap that does not say WHAT was unrecognized reproduces the
+                # diagnosis cost this guard exists to remove.
+                offending = f"{baseline_cfg['root']}/{src_name}/{rel_in_surface}"
+                artifact_class = path.suffix.lower() or path.name
+                plan.gaps.append(
+                    f"unrecognized artifact class '{artifact_class}' at {offending}; "
+                    "classify it as projectable (extend TEXT_SUFFIXES) or as excluded "
+                    "(extend is_projection_junk) - the projector will not guess"
+                )
+                continue
 
     manifest_path = base / baseline_cfg["hook_manifest"]
     if manifest_path.is_file():
@@ -528,6 +628,13 @@ def build_plan(harness: str) -> Plan:
         rendered = render_hooks_registration(profile, manifest, tokens, plan.gaps)
         if rendered is not None:
             plan.writes[rendered[0]] = rendered[1]
+
+    if profile.get("skill_body") == "adapter_script" and profile.get("skills_dir"):
+        # The counterpart of the guard above: adapter-script harnesses opt out
+        # of the full-body skill projection and are served here instead. Merged
+        # before the ownership manifest is built, so these outputs are managed
+        # and drift-detected like every other projected file.
+        plan.writes.update(adapter_skill_outputs(profile, plan.gaps))
 
     ownership = sorted(plan.writes) + [f"{profile['config_dir']}/.projection-manifest.json"]
     plan.writes[f"{profile['config_dir']}/.projection-manifest.json"] = (
