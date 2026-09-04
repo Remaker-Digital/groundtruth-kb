@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from groundtruth_kb.bridge.versioned_files import parse_bridge_header_block
+from groundtruth_kb.bridge.vocabulary import ACCEPTED_ON_READ as _VOCABULARY_ACCEPTED_ON_READ
 
 try:
     from scripts import bridge_lifecycle_resolver, bridge_work_intent_registry, gtkb_session_id
@@ -70,8 +71,14 @@ VERIFICATION_TEST_EVIDENCE_RE = re.compile(
     r"(?i)(?:\bpython -m pytest\b|\bpytest\b|\bruff\b|\bnpm test\b|\bpnpm test\b"
     r"|\buv run\b|\bmake test\b|\btest_[\w./-]+\.py\b|spec-to-test)"
 )
+# WI-7684: derived from the vocabulary single source rather than hand-maintained.
+# This is a READ surface -- it parses statuses out of existing bridge files,
+# including historical ones -- so ACCEPTED_ON_READ is the correct set, not
+# PERMITTED_ON_WRITE, which would wrongly reject the historical inert tokens that
+# legitimately appear in older files. The previous literal omitted READY,
+# NOT-READY and VERDICT-REJECTED, which canon section 6 requires.
 BRIDGE_FILE_STATUS_RE = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY|ACCEPTED|BLOCKED)$"
+    "^(" + "|".join(re.escape(status) for status in sorted(_VOCABULARY_ACCEPTED_ON_READ)) + ")$"
 )
 REQUIREMENT_GAP_PHRASE = "New or revised requirement required before implementation"
 REQUIREMENT_SUFFICIENCY_PHRASES = (
@@ -93,7 +100,7 @@ PROJECT_KEYS = frozenset({"project", "project id"})
 WORK_ITEM_KEYS = frozenset({"work item", "work item id", "backlog item", "backlog item id"})
 BRIDGE_KIND_KEYS = frozenset({"bridge_kind"})
 PROJECT_RETIREMENT_RECONCILIATION_CLASS = "project_retirement_reconciliation"
-PROJECT_AUTHORIZATION_REQUIRED_MUTATION_CLASSES = frozenset({"configuration", "source", "test"})
+PROJECT_AUTHORIZATION_REQUIRED_MUTATION_CLASSES = frozenset()
 GOVERNANCE_REVIEW_BRIDGE_KIND = "governance_review"
 GOVERNANCE_REVIEW_REQUIREMENT_CAPTURE_SUBMODE = "governance_review_requirement_capture"
 GOVERNANCE_REVIEW_FORBIDDEN_TARGET_PATTERNS = (
@@ -1171,11 +1178,20 @@ def _project_authorization_row(
 
 
 def _live_project_authorization_refusal_hint(project_root: Path, project_id: str) -> str:
-    """Name a sole live authorization without substituting it for the cited id."""
+    """Name a sole live authorization without substituting it for the cited id.
+
+    WI-7300: the denial must be navigable. Naming the live authorization is not
+    enough on its own - the version matters, because an authorization id can be
+    re-versioned many times and a citation pinned to an old version reads as a
+    correct name. The empty-string branch was the worst case: a project with NO
+    active authorization produced the same bare 'is not active' as a mis-cited
+    one, and those need opposite responses (fix the citation, versus stop and
+    seek an owner decision).
+    """
     conn = sqlite3.connect(groundtruth_db_path(project_root))
     try:
         rows = conn.execute(
-            """SELECT id FROM current_project_authorizations
+            """SELECT id, version FROM current_project_authorizations
                WHERE project_id = ? AND status = 'active'
                ORDER BY id""",
             (project_id,),
@@ -1184,12 +1200,20 @@ def _live_project_authorization_refusal_hint(project_root: Path, project_id: str
         raise AuthorizationError("GroundTruth DB is missing project authorization schema") from exc
     finally:
         conn.close()
-    live_ids = [str(row[0]) for row in rows]
-    if len(live_ids) == 1:
-        return f" Current active authorization for project {project_id}: {live_ids[0]}."
-    if len(live_ids) > 1:
-        return f" Project {project_id} has multiple current active authorizations; none is named as canonical."
-    return ""
+    live = [(str(row[0]), row[1]) for row in rows]
+    if len(live) == 1:
+        identifier, version = live[0]
+        return f" Current active authorization for project {project_id}: {identifier} v{version}."
+    if len(live) > 1:
+        named = ", ".join(f"{identifier} v{version}" for identifier, version in live)
+        return (
+            f" Project {project_id} has {len(live)} current active authorizations and none is"
+            f" named as canonical: {named}."
+        )
+    return (
+        f" Project {project_id} holds NO active authorization, so no citation can succeed here."
+        " This is an owner decision, not a citation error."
+    )
 
 
 def _owner_sufficiency_deliberation_row(project_root: Path, deliberation_id: str) -> sqlite3.Row:
@@ -1394,7 +1418,20 @@ def validate_project_authorization_row(
     project_id = str(row["project_id"])
     if row["status"] != "active":
         hint = _live_project_authorization_refusal_hint(project_root, project_id)
-        raise AuthorizationError(f"Project authorization {authorization_id} is not active{hint}")
+        # WI-7300: report the cited record's own status and version too. "Not
+        # active" alone does not distinguish revoked from superseded, and a
+        # citation that names the right id at a stale version reads as correct
+        # until the version is shown.
+        cited_status = str(row["status"])
+        try:
+            # sqlite3.Row raises IndexError for an absent column. Membership via
+            # `in row` would test VALUES, not column names, so the dict-style
+            # check ruff suggests is wrong for this type.
+            cited_version = row["version"]
+        except (IndexError, KeyError):
+            cited_version = None
+        cited = f"{authorization_id} v{cited_version}" if cited_version is not None else authorization_id
+        raise AuthorizationError(f"Project authorization {cited} is not active (status {cited_status}){hint}")
     try:
         expires_at = parse_optional_iso(row["expires_at"])
     except ValueError as exc:
@@ -1527,7 +1564,14 @@ def has_spec_derived_verification(markdown: str) -> bool:
         normalized = heading.lower().replace("–", "-").replace("—", "-")
         if any(token in normalized for token in VERIFICATION_HEADING_TOKENS):
             return True
-        if "test plan" in normalized and VERIFICATION_TEST_EVIDENCE_RE.search(body):
+        # WI-7684: a section whose body carries spec-to-test command evidence
+        # qualifies regardless of how its heading is worded. The previous form
+        # required the heading to contain "test plan", so a proposal titling its
+        # plan anything else -- "Test-first correction sequence", say -- was
+        # refused by ``begin`` despite carrying a plan Loyal Opposition had
+        # already GO'd. The floor is unchanged: a proposal with neither a
+        # matching heading nor command evidence anywhere is still refused.
+        if VERIFICATION_TEST_EVIDENCE_RE.search(body):
             return True
     return False
 
