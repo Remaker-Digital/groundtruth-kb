@@ -1,7 +1,7 @@
 # GT-KB Development Environment Inventory
 
-Generated: 2026-08-20T06:40:11Z
-Collector: gtkb-dev-environment-inventory-v1 (sha256:189a9b41f309033b71290c425cd21464bbd593522d003762811fcd4a78c0b115)
+Generated: 2026-09-03T23:36:20Z
+Collector: gtkb-dev-environment-inventory-v1 (sha256:dcd84fc545cab6a5e9adeae7915b7f3c56abfc14d672728aaab1cf4a2a3362ec)
 
 ## Project
 
@@ -13,7 +13,7 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:189a9b41f309033b71290c425cd
 ## Redaction
 
 - Status: pass
-- Sensitive local environment entries detected: 1
+- Sensitive local environment entries detected: 2
 - Public output excludes raw credential values, local-only key names, and absolute local paths.
 
 ## Toolchain
@@ -32,11 +32,11 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:189a9b41f309033b71290c425cd
 
 ## Harness And Repo Surfaces
 
-- Harness identity source present: True
-- Role assignment source present: True
+- Harness identity source present: False
+- Role assignment source present: False
 - Skills: 45
 - Claude hooks: 35
-- Codex hooks: 31
+- Codex hooks: 0
 - GitHub workflows: 17
 - MCP config: local_only presence only
 
@@ -44,10 +44,10 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:189a9b41f309033b71290c425cd
 
 | Harness | Role | Assignment Status | Configured/Verified Capabilities |
 |---|---|---|---:|
-| claude | prime-builder | configured | 13 |
-| codex | prime-builder | configured | 15 |
-| claude | loyal-opposition | configured | 13 |
-| codex | loyal-opposition | configured | 15 |
+| claude | prime-builder | configured | 11 |
+| codex | prime-builder | configured | 11 |
+| claude | loyal-opposition | configured | 11 |
+| codex | loyal-opposition | configured | 11 |
 
 ## Verification
 
