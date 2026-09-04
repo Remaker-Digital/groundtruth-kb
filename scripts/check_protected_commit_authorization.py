@@ -101,27 +101,6 @@ PAUTH_READ_SNAPSHOT_RELATIONS: tuple[tuple[str, tuple[tuple[str, str], ...]], ..
         ),
     ),
     (
-        "current_project_authorizations",
-        (
-            ("id", "TEXT"),
-            ("version", "INTEGER"),
-            ("project_id", "TEXT"),
-            ("status", "TEXT"),
-            ("authorization_name", "TEXT"),
-            ("owner_decision_deliberation_id", "TEXT"),
-            ("scope_summary", "TEXT"),
-            ("allowed_mutation_classes", "TEXT"),
-            ("forbidden_operations", "TEXT"),
-            ("included_work_item_ids", "TEXT"),
-            ("excluded_work_item_ids", "TEXT"),
-            ("included_spec_ids", "TEXT"),
-            ("excluded_spec_ids", "TEXT"),
-            ("expires_at", "TEXT"),
-            ("supersedes", "TEXT"),
-            ("superseded_by", "TEXT"),
-        ),
-    ),
-    (
         "current_projects",
         (
             ("id", "TEXT"),

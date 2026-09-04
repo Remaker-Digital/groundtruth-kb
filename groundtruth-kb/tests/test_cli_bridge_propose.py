@@ -66,17 +66,6 @@ def _seed_project(project_dir: Path) -> None:
             related_spec_ids_at_creation='["SPEC-RELATED-001"]',
         )
         db.link_project_work_item(PROJECT_ID, WI_ID, "test", "link work item")
-        db.insert_project_authorization(
-            PROJECT_ID,
-            "gt bridge propose CLI",
-            DELIB_ID,
-            "Implement deterministic bridge proposal scaffolding.",
-            "test",
-            "seed authorization",
-            id=AUTH_ID,
-            included_work_item_ids=[WI_ID],
-            included_spec_ids=["SPEC-CLI-001"],
-        )
     finally:
         db.close()
 

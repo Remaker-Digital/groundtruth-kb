@@ -438,18 +438,6 @@ def _seed_project_authorization(root: Path) -> None:
             changed_by="test",
             change_reason="seed spec for project authorization fixture",
         )
-        db.insert_project_authorization(
-            "PROJECT-AUTH",
-            "Authorized implementation project",
-            "DELIB-PROJECT-AUTH",
-            "Bounded project implementation scope.",
-            "test",
-            "seed project authorization",
-            id="PAUTH-AUTH",
-            status="active",
-            included_spec_ids=["SPEC-AUTH-SEED"],
-            allowed_mutation_classes=["configuration", "source", "test"],
-        )
     finally:
         db.close()
 

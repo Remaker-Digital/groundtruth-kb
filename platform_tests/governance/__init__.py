@@ -75,19 +75,6 @@ def _project(tmp_path: Path) -> tuple[Path, Path]:
             change_reason="seed deliberation",
             outcome="owner_decision",
         )
-        db.insert_project_authorization(
-            project_id="PROJECT-TEST",
-            authorization_name="Backlog text-edit authorization",
-            owner_decision_deliberation_id=SEED_DELIB_ID,
-            scope_summary="Authorize text edits to WI-IMPROVEMENT for tests.",
-            changed_by="test",
-            change_reason="seed authorization",
-            id=SEED_PAUTH_ID,
-            status="active",
-            allowed_mutation_classes=["cli_extension", "source", "test_addition"],
-            included_work_item_ids=["WI-IMPROVEMENT", "WI-DEFECT"],
-            included_spec_ids=["SPEC-WI4357-TEST-SEED"],
-        )
         db.insert_work_item(
             id="WI-DEFECT",
             title="Defect work item",

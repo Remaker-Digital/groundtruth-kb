@@ -255,31 +255,6 @@ def _seed_completion_env(
         db.insert_work_item(wi, f"Work item {wi}", "new", "backlog", "open", "test", "seed")
         if linked_work_items is None or wi in linked_work_items:
             db.link_project_work_item("PROJECT-X", wi, "test", "seed")
-    db.insert_project_authorization(
-        "PROJECT-X",
-        "Primary authorization",
-        "DELIB-AUTH-SEED",
-        "Bounded scope.",
-        "test",
-        "seed",
-        id="PAUTH-X",
-        status=auth_status,
-        included_work_item_ids=list(wi_verified),
-        included_spec_ids=["SPEC-SEED"],
-    )
-    if second_active_auth:
-        db.insert_project_authorization(
-            "PROJECT-X",
-            "Secondary authorization",
-            "DELIB-AUTH-SEED",
-            "Second bounded scope.",
-            "test",
-            "seed",
-            id="PAUTH-Y",
-            status="active",
-            included_work_item_ids=list(wi_verified),
-            included_spec_ids=["SPEC-SEED"],
-        )
     if implements_link:
         # v4 D4 gate: link each seeded VERIFIED thread to PROJECT-X with
         # relationship='implements'. The thread slugs match the
@@ -733,18 +708,6 @@ def test_auto_complete_does_not_cross_project_retire(tmp_path) -> None:
             "s",
             relationship="implements",
         )
-        db.insert_project_authorization(
-            "PROJECT-B",
-            "Auth B",
-            "DELIB-SEED",
-            "Bounded scope.",
-            "t",
-            "s",
-            id="PAUTH-B",
-            status="active",
-            included_work_item_ids=["WI-8002"],
-            included_spec_ids=["SPEC-SEED"],
-        )
 
         service = ProjectLifecycleService(db)
         # PROJECT-B verified set is empty (no implements link) → not completed.
@@ -922,18 +885,6 @@ def _seed_noncanonical_recognition_env(project_root: Path) -> KnowledgeDB:
     )
     db.link_project_work_item("PROJECT-X", "WI-NONCANON-RECOG-001", "test", "seed")
     db.insert_spec(id="SPEC-SEED", title="Seed spec", status="verified", changed_by="test", change_reason="seed")
-    db.insert_project_authorization(
-        "PROJECT-X",
-        "Lifecycle authorization",
-        "DELIB-SEED",
-        "Bounded scope.",
-        "test",
-        "seed",
-        id="PAUTH-X",
-        status="active",
-        included_work_item_ids=["WI-NONCANON-RECOG-001"],
-        included_spec_ids=["SPEC-SEED"],
-    )
     db.add_project_artifact_link(
         "PROJECT-X",
         "bridge_thread",
@@ -1017,18 +968,6 @@ def test_wi4737_lifecycle_two_sided_guard_rejects_unlinked_and_unverified(tmp_pa
         db.link_project_work_item("PROJECT-X", "WI-NONCANON-UNLINKED-001", "test", "seed")
         db.link_project_work_item("PROJECT-X", "WI-NONCANON-UNVERIFIED-001", "test", "seed")
         db.insert_spec(id="SPEC-SEED", title="Seed spec", status="verified", changed_by="test", change_reason="seed")
-        db.insert_project_authorization(
-            "PROJECT-X",
-            "Lifecycle authorization",
-            "DELIB-SEED",
-            "Bounded scope.",
-            "test",
-            "seed",
-            id="PAUTH-X",
-            status="active",
-            included_work_item_ids=["WI-NONCANON-UNLINKED-001", "WI-NONCANON-UNVERIFIED-001"],
-            included_spec_ids=["SPEC-SEED"],
-        )
         db.add_project_artifact_link(
             "PROJECT-X",
             "bridge_thread",

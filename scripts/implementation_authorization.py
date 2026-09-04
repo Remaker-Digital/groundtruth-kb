@@ -2050,12 +2050,10 @@ def create_authorization_packet(
     errors: list[str] = []
     spec_links: list[str] = []
     target_paths: list[str] = []
-    project_authorization: dict[str, Any] | None = None
     proposal_work_item_id = extract_metadata_value(proposal, WORK_ITEM_KEYS)
     bridge_kind = proposal_bridge_kind(proposal)
     owner_sufficiency_evidence: dict[str, Any] | None = None
     authorization_submode: str | None = None
-    structured_pauth_amendment: dict[str, Any] | None = None
 
     try:
         spec_links = extract_spec_links(proposal)
@@ -2064,23 +2062,6 @@ def create_authorization_packet(
 
     try:
         target_paths = extract_target_paths(proposal)
-    except AuthorizationError as exc:
-        errors.append(str(exc))
-
-    if bootstrap_authority is None:
-        try:
-            project_authorization = extract_and_validate_project_authorization(
-                project_root,
-                proposal,
-                spec_links,
-                target_paths=target_paths,
-                requested_operations=["implementation_packet_create"],
-            )
-        except AuthorizationError as exc:
-            errors.append(str(exc))
-
-    try:
-        structured_pauth_amendment = validate_structured_pauth_spec_amendment(project_root, proposal)
     except AuthorizationError as exc:
         errors.append(str(exc))
 
@@ -2171,16 +2152,12 @@ def create_authorization_packet(
         "created_at": created_at.isoformat().replace("+00:00", "Z"),
         "expires_at": (created_at + timedelta(minutes=expires_minutes)).isoformat().replace("+00:00", "Z"),
     }
-    if project_authorization is not None:
-        packet["project_authorization"] = project_authorization
     if bootstrap_authority is not None:
         packet["bootstrap_authority"] = bootstrap_authority
     if owner_sufficiency_evidence is not None:
         packet["requirement_sufficiency_evidence"] = owner_sufficiency_evidence
     if authorization_submode is not None:
         packet["authorization_submode"] = authorization_submode
-    if structured_pauth_amendment is not None:
-        packet["structured_pauth_spec_amendment"] = structured_pauth_amendment
     packet["packet_hash"] = packet_hash(packet)
     return packet
 

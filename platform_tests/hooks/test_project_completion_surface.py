@@ -80,19 +80,6 @@ def _seed(
         for wi in wi_verified:
             db.insert_work_item(wi, f"Work item {wi}", "new", "backlog", "open", "test", "seed")
             db.link_project_work_item("PROJECT-X", wi, "test", "seed")
-        for auth_id, wi_map in authorizations.items():
-            db.insert_project_authorization(
-                "PROJECT-X",
-                f"Authorization {auth_id}",
-                "DELIB-SEED",
-                "Bounded scope.",
-                "test",
-                "seed",
-                id=auth_id,
-                status="active",
-                included_work_item_ids=list(wi_map),
-                included_spec_ids=["SPEC-SEED"],
-            )
         if implements_link:
             # v4 D4 gate: link each seeded VERIFIED thread to PROJECT-X with
             # relationship='implements' so the v4 gate (per

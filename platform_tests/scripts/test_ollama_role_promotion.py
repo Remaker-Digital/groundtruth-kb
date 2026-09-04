@@ -125,18 +125,6 @@ def _seed_phase2_project(root: Path, db: KnowledgeDB) -> None:
             "ollama phase2 closure fixture",
             membership_order=index,
         )
-    db.insert_project_authorization(
-        roles.OLLAMA_PHASE2_PROJECT_ID,
-        "Ollama integration Phase 2+ completion",
-        "DELIB-TEST-OLLAMA-PHASE2",
-        "Fixture authorization for Ollama Phase 2+ closure tests.",
-        "test",
-        "ollama phase2 closure fixture",
-        id=roles.OLLAMA_PHASE2_AUTHORIZATION_ID,
-        status="active",
-        included_work_item_ids=list(roles.OLLAMA_PHASE2_CLOSURE_WORK_ITEMS),
-        included_spec_ids=["ADR-OLLAMA-HARNESS-ADOPTION-001"],
-    )
     memory_dir = root / "memory"
     memory_dir.mkdir(parents=True)
     (memory_dir / "MEMORY.md").write_text(

@@ -98,18 +98,6 @@ def _seed_db(
                 if db.get_work_item(wi) is None:
                     db.insert_work_item(wi, f"WI {wi}", "new", "backlog", "open", "t", "s")
                 db.link_project_work_item(project_id, wi, "t", "s")
-            db.insert_project_authorization(
-                project_id,
-                f"auth {project_id}",
-                "DELIB-SEED",
-                "scope",
-                "t",
-                "s",
-                id=f"PAUTH-{project_id}",
-                status="active",
-                included_work_item_ids=wis,
-                included_spec_ids=["SPEC-SEED"],
-            )
         for project_id, slugs in (pre_linked or {}).items():
             for slug in slugs:
                 db.add_project_artifact_link(

@@ -123,7 +123,7 @@ PRELOAD_STATES = {
         "commands": ["gt spec", "gt bridge"],
     },
     "project": {
-        "sources": ["current_project_authorizations", "open_work_items", "project_memberships"],
+        "sources": ["current_projects", "open_work_items", "project_memberships"],
         "commands": ["gt projects"],
     },
 }

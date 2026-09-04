@@ -98,18 +98,6 @@ def _seed_authorization(db: KnowledgeDB, *, project_id: str = "PROJECT-X") -> No
     db.insert_spec(
         id="SPEC-OPEN-PAUTH", title="Open PAUTH spec", status="verified", changed_by="test", change_reason="seed"
     )
-    db.insert_project_authorization(
-        project_id,
-        "Open PAUTH fixture",
-        "DELIB-OPEN-PAUTH",
-        "Bounded scope.",
-        "test",
-        "seed",
-        id="PAUTH-OPEN",
-        status="active",
-        included_work_item_ids=["WI-1", "WI-2"],
-        included_spec_ids=["SPEC-OPEN-PAUTH"],
-    )
 
 
 def _write_open_project_authorization_thread(
@@ -151,18 +139,6 @@ def _seed_keep_open_authorization(db: KnowledgeDB, project_root: Path, *, projec
         outcome="owner_decision",
     )
     db.insert_spec(id="SPEC-SEED", title="Seed spec", status="verified", changed_by="test", change_reason="seed")
-    db.insert_project_authorization(
-        project_id,
-        "Fixture authorization",
-        "DELIB-SEED",
-        "Bounded scope.",
-        "test",
-        "seed",
-        id="PAUTH-X",
-        status="active",
-        included_work_item_ids=["WI-1", "WI-2"],
-        included_spec_ids=["SPEC-SEED"],
-    )
     _write_verified_threads(project_root, db, ["WI-1", "WI-2"], project_id=project_id)
     ProjectLifecycleService(db).complete_project_authorization(
         "PAUTH-X",

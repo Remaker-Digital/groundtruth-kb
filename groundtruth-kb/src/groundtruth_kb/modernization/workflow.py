@@ -38,7 +38,6 @@ REHEARSAL_SPEC_ID = "SPEC-E2E-001"
 # through the canonical platform MemBase, never the disposable rehearsal DB.
 WORKFLOW_AUTHORITY_SPEC_IDS = ("GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001",)
 WORK_ITEM_ID = "WI-9001"
-PAUTH_ID = "PAUTH-E2E-001"
 DELIBERATION_ID = "DELIB-E2E-OWNER-001"
 BRIDGE_SLUG = "modernization-e2e"
 TARGET_PATH = "scripts/e2e_sample.py"
@@ -513,10 +512,13 @@ class ModernizationWorkflow:
         return _read_json(self.actor.envelope_path)
 
     def _seed_selection(self) -> None:
+        gov_dir = self.workspace / "config/governance"
+        gov_dir.mkdir(parents=True, exist_ok=True)
         taxonomy_source = self.platform_root / "config/governance/project-authorization-operation-taxonomy.toml"
-        taxonomy_target = self.workspace / "config/governance" / taxonomy_source.name
-        taxonomy_target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(taxonomy_source, taxonomy_target)
+        shutil.copy2(taxonomy_source, gov_dir / taxonomy_source.name)
+        spec_app_source = self.platform_root / "config/governance/spec-applicability.toml"
+        if spec_app_source.exists():
+            shutil.copy2(spec_app_source, gov_dir / spec_app_source.name)
         db = KnowledgeDB(self.workspace / "groundtruth.db")
         try:
             db.insert_spec(
@@ -639,26 +641,6 @@ class ModernizationWorkflow:
             "start_gate_reason": gate_result.get("reason", ""),
         }
 
-    def _seed_project_authorization(self) -> None:
-        db = KnowledgeDB(self.workspace / "groundtruth.db")
-        try:
-            db.insert_project_authorization(
-                PROJECT_ID,
-                "Bounded modernization rehearsal",
-                DELIBERATION_ID,
-                "One protected source target for the selected work item.",
-                "modernization-owner",
-                "authorize deterministic operation-time rehearsal",
-                id=PAUTH_ID,
-                status="active",
-                allowed_mutation_classes=["source"],
-                forbidden_operations=[],
-                included_work_item_ids=[WORK_ITEM_ID],
-                included_spec_ids=[REHEARSAL_SPEC_ID],
-            )
-        finally:
-            db.close()
-
     @property
     def applicability_config(self) -> Path:
         return self.platform_root / "config/governance/spec-applicability.toml"
@@ -695,12 +677,11 @@ class ModernizationWorkflow:
                 "",
                 "# GT-KB Modernization End-To-End Proposal",
                 "",
-                "bridge_kind: prime_proposal",
+                "bridge_kind: implementation_proposal",
                 f"Document: {BRIDGE_SLUG}",
                 "Version: 001 (NEW)",
                 f"Project: {PROJECT_ID}",
                 f"Work Item: {WORK_ITEM_ID}",
-                f"Project Authorization: {PAUTH_ID}",
                 f'target_paths: ["{TARGET_PATH}"]',
                 "",
                 "## Specification Links",
@@ -818,7 +799,6 @@ class ModernizationWorkflow:
         session = self._consume_actor_session()
         selection = self._selection_snapshot()
         missing_authority = self._prove_missing_authority_denial()
-        self._seed_project_authorization()
         proposal = self._publish_proposal()
         prepared = {
             "schema_version": PREPARED_SCHEMA_VERSION,
@@ -842,7 +822,6 @@ class ModernizationWorkflow:
                 "prime_harness_id": self.actor.harness_id,
                 "project_id": PROJECT_ID,
                 "work_item_id": WORK_ITEM_ID,
-                "pauth_id": PAUTH_ID,
                 "target_path": TARGET_PATH,
             },
         )
@@ -983,12 +962,9 @@ class ModernizationWorkflow:
             session_id=self.actor.session_id,
         )
         self.authorization.write_started_packets(self.workspace, [started])
-        if not isinstance(started.get("project_authorization"), dict):
-            raise ModernizationWorkflowError("implementation-start packet is not PAUTH-backed")
         return {
             "bridge_id": started["bridge_id"],
             "packet_hash": started["packet_hash"],
-            "project_authorization_id": started["project_authorization"]["id"],
             "implementation_start_session": started["implementation_start"]["session_id"],
         }
 
@@ -1020,8 +996,6 @@ class ModernizationWorkflow:
             packet = resolution.get("packet")
             if not isinstance(packet, dict):
                 raise ModernizationWorkflowError("protected mutation did not resolve a concrete start packet")
-            if not isinstance(packet.get("project_authorization"), dict):
-                raise ModernizationWorkflowError("protected mutation requires a current PAUTH-backed packet")
             decision = self.start_gate.gate_decision(self._mutation_payload())
         if decision:
             raise ModernizationWorkflowError(f"implementation-start gate denied authorized mutation: {decision}")
@@ -1138,7 +1112,6 @@ class ModernizationWorkflow:
                 f"Approved proposal: bridge/{BRIDGE_SLUG}-001.md",
                 f"Project: {PROJECT_ID}",
                 f"Work Item: {WORK_ITEM_ID}",
-                f"Project Authorization: {PAUTH_ID}",
                 "Recommended commit type: feat:",
                 "",
                 "## Implementation Claim",
@@ -1679,7 +1652,6 @@ class ModernizationWorkflow:
                     "project_id": PROJECT_ID,
                     "spec_id": REHEARSAL_SPEC_ID,
                     "work_item_id": WORK_ITEM_ID,
-                    "pauth_id": PAUTH_ID,
                     "target_path": TARGET_PATH,
                     "target_sha256": _sha256_bytes(TARGET_CONTENT),
                     "prime_session_id": self.actor.session_id,

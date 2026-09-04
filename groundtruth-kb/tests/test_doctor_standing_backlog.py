@@ -75,18 +75,6 @@ def _insert_authorized_open_work_item(root: Path, work_item_id: str = "WI-COVERE
             "seed",
         )
         db.link_project_work_item("PROJECT-X", work_item_id, "test", "seed")
-        db.insert_project_authorization(
-            "PROJECT-X",
-            "Primary authorization",
-            "DELIB-AUTH-SEED",
-            "Bounded scope.",
-            "test",
-            "seed",
-            id="PAUTH-X",
-            status="active",
-            included_work_item_ids=[work_item_id],
-            included_spec_ids=["SPEC-SEED"],
-        )
     finally:
         db.close()
 

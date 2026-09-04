@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.git_lifecycle.models import OperationDenied
+from groundtruth_kb.git_lifecycle.service import GitLifecycleService
 from groundtruth_kb.project.registry_control_plane import (
     apply_registry_transaction,
     serialize_registry,
@@ -79,17 +81,37 @@ def _proposal(
     )
 
 
-def _pauth_proposal(**kwargs: object) -> str:
+def _pauth_proposal(*, work_item: str = "WI-AUTH-001", **kwargs: object) -> str:
+    """Proposal carrying full authorization metadata.
+
+    WI-6856: ``work_item`` is parameterized because the work-intent registry
+    rejects claiming one work item on two threads concurrently. Fixtures that
+    stand up two simultaneously-claimed threads must give each a distinct work
+    item; the default preserves every single-thread call site unchanged.
+    """
     return (
         _proposal(**kwargs)
-        + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+        + f"\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `{work_item}`\n"
     )
+
+
+def _work_item_proposal(*, work_item: str = "WI-AUTH-001", **kwargs: object) -> str:
+    """Proposal carrying Work Item metadata but deliberately NO Project Authorization.
+
+    WI-6856: an implementation-bearing claim must carry work-item metadata, so a
+    proposal with none cannot be claimed at all and its test body never runs.
+    Tests that specify PAUTH-absence behaviour need the work item present and the
+    Project Authorization absent, which is what this builder expresses.
+    """
+    return _proposal(**kwargs) + f"\nWork Item: `{work_item}`\n"
 
 
 def _go_verdict_body(bridge_id: str = "sample-implementation") -> str:
     return "\n".join(
         [
             "GO",
+            "::init gtkb pb",
+            "::open build",
             "",
             f"author_identity: loyal-opposition/fixture-{bridge_id}",
             f"author_session_context_id: fixture-go-session-{bridge_id}",
@@ -211,12 +233,34 @@ def _seed_project_authorization(
             "seed work item",
             stage="backlogged",
         )
+        # WI-6856: a second member so fixtures that stand up two concurrently
+        # claimed threads can give each a distinct work item. The work-intent
+        # registry refuses to claim one work item on two threads at once, and
+        # packet creation refuses a work item that is not a project member, so
+        # both records are required. Single-thread fixtures are unaffected;
+        # nothing asserts on membership composition.
+        db.insert_work_item(
+            "WI-AUTH-002",
+            "Second authorized work item",
+            "new",
+            "platform",
+            "open",
+            "test",
+            "seed second work item for concurrent-thread fixtures",
+            stage="backlogged",
+        )
         if link_work_item:
             db.link_project_work_item(
                 "PROJECT-AUTH",
                 "WI-AUTH-001",
                 "test",
                 "seed work item membership",
+            )
+            db.link_project_work_item(
+                "PROJECT-AUTH",
+                "WI-AUTH-002",
+                "test",
+                "seed second work item membership",
             )
         # WI-3312 spec-linkage gate: an active project authorization must cite
         # an approved specification. Seed one so this fixture stays compliant.
@@ -226,19 +270,6 @@ def _seed_project_authorization(
             status="verified",
             changed_by="test",
             change_reason="seed spec for project authorization fixture",
-        )
-        db.insert_project_authorization(
-            "PROJECT-AUTH",
-            "Authorized implementation project",
-            "DELIB-PROJECT-AUTH",
-            "Bounded project implementation scope.",
-            "test",
-            "seed project authorization",
-            id="PAUTH-AUTH",
-            status=status,
-            included_spec_ids=["SPEC-AUTH-SEED"],
-            allowed_mutation_classes=allowed_mutation_classes or ["configuration", "source", "test"],
-            forbidden_operations=forbidden_operations,
         )
     finally:
         db.close()
@@ -413,7 +444,10 @@ def test_go_authorization_packet_without_pauth_blocks_in_scope_apply_patch(
     taxonomy_target = tmp_path / "config" / "governance" / TAXONOMY_PATH.name
     taxonomy_target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(TAXONOMY_PATH, taxonomy_target)
-    _write_thread(tmp_path)
+    # WI-6856: work item present, Project Authorization absent -- the exact state
+    # this test specifies. Without the work item the claim is refused during
+    # setup and the assertion below never runs.
+    _write_thread(tmp_path, proposal=_work_item_proposal())
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
     _claim_bridge(tmp_path)
@@ -481,7 +515,9 @@ def test_dispatcher_rules_toml_direct_apply_patch_blocked_even_with_go(
     tmp_path: Path,
 ) -> None:
     target = "config/dispatcher/rules.toml"
-    _write_thread(tmp_path, proposal=_proposal(target_paths=[target]))
+    # WI-6856: work item present so the claim succeeds; the dispatcher-config
+    # block under test is unrelated to authorization metadata.
+    _write_thread(tmp_path, proposal=_work_item_proposal(target_paths=[target]))
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
     _claim_bridge(tmp_path)
@@ -609,6 +645,7 @@ def test_gate_allows_concurrent_authorized_implementers(tmp_path: Path) -> None:
         _pauth_proposal(
             bridge_id="bridge-b",
             target_paths=["scripts/shared.py", "scripts/b_only.py"],
+            work_item="WI-AUTH-002",
         ),
         encoding="utf-8",
     )
@@ -1074,7 +1111,7 @@ def test_project_authorization_metadata_is_carried_in_packet(tmp_path: Path) -> 
     assert auth.load_packet(tmp_path)["project_authorization"]["id"] == "PAUTH-AUTH"
 
 
-def test_start_finalizer_binds_live_pauth_claim_and_role_attestation(
+def test_start_finalizer_emits_schema3_without_packet_role_or_envelope_authority(
     tmp_path: Path,
 ) -> None:
     _seed_project_authorization(tmp_path)
@@ -1094,16 +1131,118 @@ def test_start_finalizer_binds_live_pauth_claim_and_role_attestation(
     assert evidence["pre_start_packet_hash"] == pre_start_hash
     assert evidence["session_id"] == "session-1"
     assert evidence["work_intent_claim"]["claim_kind"] == "go_implementation"
-    assert evidence["role_attestation"]["role"] == "prime-builder"
-    assert evidence["role_attestation"]["session_envelope_id"] == evidence["work_intent_claim"]["session_envelope_id"]
-    assert (
-        evidence["role_attestation"]["evidence_reference"] == evidence["work_intent_claim"]["acting_role_attestation"]
-    )
+    assert evidence["schema_version"] == 3
+    serialized_evidence = json.dumps(evidence, sort_keys=True)
+    assert "role_attestation" not in serialized_evidence
+    assert "worker_role_provenance" not in serialized_evidence
+    assert "session_envelope_id" not in serialized_evidence
+    assert "acting_role" not in serialized_evidence
     assert evidence["project_authorization_decision"]["normalized_operation"] == "implementation_start"
     assert evidence["project_authorization_decision"]["allowed"] is True
     assert auth.packet_hash(finalized) == finalized["packet_hash"]
     assert auth.load_packet(tmp_path) == finalized
     assert auth.load_named_packet(tmp_path, "sample-implementation") == finalized
+
+
+@pytest.mark.parametrize("replacement", ["", "::init gtkb lo"])
+def test_start_finalizer_denies_missing_or_wrong_authored_go_init_role(
+    tmp_path: Path,
+    replacement: str,
+) -> None:
+    _seed_project_authorization(tmp_path)
+    _write_thread(tmp_path, proposal=_pauth_proposal())
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    _claim_bridge(tmp_path)
+    go_path = tmp_path / "bridge" / "sample-implementation-002.md"
+    go_path.write_text(
+        go_path.read_text(encoding="utf-8").replace("::init gtkb pb", replacement, 1),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(auth.AuthorizationError, match="DENY_NO_INIT_ROLE"):
+        auth.finalize_implementation_start_packet(tmp_path, packet, session_id="session-1")
+
+    assert not auth.packet_path(tmp_path).exists()
+    assert not auth.packet_path_for_bridge(tmp_path, "sample-implementation").exists()
+
+
+def _git_lifecycle_service_with_schema3_authority(tmp_path: Path) -> GitLifecycleService:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    _seed_project_authorization(tmp_path)
+    proposal = _proposal() + "\nProject Authorization: PAUTH-AUTH\nProject: PROJECT-AUTH\nWork Item: WI-AUTH-001\n"
+    _write_thread(tmp_path, proposal=proposal)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    _claim_bridge(tmp_path)
+    finalized = auth.finalize_implementation_start_packet(tmp_path, packet, session_id="session-1")
+    auth.write_started_packets(tmp_path, [finalized])
+    return GitLifecycleService(tmp_path)
+
+
+def test_git_lifecycle_service_accepts_schema3_from_authored_go_without_session_store(
+    tmp_path: Path,
+) -> None:
+    service = _git_lifecycle_service_with_schema3_authority(tmp_path)
+
+    authority = service._current_authority(
+        bridge_id="sample-implementation",
+        work_item_id="WI-AUTH-001",
+        required_paths=("scripts/sample.py",),
+    )
+
+    assert authority["authored_role_source"]["init_line"] == "::init gtkb pb"
+    assert authority["authored_role_source"]["path"] == "bridge/sample-implementation-002.md"
+    source = (ROOT / "groundtruth-kb/src/groundtruth_kb/git_lifecycle/service.py").read_text(encoding="utf-8")
+    assert "resolve_worker_role_provenance" not in source
+    assert "groundtruth_kb.session.envelope" not in source
+    assert "session-envelopes" not in source
+
+
+def test_git_lifecycle_service_denies_when_authored_go_init_role_disappears(
+    tmp_path: Path,
+) -> None:
+    service = _git_lifecycle_service_with_schema3_authority(tmp_path)
+    go_path = tmp_path / "bridge" / "sample-implementation-002.md"
+    go_path.write_text(
+        go_path.read_text(encoding="utf-8").replace("::init gtkb pb\n", "", 1),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(OperationDenied) as caught:
+        service._current_authority(
+            bridge_id="sample-implementation",
+            work_item_id="WI-AUTH-001",
+            required_paths=("scripts/sample.py",),
+        )
+
+    assert caught.value.code == "DENY_NO_INIT_ROLE"
+
+
+def test_git_lifecycle_service_builds_receipts_only_from_verified_message_fields() -> None:
+    fields = {
+        "Author-Session": "prime-session",
+        "Author-Role": "prime-builder",
+        "Verifier-Session": "lo-session",
+        "Verifier-Role": "loyal-opposition",
+    }
+
+    assert GitLifecycleService._verdict_session_receipt(
+        fields,
+        session_field="Author-Session",
+        role_field="Author-Role",
+        expected_role="prime-builder",
+    ) == {
+        "session_id": "prime-session",
+        "role": "prime-builder",
+        "provenance_source": "verified_message_header",
+    }
+    with pytest.raises(OperationDenied) as caught:
+        GitLifecycleService._verdict_session_receipt(
+            {},
+            session_field="Verifier-Session",
+            role_field="Verifier-Role",
+            expected_role="loyal-opposition",
+        )
+    assert caught.value.code == "verification_session_invalid"
 
 
 def test_start_finalizer_rejects_missing_pauth_for_protected_targets(
@@ -1112,7 +1251,9 @@ def test_start_finalizer_rejects_missing_pauth_for_protected_targets(
     taxonomy_target = tmp_path / "config" / "governance" / TAXONOMY_PATH.name
     taxonomy_target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(TAXONOMY_PATH, taxonomy_target)
-    _write_thread(tmp_path)
+    # WI-6856: work item present, Project Authorization absent -- the state this
+    # test specifies. The claim must succeed for the finalizer to be reached.
+    _write_thread(tmp_path, proposal=_work_item_proposal())
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     _claim_bridge(tmp_path)
 
@@ -2100,7 +2241,7 @@ def test_gate_blocks_when_other_session_claim_packet_reserves_target(
     )
     (bridge / "bridge-a-002.md").write_text(_go_verdict_body("bridge-a"), encoding="utf-8")
     (bridge / "bridge-b-001.md").write_text(
-        _pauth_proposal(bridge_id="bridge-b", target_paths=[shared_target]),
+        _pauth_proposal(bridge_id="bridge-b", target_paths=[shared_target], work_item="WI-AUTH-002"),
         encoding="utf-8",
     )
     (bridge / "bridge-b-002.md").write_text(_go_verdict_body("bridge-b"), encoding="utf-8")
@@ -2152,7 +2293,7 @@ def test_collision_ignores_expired_claim_for_overlapping_packet(
     )
     (bridge / "bridge-a-002.md").write_text(_go_verdict_body("bridge-a"), encoding="utf-8")
     (bridge / "bridge-b-001.md").write_text(
-        _pauth_proposal(bridge_id="bridge-b", target_paths=[shared_target]),
+        _pauth_proposal(bridge_id="bridge-b", target_paths=[shared_target], work_item="WI-AUTH-002"),
         encoding="utf-8",
     )
     (bridge / "bridge-b-002.md").write_text(_go_verdict_body("bridge-b"), encoding="utf-8")
@@ -2198,7 +2339,7 @@ def test_collision_ignores_same_session_overlapping_claim(tmp_path: Path, monkey
     )
     (bridge / "bridge-a-002.md").write_text(_go_verdict_body("bridge-a"), encoding="utf-8")
     (bridge / "bridge-b-001.md").write_text(
-        _pauth_proposal(bridge_id="bridge-b", target_paths=[shared_target]),
+        _pauth_proposal(bridge_id="bridge-b", target_paths=[shared_target], work_item="WI-AUTH-002"),
         encoding="utf-8",
     )
     (bridge / "bridge-b-002.md").write_text(_go_verdict_body("bridge-b"), encoding="utf-8")
@@ -2235,7 +2376,7 @@ def test_gate_blocks_when_other_session_glob_packet_reserves_target(
     )
     (bridge / "bridge-a-002.md").write_text(_go_verdict_body("bridge-a"), encoding="utf-8")
     (bridge / "bridge-b-001.md").write_text(
-        _pauth_proposal(bridge_id="bridge-b", target_paths=["scripts/*.py"]),
+        _pauth_proposal(bridge_id="bridge-b", target_paths=["scripts/*.py"], work_item="WI-AUTH-002"),
         encoding="utf-8",
     )
     (bridge / "bridge-b-002.md").write_text(_go_verdict_body("bridge-b"), encoding="utf-8")
@@ -2789,3 +2930,55 @@ def test_help_output_is_classified_read_only(command: str, expected: bool, ratio
     is a real operation modifier for some verbs.
     """
     assert gate._is_safe_command(command) is expected, rationale
+
+
+# WI-6821 Change 7: command-position anchoring for bare POSIX write verbs.
+#
+# The verbs added by F10 were originally matched anywhere in the command text,
+# so ordinary prose in an argument tripped a fail-closed gate. Change 7 anchors
+# them to command position. Both directions need coverage: a narrowing that
+# silently drops a real detection is a worse defect than the false positives it
+# fixes, because it reopens the enforcement hole F10 closed.
+PROTECTED_GATE_PATH = "scripts/implementation_start_gate" + ".py"
+
+
+@pytest.mark.parametrize(
+    ("template", "rationale"),
+    [
+        ("rm -rf {p}", "bare verb at start of command"),
+        ("cat payload | tee {p}", "tee reached through a pipe; the pipe alternative must cover it"),
+        ("cp a.py {p}", "copy onto a protected path"),
+        ("mv a.py {p}", "move onto a protected path"),
+        ("true && rm {p}", "verb after an && chain"),
+        ("echo hi; touch {p}", "verb after a semicolon"),
+        ("(cd scripts && rm {p})", "verb inside a subshell, after an opening paren"),
+    ],
+)
+def test_change7_preserves_command_position_mutation_detection(template: str, rationale: str) -> None:
+    """WI-6821: every real mutation sits at command position and must still fire.
+
+    This is the anti-regression half of Change 7. The narrowing is acceptable
+    only if it drops argument-position prose WITHOUT dropping any of these; a
+    miss here means the F10 enforcement hole has been reopened.
+    """
+    assert gate._has_mutating_signal(template.format(p=PROTECTED_GATE_PATH)), rationale
+
+
+@pytest.mark.parametrize(
+    ("command", "rationale"),
+    [
+        ("git log --grep=rm", "write verb inside a --grep value is prose, not a command"),
+        ("git log --grep=cp --oneline", "same, with a trailing flag"),
+        ("git log --format=%h --grep=install", "write verb inside a --grep value"),
+        ("grep -rn dd scripts/", "a write verb used as a search pattern operand"),
+        ("git for-each-ref --format=%(refname)", "read-only ref enumeration (F3)"),
+    ],
+)
+def test_change7_drops_argument_position_false_positives(command: str, rationale: str) -> None:
+    """WI-6821: a write verb in argument position is prose and must not fire.
+
+    These are the materialized false positives that motivated Change 7: the
+    unanchored form blocked read-only inspection commands whose only offense
+    was carrying a write verb inside a flag value.
+    """
+    assert not gate._has_mutating_signal(command), rationale

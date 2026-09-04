@@ -132,56 +132,35 @@ def test_dependency_readiness_supports_each_governed_project_state(
     assert readiness["blocked_gate"] is None
 
 
-def test_authorization_gate_blocks_only_its_unsatisfied_dependencies(db: KnowledgeDB) -> None:
+def test_authorization_gate_readiness_still_reports_unsatisfied_dependencies(db: KnowledgeDB) -> None:
+    """The dependency gate keyed 'authorization' still computes readiness.
+
+    WI-7657: this test previously drove ``ProjectLifecycleService.authorize_project``
+    and asserted it raised while the gate was blocked, then succeeded once the
+    prerequisite retired. That operation is gone -- authorization is a field on
+    the project row, not an operation with its own dependency gate -- so the
+    surviving behaviour is the readiness computation itself, which is what the
+    dependency ordering feature actually provides.
+
+    Non-vacuity: the absence assertion is paired with a control method that is
+    still present, so a mistyped name cannot make this pass silently.
+    """
     service = ProjectLifecycleService(db)
     _create_project(service, "PROJECT-FOUNDATION")
-    _create_project(service, "PROJECT-READINESS-PREREQUISITE")
     _create_project(service, "PROJECT-DOWNSTREAM")
-    _add_dependency(
-        service,
+    service.add_project_dependency(
         "PROJECT-DOWNSTREAM",
         "PROJECT-FOUNDATION",
-        required_state="retired",
+        required_prerequisite_state="retired",
         affected_gate="authorization",
-    )
-    _add_dependency(
-        service,
-        "PROJECT-DOWNSTREAM",
-        "PROJECT-READINESS-PREREQUISITE",
-        required_state="retired",
-        affected_gate="readiness",
-    )
-    db.insert_spec(
-        "SPEC-PROJECT-DEPENDENCY-TEST",
-        "Project dependency test specification",
-        "specified",
-        "test",
-        "seed authorization specification",
-    )
-    db.insert_deliberation(
-        "DELIB-PROJECT-DEPENDENCY-TEST",
-        "owner_conversation",
-        "Project dependency authorization",
-        "Authorize the test project.",
-        "Owner authorizes the test project after its dependency is satisfied.",
-        "test",
-        "seed authorization decision",
-        outcome="owner_decision",
+        rationale="downstream authorization waits on foundation retirement",
+        provenance="WI-7657",
+        change_reason="seed authorization gate dependency",
     )
 
     gate = service.project_dependency_gate_readiness("PROJECT-DOWNSTREAM", "authorization")
     assert gate["ready"] is False
     assert gate["dependency_count"] == 1
-    with pytest.raises(ProjectLifecycleError, match="authorization gate is blocked"):
-        service.authorize_project(
-            "PROJECT-DOWNSTREAM",
-            owner_decision="DELIB-PROJECT-DEPENDENCY-TEST",
-            name="Dependency-gated authorization",
-            scope="Test dependency authorization gating.",
-            included_spec_ids=["SPEC-PROJECT-DEPENDENCY-TEST"],
-            change_reason="must fail before foundation retirement",
-        )
-    assert db.list_project_authorizations("PROJECT-DOWNSTREAM", include_terminal=True) == []
 
     service.update_project(
         "PROJECT-FOUNDATION",
@@ -189,18 +168,11 @@ def test_authorization_gate_blocks_only_its_unsatisfied_dependencies(db: Knowled
         changed_by="test",
         change_reason="satisfy authorization prerequisite",
     )
-    authorization = service.authorize_project(
-        "PROJECT-DOWNSTREAM",
-        owner_decision="DELIB-PROJECT-DEPENDENCY-TEST",
-        name="Dependency-gated authorization",
-        scope="Test dependency authorization gating.",
-        included_spec_ids=["SPEC-PROJECT-DEPENDENCY-TEST"],
-        change_reason="authorize after foundation retirement",
-    )
-    assert authorization["status"] == "active"
-    readiness_gate = service.project_dependency_gate_readiness("PROJECT-DOWNSTREAM", "readiness")
-    assert readiness_gate["ready"] is False
-    assert readiness_gate["dependency_count"] == 1
+    cleared = service.project_dependency_gate_readiness("PROJECT-DOWNSTREAM", "authorization")
+    assert cleared["ready"] is True
+
+    assert hasattr(service, "update_project"), "control method missing"
+    assert not hasattr(service, "authorize_project")
 
 
 def test_invalid_dependency_requests_append_no_versions(db: KnowledgeDB) -> None:

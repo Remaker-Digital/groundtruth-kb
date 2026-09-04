@@ -212,9 +212,11 @@ def _validate_terminal_reopen_live(
     current = db.get_work_item(request.work_item_id)
     if current is None or current.get("stage") != "resolved":
         raise BacklogUpdateError("--reopen-terminal requires the current work-item stage to be exactly resolved")
-    pauth = db.get_project_authorization(policy.pauth_id)
-    if pauth is None or pauth.get("status") != "active":
-        raise BacklogUpdateError("--reopen-terminal requires the cited PAUTH to be active")
+    # WI-7657: the cited-authorization precondition is gone with the
+    # authorization record. The remaining preconditions are unchanged and are
+    # what actually constrain this path: the current stage must be exactly
+    # resolved, and every strict bridge-thread evidence file named by the
+    # policy must exist in-root at the expected lifecycle status.
 
     root = project_root.resolve()
     for rel_path in related_threads:
@@ -271,22 +273,19 @@ def _verify_text_edit_gate(db: KnowledgeDB, current: dict[str, Any], request: Ba
     satisfied. The arms are:
 
     1. ``request.owner_approved`` is True
-    2. ``request.change_reason`` cites an active ``PAUTH-*`` token (verified
-       against ``current_project_authorizations`` with status active) OR an
-       existing ``DELIB-*`` token (verified against ``current_deliberations``).
+    2. ``request.change_reason`` cites an existing ``DELIB-*`` token (verified
+       against ``current_deliberations``).
 
     Substring presence is not enough: each cited token is looked up in the DB
-    and rejected if the row is missing or, for PAUTH, not active.
+    and rejected if the row is missing.
     """
     _ = current
     if request.owner_approved:
         return
 
-    for token in _PAUTH_TOKEN_RE.findall(request.change_reason):
-        record = db.get_project_authorization(token)
-        if record and record.get("status") == "active":
-            return
-
+    # WI-7657: an authorization token is no longer accepted as text-edit
+    # authorization. It named a record that no longer exists, and citing one
+    # is an error under the current authority model rather than evidence.
     for token in _DELIB_TOKEN_RE.findall(request.change_reason):
         if db.get_deliberation(token):
             return
@@ -294,8 +293,7 @@ def _verify_text_edit_gate(db: KnowledgeDB, current: dict[str, Any], request: Ba
     raise BacklogUpdateError(
         f"Cannot edit title or description of work item {request.work_item_id} "
         f"without text-edit authorization. Satisfy one of: (1) pass "
-        f"--owner-approved; (2) cite an active PAUTH-* token or an existing "
-        f"DELIB-* token in --change-reason."
+        f"--owner-approved; (2) cite an existing DELIB-* token in --change-reason."
     )
 
 

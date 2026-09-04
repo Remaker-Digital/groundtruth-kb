@@ -170,19 +170,6 @@ def _seed_governance_records(db_path: Path) -> None:
             change_reason="seed work item",
         )
         db.link_project_work_item(FIXTURE_PROJECT_ID, FIXTURE_WORK_ITEM_ID, "test", "seed membership")
-        db.insert_project_authorization(
-            FIXTURE_PROJECT_ID,
-            "WI-5942 fixture authorization",
-            FIXTURE_DELIB_ID,
-            "Bounded authorization for the WI-5942 helper publication fixture.",
-            "test",
-            "seed authorization",
-            id=FIXTURE_PAUTH_ID,
-            allowed_mutation_classes=FIXTURE_MUTATION_CLASSES,
-            forbidden_operations=[],
-            included_work_item_ids=[FIXTURE_WORK_ITEM_ID],
-            included_spec_ids=[FIXTURE_SPEC_ID],
-        )
     finally:
         db.close()
 

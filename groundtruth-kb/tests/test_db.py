@@ -957,6 +957,65 @@ class TestTests:
         assert len(tests) == 1
 
 
+class TestArtifactUpdateRequestSchema:
+    """WI-5183 durable idempotency receipt schema."""
+
+    @staticmethod
+    def _receipt_values(key: str = "request-1") -> tuple[object, ...]:
+        return (
+            key,
+            1,
+            "request-digest",
+            "TEST-001",
+            1,
+            2,
+            "postimage-digest",
+            '{"row":{"id":"TEST-001","version":2}}',
+            "receipt-digest",
+            "PROJECT-001",
+            "WI-001",
+            "bridge-slug",
+            "bridge/bridge-slug-002.md",
+            "go-digest",
+            "session-001",
+            "2026-08-26T00:00:00Z",
+            "test",
+            "exercise receipt schema",
+        )
+
+    def test_receipt_table_and_indexes_exist(self, db):
+        conn = db._get_conn()
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(test_artifact_update_requests)")}
+        assert {
+            "idempotency_key",
+            "request_digest",
+            "result_test_version",
+            "result_payload_json",
+            "result_receipt_digest",
+            "go_sha256",
+            "actor_session_context_id",
+        } <= columns
+        indexes = {row[1] for row in conn.execute("PRAGMA index_list(test_artifact_update_requests)")}
+        assert "idx_test_artifact_update_requests_test" in indexes
+        assert "idx_test_artifact_update_requests_bridge" in indexes
+
+    def test_idempotency_key_and_result_version_are_unique(self, db):
+        conn = db._get_conn()
+        statement = """INSERT INTO test_artifact_update_requests
+            (idempotency_key, request_schema_version, request_digest, test_id,
+             expected_test_version, result_test_version, result_postimage_digest,
+             result_payload_json, result_receipt_digest, project_id, work_item_id,
+             bridge_slug, go_file, go_sha256, actor_session_context_id, created_at,
+             changed_by, change_reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+        conn.execute(statement, self._receipt_values())
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(statement, self._receipt_values())
+        second_key = list(self._receipt_values("request-2"))
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(statement, tuple(second_key))
+
+
 class TestDocuments:
     """Tests for document CRUD."""
 
@@ -1293,472 +1352,44 @@ def test_test_application_scope_insert_and_carry_forward(tmp_path):
     assert test["test_file"] == "applications/Agent_Red/tests/test_app.py"
 
 
-class TestProjectAuthorizationSpecLinkage:
-    """WI-3312: GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001.
+class TestProjectAuthorizationRemoved:
+    """WI-7657: the project-authorization record has no database surface.
 
-    An active project authorization must cite at least one included_spec_id
-    that resolves via get_spec() to a specifications-table row with an
-    approved lifecycle status ({specified, implemented, verified}). No type
-    allowlist is applied -- membership in the specifications table is itself
-    the "is a specification" predicate.
+    This replaces TestProjectAuthorizationSpecLinkage and
+    TestProjectAuthorizationSpecAmendment. Both exercised an append-only
+    authorization row -- its spec-linkage precondition and its amendment
+    path. The relation is gone and authorization is a field on the project
+    row, so both classes assert absence here instead.
+
+    Non-vacuity: each absence assertion is paired with a control that is
+    still present, so a mistyped name or a failed import cannot pass.
     """
 
-    PROJECT_ID = "PROJECT-AUTH-LINKAGE-TEST"
-    DELIB_ID = "DELIB-AUTH-LINKAGE-TEST"
-
-    def _prepare(self, db) -> None:
-        db.insert_project(
-            "Auth Linkage Test Project",
-            "test",
-            "test setup",
-            id=self.PROJECT_ID,
-        )
-        db.insert_deliberation(
-            id=self.DELIB_ID,
-            source_type="owner_conversation",
-            title="Auth linkage test owner decision",
-            summary="owner decision summary",
-            content="owner decision content",
-            changed_by="test",
-            change_reason="test setup",
-        )
-
-    def _authorize(self, db, *, included_spec_ids, status="active", change_reason="test authorization"):
-        return db.insert_project_authorization(
-            self.PROJECT_ID,
-            "Auth Linkage Test Authorization",
-            self.DELIB_ID,
-            "bounded test scope summary",
-            "test",
-            change_reason,
-            status=status,
-            included_spec_ids=included_spec_ids,
-        )
-
-    # --- blocked cases (active authorization, no approved spec) -----------------
-
-    def test_authorize_active_with_no_spec_ids_raises(self, db) -> None:
-        self._prepare(db)
-        with pytest.raises(ValueError, match="GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001"):
-            self._authorize(db, included_spec_ids=None)
-
-    def test_authorize_active_with_empty_spec_list_raises(self, db) -> None:
-        self._prepare(db)
-        with pytest.raises(ValueError, match="GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001"):
-            self._authorize(db, included_spec_ids=[])
-
-    def test_authorize_active_with_unknown_spec_id_raises(self, db) -> None:
-        self._prepare(db)
-        with pytest.raises(ValueError, match="not-found"):
-            self._authorize(db, included_spec_ids=["SPEC-DOES-NOT-EXIST"])
-
-    def test_authorize_active_with_retired_spec_raises(self, db) -> None:
-        self._prepare(db)
-        db.insert_spec(
-            id="SPEC-RETIRED-1",
-            title="Retired spec",
-            status="retired",
-            changed_by="test",
-            change_reason="test",
-        )
-        with pytest.raises(ValueError, match="status=retired-not-approved"):
-            self._authorize(db, included_spec_ids=["SPEC-RETIRED-1"])
-
-    # --- positive type-coverage (F1 false-negative class closed) ----------------
-
-    def test_authorize_active_with_specification_type_spec_succeeds(self, db) -> None:
-        self._prepare(db)
-        db.insert_spec(
-            id="SPEC-LINKAGE-1",
-            title="A specification-type spec",
-            status="verified",
-            changed_by="test",
-            change_reason="test",
-            type="specification",
-        )
-        result = self._authorize(db, included_spec_ids=["SPEC-LINKAGE-1"])
-        assert result is not None and result["status"] == "active"
-
-    def test_authorize_active_with_requirement_type_spec_succeeds(self, db) -> None:
-        self._prepare(db)
-        db.insert_spec(
-            id="REQ-LINKAGE-1",
-            title="A requirement-type spec",
-            status="implemented",
-            changed_by="test",
-            change_reason="test",
-            type="requirement",
-        )
-        result = self._authorize(db, included_spec_ids=["REQ-LINKAGE-1"])
-        assert result is not None and result["status"] == "active"
-
-    def test_authorize_active_with_governance_type_spec_succeeds(self, db) -> None:
-        self._prepare(db)
-        db.insert_spec(
-            id="GOV-LINKAGE-1",
-            title="A governance-type spec",
-            status="specified",
-            changed_by="test",
-            change_reason="test",
-            type="governance",
-        )
-        result = self._authorize(db, included_spec_ids=["GOV-LINKAGE-1"])
-        assert result is not None and result["status"] == "active"
-
-    def test_authorize_active_with_valid_and_invalid_mix_succeeds(self, db) -> None:
-        # One resolvable approved spec is sufficient even alongside invalid ids.
-        self._prepare(db)
-        db.insert_spec(
-            id="SPEC-LINKAGE-2",
-            title="Valid spec",
-            status="verified",
-            changed_by="test",
-            change_reason="test",
-        )
-        result = self._authorize(db, included_spec_ids=["SPEC-MISSING", "SPEC-LINKAGE-2"])
-        assert result is not None and result["status"] == "active"
-
-    # --- non-active / exempt paths ----------------------------------------------
-
-    def test_authorize_draft_with_no_specs_succeeds(self, db) -> None:
-        self._prepare(db)
-        result = self._authorize(db, included_spec_ids=None, status="draft")
-        assert result is not None and result["status"] == "draft"
-
-    def test_authorize_status_only_change_no_spec_validation(self, db) -> None:
-        # A later non-active version (active -> revoked) with the spec set
-        # unchanged is not spec-validated by the active-authorization gate.
-        # The spec set is held constant so this stays a pure status change
-        # (a spec change would engage the WI-3313 amendment gate instead).
-        self._prepare(db)
-        db.insert_spec(
-            id="SPEC-LINKAGE-3",
-            title="Valid spec",
-            status="verified",
-            changed_by="test",
-            change_reason="test",
-        )
-        self._authorize(db, included_spec_ids=["SPEC-LINKAGE-3"])
-        revoked = self._authorize(
-            db,
-            included_spec_ids=["SPEC-LINKAGE-3"],
-            status="revoked",
-            change_reason="revoke",
-        )
-        assert revoked is not None and revoked["status"] == "revoked"
-
-    def test_existing_grandfathered_row_read_unchanged(self, db) -> None:
-        # The gate is insert-time only: a pre-existing active authorization with
-        # no included_spec_ids (written before the gate) is unaffected on read.
-        self._prepare(db)
-        conn = db._get_conn()
-        conn.execute(
-            "INSERT INTO project_authorizations "
-            "(id, version, project_id, status, authorization_name, "
-            "owner_decision_deliberation_id, scope_summary, changed_by, "
-            "changed_at, change_reason) "
-            "VALUES (?, 1, ?, 'active', 'Grandfathered Authorization', ?, "
-            "'legacy scope', 'test', '2026-01-01T00:00:00Z', 'legacy pre-gate insert')",
-            ("PAUTH-GRANDFATHERED-TEST", self.PROJECT_ID, self.DELIB_ID),
-        )
-        conn.commit()
-        row = db.get_project_authorization("PAUTH-GRANDFATHERED-TEST")
-        assert row is not None
-        assert row["status"] == "active"
-
-
-class TestProjectAuthorizationSpecAmendment:
-    """WI-3313: DCL-PROJECT-SPECIFICATION-AMENDMENT-APPROVAL-REQUIRED-001.
-
-    A project-authorization version that mutates included/excluded spec sets
-    (relative to the prior version) must cite, in change_reason, a real,
-    owner-approved, covering formal-artifact-approval packet.
-    """
-
-    PROJECT_ID = "PROJECT-AMEND-TEST"
-    DELIB_ID = "DELIB-AMEND-TEST"
-    AUTH_NAME = "Amend Test Authorization"
-
-    def _prepare(self, db) -> None:
-        db.insert_project("Amend Test Project", "test", "setup", id=self.PROJECT_ID)
-        db.insert_deliberation(
-            id=self.DELIB_ID,
-            source_type="owner_conversation",
-            title="Amend test owner decision",
-            summary="owner decision summary",
-            content="owner decision content",
-            changed_by="test",
-            change_reason="setup",
-        )
-        for spec_id in ("SPEC-AMEND-1", "SPEC-AMEND-2", "SPEC-AMEND-3"):
-            db.insert_spec(
-                id=spec_id,
-                title=f"Spec {spec_id}",
-                status="verified",
-                changed_by="test",
-                change_reason="setup",
-            )
-
-    def _v1(self, db, change_reason="initial authorization"):
-        return db.insert_project_authorization(
-            self.PROJECT_ID,
-            self.AUTH_NAME,
-            self.DELIB_ID,
-            "bounded scope",
-            "test",
-            change_reason,
-            status="active",
-            included_spec_ids=["SPEC-AMEND-1"],
-        )
-
-    def _amend(
-        self,
-        db,
-        change_reason,
-        *,
-        included_spec_ids=("SPEC-AMEND-1", "SPEC-AMEND-2"),
-        excluded_spec_ids=None,
-        status="active",
-    ):
-        return db.insert_project_authorization(
-            self.PROJECT_ID,
-            self.AUTH_NAME,
-            self.DELIB_ID,
-            "bounded scope",
-            "test",
-            change_reason,
-            status=status,
-            included_spec_ids=list(included_spec_ids) if included_spec_ids is not None else None,
-            excluded_spec_ids=list(excluded_spec_ids) if excluded_spec_ids is not None else None,
-        )
-
-    def _packet_dir(self, db):
-        directory = db.db_path.resolve().parent / ".groundtruth" / "formal-artifact-approvals"
-        directory.mkdir(parents=True, exist_ok=True)
-        return directory
-
-    def _write_packet(self, db, filename, *, full_content, approved_by="owner", drop_field=None, raw=None):
-        import json as _json
-
-        from groundtruth_kb.governance.approval_packet import content_hash
-
-        path = self._packet_dir(db) / filename
-        if raw is not None:
-            path.write_text(raw, encoding="utf-8")
-            return path
-        packet = {
-            "artifact_type": "design_constraint",
-            "artifact_id": "PAUTH-AMEND-TEST-ARTIFACT",
-            "action": "amend",
-            "source_ref": "S350 owner conversation",
-            "full_content": full_content,
-            "full_content_sha256": content_hash(full_content),
-            "approval_mode": "approve",
-            "presented_to_user": True,
-            "transcript_captured": True,
-            "explicit_change_request": "owner authorizes the project-authorization spec amendment",
-            "changed_by": "owner",
-            "change_reason": "owner-approved spec amendment",
-        }
-        if approved_by is not None:
-            packet["approved_by"] = approved_by
-        if drop_field is not None:
-            packet.pop(drop_field, None)
-        path.write_text(_json.dumps(packet), encoding="utf-8")
-        return path
-
-    # Covering content: mentions the project id and the added spec (SPEC-AMEND-2).
-    _COVERING = (
-        "Owner-approved amendment of project PROJECT-AMEND-TEST authorization "
-        "adding SPEC-AMEND-2 alongside SPEC-AMEND-1."
+    REMOVED_WRITERS = (
+        "insert_project_authorization",
+        "update_project_authorization",
+        "get_project_authorization",
+        "list_project_authorizations",
     )
 
-    # --- blocked cases ----------------------------------------------------------
+    def test_control_surface_is_present(self, db) -> None:
+        assert hasattr(db, "insert_project")
+        assert hasattr(db, "get_project")
 
-    def test_amend_specs_without_packet_path_raises(self, db) -> None:
-        self._prepare(db)
-        self._v1(db)
-        with pytest.raises(ValueError, match="No packet path detected"):
-            self._amend(db, "amend the authorization specs with no packet citation")
+    def test_authorization_writers_are_absent(self, db) -> None:
+        assert hasattr(db, "insert_project"), "control method missing"
+        for name in self.REMOVED_WRITERS:
+            assert not hasattr(db, name), f"KnowledgeDB should no longer expose {name}"
 
-    def test_amend_specs_with_fake_path_raises(self, db) -> None:
-        self._prepare(db)
-        self._v1(db)
-        with pytest.raises(ValueError, match="not found"):
-            self._amend(
-                db,
-                "amend per .groundtruth/formal-artifact-approvals/does-not-exist.json",
-            )
+    def test_authorization_relations_are_absent(self, db) -> None:
+        names = {row[0] for row in db._get_conn().execute("SELECT name FROM sqlite_master")}
+        assert "projects" in names, "control relation missing"
+        assert not [name for name in names if "project_authorization" in name]
 
-    def test_amend_specs_with_outside_root_path_raises(self, db) -> None:
-        self._prepare(db)
-        self._v1(db)
-        with pytest.raises(ValueError, match="outside the project root"):
-            self._amend(
-                db,
-                "amend per .groundtruth/formal-artifact-approvals/../../../escapes-root.json",
-            )
-
-    def test_amend_specs_with_malformed_json_raises(self, db) -> None:
-        self._prepare(db)
-        self._v1(db)
-        self._write_packet(db, "malformed.json", full_content="", raw="{not valid json")
-        with pytest.raises(ValueError, match="not readable JSON"):
-            self._amend(
-                db,
-                "amend per .groundtruth/formal-artifact-approvals/malformed.json",
-            )
-
-    def test_amend_specs_with_schema_invalid_packet_raises(self, db) -> None:
-        self._prepare(db)
-        self._v1(db)
-        self._write_packet(db, "schema-bad.json", full_content=self._COVERING, drop_field="action")
-        with pytest.raises(ValueError, match="fails schema validation"):
-            self._amend(
-                db,
-                "amend per .groundtruth/formal-artifact-approvals/schema-bad.json",
-            )
-
-    def test_amend_specs_with_non_owner_approved_packet_raises(self, db) -> None:
-        self._prepare(db)
-        self._v1(db)
-        self._write_packet(
-            db,
-            "non-owner.json",
-            full_content=self._COVERING,
-            approved_by="some-agent",
-        )
-        with pytest.raises(ValueError, match="not owner-approved"):
-            self._amend(
-                db,
-                "amend per .groundtruth/formal-artifact-approvals/non-owner.json",
-            )
-
-    def test_amend_specs_packet_does_not_cover_project_raises(self, db) -> None:
-        self._prepare(db)
-        self._v1(db)
-        # full_content omits the project id (and no authorization id appears).
-        self._write_packet(
-            db,
-            "no-project.json",
-            full_content="Owner-approved amendment adding SPEC-AMEND-2.",
-        )
-        with pytest.raises(ValueError, match="does not cover the amendment"):
-            self._amend(
-                db,
-                "amend per .groundtruth/formal-artifact-approvals/no-project.json",
-            )
-
-    def test_amend_specs_packet_does_not_cover_added_spec_raises(self, db) -> None:
-        self._prepare(db)
-        self._v1(db)
-        # full_content mentions the project but omits the added spec SPEC-AMEND-2.
-        self._write_packet(
-            db,
-            "no-spec.json",
-            full_content="Owner-approved amendment of project PROJECT-AMEND-TEST.",
-        )
-        with pytest.raises(ValueError, match="does not cover the amendment"):
-            self._amend(
-                db,
-                "amend per .groundtruth/formal-artifact-approvals/no-spec.json",
-            )
-
-    # --- passing cases ----------------------------------------------------------
-
-    def test_amend_specs_with_covering_packet_succeeds(self, db) -> None:
-        self._prepare(db)
-        self._v1(db)
-        self._write_packet(db, "covering.json", full_content=self._COVERING)
-        result = self._amend(
-            db,
-            "amend per .groundtruth/formal-artifact-approvals/covering.json",
-        )
-        assert result is not None and result["status"] == "active" and result["version"] == 2
-
-    def test_amend_specs_batch_packet_multiple_projects(self, db) -> None:
-        self._prepare(db)
-        self._v1(db)
-        # A batch packet covering several projects in one owner approval.
-        batch_content = (
-            "Owner-approved batch amendment covering project PROJECT-OTHER-1 and "
-            "project PROJECT-AMEND-TEST and project PROJECT-OTHER-2; specs "
-            "SPEC-AMEND-1, SPEC-AMEND-2, SPEC-AMEND-3."
-        )
-        self._write_packet(db, "batch.json", full_content=batch_content)
-        result = self._amend(
-            db,
-            "amend per .groundtruth/formal-artifact-approvals/batch.json",
-        )
-        assert result is not None and result["version"] == 2
-
-    def test_authorize_initial_version_no_packet_required(self, db) -> None:
-        # Version 1 has no prior version, so no amendment gate applies.
-        self._prepare(db)
-        result = self._v1(db)
-        assert result is not None and result["version"] == 1
-
-    def test_authorize_status_change_no_packet_required(self, db) -> None:
-        # active -> revoked with the spec set unchanged is not an amendment.
-        self._prepare(db)
-        self._v1(db)
-        result = self._amend(
-            db,
-            "revoke the authorization",
-            included_spec_ids=("SPEC-AMEND-1",),
-            status="revoked",
-        )
-        assert result is not None and result["status"] == "revoked"
-
-    def test_amend_excluded_specs_also_gated(self, db) -> None:
-        # Mutating excluded_spec_ids (not just included) engages the gate.
-        self._prepare(db)
-        self._v1(db)
-        with pytest.raises(ValueError, match="No packet path detected"):
-            self._amend(
-                db,
-                "exclude a spec with no packet",
-                included_spec_ids=("SPEC-AMEND-1",),
-                excluded_spec_ids=("SPEC-AMEND-3",),
-            )
-
-    # --- helper-isolation tests -------------------------------------------------
-
-    def test_parse_packet_path_from_change_reason_helper(self) -> None:
-        from groundtruth_kb.governance.approval_packet import (
-            parse_packet_path_from_change_reason,
-        )
-
-        assert (
-            parse_packet_path_from_change_reason("see .groundtruth/formal-artifact-approvals/p.json for detail")
-            == ".groundtruth/formal-artifact-approvals/p.json"
-        )
-        # Backslash separators are normalized to forward slashes.
-        assert (
-            parse_packet_path_from_change_reason("see .groundtruth\\formal-artifact-approvals\\p.json")
-            == ".groundtruth/formal-artifact-approvals/p.json"
-        )
-        assert parse_packet_path_from_change_reason("no packet path in this reason") is None
-
-    def test_packet_covers_amendment_helper(self) -> None:
-        from groundtruth_kb.governance.approval_packet import packet_covers_amendment
-
-        packet = {
-            "artifact_id": "",
-            "full_content": "amend PROJECT-X authorization adding SPEC-1 and SPEC-2",
-            "explicit_change_request": "",
-            "change_reason": "",
-        }
-        covers, _ = packet_covers_amendment(packet, "PROJECT-X", "PAUTH-X", {"SPEC-1"}, {"SPEC-2"})
-        assert covers is True
-        covers_no_project, reason = packet_covers_amendment(
-            packet,
-            "PROJECT-MISSING",
-            "PAUTH-MISSING",
-            {"SPEC-1"},
-            set(),
-        )
-        assert covers_no_project is False and "PROJECT-MISSING" in reason
+    def test_authorization_is_a_project_row_field(self, db) -> None:
+        columns = {row[1] for row in db._get_conn().execute("PRAGMA table_info(projects)")}
+        assert "id" in columns, "control column missing"
+        assert "authorization" in columns
 
 
 class TestHarnesses:

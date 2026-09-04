@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from groundtruth_kb.bridge.versioned_files import parse_bridge_header_block
 from groundtruth_kb.git_lifecycle.commands import (
     CommandBoundary,
     CommandResult,
@@ -32,7 +33,6 @@ from groundtruth_kb.git_lifecycle.quiescence import (
 )
 from groundtruth_kb.git_lifecycle.repository import GitRepository, normalize_repo_path
 from groundtruth_kb.git_lifecycle.state import LifecycleState, canonical_json, sha256_json
-from groundtruth_kb.session.envelope import EnvelopeError, resolve_worker_role_provenance
 
 _WORK_ITEM = re.compile(r"^[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+$")
 _OPERATION_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{2,127}$")
@@ -960,7 +960,7 @@ class GitLifecycleService:
         if current["binding_hash"] != authority["binding_hash"]:
             raise OperationDenied(
                 "authorization_evidence_stale",
-                "PAUTH, claim, or implementation-start evidence changed at the Git-effect boundary",
+                "claim or implementation-start evidence changed at the Git-effect boundary",
                 operation_id=operation_id,
             )
         return marker
@@ -1086,54 +1086,15 @@ class GitLifecycleService:
 
         packet, packet_path = self._authority_packet(bridge_id)
         start = packet.get("implementation_start")
-        embedded_pauth = packet.get("project_authorization")
-        if (
-            not isinstance(start, dict)
-            or start.get("schema_version") not in {1, 2}
-            or not isinstance(embedded_pauth, dict)
-        ):
+        if not isinstance(start, dict) or start.get("schema_version") not in {1, 2, 3}:
             raise OperationDenied(
                 "implementation_start_invalid", "implementation-start authority envelope is incomplete"
             )
         if start.get("bridge_id") != bridge_id:
             raise OperationDenied("implementation_start_invalid", "implementation-start bridge binding is inconsistent")
         session_id = start.get("session_id")
-        provenance = start.get("worker_role_provenance") or start.get("role_attestation")
-        prov_session = (
-            provenance.get("session_id") or provenance.get("invoking_context") if isinstance(provenance, dict) else None
-        )
-        if (
-            not isinstance(session_id, str)
-            or not isinstance(provenance, dict)
-            or provenance.get("role") != "prime-builder"
-            or prov_session != session_id
-        ):
-            raise OperationDenied(
-                "implementation_start_invalid", "implementation-start PB session provenance is invalid"
-            )
-        try:
-            canonical_provenance = resolve_worker_role_provenance(
-                self.repo.root,
-                current_session_id=session_id,
-                harness_name=provenance.get("harness_name"),
-            )
-        except EnvelopeError as exc:
-            raise OperationDenied(
-                "implementation_start_invalid",
-                "implementation-start session provenance is absent or ambiguous in the canonical store",
-            ) from exc
-        if (
-            canonical_provenance.get("role") != "prime-builder"
-            or canonical_provenance.get("session_id") != session_id
-            or (
-                provenance.get("harness_id") is not None
-                and canonical_provenance.get("harness_id") != provenance.get("harness_id")
-            )
-        ):
-            raise OperationDenied(
-                "implementation_start_invalid",
-                "implementation-start packet conflicts with canonical PB session provenance",
-            )
+        if not isinstance(session_id, str) or not session_id.strip():
+            raise OperationDenied("implementation_start_invalid", "implementation-start session identity is invalid")
 
         packet_targets = packet.get("target_path_globs")
         start_targets = start.get("target_path_globs")
@@ -1156,9 +1117,19 @@ class GitLifecycleService:
         if not isinstance(go_file, str) or not go_file.startswith("bridge/"):
             raise OperationDenied("implementation_start_invalid", "implementation-start GO reference is invalid")
         go_path = self._evidence_path(go_file)
-        go_lines = [line.strip() for line in go_path.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
-        if not go_lines or go_lines[0] != "GO":
+        try:
+            go_text = go_path.read_text(encoding="utf-8-sig")
+        except OSError as exc:
+            raise OperationDenied("implementation_start_invalid", "implementation-start GO is unreadable") from exc
+        go_header = parse_bridge_header_block(go_text)
+        if go_header.status != "GO" or not go_header.status_line_exact:
             raise OperationDenied("implementation_start_invalid", "implementation-start GO reference is not GO")
+        if go_header.init_line != "::init gtkb pb":
+            raise OperationDenied(
+                "DENY_NO_INIT_ROLE",
+                "implementation-start GO must carry the exact authored ::init gtkb pb role source",
+                go_file=go_file,
+            )
         go_sha256 = self._file_sha256(go_path)
         latest_bridge_path, latest_bridge_lines = self._latest_bridge_entry(bridge_id)
         latest_bridge_status = latest_bridge_lines[0] if latest_bridge_lines else ""
@@ -1195,10 +1166,6 @@ class GitLifecycleService:
         try:
             connection = sqlite3.connect(f"file:{db_path.as_posix()}?mode=ro", uri=True)
             connection.row_factory = sqlite3.Row
-            authorization_id = embedded_pauth.get("id")
-            pauth_row = connection.execute(
-                "SELECT * FROM current_project_authorizations WHERE id = ?", (authorization_id,)
-            ).fetchone()
             claim_row = connection.execute(
                 "SELECT * FROM work_intent_claims WHERE thread_slug = ?", (bridge_id,)
             ).fetchone()
@@ -1207,44 +1174,13 @@ class GitLifecycleService:
         finally:
             if "connection" in locals():
                 connection.close()
-        if pauth_row is None or claim_row is None:
-            raise OperationDenied("authority_evidence_missing", "current PAUTH or work-intent claim is missing")
-        pauth = dict(pauth_row)
+        if claim_row is None:
+            raise OperationDenied("authority_evidence_missing", "current work-intent claim is missing")
         claim = dict(claim_row)
-        if (
-            pauth.get("status") != "active"
-            or embedded_pauth.get("id") != pauth.get("id")
-            or embedded_pauth.get("version") != pauth.get("version")
-            or embedded_pauth.get("project_id") != pauth.get("project_id")
-        ):
-            raise OperationDenied("project_authorization_inactive", "current PAUTH does not match the start packet")
-        if project_id is not None and pauth.get("project_id") != project_id:
-            raise OperationDenied("project_authorization_subject_mismatch", "PAUTH targets another project")
-        included_work_items = self._json_list(
-            pauth.get("included_work_item_ids"), label="PAUTH included_work_item_ids", optional=True
-        )
-        excluded_work_items = self._json_list(
-            pauth.get("excluded_work_item_ids"), label="PAUTH excluded_work_item_ids", optional=True
-        )
-        if work_item_id is not None and (
-            work_item_id in excluded_work_items
-            or (included_work_items and work_item_id not in included_work_items)
-            or embedded_pauth.get("work_item_id") != work_item_id
-        ):
-            raise OperationDenied("project_authorization_subject_mismatch", "PAUTH does not authorize this work item")
-        expires_at = pauth.get("expires_at")
         now = datetime.fromtimestamp(self.clock(), tz=UTC)
-        if expires_at and now >= self._parse_utc(expires_at, label="PAUTH expiry"):
-            raise OperationDenied("project_authorization_inactive", "PAUTH is expired")
         packet_expires_at = packet.get("expires_at")
         if now >= self._parse_utc(packet_expires_at, label="implementation-start packet expiry"):
             raise OperationDenied("implementation_start_expired", "implementation-start packet is expired")
-        forbidden = self._json_list(
-            pauth.get("forbidden_operations"), label="PAUTH forbidden_operations", optional=True
-        )
-        if any(item in {"git_commit", "git_promotion", "git_lifecycle"} for item in forbidden):
-            raise OperationDenied("project_authorization_operation_denied", "PAUTH forbids Git lifecycle mutation")
-
         embedded_claim = start.get("work_intent_claim")
         if not isinstance(embedded_claim, dict):
             raise OperationDenied("work_intent_claim_invalid", "start packet has no claim binding")
@@ -1252,7 +1188,7 @@ class GitLifecycleService:
             claim.get("session_id") != session_id
             or claim.get("claim_kind") != "go_implementation"
             or claim.get("acting_role") != "prime-builder"
-            or claim.get("project_id") != pauth.get("project_id")
+            or (project_id is not None and claim.get("project_id") != project_id)
             or embedded_claim.get("thread_slug") != bridge_id
             or embedded_claim.get("session_id") != session_id
             or embedded_claim.get("claim_kind") != "go_implementation"
@@ -1261,23 +1197,16 @@ class GitLifecycleService:
         claim_expiry = claim.get("implementation_grace_expires_at") or claim.get("ttl_expires_at")
         if now >= self._parse_utc(claim_expiry, label="work-intent claim expiry"):
             raise OperationDenied("work_intent_claim_expired", "current work-intent claim is expired")
-        decision = start.get("project_authorization_decision")
-        if (
-            not isinstance(decision, dict)
-            or decision.get("allowed") is not True
-            or decision.get("authorization_id") != pauth.get("id")
-            or decision.get("authorization_version") != pauth.get("version")
-            or decision.get("normalized_operation") != "implementation_start"
-        ):
-            raise OperationDenied("implementation_start_invalid", "operation-time PAUTH decision is invalid")
-
         authority_material = {
             "bridge_id": bridge_id,
             "packet_sha256": self._file_sha256(packet_path),
-            "pauth": pauth,
             "claim": claim,
             "session_id": session_id,
-            "session_provenance": canonical_provenance,
+            "authored_role_source": {
+                "path": go_file,
+                "sha256": go_sha256,
+                "init_line": go_header.init_line,
+            },
             "go_file": go_file,
             "go_sha256": go_sha256,
             "latest_bridge_file": latest_bridge_file,
@@ -1592,44 +1521,35 @@ class GitLifecycleService:
             raise OperationDenied("verification_missing", "canonical bridge verdict is unreadable") from exc
         return path, lines
 
-    def _canonical_session_receipt(self, session_id: str, *, expected_role: str) -> dict[str, Any]:
-        try:
-            provenance = resolve_worker_role_provenance(
-                self.repo.root,
-                current_session_id=session_id,
-            )
-        except EnvelopeError as exc:
+    @staticmethod
+    def _verdict_session_receipt(
+        fields: dict[str, str],
+        *,
+        session_field: str,
+        role_field: str,
+        expected_role: str,
+    ) -> dict[str, Any]:
+        """Return stateless authored provenance from the VERIFIED message itself."""
+
+        session_id = fields.get(session_field)
+        role = fields.get(role_field)
+        if not isinstance(session_id, str) or not session_id.strip():
             raise OperationDenied(
                 "verification_session_invalid",
-                "verification session is absent or ambiguous in the canonical session store",
-                session_id=session_id,
-            ) from exc
-        if provenance.get("role") != expected_role:
+                "VERIFIED authored metadata is missing a session context id",
+                session_field=session_field,
+            )
+        if role != expected_role:
             raise OperationDenied(
                 "verification_role_invalid",
-                "canonical verification session has the wrong role",
+                "VERIFIED authored metadata has the wrong role",
                 expected_role=expected_role,
                 session_id=session_id,
             )
-        harness_name = provenance.get("harness_name")
-        if not isinstance(harness_name, str):
-            raise OperationDenied("verification_session_invalid", "canonical session harness is missing")
-        path = (self.repo.root / "harness-state" / harness_name / "session-envelopes" / f"{session_id}.json").resolve()
-        try:
-            path.relative_to(self.repo.root)
-        except ValueError as exc:
-            raise OperationDenied(
-                "verification_session_invalid", "canonical session path escaped the repository"
-            ) from exc
-        if not path.is_file():
-            raise OperationDenied("verification_session_invalid", "canonical session document is missing")
         return {
             "session_id": session_id,
             "role": expected_role,
-            "harness_id": provenance["harness_id"],
-            "harness_name": harness_name,
-            "path": path.relative_to(self.repo.root).as_posix(),
-            "sha256": self._file_sha256(path),
+            "provenance_source": "verified_message_header",
         }
 
     def _verified_verdict(
@@ -1668,8 +1588,18 @@ class GitLifecycleService:
                 "verification_session_mismatch",
                 "canonical VERIFIED author metadata does not identify the verifier session",
             )
-        author_receipt = self._canonical_session_receipt(author_session, expected_role="prime-builder")
-        verifier_receipt = self._canonical_session_receipt(verifier_session, expected_role="loyal-opposition")
+        author_receipt = self._verdict_session_receipt(
+            fields,
+            session_field="Author-Session",
+            role_field="Author-Role",
+            expected_role="prime-builder",
+        )
+        verifier_receipt = self._verdict_session_receipt(
+            fields,
+            session_field="Verifier-Session",
+            role_field="Verifier-Role",
+            expected_role="loyal-opposition",
+        )
         return {
             "path": path.relative_to(self.repo.root).as_posix(),
             "sha256": self._file_sha256(path),
@@ -1722,8 +1652,6 @@ class GitLifecycleService:
                 "authority_binding_hash": authority["binding_hash"],
                 "authority_provenance": {
                     "packet_sha256": authority["packet_sha256"],
-                    "pauth_id": authority["pauth"]["id"],
-                    "pauth_version": authority["pauth"]["version"],
                     "claim_session": authority["claim"]["session_id"],
                     "start_session": authority["session_id"],
                 },
@@ -1789,8 +1717,6 @@ class GitLifecycleService:
                 "authority_binding_hash": authority["binding_hash"],
                 "authority_provenance": {
                     "packet_sha256": authority["packet_sha256"],
-                    "pauth_id": authority["pauth"]["id"],
-                    "pauth_version": authority["pauth"]["version"],
                     "claim_session": authority["claim"]["session_id"],
                     "start_session": authority["session_id"],
                 },

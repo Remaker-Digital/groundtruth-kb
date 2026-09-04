@@ -28,9 +28,6 @@ WORKFLOW_RECORD_LIMIT = 20
 METRICS_SNAPSHOT_CATEGORY = "dispatch_default_metrics_snapshot"
 _METRIC_LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._:/@()+-]{0,119}$")
 _WORK_ITEM_METADATA_RE = re.compile(r"^Work Item:\s*`?(?P<work_item_id>WI-[A-Za-z0-9-]+)", re.IGNORECASE | re.MULTILINE)
-_PROJECT_AUTHORIZATION_METADATA_RE = re.compile(
-    r"^Project Authorization:\s*`?(?P<authorization_id>PAUTH-[A-Za-z0-9-]+)", re.IGNORECASE | re.MULTILINE
-)
 _PROJECT_METADATA_RE = re.compile(r"^Project:\s*`?(?P<project_id>[A-Za-z0-9_-]+)", re.IGNORECASE | re.MULTILINE)
 _BRIDGE_VERSION_RE = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3,})\.md$")
 _BRIDGE_SLUG_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$")
@@ -556,14 +553,11 @@ def _workflow_record(item: Any) -> dict[str, Any]:
 def _workflow_go_context(root: Path, top_file: str) -> tuple[str | None, dict[str, Any]]:
     metadata = _read_workflow_bridge_metadata(root, top_file)
     work_item_id = metadata.get("work_item_id")
-    authorization_id = metadata.get("authorization_id")
     project_id = metadata.get("project_id")
     if not work_item_id or not project_id:
         return "bridge_metadata_unresolvable", {}
 
     context: dict[str, Any] = {"work_item_id": work_item_id, "project_id": project_id}
-    if authorization_id:
-        context["project_authorization_id"] = authorization_id
     db_path = root / "groundtruth.db"
     if not db_path.is_file():
         return "bridge_metadata_unresolvable", context
@@ -605,26 +599,9 @@ def _workflow_go_context(root: Path, top_file: str) -> tuple[str | None, dict[st
                 "verified",
             }:
                 return "missing_source_spec", context
-            if not authorization_id:
-                return "missing_matching_pauth", context
-            authorization = connection.execute(
-                """
-                SELECT id, project_id, status, included_work_item_ids, excluded_work_item_ids
-                FROM current_project_authorizations
-                WHERE id = ? AND status = 'active'
-                LIMIT 1
-                """,
-                (authorization_id,),
-            ).fetchone()
     except (OSError, sqlite3.Error):
         return "bridge_metadata_unresolvable", context
 
-    if (
-        authorization is None
-        or str(authorization["project_id"] or "") != project_id
-        or not _authorization_covers_work_item(authorization, work_item_id)
-    ):
-        return "missing_matching_pauth", context
     return None, context
 
 
@@ -640,7 +617,7 @@ def _read_workflow_bridge_metadata(root: Path, top_file: str) -> dict[str, str |
                 versions.append((int(version_match.group("version")), path))
         candidates = [path for _version, path in sorted(versions, reverse=True)]
 
-    metadata: dict[str, str | None] = {"work_item_id": None, "authorization_id": None, "project_id": None}
+    metadata: dict[str, str | None] = {"work_item_id": None, "project_id": None}
     for path in candidates:
         try:
             text = path.read_text(encoding="utf-8")
@@ -650,10 +627,6 @@ def _read_workflow_bridge_metadata(root: Path, top_file: str) -> dict[str, str |
             work_item = _WORK_ITEM_METADATA_RE.search(text)
             if work_item:
                 metadata["work_item_id"] = work_item.group("work_item_id").upper()
-        if metadata["authorization_id"] is None:
-            authorization = _PROJECT_AUTHORIZATION_METADATA_RE.search(text)
-            if authorization:
-                metadata["authorization_id"] = authorization.group("authorization_id")
         if metadata["project_id"] is None:
             project = _PROJECT_METADATA_RE.search(text)
             if project:
@@ -661,12 +634,6 @@ def _read_workflow_bridge_metadata(root: Path, top_file: str) -> dict[str, str |
         if all(metadata.values()):
             break
     return metadata
-
-
-def _authorization_covers_work_item(authorization: sqlite3.Row, work_item_id: str) -> bool:
-    included = _workflow_json_list(authorization["included_work_item_ids"])
-    excluded = _workflow_json_list(authorization["excluded_work_item_ids"])
-    return work_item_id not in excluded and (not included or work_item_id in included)
 
 
 def _workflow_json_list(value: Any) -> set[str]:

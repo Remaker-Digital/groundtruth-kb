@@ -54,18 +54,6 @@ def _seed_authorization(db: KnowledgeDB, work_item_ids: list[str], *, project_id
         outcome="owner_decision",
     )
     db.insert_spec(id="SPEC-SEED", title="Seed spec", status="verified", changed_by="test", change_reason="seed")
-    db.insert_project_authorization(
-        project_id,
-        "Fixture authorization",
-        "DELIB-SEED",
-        "Bounded scope.",
-        "test",
-        "seed",
-        id="PAUTH-X",
-        status="active",
-        included_work_item_ids=work_item_ids,
-        included_spec_ids=["SPEC-SEED"],
-    )
 
 
 def _write_verified_threads(project_root: Path, db: KnowledgeDB, work_item_ids: list[str]) -> None:

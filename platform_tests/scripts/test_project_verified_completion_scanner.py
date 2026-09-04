@@ -38,7 +38,7 @@ def _seed(
     linked_work_items: set[str] | None = None,
     implements_link: bool = True,
 ) -> None:
-    """Seed a project root with one active authorization (PAUTH-X) over the WIs
+    """Seed a project root with one active project (PROJECT-X) over the WIs
     in ``wi_statuses``. Each WI maps to whether its bridge thread is VERIFIED.
 
     GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v4 gates the auto-completion
@@ -75,7 +75,7 @@ def _seed(
             "DELIB-SEED",
             "owner_conversation",
             "Owner approved",
-            "Owner approved PROJECT-X authorization PAUTH-X.",
+            "Owner approved PROJECT-X.",
             "{}",
             "test",
             "seed",
@@ -92,18 +92,6 @@ def _seed(
             status="verified",
             changed_by="test",
             change_reason="seed",
-        )
-        db.insert_project_authorization(
-            "PROJECT-X",
-            "Scanner authorization",
-            "DELIB-SEED",
-            "Bounded scope.",
-            "test",
-            "seed",
-            id="PAUTH-X",
-            status="active",
-            included_work_item_ids=list(wi_statuses),
-            included_spec_ids=["SPEC-SEED"],
         )
         # v4 D4 gate seed: link each VERIFIED thread to PROJECT-X with
         # relationship='implements'. Without this row, the thread is treated
@@ -157,7 +145,7 @@ def _add_completion_guard(
 def test_scanner_marks_all_verified_authorization_completion_ready(scanner, tmp_path):
     _seed(tmp_path, wi_statuses={"WI-8001": True, "WI-8002": True})
     ready = scanner.completion_ready(tmp_path)
-    assert [r.authorization_id for r in ready] == ["PAUTH-X"]
+    assert [r.authorization_id for r in ready] == ["PROJECT-X"]
     assert ready[0].completion_ready is True
     assert set(ready[0].verified_work_item_ids) == {"WI-8001", "WI-8002"}
     assert ready[0].unverified_work_item_ids == []
@@ -168,9 +156,9 @@ def test_scanner_plan_incomplete_completion_guard_does_not_suppress_completion(s
     _add_completion_guard(tmp_path, artifact_type="completion_guard")
 
     ready = scanner.completion_ready(tmp_path)
-    assert [r.authorization_id for r in ready] == ["PAUTH-X"]
+    assert [r.authorization_id for r in ready] == ["PROJECT-X"]
     full = scanner.scan(tmp_path)
-    auth = next(r for r in full if r.authorization_id == "PAUTH-X")
+    auth = next(r for r in full if r.authorization_id == "PROJECT-X")
     assert auth.completion_ready is True
     assert auth.completion_guarded is True
     assert auth.unverified_work_item_ids == []
@@ -186,7 +174,7 @@ def test_scanner_plan_incomplete_bridge_thread_guard_suppresses_completion(scann
 
     assert scanner.completion_ready(tmp_path) == []
     full = scanner.scan(tmp_path)
-    auth = next(r for r in full if r.authorization_id == "PAUTH-X")
+    auth = next(r for r in full if r.authorization_id == "PROJECT-X")
     assert auth.completion_ready is False
     assert auth.completion_guarded is True
     assert auth.unverified_work_item_ids == []
@@ -202,7 +190,7 @@ def test_inactive_plan_incomplete_guard_does_not_suppress_completion(scanner, tm
     _add_completion_guard(tmp_path, artifact_type="bridge_thread", status="inactive")
 
     ready = scanner.completion_ready(tmp_path)
-    assert [r.authorization_id for r in ready] == ["PAUTH-X"]
+    assert [r.authorization_id for r in ready] == ["PROJECT-X"]
     assert ready[0].completion_guarded is False
 
 
@@ -221,7 +209,7 @@ def test_scanner_skips_authorization_with_one_non_verified_wi(scanner, tmp_path)
     _seed(tmp_path, wi_statuses={"WI-8001": True, "WI-8002": False})
     assert scanner.completion_ready(tmp_path) == []
     full = scanner.scan(tmp_path)
-    auth = next(r for r in full if r.authorization_id == "PAUTH-X")
+    auth = next(r for r in full if r.authorization_id == "PROJECT-X")
     assert auth.completion_ready is False
     assert auth.unverified_work_item_ids == ["WI-8002"]
     assert auth.verified_work_item_ids == ["WI-8001"]
@@ -231,14 +219,14 @@ def test_scanner_gating_uses_membership_links_not_included_ids(scanner, tmp_path
     # WI-8002 is in the authorization's included_work_item_ids and its bridge
     # thread is not VERIFIED, but it is not membership-linked to PROJECT-X.
     # GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 gates on the membership
-    # links, so PAUTH-X is completion-ready on the linked WI-8001 alone.
+    # links, so PROJECT-X is completion-ready on the linked WI-8001 alone.
     _seed(
         tmp_path,
         wi_statuses={"WI-8001": True, "WI-8002": False},
         linked_work_items={"WI-8001"},
     )
     ready = scanner.completion_ready(tmp_path)
-    assert [r.authorization_id for r in ready] == ["PAUTH-X"]
+    assert [r.authorization_id for r in ready] == ["PROJECT-X"]
     assert ready[0].verified_work_item_ids == ["WI-8001"]
     assert ready[0].unverified_work_item_ids == []
 
@@ -246,10 +234,14 @@ def test_scanner_gating_uses_membership_links_not_included_ids(scanner, tmp_path
 def test_scanner_makes_no_db_writes(scanner, tmp_path):
     _seed(tmp_path, wi_statuses={"WI-8001": True})
     db_path = tmp_path / "groundtruth.db"
+    # WI-7657: the retired authorization row was the original write probe. The
+    # project row is its surviving equivalent -- it is what the scanner would
+    # mutate if it wrote, and versioning is append-only, so an unchanged
+    # version plus an unchanged row count still detects a write.
     probe = KnowledgeDB(db_path)
     try:
-        before_version = probe.get_project_authorization("PAUTH-X")["version"]
-        before_rows = probe._get_conn().execute("SELECT COUNT(*) FROM project_authorizations").fetchone()[0]
+        before_version = probe.get_project("PROJECT-X")["version"]
+        before_rows = probe._get_conn().execute("SELECT COUNT(*) FROM projects").fetchone()[0]
     finally:
         probe.close()
 
@@ -258,8 +250,8 @@ def test_scanner_makes_no_db_writes(scanner, tmp_path):
 
     probe = KnowledgeDB(db_path)
     try:
-        after_version = probe.get_project_authorization("PAUTH-X")["version"]
-        after_rows = probe._get_conn().execute("SELECT COUNT(*) FROM project_authorizations").fetchone()[0]
+        after_version = probe.get_project("PROJECT-X")["version"]
+        after_rows = probe._get_conn().execute("SELECT COUNT(*) FROM projects").fetchone()[0]
     finally:
         probe.close()
     assert after_version == before_version
@@ -286,7 +278,7 @@ def test_incidental_citation_thread_does_not_complete_wi(scanner, tmp_path):
     assert scanner.verified_work_items_by_project(tmp_path).get("PROJECT-X", set()) == set()
     assert scanner.completion_ready(tmp_path) == []
     full = scanner.scan(tmp_path)
-    auth = next(r for r in full if r.authorization_id == "PAUTH-X")
+    auth = next(r for r in full if r.authorization_id == "PROJECT-X")
     assert auth.completion_ready is False
     assert auth.verified_work_item_ids == []
     assert auth.unverified_work_item_ids == ["WI-8001"]
@@ -304,7 +296,7 @@ def test_implements_linked_thread_completes_wi(scanner, tmp_path):
 
     assert "WI-8001" in scanner.verified_work_items_by_project(tmp_path).get("PROJECT-X", set())
     ready = scanner.completion_ready(tmp_path)
-    assert [r.authorization_id for r in ready] == ["PAUTH-X"]
+    assert [r.authorization_id for r in ready] == ["PROJECT-X"]
     assert ready[0].completion_ready is True
     assert ready[0].verified_work_item_ids == ["WI-8001"]
 
@@ -370,7 +362,7 @@ def test_fail_safe_no_implements_link_no_completion(scanner, tmp_path):
     assert scanner.verified_work_items_by_project(tmp_path).get("PROJECT-X", set()) == set()
     assert scanner.completion_ready(tmp_path) == []
     full = scanner.scan(tmp_path)
-    auth = next(r for r in full if r.authorization_id == "PAUTH-X")
+    auth = next(r for r in full if r.authorization_id == "PROJECT-X")
     assert auth.completion_ready is False
     assert set(auth.unverified_work_item_ids) == {"WI-8001", "WI-8002"}
     assert auth.verified_work_item_ids == []
@@ -424,19 +416,6 @@ def test_cross_project_implements_link_does_not_satisfy_other_project(scanner, t
             "s",
             relationship="implements",
         )
-        for pid in ("PROJECT-A", "PROJECT-B"):
-            db.insert_project_authorization(
-                pid,
-                f"Auth {pid}",
-                "DELIB-SEED",
-                "Bounded scope.",
-                "t",
-                "s",
-                id=f"PAUTH-{pid[-1]}",
-                status="active",
-                included_work_item_ids=["WI-8002"],
-                included_spec_ids=["SPEC-SEED"],
-            )
     finally:
         db.close()
 
@@ -450,7 +429,7 @@ def test_cross_project_implements_link_does_not_satisfy_other_project(scanner, t
     assert "PROJECT-B" not in ready_ids, "F1 regression: PROJECT-A's implements link must not complete PROJECT-B"
     # PROJECT-B's WI-8002 is correctly reported unverified for PROJECT-B.
     full = scanner.scan(tmp_path)
-    auth_b = next(r for r in full if r.authorization_id == "PAUTH-B")
+    auth_b = next(r for r in full if r.authorization_id == "PROJECT-B")
     assert auth_b.completion_ready is False
     assert auth_b.unverified_work_item_ids == ["WI-8002"]
 
@@ -507,18 +486,6 @@ def test_wi4737_noncanonical_wi_recognized_via_related_bridge_threads(scanner, t
         )
         db.link_project_work_item("PROJECT-X", wi, "test", "seed")
         db.insert_spec(id="SPEC-SEED", title="Seed spec", status="verified", changed_by="test", change_reason="seed")
-        db.insert_project_authorization(
-            "PROJECT-X",
-            "Scanner authorization",
-            "DELIB-SEED",
-            "Bounded scope.",
-            "test",
-            "seed",
-            id="PAUTH-X",
-            status="active",
-            included_work_item_ids=[wi],
-            included_spec_ids=["SPEC-SEED"],
-        )
         db.add_project_artifact_link(
             "PROJECT-X",
             "bridge_thread",
@@ -532,7 +499,7 @@ def test_wi4737_noncanonical_wi_recognized_via_related_bridge_threads(scanner, t
 
     assert wi in scanner.verified_work_items_by_project(tmp_path).get("PROJECT-X", set())
     ready = scanner.completion_ready(tmp_path)
-    assert [r.authorization_id for r in ready] == ["PAUTH-X"]
+    assert [r.authorization_id for r in ready] == ["PROJECT-X"]
     assert ready[0].verified_work_item_ids == [wi]
 
 
@@ -590,18 +557,6 @@ def test_wi4737_two_sided_guard_rejects_unlinked_and_unverified(scanner, tmp_pat
         db.link_project_work_item("PROJECT-X", "WI-NONCANON-UNLINKED-001", "test", "seed")
         db.link_project_work_item("PROJECT-X", "WI-NONCANON-UNVERIFIED-001", "test", "seed")
         db.insert_spec(id="SPEC-SEED", title="Seed spec", status="verified", changed_by="test", change_reason="seed")
-        db.insert_project_authorization(
-            "PROJECT-X",
-            "Scanner authorization",
-            "DELIB-SEED",
-            "Bounded scope.",
-            "test",
-            "seed",
-            id="PAUTH-X",
-            status="active",
-            included_work_item_ids=["WI-NONCANON-UNLINKED-001", "WI-NONCANON-UNVERIFIED-001"],
-            included_spec_ids=["SPEC-SEED"],
-        )
         # Only the GO thread is implements-linked; the VERIFIED one deliberately is NOT.
         db.add_project_artifact_link(
             "PROJECT-X",

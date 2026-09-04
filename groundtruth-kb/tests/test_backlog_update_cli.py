@@ -150,18 +150,6 @@ def _seed_terminal_reopen(project_dir: Path) -> None:
             stage="resolved",
             project_name="PROJECT-GTKB-HOUSEKEEPING-HARDENING",
         )
-        db.insert_project_authorization(
-            "PROJECT-GTKB-HOUSEKEEPING-HARDENING",
-            "WI-5441 registry control plane",
-            "DELIB-WI5441-OWNER-REPAIR",
-            "Bounded terminal repair",
-            "test",
-            "seed authorization",
-            id=_REOPEN_PAUTH_ID,
-            status="active",
-            included_work_item_ids=["WI-5441"],
-            included_spec_ids=["GOV-PLATFORM-SOT-REGISTRY-001"],
-        )
     finally:
         db.close()
 
@@ -882,18 +870,6 @@ def _seed_wi5640_terminal_reopen(project_dir: Path) -> None:
             stage="resolved",
             project_name="PROJECT-GTKB-PLATFORM-MODERNIZATION-HARNESS-PARITY",
             priority="P0",
-        )
-        db.insert_project_authorization(
-            "PROJECT-GTKB-PLATFORM-MODERNIZATION-HARNESS-PARITY",
-            "WI-5640 file move canonicalization",
-            "DELIB-WI5640-OWNER-REPAIR",
-            "Bounded terminal repair",
-            "test",
-            "seed authorization",
-            id=_WI5640_PAUTH_ID,
-            status="active",
-            included_work_item_ids=["WI-5640"],
-            included_spec_ids=["GOV-PLATFORM-SOT-REGISTRY-001"],
         )
     finally:
         db.close()

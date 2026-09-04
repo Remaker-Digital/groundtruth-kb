@@ -109,19 +109,6 @@ def _project(tmp_path: Path) -> tuple[Path, Path]:
             change_reason="seed deliberation",
             outcome="owner_decision",
         )
-        db.insert_project_authorization(
-            project_id="PROJECT-TEST",
-            authorization_name="Backlog text-edit authorization",
-            owner_decision_deliberation_id=SEED_DELIB_ID,
-            scope_summary="Authorize text edits to WI-IMPROVEMENT for tests.",
-            changed_by="test",
-            change_reason="seed authorization",
-            id=SEED_PAUTH_ID,
-            status="active",
-            allowed_mutation_classes=["cli_extension", "source", "test_addition"],
-            included_work_item_ids=["WI-IMPROVEMENT", "WI-DEFECT"],
-            included_spec_ids=["SPEC-WI4357-TEST-SEED"],
-        )
         db.insert_work_item(
             id="WI-DEFECT",
             title="Defect work item",
@@ -186,27 +173,21 @@ def _config_args(config: Path) -> list[str]:
 
 def _current_title(db_path: Path, wi_id: str) -> str:
     with sqlite3.connect(db_path) as conn:
-        row = conn.execute(
-            "SELECT title FROM current_work_items WHERE id = ?", (wi_id,)
-        ).fetchone()
+        row = conn.execute("SELECT title FROM current_work_items WHERE id = ?", (wi_id,)).fetchone()
     assert row is not None, f"WI {wi_id} missing"
     return str(row[0])
 
 
 def _current_description(db_path: Path, wi_id: str) -> str | None:
     with sqlite3.connect(db_path) as conn:
-        row = conn.execute(
-            "SELECT description FROM current_work_items WHERE id = ?", (wi_id,)
-        ).fetchone()
+        row = conn.execute("SELECT description FROM current_work_items WHERE id = ?", (wi_id,)).fetchone()
     assert row is not None
     return None if row[0] is None else str(row[0])
 
 
 def _version_count(db_path: Path, wi_id: str) -> int:
     with sqlite3.connect(db_path) as conn:
-        row = conn.execute(
-            "SELECT COUNT(*) FROM work_items WHERE id = ?", (wi_id,)
-        ).fetchone()
+        row = conn.execute("SELECT COUNT(*) FROM work_items WHERE id = ?", (wi_id,)).fetchone()
     return int(row[0])
 
 
@@ -233,10 +214,7 @@ def test_gate_rejects_without_evidence(tmp_path: Path) -> None:
     assert "without text-edit authorization" in result.output
     # Verify no new version was persisted.
     assert _version_count(root / "groundtruth.db", "WI-IMPROVEMENT") == 1
-    assert (
-        _current_title(root / "groundtruth.db", "WI-IMPROVEMENT")
-        == "Improvement work item"
-    )
+    assert _current_title(root / "groundtruth.db", "WI-IMPROVEMENT") == "Improvement work item"
 
 
 # ---------------------------------------------------------------------------
@@ -260,10 +238,7 @@ def test_owner_approved_admits_title_edit(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    assert (
-        _current_title(root / "groundtruth.db", "WI-IMPROVEMENT")
-        == "Owner-approved new title"
-    )
+    assert _current_title(root / "groundtruth.db", "WI-IMPROVEMENT") == "Owner-approved new title"
     assert _version_count(root / "groundtruth.db", "WI-IMPROVEMENT") == 2
 
 
@@ -287,10 +262,7 @@ def test_pauth_citation_admits_description_edit(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    assert (
-        _current_description(root / "groundtruth.db", "WI-IMPROVEMENT")
-        == "New description authorized by PAUTH"
-    )
+    assert _current_description(root / "groundtruth.db", "WI-IMPROVEMENT") == "New description authorized by PAUTH"
 
 
 # ---------------------------------------------------------------------------
@@ -313,10 +285,7 @@ def test_delib_citation_admits_text_edit(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    assert (
-        _current_title(root / "groundtruth.db", "WI-IMPROVEMENT")
-        == "Title authorized by DELIB"
-    )
+    assert _current_title(root / "groundtruth.db", "WI-IMPROVEMENT") == "Title authorized by DELIB"
 
 
 # ---------------------------------------------------------------------------
@@ -366,10 +335,7 @@ def test_bridge_authorized_approval_state_does_not_admit_text_edit(
     )
     assert result.exit_code != 0, result.output
     assert "without text-edit authorization" in result.output
-    assert (
-        _current_title(root / "groundtruth.db", "WI-BRIDGE")
-        == "Legacy approval-state work item"
-    )
+    assert _current_title(root / "groundtruth.db", "WI-BRIDGE") == "Legacy approval-state work item"
     assert _version_count(root / "groundtruth.db", "WI-BRIDGE") == 1
 
 
@@ -419,10 +385,7 @@ def test_mixed_title_and_resolution_status_requires_both_gates(tmp_path: Path) -
         ],
     )
     assert result_ok.exit_code == 0, result_ok.output
-    assert (
-        _current_title(root / "groundtruth.db", "WI-DEFECT")
-        == "Resolved with new title"
-    )
+    assert _current_title(root / "groundtruth.db", "WI-DEFECT") == "Resolved with new title"
 
 
 # ---------------------------------------------------------------------------
@@ -452,10 +415,7 @@ def test_mixed_title_and_non_terminal_stage_text_gate_only(tmp_path: Path) -> No
         ],
     )
     assert result.exit_code == 0, result.output
-    assert (
-        _current_title(root / "groundtruth.db", "WI-TESTED")
-        == "Title with stage advance"
-    )
+    assert _current_title(root / "groundtruth.db", "WI-TESTED") == "Title with stage advance"
 
 
 # ---------------------------------------------------------------------------
@@ -487,10 +447,7 @@ def test_dry_run_validates_and_reports_no_write(tmp_path: Path) -> None:
     assert payload["fields"]["title"] == "Dry-run title proposal"
     # Verify no new version was persisted.
     assert _version_count(root / "groundtruth.db", "WI-IMPROVEMENT") == 1
-    assert (
-        _current_title(root / "groundtruth.db", "WI-IMPROVEMENT")
-        == "Improvement work item"
-    )
+    assert _current_title(root / "groundtruth.db", "WI-IMPROVEMENT") == "Improvement work item"
 
 
 # ---------------------------------------------------------------------------

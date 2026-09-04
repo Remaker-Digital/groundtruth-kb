@@ -30,7 +30,6 @@ LIVE_GATE = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
 SLUG = "restamp-fixture"
 PROJECT_ID = "PROJECT-RESTAMP-FIXTURE"
 WORK_ITEM_ID = "WI-RESTAMP-FIXTURE"
-AUTHORIZATION_ID = "PAUTH-RESTAMP-FIXTURE"
 OWNER_DECISION_ID = "DELIB-RESTAMP-FIXTURE"
 SPEC_ID = "GOV-FILE-BRIDGE-AUTHORITY-001"
 _THIS_TEST = "platform_tests/skills/test_verified_finalization_candidate_evidence_hash_restamp.py"
@@ -91,7 +90,6 @@ Document: restamp-fixture
 Version: 003
 Responds to: bridge/restamp-fixture-002.md
 Approved proposal: bridge/restamp-fixture-001.md
-Project Authorization: {AUTHORIZATION_ID}
 Project: {PROJECT_ID}
 Work Item: {WORK_ITEM_ID}
 target_paths: ["scripts/feature.py"]
@@ -104,8 +102,12 @@ target_paths: ["scripts/feature.py"]
 """
 
 
-def _seed_project_authorization(repo: Path) -> None:
-    """Create a real list-free project authorization for the fixture chain."""
+def _seed_project_fixture(repo: Path) -> None:
+    """Seed the project, work item, membership, owner decision and spec.
+
+    WI-7657: this previously also created an authorization record. Authorization
+    is now a field on the project row, so the fixture seeds membership only.
+    """
     db = KnowledgeDB(repo / "groundtruth.db")
     try:
         db.insert_project("Restamp fixture", "test", "seed fixture", id=PROJECT_ID, status="active")
@@ -136,20 +138,6 @@ def _seed_project_authorization(repo: Path) -> None:
             changed_by="test",
             change_reason="seed fixture",
         )
-        db.insert_project_authorization(
-            PROJECT_ID,
-            "Restamp fixture authorization",
-            OWNER_DECISION_ID,
-            "List-free fixture authorization for bridge and source finalization.",
-            "test",
-            "seed fixture",
-            id=AUTHORIZATION_ID,
-            status="active",
-            allowed_mutation_classes=["bridge", "source"],
-            forbidden_operations=[],
-            included_work_item_ids=[],
-            included_spec_ids=[SPEC_ID],
-        )
     finally:
         db.close()
 
@@ -171,12 +159,11 @@ def _init_repo(tmp_path: Path) -> Path:
         REPO_ROOT / "config" / "governance" / "project-authorization-operation-taxonomy.toml",
         taxonomy,
     )
-    _seed_project_authorization(repo)
+    _seed_project_fixture(repo)
     _write(
         repo / "bridge" / f"{SLUG}-001.md",
         "NEW\n::init gtkb pb\n::open build\n\nbridge_kind: prime_proposal\n"
         f"Document: {SLUG}\nVersion: 001\n"
-        f"Project Authorization: {AUTHORIZATION_ID}\n"
         f"Project: {PROJECT_ID}\n"
         f"Work Item: {WORK_ITEM_ID}\n"
         'target_paths: ["scripts/feature.py"]\n\n'
