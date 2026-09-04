@@ -35,12 +35,13 @@ _ACCEPTED_STATUS_TOKENS: Final[frozenset[str]] = frozenset(
         "REVISED",
         "GO",
         "NO-GO",
-        "NO-ACTION",
+        "VERDICT-REJECTED",
         "VERIFIED",
         "WITHDRAWN",
         "ADVISORY",
-        "DEFERRED",
-        "ACCEPTED",
+        "READY",
+        "NOT-READY",
+        "SUPERSEDED",
         "BLOCKED",
     }
 )
@@ -646,8 +647,12 @@ def _bridge_file_status(path: Path) -> str:
         (line for line in header.raw_lines if not line.lower().startswith(("::init", "::open"))),
         None,
     )
-    if candidate is not None and candidate in _ACCEPTED_STATUS_TOKENS:
-        return candidate
+    # The shared reader normalizes historical NO-ACTION to the canonical
+    # VERDICT-REJECTED state.  Require an exact header token so decorated or
+    # otherwise malformed lines still fail closed under this consumer's
+    # narrower acceptance policy.
+    if header.status_line_exact and header.status in _ACCEPTED_STATUS_TOKENS:
+        return header.status
     raise MalformedBridgeStatusError(
         f"Bridge file has unrecognized status line: {path}: {candidate!r}",
         path=path,

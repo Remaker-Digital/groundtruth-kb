@@ -1,11 +1,23 @@
-"""Doc-code consistency test for the bridge post-verdict transition table.
+"""Doc-code consistency test for the bridge transition table.
 
-WI-5827 / TEST-11783 (spec GOV-FILE-BRIDGE-AUTHORITY-001). Asserts the
-canonical file-bridge-protocol prose, its generated ``.claude/rules/``
-projection, and the ``gtkb-verify`` Loyal Opposition verdict skill agree with
-the code of record (``ORDINARY_TRANSITIONS`` / ``POST_GO_REPORT_AUGMENTATIONS``
-in ``scripts/bridge_lifecycle_resolver.py``) on lawful post-verdict Prime
-statuses, and regression-pins the exact r2b wedge class (``NO-GO -> NEW``).
+WI-5827 / TEST-11783, re-sourced by WI-7118 (spec `GOV-FILE-BRIDGE-AUTHORITY-001`,
+`SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001`).
+
+Two things changed at WI-7118 and both matter to this test:
+
+* The code of record moved. It is now the single `TRANSITIONS` constant in
+  `groundtruth_kb.bridge.vocabulary`, not `ORDINARY_TRANSITIONS` plus
+  `POST_GO_REPORT_AUGMENTATIONS` in the resolver. The augmentation map is
+  retired, not relocated: it was the only mechanism by which the successor
+  relation consulted thread history, which clause 4 forbids.
+* The document of record moved. This test now reads the neutral baseline at
+  `.harness-baseline-configuration/rules/file-bridge-protocol.md`. It
+  previously read `config/agent-control/gtkb-file-bridge-protocol.md`, which
+  canon section 8 classifies as forbidden drift, and additionally asserted
+  against the generated `.claude` projection. Binding a test to generated
+  output makes the projection authoritative, which is exactly the inversion
+  canon section 8 prohibits; the projector's own `--check` verifies that
+  projections match the baseline.
 """
 
 from __future__ import annotations
@@ -16,20 +28,21 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "groundtruth-kb" / "src"))
 
-from scripts.bridge_lifecycle_resolver import (  # noqa: E402
-    ORDINARY_TRANSITIONS,
-    POST_GO_REPORT_AUGMENTATIONS,
+from groundtruth_kb.bridge.vocabulary import (  # noqa: E402
+    CANONICAL_STATUSES,
+    PERMITTED_ON_WRITE,
+    TRANSITIONS,
 )
 
-CANONICAL_DOC = PROJECT_ROOT / "config" / "agent-control" / "gtkb-file-bridge-protocol.md"
-PROJECTION_DOC = PROJECT_ROOT / ".claude" / "rules" / "file-bridge-protocol.md"
-VERIFY_SKILL = PROJECT_ROOT / ".claude" / "skills" / "gtkb-verify" / "SKILL.md"
+BASELINE_DOC = PROJECT_ROOT / ".harness-baseline-configuration" / "rules" / "file-bridge-protocol.md"
 
 TABLE_HEADING = "## Post-Verdict Transition Table"
+STATUS_HEADING = "## Statuses"
 POST_IMPL_HEADING = "## Post-Implementation Verification"
 
-_ROW_RE = re.compile(r"^\|\s*([A-Z][A-Z -]*?(?:\(post-GO\))?)\s*\|\s*([A-Z, -]+?)\s*\|\s*$")
+_ROW_RE = re.compile(r"^\|\s*([A-Z][A-Z-]*)\s*\|\s*([A-Z, -]+?)\s*\|\s*$")
 
 
 def _read(path: Path) -> str:
@@ -42,83 +55,98 @@ def _section(text: str, heading: str) -> str:
     return text[start:end] if end != -1 else text[start:]
 
 
-def _parse_tables(section: str) -> list[dict[str, frozenset[str]]]:
-    tables: list[dict[str, frozenset[str]]] = []
-    current: dict[str, frozenset[str]] = {}
-    in_table = False
+def _parse_table(section: str) -> dict[str, frozenset[str]]:
+    table: dict[str, frozenset[str]] = {}
     for raw_line in section.splitlines():
         line = raw_line.strip()
-        if line.startswith("|"):
-            if line.replace("|", "").replace("-", "").strip() == "":
-                continue  # separator row
-            match = _ROW_RE.match(line)
-            if match is None:
-                continue  # header row like "| Previous status | ... |"
-            key = match.group(1).replace("(post-GO)", "").strip()
-            values = frozenset(v.strip() for v in match.group(2).split(",") if v.strip())
-            current[key] = values
-            in_table = True
-        elif in_table:
-            tables.append(current)
-            current = {}
-            in_table = False
-    if current:
-        tables.append(current)
-    return tables
+        if not line.startswith("|"):
+            continue
+        if line.replace("|", "").replace("-", "").strip() == "":
+            continue  # separator row
+        match = _ROW_RE.match(line)
+        if match is None:
+            continue  # header row, or a prose row this table does not own
+        key = match.group(1).strip()
+        values = frozenset(v.strip() for v in match.group(2).split(",") if v.strip())
+        table[key] = values
+    return table
 
 
-def _doc_tables(path: Path) -> tuple[dict[str, frozenset[str]], dict[str, frozenset[str]]]:
-    section = _section(_read(path), TABLE_HEADING)
-    tables = _parse_tables(section)
-    assert len(tables) == 2, (
-        f"{path.name}: expected base + post-GO augmentation tables in '{TABLE_HEADING}', found {len(tables)}"
+def test_baseline_table_matches_the_single_vocabulary() -> None:
+    """The rendered table equals the code of record.
+
+    `WITHDRAWN` is compared out: canon gives it no successors, the constant
+    holds an empty frozenset for it, and an empty markdown cell is not a
+    renderable row. The document says so in prose instead.
+    """
+    rendered = _parse_table(_section(_read(BASELINE_DOC), TABLE_HEADING))
+    expected = {k: v for k, v in TRANSITIONS.items() if v}
+    assert rendered == expected
+    assert "`WITHDRAWN` is terminal and has no successors" in _section(_read(BASELINE_DOC), TABLE_HEADING)
+
+
+def test_report_phase_and_proposal_phase_share_no_token() -> None:
+    """The point of the READY/NOT-READY pair, asserted mechanically.
+
+    Canon section 6: NOT-READY "exists so that no token is lawful in both the
+    proposal phase and the report phase."
+    """
+    proposal_phase = {"NEW", "REVISED", "GO", "NO-GO"}
+    report_phase = {"READY", "NOT-READY"}
+    assert not (proposal_phase & report_phase)
+    assert "READY" not in TRANSITIONS["NO-GO"], "canon rejects NO-GO -> READY"
+    assert TRANSITIONS["GO"] == frozenset({"READY", "VERDICT-REJECTED"})
+    assert TRANSITIONS["READY"] == frozenset({"VERIFIED", "NOT-READY"})
+
+
+def test_no_go_row_never_allows_new_or_ready() -> None:
+    assert "NEW" not in TRANSITIONS["NO-GO"]
+    assert "READY" not in TRANSITIONS["NO-GO"]
+    rendered = _parse_table(_section(_read(BASELINE_DOC), TABLE_HEADING))
+    assert "NEW" not in rendered["NO-GO"]
+    assert "READY" not in rendered["NO-GO"]
+
+
+def test_vocabulary_is_exactly_canon_ten() -> None:
+    assert len(CANONICAL_STATUSES) == 10
+    assert (
+        frozenset(
+            {
+                "NEW",
+                "REVISED",
+                "READY",
+                "VERDICT-REJECTED",
+                "GO",
+                "NO-GO",
+                "NOT-READY",
+                "VERIFIED",
+                "WITHDRAWN",
+                "ADVISORY",
+            }
+        )
+        == CANONICAL_STATUSES
     )
-    return tables[0], tables[1]
+    assert PERMITTED_ON_WRITE == CANONICAL_STATUSES
+    status_section = _section(_read(BASELINE_DOC), STATUS_HEADING)
+    for status in CANONICAL_STATUSES:
+        assert f"| {status} |" in status_section, f"{status} missing from baseline table"
 
 
-def test_canonical_prose_table_matches_resolver() -> None:
-    base, augmentations = _doc_tables(CANONICAL_DOC)
-    assert base == dict(ORDINARY_TRANSITIONS)
-    assert augmentations == dict(POST_GO_REPORT_AUGMENTATIONS)
+def test_obsolete_statuses_are_inert_and_never_writable() -> None:
+    """Canon section 6: no alias or crosswalk exists for NO-ACTION or DEFERRED."""
+    for obsolete in ("NO-ACTION", "DEFERRED"):
+        assert obsolete not in PERMITTED_ON_WRITE
+        assert obsolete not in CANONICAL_STATUSES
+        # Inert means it has no forward transitions of its own beyond the
+        # read-time compatibility set, and never appears as a canonical target.
+        assert obsolete not in TRANSITIONS
+    status_section = _section(_read(BASELINE_DOC), STATUS_HEADING)
+    assert "no alias or crosswalk exists" in status_section
 
 
-def test_projection_table_matches_resolver() -> None:
-    base, augmentations = _doc_tables(PROJECTION_DOC)
-    assert base == dict(ORDINARY_TRANSITIONS)
-    assert augmentations == dict(POST_GO_REPORT_AUGMENTATIONS)
-
-
-def test_no_go_row_never_allows_new() -> None:
-    assert "NEW" not in ORDINARY_TRANSITIONS["NO-GO"]
-    assert "NO-GO" not in POST_GO_REPORT_AUGMENTATIONS
-    for doc in (CANONICAL_DOC, PROJECTION_DOC):
-        base, _ = _doc_tables(doc)
-        assert "NEW" not in base["NO-GO"], f"{doc.name}: NO-GO row must not allow NEW"
-
-
-def test_post_implementation_section_names_revised() -> None:
-    for doc in (CANONICAL_DOC, PROJECTION_DOC):
-        section = _section(_read(doc), POST_IMPL_HEADING)
-        assert "corrected report publishes as REVISED" in section
-        assert "never NEW" in section
-        assert "`NEW` is never a lawful successor to `NO-GO`" in section
-        assert "The FIRST post-implementation report after a GO publishes as a NEW" in section
-        assert "2. Prime uses the governed writer to publish a NEW verification-request entry" not in section
-
-
-def test_verify_skill_remedy_names_revised() -> None:
-    skill = _read(VERIFY_SKILL)
-    assert "MUST instruct Prime Builder to refile the corrected proposal or report as" in skill
-    assert "`REVISED`, per the authoritative post-verdict transition table" in skill
-    assert "MUST NOT instruct a refile as" in skill
-    assert not re.search(r"refile[^.]*with status token `NEW`", skill, flags=re.IGNORECASE | re.DOTALL)
-    assert not re.search(r"[Rr]efile the same implementation report as `NEW`", skill)
-
-
-def test_table_documents_no_action_branch() -> None:
-    assert "NO-ACTION" in ORDINARY_TRANSITIONS["NO-GO"]
-    for doc in (CANONICAL_DOC, PROJECTION_DOC):
-        section = _section(_read(doc), TABLE_HEADING)
-        base, _ = _doc_tables(doc)
-        assert "NO-ACTION" in base["NO-GO"]
-        assert "DCL-NO-ACTION-STATUS-SEMANTICS-001" in section
+def test_post_implementation_section_names_ready() -> None:
+    section = _section(_read(BASELINE_DOC), POST_IMPL_HEADING)
+    assert "publishes as a `READY` entry" in section
+    assert "`bridge_kind: implementation_report`" in section
+    assert "It replaces the historical\n   use of `NEW` for reports." in section
+    assert "the corrected report publishes as `READY` again" in section

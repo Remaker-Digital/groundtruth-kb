@@ -148,6 +148,16 @@ BRIDGE_STATUS_TOKENS = (
     # Retiring NO-ACTION/DEFERRED needs a read/write vocabulary split and is tracked
     # separately. Authority: DELIB-20260825203701 (emergency-bootstrap event).
     "VERDICT-REJECTED",
+    # WI-7675: the same gap WI-7045 repaired for VERDICT-REJECTED, for the two
+    # report-phase tokens. Canon section 6 makes READY the implementation report
+    # and NOT-READY its rejection, but neither was writable here, so a GO'd work
+    # item had no lawful head for its report: READY was refused, and NEW or
+    # REVISED produced a GO->NEW / GO->REVISED pair that the lifecycle resolver
+    # rejects. NOT-READY precedes READY because this tuple also builds
+    # BRIDGE_FILE_STATUS_RE, and alternation is first-match, so the longer token
+    # must be offered first for the prefix never to truncate.
+    "NOT-READY",
+    "READY",
     "NO-ACTION",
     "WITHDRAWN",
     "ADVISORY",
@@ -1445,8 +1455,6 @@ def _project_metadata_gaps(content: str) -> list[str]:
     (CLAUSE-PROJECT-METADATA-PRESENT satisfied).
     """
     gaps: list[str] = []
-    if not PROJECT_AUTHORIZATION_LINE_RE.search(content):
-        gaps.append("Project Authorization:")
     if not PROJECT_LINE_RE.search(content):
         gaps.append("Project:")
     if not WORK_ITEM_LINE_RE.search(content):
@@ -2472,8 +2480,12 @@ def _deny_reason_for_content(
         if _body_status_token_violation(file_path, content):
             return (
                 "[Governance] Versioned bridge files (bridge/<slug>-NNN.md) must carry a "
-                "canonical status token in the artifact head: one of NEW, REVISED, GO, "
-                "NO-GO, VERIFIED, NO-ACTION, ADVISORY, DEFERRED, WITHDRAWN. The first "
+                "canonical status token in the artifact head: one of "
+                # WI-7675: derived from the constant rather than restated. The
+                # hardcoded list had already drifted, omitting VERDICT-REJECTED
+                # for the whole life of the WI-7045 repair, so an author reading
+                # the refusal was told a token was invalid when it was accepted.
+                f"{', '.join(BRIDGE_STATUS_TOKENS)}. The first "
                 "non-envelope line was "
                 f"{_first_nonblank_line(content)!r}. The canonical header is '::init gtkb "
                 "<pb|lo>' then '::open <activity>' then the status token (the ::init/::open "

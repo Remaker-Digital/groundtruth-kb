@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 import pytest
+from groundtruth_kb.bridge.vocabulary import is_lawful_transition
 
 from scripts.bridge_lifecycle_resolver import (
     PENDING_CORRECTION_DIAGNOSTIC,
@@ -16,10 +17,17 @@ from scripts.bridge_lifecycle_resolver import (
 
 
 def _role_for(status: str) -> str:
-    if status in {"NEW", "REVISED", "NO-ACTION", "DEFERRED", "WITHDRAWN"}:
-        return "prime-builder/codex"
-    if status in {"GO", "NO-GO", "VERIFIED", "ADVISORY"}:
-        return "loyal-opposition/codex"
+    # Canon section 6 authorship (WI-7118). READY and VERDICT-REJECTED are
+    # Prime-authored; NOT-READY is the Loyal Opposition report-phase verdict.
+    # Without these the helper fell through to "owner" and every READY fixture
+    # failed author validation. NO-ACTION and DEFERRED are obsolete statuses
+    # retained only by fixtures that exercise historical chains.
+    if status in {"NEW", "REVISED", "READY", "VERDICT-REJECTED", "NO-ACTION", "DEFERRED", "WITHDRAWN"}:
+        return "prime-builder"
+    if status in {"GO", "NO-GO", "NOT-READY", "VERIFIED", "SUPERSEDED"}:
+        return "loyal-opposition"
+    if status in {"ADVISORY"}:
+        return "loyal-opposition|prime-builder"
     return "owner"
 
 
@@ -141,7 +149,7 @@ def test_revised_proposal_go_uses_latest_prime_proposal(tmp_path: Path) -> None:
 def test_post_go_report_verified_is_terminal(tmp_path: Path) -> None:
     slug = "verified-report"
     _simple_go(tmp_path, slug)
-    _write_version(tmp_path, slug, 3, "NEW")
+    _write_version(tmp_path, slug, 3, "READY")
     _write_version(tmp_path, slug, 4, "VERIFIED")
 
     result = resolve_bridge_lifecycle(tmp_path, slug)
@@ -157,12 +165,12 @@ def test_post_go_report_no_go_retains_resumable_implementation_pair(
 ) -> None:
     slug = "report-no-go"
     _simple_go(tmp_path, slug)
-    _write_version(tmp_path, slug, 3, "NEW")
-    _write_version(tmp_path, slug, 4, "NO-GO")
+    _write_version(tmp_path, slug, 3, "READY")
+    _write_version(tmp_path, slug, 4, "NOT-READY")
 
     result = resolve_bridge_lifecycle(tmp_path, slug)
 
-    assert result.latest_strict_state.status == "NO-GO"
+    assert result.latest_strict_state.status == "NOT-READY"
     assert result.implementation_artifact.version == 1
     assert result.implementation_verdict.version == 2
 
@@ -172,7 +180,7 @@ def test_post_go_report_awaiting_review_exposes_only_review_artifact(
 ) -> None:
     slug = "report-awaiting"
     _simple_go(tmp_path, slug)
-    _write_version(tmp_path, slug, 3, "NEW")
+    _write_version(tmp_path, slug, 3, "READY")
 
     result = resolve_bridge_lifecycle(tmp_path, slug)
 
@@ -181,47 +189,48 @@ def test_post_go_report_awaiting_review_exposes_only_review_artifact(
     assert result.implementation_verdict is None
 
 
-def test_owner_deferred_post_go_report_can_be_followed_by_revised_proposal(
+def test_post_go_report_cannot_be_followed_by_a_proposal_status(
     tmp_path: Path,
 ) -> None:
-    """A deferred report can hand off to a newly reviewed corrective proposal."""
+    """The retired owner-deferred re-proposal shape now fails closed (WI-7118).
+
+    Under the superseded model a post-GO report could be parked and handed off
+    to a fresh REVISED proposal, which a second GO then authorized. Canon
+    section 6 removes that path: READY admits only VERIFIED or NOT-READY, and
+    no canonical successor of a report is a proposal status. The shape depended
+    on bridge-status DEFERRED, which canon retires.
+    """
 
     slug = "deferred-report-reproposal"
     _simple_go(tmp_path, slug)
-    _write_version(tmp_path, slug, 3, "NEW")
+    _write_version(tmp_path, slug, 3, "READY")
     _write_version(tmp_path, slug, 4, "REVISED")
 
-    awaiting_go = resolve_bridge_lifecycle(tmp_path, slug)
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
 
-    assert awaiting_go.latest_strict_state.version == 4
-    assert awaiting_go.review_artifact.version == 4
-    assert awaiting_go.implementation_artifact is None
-    assert awaiting_go.implementation_verdict is None
-
-    _write_version(tmp_path, slug, 5, "GO")
-    approved = resolve_bridge_lifecycle(tmp_path, slug)
-
-    assert approved.implementation_artifact.version == 4
-    assert approved.implementation_verdict.version == 5
+    assert caught.value.code == "INVALID_BRIDGE_TRANSITION"
 
 
-def test_no_go_on_owner_deferred_corrective_proposal_does_not_resume_old_go(
+def test_no_go_after_a_report_is_unlawful_report_rejection_is_not_ready(
     tmp_path: Path,
 ) -> None:
-    """The old GO cannot authorize work after the new proposal receives NO-GO."""
+    """Canon section 6: "Report rejection is never NO-GO; it is NOT-READY."
+
+    The superseded model rejected a post-GO report with NO-GO, which is what
+    made a token lawful in both the proposal and report phases. NOT-READY
+    exists precisely to end that overlap.
+    """
 
     slug = "deferred-report-reproposal-no-go"
     _simple_go(tmp_path, slug)
-    _write_version(tmp_path, slug, 3, "NEW")
-    _write_version(tmp_path, slug, 4, "REVISED")
-    _write_version(tmp_path, slug, 5, "NO-GO")
+    _write_version(tmp_path, slug, 3, "READY")
+    _write_version(tmp_path, slug, 4, "NO-GO")
 
-    result = resolve_bridge_lifecycle(tmp_path, slug)
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
 
-    assert result.latest_strict_state.status == "NO-GO"
-    assert result.review_artifact is None
-    assert result.implementation_artifact is None
-    assert result.implementation_verdict is None
+    assert caught.value.code == "INVALID_BRIDGE_TRANSITION"
 
 
 def test_pending_correction_is_reviewable_non_authorizing_and_not_quarantined(
@@ -266,7 +275,7 @@ def test_complete_corrected_go_quarantines_only_malformed_file(tmp_path: Path) -
 def test_corrected_go_continues_into_pending_report(tmp_path: Path) -> None:
     slug = "corrected-report-pending"
     _corrected_go(tmp_path, slug)
-    _write_version(tmp_path, slug, 5, "NEW")
+    _write_version(tmp_path, slug, 5, "READY")
 
     result = resolve_bridge_lifecycle(tmp_path, slug)
 
@@ -281,52 +290,57 @@ def test_corrected_go_continues_into_pending_report(tmp_path: Path) -> None:
 def test_public_foundation_shape_continues_to_report_no_go(tmp_path: Path) -> None:
     slug = "foundation-corrected-report"
     _corrected_go(tmp_path, slug)
-    _write_version(tmp_path, slug, 5, "NEW")
-    _write_version(tmp_path, slug, 6, "NO-GO")
+    _write_version(tmp_path, slug, 5, "READY")
+    _write_version(tmp_path, slug, 6, "NOT-READY")
 
     result = resolve_bridge_lifecycle(tmp_path, slug)
 
     assert tuple(item.version for item in result.audit_versions) == (1, 2, 3, 4, 5, 6)
     assert result.latest_strict_state.version == 6
-    assert result.latest_strict_state.status == "NO-GO"
+    assert result.latest_strict_state.status == "NOT-READY"
     assert result.review_artifact is None
     assert result.implementation_artifact.version == 1
     assert result.implementation_verdict.version == 4
     assert result.quarantined_paths == (f"bridge/{slug}-002.md",)
 
 
-def test_corrected_report_revision_switches_to_latest_implementation_pair(
+def test_corrected_report_retains_the_original_implementation_pair(
     tmp_path: Path,
 ) -> None:
+    """A corrected report does not re-open the proposal phase (WI-7118).
+
+    The superseded model rejected a post-GO report with NO-GO and let a fresh
+    proposal plus a second GO become the operative implementation pair. Canon
+    section 6 removes that: NOT-READY returns the thread to Prime Builder for a
+    corrected READY against the SAME authorization, so the operative pair stays
+    the original proposal and its GO.
+    """
     slug = "corrected-report-revision"
     _corrected_go(tmp_path, slug)
-    _write_version(tmp_path, slug, 5, "NEW")
-    _write_version(tmp_path, slug, 6, "NO-GO")
-    _write_version(tmp_path, slug, 7, "REVISED")
-    _write_version(tmp_path, slug, 8, "GO")
+    _write_version(tmp_path, slug, 5, "READY")
+    _write_version(tmp_path, slug, 6, "NOT-READY")
 
     result = resolve_bridge_lifecycle(tmp_path, slug)
 
-    assert result.latest_strict_state.version == 8
-    assert result.implementation_artifact.version == 7
-    assert result.implementation_verdict.version == 8
+    assert result.latest_strict_state.version == 6
+    assert result.latest_strict_state.status == "NOT-READY"
+    assert result.implementation_artifact.version == 1
+    assert result.implementation_verdict.version == 4
     assert result.quarantined_paths == (f"bridge/{slug}-002.md",)
 
 
 def test_corrected_chain_continues_to_terminal_verified(tmp_path: Path) -> None:
     slug = "corrected-terminal"
     _corrected_go(tmp_path, slug)
-    _write_version(tmp_path, slug, 5, "NEW")
-    _write_version(tmp_path, slug, 6, "NO-GO")
-    _write_version(tmp_path, slug, 7, "REVISED")
-    _write_version(tmp_path, slug, 8, "GO")
-    _write_version(tmp_path, slug, 9, "NEW")
-    _write_version(tmp_path, slug, 10, "VERIFIED")
+    _write_version(tmp_path, slug, 5, "READY")
+    _write_version(tmp_path, slug, 6, "NOT-READY")
+    _write_version(tmp_path, slug, 7, "READY")
+    _write_version(tmp_path, slug, 8, "VERIFIED")
 
     result = resolve_bridge_lifecycle(tmp_path, slug)
 
-    assert tuple(item.version for item in result.audit_versions) == tuple(range(1, 11))
-    assert result.latest_strict_state.version == 10
+    assert tuple(item.version for item in result.audit_versions) == tuple(range(1, 9))
+    assert result.latest_strict_state.version == 8
     assert result.latest_strict_state.status == "VERIFIED"
     assert result.review_artifact is None
     assert result.implementation_artifact is None
@@ -360,7 +374,7 @@ def test_version_after_corrected_verified_fails_terminal(tmp_path: Path) -> None
 def test_corrected_tail_does_not_accept_responds_to_go_alias(tmp_path: Path) -> None:
     slug = "corrected-responds-to-go"
     _corrected_go(tmp_path, slug)
-    report = _write_version(tmp_path, slug, 5, "NEW")
+    report = _write_version(tmp_path, slug, 5, "READY")
     content = report.read_text(encoding="utf-8-sig")
     report.write_text(
         content.replace("Responds to:", "Responds to GO:"),
@@ -384,8 +398,8 @@ def test_corrected_tail_does_not_accept_decorated_version_metadata(
         tmp_path,
         slug,
         5,
-        "NEW",
-        metadata_version="005 (NEW; implementation report)",
+        "READY",
+        metadata_version="005 (READY; implementation report)",
     )
 
     # WI-5827 N2: a single trailing parenthetical annotation on the Version
@@ -395,7 +409,7 @@ def test_corrected_tail_does_not_accept_decorated_version_metadata(
     result = resolve_bridge_lifecycle(tmp_path, slug)
     report = result.audit_versions[-1]
     assert report.version == 5
-    assert report.raw_version == "005 (NEW; implementation report)"
+    assert report.raw_version == "005 (READY; implementation report)"
 
 
 @pytest.mark.parametrize(
@@ -415,7 +429,7 @@ def test_wi5827_enumerated_responds_to_synonyms_resolve(
     """WI-5827 N1: each enumerated synonym key resolves to the canonical value."""
     slug = f"synonym-{len(alias_key)}"
     _corrected_go(tmp_path, slug)
-    report = _write_version(tmp_path, slug, 5, "NEW")
+    report = _write_version(tmp_path, slug, 5, "READY")
     content = report.read_text(encoding="utf-8-sig")
     report.write_text(
         content.replace("Responds to:", f"{alias_key}:"),
@@ -435,7 +449,7 @@ def test_wi5827_unknown_responds_to_key_still_fails_closed(
     """WI-5827 N1 reconciliation with WI-5636: unrecognized keys still fail closed."""
     slug = f"unknown-key-{len(unknown_key)}"
     _corrected_go(tmp_path, slug)
-    report = _write_version(tmp_path, slug, 5, "NEW")
+    report = _write_version(tmp_path, slug, 5, "READY")
     content = report.read_text(encoding="utf-8-sig")
     report.write_text(
         content.replace("Responds to:", f"{unknown_key}:"),
@@ -451,7 +465,7 @@ def test_wi5827_canonical_key_takes_precedence_over_synonym(tmp_path: Path) -> N
     """WI-5827 N1: the canonical key wins when both canonical and a synonym appear."""
     slug = "canonical-precedence"
     _corrected_go(tmp_path, slug)
-    report = _write_version(tmp_path, slug, 5, "NEW")
+    report = _write_version(tmp_path, slug, 5, "READY")
     content = report.read_text(encoding="utf-8-sig")
     # The write already carries the canonical "Responds to:" with the correct
     # predecessor. Add a synonym "Reviewed:" with a wrong value; the canonical
@@ -470,7 +484,7 @@ def test_wi5827_strips_trailing_annotation_on_responds_to(tmp_path: Path) -> Non
     """WI-5827 N2: a trailing parenthetical on Responds to is normalized."""
     slug = "decorated-responds"
     _corrected_go(tmp_path, slug)
-    report = _write_version(tmp_path, slug, 5, "NEW")
+    report = _write_version(tmp_path, slug, 5, "READY")
     content = report.read_text(encoding="utf-8-sig")
     report.write_text(
         content.replace(
@@ -490,7 +504,7 @@ def test_wi5827_does_not_mask_wrong_responds_to_predecessor(tmp_path: Path) -> N
     """WI-5827 N2: a wrong predecessor path still fails closed."""
     slug = "wrong-predecessor"
     _corrected_go(tmp_path, slug)
-    report = _write_version(tmp_path, slug, 5, "NEW")
+    report = _write_version(tmp_path, slug, 5, "READY")
     content = report.read_text(encoding="utf-8-sig")
     report.write_text(
         content.replace(f"Responds to: bridge/{slug}-004.md", "Responds to: bridge/wrong-003.md"),
@@ -590,20 +604,9 @@ def test_strict_utf8_sig_rejects_invalid_bytes(tmp_path: Path) -> None:
         resolve_bridge_lifecycle(tmp_path, slug)
     assert caught.value.code == "BRIDGE_FILE_INVALID_UTF8"
 
-
-@pytest.mark.parametrize("line_one", ["", " GO", "GO ", "GO - approved"])
-def test_status_must_be_exact_physical_line_one(tmp_path: Path, line_one: str) -> None:
-    slug = "strict-line-one"
-    if line_one == "":
-        content = f"\nGO\nauthor_identity: loyal-opposition/codex\nDocument: {slug}\nVersion: 001\n"
-        path = tmp_path / "bridge" / f"{slug}-001.md"
-        path.parent.mkdir(parents=True)
-        path.write_text(content, encoding="utf-8-sig")
-    else:
-        _write_malformed(tmp_path, slug, 1, first_line=line_one)
-
-    with pytest.raises(BridgeLifecycleResolutionError):
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
         resolve_bridge_lifecycle(tmp_path, slug)
+        assert caught.value.code == "BRIDGE_FILE_INVALID_UTF8"
 
 
 @pytest.mark.parametrize(
@@ -783,6 +786,21 @@ def test_legacy_no_suffix_file_is_ignored_beside_exact_chain(tmp_path: Path) -> 
 # be provenance-complete.
 
 
+@pytest.mark.parametrize("line_one", ["", " GO", "GO ", "GO - approved"])
+def test_status_must_be_exact_physical_line_one(tmp_path: Path, line_one: str) -> None:
+    slug = "strict-line-one"
+    if line_one == "":
+        content = f"\nGO\nauthor_identity: loyal-opposition/codex\nDocument: {slug}\nVersion: 001\n"
+        path = tmp_path / "bridge" / f"{slug}-001.md"
+        path.parent.mkdir(parents=True)
+        path.write_text(content, encoding="utf-8-sig")
+    else:
+        _write_malformed(tmp_path, slug, 1, first_line=line_one)
+
+    with pytest.raises(BridgeLifecycleResolutionError):
+        resolve_bridge_lifecycle(tmp_path, slug)
+
+
 def test_legacy_non_operative_verdict_is_grandfathered(tmp_path: Path) -> None:
     """A non-operative legacy NO-GO (no author_identity) does not block an
     otherwise-strict thread from resolving to its strict operative pair."""
@@ -874,7 +892,7 @@ def test_roleless_terminal_verified_after_strict_report_fails_closed(
     slug = "roleless-terminal-verified"
     _write_version(tmp_path, slug, 1, "NEW")
     _write_version(tmp_path, slug, 2, "GO")
-    _write_version(tmp_path, slug, 3, "NEW")
+    _write_version(tmp_path, slug, 3, "READY")
     _write_version(tmp_path, slug, 4, "VERIFIED", author_identity="codex/A")
 
     with pytest.raises(BridgeLifecycleResolutionError) as caught:
@@ -1099,11 +1117,6 @@ def test_work_intent_registry_keeps_stricter_acceptance_than_accessor(
         _bridge_file_status(decorated)  # registry is not
     assert excinfo.value.offending_line == "GO test"
 
-    legacy = _write_header(tmp_path, "legacy-001.md", "PAUSED\n\n# Body\n")
-    assert status_from_bridge_text("PAUSED\n") == "PAUSED"  # accessor admits it
-    with pytest.raises(MalformedBridgeStatusError):
-        _bridge_file_status(legacy)  # registry does not
-
 
 def test_work_intent_registry_still_fails_closed_without_status(tmp_path: Path) -> None:
     """Markers alone are not a status; the malformed contract is preserved."""
@@ -1198,8 +1211,8 @@ def test_swept_prefix_starting_at_go_clears_initial_status_but_hits_prime_artifa
     """
     slug = "swept-go-first"
     _write_version(tmp_path, slug, 2, "GO")
-    _write_version(tmp_path, slug, 3, "NEW")
-    _write_version(tmp_path, slug, 4, "NO-GO")
+    _write_version(tmp_path, slug, 3, "READY")
+    _write_version(tmp_path, slug, 4, "NOT-READY")
 
     with pytest.raises(BridgeLifecycleResolutionError) as caught:
         resolve_bridge_lifecycle(tmp_path, slug)
@@ -1254,22 +1267,45 @@ def test_swept_prefix_still_validates_pairwise_transitions(tmp_path: Path) -> No
     assert caught.value.code == "INVALID_BRIDGE_TRANSITION"
 
 
-def test_swept_prefix_preserves_prior_go_seeding(tmp_path: Path) -> None:
-    """prior_go_seen is seeded from a GO first version, so NEW is a lawful successor."""
-    slug = "swept-go-seeding"
-    _write_version(tmp_path, slug, 2, "GO")
-    _write_version(tmp_path, slug, 3, "NEW")
+def test_swept_prefix_does_not_reseed_a_proposal_after_go(tmp_path: Path) -> None:
+    """The retired prior_go_seen seeding is gone (WI-7118).
 
-    result = resolve_bridge_lifecycle(tmp_path, slug)
+    A swept chain whose lowest present version is GO used to seed
+    prior_go_seen, which made a post-GO NEW lawful only for chains that had
+    been swept. That history gate violated
+    SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001 clause 4: the successor relation must
+    be a pure function of the current status.
 
-    assert result.latest_strict_state.status == "NEW"
+    `GO -> NEW` is now resolvable for every chain, because it is grandfathered
+    read-time tolerance (owner decision, AskUserQuestion 2026-09-03) rather
+    than a history-dependent exemption. What clause 4 forbids is the
+    *dependence on history*, and this asserts it is absent: a swept chain and a
+    full chain reach the same verdict on the same pair. Write-time canon is
+    unchanged and still refuses the pair.
+    """
+
+    # Write-time canon is untouched by the read-time tolerance.
+    assert is_lawful_transition("GO", "NEW") is False
+
+    swept = "swept-go-seeding"
+    _write_version(tmp_path, swept, 2, "GO")
+    _write_version(tmp_path, swept, 3, "NEW")
+    resolve_bridge_lifecycle(tmp_path, swept)
+
+    full = "unswept-go-seeding"
+    _write_version(tmp_path, full, 1, "NEW")
+    _write_version(tmp_path, full, 2, "GO")
+    _write_version(tmp_path, full, 3, "NEW")
+    resolve_bridge_lifecycle(tmp_path, full)
+
+    # Both resolved: the pair's treatment does not consult the swept prefix.
 
 
 def test_swept_prefix_preserves_terminal_seeding(tmp_path: Path) -> None:
     """terminal_seen is seeded from a terminal first version and still fails closed."""
     slug = "swept-terminal-seeding"
     _write_version(tmp_path, slug, 2, "VERIFIED")
-    _write_version(tmp_path, slug, 3, "NEW")
+    _write_version(tmp_path, slug, 3, "READY")
 
     with pytest.raises(BridgeLifecycleResolutionError) as caught:
         resolve_bridge_lifecycle(tmp_path, slug)
@@ -1281,7 +1317,7 @@ def test_interior_gap_still_fails_closed(tmp_path: Path) -> None:
     slug = "swept-interior-gap"
     _write_version(tmp_path, slug, 2, "NEW")
     _write_version(tmp_path, slug, 3, "GO")
-    _write_version(tmp_path, slug, 5, "NEW")
+    _write_version(tmp_path, slug, 5, "READY")
 
     with pytest.raises(BridgeLifecycleResolutionError) as caught:
         resolve_bridge_lifecycle(tmp_path, slug)

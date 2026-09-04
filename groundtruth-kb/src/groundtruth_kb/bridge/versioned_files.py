@@ -9,6 +9,9 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+# replace the hand-maintained _CANONICAL_STATUS_TOKENS literal with:
+from groundtruth_kb.bridge.vocabulary import CANONICAL_STATUSES
+
 __all__ = [
     "BridgeHeaderBlock",
     "ExpectedDocument",
@@ -22,15 +25,22 @@ __all__ = [
 ]
 
 _BRIDGE_FILE_RE = re.compile(r"^(?P<slug>.+)-(?P<version>\d+)\.md$")
-_TERMINAL_STATUS_TOKENS = frozenset({"VERIFIED", "WITHDRAWN", "DEFERRED", "ADVISORY", "ACCEPTED"})
-_NON_TERMINAL_STATUS_TOKENS = frozenset({"NEW", "REVISED", "GO", "NO-GO", "NO-ACTION"})
-_EXTRA_STATUS_TOKENS = frozenset({"PAUSED", "BLOCKED", "RETIRED", "SUPERSEDED"})
+_TERMINAL_STATUS_TOKENS = frozenset({"VERIFIED", "WITHDRAWN", "SUPERSEDED"})
+_NON_TERMINAL_STATUS_TOKENS = frozenset(
+    {"NEW", "REVISED", "GO", "NO-GO", "VERDICT-REJECTED", "ADVISORY", "READY", "NOT-READY"}
+)
+_EXTRA_STATUS_TOKENS = frozenset({"BLOCKED"})
 _CANONICAL_STATUS_TOKENS = _TERMINAL_STATUS_TOKENS | _NON_TERMINAL_STATUS_TOKENS | _EXTRA_STATUS_TOKENS
+# DCL-NO-ACTION-STATUS-SEMANTICS-001 v2: historical artifacts retain the
+# obsolete spelling on disk, but every reader reconstructs the one canonical
+# correction state.  New-output acceptance is deliberately owned by writers,
+# not by this compatibility reader.
+_STATUS_SYNONYMS: dict[str, str] = {"NO-ACTION": "VERDICT-REJECTED"}
 _LEADING_MARKER_RE = re.compile(r"^[#>*\-\s`]+")
 _STATUS_TOKEN_RE = re.compile(r"^([A-Z][A-Z-]*)")
 _INIT_PREFIX = "::init"
 _OPEN_PREFIX = "::open"
-_HEADER_BLOCK_MAX_LINES = 3
+_HEADER_BLOCK_MAX_LINES = 5
 _ACKNOWLEDGED_CONFIG_REL = "config/governance/tafe-acknowledged-archived-bridges.toml"
 _IMPLEMENTATION_SIBLING_SUFFIX = "-implementation"
 _ARCHIVE_DIR_REL = "archive/bridge-terminal-verdicts"
@@ -78,8 +88,11 @@ class BridgeHeaderBlock:
 def _line_status_token(line: str) -> str | None:
     stripped = _LEADING_MARKER_RE.sub("", line.strip())
     match = _STATUS_TOKEN_RE.match(stripped)
-    if match is not None and match.group(1) in _CANONICAL_STATUS_TOKENS:
-        return match.group(1)
+    if match is None:
+        return None
+    token = _STATUS_SYNONYMS.get(match.group(1), match.group(1))
+    if token in _CANONICAL_STATUS_TOKENS:
+        return token
     return None
 
 
@@ -111,7 +124,10 @@ def parse_bridge_header_block(text: str, *, max_lines: int = _HEADER_BLOCK_MAX_L
         token = _line_status_token(line)
         if token is not None and status is None:
             status = token
-            status_line = line
+            # A bare synonym token reports its canonical form so
+            # ``status_line_exact`` stays true. A decorated line is kept
+            # verbatim so the decorated-verdict malformation path is intact.
+            status_line = token if _LEADING_MARKER_RE.sub("", line.strip()) in _STATUS_SYNONYMS else line
     return BridgeHeaderBlock(
         status=status,
         status_line=status_line,
@@ -125,6 +141,11 @@ def status_from_bridge_text(text: str) -> str | None:
     """Return the canonical status token from a bridge file body."""
 
     return parse_bridge_header_block(text).status
+
+
+def test_parser_reads_every_canonical_status():
+    for status in CANONICAL_STATUSES:
+        assert _line_status_token(status) == status
 
 
 def status_from_bridge_file(path: Path) -> str | None:

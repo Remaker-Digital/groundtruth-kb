@@ -13,66 +13,37 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from groundtruth_kb.bridge.versioned_files import parse_bridge_header_block
-
-CANONICAL_STATUSES = frozenset(
-    {
-        "NEW",
-        "REVISED",
-        "GO",
-        "NO-GO",
-        "NO-ACTION",
-        "VERIFIED",
-        "DEFERRED",
-        "WITHDRAWN",
-        "ADVISORY",
-        "ACCEPTED",
-        "BLOCKED",
-    }
+from groundtruth_kb.bridge.vocabulary import (
+    CANONICAL_STATUSES,
+    LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
+    LOYAL_OPPOSITION_AUTHORED_STATUSES,
+    PRIME_AUTHORED_STATUSES,
+    is_resolvable_transition,
+    observed_status_pattern,
 )
-PRIME_STATUSES = frozenset({"NEW", "REVISED", "NO-ACTION"})
-LOYAL_OPPOSITION_STATUSES = frozenset({"GO", "NO-GO", "VERIFIED"})
+
 PENDING_CORRECTION_DIAGNOSTIC = "PENDING_CORRECTION_NO_IMPLEMENTATION_AUTHORITY"
 
-# The single in-code authority for ordinary bridge transitions (WI-5827).
-# Each key is a previous status; the value is the base set of lawful successor
-# statuses. Post-``NO-GO``, the lawful Prime statuses are ``REVISED`` and
-# ``NO-ACTION`` (per DCL-NO-ACTION-STATUS-SEMANTICS-001); ``DEFERRED`` (owner
-# parking) and ``WITHDRAWN`` (terminal) complete the set. ``NEW`` is never a
-# lawful successor to ``NO-GO``. Narrative surfaces (the canonical file-bridge
-# protocol prose and its generated projection) render this table and are bound
-# to it by ``platform_tests/scripts/
-# test_bridge_protocol_transition_table_consistency.py``.
-ORDINARY_TRANSITIONS: dict[str, frozenset[str]] = {
-    "NEW": frozenset({"GO", "NO-GO", "WITHDRAWN", "DEFERRED"}),
-    "REVISED": frozenset({"GO", "NO-GO", "WITHDRAWN", "DEFERRED"}),
-    "GO": frozenset({"GO", "NEW", "REVISED", "NO-ACTION", "DEFERRED", "WITHDRAWN"}),
-    "NO-GO": frozenset({"GO", "REVISED", "NO-ACTION", "DEFERRED", "WITHDRAWN"}),
-    "NO-ACTION": frozenset({"GO", "NO-GO", "VERIFIED"}),
-    "ADVISORY": frozenset({"ADVISORY", "ACCEPTED", "BLOCKED", "DEFERRED", "WITHDRAWN"}),
-    "BLOCKED": frozenset({"REVISED", "WITHDRAWN"}),
-    "DEFERRED": frozenset({"REVISED", "WITHDRAWN"}),
-}
-
-# Post-GO augmentations to ORDINARY_TRANSITIONS, applied only once a GO has
-# been seen earlier in the chain (``prior_go_seen``).
+# WI-7118: the status vocabulary now has exactly one home,
+# ``groundtruth_kb.bridge.vocabulary``, per
+# ``SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001`` clause 5. The eight local
+# definitions this module used to carry -- plus the hand-maintained status
+# regex that restated the token list a ninth time -- are gone. Narrative
+# surfaces render ``TRANSITIONS`` and are bound to it by
+# ``platform_tests/scripts/test_bridge_protocol_transition_table_consistency.py``.
 #
-# A Prime NEW filed after a GO is normally an implementation report.
-# An owner may explicitly defer that report's VERIFIED because its
-# intermediate worktree cannot be finalized, then require a fresh
-# reviewed REVISED proposal for the corrective implementation that
-# will make the single governed commit possible.  That edge still
-# has no implementation authority: the REVISED remains LO-review
-# actionable until a later independent GO.
-#
-# Additionally, post-GO NEW/REVISED reports may receive a terminal VERIFIED.
-POST_GO_REPORT_AUGMENTATIONS: dict[str, frozenset[str]] = {
-    "NEW": frozenset({"REVISED", "VERIFIED"}),
-    "REVISED": frozenset({"VERIFIED"}),
-}
+# ``POST_GO_REPORT_AUGMENTATIONS`` is retired rather than relocated. It was the
+# only mechanism by which the successor relation consulted thread history
+# (``prior_go_seen``), which ``SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001`` clause 4
+# forbids. Canon section 6 replaces it with ``READY``: a post-implementation
+# report is its own token rather than a ``NEW`` reinterpreted by history.
 
-_PRIME_AUTHORED_STATUSES = PRIME_STATUSES | {"DEFERRED", "WITHDRAWN"}
-_LOYAL_AUTHORED_STATUSES = LOYAL_OPPOSITION_STATUSES
-_OWNER_AUTHORED_STATUSES = frozenset({"ACCEPTED", "BLOCKED"})
+# Loyal Opposition verdicts proper. ADVISORY is excluded: canon section 6 has
+# it authored by either role, so it is not a verdict and must not satisfy a
+# verdict-correction check.
+LOYAL_OPPOSITION_VERDICT_STATUSES = frozenset({"GO", "NO-GO", "NOT-READY", "VERIFIED"})
+_PRIME_AUTHORED_STATUSES = PRIME_AUTHORED_STATUSES
+_LOYAL_AUTHORED_STATUSES = LOYAL_OPPOSITION_AUTHORED_STATUSES
 _METADATA_FIELDS = ("author_identity", "Document", "Version", "Responds to")
 
 # WI-5827 N1 - enumerated key-synonym resolution. A closed, enumerated
@@ -98,10 +69,7 @@ _METADATA_KEY_SYNONYMS: dict[str, tuple[str, ...]] = {
 # pre-normalization value is preserved on `BridgeVersion` for audit.
 _TRAILING_ANNOTATION_RE = re.compile(r"\s*\([^()]*\)\s*$")
 
-_OBSERVED_STATUS_RE = re.compile(
-    r"^(?P<status>NO-ACTION|NO-GO|WITHDRAWN|VERIFIED|REVISED|DEFERRED|ADVISORY|ACCEPTED|BLOCKED|NEW|GO)"
-    r"(?=$|[^A-Z0-9-])"
-)
+_OBSERVED_STATUS_RE = observed_status_pattern()
 _BRIDGE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
@@ -335,6 +303,36 @@ def _author_role(author_identity: str) -> str | None:
     return None
 
 
+def author_roles_for_status(status: str) -> set[str]:
+    """Roles permitted to author `status`.
+
+    Public because the write-time guard and this reader must not answer the
+    authorship question differently; WI-7118 exists to remove exactly that
+    class of restatement.
+    """
+    if status == "ADVISORY":
+        # ADVISORY is informational, non-authoritative, and non-dispatchable.
+        # Owner canon permits any operating role to author one; unlike a Prime
+        # proposal or Loyal Opposition verdict, it carries no role-owned
+        # lifecycle authority.
+        return {"prime-builder", "loyal-opposition", "owner"}
+    if status in _PRIME_AUTHORED_STATUSES:
+        return {"prime-builder", "owner"} if status in {"DEFERRED", "WITHDRAWN"} else {"prime-builder"}
+    if status in _LOYAL_AUTHORED_STATUSES:
+        return {"loyal-opposition"}
+    return {"owner"}
+
+
+def author_role_is_valid_for_status(status: str, role: str | None) -> bool:
+    """Whether `role` may author `status`.
+
+    Restored in the grandfathering pass: the WI-7118 refactor inlined this
+    logic into the private validator and dropped the public predicate, which
+    broke every caller that asked the question without wanting the exception.
+    """
+    return role in author_roles_for_status(status)
+
+
 def _validate_author_role(
     status: str,
     role: str | None,
@@ -342,19 +340,7 @@ def _validate_author_role(
     rel_path: str,
     version: int,
 ) -> None:
-    if status == "ADVISORY":
-        # ADVISORY is informational, non-authoritative, and non-dispatchable.
-        # Owner canon permits any operating role to author one; unlike a Prime
-        # proposal or Loyal Opposition verdict, it carries no role-owned
-        # lifecycle authority.
-        allowed = {"prime-builder", "loyal-opposition", "owner"}
-    elif status in _PRIME_AUTHORED_STATUSES:
-        allowed = {"prime-builder", "owner"} if status in {"DEFERRED", "WITHDRAWN"} else {"prime-builder"}
-    elif status in _LOYAL_AUTHORED_STATUSES:
-        allowed = {"loyal-opposition"}
-    else:
-        allowed = {"owner"}
-    if role not in allowed:
+    if not author_role_is_valid_for_status(status, role):
         _fail(
             "WRONG_STATUS_AUTHOR_ROLE",
             f"Status {status} has wrong or unreadable author role {role!r}: {rel_path}",
@@ -470,6 +456,7 @@ def _parse_version(
     # WI-5827 N2: normalize a single trailing parenthetical annotation on the
     # Responds to value before the exact comparison; preserve the raw value.
     responds_to = _strip_trailing_annotation(raw_responds_to) if raw_responds_to else None
+    responds_to = _normalize_predecessor_pointer(responds_to)
 
     if document != bridge_id:
         _fail(
@@ -579,7 +566,6 @@ def _validate_ordinary_transitions(versions: tuple[BridgeVersion, ...]) -> None:
             version=first.version,
         )
 
-    prior_go_seen = first.status == "GO"
     terminal_seen = first.status in {"VERIFIED", "WITHDRAWN", "ACCEPTED"}
     for previous, current in zip(versions, versions[1:]):
         assert previous.status is not None
@@ -592,20 +578,48 @@ def _validate_ordinary_transitions(versions: tuple[BridgeVersion, ...]) -> None:
                 version=current.version,
             )
 
-        # WI-5827: consume the module-level authoritative table (base map plus
-        # the documented post-GO augmentations); no allowed set changes.
-        allowed: set[str] = set(ORDINARY_TRANSITIONS.get(previous.status, frozenset()))
-        if prior_go_seen:
-            allowed |= POST_GO_REPORT_AUGMENTATIONS.get(previous.status, frozenset())
+        # WI-7118: the successor relation is a pure function of the current
+        # status, per SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001 clause 4. No branch
+        # here consults thread history.
+        #
+        # This resolver is a READ surface: every pair it inspects is between two
+        # bridge files that already exist, and bridge files are append-only, so
+        # the pair is history by construction. It therefore resolves against
+        # canon plus the closed historical set (`is_resolvable_transition`)
+        # rather than canon alone. Failing closed on a superseded pair does not
+        # correct the pair -- nothing can, the files are immutable -- it only
+        # strands whatever live work sits on top of it, because the clause
+        # preflight that gates every verdict calls this function.
+        #
+        # Write-time canon remains `is_lawful_transition`. Owner decision,
+        # AskUserQuestion 2026-09-03: accept historical pairs on read, keep
+        # canon strict on write.
 
-        if current.status not in allowed:
+        # Canon section 6: NO-GO has two forms, "distinguished by author, not by
+        # the artifact adjudicated". Only the Dispatcher-authored finalization
+        # form may be followed by VERIFIED. The union in TRANSITIONS keeps the
+        # successor relation a pure function of the current status per
+        # SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001 clause 4; this authorship check
+        # supplies the restriction that the union deliberately leaves out.
+        # Dispatcher Next is not activated (canon section 10) and no author
+        # identity resolves to a dispatcher, so this fails closed for every
+        # ordinary Loyal-Opposition NO-GO, which is the intended behavior.
+        if previous.status == "NO-GO" and current.status == "VERIFIED" and previous.author_role != "dispatcher":
+            _fail(
+                "INVALID_BRIDGE_TRANSITION",
+                "Invalid bridge transition NO-GO -> VERIFIED: only a Dispatcher-authored "
+                "finalization NO-GO may be followed by VERIFIED",
+                path=current.path,
+                version=current.version,
+            )
+
+        if not is_resolvable_transition(previous.status, current.status):
             _fail(
                 "INVALID_BRIDGE_TRANSITION",
                 f"Invalid bridge transition {previous.status} -> {current.status}",
                 path=current.path,
                 version=current.version,
             )
-        prior_go_seen = prior_go_seen or current.status == "GO"
         terminal_seen = current.status in {"VERIFIED", "WITHDRAWN", "ACCEPTED"}
 
 
@@ -625,7 +639,7 @@ def _ordinary_resolution(
 ) -> BridgeLifecycleResolution:
     _validate_ordinary_transitions(versions)
     latest = versions[-1]
-    review_artifact = latest if latest.status in PRIME_STATUSES else None
+    review_artifact = latest if latest.status in LOYAL_OPPOSITION_ACTIONABLE_STATUSES else None
     implementation_artifact: BridgeVersion | None = None
     implementation_verdict: BridgeVersion | None = None
 
@@ -636,16 +650,19 @@ def _ordinary_resolution(
         post_go_versions = versions[go_index + 1 :]
         statuses_after_go = [item.status for item in post_go_versions]
         latest_status = latest.status
-        owner_deferred_reproposal = any(
-            previous.status == "NEW" and current.status == "REVISED"
-            for previous, current in zip(post_go_versions, post_go_versions[1:])
-        )
-        latest_is_resumable_report_no_go = (
-            latest_status == "NO-GO"
-            and any(status in {"NEW", "REVISED"} for status in statuses_after_go[:-1])
-            and not owner_deferred_reproposal
-        )
-        if latest_status == "GO" or latest_is_resumable_report_no_go:
+        # Canon section 6 (WI-7118): the post-GO report is READY and its
+        # rejection is NOT-READY, so resumability keys on those rather than on
+        # the retired post-GO NEW rejected by NO-GO. A NOT-READY leaves the
+        # original proposal/GO pair resumable, because Prime Builder files a
+        # corrected READY against the same authorization rather than seeking a
+        # fresh GO.
+        #
+        # The former `owner_deferred_reproposal` branch is retired with it. It
+        # existed to stop a post-GO NEW->REVISED sequence from resuming the old
+        # GO, a shape that depended on bridge-status DEFERRED; canon retires
+        # DEFERRED, and no canonical successor of READY is a proposal status.
+        latest_is_resumable_report_rejection = latest_status == "NOT-READY" and "READY" in statuses_after_go[:-1]
+        if latest_status == "GO" or latest_is_resumable_report_rejection:
             proposal = _nearest_prime_artifact(versions, go_index)
             if proposal is None:
                 _fail(
@@ -687,13 +704,41 @@ def _ordinary_resolution(
     )
 
 
+def _normalize_predecessor_pointer(value: str | None) -> str | None:
+    """Return a predecessor pointer in canonical ``bridge/<slug>-NNN.md`` form.
+
+    Accepts the bare ``<slug>-NNN`` form some authors emit. This is the same
+    robustness convention as the ``Reviewed:`` fallback below (Postel's Law),
+    not a thread-specific concession: the predecessor identity is unambiguous
+    in either spelling.
+
+    Rejecting the bare form does not merely strand its own thread. The
+    implementation-start gate resolves bridge lifecycles on every
+    protected-path check, so one non-canonical pointer blocks EVERY protected
+    mutation platform-wide until it is corrected -- and bridge files are
+    append-only, so the defective file cannot lawfully be edited in place.
+
+    Source: gtkb-wi6898-canonical-terminality-evaluators-007, whose pointer
+    omitted the ``bridge/`` prefix and ``.md`` suffix that every sibling in
+    the same chain carries.
+    """
+    if not value:
+        return value
+    text = value.strip()
+    if text.startswith("bridge/") or text.endswith(".md"):
+        return text
+    if re.fullmatch(r".+-\d{3,}", text):
+        return f"bridge/{text}.md"
+    return text
+
+
 def _correction_resolution(
     bridge_id: str,
     versions: tuple[BridgeVersion, ...],
     malformed_index: int,
 ) -> BridgeLifecycleResolution:
     malformed = versions[malformed_index]
-    if malformed.observed_status not in LOYAL_OPPOSITION_STATUSES:
+    if malformed.observed_status not in LOYAL_OPPOSITION_VERDICT_STATUSES:
         _fail(
             "MALFORMED_CORRECTION_WRONG_SHAPE",
             f"Malformed correction candidate is not LO-verdict-shaped: {malformed.path}",
@@ -723,32 +768,32 @@ def _correction_resolution(
     if not tail:
         _fail(
             "MALFORMED_CORRECTION_INVALID_TAIL",
-            "Malformed correction requires a strict Prime NO-ACTION",
+            "Malformed correction requires a strict Prime VERDICT-REJECTED",
             path=malformed.path,
             version=malformed.version,
         )
 
-    no_action = tail[0]
-    if no_action.status != "NO-ACTION" or no_action.author_role != "prime-builder":
+    verdict_rejected = tail[0]
+    if verdict_rejected.status != "VERDICT-REJECTED" or verdict_rejected.author_role != "prime-builder":
         _fail(
             "MALFORMED_CORRECTION_MISSING_NO_ACTION",
-            f"Malformed correction must be followed by strict Prime NO-ACTION: {malformed.path}",
-            path=no_action.path,
-            version=no_action.version,
+            f"Malformed correction must be followed by strict Prime VERDICT-REJECTED: {malformed.path}",
+            path=verdict_rejected.path,
+            version=verdict_rejected.version,
         )
 
     if len(tail) == 1:
         diagnostic = LifecycleDiagnostic(
             code=PENDING_CORRECTION_DIAGNOSTIC,
             message="Pending corrected LO verdict; implementation authority is unavailable",
-            path=no_action.path,
-            version=no_action.version,
+            path=verdict_rejected.path,
+            version=verdict_rejected.version,
         )
         return BridgeLifecycleResolution(
             bridge_id=bridge_id,
             audit_versions=versions,
-            latest_strict_state=no_action,
-            review_artifact=no_action,
+            latest_strict_state=verdict_rejected,
+            review_artifact=verdict_rejected,
             implementation_artifact=None,
             implementation_verdict=None,
             quarantined_paths=(),
@@ -756,7 +801,7 @@ def _correction_resolution(
         )
 
     corrected = tail[1]
-    if corrected.status not in LOYAL_OPPOSITION_STATUSES or corrected.author_role != "loyal-opposition":
+    if corrected.status not in LOYAL_OPPOSITION_VERDICT_STATUSES or corrected.author_role != "loyal-opposition":
         _fail(
             "MALFORMED_CORRECTION_INVALID_VERDICT",
             "Completed correction requires a strict role-correct GO, NO-GO, or VERIFIED",
