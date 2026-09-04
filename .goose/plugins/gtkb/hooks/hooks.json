@@ -3,200 +3,170 @@
   "hooks": {
     "PreToolUse": [
       {
-        "command": "python .goose/hooks/spec-before-code.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/spec-before-code.py",
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/kb-not-markdown.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/kb-not-markdown.py",
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/destructive-gate.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/destructive-gate.py",
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/credential-scan.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/credential-scan.py",
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/scanner-safe-writer.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/scanner-safe-writer.py",
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/formal-artifact-approval-gate.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/formal-artifact-approval-gate.py",
         "timeout": 5,
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/document_author_provenance_gate.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/document_author_provenance_gate.py",
         "timeout": 5,
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/workstream-focus.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/lo-file-safety-gate.py",
         "timeout": 5,
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/lo-file-safety-gate.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/directive-enforcement-adapter.py",
         "timeout": 5,
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/implementation-start-gate.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/bridge-compliance-gate.py",
         "timeout": 5,
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/directive-enforcement-adapter.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/bridge-proposal-wi-id-collision-gate.py",
         "timeout": 5,
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/bridge-compliance-gate.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/narrative-artifact-approval-gate.py",
         "timeout": 5,
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/bridge-proposal-wi-id-collision-gate.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/code-quality-baseline-proposal-check.py",
         "timeout": 5,
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/narrative-artifact-approval-gate.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/sot-read-discipline.py",
         "timeout": 5,
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/code-quality-baseline-proposal-check.py",
-        "timeout": 5,
-        "blocking": true
-      },
-      {
-        "command": "python .goose/hooks/sot-read-discipline.py",
-        "timeout": 5,
-        "blocking": true
-      },
-      {
-        "command": "python scripts/dispatch_blackbox_gate.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" scripts/dispatch_blackbox_gate.py",
         "timeout": 5,
         "blocking": true
       }
     ],
     "SessionStart": [
       {
-        "command": "python .goose/hooks/session-start-governance.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/session-start-governance.py",
         "timeout": 60
       },
       {
-        "command": "python .goose/hooks/assertion-check.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/assertion-check.py",
         "timeout": 60
       },
       {
-        "command": "python .goose/hooks/session_start_dispatch.py",
-        "timeout": 60
-      },
-      {
-        "command": "python .goose/hooks/assertion-check.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/session_start_dispatch.py",
         "timeout": 60
       }
     ],
     "PostToolUse": [
       {
-        "command": "python .goose/hooks/delib-search-tracker.py"
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/delib-search-tracker.py"
       },
       {
-        "command": "python .goose/hooks/owner-decision-capture.py"
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/owner-decision-capture.py"
       },
       {
-        "command": "python .goose/hooks/spec-event-surfacer.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/spec-event-surfacer.py",
         "timeout": 5
       },
       {
-        "command": "python .goose/hooks/spec-event-surfacer.py"
-      },
-      {
-        "command": "python .goose/hooks/owner-decision-capture.py"
-      },
-      {
-        "command": "python scripts/registry_observation_hook.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" scripts/registry_observation_hook.py",
         "timeout": 10
       }
     ],
     "Stop": [
       {
-        "command": "python .goose/hooks/owner-decision-tracker.py --mode stop",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/owner-decision-tracker.py --mode stop",
         "timeout": 5,
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/advisory-router-scan.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/advisory-router-scan.py",
         "timeout": 10,
         "blocking": true
       },
       {
-        "command": "python scripts/session_self_initialization.py --emit-wrapup --fast-hook --harness-name goose",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" scripts/session_self_initialization.py --emit-wrapup --fast-hook --harness-name goose",
         "timeout": 60,
         "blocking": true
       },
       {
-        "command": "python scripts/advisory_grilling_gate_lint.py --stop-hook",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" scripts/advisory_grilling_gate_lint.py --stop-hook",
         "timeout": 10,
         "blocking": true
       },
       {
-        "command": "python scripts/auto_finalize_sweep.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" scripts/auto_finalize_sweep.py",
         "timeout": 15,
         "blocking": true
       }
     ],
     "UserPromptSubmit": [
       {
-        "command": "python .goose/hooks/session-init-binding.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/session-init-binding.py",
         "timeout": 5
       },
       {
-        "command": "python .goose/hooks/workstream-focus.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/workstream-focus.py",
         "timeout": 5
       },
       {
-        "command": "python .goose/hooks/delib-search-gate.py"
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/delib-search-gate.py"
       },
       {
-        "command": "python .goose/hooks/intake-classifier.py"
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/intake-classifier.py"
       },
       {
-        "command": "python .goose/hooks/gov09-capture.py"
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/gov09-capture.py"
       },
       {
-        "command": "python .goose/hooks/owner-decision-tracker.py --mode user-prompt-submit",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/bridge-axis-2-surface.py",
         "timeout": 5
       },
       {
-        "command": "python .goose/hooks/bridge-axis-2-surface.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/spec-classifier.py",
         "timeout": 5
       },
       {
-        "command": "python .goose/hooks/spec-classifier.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/glossary-expansion.py",
         "timeout": 5
       },
       {
-        "command": "python .goose/hooks/glossary-expansion.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/project-completion-surface.py",
         "timeout": 5
       },
       {
-        "command": "python .goose/hooks/project-completion-surface.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" .goose/hooks/session-topic-envelope-router.py",
         "timeout": 5
-      },
-      {
-        "command": "python .goose/hooks/session-topic-envelope-router.py",
-        "timeout": 5
-      },
-      {
-        "command": "python .goose/hooks/intake-classifier.py"
-      },
-      {
-        "command": "python .goose/hooks/gov09-capture.py"
       }
     ]
   }

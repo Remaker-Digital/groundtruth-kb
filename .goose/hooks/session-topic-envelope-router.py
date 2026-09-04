@@ -47,7 +47,6 @@ def _discover_project_root() -> Path:
 
 
 PROJECT_ROOT = _discover_project_root()
-OUT_DIR = PROJECT_ROOT / ".gtkb-state" / "session-topic-router" / HARNESS_NAME
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -152,11 +151,16 @@ def main() -> int:
     raw_input = _read_stdin()
     prompt = _extract_prompt(raw_input)
 
-    if _startup_input_gate_active():
+    command = parse_topic_command(prompt)
+
+    # An explicit topic command is declarative and idempotent (Canon activity
+    # rules); the startup relay may suppress an ORDINARY prompt but must never
+    # silently discard an explicit ::open/::close. Discarding it produced three
+    # failed registrations with no error and no record.
+    if command is None and _startup_input_gate_active():
         _emit_no_context()
         return 0
 
-    command = parse_topic_command(prompt)
     if command is None:
         try:
             selection = route_prompt_resources(
@@ -181,14 +185,6 @@ def main() -> int:
             harness_name=HARNESS_NAME,
             harness_id=_persistent_harness_id(),
         )
-        try:
-            OUT_DIR.mkdir(parents=True, exist_ok=True)
-            (OUT_DIR / "last-topic-envelope-command.json").write_text(
-                json.dumps(result, indent=2, sort_keys=True),
-                encoding="utf-8",
-            )
-        except OSError:
-            pass
         print(_dump_payload(_hook_payload(render_topic_context(result))))
     except EnvelopeError as exc:
         context = (

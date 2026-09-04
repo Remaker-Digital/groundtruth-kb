@@ -46,6 +46,15 @@ from groundtruth_kb.project.registry_control_plane import load_registry_snapshot
 BYPASS_ENV_VAR = "GTKB_SOT_READ_DISCIPLINE_BYPASS"
 
 NATIVE_READ_TOOLS = {"Read", "Grep", "Glob"}
+
+# WI-7289: the shell surface is not one tool name. The projector renders
+# shell_exec to "Bash|PowerShell" for Claude and "Shell|Bash" for Cursor, and
+# Goose registers every PreToolUse hook without a matcher at all, so a payload
+# can arrive under any of these names. Matching only "Bash" left the specified
+# shell surface of DCL-SOT-READ-HOOK-CONTRACT-001 unenforced on the harnesses
+# that do not use that name, even once the intent is declared.
+SHELL_COMMAND_TOOLS = frozenset({"Bash", "PowerShell", "Shell", "shell", "bash", "powershell"})
+# Retained for callers and tests that referenced the single-name constant.
 SHELL_COMMAND_TOOL = "Bash"
 
 # Per-verb extractor table for the shell-command branch.
@@ -235,7 +244,7 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
                 base = re.split(r"[*?\[]", raw, maxsplit=1)[0]
                 if base:
                     targets.append(base)
-    elif tool_name == SHELL_COMMAND_TOOL:
+    elif tool_name in SHELL_COMMAND_TOOLS:
         command = tool_input.get("command") or ""
         if isinstance(command, str) and command:
             targets.extend(_extract_paths_from_bash(command))

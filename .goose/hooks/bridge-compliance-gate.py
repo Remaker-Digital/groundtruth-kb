@@ -83,7 +83,42 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
 
     def is_synthetic_session_context_id(value: object) -> bool:
         text = str(value or "").strip().strip("`")
-        return bool(re.fullmatch(r"(?:openrouter|ollama)-harness-[a-z]", text, re.IGNORECASE))
+        lowered = text.lower()
+        leading_segment = lowered.split("-", 1)[0]
+        return (
+            lowered
+            in {
+                "",
+                "-",
+                "--",
+                "<tbd>",
+                "<unknown>",
+                "[tbd]",
+                "[unknown]",
+                "n/a",
+                "na",
+                "none",
+                "null",
+                "tbd",
+                "todo",
+                "unknown",
+                "unspecified",
+            }
+            or bool(re.fullmatch(r"(?:openrouter|ollama)-harness-[a-z]", text, re.IGNORECASE))
+            or any(character.isspace() for character in text)
+            or leading_segment
+            in {
+                "absent",
+                "missing",
+                "none",
+                "nosession",
+                "notset",
+                "null",
+                "unavailable",
+                "unknown",
+                "unset",
+            }
+        )
 
 
 try:
@@ -110,6 +145,25 @@ BRIDGE_STATUS_TOKENS = (
     "GO",
     "NO-GO",
     "VERIFIED",
+    # WI-7045: canon section 6 names VERDICT-REJECTED the Prime rejection token and
+    # retires NO-ACTION. gtkb_bridge_writer._write_bridge_file_exclusive already
+    # requires VERDICT-REJECTED for new governed output while this audit rejected it,
+    # so no token was writable and the Prime verdict-rejection route was inoperable.
+    # Additive on purpose: NO-ACTION stays because this tuple also builds
+    # BRIDGE_FILE_STATUS_RE, which resolves the status of files already on disk.
+    # Retiring NO-ACTION/DEFERRED needs a read/write vocabulary split and is tracked
+    # separately. Authority: DELIB-20260825203701 (emergency-bootstrap event).
+    "VERDICT-REJECTED",
+    # WI-7675: the same gap WI-7045 repaired for VERDICT-REJECTED, for the two
+    # report-phase tokens. Canon section 6 makes READY the implementation report
+    # and NOT-READY its rejection, but neither was writable here, so a GO'd work
+    # item had no lawful head for its report: READY was refused, and NEW or
+    # REVISED produced a GO->NEW / GO->REVISED pair that the lifecycle resolver
+    # rejects. NOT-READY precedes READY because this tuple also builds
+    # BRIDGE_FILE_STATUS_RE, and alternation is first-match, so the longer token
+    # must be offered first for the prefix never to truncate.
+    "NOT-READY",
+    "READY",
     "NO-ACTION",
     "WITHDRAWN",
     "ADVISORY",
@@ -174,6 +228,19 @@ PRIOR_DELIBERATIONS_HEADING_RE = re.compile(
     r"^#{1,6}\s*prior\s+deliberations\s*$",
     re.IGNORECASE,
 )
+# WI-6741: mandatory Simplification Accounting section on implementation proposals.
+# An explicit "nothing gets smaller" is a complete and valid answer; omission is not.
+# Placeholder set is deliberately NARROWER than the owner-decisions one: "none" and
+# "n/a" are excluded, because "none" is a substantive answer to "what gets smaller"
+# where it is a non-answer to "which owner decisions authorize this".
+SIMPLIFICATION_ACCOUNTING_HEADING_RE = re.compile(
+    r"^#{1,6}\s*Simplification Accounting\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+SIMPLIFICATION_ACCOUNTING_PLACEHOLDER_LINE_RE = re.compile(
+    r"^[\s>*`_\-:]*(?:tbd|todo|fill in|fill this in|\?+)[\s.`_\-:]*$",
+    re.IGNORECASE,
+)
 NO_PRIOR_DELIBS_PLACEHOLDER = "_No prior deliberations: <fill in reason before filing>._"
 SPEC_TEST_HEADING_RE = re.compile(
     r"^#{1,6}\s*(?:spec(?:ification)?[-\s]+to[-\s]+test|specification[-\s]+derived\s+verification)",
@@ -192,6 +259,14 @@ COMMIT_FINALIZATION_HEADING_RE = re.compile(
     re.IGNORECASE,
 )
 SAME_TRANSACTION_PATH_SET_RE = re.compile(r"\bsame-transaction\s+path\s+set\b", re.IGNORECASE)
+# WI-6365: post-commit finalization evidence. Under owner canon the commit of the
+# work product IS the terminal state and PRECEDES the VERIFIED verdict, so a
+# canonical verdict can never carry same-transaction evidence -- the commit it
+# attests already happened. It cites that commit instead.
+WORK_PRODUCT_COMMIT_RE = re.compile(
+    r"\bwork-product\s+commit\s*:\s*`?[0-9a-f]{7,40}`?",
+    re.IGNORECASE,
+)
 FINALIZATION_PATH_BULLET_RE = re.compile(r"(?m)^\s*[-*]\s+`[^`]+`\s*$")
 PREFLIGHT_PACKET_HASH_RE = re.compile(
     r"\bpacket_hash\s*:\s*`?sha256:[0-9a-f]{64}`?",
@@ -671,11 +746,34 @@ def _latest_bridge_statuses(project_root: Path) -> dict[str, str]:
     return {slug: values[0][1] for slug, values in _versioned_bridge_entries(project_root).items() if values}
 
 
+_ENVELOPE_HEAD_PREFIXES = ("::init", "::open")
+
+
 def _first_nonblank_line(content: str) -> str:
+    """Return the first non-blank line that is not an artifact-head envelope marker.
+
+    The canonical bridge header is::
+
+        ::init gtkb <pb|lo>
+        ::open <activity>
+        <status token>
+
+    (owner directive 2026-08-16; the ``::init`` / ``::open`` lines may be null
+    only when the status is ``ADVISORY``). The status token is therefore not
+    necessarily the first non-blank line of the file. Leading envelope markers
+    are skipped here so that every status-dependent check in this module reads
+    the true status token through this single accessor rather than each
+    re-deriving it. Markers that appear after the status token are the envelope
+    validator's concern, not this function's: iteration stops at the first
+    non-marker line.
+    """
     for line in content.splitlines():
         stripped = line.strip()
-        if stripped:
-            return stripped
+        if not stripped:
+            continue
+        if stripped.startswith(_ENVELOPE_HEAD_PREFIXES):
+            continue
+        return stripped
     return ""
 
 
@@ -802,8 +900,11 @@ def _ondisk_first_nonblank_line(file_path: str) -> str | None:
         with path.open("r", encoding="utf-8-sig") as handle:
             for raw_line in handle:
                 stripped = raw_line.strip()
-                if stripped:
-                    return stripped
+                if not stripped:
+                    continue
+                if stripped.startswith(_ENVELOPE_HEAD_PREFIXES):
+                    continue
+                return stripped
         return ""
     except OSError:
         return None
@@ -1070,7 +1171,13 @@ def _has_commit_finalization_evidence(content: str) -> bool:
     if start is None:
         return False
     section = "\n".join(_collect_section_lines(lines, start))
-    return bool(SAME_TRANSACTION_PATH_SET_RE.search(section) and FINALIZATION_PATH_BULLET_RE.search(section))
+    # WI-6365: both accepted forms require the committed path set. What differs is
+    # how the commit is identified -- same-transaction (legacy atomic helper) or a
+    # work-product commit reference (canonical commit-then-verdict ordering).
+    # Evidence must still be present and substantive; an empty section fails.
+    if not FINALIZATION_PATH_BULLET_RE.search(section):
+        return False
+    return bool(SAME_TRANSACTION_PATH_SET_RE.search(section) or WORK_PRODUCT_COMMIT_RE.search(section))
 
 
 def _synthetic_session_context_id_for_content(content: str) -> str | None:
@@ -1108,6 +1215,34 @@ def _has_concrete_owner_decisions_section(content: str) -> bool:
         return False
     nonblank_lines = [line for line in (ln.strip() for ln in section) if line]
     return any(not OWNER_DECISIONS_PLACEHOLDER_LINE_RE.match(line) for line in nonblank_lines)
+
+
+def _has_concrete_simplification_accounting(content: str) -> bool:
+    """Heading present AND section text non-empty AND not placeholder-only (WI-6741).
+
+    Mirrors ``_has_concrete_owner_decisions_section``. The one deliberate
+    divergence is the placeholder set: an author who writes "nothing gets
+    smaller" has answered the question, so that must pass. Only genuinely
+    unfilled markers -- ``tbd``, ``todo``, ``fill in``, a bare ``?`` -- fail.
+
+    The gate cannot detect an insincere answer, and does not try. Its job is to
+    put the question on the path the author already walks; whether the answer is
+    honest is what the Loyal Opposition simplicity challenge (WI-6742) exists to
+    test.
+    """
+    lines = content.splitlines()
+    start: int | None = None
+    for i, line in enumerate(lines):
+        if SIMPLIFICATION_ACCOUNTING_HEADING_RE.match(line.strip()):
+            start = i + 1
+            break
+    if start is None:
+        return False
+    section = _collect_section_lines(lines, start)
+    if not "\n".join(section).strip():
+        return False
+    nonblank = [line for line in (ln.strip() for ln in section) if line]
+    return any(not SIMPLIFICATION_ACCOUNTING_PLACEHOLDER_LINE_RE.match(line) for line in nonblank)
 
 
 def _target_paths_touch_harness_surface(content: str) -> bool:
@@ -1324,8 +1459,6 @@ def _project_metadata_gaps(content: str) -> list[str]:
     (CLAUSE-PROJECT-METADATA-PRESENT satisfied).
     """
     gaps: list[str] = []
-    if not PROJECT_AUTHORIZATION_LINE_RE.search(content):
-        gaps.append("Project Authorization:")
     if not PROJECT_LINE_RE.search(content):
         gaps.append("Project:")
     if not WORK_ITEM_LINE_RE.search(content):
@@ -1357,6 +1490,36 @@ def _parse_json_id_list(raw: object) -> list[str]:
     if isinstance(parsed, list):
         return [str(x) for x in parsed]
     return []
+
+
+def _live_project_authorization_refusal_hint(cwd_path: Path, project_id: str | None) -> str:
+    """Name a sole live PAUTH for diagnostics; never substitute its authority."""
+    if not project_id:
+        return ""
+    db_path = _canonical_project_root(cwd_path) / "groundtruth.db"
+    if not db_path.is_file():
+        return ""
+    conn: sqlite3.Connection | None = None
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5)
+        rows = conn.execute(
+            """SELECT id FROM current_project_authorizations
+               WHERE project_id = ? AND status = 'active'
+               ORDER BY id""",
+            (project_id,),
+        ).fetchall()
+    except (sqlite3.Error, OSError) as exc:
+        print(f"[Governance] live authorization diagnostic warning: {exc}", file=sys.stderr)
+        return ""
+    finally:
+        if conn is not None:
+            conn.close()
+    live_ids = [str(row[0]) for row in rows]
+    if len(live_ids) == 1:
+        return f" Current active authorization for project {project_id}: {live_ids[0]}."
+    if len(live_ids) > 1:
+        return f" Project {project_id} has multiple current active authorizations; none is named as canonical."
+    return ""
 
 
 def _wi_project_membership_gap(content: str, cwd_path: Path) -> str | None:
@@ -1417,6 +1580,28 @@ def _wi_project_membership_gap(content: str, cwd_path: Path) -> str | None:
         if conn is not None:
             conn.close()
     return None
+
+
+def _project_membership_refusal_message(content: str, cwd_path: Path, membership_gap: str) -> str:
+    """Render the stable refusal classification plus an optional live-PAUTH hint."""
+    authorization_id, project_id, work_item_id = _extract_project_metadata(content)
+    live_authorization_hint = (
+        _live_project_authorization_refusal_hint(cwd_path, project_id)
+        if membership_gap in {"authorization-inactive", "authorization-not-found"}
+        else ""
+    )
+    return (
+        "[Governance] Bridge proposal fails the live work-item/project "
+        f"membership check: {membership_gap}. Cited WI={work_item_id}, "
+        f"Project={project_id}, Project Authorization={authorization_id}."
+        f"{live_authorization_hint} "
+        "The cited metadata must resolve to an active project membership and "
+        "an active, unexpired, including authorization in MemBase. "
+        "(Hard-block per DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001/"
+        "CLAUSE-BRIDGE-WI-PROJECT-MEMBERSHIP + "
+        "DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001/"
+        "CLAUSE-PROJECT-AUTH-LIVE-CHECK.)"
+    )
 
 
 def _advisory_report_template_gaps(content: str) -> list[str]:
@@ -2298,11 +2483,18 @@ def _deny_reason_for_content(
     if _is_bridge_markdown_file(file_path) and content:
         if _body_status_token_violation(file_path, content):
             return (
-                "[Governance] Versioned bridge files (bridge/<slug>-NNN.md) must begin with a "
-                "canonical status token on the first non-blank line: one of NEW, REVISED, GO, "
-                "NO-GO, VERIFIED, NO-ACTION, ADVISORY, DEFERRED, WITHDRAWN. The first non-blank line was "
-                f"{_first_nonblank_line(content)!r}. Put the status token on line 1 (headings "
-                "and prose follow it). Existing files with a non-canonical first line are "
+                "[Governance] Versioned bridge files (bridge/<slug>-NNN.md) must carry a "
+                "canonical status token in the artifact head: one of "
+                # WI-7675: derived from the constant rather than restated. The
+                # hardcoded list had already drifted, omitting VERDICT-REJECTED
+                # for the whole life of the WI-7045 repair, so an author reading
+                # the refusal was told a token was invalid when it was accepted.
+                f"{', '.join(BRIDGE_STATUS_TOKENS)}. The first "
+                "non-envelope line was "
+                f"{_first_nonblank_line(content)!r}. The canonical header is '::init gtkb "
+                "<pb|lo>' then '::open <activity>' then the status token (the ::init/::open "
+                "lines may be null only for ADVISORY); a bare status token on line 1 also "
+                "remains accepted. Existing files with a non-canonical head are "
                 "grandfathered. (Hard-block per GTKB-GOV-PROPOSAL-STANDARDS Slice 1 "
                 "body-status-token rule; see .goose/rules/file-bridge-protocol.md "
                 "section 'Body Status-Token Rule'.)"
@@ -2367,9 +2559,10 @@ def _deny_reason_for_content(
             )
         if first_line == "VERIFIED" and not _has_commit_finalization_evidence(content):
             return (
-                "[Governance] VERIFIED bridge verdicts must include Commit Finalization Evidence "
-                "with a Same-transaction path set. Use the atomic VERIFIED finalization helper "
-                "instead of writing terminal VERIFIED bridge files directly. "
+                "[Governance] VERIFIED bridge verdicts must include a Commit Finalization Evidence "
+                "section carrying the committed path set as `-` bullets, plus ONE of: "
+                "(a) 'Work-product commit: <sha>' -- the canonical form, where the commit precedes "
+                "the verdict; or (b) 'Same-transaction path set' -- the legacy atomic-helper form. "
                 "(Hard-block per the Mandatory VERIFIED Commit-Finalization Gate.)"
             )
         if first_line in {"NO-GO", "VERIFIED"}:
@@ -2403,6 +2596,19 @@ def _deny_reason_for_content(
         if (
             first_line in PENDING_PREFLIGHT_STATUSES
             and _bridge_kind_is_implementation_proposal(content)
+            and not _has_concrete_simplification_accounting(content)
+        ):
+            return (
+                "[Governance] Implementation proposals must include a non-empty "
+                "`## Simplification Accounting` section stating what gets smaller: "
+                "net artifacts, lines, state locations, concepts. An explicit "
+                '"nothing gets smaller" is a complete answer; omitting the section '
+                "is not. (Hard-block per WI-6741; see "
+                "bridge/gtkb-wi6741-simplification-accounting-section-002.md.)"
+            )
+        if (
+            first_line in PENDING_PREFLIGHT_STATUSES
+            and _bridge_kind_is_implementation_proposal(content)
             and _prior_deliberations_has_unedited_placeholder(content)
         ):
             return (
@@ -2429,18 +2635,7 @@ def _deny_reason_for_content(
                 )
             membership_gap = _wi_project_membership_gap(content, cwd_path)
             if membership_gap:
-                authorization_id, project_id, work_item_id = _extract_project_metadata(content)
-                return (
-                    "[Governance] Bridge proposal fails the live work-item/project "
-                    f"membership check: {membership_gap}. Cited WI={work_item_id}, "
-                    f"Project={project_id}, Project Authorization={authorization_id}. "
-                    "The cited metadata must resolve to an active project membership and "
-                    "an active, unexpired, including authorization in MemBase. "
-                    "(Hard-block per DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001/"
-                    "CLAUSE-BRIDGE-WI-PROJECT-MEMBERSHIP + "
-                    "DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001/"
-                    "CLAUSE-PROJECT-AUTH-LIVE-CHECK.)"
-                )
+                return _project_membership_refusal_message(content, cwd_path, membership_gap)
         if (
             first_line in PROJECT_METADATA_STATUSES
             and _bridge_kind_is_implementation_proposal(content)
@@ -2539,9 +2734,9 @@ def _deny_reason_for_content(
             if synthetic_session_context_id:
                 return (
                     "[Governance] Bridge artifacts must include a real author_session_context_id, "
-                    f"not synthetic harness placeholder {synthetic_session_context_id!r}. The authoring "
+                    f"not an unresolvable placeholder {synthetic_session_context_id!r}. The authoring "
                     "session or dispatcher must provide the concrete session context id before the "
-                    "bridge file reaches disk. (Hard-block per WI-4940; "
+                    "bridge file reaches disk. (Hard-block per WI-4940 and WI-7298; "
                     "GOV-DOCUMENT-AUTHOR-PROVENANCE-001.)"
                 )
     return None
@@ -2678,6 +2873,28 @@ def _audit_only(argv: list[str]) -> int:
     return 0
 
 
+def _shell_candidates(payload: dict, root: Path) -> list[dict]:
+    """Native-shaped payloads to judge for one incoming payload (WI-7289).
+
+    A native payload expands to itself, so native handling is byte-for-byte the
+    code that ran before. A shell payload expands to one synthetic Write per
+    recognized write target; an unrecognized command expands to nothing and is
+    therefore allowed.
+    """
+    hooks_dir = str(Path(__file__).resolve().parent)
+    if hooks_dir not in sys.path:
+        sys.path.insert(0, hooks_dir)
+    try:
+        from _shell_payload import expand_shell_payload
+    except ImportError:
+        return [payload]
+    try:
+        return expand_shell_payload(payload, root)
+    except Exception:
+        # Extraction must never harden into a new failure mode for the gate.
+        return [payload]
+
+
 def main() -> None:
     try:
         from groundtruth_kb.governance.output import emit_ask, emit_deny, emit_pass
@@ -2725,49 +2942,54 @@ def main() -> None:
         emit_pass()
         sys.exit(0)
 
-    tool_name = payload.get("tool_name", "")
-    tool_input = payload.get("tool_input", {})
     cwd = payload.get("cwd", ".")
     cwd_path = Path(cwd).resolve()
 
-    if tool_name not in WRITE_TOOLS:
-        emit_pass()
-        sys.exit(0)
+    # WI-7289: now that the baseline manifest declares shell_exec for this gate,
+    # shell commands that write governed files reach it. Expand each recognized
+    # shell write into a native-shaped payload and judge it with the identical
+    # code below, so a shell denial reason matches its native counterpart by
+    # construction rather than by a parallel implementation that can drift.
+    for candidate in _shell_candidates(payload, cwd_path):
+        tool_name = candidate.get("tool_name", "")
+        tool_input = candidate.get("tool_input", {})
 
-    file_path = tool_input.get("file_path", "")
-    if not file_path:
-        emit_pass()
-        sys.exit(0)
+        if tool_name not in WRITE_TOOLS:
+            continue
 
-    work_intent_reason = _bridge_work_intent_deny_reason(cwd_path=cwd_path, file_path=file_path, payload=payload)
-    if work_intent_reason:
-        _record_gate_denial("bridge-compliance", file_path, work_intent_reason, root=cwd_path)
-        emit_deny("PreToolUse", work_intent_reason)
-        sys.exit(0)
+        file_path = tool_input.get("file_path", "")
+        if not file_path:
+            continue
 
-    content = str(tool_input.get("content", ""))
-    reason = _deny_reason_for_content(
-        cwd_path=cwd_path,
-        file_path=file_path,
-        content=content,
-        run_pending_preflight=tool_name == "Write",
-    )
-    if reason:
-        _record_gate_denial("bridge-compliance", file_path, reason, root=cwd_path)
-        emit_deny("PreToolUse", reason)
-        sys.exit(0)
+        work_intent_reason = _bridge_work_intent_deny_reason(cwd_path=cwd_path, file_path=file_path, payload=candidate)
+        if work_intent_reason:
+            _record_gate_denial("bridge-compliance", file_path, work_intent_reason, root=cwd_path)
+            emit_deny("PreToolUse", work_intent_reason)
+            sys.exit(0)
 
-    heading_ask_reason = _ask_reason_for_content(file_path, content)
-    if heading_ask_reason:
-        emit_ask("PreToolUse", heading_ask_reason)
-        sys.exit(0)
+        content = str(tool_input.get("content", ""))
+        reason = _deny_reason_for_content(
+            cwd_path=cwd_path,
+            file_path=file_path,
+            content=content,
+            run_pending_preflight=tool_name == "Write",
+        )
+        if reason:
+            _record_gate_denial("bridge-compliance", file_path, reason, root=cwd_path)
+            emit_deny("PreToolUse", reason)
+            sys.exit(0)
 
-    ask_reason = None
-    if not (_is_bridge_markdown_file(file_path) or _is_lo_verdict_bridge_file(file_path)):
-        ask_reason = _pending_proposal_ask_reason(_canonical_project_root(cwd_path), file_path)
-    if ask_reason:
-        emit_ask("PreToolUse", ask_reason)
-        sys.exit(0)
+        heading_ask_reason = _ask_reason_for_content(file_path, content)
+        if heading_ask_reason:
+            emit_ask("PreToolUse", heading_ask_reason)
+            sys.exit(0)
+
+        ask_reason = None
+        if not (_is_bridge_markdown_file(file_path) or _is_lo_verdict_bridge_file(file_path)):
+            ask_reason = _pending_proposal_ask_reason(_canonical_project_root(cwd_path), file_path)
+        if ask_reason:
+            emit_ask("PreToolUse", ask_reason)
+            sys.exit(0)
 
     emit_pass()
     sys.exit(0)
