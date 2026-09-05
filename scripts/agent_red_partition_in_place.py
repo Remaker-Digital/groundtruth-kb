@@ -14,6 +14,7 @@ from groundtruth_kb.project.application_scope import (
     classify_application_scope,
     scope_path_violations,
 )
+from groundtruth_kb.test_artifact_update import update_test_artifact_for_maintenance
 
 DEFAULT_DB_PATH = Path("groundtruth.db")
 DEFAULT_CHANGED_BY = "prime-builder/codex"
@@ -94,6 +95,7 @@ def apply_manifest(
     changed_by: str,
     change_reason: str,
     max_mutations: int,
+    update_context: dict[str, str | Path],
 ) -> list[dict[str, Any]]:
     actions = list(manifest["actions"])
     if len(actions) > max_mutations:
@@ -115,11 +117,13 @@ def apply_manifest(
                 **fields,
             )
         elif action["kind"] == "test":
-            updated = db.update_test(
-                str(action["id"]),
+            updated = update_test_artifact_for_maintenance(
+                db,
+                **update_context,
+                test_id=str(action["id"]),
                 changed_by=changed_by,
                 change_reason=change_reason,
-                **fields,
+                updates=fields,
             )
         else:  # pragma: no cover - impossible from build_manifest
             raise SystemExit(f"unknown action kind: {action['kind']}")
@@ -143,6 +147,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--changed-by", default=DEFAULT_CHANGED_BY)
     parser.add_argument("--change-reason", default=DEFAULT_CHANGE_REASON)
     parser.add_argument("--max-mutations", type=int, default=MAX_MUTATIONS)
+    parser.add_argument("--project")
+    parser.add_argument("--work-item")
+    parser.add_argument("--bridge-id")
+    parser.add_argument("--session-context-id")
     return parser
 
 
@@ -153,12 +161,21 @@ def main(argv: list[str] | None = None) -> int:
         manifest = build_manifest(db)
         applied: list[dict[str, Any]] = []
         if args.execute:
+            if not all((args.project, args.work_item, args.bridge_id, args.session_context_id)):
+                raise SystemExit("--execute requires --project, --work-item, --bridge-id, and --session-context-id")
             applied = apply_manifest(
                 db,
                 manifest,
                 changed_by=args.changed_by,
                 change_reason=args.change_reason,
                 max_mutations=args.max_mutations,
+                update_context={
+                    "project_root": Path.cwd(),
+                    "project_id": args.project,
+                    "work_item_id": args.work_item,
+                    "bridge_slug": args.bridge_id,
+                    "actor_session_context_id": args.session_context_id,
+                },
             )
             manifest = build_manifest(db)
         result = {

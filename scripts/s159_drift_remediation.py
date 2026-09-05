@@ -18,7 +18,6 @@ Safety:
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -28,7 +27,7 @@ KB_DIR = PROJECT_ROOT / "tools" / "knowledge-db"
 
 sys.path.insert(0, str(KB_DIR))
 from db import KnowledgeDB  # noqa: E402
-
+from groundtruth_kb.test_artifact_update import update_test_artifact_for_maintenance  # noqa: E402
 
 # ── Fix 1: SPEC-0295 test mislinks ─────────────────────────────────────────
 # SPEC-0295 = "An append-only audit log shall be maintained for all tenant operations"
@@ -46,22 +45,25 @@ SPEC_0295_REMAP = {
 }
 
 
-def fix_1_remap_spec0295(db: KnowledgeDB, *, apply: bool = False) -> dict:
+def fix_1_remap_spec0295(db: KnowledgeDB, *, apply: bool = False, update_context: dict | None = None) -> dict:
     """Remap mislinked tests from SPEC-0295 to correct specs."""
     remapped = 0
     for test_id, new_spec_id in SPEC_0295_REMAP.items():
         remapped += 1
         if apply:
-            db.update_test(
-                test_id,
+            assert update_context is not None
+            update_test_artifact_for_maintenance(
+                db,
+                **update_context,
+                test_id=test_id,
                 changed_by="S159-drift",
                 change_reason=f"Remap from SPEC-0295 (audit log) to {new_spec_id} (correct spec, drift Fix 1)",
-                spec_id=new_spec_id,
+                updates={"spec_id": new_spec_id},
             )
 
     print(f"  Fix 1: SPEC-0295 mislinked tests remapped: {remapped}")
     if not apply and remapped:
-        print(f"         (dry-run -- use --apply to execute)")
+        print("         (dry-run -- use --apply to execute)")
     for tid, sid in SPEC_0295_REMAP.items():
         print(f"         {tid} -> {sid}")
     return {"remapped": remapped}
@@ -118,7 +120,7 @@ LOST_V1_ANALYSIS = {
 
 def fix_2_document_lost_specs(db: KnowledgeDB, *, apply: bool = False) -> dict:
     """Document the 7 lost v1 spec topics as a KB document for audit trail."""
-    print(f"  Fix 2: Lost v1 spec topics documented")
+    print("  Fix 2: Lost v1 spec topics documented")
     for spec_id, info in LOST_V1_ANALYSIS.items():
         print(f"         {spec_id}: [{info['status']}] {info['v1_title'][:50]}")
 
@@ -148,7 +150,7 @@ def fix_2_document_lost_specs(db: KnowledgeDB, *, apply: bool = False) -> dict:
             change_reason="Document 7 lost v1 spec topics from S121 spec ID reuse",
             content=content,
         )
-        print(f"         Document created in KB")
+        print("         Document created in KB")
 
     return {"topics_analyzed": len(LOST_V1_ANALYSIS)}
 
@@ -245,7 +247,20 @@ def main():
     parser = argparse.ArgumentParser(description="S159 Drift Remediation")
     parser.add_argument("--apply", action="store_true", help="Actually execute fixes (default is dry-run)")
     parser.add_argument("--fix", nargs="+", type=int, default=None, help="Run specific fixes only (e.g., --fix 1 2)")
+    parser.add_argument("--project")
+    parser.add_argument("--work-item")
+    parser.add_argument("--bridge-id")
+    parser.add_argument("--session-context-id")
     args = parser.parse_args()
+    if args.apply and not all((args.project, args.work_item, args.bridge_id, args.session_context_id)):
+        parser.error("--apply requires --project, --work-item, --bridge-id, and --session-context-id")
+    update_context = {
+        "project_root": PROJECT_ROOT,
+        "project_id": args.project,
+        "work_item_id": args.work_item,
+        "bridge_slug": args.bridge_id,
+        "actor_session_context_id": args.session_context_id,
+    }
 
     fixes = set(args.fix) if args.fix else {1, 2, 3}
 
@@ -259,7 +274,7 @@ def main():
     results = {}
 
     if 1 in fixes:
-        results["fix_1"] = fix_1_remap_spec0295(db, apply=args.apply)
+        results["fix_1"] = fix_1_remap_spec0295(db, apply=args.apply, update_context=update_context)
     if 2 in fixes:
         results["fix_2"] = fix_2_document_lost_specs(db, apply=args.apply)
     if 3 in fixes:
@@ -269,7 +284,7 @@ def main():
     total = sum(v.get("remapped", 0) + v.get("topics_analyzed", 0) for v in results.values())
     print(f"  Total actions: {total}")
     if not args.apply:
-        print(f"  Mode: DRY-RUN (re-run with --apply to execute)")
+        print("  Mode: DRY-RUN (re-run with --apply to execute)")
     print(f"{'=' * 60}")
 
     db.close()

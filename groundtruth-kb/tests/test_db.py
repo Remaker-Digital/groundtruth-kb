@@ -1344,7 +1344,7 @@ def test_test_application_scope_insert_and_carry_forward(tmp_path):
         change_reason="initial",
         application_scope="agent_red_application",
     )
-    db.update_test("TEST-APP-SCOPE", changed_by="test", change_reason="result", last_result="pass")
+    db._seed_test_version_for_test_only("TEST-APP-SCOPE", changed_by="test", change_reason="result", last_result="pass")
     test = db.get_test("TEST-APP-SCOPE")
     db.close()
     assert test is not None

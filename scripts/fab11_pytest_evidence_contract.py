@@ -23,14 +23,9 @@ if str(GTKB_SRC) not in sys.path:
     sys.path.insert(0, str(GTKB_SRC))
 
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
-from groundtruth_kb.governance.approval_packet import (  # noqa: E402
-    construct_approval_packet,
-    validate_packet,
-)
+from groundtruth_kb.test_artifact_update import update_test_artifact_for_maintenance  # noqa: E402
 
 BRIDGE_ID = "gtkb-fab-11-regression-signal-revival"
-SOURCE_REF = "bridge/gtkb-fab-11-regression-signal-revival-003.md"
-OWNER_DECISION = "DELIB-FAB11-REMEDIATION-20260610B / PAUTH-FAB11-20260610"
 CHANGED_BY = "prime-builder/codex"
 HISTORICAL_RESULT = "historical_agent_red"
 HISTORICAL_CUTOFF = "2026-05-01T00:00:00+00:00"
@@ -60,7 +55,6 @@ WHERE s.status != 'retired'
 @dataclass(frozen=True)
 class SpecAmendment:
     spec_id: str
-    packet_path: str
     new_description: str
 
 
@@ -99,16 +93,6 @@ def _append_amendment(description: str | None, spec_id: str) -> str:
     return f"{base}\n\n{addition}".strip()
 
 
-def _packet_path(spec_id: str, date_text: str) -> Path:
-    safe_id = spec_id.lower().replace("-", "-")
-    return (
-        PROJECT_ROOT
-        / ".groundtruth"
-        / "formal-artifact-approvals"
-        / (f"{date_text}-fab11-{safe_id}-pytest-evidence.json")
-    )
-
-
 def plan_spec_amendments(db: KnowledgeDB, date_text: str) -> list[SpecAmendment]:
     amendments: list[SpecAmendment] = []
     for spec_id in TARGET_SPECS:
@@ -116,41 +100,13 @@ def plan_spec_amendments(db: KnowledgeDB, date_text: str) -> list[SpecAmendment]
         if spec is None:
             raise RuntimeError(f"{spec_id} not found")
         new_description = _append_amendment(spec.get("description"), spec_id)
-        packet_path = _packet_path(spec_id, date_text)
         amendments.append(
             SpecAmendment(
                 spec_id=spec_id,
-                packet_path=packet_path.relative_to(PROJECT_ROOT).as_posix(),
                 new_description=new_description,
             )
         )
     return amendments
-
-
-def write_packet(spec: dict[str, Any], amendment: SpecAmendment, packet_path: Path) -> dict[str, object]:
-    packet = construct_approval_packet(
-        artifact_type=spec["type"],
-        artifact_id=amendment.spec_id,
-        action="update",
-        source_ref=SOURCE_REF,
-        full_content=amendment.new_description,
-        approval_mode="approve",
-        presented_to_user=True,
-        transcript_captured=True,
-        explicit_change_request=(
-            f"{OWNER_DECISION}: amend {amendment.spec_id} to recognize pytest execution "
-            "and pytest coverage mappings as current governed verification evidence."
-        ),
-        changed_by=CHANGED_BY,
-        change_reason=f"{BRIDGE_ID}: pytest evidence contract amendment",
-        approved_by="owner",
-    )
-    validation = validate_packet(packet)
-    if not validation.is_valid:
-        raise RuntimeError("; ".join(validation.errors))
-    packet_path.parent.mkdir(parents=True, exist_ok=True)
-    packet_path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return packet
 
 
 def _historical_test_rows(conn: sqlite3.Connection) -> list[str]:
@@ -164,7 +120,13 @@ def _historical_test_rows(conn: sqlite3.Connection) -> list[str]:
     return [row["id"] for row in rows]
 
 
-def _apply_historical_test_scope(db: KnowledgeDB, test_ids: list[str], *, max_tests: int | None) -> int:
+def _apply_historical_test_scope(
+    db: KnowledgeDB,
+    test_ids: list[str],
+    *,
+    max_tests: int | None,
+    update_context: dict[str, Any],
+) -> int:
     applied = 0
     for test_id in test_ids:
         if max_tests is not None and applied >= max_tests:
@@ -178,12 +140,13 @@ def _apply_historical_test_scope(db: KnowledgeDB, test_ids: list[str], *, max_te
         )
         if note not in description:
             description = f"{description}\n\n{note}".strip()
-        db.update_test(
-            test_id,
+        update_test_artifact_for_maintenance(
+            db,
+            **update_context,
+            test_id=test_id,
             changed_by=CHANGED_BY,
             change_reason=f"{BRIDGE_ID}: scope pre-isolation tests table row to Agent Red history",
-            last_result=HISTORICAL_RESULT,
-            description=description,
+            updates={"last_result": HISTORICAL_RESULT, "description": description},
         )
         applied += 1
     return applied
@@ -195,26 +158,26 @@ def _migrate_view(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def apply(db_path: Path, *, date_text: str, max_tests: int | None = None) -> dict[str, Any]:
+def apply(
+    db_path: Path,
+    *,
+    date_text: str,
+    update_context: dict[str, Any],
+    max_tests: int | None = None,
+) -> dict[str, Any]:
     db = KnowledgeDB(db_path=db_path)
     try:
         amendments = plan_spec_amendments(db, date_text)
-        packets: list[str] = []
         amended_specs = 0
         for amendment in amendments:
             spec = db.get_spec(amendment.spec_id)
             if spec is None:
                 raise RuntimeError(f"{amendment.spec_id} not found")
-            packet_path = PROJECT_ROOT / amendment.packet_path
-            write_packet(spec, amendment, packet_path)
-            packets.append(amendment.packet_path)
             if spec.get("description") != amendment.new_description:
                 db.update_spec(
                     amendment.spec_id,
                     changed_by=CHANGED_BY,
-                    change_reason=(
-                        f"{BRIDGE_ID}: pytest evidence contract amendment; approval packet {amendment.packet_path}"
-                    ),
+                    change_reason=f"{BRIDGE_ID}: pytest evidence contract amendment",
                     description=amendment.new_description,
                     validate_assertions=False,
                 )
@@ -226,7 +189,9 @@ def apply(db_path: Path, *, date_text: str, max_tests: int | None = None) -> dic
             _migrate_view(conn)
         finally:
             conn.close()
-        historical_tests_applied = _apply_historical_test_scope(db, test_ids, max_tests=max_tests)
+        historical_tests_applied = _apply_historical_test_scope(
+            db, test_ids, max_tests=max_tests, update_context=update_context
+        )
     finally:
         db.close()
 
@@ -234,7 +199,6 @@ def apply(db_path: Path, *, date_text: str, max_tests: int | None = None) -> dic
         "bridge_id": BRIDGE_ID,
         "applied": True,
         "amended_specs": amended_specs,
-        "approval_packets": packets,
         "historical_tests_planned": len(test_ids),
         "historical_tests_applied": historical_tests_applied,
         "max_tests": max_tests,
@@ -270,10 +234,27 @@ def main() -> int:
     parser.add_argument("--date", default=_now_date())
     parser.add_argument("--max-tests", type=int)
     parser.add_argument("--format", choices=("json", "text"), default="text")
+    parser.add_argument("--project")
+    parser.add_argument("--work-item")
+    parser.add_argument("--bridge-id")
+    parser.add_argument("--session-context-id")
     args = parser.parse_args()
 
+    if args.apply and not all((args.project, args.work_item, args.bridge_id, args.session_context_id)):
+        parser.error("--apply requires --project, --work-item, --bridge-id, and --session-context-id")
     result = (
-        apply(args.db, date_text=args.date, max_tests=args.max_tests)
+        apply(
+            args.db,
+            date_text=args.date,
+            max_tests=args.max_tests,
+            update_context={
+                "project_root": PROJECT_ROOT,
+                "project_id": args.project,
+                "work_item_id": args.work_item,
+                "bridge_slug": args.bridge_id,
+                "actor_session_context_id": args.session_context_id,
+            },
+        )
         if args.apply
         else dry_run(args.db, date_text=args.date)
     )

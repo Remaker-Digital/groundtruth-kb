@@ -20,8 +20,6 @@ Safety:
 from __future__ import annotations
 
 import argparse
-import json
-import re
 import sys
 from pathlib import Path
 
@@ -31,6 +29,7 @@ KB_DIR = PROJECT_ROOT / "tools" / "knowledge-db"
 
 sys.path.insert(0, str(KB_DIR))
 from db import KnowledgeDB  # noqa: E402
+from groundtruth_kb.test_artifact_update import update_test_artifact_for_maintenance  # noqa: E402
 
 # ── Manual mapping for the 32 unmatched test files ──────────────────────────
 # These are test files in SPEC-1100 that don't have an obvious spec match
@@ -121,7 +120,7 @@ def _build_file_to_spec_map(conn) -> dict[str, str]:
     return mapping
 
 
-def fix_a_remap_spec1100(db: KnowledgeDB, *, apply: bool = False) -> dict:
+def fix_a_remap_spec1100(db: KnowledgeDB, *, apply: bool = False, update_context: dict | None = None) -> dict:
     """Remap tests from SPEC-1100 mega-bucket to their correct specs."""
     conn = db._get_conn()
 
@@ -151,22 +150,25 @@ def fix_a_remap_spec1100(db: KnowledgeDB, *, apply: bool = False) -> dict:
             remapped += 1
             remap_log.append(f"{test_id}: {tf} -> SPEC-{new_spec_id}")
             if apply:
-                db.update_test(
-                    test_id,
+                assert update_context is not None
+                update_test_artifact_for_maintenance(
+                    db,
+                    **update_context,
+                    test_id=test_id,
                     changed_by="S159-audit",
-                    change_reason=f"Remap from SPEC-1100 bucket to correct spec (Fix A)",
-                    spec_id=new_spec_id,
+                    change_reason="Remap from SPEC-1100 bucket to correct spec (Fix A)",
+                    updates={"spec_id": new_spec_id},
                 )
         else:
             orphaned += 1
 
     print(f"  Fix A: SPEC-1100 tests remapped: {remapped}, orphaned (no spec match): {orphaned}")
     if not apply and remapped:
-        print(f"         (dry-run -- use --apply to execute)")
+        print("         (dry-run -- use --apply to execute)")
     return {"remapped": remapped, "orphaned": orphaned}
 
 
-def fix_b_template_outcomes(db: KnowledgeDB, *, apply: bool = False) -> dict:
+def fix_b_template_outcomes(db: KnowledgeDB, *, apply: bool = False, update_context: dict | None = None) -> dict:
     """Enrich template-formula expected_outcomes with behavioral descriptions."""
     conn = db._get_conn()
 
@@ -192,20 +194,23 @@ def fix_b_template_outcomes(db: KnowledgeDB, *, apply: bool = False) -> dict:
 
         enriched += 1
         if apply:
-            db.update_test(
-                t["id"],
+            assert update_context is not None
+            update_test_artifact_for_maintenance(
+                db,
+                **update_context,
+                test_id=t["id"],
                 changed_by="S159-audit",
                 change_reason="Enrich template expected_outcome with behavioral description (Fix B)",
-                expected_outcome=new_outcome,
+                updates={"expected_outcome": new_outcome},
             )
 
     print(f"  Fix B: Template expected_outcomes enriched: {enriched}")
     if not apply and enriched:
-        print(f"         (dry-run -- use --apply to execute)")
+        print("         (dry-run -- use --apply to execute)")
     return {"enriched": enriched}
 
 
-def fix_c_bare_pass_outcomes(db: KnowledgeDB, *, apply: bool = False) -> dict:
+def fix_c_bare_pass_outcomes(db: KnowledgeDB, *, apply: bool = False, update_context: dict | None = None) -> dict:
     """Enrich bare 'pass' expected_outcomes with spec-derived behavior."""
     conn = db._get_conn()
 
@@ -229,16 +234,19 @@ def fix_c_bare_pass_outcomes(db: KnowledgeDB, *, apply: bool = False) -> dict:
 
         enriched += 1
         if apply:
-            db.update_test(
-                t["id"],
+            assert update_context is not None
+            update_test_artifact_for_maintenance(
+                db,
+                **update_context,
+                test_id=t["id"],
                 changed_by="S159-audit",
                 change_reason="Enrich bare-pass expected_outcome with behavioral description (Fix C)",
-                expected_outcome=new_outcome,
+                updates={"expected_outcome": new_outcome},
             )
 
     print(f"  Fix C: Bare-pass expected_outcomes enriched: {enriched}")
     if not apply and enriched:
-        print(f"         (dry-run -- use --apply to execute)")
+        print("         (dry-run -- use --apply to execute)")
     return {"enriched": enriched}
 
 
@@ -270,7 +278,7 @@ def report_summary(db: KnowledgeDB) -> None:
           AND LOWER(TRIM(t.expected_outcome)) = 'pass'
     """).fetchone()[0]
 
-    print(f"\n  === Post-Fix Quality Summary ===")
+    print("\n  === Post-Fix Quality Summary ===")
     print(f"  Total non-retired linked tests: {total}")
     print(f"  Behavioral expected_outcomes:   {behavioral} ({behavioral / total * 100:.1f}%)")
     print(f"  Remaining bare 'pass':          {bare_pass}")
@@ -283,7 +291,20 @@ def main():
     parser.add_argument(
         "--fix", nargs="+", choices=["a", "b", "c"], default=None, help="Run specific fixes only (e.g., --fix a b)"
     )
+    parser.add_argument("--project")
+    parser.add_argument("--work-item")
+    parser.add_argument("--bridge-id")
+    parser.add_argument("--session-context-id")
     args = parser.parse_args()
+    if args.apply and not all((args.project, args.work_item, args.bridge_id, args.session_context_id)):
+        parser.error("--apply requires --project, --work-item, --bridge-id, and --session-context-id")
+    update_context = {
+        "project_root": PROJECT_ROOT,
+        "project_id": args.project,
+        "work_item_id": args.work_item,
+        "bridge_slug": args.bridge_id,
+        "actor_session_context_id": args.session_context_id,
+    }
 
     fixes = set(args.fix) if args.fix else {"a", "b", "c"}
 
@@ -297,11 +318,11 @@ def main():
     results = {}
 
     if "a" in fixes:
-        results["fix_a"] = fix_a_remap_spec1100(db, apply=args.apply)
+        results["fix_a"] = fix_a_remap_spec1100(db, apply=args.apply, update_context=update_context)
     if "b" in fixes:
-        results["fix_b"] = fix_b_template_outcomes(db, apply=args.apply)
+        results["fix_b"] = fix_b_template_outcomes(db, apply=args.apply, update_context=update_context)
     if "c" in fixes:
-        results["fix_c"] = fix_c_bare_pass_outcomes(db, apply=args.apply)
+        results["fix_c"] = fix_c_bare_pass_outcomes(db, apply=args.apply, update_context=update_context)
 
     report_summary(db)
 
@@ -309,7 +330,7 @@ def main():
     total = sum(v.get("remapped", 0) + v.get("enriched", 0) for v in results.values())
     print(f"  Total test artifacts updated: {total}")
     if not args.apply:
-        print(f"  Mode: DRY-RUN (re-run with --apply to execute)")
+        print("  Mode: DRY-RUN (re-run with --apply to execute)")
     print(f"{'=' * 60}")
 
     db.close()

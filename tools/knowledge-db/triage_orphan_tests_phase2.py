@@ -5,7 +5,7 @@
 Three modes:
 - --dry-run: Report Class A sibling-match candidates + preview A/B/C/D classification
              (precedence A -> D -> B -> C). No mutation.
-- --apply:   Auto-link Class A orphans via KnowledgeDB.update_test(spec_id=<sibling_spec_id>).
+- --apply:   Auto-link Class A orphans through the governed TEST update service.
              Writes snapshot + classification report files.
 - --verify:  Assert 6 Phase 2 invariants (I1-I6) per bridge GO conditions.
 
@@ -62,9 +62,9 @@ def _latest_orphans(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     ]
 
 
-def _sibling_matches(conn: sqlite3.Connection, orphans: list[dict[str, Any]]) -> tuple[
-    list[dict[str, Any]], list[dict[str, Any]]
-]:
+def _sibling_matches(
+    conn: sqlite3.Connection, orphans: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Return (matches, conflicts).
 
     A sibling-match for orphan O: another latest-version test S where
@@ -174,9 +174,7 @@ def _classify_disjoint(
             continue
         tfile = orphan["test_file"]
         if not tfile:
-            class_d.append(
-                {"test_id": orphan["id"], "test_file": tfile, "reason": "test_file NULL or empty"}
-            )
+            class_d.append({"test_id": orphan["id"], "test_file": tfile, "reason": "test_file NULL or empty"})
             continue
         if tfile in files_with_linked_tests:
             class_b.append(
@@ -198,13 +196,16 @@ def _classify_disjoint(
     return {"B_file_bucket": class_b, "C_fully_orphaned_file": class_c, "D_null_or_missing": class_d}
 
 
-def _print_summary(matches: list[dict[str, Any]], conflicts: list[dict[str, Any]],
-                   classes: dict[str, list[dict[str, Any]]]) -> None:
+def _print_summary(
+    matches: list[dict[str, Any]], conflicts: list[dict[str, Any]], classes: dict[str, list[dict[str, Any]]]
+) -> None:
     class_c_orphan_count = sum(entry["orphan_count"] for entry in classes["C_fully_orphaned_file"])
     print(f"Class A sibling-match candidates: {len(matches)}")
     print(f"Sibling-match conflicts (fail-closed trigger): {len(conflicts)}")
     print(f"Class B file-bucket: {len(classes['B_file_bucket'])}")
-    print(f"Class C fully-orphaned files: {len(classes['C_fully_orphaned_file'])} files covering {class_c_orphan_count} tests")
+    print(
+        f"Class C fully-orphaned files: {len(classes['C_fully_orphaned_file'])} files covering {class_c_orphan_count} tests"
+    )
     print(f"Class D NULL or missing: {len(classes['D_null_or_missing'])}")
     total = len(matches) + len(classes["B_file_bucket"]) + class_c_orphan_count + len(classes["D_null_or_missing"])
     print(f"Disjoint sum (A+B+C+D, including conflicts-as-A-eligible): {total}")
@@ -231,9 +232,10 @@ def cmd_dry_run() -> int:
         conn.close()
 
 
-def cmd_apply() -> int:
+def cmd_apply(args: argparse.Namespace) -> int:
     sys.path.insert(0, str(REPO_ROOT / "tools" / "knowledge-db"))
     from db import KnowledgeDB  # noqa: E402
+    from groundtruth_kb.test_artifact_update import update_test_artifact_for_maintenance  # noqa: E402
 
     conn = sqlite3.connect(DB_PATH)
     try:
@@ -257,9 +259,7 @@ def cmd_apply() -> int:
         "as_of_pre_apply": True,
         "class_a_matches": matches,
     }
-    SNAPSHOT_PATH.write_text(
-        json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    SNAPSHOT_PATH.write_text(json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"Snapshot written: {SNAPSHOT_PATH.relative_to(REPO_ROOT)}")
 
     # Write classification report (GO condition 4).
@@ -269,9 +269,7 @@ def cmd_apply() -> int:
         "counts": {
             "A_sibling_match": len(matches),
             "B_file_bucket": len(classes["B_file_bucket"]),
-            "C_fully_orphaned_file_tests": sum(
-                e["orphan_count"] for e in classes["C_fully_orphaned_file"]
-            ),
+            "C_fully_orphaned_file_tests": sum(e["orphan_count"] for e in classes["C_fully_orphaned_file"]),
             "C_fully_orphaned_files": len(classes["C_fully_orphaned_file"]),
             "D_null_or_missing": len(classes["D_null_or_missing"]),
         },
@@ -280,23 +278,27 @@ def cmd_apply() -> int:
         "C_fully_orphaned_file": classes["C_fully_orphaned_file"],
         "D_null_or_missing": classes["D_null_or_missing"],
     }
-    CLASSIFICATION_PATH.write_text(
-        json.dumps(classification, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    CLASSIFICATION_PATH.write_text(json.dumps(classification, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"Classification written: {CLASSIFICATION_PATH.relative_to(REPO_ROOT)}")
 
     # Apply Class A links.
     db = KnowledgeDB(str(DB_PATH))
     applied = 0
     for m in matches:
-        db.update_test(
-            m["orphan_id"],
+        update_test_artifact_for_maintenance(
+            db,
+            project_root=REPO_ROOT,
+            project_id=args.project,
+            work_item_id=args.work_item,
+            bridge_slug=args.bridge_id,
+            actor_session_context_id=args.session_context_id,
+            test_id=m["orphan_id"],
             changed_by="por_step16d_phase2",
             change_reason=(
                 f"Auto-linked via sibling-match - same (test_file, test_class, test_function) "
                 f"triple as {m['sibling_id']} which links to {m['target_spec_id']}"
             ),
-            spec_id=m["target_spec_id"],
+            updates={"spec_id": m["target_spec_id"]},
         )
         applied += 1
         if applied % 50 == 0:
@@ -325,9 +327,7 @@ def cmd_verify() -> int:
         results: list[tuple[str, bool, str]] = []
 
         # Baseline counts
-        total = conn.execute(
-            "SELECT COUNT(*) FROM (SELECT id, MAX(version) FROM tests GROUP BY id)"
-        ).fetchone()[0]
+        total = conn.execute("SELECT COUNT(*) FROM (SELECT id, MAX(version) FROM tests GROUP BY id)").fetchone()[0]
         empty_count = conn.execute("""
           WITH latest AS (
             SELECT t.* FROM tests t
@@ -342,24 +342,28 @@ def cmd_verify() -> int:
         class_a_remaining = len(matches)
 
         # I1: Class A remaining = 0.
-        results.append(("I1", class_a_remaining == 0,
-                        f"Class A remaining = {class_a_remaining} (expected 0)"))
+        results.append(("I1", class_a_remaining == 0, f"Class A remaining = {class_a_remaining} (expected 0)"))
 
         # I2: total latest tests = 11142.
-        results.append(("I2", total == EXPECTED_TOTAL_TESTS,
-                        f"total latest tests = {total} (expected {EXPECTED_TOTAL_TESTS})"))
+        results.append(
+            ("I2", total == EXPECTED_TOTAL_TESTS, f"total latest tests = {total} (expected {EXPECTED_TOTAL_TESTS})")
+        )
 
         # I3: empty-spec orphans = 2189.
-        results.append(("I3", empty_count == EXPECTED_POST_APPLY_ORPHANS,
-                        f"empty spec_id = {empty_count} (expected {EXPECTED_POST_APPLY_ORPHANS})"))
+        results.append(
+            (
+                "I3",
+                empty_count == EXPECTED_POST_APPLY_ORPHANS,
+                f"empty spec_id = {empty_count} (expected {EXPECTED_POST_APPLY_ORPHANS})",
+            )
+        )
 
         # I4: classification report exists with 4 class keys (A/B/C/D).
         if not CLASSIFICATION_PATH.exists():
             results.append(("I4", False, "classification JSON missing"))
         else:
             report = json.loads(CLASSIFICATION_PATH.read_text(encoding="utf-8"))
-            expected_keys = {"A_sibling_match", "B_file_bucket", "C_fully_orphaned_file",
-                             "D_null_or_missing"}
+            expected_keys = {"A_sibling_match", "B_file_bucket", "C_fully_orphaned_file", "D_null_or_missing"}
             has_keys = expected_keys.issubset(report.keys())
             results.append(("I4", has_keys, f"classification keys present: {has_keys}"))
 
@@ -367,12 +371,15 @@ def cmd_verify() -> int:
         if CLASSIFICATION_PATH.exists():
             report = json.loads(CLASSIFICATION_PATH.read_text(encoding="utf-8"))
             counts = report.get("counts", {})
-            sum_all = (counts.get("A_sibling_match", 0)
-                       + counts.get("B_file_bucket", 0)
-                       + counts.get("C_fully_orphaned_file_tests", 0)
-                       + counts.get("D_null_or_missing", 0))
-            results.append(("I5", sum_all == EXPECTED_TOTAL_ORPHANS,
-                            f"class sum = {sum_all} (expected {EXPECTED_TOTAL_ORPHANS})"))
+            sum_all = (
+                counts.get("A_sibling_match", 0)
+                + counts.get("B_file_bucket", 0)
+                + counts.get("C_fully_orphaned_file_tests", 0)
+                + counts.get("D_null_or_missing", 0)
+            )
+            results.append(
+                ("I5", sum_all == EXPECTED_TOTAL_ORPHANS, f"class sum = {sum_all} (expected {EXPECTED_TOTAL_ORPHANS})")
+            )
         else:
             results.append(("I5", False, "no classification file to sum"))
 
@@ -389,9 +396,7 @@ def cmd_verify() -> int:
                 orphan_id = m["orphan_id"]
                 pre_version = m["orphan_version_before_apply"]
                 target_spec = m["target_spec_id"]
-                row = conn.execute(
-                    "SELECT MAX(version) FROM tests WHERE id = ?", (orphan_id,)
-                ).fetchone()
+                row = conn.execute("SELECT MAX(version) FROM tests WHERE id = ?", (orphan_id,)).fetchone()
                 cur_version = row[0] if row else None
                 if cur_version is None or cur_version <= pre_version:
                     problems.append(f"{orphan_id} version did not increment ({pre_version} -> {cur_version})")
@@ -429,19 +434,23 @@ def cmd_verify() -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="POR Step 16.D Phase 2 - orphan-test triage"
-    )
+    parser = argparse.ArgumentParser(description="POR Step 16.D Phase 2 - orphan-test triage")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--dry-run", action="store_true", help="Report + classification preview; no mutation")
     group.add_argument("--apply", action="store_true", help="Auto-link Class A + write snapshot/report")
     group.add_argument("--verify", action="store_true", help="Assert I1-I6 invariants")
+    parser.add_argument("--project")
+    parser.add_argument("--work-item")
+    parser.add_argument("--bridge-id")
+    parser.add_argument("--session-context-id")
     args = parser.parse_args()
 
     if args.dry_run:
         return cmd_dry_run()
     if args.apply:
-        return cmd_apply()
+        if not all((args.project, args.work_item, args.bridge_id, args.session_context_id)):
+            parser.error("--apply requires --project, --work-item, --bridge-id, and --session-context-id")
+        return cmd_apply(args)
     if args.verify:
         return cmd_verify()
     return 2

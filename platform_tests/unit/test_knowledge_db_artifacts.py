@@ -188,7 +188,7 @@ class TestTestsArtifact:
     def test_update_test_creates_new_version(self, db):
         self._seed_spec(db)
         db.insert_test("TEST-0001", "Original", "SPEC-T1", "unit", "Pass condition", "test", "create")
-        updated = db.update_test(
+        updated = db._seed_test_version_for_test_only(
             "TEST-0001", "test", "updated description", description="Improved test", last_result="PASS"
         )
         assert updated["version"] == 2
@@ -199,7 +199,7 @@ class TestTestsArtifact:
     def test_get_test_returns_latest_version(self, db):
         self._seed_spec(db)
         db.insert_test("TEST-0001", "v1", "SPEC-T1", "unit", "outcome", "test", "v1")
-        db.update_test("TEST-0001", "test", "v2", title="v2 title")
+        db._seed_test_version_for_test_only("TEST-0001", "test", "v2", title="v2 title")
         t = db.get_test("TEST-0001")
         assert t["version"] == 2
         assert t["title"] == "v2 title"
@@ -207,8 +207,8 @@ class TestTestsArtifact:
     def test_get_test_history(self, db):
         self._seed_spec(db)
         db.insert_test("TEST-0001", "v1", "SPEC-T1", "unit", "outcome", "test", "v1")
-        db.update_test("TEST-0001", "test", "v2", title="v2")
-        db.update_test("TEST-0001", "test", "v3", title="v3")
+        db._seed_test_version_for_test_only("TEST-0001", "test", "v2", title="v2")
+        db._seed_test_version_for_test_only("TEST-0001", "test", "v3", title="v3")
         history = db.get_test_history("TEST-0001")
         assert len(history) == 3
         assert history[0]["version"] == 3  # newest first
@@ -261,7 +261,7 @@ class TestTestsArtifact:
 
     def test_update_nonexistent_test_raises(self, db):
         with pytest.raises(ValueError, match="not found"):
-            db.update_test("NONEXISTENT", "test", "reason")
+            db._seed_test_version_for_test_only("NONEXISTENT", "test", "reason")
 
 
 # ------------------------------------------------------------------
@@ -663,8 +663,8 @@ class TestAppendOnlyInvariant:
     def test_test_update_preserves_all_versions(self, db):
         db.insert_spec("SPEC-T1", "Spec", "specified", "test", "seed")
         db.insert_test("TEST-0001", "v1", "SPEC-T1", "unit", "outcome", "test", "v1")
-        db.update_test("TEST-0001", "test", "v2", title="v2")
-        db.update_test("TEST-0001", "test", "v3", title="v3")
+        db._seed_test_version_for_test_only("TEST-0001", "test", "v2", title="v2")
+        db._seed_test_version_for_test_only("TEST-0001", "test", "v3", title="v3")
         conn = db._get_conn()
         total_rows = conn.execute("SELECT COUNT(*) FROM tests WHERE id = 'TEST-0001'").fetchone()[0]
         assert total_rows == 3
@@ -720,7 +720,7 @@ class TestTransportGovernanceGate:
             last_result="not_proven",
         )
         with pytest.raises(TransportEvidenceGateError, match="test_file is required"):
-            gated_db.update_test("TEST-9001", "test", "promote", last_result="pass")
+            gated_db._seed_test_version_for_test_only("TEST-9001", "test", "promote", last_result="pass")
 
     def test_insert_test_rejects_pass_with_fake_file(self, gated_db):
         """Transport test cannot be marked pass with a nonexistent file."""
@@ -755,7 +755,7 @@ class TestTransportGovernanceGate:
             "init",
         )
         with pytest.raises(TransportEvidenceGateError, match="does not exist on disk"):
-            gated_db.update_test(
+            gated_db._seed_test_version_for_test_only(
                 "TEST-9001",
                 "test",
                 "promote",

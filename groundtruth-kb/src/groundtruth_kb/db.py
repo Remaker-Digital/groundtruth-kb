@@ -4708,14 +4708,19 @@ class KnowledgeDB:
             raise
         return self.get_test(id)
 
-    def update_test(
+    def _seed_test_version_for_test_only(
         self,
         id: str,
         changed_by: str,
         change_reason: str,
         **fields: Any,
     ) -> dict[str, Any] | None:
-        """Create a new version of a test, carrying forward unchanged fields."""
+        """Create a TEST version for isolated fixtures only.
+
+        Production and maintenance callers must use ``gt tests update`` or
+        ``update_test_artifact`` so the governed CAS, claim, and durable
+        idempotency contract cannot be bypassed.
+        """
         current = self.get_test(id)
         if not current:
             raise ValueError(f"Test {id} not found")

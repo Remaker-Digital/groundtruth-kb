@@ -4,7 +4,7 @@
 
 Three modes:
 - --dry-run: Query live KB; report phantom-link count + distinct IDs. No mutation.
-- --apply:   For each phantom-linked test, call update_test(..., spec_id="", ...).
+- --apply:   Clear each phantom link through the governed TEST update service.
              Also writes a pre-apply snapshot file for I4 verification.
 - --verify:  Assert the 4 Phase 1 invariants (I1-I4); exit non-zero on any FAIL.
 
@@ -22,7 +22,6 @@ import json
 import sqlite3
 import sys
 from pathlib import Path
-from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DB_PATH = REPO_ROOT / "groundtruth.db"
@@ -94,10 +93,11 @@ def cmd_dry_run() -> int:
         conn.close()
 
 
-def cmd_apply() -> int:
+def cmd_apply(args: argparse.Namespace) -> int:
     # Import KnowledgeDB from the project tooling.
     sys.path.insert(0, str(REPO_ROOT / "tools" / "knowledge-db"))
     from db import KnowledgeDB  # noqa: E402  (late import is deliberate)
+    from groundtruth_kb.test_artifact_update import update_test_artifact_for_maintenance  # noqa: E402
 
     conn = sqlite3.connect(DB_PATH)
     try:
@@ -129,9 +129,7 @@ def cmd_apply() -> int:
             for row in phantoms
         ],
     }
-    SNAPSHOT_PATH.write_text(
-        json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    SNAPSHOT_PATH.write_text(json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"Snapshot written: {SNAPSHOT_PATH.relative_to(REPO_ROOT)}")
 
     # Apply mutations.
@@ -140,14 +138,20 @@ def cmd_apply() -> int:
     for row in phantoms:
         test_id = row[0]
         old_spec_id = row[2]
-        db.update_test(
-            test_id,
+        update_test_artifact_for_maintenance(
+            db,
+            project_root=REPO_ROOT,
+            project_id=args.project,
+            work_item_id=args.work_item,
+            bridge_slug=args.bridge_id,
+            actor_session_context_id=args.session_context_id,
+            test_id=test_id,
             changed_by="por_step16d_phase1",
             change_reason=(
                 f"Phantom spec_id cleared per POR Step 16.D Phase 1 — "
                 f"old spec_id={old_spec_id!r} did not resolve to any KB specification"
             ),
-            spec_id="",
+            updates={"spec_id": ""},
         )
         mutated += 1
         if mutated % 200 == 0:
@@ -160,10 +164,7 @@ def cmd_apply() -> int:
     try:
         final = _baseline_counts(conn)
         print(f"Post-apply baseline: {final}")
-        print(
-            f"Final empty-spec count: {final['empty_spec_id']} "
-            f"(expected {baseline['empty_spec_id'] + mutated})"
-        )
+        print(f"Final empty-spec count: {final['empty_spec_id']} (expected {baseline['empty_spec_id'] + mutated})")
     finally:
         conn.close()
     return 0
@@ -188,9 +189,7 @@ def cmd_verify() -> int:
 
         # I2: total latest-version test count = 11,142.
         i2_pass = counts["total"] == 11142
-        results.append(
-            ("I2", i2_pass, f"total latest tests = {counts['total']} (expected 11142)")
-        )
+        results.append(("I2", i2_pass, f"total latest tests = {counts['total']} (expected 11142)"))
 
         # I3: empty-spec count = 2,322.
         i3_pass = counts["empty_spec_id"] == 2322
@@ -219,9 +218,7 @@ def cmd_verify() -> int:
             for row in affected_tests:
                 test_id = row["id"]
                 pre_version = row["version_before_apply"]
-                cur_version_row = conn.execute(
-                    "SELECT MAX(version) FROM tests WHERE id = ?", (test_id,)
-                ).fetchone()
+                cur_version_row = conn.execute("SELECT MAX(version) FROM tests WHERE id = ?", (test_id,)).fetchone()
                 cur_version = cur_version_row[0] if cur_version_row else None
                 if cur_version is not None and cur_version > pre_version:
                     mutated_count += 1
@@ -230,8 +227,7 @@ def cmd_verify() -> int:
                 (
                     "I4",
                     i4_pass,
-                    f"version-increment count = {mutated_count} of "
-                    f"{len(affected_tests)} snapshot IDs (expected 2068)",
+                    f"version-increment count = {mutated_count} of {len(affected_tests)} snapshot IDs (expected 2068)",
                 )
             )
 
@@ -247,19 +243,23 @@ def cmd_verify() -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="POR Step 16.D Phase 1 — phantom spec-link cleanup"
-    )
+    parser = argparse.ArgumentParser(description="POR Step 16.D Phase 1 — phantom spec-link cleanup")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--dry-run", action="store_true", help="Report phantom links; no mutation")
     group.add_argument("--apply", action="store_true", help="Apply cleanup + write snapshot")
     group.add_argument("--verify", action="store_true", help="Assert I1-I4 invariants")
+    parser.add_argument("--project")
+    parser.add_argument("--work-item")
+    parser.add_argument("--bridge-id")
+    parser.add_argument("--session-context-id")
     args = parser.parse_args()
 
     if args.dry_run:
         return cmd_dry_run()
     if args.apply:
-        return cmd_apply()
+        if not all((args.project, args.work_item, args.bridge_id, args.session_context_id)):
+            parser.error("--apply requires --project, --work-item, --bridge-id, and --session-context-id")
+        return cmd_apply(args)
     if args.verify:
         return cmd_verify()
     return 2

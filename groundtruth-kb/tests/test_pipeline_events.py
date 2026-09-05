@@ -171,7 +171,7 @@ class TestTestEvents:
             changed_by="test",
             change_reason="test",
         )
-        db.update_test(
+        db._seed_test_version_for_test_only(
             "TEST-E2",
             changed_by="test",
             change_reason="ran",
@@ -203,7 +203,7 @@ class TestTestEvents:
             last_result="pass",
             last_executed_at="2026-04-11T00:00:00Z",
         )
-        db.update_test("TEST-E3", changed_by="test", change_reason="rename", title="Renamed T")
+        db._seed_test_version_for_test_only("TEST-E3", changed_by="test", change_reason="rename", title="Renamed T")
         events = db.get_events_for_artifact("test", "TEST-E3")
         assert len(events) == 1  # Only test_created, no test_executed
 
@@ -261,7 +261,7 @@ class TestAtomicity:
             changed_by="test",
             change_reason="test",
         )
-        db.update_test(
+        db._seed_test_version_for_test_only(
             "TEST-AT1", changed_by="test", change_reason="ran", last_result="pass", last_executed_at="2026-04-11"
         )
         s = db.get_summary()
@@ -377,7 +377,7 @@ class TestMetadataContracts:
             changed_by="test",
             change_reason="test",
         )
-        db.update_test(
+        db._seed_test_version_for_test_only(
             "TEST-M1", changed_by="test", change_reason="ran", last_result="fail", last_executed_at="2026-04-11"
         )
         events = db.get_events_for_artifact("test", "TEST-M1")

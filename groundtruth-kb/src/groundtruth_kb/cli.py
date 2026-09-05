@@ -56,6 +56,7 @@ from groundtruth_kb.cli_session_handoff import session_group
 from groundtruth_kb.cli_skills import skills_group
 from groundtruth_kb.cli_spec_record import SPEC_RECORD_TYPES, SpecRecordError, SpecRecordRequest, record_spec
 from groundtruth_kb.cli_spec_update import SpecUpdateError, SpecUpdateRequest, update_spec
+from groundtruth_kb.cli_tests_update import register_tests_update_command
 from groundtruth_kb.coherence import (
     CoherenceRuleError,
 )
@@ -9116,6 +9117,9 @@ def spec_update_cmd(
 @main.group("tests")
 def tests_cmd() -> None:
     """Governed test artifact read commands."""
+
+
+register_tests_update_command(tests_cmd, _resolve_config)
 
 
 def _echo_test_row(row: dict[str, Any]) -> None:
