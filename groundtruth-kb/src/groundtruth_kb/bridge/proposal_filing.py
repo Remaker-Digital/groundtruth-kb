@@ -24,6 +24,7 @@ from groundtruth_kb.bridge.proposal_autoload import (
     get_work_item_or_raise,
 )
 from groundtruth_kb.bridge.taxonomy import BridgeKind
+from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.governance.project_authorization_operation_time import (
     classify_target,
@@ -309,10 +310,10 @@ def _bridge_invalidation_inputs(project_root: Path, slug: str) -> dict[str, Any]
             "planned_bridge_version": 1,
         }
     version, path = max(versions, key=lambda item: item[0])
-    first_line = next((line.strip() for line in path.read_text(encoding="utf-8-sig").splitlines() if line.strip()), "")
+    _status = status_from_bridge_file(path)
     return {
         "bridge_document": slug,
-        "latest_bridge_status": first_line or "UNREADABLE",
+        "latest_bridge_status": _status or "UNREADABLE",
         "latest_bridge_version": version,
         "reviewed_proposal_version": 1,
         "planned_bridge_status": "NEW",
