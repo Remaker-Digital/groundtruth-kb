@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from groundtruth_kb.bridge.versioned_files import status_from_bridge_text
 from groundtruth_kb.db import (
     WORK_ITEM_TERMINAL_RESOLUTION_STATUSES,
     KnowledgeDB,
@@ -182,8 +183,7 @@ def _resolve_bridge_lineage(project_root: Path, request: TestArtifactUpdateReque
     latest = _latest_bridge_file(project_root, request.bridge_slug)
     go_bytes = latest.read_bytes()
     go_text = go_bytes.decode("utf-8-sig")
-    go_lines = go_text.splitlines()
-    if not go_lines or go_lines[0].strip() != "GO":
+    if status_from_bridge_text(go_text) != "GO":
         raise TestArtifactUpdateError(f"current bridge status is not GO: {latest.relative_to(project_root)}")
     if _metadata_value(go_text, "Document") != request.bridge_slug:
         raise TestArtifactUpdateError("current GO Document does not match requested bridge slug")
@@ -200,8 +200,7 @@ def _resolve_bridge_lineage(project_root: Path, request: TestArtifactUpdateReque
     if not proposal.is_relative_to(project_root.resolve()) or not proposal.is_file():
         raise TestArtifactUpdateError("current GO proposal predecessor is outside the project or missing")
     proposal_text = proposal.read_text(encoding="utf-8-sig")
-    proposal_lines = proposal_text.splitlines()
-    if not proposal_lines or proposal_lines[0].strip() not in {"NEW", "REVISED"}:
+    if status_from_bridge_text(proposal_text) not in {"NEW", "REVISED"}:
         raise TestArtifactUpdateError("GO predecessor is not an implementation proposal")
     if _metadata_value(proposal_text, "Document") != request.bridge_slug:
         raise TestArtifactUpdateError("proposal Document does not match requested bridge slug")

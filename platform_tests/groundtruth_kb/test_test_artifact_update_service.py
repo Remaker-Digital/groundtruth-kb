@@ -33,16 +33,20 @@ def _past(minutes: int = 30) -> str:
     return (datetime.now(UTC) - timedelta(minutes=minutes)).isoformat().replace("+00:00", "Z")
 
 
-def _write_bridge(root: Path, targets: list[str] | None = None) -> None:
+def _write_bridge_heads(
+    root: Path,
+    *,
+    proposal_head: list[str],
+    go_head: list[str],
+    targets: list[str] | None = None,
+) -> None:
     targets = [TEST_ID] if targets is None else targets
     bridge = root / "bridge"
     bridge.mkdir(exist_ok=True)
     (bridge / f"{BRIDGE_SLUG}-001.md").write_text(
         "\n".join(
-            [
-                "NEW",
-                "::init gtkb lo",
-                "::open build",
+            proposal_head
+            + [
                 "",
                 "bridge_kind: implementation_proposal",
                 f"Document: {BRIDGE_SLUG}",
@@ -57,10 +61,8 @@ def _write_bridge(root: Path, targets: list[str] | None = None) -> None:
     )
     (bridge / f"{BRIDGE_SLUG}-002.md").write_text(
         "\n".join(
-            [
-                "GO",
-                "::init gtkb pb",
-                "::open build",
+            go_head
+            + [
                 "",
                 "bridge_kind: lo_verdict",
                 f"Document: {BRIDGE_SLUG}",
@@ -72,6 +74,15 @@ def _write_bridge(root: Path, targets: list[str] | None = None) -> None:
             ]
         ),
         encoding="utf-8",
+    )
+
+
+def _write_bridge(root: Path, targets: list[str] | None = None) -> None:
+    _write_bridge_heads(
+        root,
+        proposal_head=["NEW", "::init gtkb lo", "::open build"],
+        go_head=["GO", "::init gtkb pb", "::open build"],
+        targets=targets,
     )
 
 
@@ -245,6 +256,70 @@ def test_dry_run_returns_complete_postimage_and_zero_effect(service_env) -> None
     assert len(db.get_test_history(TEST_ID)) == 1
     assert db._get_conn().execute("SELECT COUNT(*) FROM test_artifact_update_requests").fetchone()[0] == 0
     db.close()
+
+
+def test_bridge_lineage_accepts_order_independent_status_heads_and_rejects_invalid_heads(
+    service_env,
+) -> None:
+    root, db_path = service_env
+    accepted_heads = [
+        (
+            ["NEW", "::init gtkb lo", "::open build"],
+            ["GO", "::init gtkb pb", "::open build"],
+        ),
+        (
+            ["::init gtkb lo", "NEW", "::open build"],
+            ["::init gtkb pb", "GO", "::open build"],
+        ),
+        (
+            ["::init gtkb lo", "::open build", "REVISED"],
+            ["::init gtkb pb", "::open build", "GO"],
+        ),
+    ]
+    for index, (proposal_head, go_head) in enumerate(accepted_heads):
+        _write_bridge_heads(root, proposal_head=proposal_head, go_head=go_head)
+        db = KnowledgeDB(db_path=db_path)
+        result = update_test_artifact(
+            db,
+            _request(key=f"order-independent-{index}", dry_run=True),
+            project_root=root,
+        )
+        assert result.status == "dry_run"
+        db.close()
+
+    rejected_heads = [
+        (
+            ["NEW", "::init gtkb lo", "::open build"],
+            ["::init gtkb pb", "::open build", "no status token"],
+        ),
+        (
+            ["NEW", "::init gtkb lo", "::open build"],
+            ["::init gtkb pb", "::open build", "go"],
+        ),
+        (
+            ["NEW", "::init gtkb lo", "::open build"],
+            ["NEW", "GO", "::init gtkb pb", "::open build"],
+        ),
+        (
+            ["NEW", "::init gtkb lo", "::open build"],
+            ["READY", "::init gtkb pb", "::open build"],
+        ),
+        (
+            ["GO", "REVISED", "::init gtkb lo", "::open build"],
+            ["GO", "::init gtkb pb", "::open build"],
+        ),
+    ]
+    for index, (proposal_head, go_head) in enumerate(rejected_heads):
+        _write_bridge_heads(root, proposal_head=proposal_head, go_head=go_head)
+        db = KnowledgeDB(db_path=db_path)
+        result = update_test_artifact(
+            db,
+            _request(key=f"invalid-head-{index}", dry_run=True),
+            project_root=root,
+        )
+        assert result.status == "denied"
+        assert result.reason_code == "validation_failed"
+        db.close()
 
 
 def test_apply_restart_replay_and_later_version_coexistence(service_env) -> None:
