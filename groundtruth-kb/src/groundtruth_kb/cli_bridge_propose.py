@@ -73,7 +73,6 @@ Version: 001 (DRAFT; non-dispatchable)
 Date: ${date}
 ${author_metadata_block}
 
-Project Authorization: ${project_authorization_id}
 Project: ${project_id}
 Work Item: ${wi_id}
 
@@ -240,7 +239,6 @@ def build_propose_context(
         "wi_id": wi_id,
         "wi_title": str(work_item.get("title") or wi_id),
         "wi_description": str(work_item.get("description") or ""),
-        "project_authorization_id": metadata["project_authorization_id"],
         "project_id": metadata["project_id"],
         "project_name": metadata["project_name"],
         "target_paths_json": target_paths_json,
@@ -257,7 +255,7 @@ def build_propose_context(
         ),
         "auto_owner_decisions": _format_bullets(
             owner_decisions,
-            empty=f"`{metadata['project_authorization_id']}` - <verify owner-decision evidence before filing>",
+            empty=f"`{metadata['project_id']}` - <cite the owner decision that authorized this project before filing>",
         ),
         "kind_specific_intro": KIND_INTROS[kind],
         "recommended_commit_type": RECOMMENDED_COMMIT_TYPES[kind],

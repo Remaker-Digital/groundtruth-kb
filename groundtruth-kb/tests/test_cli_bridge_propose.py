@@ -24,7 +24,6 @@ from groundtruth_kb.db import KnowledgeDB
 
 WI_ID = "WI-3318"
 PROJECT_ID = "PROJECT-GTKB-DETERMINISTIC-SERVICES-TEST"
-AUTH_ID = "PAUTH-GT-BRIDGE-PROPOSE-CLI"
 DELIB_ID = "DELIB-GT-BRIDGE-PROPOSE-CLI"
 
 
@@ -105,7 +104,7 @@ def test_scaffold_emits_six_author_metadata_field_labels(project_dir: Path, monk
         assert f"{field}:" in rendered
 
 
-def test_scaffold_author_block_after_date_before_project_auth(
+def test_scaffold_author_block_after_date_before_project_line(
     project_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _clear_author_env(monkeypatch)
@@ -113,7 +112,7 @@ def test_scaffold_author_block_after_date_before_project_auth(
     rendered = render_proposal_draft("implementation", _context(project_dir))
 
     assert rendered.index("Date: ") < rendered.index("author_identity:")
-    assert rendered.index("author_model_configuration:") < rendered.index("Project Authorization:")
+    assert rendered.index("author_model_configuration:") < rendered.index("Project: ")
 
 
 def test_scaffold_author_block_populates_resolvable_fields_from_env(
@@ -154,7 +153,10 @@ def test_scaffold_author_block_degrades_to_placeholder_when_unresolvable(
         assert f"{field}: TODO: <fill {field}>" in rendered
 
 
-def test_auto_project_metadata_active_auth(project_dir: Path) -> None:
+def test_auto_project_metadata_names_no_authorization_record(project_dir: Path) -> None:
+    # Authorization is a field on the project row and gates dispatch, not
+    # filing (canon v8.92 section 3), so the scaffold metadata carries the
+    # project and work item only.
     _seed_project(project_dir)
     db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
     try:
@@ -162,7 +164,7 @@ def test_auto_project_metadata_active_auth(project_dir: Path) -> None:
     finally:
         db.close()
 
-    assert metadata["project_authorization_id"] == AUTH_ID
+    assert "project_authorization_id" not in metadata
     assert metadata["project_id"] == PROJECT_ID
     assert metadata["work_item_title"] == "gt bridge propose CLI"
 
@@ -193,7 +195,9 @@ def test_implementation_template_renders(project_dir: Path) -> None:
     _seed_project(project_dir)
     rendered = render_proposal_draft("implementation", _context(project_dir))
     assert "# Implementation Proposal - gt bridge propose CLI" in rendered
-    assert f"Project Authorization: {AUTH_ID}" in rendered
+    assert f"Project: {PROJECT_ID}" in rendered
+    assert f"Work Item: {WI_ID}" in rendered
+    assert "Project Authorization:" not in rendered
     assert "## Specification Links" in rendered
     assert "## Intuitiveness / Non-Impairment Disposition" in rendered
     section = rendered.split("## Intuitiveness / Non-Impairment Disposition", 1)[1]
