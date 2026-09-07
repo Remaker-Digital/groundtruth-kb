@@ -154,20 +154,15 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
 
 WRITE_TOOLS = {"Write", "Edit"}
 PENDING_PREFLIGHT_STATUSES = {"NEW", "REVISED"}
-BRIDGE_STATUS_TOKENS = (
-    "NEW",
-    "REVISED",
-    "GO",
-    "NO-GO",
-    "VERIFIED",
-    "VERDICT-REJECTED",
-    "NOT-READY",
-    "READY",
-    "WITHDRAWN",
-    "ADVISORY",
-    "SUPERSEDED",
-    "BLOCKED",
-)
+try:
+    from groundtruth_kb.bridge.vocabulary import CANONICAL_STATUSES as _CANONICAL_STATUSES
+except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
+    _CANONICAL_STATUSES = frozenset(BRIDGE_AUTHOR_METADATA_STATUSES)
+# Canon section 6: the twelve canonical statuses come from the single code of
+# record, groundtruth_kb.bridge.vocabulary; the gate does not restate them. The
+# tuple is ordered longest-first so no token in the alternation below can be
+# shadowed by a shorter token that it starts with.
+BRIDGE_STATUS_TOKENS = tuple(sorted(_CANONICAL_STATUSES, key=lambda status: (-len(status), status)))
 BRIDGE_VERSIONED_FILE_RE = re.compile(r"^(.+)-(\d{3,})\.md$")
 LO_VERDICT_BRIDGE_FILE_RE = re.compile(r"^.+\.lo-verdict\.md$", re.IGNORECASE)
 BRIDGE_FILE_STATUS_RE = re.compile(
