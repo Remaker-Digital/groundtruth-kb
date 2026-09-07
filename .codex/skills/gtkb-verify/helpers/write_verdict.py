@@ -1,3 +1,9 @@
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project codex`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Helper utilities for Loyal Opposition verdict authoring."""
 
@@ -35,10 +41,17 @@ if str(PROJECT_ROOT) not in sys.path:
 from groundtruth_kb.bridge.prior_deliberations import (  # noqa: E402
     pre_populate_prior_deliberations,
 )
+from groundtruth_kb.bridge.vocabulary import (  # noqa: E402
+    LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
+)
 
 from scripts.bridge_author_metadata import (  # noqa: E402
     extract_author_metadata,
     is_synthetic_session_context_id,
+)
+from scripts.gtkb_session_id import (  # noqa: E402
+    resolve_session_id,
+    sanitize_session_id,
 )
 from scripts.verdict_evidence_anchor_preflight import (  # noqa: E402
     validate_verdict_evidence_anchors,
@@ -46,8 +59,15 @@ from scripts.verdict_evidence_anchor_preflight import (  # noqa: E402
 )
 from scripts.windows_subprocess import no_window_subprocess_kwargs  # noqa: E402
 
-DEFAULT_VERDICT_PREPOPULATION_LOG = Path(".gtkb-state/bridge-verify-helper/last-prepopulation.json")
-STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY|IMPLEMENTED)$")
+# Canon s17: helper scratch is session-scoped under the canonical scratchpad
+# root, never `.gtkb-state`. Session id resolution reuses the single membership
+# authority in `scripts.gtkb_session_id` rather than re-listing the env vars.
+DEFAULT_VERDICT_PREPOPULATION_LOG = (
+    Path("scratchpad") / sanitize_session_id(resolve_session_id()) / "bridge-verify-helper" / "last-prepopulation.json"
+)
+STATUS_RE = re.compile(
+    r"^(NEW|REVISED|GO|NO-GO|NO-ACTION|VERDICT-REJECTED|VERIFIED|WITHDRAWN|ADVISORY|IMPLEMENTED|READY|NOT-READY|SUPERSEDED|BLOCKED)$"
+)
 VERSIONED_BRIDGE_RE_TEMPLATE = r"^{slug}-(?P<version>\d{{3}})\.md$"
 RECOMMENDED_COMMIT_TYPE_RE = re.compile(r"Recommended commit type\s*:", re.IGNORECASE)
 UNRESOLVED_PLACEHOLDER_RE = re.compile(
@@ -198,9 +218,12 @@ def _bridge_versions(slug: str, project_root: Path) -> list[BridgeVersion]:
             lines = path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
         except OSError as exc:
             raise VerifiedFinalizationError(f"Bridge file is unreadable: {path}") from exc
-        status = next((line.strip() for line in lines if line.strip()), "")
-        if not STATUS_RE.fullmatch(status):
-            raise VerifiedFinalizationError(f"Bridge file has invalid status token: {path}: {status!r}")
+        head = [line.strip() for line in lines if line.strip()][:3]
+        status = next((line for line in head if STATUS_RE.fullmatch(line)), "")
+        if not status:
+            raise VerifiedFinalizationError(
+                f"Bridge file has no status token in its first three lines: {path}: {head!r}"
+            )
         versions.append(
             BridgeVersion(
                 status=status,
@@ -216,10 +239,11 @@ def _bridge_versions(slug: str, project_root: Path) -> list[BridgeVersion]:
 def _assert_verification_ready(slug: str, project_root: Path) -> tuple[int, str]:
     versions = _bridge_versions(slug, project_root)
     latest = versions[0]
-    if latest.status not in {"NEW", "REVISED", "NO-ACTION"}:
+    if latest.status not in LOYAL_OPPOSITION_ACTIONABLE_STATUSES:
         raise VerifiedFinalizationError(
             "VERIFIED finalization requires a post-implementation report latest "
-            f"status of NEW, REVISED, or NO-ACTION; got {latest.status} at {latest.rel_path}."
+            f"status in {sorted(LOYAL_OPPOSITION_ACTIONABLE_STATUSES)}; "
+            f"got {latest.status} at {latest.rel_path}."
         )
     if not any(version.status == "GO" for version in versions[1:]):
         raise VerifiedFinalizationError(f"VERIFIED finalization requires a prior GO in the bridge chain for {slug!r}.")
@@ -469,6 +493,17 @@ def _assert_predecessor_chain_committed(
             continue
         tracked = _run_git(["ls-files", "--error-unmatch", "--", rel_path], cwd=project_root, check=False)
         if tracked.returncode != 0:
+            # WI-6530 reclassified `bridge/` as ephemeral runtime state and added the
+            # matching `git add -f` staging below, but left this check asserting the
+            # pre-WI-6530 tracked-artifact model -- making VERIFIED unreachable for
+            # every multi-version thread. An IGNORED predecessor present on disk
+            # satisfies chain integrity: the chain is complete, and tracked-ness is
+            # not a meaningful signal for a path class governance declared ephemeral.
+            # An untracked predecessor that is NOT ignored remains a real gap and
+            # still fails closed.
+            ignored = _run_git(["check-ignore", "-q", "--", rel_path], cwd=project_root, check=False)
+            if ignored.returncode == 0:
+                continue
             problems.append(f"{rel_path} is not git-tracked and is not included in the VERIFIED transaction")
             continue
         status = _run_git(["status", "--porcelain", "--", rel_path], cwd=project_root, check=True).stdout.strip()
@@ -1007,7 +1042,7 @@ def _append_commit_finalization_evidence(body: str, *, commit_message: str, path
     subject = commit_message.splitlines()[0].strip()
     return (
         body.rstrip() + "\n\n## Commit Finalization Evidence\n\n"
-        "- Finalization helper: `.claude/skills/gtkb-verify/helpers/write_verdict.py --finalize-verified`\n"
+        "- Finalization helper: `.harness-baseline-configuration/skills/gtkb-verify/helpers/write_verdict.py --finalize-verified`\n"
         f"- Intended commit subject: `{subject}`\n"
         "- Same-transaction path set:\n"
         f"{path_lines}\n"

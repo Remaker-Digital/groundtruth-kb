@@ -2,7 +2,7 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project antigravity`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
@@ -21,7 +21,7 @@ live here as numbered markdown files.
 ## Mandatory Root Boundary Gate
 
 Every bridge proposal, review, implementation report, and verification must
-comply with `.claude/rules/project-root-boundary.md`: all active GT-KB files and
+comply with `.agent/rules/project-root-boundary.md`: all active GT-KB files and
 artifacts must remain within `E:\GT-KB`; all GT-KB application files must remain
 within `E:\GT-KB\applications\`. Agent Red is the reference adopter application
 for GT-KB at `applications/Agent_Red/`; its subtree is in scope for GT-KB bridge
@@ -119,7 +119,7 @@ repair the resolver before relying on the result.
 This subsection operationalizes
 `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` (proposal must cite all
 relevant specs) and is mechanically enforced by
-`.claude/hooks/bridge-compliance-gate.py` per the companion bridge thread
+`.agent/hooks/bridge-compliance-gate.py` per the companion bridge thread
 `bridge/gtkb-pre-filing-preflight-hook-NNN.md`. Until the hook upgrade lands,
 this subsection is rule-cited soft authority; the Loyal Opposition NO-GO at review time
 remains the reliable feedback loop.
@@ -240,6 +240,29 @@ Opposition remains responsible for identifying relevant specifications that
 are not yet represented in `config/governance/spec-applicability.toml` and
 should raise omissions as findings or propose registry updates.
 
+## Mandatory Simpler-Alternative Section In GO Verdicts
+
+Every `GO` verdict must include a `## Simpler Alternative Considered` section
+naming the simpler design Loyal Opposition weighed against the approved design,
+and why the approved design was preferred.
+
+This applies the rejected-alternatives discipline that ADRs already carry to
+routine approvals, so a `GO` records what was weighed rather than only what was
+accepted. It extends the same pattern as the mandatory `Applicability Preflight`
+and `Clause Applicability` sections above.
+
+Scope: `GO` verdicts only. `NO-GO` is already a rejection and needs no rejected
+alternative; `VERIFIED` is post-commit evidence rather than an approval decision.
+
+"No simpler alternative exists" is a permitted answer only when the reviewer
+states what was considered and why it does not apply. A bare denial is not a
+considered alternative. Mechanical enforcement can detect an absent or
+placeholder section; it cannot detect an insincere one, and this section does
+not claim otherwise.
+
+Authority: `GOV-FILE-BRIDGE-AUTHORITY-001`; owner AUQ 2026-08-21 Item D;
+WI-6742.
+
 ## Clause-Test Preflight (Advisory; Slice 1)
 
 A companion preflight surface, `scripts/adr_dcl_clause_preflight.py`, asks
@@ -281,51 +304,78 @@ numbered bridge file.
 
 ## Statuses
 
+Canon section 6 fixes the vocabulary at exactly ten. The code of record is
+`CANONICAL_STATUSES` in `groundtruth_kb.bridge.vocabulary`, the single source
+named by `SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001` clause 5.
+
 | Status | Set by | Meaning |
 |--------|--------|---------|
-| NEW | Prime | Fresh proposal awaiting review |
-| REVISED | Prime | Updated proposal after a NO-GO |
-| GO | Loyal Opposition | Proposal approved for implementation |
-| NO-GO | Loyal Opposition | Proposal requires changes before approval |
-| VERIFIED | Loyal Opposition | Post-implementation verification passed |
-| ADVISORY | Loyal Opposition | Advisory report; actionable by Prime Builder in interactive sessions to trigger owner-deliberation / UAQ disposition; non-dispatchable for headless runs (`_derive_dispatchable` returns False). NOT awaiting GO/NO-GO/VERIFIED. |
-| DEFERRED | Owner | Owner-directed parked bridge state; non-actionable until the owner-directed clear/resume condition is met. |
-| NO-ACTION | Prime Builder | Prime Builder rejection of an LO GO/NO-GO verdict for governance non-compliance; the reason states what the reviewer must fix. Loyal-Opposition-actionable (routes back to LO to re-issue a corrected verdict); NOT terminal, NOT owner-visible. MUST NOT be used to dispose of an ADVISORY thread. See `DCL-NO-ACTION-STATUS-SEMANTICS-001`. |
+| NEW | Prime Builder | Fresh implementation proposal. Addressed to Loyal Opposition. |
+| REVISED | Prime Builder | Revised implementation proposal after a NO-GO. Addressed to Loyal Opposition. |
+| READY | Prime Builder | Implementation report, valid only after GO. Must carry `bridge_kind: implementation_report`, which the governed writer validates. READY cannot begin a thread. It replaces the historical use of NEW for post-implementation reports. |
+| VERDICT-REJECTED | Prime Builder | Rejects a governance-noncompliant, Prime-addressed Loyal Opposition verdict and routes a fresh Loyal Opposition correction. |
+| GO | Loyal Opposition | Approves a proposal for implementation. Addressed to Prime Builder. |
+| NO-GO | Loyal Opposition, or Dispatcher | Rejects a proposal and requires revision. Dispatcher may also author the finalization-repair NO-GO of section 7, which is addressed exclusively to Loyal Opposition. |
+| NOT-READY | Loyal Opposition | Rejects an implementation report and requires a corrected report. The report-phase counterpart of NO-GO, so that no token is lawful in both the proposal phase and the report phase. |
+| VERIFIED | Loyal Opposition | Records review completion. Terminal for agents and not dispatchable; only Dispatcher may follow it, per section 7. |
+| WITHDRAWN | Prime Builder | Valid only before GO. Terminal and not dispatchable. |
+| ADVISORY | Either role | Informational at any time. Not dispatchable, and not part of an implementation lifecycle. |
+
+NO-ACTION and DEFERRED are obsolete and invalid. New writes reject both.
+Historical files bearing them are inert historical text: they confer no
+routing, lifecycle, claim, lease, or implementation state, are never rewritten
+or normalized, and no alias or crosswalk exists.
 
 ## Post-Verdict Transition Table
 
-The single authoritative transition table for ordinary bridge lifecycles is
-the `ORDINARY_TRANSITIONS` constant in `scripts/bridge_lifecycle_resolver.py`
-(the code of record). This section renders that table; the doc-code
-consistency test
+The single authoritative transition table is the `TRANSITIONS` constant in
+`groundtruth_kb.bridge.vocabulary` (the code of record). This section renders
+that table; the doc-code consistency test
 `platform_tests/scripts/test_bridge_protocol_transition_table_consistency.py`
-asserts the rendering matches the constant on every surface.
+asserts the rendering matches the constant.
+
+The successor relation is a pure function of the current status. No entry
+consults thread history, per `SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001` clause 4.
 
 | Previous status | Allowed successors |
 |---|---|
-| NEW | GO, NO-GO, WITHDRAWN, DEFERRED |
-| REVISED | GO, NO-GO, WITHDRAWN, DEFERRED |
-| GO | GO, NEW, REVISED, NO-ACTION, DEFERRED, WITHDRAWN |
-| NO-GO | GO, REVISED, NO-ACTION, DEFERRED, WITHDRAWN |
-| NO-ACTION | GO, NO-GO, VERIFIED |
-| ADVISORY | ADVISORY, ACCEPTED, BLOCKED, DEFERRED, WITHDRAWN |
-| BLOCKED | REVISED, WITHDRAWN |
-| DEFERRED | REVISED, WITHDRAWN |
+| NEW | GO, NO-GO, WITHDRAWN |
+| REVISED | GO, NO-GO, WITHDRAWN |
+| GO | READY, VERDICT-REJECTED |
+| READY | VERIFIED, NOT-READY |
+| NOT-READY | READY, VERDICT-REJECTED |
+| NO-GO | REVISED, WITHDRAWN, VERDICT-REJECTED, VERIFIED |
+| VERDICT-REJECTED | GO, NO-GO, NOT-READY |
+| VERIFIED | NO-GO |
+| ADVISORY | ADVISORY |
 
-Post-GO augmentations (`POST_GO_REPORT_AUGMENTATIONS` in the same module),
-applied only once a `GO` has been seen earlier in the chain:
+`WITHDRAWN` is terminal and has no successors, so it carries no row.
 
-| Previous status (post-GO) | Additional allowed successors |
-|---|---|
-| NEW | REVISED, VERIFIED |
-| REVISED | VERIFIED |
+`NO-GO` has two forms, distinguished by author rather than by the artifact
+adjudicated. The Loyal-Opposition form rejects a proposal and routes to Prime
+Builder for `REVISED`. The Dispatcher form reports a failed project commit and
+routes to Loyal Opposition for finalization repair; it is the only form whose
+successor may be `VERIFIED`, and the only status that may follow `VERIFIED`.
+The row above is the union of both forms, which keeps the relation a function
+of the current status alone; the restriction of `VERIFIED` to the Dispatcher
+form is an authorship check, not a successor-set difference. `NO-GO -> READY`
+is invalid, and READY is absent from the row accordingly.
 
-Post-`NO-GO`, the lawful Prime Builder statuses are `REVISED` (the corrected
-proposal or corrected implementation report) and `NO-ACTION` (Prime rejection
-of a governance-non-compliant verdict per
-`DCL-NO-ACTION-STATUS-SEMANTICS-001`); `DEFERRED` (owner parking) and
-`WITHDRAWN` (terminal) complete the set. `NEW` is never a lawful successor to
-`NO-GO`.
+Report rejection is never `NO-GO`; it is `NOT-READY`.
+
+`VERDICT-REJECTED` may immediately follow only an agent-authored,
+Prime-addressed Loyal Opposition `GO`, `NO-GO`, or `NOT-READY`. It may never
+follow `VERIFIED`, `WITHDRAWN`, `ADVISORY`, or a Dispatcher-authored
+finalization `NO-GO`.
+
+A later `ADVISORY` on the same advisory thread is the latest advisory message.
+No other status may follow `ADVISORY`. Work derived from an advisory begins a
+fresh `NEW` chain that cites it.
+
+Chains committed before this vocabulary took effect may encode superseded
+pairs, most commonly `GO -> NEW` from the retired practice of filing a report
+as a second `NEW`. Those are accepted when reading committed history only, via
+`HISTORICAL_TRANSITIONS` in the same module. They confer no write authority.
 
 ## Review Independence Boundary
 
@@ -354,7 +404,7 @@ status token on the first non-blank line: one of `NEW`, `REVISED`, `GO`,
 follow the token. This keeps each bridge file self-describing and makes the
 first line a reliable routing signal.
 
-The rule is mechanically enforced by `.claude/hooks/bridge-compliance-gate.py`
+The rule is mechanically enforced by `.agent/hooks/bridge-compliance-gate.py`
 (activated byte-for-byte from
 `groundtruth-kb/templates/hooks/bridge-compliance-gate.py`): a `Write` of a
 versioned bridge file whose first non-blank line is not a recognized status
@@ -364,6 +414,28 @@ disk with a non-canonical first line are grandfathered, so the rule never
 retroactively breaks historical bridge files on overwrite. Non-versioned bridge
 markdown is outside the dispatchable numbered-file chain. `WITHDRAWN` remains
 an accepted canonical token where it appears as a terminal status.
+
+### Complete authored heads are order-independent at the writer (WI-6538)
+
+A bridge artifact head is COMPLETE when all three required elements - a canonical
+status token, one `::init gtkb <pb|lo>` line, and one `::open <activity>` line -
+are present within the first three non-blank lines, with the responder role and
+activity valid for that status.
+
+A complete head is correct in ANY order. Owner canon does not fix the order of
+the three lines, and a complete-but-disordered head is not an error.
+
+The governed writer therefore MUST preserve a complete authored head byte-for-byte.
+`normalize_bridge_envelope_head` in `scripts/gtkb_bridge_writer.py` returns such
+content unmodified; normalization is reserved for heads that are INCOMPLETE or
+MALFORMED, which is where it materializes the missing elements. A writer that
+rebuilds a complete head into a canonical order is mutating an artifact that was
+never in error, and is defective.
+
+This clause governs the writer surface only. It does not restate, relax, or
+override any line-position requirement enforced elsewhere, including at the
+artifact-head envelope gate; where a consumer imposes a stricter position
+constraint, that constraint is owned by its own surface and is out of scope here.
 
 Source: `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1
 (`DELIB-S382-PROPOSAL-STANDARDS-COMPLETION-SCOPE`; GO at
@@ -390,12 +462,12 @@ includes `NEW`, `REVISED`, `NO-ACTION`). It is **not** terminal and **not**
 owner-visible.
 
 `NO-ACTION` MUST NOT be used to dispose of an `ADVISORY` thread, and MUST NOT be
-used to record a Prime Builder "no further action" close. Advisory dispositions
-are Prime-actionable and remain under `ADVISORY`
-(`prime_advisory_disposition` / `owner_disposition`) or move to a terminal
+used to record a Prime Builder "no further action" close. Advisory reports are
+owner-visible informational input, never assigned or dispatched. They remain
+under `ADVISORY` (`advisory_owner_visible` / `none`) or move to a terminal
 status (`WITHDRAWN`) with recorded rationale and a cited owner decision. Writing
 `NO-ACTION` on an advisory that has no prior Loyal Opposition verdict flips the
-thread from Prime-actionable `ADVISORY` into Loyal-Opposition-actionable
+thread from owner-visible `ADVISORY` into Loyal-Opposition-actionable
 `NO-ACTION` with no verdict to correct, mis-routing it permanently into the
 Loyal Opposition queue.
 
@@ -406,7 +478,7 @@ Authority: `DCL-NO-ACTION-STATUS-SEMANTICS-001`; owner decision
 
 **Purpose:** Advisory reports are first-class workflow state, not transport workarounds via `NO-GO@001`. They may be owner-initiated (owner asks LO to investigate a peer system) or LO-initiated (LO surfaces a finding during normal review).
 
-**Routing:** ADVISORY entries are Prime-actionable for interactive sessions and non-dispatchable for headless runs. `ACTIONABLE_STATUSES_FOR_PRIME` in `groundtruth_kb.bridge.notify` includes `ADVISORY`, so `compute_actionable_pending` surfaces them in the Prime actionable list; the `_derive_dispatchable` invariant returns False for non-GO/NEW/REVISED/NO-GO statuses, so every headless dispatch surface (dispatcher daemon, single-harness dispatcher) filters them out before spawning. Manual `/bridge` scans show them; `bridge-axis-2-surface.py` also filters non-dispatchable items, so AXIS-2 surfacing of ADVISORY status entries is a separate follow-on concern.
+**Routing:** ADVISORY entries are owner-visible informational input. They are not Prime-actionable, not Loyal-Opposition-actionable, never assigned, and non-dispatchable for headless runs. `ACTIONABLE_STATUSES_FOR_PRIME` in `groundtruth_kb.bridge.notify` is GO/NO-GO only, so `compute_actionable_pending` does not surface ADVISORY in the Prime actionable list. Manual `/bridge` scans may list them under `owner_visible`; `bridge-axis-2-surface.py` also filters non-dispatchable items, so AXIS-2 surfacing of ADVISORY status entries is a separate follow-on concern.
 
 **Authority:** Loyal Opposition (or owner-direction) authors ADVISORY entries; Prime Builder acknowledges in an interactive session and dispositions through owner-deliberation / UAQ flows, producing one of: (a) a normal NEW implementation proposal converting the advisory (`adopt` / `adapt`), (b) an explicit deferral with documented defer-trigger, or (c) a documented rejection (`reject`).
 
@@ -443,9 +515,9 @@ unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
    writer path
 2. Let the governed writer publish bridge state.
 3. Continue working on other tasks
-4. Periodically scan bridge state for GO, NO-GO, or ADVISORY
-   responses; GO and NO-GO are dispatchable implementation/revision work,
-   ADVISORY is interactive-only disposition work (non-dispatchable). Skip
+4. Periodically scan bridge state for GO or NO-GO
+   responses; GO and NO-GO are dispatchable implementation/revision work.
+   ADVISORY is owner-visible informational input (never assigned or dispatched). Skip
    DEFERRED, WITHDRAWN, and VERIFIED as non-actionable.
 5. On GO: proceed with implementation
 6. On NO-GO: read the NO-GO file, address findings, save revised file with
@@ -465,15 +537,15 @@ unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
 
 After Prime implements a GO'd proposal:
 1. Prime saves a post-implementation report as a new version with incremented number
-2. The FIRST post-implementation report after a GO publishes as a NEW
-   verification-request entry through the governed writer
-3. Loyal Opposition reviews and responds with NO-GO, or records VERIFIED only
-   through the commit-finalization helper so the verified work, implementation
-   report, and verdict artifact enter git history in the same local commit.
-4. After a Loyal Opposition NO-GO on a post-implementation report, the
-   corrected report publishes as REVISED — never NEW — mirroring § Prime
-   Workflow step 6 and the § Post-Verdict Transition Table (`NO-GO ->
-   REVISED`; `NEW` is never a lawful successor to `NO-GO`).
+2. Every post-implementation report publishes as a `READY` entry through the
+   governed writer, carrying `bridge_kind: implementation_report`. `READY` is
+   valid only after `GO` and cannot begin a thread. It replaces the historical
+   use of `NEW` for reports.
+3. Loyal Opposition reviews and responds with `NOT-READY`, or records
+   `VERIFIED`.
+4. After a `NOT-READY`, the corrected report publishes as `READY` again — never
+   `NEW` and never `REVISED`, which belong to the proposal phase. No token is
+   lawful in both phases, which is the point of the READY/NOT-READY pair.
 
 ## Bridge State Maintenance
 
@@ -494,7 +566,7 @@ historical reference.
 
 Implementation proposals and reports that depend on owner approval — citing Sub-slice B's AUQ-only rule (`bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-006.md`), referencing AskUserQuestion answers, or otherwise indicating owner-decision scope — MUST include a non-empty `Owner Decisions / Input` section enumerating the relevant AskUserQuestion evidence.
 
-The bridge-compliance-gate hook (`.claude/hooks/bridge-compliance-gate.py`) mechanically enforces this requirement at Write time.
+The bridge-compliance-gate hook (`.agent/hooks/bridge-compliance-gate.py`) mechanically enforces this requirement at Write time.
 
 The check fires conditionally — proposals that do NOT depend on owner approval (routine refactors, scaffold updates, etc.) are not affected. Loyal Opposition verdict files (lines starting with `GO`, `NO-GO`, or `VERIFIED`) are explicitly excluded because they are evidence narratives, not approval claims.
 

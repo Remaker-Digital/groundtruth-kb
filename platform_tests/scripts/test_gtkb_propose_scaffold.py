@@ -160,7 +160,12 @@ def test_self_review_checklist_commands():
 def test_helper_writes_only_draft_path(tmp_path):
     body = _scaffold()
     path = _h.write_draft("my-demo-thread", body, project_root=tmp_path)
-    assert path == tmp_path / ".gtkb-state" / "propose-drafts" / "my-demo-thread-001.md"
+    # Canon s17: drafts live under the session-scoped scratchpad, never
+    # `.gtkb-state`. The session component is resolved by the same single
+    # membership authority the helper uses, so the two cannot drift apart.
+    session = _h._gtkb_session_id.sanitize_session_id(_h._gtkb_session_id.resolve_session_id())
+    assert path == tmp_path / "scratchpad" / session / "propose-drafts" / "my-demo-thread-001.md"
+    assert ".gtkb-state" not in path.parts
     assert path.is_file()
     assert path.read_text(encoding="utf-8").startswith("NEW")
     # Never writes under bridge/.

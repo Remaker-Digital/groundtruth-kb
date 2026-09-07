@@ -6,7 +6,7 @@ Implements IP-0 of bridge/gtkb-work-intent-registry-prime-write-integration-011
 ``bridge_work_intent_registry`` primitive. This is the canonical interactive
 pre-drafting boundary for bridge thread coordination per the
 "Mandatory Pre-Drafting Claim Step" rule (to be added to
-.claude/rules/file-bridge-protocol.md in IP-0b).
+.harness-baseline-configuration/rules/file-bridge-protocol.md in IP-0b).
 
 Usage:
     python scripts/bridge_claim_cli.py claim <slug>
@@ -60,6 +60,7 @@ from bridge_work_intent_registry import (  # noqa: E402  (path-fix import)
     CLAIM_KIND_NO_ACTION_CORRECTION,
     CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
     WorkIntentRegistryError,
+    WorkIntentWorkItemCollisionError,
     acquire,
     claim_status,
     current_holder,
@@ -137,6 +138,9 @@ def _cmd_claim_with_kind(
             claim_kind=claim_kind,
             bootstrap_authority=bootstrap_authority,
         )
+    except WorkIntentWorkItemCollisionError as exc:
+        print(json.dumps(exc.as_dict(), indent=2, sort_keys=True))
+        return 2
     except WorkIntentRegistryError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 3

@@ -59,7 +59,6 @@ tables = [
   "harnesses",
   "operational_procedures",
   "project_artifact_links",
-  "project_authorizations",
   "project_dependencies",
   "project_work_item_memberships",
   "projects",
@@ -102,7 +101,6 @@ operational_procedures = 500                   # ~2.0 kB/row
 test_plan_phases = 2_500                       # ~2.6 kB/row
 sot_artifacts = 2_000                          # ~0.9 kB/row
 work_items = 4_000                             # ~2.0 kB/row
-project_authorizations = 4_000                 # ~1.8 kB/row
 specifications = 5_000                         # ~1.2 kB/row
 projects = 8_000                               # ~1.1 kB/row
 canonical_terms = 8_000                        # ~1.1 kB/row

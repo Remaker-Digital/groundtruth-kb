@@ -2,7 +2,7 @@
 
 Each benchmark module is read-only and produces a ``BenchmarkResult`` with
 optional per-dimension breakdown. ``write_run_outputs()`` emits one JSON file
-and one markdown summary per run under ``.gtkb-state/benchmarks/<run_id>/``.
+and one markdown summary per run under ``scratchpad/<session>/benchmarks/<run_id>/``.
 
 The idempotency key is the SHA-256 hash of the input window + the benchmark IDs
 present in the run. Two runs with identical inputs over identical commits
@@ -73,10 +73,21 @@ def _resolve_project_root(project_root: Path | str | None) -> Path:
     return Path(project_root).resolve()
 
 
+def _session_scratch_dirname() -> str:
+    """Session-scoped scratch subdirectory name per canon s17."""
+    from scripts.gtkb_session_id import session_scratch_dirname
+
+    return session_scratch_dirname()
+
+
 def benchmark_output_dir(run_id: str, project_root: Path | str | None = None) -> Path:
-    """Return (and create) the output directory for a benchmark run."""
+    """Return (and create) the output directory for a benchmark run.
+
+    Canon s17: benchmark output is session-scoped scratch under
+    ``scratchpad/<session>/benchmarks/<run_id>``, never ``.gtkb-state``.
+    """
     root = _resolve_project_root(project_root)
-    out = root / ".gtkb-state" / "benchmarks" / run_id
+    out = root / "scratchpad" / _session_scratch_dirname() / "benchmarks" / run_id
     out.mkdir(parents=True, exist_ok=True)
     return out
 

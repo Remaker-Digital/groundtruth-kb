@@ -8,7 +8,7 @@ GOV-SESSION-SELF-INITIALIZATION-001; bridge/gtkb-startup-refractor-slice-c-start
 # Prime Builder Startup Overlay
 
 Compact Prime Builder layer over `config/agent-control/SESSION-STARTUP-INDEX.md`.
-Behavior contract: `.claude/rules/prime-builder-role.md` (authoritative).
+Behavior contract: `.harness-baseline-configuration/rules/prime-builder-role.md` (authoritative).
 
 ## Disclosure
 
@@ -43,7 +43,7 @@ Behavior contract: `.claude/rules/prime-builder-role.md` (authoritative).
   `independent-progress-assessments/` is retired (contents deleted by owner
   directive) and must not be read from or recreated.
 - No implementation without a Loyal Opposition `GO` + an implementation-start
-  authorization packet (`.claude/rules/codex-review-gate.md`).
+  authorization packet (`.harness-baseline-configuration/rules/counterpart-review-gate.md`).
 - **Session-context review independence:** the blocker is same author/reviewer
   session context (cognitive contamination), not harness ID or durable registry
   role. `::init gtkb pb` grants Prime Builder authority regardless of durable
@@ -61,13 +61,11 @@ Behavior contract: `.claude/rules/prime-builder-role.md` (authoritative).
 
 ## Pre-flight (before any KB-write or bridge claim)
 
-Worker-role provenance requires an open session envelope. Open one with:
-
-```
-python -m groundtruth_kb session envelope open --harness-name <name> --harness-id <id> --init-keyword "::init gtkb pb" --subject gtkb --role prime-builder
-```
-
-before any `gt backlog`, `gt bridge`, or `implementation_authorization.py begin` command.
+Role comes from the owner `::init` marker. `bind_exact_init` writes the
+immutable binding when the full prompt is an exact canonical init (WI-6499).
+Do not create or require an on-disk session envelope document. Do not invoke
+the envelope-open CLI before `gt backlog`, `gt bridge`, or
+`implementation_authorization.py begin`.
 
 ---
 

@@ -60,7 +60,7 @@ Each finding must include:
 
 **Phase B â€” Local bootstrap (after bridge obligations are clear):**
 5. Read `AGENTS.md`.
-6. Read `.claude/rules/canonical-terminology.md`.
+6. Read `.harness-baseline-configuration/rules/canonical-terminology.md`.
 7. Read `CODEX-WAY-OF-WORKING.md`.
 8. Read `CODEX-REVIEW-OPERATING-CONTRACT.md`.
 9. Read latest relevant entries in `LOYAL-OPPOSITION-LOG.md`.

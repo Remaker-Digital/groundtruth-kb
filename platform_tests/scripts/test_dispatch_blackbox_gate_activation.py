@@ -85,6 +85,6 @@ def test_blackbox_gate_registered_on_cursor() -> None:
         and "cursor_hook_adapter.py" in entry.get("command", "")
     ]
     assert matched, "dispatch_blackbox_gate.py not registered in .cursor/hooks.json preToolUse"
-    assert any(entry.get("matcher") == "Write" for entry in matched), (
+    assert any("Write" in str(entry.get("matcher") or "") for entry in matched), (
         f"gate registered on Cursor but not under a Write matcher: {matched}"
     )

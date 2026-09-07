@@ -32,7 +32,7 @@ Required follow-on: a NEW bridge proposal documenting WHICH parts adopt and WHIC
 
 Prime rejects the peer solution because it does not address the GT-KB problem, conflicts with established GT-KB governance, or its tradeoffs are unacceptable. Use when adoption or adaptation would weaken GT-KB rather than strengthen it.
 
-Required follow-on: a Deliberation Archive record (per `.claude/rules/deliberation-protocol.md`) capturing the rejection rationale. The rejected peer solution stays referenced in the DA so future sessions surfacing the same idea see the prior rejection.
+Required follow-on: a Deliberation Archive record (per `.harness-baseline-configuration/rules/deliberation-protocol.md`) capturing the rejection rationale. The rejected peer solution stays referenced in the DA so future sessions surfacing the same idea see the prior rejection.
 
 ### `defer`
 
@@ -51,7 +51,7 @@ Required follow-on: a Deliberation Archive record citing the peer-system URL or 
 The loop runs as follows:
 
 1. **LO files peer-solution advisory.** LO investigates a peer system on owner request (or proactively when LO encounters one in the course of normal review work). LO files the advisory as an LO Advisory Proposal bridge entry when it may create future Prime Builder work, or as a Deliberation Archive record when it is a process/review finding with no derived-work implication.
-2. **Prime reads the advisory** as part of the standard Loyal-Opposition-insight review path defined in `.claude/rules/codex-way-of-working.md`.
+2. **Prime reads the advisory** as part of the standard Loyal-Opposition-insight review path defined in `.harness-baseline-configuration/rules/way-of-working.md`.
 3. **Prime classifies the advisory** using the five-state vocabulary above. The classification IS a Prime decision recorded in the response.
 4. **Prime drafts the response artifact** appropriate to the classification:
    - `adopt` / `adapt` -> NEW bridge proposal.
@@ -72,7 +72,7 @@ section in the advisory body. The gate section enumerates:
 2. What Prime Builder must grill the owner about before drafting any
    implementation proposal derived from this advisory.
 3. What owner decisions must be durable, recorded via `AskUserQuestion`
-   per `.claude/rules/prime-builder-role.md` § "AskUserQuestion as the
+   per `.harness-baseline-configuration/rules/prime-builder-role.md` § "AskUserQuestion as the
    Only Valid Owner-Decision Channel", before an implementation
    proposal can exist.
 
@@ -80,7 +80,7 @@ Prime Builder must conduct a structured owner clarification/grilling
 pass — using the `/grill-me-for-clarification` skill or an equivalent
 AUQ-recorded structured interview — and the resulting AUQ evidence
 MUST land in the resulting bridge proposal's mandatory `## Owner
-Decisions / Input` section (per `.claude/rules/file-bridge-protocol.md`
+Decisions / Input` section (per `.harness-baseline-configuration/rules/file-bridge-protocol.md`
 § "Mandatory Owner Decisions / Input Section Gate") before the proposal
 is filed as `NEW`.
 

@@ -1,6 +1,6 @@
 ---
 name: gtkb-bridge-propose
-description: Write a bridge proposal to ``bridge/<topic>-001.md`` through the governed no-index bridge path under governance-safe credential-scan and concurrency controls. Use when drafting a new NEW or REVISED proposal through the helper path rather than a direct file write.
+description: Write a bridge proposal to ``bridge/<topic>-001.md`` through the governed no-index bridge path under governance-safe credential-scan and concurrency controls. Use when drafting a new NEW or REVISED proposal through the helper path (non-Claude-Write).
 ---
 <!--
 THIS FILE IS A PROJECTION, NOT CANONICAL.
@@ -10,7 +10,6 @@ Do not edit here: change the baseline (.harness-baseline-configuration) and re-p
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
-
 This skill implements the helper-mediated bridge-write path. It is the
 safe alternative to persisting proposal bodies through non-Write code
 paths (``file.write_bytes``, ``shutil.copy2``, etc.) that are outside
@@ -32,13 +31,14 @@ dispatcher/TAFE state without creating or requiring aggregate queue artifacts.
 
 **Project-linkage metadata (per ``DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001``)**:
 the proposal body for an implementation-targeting NEW/REVISED proposal MUST
-include three machine-readable header lines near the top::
+include two machine-readable header lines near the top::
 
-    Project Authorization: PAUTH-<authorization-id>
     Project: <PROJECT-ID>
     Work Item: <WI-NNNN | GTKB-* | WORKLIST-*>
 
-``bridge-compliance-gate.py`` hard-blocks the Write when any line is absent.
+``bridge-compliance-gate.py`` hard-blocks the Write when either line is absent.
+If a deployed gate still requires a separate authorization header or identifier,
+it is stale and must be corrected rather than satisfied.
 Non-implementation proposals self-declare exemption with a ``bridge_kind:``
 header in ``{spec_intake, governance_review, loyal_opposition_advisory}``;
 verdict files (GO/NO-GO/VERIFIED/WITHDRAWN) are exempt by status.
@@ -84,18 +84,18 @@ Do NOT use for:
 
 The bridge-propose helper has two governed authoring paths:
 
-- **Native-Write path:** helper composer functions may return proposal content for
-  the harness to persist through its governed native ``Write`` / ``Edit`` tool
-  calls. Those calls flow through the live PreToolUse governance hooks.
-- **Helper-mediated path:** a harness without intercepted native Write tools must use the helper-mediated path that runs
-  ``.goose/hooks/bridge-compliance-gate.py --audit-only`` against the composed
-  proposal content before any proposal file is written. Such a harness must not treat
-  its patch-apply mechanism as equivalent to governed ``Write`` / ``Edit`` for bridge
+- **Claude path:** helper composer functions may return proposal content for
+  the harness to persist through Claude ``Write`` / ``Edit`` tool
+  calls. Those calls flow through the live Claude PreToolUse governance hooks.
+- **Codex path:** Codex must use the helper-mediated path that runs
+  ``.harness-baseline-configuration/hooks/bridge-compliance-gate.py --audit-only`` against the composed
+  proposal content before any proposal file is written. Codex must not treat
+  ``apply_patch`` as equivalent to Claude ``Write`` / ``Edit`` for bridge
   compliance unless a future hook-parity change explicitly adds that coverage.
 
 The pure composer functions are ``compose_proposal(...)`` and state-publication
-helpers. They perform no file I/O. The non-bypass writer entry
-point is ``propose_bridge_non_bypass(...)``; it preserves credential
+helpers. They perform no file I/O. The Codex writer entry
+point is ``propose_bridge_codex_non_bypass(...)``; it preserves credential
 scanning, author metadata insertion, bridge-compliance validation, file-first
 write ordering, and no-index dispatcher/TAFE publication behavior.
 
@@ -119,7 +119,7 @@ publication. Here "canonical write path" means the current governed helper path
 for bridge file and state publication; it does not create or depend on
 aggregate queue artifacts.
 
-Invokes ``scripts/skill-helpers/gtkb-bridge-propose/write_bridge.py``'s ``propose_bridge()`` with the
+Invokes ``helpers/write_bridge.py``'s ``propose_bridge()`` with the
 caller-supplied ``topic_slug``, ``body``, and optional metadata.
 
 ### Phase 0 — Prior Deliberations pre-population
@@ -131,7 +131,7 @@ scan. Retrieval has a deterministic baseline plus an explicit semantic-search
 opt-in:
 
 1. **Glossary-source seeding (deterministic).** The helper reads
-   ``.goose/rules/canonical-terminology.md`` and looks for a
+   ``.harness-baseline-configuration/rules/canonical-terminology.md`` and looks for a
    ``### <heading>`` matching the topic slug (kebab-case → space-separated,
    case-insensitive). If matched, the heading's ``**Source:**`` block is
    parsed and ``DELIB-*`` / MemBase spec IDs are extracted as deterministic
@@ -159,7 +159,7 @@ author content, helper-suggested candidates land under a
 prior content.
 
 The author then reviews and prunes irrelevant entries before the
-proposal is filed. The Loyal Opposition review-side check (``gtkb-review-gate.md``
+proposal is filed. The Loyal Opposition review-side check (``codex-review-gate.md``
 sixth review obligation) NO-GOs proposals with empty Prior Deliberations
 sections lacking justification (a ``_No prior deliberations: <reason>._``
 line is the explicit empty-justification convention for novel topics).
@@ -239,8 +239,8 @@ the governed bridge path.
 <!--
 GTKB-GOOSE-SKILL-ADAPTER-BEGIN
 Generated by: scripts/harness_projection/project_harness.py
-Generated at: content-addressed c3539fd32e90
+Generated at: content-addressed 91b72b8455cf
 Canonical source: .harness-baseline-configuration/skills/gtkb-bridge-propose/SKILL.md
-Canonical source sha256: c3539fd32e902a598ec7e3e5cdb7aa830dbeea2bb7e0b0bb64448b29db5126f2
+Canonical source sha256: 91b72b8455cfcf8db3416c8dc250ffaa2454c068582850fbc11767ea0b71b4b7
 GTKB-GOOSE-SKILL-ADAPTER-END
 -->

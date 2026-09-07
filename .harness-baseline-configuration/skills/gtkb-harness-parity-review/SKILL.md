@@ -120,7 +120,7 @@ Include:
 | Claude Code | (canonical source — no generator needed) | `.harness-baseline-configuration/skills/` |
 | Codex | `scripts/generate_codex_skill_adapters.py` | `.harness-baseline-configuration/skills/` |
 | Antigravity | **No generator** — inline loading | N/A |
-| Cursor | **No generator** — Claude-compatible loading | N/A |
+| Cursor | `scripts/generate_cursor_skill_adapters.py` | `.cursor/skills/` |
 | Goose | **No generator** — inline loading | N/A |
 | OpenRouter | **No generator** — inline loading | N/A |
 

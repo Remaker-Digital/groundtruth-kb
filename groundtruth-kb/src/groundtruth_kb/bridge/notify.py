@@ -35,8 +35,9 @@ operational_state_change/candidate_spec_intake).
 Routing contract (per ``AGENTS.md:153-159`` + DELIB-S319-SMART-POLLER-OBJECTIVE-CLARIFICATION
 + smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4):
 
-- ``NEW`` / ``REVISED`` / ``NO-ACTION`` top status → Codex (Loyal Opposition reviews).
-  Always dispatchable; kind classification is informational only.
+- ``NEW`` / ``REVISED`` / ``READY`` / ``VERDICT-REJECTED`` top status → Loyal
+  Opposition (reviews). Always dispatchable; kind classification is
+  informational only.
 - ``NO-GO`` top status → Prime Builder (Prime revises). Always dispatchable
   because NO-GO is "proposal requires changes before approval", regardless
   of bridge_kind, except when the latest verdict explicitly marks the thread
@@ -48,10 +49,11 @@ Routing contract (per ``AGENTS.md:153-159`` + DELIB-S319-SMART-POLLER-OBJECTIVE-
   operational_state_change, candidate_spec_intake, implementation_report) or
   explicit ``Hold for Owner Decision`` latest verdicts have no headless Prime
   follow-up after a GO verdict.
-- ``ADVISORY`` top status -> Prime Builder owner-visible disposition work,
-  but non-dispatchable for headless automation.
-- ``VERIFIED`` / ``DEFERRED`` / ``WITHDRAWN`` top status -> not actionable
-  for either role.
+- ``ADVISORY`` top status -> not actionable for either role. It is
+  owner-visible informational input only: never assigned, dispatched, or
+  placed in a role queue.
+- ``VERIFIED`` / ``WITHDRAWN`` / ``SUPERSEDED`` / ``BLOCKED`` top status ->
+  not actionable for either role.
 
 Phase-2 Ollama dispatch wiring keeps this module role-actionability-only.
 Harness-local readiness (Ollama shim, daemon, route/tool subset) is applied
@@ -70,6 +72,9 @@ import datetime as dt
 import json
 import os
 import re
+import sqlite3
+import subprocess
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
@@ -89,11 +94,6 @@ from groundtruth_kb.bridge.routing import BridgeAgent
 
 NOTIFY_SUBDIR: Final[str] = "notifications"
 NOTIFY_SCHEMA_VERSION: Final[int] = 3
-
-# Per AGENTS.md + DELIB-S319-SMART-POLLER-OBJECTIVE-CLARIFICATION.
-# These compatibility names are sourced from the shared disposition matrix.
-ACTIONABLE_STATUSES_FOR_PRIME: Final[frozenset[str]] = PRIME_ACTIONABLE_STATUSES
-ACTIONABLE_STATUSES_FOR_CODEX: Final[frozenset[str]] = LOYAL_OPPOSITION_ACTIONABLE_STATUSES
 
 # Feature flag for kind-aware routing. =0 disables filtering and matches
 # pre-refinement behavior (all entries dispatchable=True via fallback).
@@ -124,6 +124,19 @@ _HEADLESS_INELIGIBLE_RE: Final[re.Pattern[str]] = re.compile(
     r"|\bno\s+further\s+(?:codex\s+)?headless\s+(?:auto-?)?re-?dispatch(?:es)?\b",
     re.IGNORECASE,
 )
+_WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(
+    r"^\s*(?:[-*+]\s*)?Work Item:\s*`?(?P<work_item_id>WI-\d+)\b",
+    re.IGNORECASE | re.MULTILINE,
+)
+_COMMIT_SUBJECT_WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(r"\((WI-\d+)\)\s*$", re.IGNORECASE)
+_COMMIT_TRAILER_WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(
+    r"^(?:Retired-Work-Item|Work-Item):\s*(WI-\d+)\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+_TERMINAL_WORK_ITEM_STAGES: Final[frozenset[str]] = frozenset(
+    {"complete", "completed", "resolved", "retired", "terminal"}
+)
+_TERMINAL_RESOLUTION_STATUSES: Final[frozenset[str]] = frozenset({"resolved", "retired", "superseded", "wont_fix"})
 
 # Header read budget (bytes). bridge_kind is always in the header section.
 _HEADER_READ_BUDGET_BYTES: Final[int] = 4096
@@ -277,17 +290,40 @@ def _derive_dispatchable(top_status: str, classification: str) -> bool:
 
     Per smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4 §1.1:
 
-    - NEW / REVISED / NO-ACTION → True (Codex reviews regardless of kind classification;
-      terminal-kind means "no Prime follow-up", not "no Codex review")
+    - NEW / REVISED / READY / VERDICT-REJECTED → True (Loyal Opposition reviews
+      regardless of kind classification; terminal-kind means "no Prime
+      follow-up", not "no Loyal Opposition review")
     - NO-GO → True unless the latest verdict explicitly declares owner-hold
       (Prime revises regardless of kind, per file-bridge-protocol.md:92,
       104-107: "proposal requires changes before approval")
     - GO → ``classification != "terminal"`` (Prime filters terminal kinds,
       keeps everything else, unless latest-verdict owner-hold suppresses it)
-    - ADVISORY + others -> False for headless dispatch (Prime-visible/manual only)
-    - VERIFIED / DEFERRED / WITHDRAWN + others -> False (not actionable)
+    - ADVISORY + others -> False (owner-visible informational input only)
+    - VERIFIED / WITHDRAWN / SUPERSEDED / BLOCKED + others -> False (not actionable)
     """
     return dispatchable_for_status(top_status, classification)
+
+
+@dataclass(frozen=True)
+class WorkItemTerminality:
+    """Fail-visible checked-in Git terminality for one work item."""
+
+    state: str
+    commit: str | None = None
+    diagnostic: str | None = None
+
+
+@dataclass(frozen=True)
+class WorkItemActionabilityAnnotation:
+    """Advisory work-item context attached to one visible bridge thread."""
+
+    work_item_id: str | None = None
+    stage: str | None = None
+    resolution_status: str | None = None
+    status_detail: str | None = None
+    git_terminality: str = "ambiguous"
+    terminal_commit: str | None = None
+    terminality_diagnostic: str | None = "work_item_id_unresolved"
 
 
 @dataclass(frozen=True)
@@ -304,6 +340,13 @@ class ActionablePending:
     index_line_number: int
     dispatchable: bool = True
     classification: str = "ambiguous"
+    work_item_id: str | None = None
+    work_item_stage: str | None = None
+    work_item_resolution_status: str | None = None
+    work_item_status_detail: str | None = None
+    git_terminality: str = "ambiguous"
+    terminal_commit: str | None = None
+    terminality_diagnostic: str | None = None
 
 
 @dataclass(frozen=True)
@@ -359,9 +402,9 @@ def _scoping_terminal_with_successor(doc_name: str, parse_result: ParseResult) -
 
     A scoping thread is identified by the ``-scoping`` slug suffix. Its
     successor is the document at the same slug with the suffix stripped.
-    When the successor exists in ``parse_result.documents`` (at any status:
-    NEW/REVISED/GO/VERIFIED/NO-GO/ADVISORY/WITHDRAWN/DEFERRED), the scoping
-    thread is terminal-for-scoping and no longer actionable for either role.
+    When the successor exists in ``parse_result.documents`` (at any canonical
+    bridge status), the scoping thread is terminal-for-scoping and no longer
+    actionable for either role.
 
     Per WI-3442 + bridge/gtkb-axis-2-scoping-terminal-classifier-fix-002 (GO).
     """
@@ -394,6 +437,186 @@ def _has_verified_implementation_sibling(doc_name: str, parse_result: ParseResul
     return False
 
 
+def _work_item_id_from_thread_files(project_root: Path, files: Sequence[str | Path]) -> str | None:
+    """Return the first exact Work Item header found, newest file first."""
+
+    for raw_path in files:
+        path = Path(raw_path)
+        if not path.is_absolute():
+            path = project_root / path
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                text = handle.read(_OWNER_HOLD_READ_BUDGET_BYTES)
+        except (OSError, UnicodeDecodeError):
+            continue
+        match = _WORK_ITEM_RE.search(text)
+        if match:
+            return match.group("work_item_id").upper()
+    return None
+
+
+def _read_work_item_rows(
+    project_root: Path,
+    work_item_ids: set[str],
+) -> tuple[dict[str, dict[str, str | None]], str | None]:
+    """Read current work-item annotation fields without creating a database."""
+
+    if not work_item_ids:
+        return {}, None
+    db_path = project_root / "groundtruth.db"
+    if not db_path.is_file():
+        return {}, "work_item_database_missing"
+    placeholders = ", ".join("?" for _ in work_item_ids)
+    try:
+        connection = sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True)
+        connection.row_factory = sqlite3.Row
+        try:
+            connection.execute("PRAGMA query_only = ON")
+            rows = connection.execute(
+                "SELECT id, stage, resolution_status, status_detail "
+                f"FROM current_work_items WHERE id IN ({placeholders})",
+                tuple(sorted(work_item_ids)),
+            ).fetchall()
+        finally:
+            connection.close()
+    except (OSError, sqlite3.Error, ValueError):
+        return {}, "work_item_database_unreadable"
+    return {
+        str(row["id"]).upper(): {
+            "stage": str(row["stage"]) if row["stage"] is not None else None,
+            "resolution_status": (str(row["resolution_status"]) if row["resolution_status"] is not None else None),
+            "status_detail": str(row["status_detail"]) if row["status_detail"] is not None else None,
+        }
+        for row in rows
+    }, None
+
+
+def _checked_in_work_item_commit_index(
+    project_root: Path,
+) -> tuple[dict[str, tuple[str, ...]], set[str], str | None]:
+    """Index exact terminal-commit metadata from commits reachable from HEAD."""
+
+    if not (project_root / ".git").exists():
+        return {}, set(), "git_repository_unavailable"
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(project_root), "log", "--format=%H%x1f%B%x1e", "HEAD"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return {}, set(), "git_log_unavailable"
+    if result.returncode != 0:
+        return {}, set(), "git_log_failed"
+
+    commits: dict[str, list[str]] = {}
+    ambiguous_ids: set[str] = set()
+    for raw_record in result.stdout.split("\x1e"):
+        record = raw_record.strip("\r\n")
+        if not record:
+            continue
+        commit, separator, message = record.partition("\x1f")
+        if not separator or not commit:
+            continue
+        subject = message.splitlines()[0] if message.splitlines() else ""
+        subject_match = _COMMIT_SUBJECT_WORK_ITEM_RE.search(subject)
+        work_item_ids = {subject_match.group(1).upper()} if subject_match else set()
+        work_item_ids.update(match.upper() for match in _COMMIT_TRAILER_WORK_ITEM_RE.findall(message))
+        if len(work_item_ids) != 1:
+            ambiguous_ids.update(work_item_ids)
+            continue
+        work_item_id = next(iter(work_item_ids))
+        commits.setdefault(work_item_id, []).append(commit)
+    return {work_item_id: tuple(values) for work_item_id, values in commits.items()}, ambiguous_ids, None
+
+
+def _resolve_terminality_from_evidence(
+    work_item_id: str,
+    *,
+    work_item_row: Mapping[str, str | None] | None,
+    commit_index: Mapping[str, tuple[str, ...]],
+    ambiguous_commit_ids: set[str],
+    git_error: str | None,
+) -> WorkItemTerminality:
+    if git_error is not None:
+        return WorkItemTerminality(state="ambiguous", diagnostic=git_error)
+    commits = commit_index.get(work_item_id, ())
+    if work_item_id in ambiguous_commit_ids or len(commits) > 1:
+        return WorkItemTerminality(state="ambiguous", diagnostic="multiple_or_non_singleton_commit_metadata")
+    if len(commits) == 1:
+        return WorkItemTerminality(state="confirmed", commit=commits[0])
+    if work_item_row is None:
+        return WorkItemTerminality(state="ambiguous", diagnostic="work_item_row_missing")
+    stage = str(work_item_row.get("stage") or "").lower()
+    resolution_status = str(work_item_row.get("resolution_status") or "").lower()
+    if stage in _TERMINAL_WORK_ITEM_STAGES or resolution_status in _TERMINAL_RESOLUTION_STATUSES:
+        return WorkItemTerminality(
+            state="ambiguous",
+            diagnostic="work_item_terminal_without_checked_in_commit",
+        )
+    return WorkItemTerminality(state="not_confirmed", diagnostic="no_checked_in_terminal_commit")
+
+
+def resolve_work_item_terminality(work_item_id: str, *, project_root: Path) -> WorkItemTerminality:
+    """Resolve one work item; ambiguity is explicit and never suppressive."""
+
+    normalized = work_item_id.upper()
+    rows, _ = _read_work_item_rows(project_root, {normalized})
+    commit_index, ambiguous_ids, git_error = _checked_in_work_item_commit_index(project_root)
+    return _resolve_terminality_from_evidence(
+        normalized,
+        work_item_row=rows.get(normalized),
+        commit_index=commit_index,
+        ambiguous_commit_ids=ambiguous_ids,
+        git_error=git_error,
+    )
+
+
+def resolve_thread_actionability_annotations(
+    project_root: Path,
+    thread_files: Mapping[str, Sequence[str | Path]],
+) -> dict[str, WorkItemActionabilityAnnotation]:
+    """Batch-resolve advisory work-item fields and checked-in terminality."""
+
+    thread_work_items = {
+        slug: _work_item_id_from_thread_files(project_root, files) for slug, files in thread_files.items()
+    }
+    work_item_ids = {work_item_id for work_item_id in thread_work_items.values() if work_item_id}
+    rows, db_error = _read_work_item_rows(project_root, work_item_ids)
+    commit_index, ambiguous_ids, git_error = _checked_in_work_item_commit_index(project_root)
+
+    annotations: dict[str, WorkItemActionabilityAnnotation] = {}
+    for slug, work_item_id in thread_work_items.items():
+        if work_item_id is None:
+            annotations[slug] = WorkItemActionabilityAnnotation()
+            continue
+        row = rows.get(work_item_id)
+        terminality = _resolve_terminality_from_evidence(
+            work_item_id,
+            work_item_row=row,
+            commit_index=commit_index,
+            ambiguous_commit_ids=ambiguous_ids,
+            git_error=git_error,
+        )
+        diagnostic = terminality.diagnostic
+        if db_error is not None and row is None:
+            diagnostic = ";".join(part for part in (diagnostic, db_error) if part)
+        annotations[slug] = WorkItemActionabilityAnnotation(
+            work_item_id=work_item_id,
+            stage=row.get("stage") if row else None,
+            resolution_status=row.get("resolution_status") if row else None,
+            status_detail=row.get("status_detail") if row else None,
+            git_terminality=terminality.state,
+            terminal_commit=terminality.commit,
+            terminality_diagnostic=diagnostic,
+        )
+    return annotations
+
+
 def compute_actionable_pending(
     parse_result: ParseResult,
     *,
@@ -405,11 +628,13 @@ def compute_actionable_pending(
     one entry per document whose CURRENT TOP STATUS is actionable for that
     recipient.
 
-    - ``GO`` / ``NO-GO`` → Prime list.
-    - ``NEW`` / ``REVISED`` / ``NO-ACTION`` → Codex list.
-    - ``ADVISORY`` -> Prime list, with ``dispatchable=False`` for headless
-      automation.
-    - ``VERIFIED`` / ``DEFERRED`` / ``WITHDRAWN`` -> excluded
+    - ``GO`` / ``NO-GO`` / ``NOT-READY`` → Prime list
+      (``PRIME_ACTIONABLE_STATUSES``).
+    - ``NEW`` / ``REVISED`` / ``READY`` / ``VERDICT-REJECTED`` → Loyal
+      Opposition list (``LOYAL_OPPOSITION_ACTIONABLE_STATUSES``).
+    - ``ADVISORY`` -> excluded from BOTH lists. It is owner-visible
+      informational input, never assigned or dispatched to a role.
+    - ``VERIFIED`` / ``WITHDRAWN`` / ``SUPERSEDED`` / ``BLOCKED`` -> excluded
       (non-actionable for both per bridge protocol).
     - Documents whose top file is missing on disk are excluded (UNROUTABLE_FILE_MISSING
       semantic from P1 routing).
@@ -421,6 +646,10 @@ def compute_actionable_pending(
     """
     actionable_for_prime: list[ActionablePending] = []
     actionable_for_codex: list[ActionablePending] = []
+    annotations = resolve_thread_actionability_annotations(
+        project_root,
+        {doc.name: tuple(version.file_path for version in doc.versions) for doc in parse_result.documents},
+    )
 
     for doc in parse_result.documents:
         if not doc.versions:
@@ -443,6 +672,10 @@ def compute_actionable_pending(
         if _has_verified_implementation_sibling(doc.name, parse_result):
             continue
 
+        annotation = annotations[doc.name]
+        if annotation.git_terminality == "confirmed":
+            continue
+
         # Kind-aware classification per smart-poller-kind-aware-routing
         # -2026-04-30-009 REVISED-4. Read bridge_kind from the operative
         # Prime proposal (latest NEW/REVISED), classify, then derive
@@ -458,13 +691,21 @@ def compute_actionable_pending(
             index_line_number=top.line_number,
             dispatchable=dispatchable,
             classification=classification,
+            work_item_id=annotation.work_item_id,
+            work_item_stage=annotation.stage,
+            work_item_resolution_status=annotation.resolution_status,
+            work_item_status_detail=annotation.status_detail,
+            git_terminality=annotation.git_terminality,
+            terminal_commit=annotation.terminal_commit,
+            terminality_diagnostic=annotation.terminality_diagnostic,
         )
-        if status_str in ACTIONABLE_STATUSES_FOR_PRIME:
+        if status_str in PRIME_ACTIONABLE_STATUSES:
             actionable_for_prime.append(entry)
-        elif status_str in ACTIONABLE_STATUSES_FOR_CODEX:
+        elif status_str in LOYAL_OPPOSITION_ACTIONABLE_STATUSES:
             actionable_for_codex.append(entry)
-        # VERIFIED/DEFERRED/WITHDRAWN + anything else: not actionable, skip.
-        # ADVISORY is handled above as Prime-visible but non-dispatchable.
+        # VERIFIED/WITHDRAWN/SUPERSEDED/BLOCKED + anything else: not
+        # actionable, skip. ADVISORY falls here too: it is in neither
+        # PRIME_ACTIONABLE_STATUSES nor LOYAL_OPPOSITION_ACTIONABLE_STATUSES.
 
     return actionable_for_prime, actionable_for_codex
 
@@ -496,8 +737,11 @@ def _render_markdown(artifact: NotificationArtifact) -> str:
     if artifact.pending_actions:
         # Schema v3 columns: kind classification + dispatchability per
         # smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4.
-        lines.append("| Document | Top status | Top file | INDEX line | Dispatchable | Classification |")
-        lines.append("|---|---|---|---|---|---|")
+        lines.append(
+            "| Document | Top status | Top file | INDEX line | Dispatchable | Classification | "
+            "Work item | Work-item state | Git terminality |"
+        )
+        lines.append("|---|---|---|---|---|---|---|---|---|")
         for item in artifact.pending_actions:
             dispatchable_marker = "yes" if item.dispatchable else "no"
             # `(terminal)` prefix shown only when classification is terminal AND
@@ -510,7 +754,10 @@ def _render_markdown(artifact: NotificationArtifact) -> str:
             )
             lines.append(
                 f"| {prefix}{item.document_name} | {item.top_status} | {item.top_file} | "
-                f"{item.index_line_number} | {dispatchable_marker} | {item.classification} |"
+                f"{item.index_line_number} | {dispatchable_marker} | {item.classification} | "
+                f"{item.work_item_id or '(unresolved)'} | "
+                f"{item.work_item_stage or '(unknown)'}/{item.work_item_resolution_status or '(unknown)'} | "
+                f"{item.git_terminality} |"
             )
     return "\n".join(lines) + "\n"
 
@@ -560,6 +807,13 @@ def update_notification(
                 "index_line_number": item.index_line_number,
                 "dispatchable": item.dispatchable,
                 "classification": item.classification,
+                "work_item_id": item.work_item_id,
+                "work_item_stage": item.work_item_stage,
+                "work_item_resolution_status": item.work_item_resolution_status,
+                "work_item_status_detail": item.work_item_status_detail,
+                "git_terminality": item.git_terminality,
+                "terminal_commit": item.terminal_commit,
+                "terminality_diagnostic": item.terminality_diagnostic,
             }
             for item in artifact.pending_actions
         ],
@@ -592,6 +846,19 @@ def read_notification(state_dir: Path, recipient: BridgeAgent | str) -> Notifica
             index_line_number=int(a["index_line_number"]),
             dispatchable=bool(a.get("dispatchable", True)),
             classification=str(a.get("classification", "ambiguous")),
+            work_item_id=str(a["work_item_id"]) if a.get("work_item_id") is not None else None,
+            work_item_stage=str(a["work_item_stage"]) if a.get("work_item_stage") is not None else None,
+            work_item_resolution_status=(
+                str(a["work_item_resolution_status"]) if a.get("work_item_resolution_status") is not None else None
+            ),
+            work_item_status_detail=(
+                str(a["work_item_status_detail"]) if a.get("work_item_status_detail") is not None else None
+            ),
+            git_terminality=str(a.get("git_terminality", "ambiguous")),
+            terminal_commit=str(a["terminal_commit"]) if a.get("terminal_commit") is not None else None,
+            terminality_diagnostic=(
+                str(a["terminality_diagnostic"]) if a.get("terminality_diagnostic") is not None else None
+            ),
         )
         for a in raw.get("pending_actions", [])
     )

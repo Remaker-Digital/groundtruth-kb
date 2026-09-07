@@ -52,7 +52,7 @@ NEW_SECTION = (
 
 
 def main() -> None:
-    src_path = Path(".claude/rules/canonical-terminology.md")
+    src_path = Path(".harness-baseline-configuration/rules/canonical-terminology.md")
     current = src_path.read_text(encoding="utf-8")
     # Insertion anchor: end of the "### OS poller" block (after its trailing
     # blank line) and before "### doctor".
@@ -70,7 +70,7 @@ def main() -> None:
         "artifact_type": "narrative_artifact",
         "artifact_id": "canonical-terminology-md-canonical-init-keyword-entry",
         "action": "insert-section",
-        "target_path": ".claude/rules/canonical-terminology.md",
+        "target_path": ".harness-baseline-configuration/rules/canonical-terminology.md",
         "source_ref": "bridge:gtkb-canonical-init-keyword-syntax-001-007:IP-7",
         "full_content": new_content,
         "full_content_sha256": new_hash,
@@ -80,7 +80,7 @@ def main() -> None:
         "explicit_change_request": (
             "Implement IP-7 of bridge/gtkb-canonical-init-keyword-syntax-001-007.md (GO at -008): "
             "insert the 'canonical init keyword' glossary entry into "
-            ".claude/rules/canonical-terminology.md (after the OS poller entry, before the doctor entry, "
+            ".harness-baseline-configuration/rules/canonical-terminology.md (after the OS poller entry, before the doctor entry, "
             "in the GT-KB DA Read-Surface and Operational Vocabulary section). This satisfies "
             "DCL-CONCEPT-ON-CONTACT-001's first-contact obligation for the load-bearing 'canonical init "
             "keyword' concept introduced by SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001."

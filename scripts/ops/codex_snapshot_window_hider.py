@@ -24,7 +24,8 @@ WINEVENT_OUTOFCONTEXT = 0x0000
 WINEVENT_SKIPOWNPROCESS = 0x0002
 SW_HIDE = 0
 ERROR_ALREADY_EXISTS = 183
-MUTEX_NAME = "Local\\GTKB-CodexSnapshotWindowHider-v1"
+MUTEX_NAME = "Local\\GTKB-CodexSnapshotWindowHider-v2"
+METADATA_ATTEMPTS = 2
 
 REQUIRED_GIT_CONFIG = {
     "core.hookspath": "NUL",
@@ -77,42 +78,50 @@ def is_codex_git_manager_commandline(commandline: Sequence[str]) -> bool:
     return bool(subcommand) and subcommand == subcommand.strip() and not subcommand.startswith("-")
 
 
+def _inspect_qualifying_console_process(
+    pid: int,
+    process_factory: Callable[[int], Any],
+) -> bool:
+    """Return True when conhost -> git.exe reaches ChatGPT.exe in a bounded walk."""
+
+    console = process_factory(pid)
+    if console is None or console.name().casefold() != "conhost.exe":
+        return False
+
+    snapshot_git = console.parent()
+    if snapshot_git is None or snapshot_git.name().casefold() != "git.exe":
+        return False
+
+    ancestor = snapshot_git.parent()
+    for _ in range(6):
+        if ancestor is None:
+            return False
+        if ancestor.name().casefold() == "chatgpt.exe":
+            return True
+        ancestor = ancestor.parent()
+    return False
+
+
 def is_qualifying_console_process(
     pid: int,
     *,
     process_factory: Callable[[int], Any] = psutil.Process,
+    metadata_attempts: int = METADATA_ATTEMPTS,
 ) -> bool:
-    """Require conhost -> exact snapshot Git -> ChatGPT ancestry.
+    """Require conhost -> git.exe -> bounded ChatGPT ancestry.
 
-    Process inspection races and access failures deliberately fail open: the
-    window remains visible and no process or window is changed.
+    Git arguments are not an allowlist. Nested git.exe ancestors remain
+    acceptable. Missing metadata is retried once, then fails open: the window
+    remains visible and no process or window is changed.
     """
 
-    try:
-        console = process_factory(pid)
-        if console.name().casefold() != "conhost.exe":
-            return False
-
-        snapshot_git = console.parent()
-        if (
-            snapshot_git is None
-            or snapshot_git.name().casefold() != "git.exe"
-            or not is_codex_git_manager_commandline(snapshot_git.cmdline())
-        ):
-            return False
-
-        ancestor = snapshot_git.parent()
-        for _ in range(6):
-            if ancestor is None:
+    attempts = max(1, int(metadata_attempts))
+    for attempt in range(attempts):
+        try:
+            return _inspect_qualifying_console_process(pid, process_factory)
+        except (AttributeError, TypeError, psutil.Error, OSError, RuntimeError, ValueError):
+            if attempt + 1 >= attempts:
                 return False
-            ancestor_name = ancestor.name().casefold()
-            if ancestor_name == "chatgpt.exe":
-                return True
-            if ancestor_name == "git.exe":
-                return False
-            ancestor = ancestor.parent()
-    except (AttributeError, TypeError, psutil.Error, OSError, RuntimeError, ValueError):
-        return False
     return False
 
 
@@ -122,6 +131,7 @@ def hide_qualifying_window(
     pid_resolver: Callable[[int], int],
     hide_window: Callable[[int], bool],
     process_factory: Callable[[int], Any] = psutil.Process,
+    metadata_attempts: int = METADATA_ATTEMPTS,
 ) -> bool:
     """Hide *hwnd* only when every provenance predicate is satisfied."""
 
@@ -129,7 +139,11 @@ def hide_qualifying_window(
         pid = int(pid_resolver(hwnd))
     except (OSError, RuntimeError, TypeError, ValueError):
         return False
-    if pid <= 0 or not is_qualifying_console_process(pid, process_factory=process_factory):
+    if pid <= 0 or not is_qualifying_console_process(
+        pid,
+        process_factory=process_factory,
+        metadata_attempts=metadata_attempts,
+    ):
         return False
     try:
         return bool(hide_window(hwnd))

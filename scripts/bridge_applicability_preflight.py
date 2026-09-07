@@ -19,7 +19,6 @@ import sqlite3
 import sys
 import tomllib
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 
@@ -27,14 +26,12 @@ try:
     from scripts.implementation_authorization import (
         PATH_TOKEN_RE,
         AuthorizationError,
-        extract_and_validate_project_authorization,
         validate_structured_pauth_spec_amendment,
     )
 except ImportError:  # pragma: no cover - direct script execution path
     from implementation_authorization import (  # type: ignore[no-redef]
         PATH_TOKEN_RE,
         AuthorizationError,
-        extract_and_validate_project_authorization,
         validate_structured_pauth_spec_amendment,
     )
 
@@ -44,25 +41,19 @@ except ImportError:  # pragma: no cover - direct script execution path
     from bridge_author_metadata import REQUIRED_AUTHOR_METADATA_FIELDS
 
 try:
+    # WI-7618 removed the operation-time authorization evaluation, so
+    # ``evaluate_envelope`` and ``load_operation_taxonomy`` are no longer imported.
+    # ``classify_target`` is retained: it backs the target-path mutation-class
+    # diagnostic, which is not an authorization question.
     from groundtruth_kb.governance.project_authorization_operation_time import (
         classify_target as _classify_target,
     )
-    from groundtruth_kb.governance.project_authorization_operation_time import (
-        evaluate_envelope as _evaluate_envelope,
-    )
-    from groundtruth_kb.governance.project_authorization_operation_time import (
-        load_operation_taxonomy as _load_operation_taxonomy,
-    )
 except ImportError:  # pragma: no cover
     _classify_target = None  # type: ignore[assignment]
-    _evaluate_envelope = None  # type: ignore[assignment]
-    _load_operation_taxonomy = None  # type: ignore[assignment]
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 DEFAULT_BRIDGE_DIR: Final[Path] = PROJECT_ROOT / "bridge"
-DEFAULT_CONFIG_PATH: Final[Path] = (
-    PROJECT_ROOT / "config" / "governance" / "spec-applicability.toml"
-)
+DEFAULT_CONFIG_PATH: Final[Path] = PROJECT_ROOT / "config" / "governance" / "spec-applicability.toml"
 DEFAULT_DB_PATH: Final[Path] = PROJECT_ROOT / "groundtruth.db"
 PACKET_HASH_SCHEMA_VERSION: Final[int] = 3
 PACKET_HASH_MATERIAL_KEYS: Final[frozenset[str]] = frozenset(
@@ -107,21 +98,13 @@ SPEC_LINK_HEADING_LOOSE_RE: Final[re.Pattern[str]] = re.compile(
     r"^#{1,6}\s+.*\bspecification.*\b(?:link|reference)",
     re.IGNORECASE,
 )
-SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(
-    r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ|DELIB)-[A-Z0-9][A-Z0-9_-]*\b"
-)
+SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ|DELIB)-[A-Z0-9][A-Z0-9_-]*\b")
 RULE_PATH_RE: Final[re.Pattern[str]] = re.compile(r"\.claude/rules/[a-z0-9_-]+\.md")
-WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(
-    r"\b(?:WI|GTKB)-[A-Z0-9][A-Z0-9_-]*\b"
-)
-DOCUMENT_DECLARATION_RE: Final[re.Pattern[str]] = re.compile(
-    r"(?im)^\s*Document:\s*([A-Za-z0-9_.-]+)\s*$"
-)
+WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:WI|GTKB)-[A-Z0-9][A-Z0-9_-]*\b")
+DOCUMENT_DECLARATION_RE: Final[re.Pattern[str]] = re.compile(r"(?im)^\s*Document:\s*([A-Za-z0-9_.-]+)\s*$")
 # PATH_TOKEN_RE is imported from implementation_authorization (HYG-046 single
 # source; previously a drifted local copy that lacked 'memory/').
-TARGET_PATH_RE: Final[re.Pattern[str]] = re.compile(
-    r"^\s*target_paths?\s*[:=]\s*(.+)", re.IGNORECASE
-)
+TARGET_PATH_RE: Final[re.Pattern[str]] = re.compile(r"^\s*target_paths?\s*[:=]\s*(.+)", re.IGNORECASE)
 FILES_CHANGED_HEADING_RE: Final[re.Pattern[str]] = re.compile(
     r"^#{1,6}\s+Files\s+(?:Changed|Expected\s+To\s+Change)\s*$",
     re.IGNORECASE,
@@ -130,21 +113,13 @@ OPERATIVE_REFERENCE_RE: Final[re.Pattern[str]] = re.compile(
     r"(?im)^\s*(?:Responds\s+to|Corrects|Approved\s+proposal|Reviewed|Verified):\s*"
     r"(?:bridge/)?([^\s`]+)-(\d+)\.md\s*$"
 )
-BRIDGE_KIND_RE: Final[re.Pattern[str]] = re.compile(
-    r"(?im)^\s*bridge_kind:\s*([a-z0-9_-]+)\s*$"
-)
-VERSION_DECLARATION_RE: Final[re.Pattern[str]] = re.compile(
-    r"(?im)^\s*Version:\s*(\d+)\s*$"
-)
-PAUTH_METADATA_RE: Final[re.Pattern[str]] = re.compile(
-    r"(?im)^\s*Project Authorization(?: ID)?:\s*\S+"
-)
+BRIDGE_KIND_RE: Final[re.Pattern[str]] = re.compile(r"(?im)^\s*bridge_kind:\s*([a-z0-9_-]+)\s*$")
+VERSION_DECLARATION_RE: Final[re.Pattern[str]] = re.compile(r"(?im)^\s*Version:\s*(\d+)\s*$")
+PAUTH_METADATA_RE: Final[re.Pattern[str]] = re.compile(r"(?im)^\s*Project Authorization(?: ID)?:\s*\S+")
 APPROVED_PROPOSAL_RE: Final[re.Pattern[str]] = re.compile(
     r"(?im)^\s*Approved proposal:\s*`?(?:bridge/)?([A-Za-z0-9_.-]+)-(\d{3})\.md`?\s*$"
 )
-PROPOSAL_BRIDGE_KINDS: Final[frozenset[str]] = frozenset(
-    {"prime_proposal", "implementation_proposal"}
-)
+PROPOSAL_BRIDGE_KINDS: Final[frozenset[str]] = frozenset({"prime_proposal", "implementation_proposal"})
 FINALIZATION_BRIDGE_KINDS: Final[frozenset[str]] = frozenset(
     {"implementation_report", "implementation_report_revision"}
 )
@@ -157,9 +132,7 @@ PAUTH_PHASE_OPERATIONS: Final[dict[str, tuple[str, ...]]] = {
     # report under any PAUTH that (correctly) forbids it.
     "finalization": ("protected_mutation",),
 }
-VERDICT_CANDIDATE_STATUSES: Final[frozenset[str]] = frozenset(
-    {"GO", "NO-GO", "VERIFIED"}
-)
+VERDICT_CANDIDATE_STATUSES: Final[frozenset[str]] = frozenset({"GO", "NO-GO", "VERIFIED"})
 RESPONDS_TO_BRIDGE_PATH_RE: Final[re.Pattern[str]] = re.compile(
     r"(?im)^\s*Responds\s+to\s*:\s*`?(?P<path>[^`\r\n]+?\.md)`?\s*$"
 )
@@ -233,9 +206,7 @@ def _is_fence_closer(line: str, fence_char: str, fence_len: int) -> bool:
     only whitespace (CommonMark). This keeps a marker-plus-language line inside a fence
     from closing it early (WI-4838 inner-marker desync).
     """
-    return (
-        re.match(rf"^\s*{re.escape(fence_char)}{{{fence_len},}}\s*$", line) is not None
-    )
+    return re.match(rf"^\s*{re.escape(fence_char)}{{{fence_len},}}\s*$", line) is not None
 
 
 def _strip_code_fences(lines: list[str]) -> list[str]:
@@ -294,9 +265,7 @@ def _status_from_content(text: str) -> str | None:
     return None
 
 
-def parse_versioned_files_for_document(
-    bridge_dir: Path, bridge_id: str
-) -> list[BridgeVersion]:
+def parse_versioned_files_for_document(bridge_dir: Path, bridge_id: str) -> list[BridgeVersion]:
     """Return versioned bridge files for ``bridge_id`` when INDEX is absent."""
     versions: list[BridgeVersion] = []
     for path in bridge_dir.glob(f"{bridge_id}-*.md"):
@@ -325,8 +294,7 @@ def choose_operative_version(versions: list[BridgeVersion]) -> BridgeVersion | N
         earlier_no_actions = [
             version
             for version in versions
-            if version.status == "NO-ACTION"
-            and version.version_number < latest.version_number
+            if version.status == "NO-ACTION" and version.version_number < latest.version_number
         ]
         if latest.status in {"GO", "NO-GO", "VERIFIED"} and earlier_no_actions:
             references = _operative_reference_versions(latest)
@@ -349,11 +317,7 @@ def _operative_reference_versions(version: BridgeVersion) -> set[int]:
     except OSError:
         return set()
     thread_name = re.sub(r"-\d+\.md$", "", Path(version.rel_path).name)
-    return {
-        int(match.group(2))
-        for match in OPERATIVE_REFERENCE_RE.finditer(content)
-        if match.group(1) == thread_name
-    }
+    return {int(match.group(2)) for match in OPERATIVE_REFERENCE_RE.finditer(content) if match.group(1) == thread_name}
 
 
 def extract_spec_links(content: str) -> set[str]:
@@ -442,11 +406,7 @@ def _parse_declared_path_values(raw: str) -> set[str]:
     except json.JSONDecodeError:
         parsed = [p.strip("\"' ") for p in re.split(r"[,\s]+", raw) if p.strip("\"' ")]
     if isinstance(parsed, list):
-        return {
-            _normalize_path_token(str(p))
-            for p in parsed
-            if _normalize_path_token(str(p))
-        }
+        return {_normalize_path_token(str(p)) for p in parsed if _normalize_path_token(str(p))}
     parsed_token = _normalize_path_token(str(parsed))
     return {parsed_token} if parsed_token else set()
 
@@ -488,9 +448,7 @@ def collect_cited_implementation_paths(content: str) -> set[str]:
     return paths
 
 
-def compute_missing_parent_dir_warnings(
-    project_root: Path, paths: set[str]
-) -> list[str]:
+def compute_missing_parent_dir_warnings(project_root: Path, paths: set[str]) -> list[str]:
     warnings: list[str] = []
     root = project_root.resolve()
     for rel_path in sorted(paths):
@@ -517,15 +475,9 @@ def _parse_rules(content: str) -> list[ApplicabilityRule]:
                 spec_id=str(raw["spec_id"]),
                 severity=str(raw.get("severity", "blocking")),
                 rationale=str(raw.get("rationale", "")),
-                applies_when_paths_match=tuple(
-                    str(v) for v in raw.get("applies_when_paths_match", [])
-                ),
-                applies_when_doc_matches=tuple(
-                    str(v) for v in raw.get("applies_when_doc_matches", [])
-                ),
-                applies_when_content_matches=tuple(
-                    str(v) for v in raw.get("applies_when_content_matches", [])
-                ),
+                applies_when_paths_match=tuple(str(v) for v in raw.get("applies_when_paths_match", [])),
+                applies_when_doc_matches=tuple(str(v) for v in raw.get("applies_when_doc_matches", [])),
+                applies_when_content_matches=tuple(str(v) for v in raw.get("applies_when_content_matches", [])),
             )
         )
     return rules
@@ -593,9 +545,7 @@ def enrich_from_membase(applicable: dict[str, ApplicableSpec], db_path: Path) ->
         conn.close()
 
 
-def _pauth_amendment_blocking_errors(
-    content: str, project_root: Path, db_path: Path
-) -> list[str]:
+def _pauth_amendment_blocking_errors(content: str, project_root: Path, db_path: Path) -> list[str]:
     """Thin adapter over the canonical structured PAUTH-amendment validator.
 
     Delegates real structured-replacement-envelope validation to
@@ -618,9 +568,7 @@ def _check_author_metadata_presence(content: str) -> list[str]:
     """Check for missing required author-metadata fields in bridge content."""
     warnings: list[str] = []
     for field_name in REQUIRED_AUTHOR_METADATA_FIELDS:
-        pattern = re.compile(
-            r"^" + re.escape(field_name) + r"\s*:\s*(.+)$", re.MULTILINE | re.IGNORECASE
-        )
+        pattern = re.compile(r"^" + re.escape(field_name) + r"\s*:\s*(.+)$", re.MULTILINE | re.IGNORECASE)
         if not pattern.search(content):
             warnings.append(field_name)
     return warnings
@@ -645,9 +593,7 @@ def _normalize_lf(content: str) -> str:
     return content.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def normalize_verdict_candidate_path(
-    candidate_path: str | Path, project_root: Path
-) -> tuple[str, Path]:
+def normalize_verdict_candidate_path(candidate_path: str | Path, project_root: Path) -> tuple[str, Path]:
     """Return one canonical root-relative numbered bridge-candidate path."""
 
     cleaned = str(candidate_path).strip().strip("`").replace("\\", "/")
@@ -659,28 +605,20 @@ def normalize_verdict_candidate_path(
     try:
         relative = resolved.relative_to(root).as_posix()
     except ValueError as exc:
-        raise VerdictCandidatePreparationError(
-            "candidate path escapes the project root"
-        ) from exc
+        raise VerdictCandidatePreparationError("candidate path escapes the project root") from exc
     if resolved.parent != (root / "bridge").resolve():
         raise VerdictCandidatePreparationError(
             "candidate path must be a direct child of the canonical bridge directory"
         )
     if re.fullmatch(r".+-\d{3}\.md", resolved.name) is None:
-        raise VerdictCandidatePreparationError(
-            "candidate path must name an exact three-digit numbered bridge file"
-        )
+        raise VerdictCandidatePreparationError("candidate path must name an exact three-digit numbered bridge file")
     return relative, resolved
 
 
 def _candidate_bridge_identity(candidate_relative: str) -> tuple[str, int]:
-    match = re.fullmatch(
-        r"bridge/(?P<document>.+)-(?P<version>\d{3})\.md", candidate_relative
-    )
+    match = re.fullmatch(r"bridge/(?P<document>.+)-(?P<version>\d{3})\.md", candidate_relative)
     if match is None:  # pragma: no cover - guarded by normalize_verdict_candidate_path
-        raise VerdictCandidatePreparationError(
-            "candidate path is not a canonical numbered bridge file"
-        )
+        raise VerdictCandidatePreparationError("candidate path is not a canonical numbered bridge file")
     return match.group("document"), int(match.group("version"))
 
 
@@ -692,12 +630,8 @@ def resolve_verdict_responds_to_source(
 ) -> tuple[str, Path, str]:
     """Resolve the exact existing same-thread source named by ``Responds to``."""
 
-    candidate_relative, _ = normalize_verdict_candidate_path(
-        candidate_path, project_root
-    )
-    candidate_document, candidate_version = _candidate_bridge_identity(
-        candidate_relative
-    )
+    candidate_relative, _ = normalize_verdict_candidate_path(candidate_path, project_root)
+    candidate_document, candidate_version = _candidate_bridge_identity(candidate_relative)
     matches = list(RESPONDS_TO_BRIDGE_PATH_RE.finditer(content))
     if len(matches) != 1:
         raise VerdictCandidatePreparationError(
@@ -709,35 +643,21 @@ def resolve_verdict_responds_to_source(
     )
     source_document, source_version = _candidate_bridge_identity(source_relative)
     if source_document != candidate_document:
-        raise VerdictCandidatePreparationError(
-            "Responds to source must belong to the candidate bridge thread"
-        )
+        raise VerdictCandidatePreparationError("Responds to source must belong to the candidate bridge thread")
     if source_version >= candidate_version:
-        raise VerdictCandidatePreparationError(
-            "Responds to source must be an earlier bridge version"
-        )
+        raise VerdictCandidatePreparationError("Responds to source must be an earlier bridge version")
     if not source_path.is_file():
-        raise VerdictCandidatePreparationError(
-            "Responds to source does not exist as a canonical bridge file"
-        )
+        raise VerdictCandidatePreparationError("Responds to source does not exist as a canonical bridge file")
     return source_relative, source_path, candidate_document
 
 
-def candidate_evidence_hash(
-    candidate_path: str | Path, content: str, project_root: Path
-) -> str:
+def candidate_evidence_hash(candidate_path: str | Path, content: str, project_root: Path) -> str:
     """Bind normalized candidate bytes to their exact root-relative path."""
 
-    candidate_relative, _ = normalize_verdict_candidate_path(
-        candidate_path, project_root
-    )
+    candidate_relative, _ = normalize_verdict_candidate_path(candidate_path, project_root)
     normalized = _normalize_lf(content)
     normalized, replacements = CANDIDATE_EVIDENCE_HASH_LINE_RE.subn(
-        lambda match: (
-            match.group("prefix")
-            + CANDIDATE_EVIDENCE_HASH_SENTINEL
-            + match.group("suffix")
-        ),
+        lambda match: match.group("prefix") + CANDIDATE_EVIDENCE_HASH_SENTINEL + match.group("suffix"),
         normalized,
     )
     if replacements != 1:
@@ -756,9 +676,7 @@ def _applicability_preflight_span(content: str) -> tuple[int, int]:
         )
     match = matches[0]
     heading_level = len(match.group("marks"))
-    next_heading = re.compile(rf"(?m)^#{{1,{heading_level}}}\s+").search(
-        content, match.end()
-    )
+    next_heading = re.compile(rf"(?m)^#{{1,{heading_level}}}\s+").search(content, match.end())
     end = next_heading.start() if next_heading is not None else len(content)
     return match.start(), end
 
@@ -767,17 +685,10 @@ def verdict_candidate_needs_preparation(content: str) -> bool:
     """Return whether the writer should rebuild an existing verdict section."""
 
     status = next(
-        (
-            line.strip().upper()
-            for line in _normalize_lf(content).splitlines()
-            if line.strip()
-        ),
+        (line.strip().upper() for line in _normalize_lf(content).splitlines() if line.strip()),
         "",
     )
-    return (
-        status in VERDICT_CANDIDATE_STATUSES
-        and APPLICABILITY_PREFLIGHT_HEADING_RE.search(content) is not None
-    )
+    return status in VERDICT_CANDIDATE_STATUSES and APPLICABILITY_PREFLIGHT_HEADING_RE.search(content) is not None
 
 
 def _text_sha256(content: str) -> str:
@@ -799,9 +710,7 @@ def _canonical_explicit_version(
         return None
 
     versioned = re.fullmatch(r"(?P<document>.+)-(?P<version>\d+)\.md", source_path.name)
-    looks_canonical = versioned is not None or source_path.name.startswith(
-        f"{bridge_id}-"
-    )
+    looks_canonical = versioned is not None or source_path.name.startswith(f"{bridge_id}-")
     if versioned is None:
         if looks_canonical:
             raise SystemExit(
@@ -821,9 +730,7 @@ def _canonical_explicit_version(
     try:
         rel_path = source_path.relative_to(bridge_root.parent).as_posix()
     except ValueError as exc:
-        raise SystemExit(
-            "ERR_EXPLICIT_BRIDGE_SOURCE_ESCAPE: canonical source escapes the project root"
-        ) from exc
+        raise SystemExit("ERR_EXPLICIT_BRIDGE_SOURCE_ESCAPE: canonical source escapes the project root") from exc
     return BridgeVersion(
         status=status,
         rel_path=rel_path,
@@ -856,9 +763,7 @@ def _stable_applicable_specs(
     }
 
 
-def _packet_hash_material(
-    packet: dict[str, Any], applicable: dict[str, ApplicableSpec]
-) -> dict[str, Any]:
+def _packet_hash_material(packet: dict[str, Any], applicable: dict[str, ApplicableSpec]) -> dict[str, Any]:
     pauth = packet.get("project_authorization_operation_time") or {}
     stable_pauth = {
         "applicable": pauth.get("applicable"),
@@ -910,9 +815,7 @@ def _packet_hash_material(
         "missing_advisory_specs": packet["missing_advisory_specs"],
         "project_authorization_operation_time": stable_pauth,
     }
-    if (
-        set(material) != PACKET_HASH_MATERIAL_KEYS
-    ):  # pragma: no cover - construction invariant
+    if set(material) != PACKET_HASH_MATERIAL_KEYS:  # pragma: no cover - construction invariant
         raise RuntimeError("packet hash material key set drifted")
     return material
 
@@ -930,9 +833,7 @@ def _pauth_phase(content: str, versions: list[BridgeVersion]) -> str | None:
         return "finalization"
     if PAUTH_METADATA_RE.search(content) and extract_declared_target_paths(content):
         status = _status_from_content(content)
-        if status in {"NEW", "REVISED"} and any(
-            version.status == "GO" for version in versions
-        ):
+        if status in {"NEW", "REVISED"} and any(version.status == "GO" for version in versions):
             return "finalization"
         return "proposal"
     return None
@@ -953,10 +854,7 @@ def _approved_proposal_for_report(
 
     def approved_by_go(proposal: BridgeVersion) -> bool:
         for verdict in versions:
-            if (
-                verdict.status != "GO"
-                or verdict.version_number <= proposal.version_number
-            ):
+            if verdict.status != "GO" or verdict.version_number <= proposal.version_number:
                 continue
             if report_version is not None and verdict.version_number >= report_version:
                 continue
@@ -964,13 +862,8 @@ def _approved_proposal_for_report(
                 verdict_content = verdict.abs_path.read_text(encoding="utf-8")
             except OSError:
                 continue
-            for reference_slug, reference_version in OPERATIVE_REFERENCE_RE.findall(
-                verdict_content
-            ):
-                if (
-                    reference_slug == bridge_id
-                    and int(reference_version) == proposal.version_number
-                ):
+            for reference_slug, reference_version in OPERATIVE_REFERENCE_RE.findall(verdict_content):
+                if reference_slug == bridge_id and int(reference_version) == proposal.version_number:
                     return True
         return False
 
@@ -985,11 +878,7 @@ def _approved_proposal_for_report(
             )
         explicit_version = int(explicit_version_text)
         match = next(
-            (
-                version
-                for version in versions
-                if version.version_number == explicit_version
-            ),
+            (version for version in versions if version.version_number == explicit_version),
             None,
         )
         if match is None:
@@ -1030,9 +919,7 @@ def _approved_proposal_for_report(
             candidate_content = version.abs_path.read_text(encoding="utf-8")
         except OSError:
             continue
-        if _bridge_kind(candidate_content) in PROPOSAL_BRIDGE_KINDS and approved_by_go(
-            version
-        ):
+        if _bridge_kind(candidate_content) in PROPOSAL_BRIDGE_KINDS and approved_by_go(version):
             candidates.append((version, candidate_content))
     if not candidates:
         # WI-5837 Slice A: legacy bridge-kind tolerance. Pre-convention versions
@@ -1049,10 +936,7 @@ def _approved_proposal_for_report(
                 continue
             if _bridge_kind(candidate_content) is not None:
                 continue  # only tolerate versions with NO marker
-            if (
-                APPROVED_PROPOSAL_RE.search(candidate_content)
-                or "Controlling GO:" in candidate_content
-            ):
+            if APPROVED_PROPOSAL_RE.search(candidate_content) or "Controlling GO:" in candidate_content:
                 continue  # report-shaped legacy artifact
             if not extract_declared_target_paths(candidate_content):
                 continue
@@ -1060,24 +944,18 @@ def _approved_proposal_for_report(
                 continue
             legacy.append((version, candidate_content))
         if legacy:
-            proposal, proposal_content = max(
-                legacy, key=lambda item: item[0].version_number
-            )
+            proposal, proposal_content = max(legacy, key=lambda item: item[0].version_number)
             return proposal_content, proposal.rel_path, None
         return (
             None,
             None,
             "Implementation report has no readable earlier proposal-kind artifact with a matching GO verdict",
         )
-    proposal, proposal_content = max(
-        candidates, key=lambda item: item[0].version_number
-    )
+    proposal, proposal_content = max(candidates, key=lambda item: item[0].version_number)
     return proposal_content, proposal.rel_path, None
 
 
-NUMBERED_BRIDGE_FILE_RE: Final[re.Pattern[str]] = re.compile(
-    r"^bridge/[A-Za-z0-9_.-]+-\d{3}\.md$"
-)
+NUMBERED_BRIDGE_FILE_RE: Final[re.Pattern[str]] = re.compile(r"^bridge/[A-Za-z0-9_.-]+-\d{3}\.md$")
 
 
 def _is_numbered_bridge_file(path: str) -> bool:
@@ -1106,9 +984,7 @@ def _finalization_coordination_paths(
     else:
         observed_versions = [version.version_number for version in versions]
         next_version = max(observed_versions, default=0) + 1
-    return [
-        f"bridge/{bridge_id}-{version:03d}.md" for version in range(1, next_version + 1)
-    ]
+    return [f"bridge/{bridge_id}-{version:03d}.md" for version in range(1, next_version + 1)]
 
 
 def _pauth_phase_cohort(
@@ -1133,125 +1009,10 @@ def _pauth_phase_cohort(
 
     if approved_proposal_content is not None:
         implementation_targets.update(
-            _durable_implementation_targets(
-                extract_declared_target_paths(approved_proposal_content)
-            )
+            _durable_implementation_targets(extract_declared_target_paths(approved_proposal_content))
         )
     _ = bridge_id, versions, source_horizon_version
     return sorted(implementation_targets)
-
-
-def _evaluate_pauth_phase(
-    *,
-    content: str,
-    project_root: Path,
-    phase: str | None,
-    cohort: list[str],
-    cited_specs: set[str],
-    authorization_source: str | None = None,
-    decision_time: datetime | None = None,
-) -> tuple[dict[str, Any], list[str]]:
-    if phase is None:
-        return {
-            "applicable": False,
-            "phase": None,
-            "status": "not_applicable",
-            "requested_operations": [],
-            "cohort": [],
-            "allowed": None,
-            "reason_code": "not_applicable",
-            "decisions": [],
-        }, []
-
-    requested_operations = list(PAUTH_PHASE_OPERATIONS[phase])
-    base: dict[str, Any] = {
-        "applicable": True,
-        "phase": phase,
-        "status": "error",
-        "requested_operations": requested_operations,
-        "cohort": cohort,
-        "allowed": False,
-        "reason_code": "evaluation_error",
-        "authorization_source": authorization_source,
-        "decisions": [],
-    }
-    try:
-        envelope = extract_and_validate_project_authorization(
-            project_root,
-            content,
-            sorted(cited_specs),
-        )
-        if envelope is None:
-            raise AuthorizationError(
-                "implementation-bearing bridge content does not cite Project Authorization metadata"
-            )
-        if _evaluate_envelope is None or _load_operation_taxonomy is None:
-            raise AuthorizationError(
-                "canonical project-authorization operation evaluator is unavailable"
-            )
-        taxonomy = _load_operation_taxonomy(project_root)
-        effective_decision_time = (decision_time or datetime.now(UTC)).replace(
-            microsecond=0
-        )
-        decisions = [
-            _evaluate_envelope(
-                envelope,
-                requested_operation=operation,
-                target_paths=cohort,
-                decision_time=effective_decision_time,
-                taxonomy=taxonomy,
-            )
-            for operation in requested_operations
-        ]
-        decision_payloads = [decision.as_dict() for decision in decisions]
-        allowed = all(decision.allowed for decision in decisions)
-        base.update(
-            {
-                "authorization_id": envelope.get("id"),
-                "authorization_version": envelope.get("version"),
-                "project_id": envelope.get("project_id"),
-                "allowed": allowed,
-                "status": "allowed" if allowed else "denied",
-                "reason_code": "allowed"
-                if allowed
-                else next(
-                    decision.reason_code
-                    for decision in decisions
-                    if not decision.allowed
-                ),
-                "decisions": decision_payloads,
-                "target_classifications": (
-                    decision_payloads[0].get("classified_targets", [])
-                    if decision_payloads
-                    else []
-                ),
-                "evaluator_id": decision_payloads[0].get("evaluator_id")
-                if decision_payloads
-                else None,
-                "evaluator_version": decision_payloads[0].get("evaluator_version")
-                if decision_payloads
-                else None,
-                "evaluator_sha256": decision_payloads[0].get("evaluator_sha256")
-                if decision_payloads
-                else None,
-                "taxonomy_version": decision_payloads[0].get("taxonomy_version")
-                if decision_payloads
-                else None,
-                "taxonomy_sha256": decision_payloads[0].get("taxonomy_sha256")
-                if decision_payloads
-                else None,
-            }
-        )
-        errors = [
-            "PAUTH operation-time denial "
-            f"({decision.normalized_operation or operation}): {decision.reason_code}: {decision.reason}"
-            for operation, decision in zip(requested_operations, decisions, strict=True)
-            if not decision.allowed
-        ]
-        return base, errors
-    except (AuthorizationError, OSError, RuntimeError, ValueError) as exc:
-        base["error"] = str(exc)
-        return base, [f"PAUTH operation-time evaluation failed closed: {exc}"]
 
 
 def build_packet(
@@ -1312,15 +1073,15 @@ def build_packet(
     required = {sid for sid, item in applicable.items() if item.severity == "blocking"}
     missing_required = sorted(required - cited_specs)
     advisory_missing = sorted(
-        sid
-        for sid, item in applicable.items()
-        if item.severity != "blocking" and sid not in cited_specs
+        sid for sid, item in applicable.items() if item.severity != "blocking" and sid not in cited_specs
     )
     blocking_errors = _pauth_amendment_blocking_errors(content, project_root, db_path)
     pauth_phase = _pauth_phase(content, versions)
-    authorization_content = content
+    # WI-7618: ``authorization_content`` and ``authorization_specs`` were read only
+    # by the removed operation-time evaluator and are gone with it.
+    # ``authorization_source`` is retained: it still names the file the reported
+    # phase was resolved from, which the packet surfaces as provenance.
     authorization_source = content_source.get("path")
-    authorization_specs = set(cited_specs)
     proposal_error: str | None = None
     approved_content: str | None = None
     if pauth_phase == "finalization":
@@ -1330,9 +1091,7 @@ def build_packet(
             versions=versions,
         )
         if approved_content is not None:
-            authorization_content = approved_content
             authorization_source = approved_path
-            authorization_specs.update(extract_spec_links(approved_content))
     pauth_cohort = _pauth_phase_cohort(
         phase=pauth_phase or "proposal",
         bridge_id=bridge_id,
@@ -1340,26 +1099,20 @@ def build_packet(
         declared_target_paths=declared_target_paths,
         versions=versions,
         approved_proposal_content=approved_content,
-        source_horizon_version=explicit_version.version_number
-        if explicit_version is not None
-        else None,
+        source_horizon_version=explicit_version.version_number if explicit_version is not None else None,
     )
     coordination_paths = (
         _finalization_coordination_paths(
             bridge_id=bridge_id,
             versions=versions,
-            source_horizon_version=explicit_version.version_number
-            if explicit_version is not None
-            else None,
+            source_horizon_version=explicit_version.version_number if explicit_version is not None else None,
         )
         if pauth_phase == "finalization"
         else []
     )
     undeclared_implementation_targets: list[str] = []
     if pauth_phase == "finalization" and approved_content is not None:
-        approved_durable = _durable_implementation_targets(
-            extract_declared_target_paths(approved_content)
-        )
+        approved_durable = _durable_implementation_targets(extract_declared_target_paths(approved_content))
         report_durable = _durable_implementation_targets(declared_target_paths)
         undeclared_implementation_targets = sorted(report_durable - approved_durable)
     if proposal_error is not None:
@@ -1376,9 +1129,7 @@ def build_packet(
             "decisions": [],
             "error": proposal_error,
         }
-        pauth_errors = [
-            f"PAUTH operation-time evaluation failed closed: {proposal_error}"
-        ]
+        pauth_errors = [f"PAUTH operation-time evaluation failed closed: {proposal_error}"]
     elif undeclared_implementation_targets:
         pauth_operation_time = {
             "applicable": True,
@@ -1395,19 +1146,36 @@ def build_packet(
         }
         pauth_errors = [
             "PAUTH operation-time denial (undeclared_implementation_target): "
-            "report durable targets absent from the approved proposal: "
-            + ", ".join(undeclared_implementation_targets)
+            "report durable targets absent from the approved proposal: " + ", ".join(undeclared_implementation_targets)
         ]
     else:
-        pauth_operation_time, pauth_errors = _evaluate_pauth_phase(
-            content=authorization_content,
-            project_root=project_root,
-            phase=pauth_phase,
-            cohort=pauth_cohort,
-            cited_specs=authorization_specs,
-            authorization_source=authorization_source,
-        )
-        pauth_operation_time["coordination_paths"] = coordination_paths
+        # WI-7618: the operation-time project-authorization evaluation is removed.
+        #
+        # Authorization is a value on the project row, set by the owner and
+        # enforced at dispatch. It is not an envelope a bridge artifact cites, so
+        # the absence of authorization metadata in bridge content is not an error
+        # and must not make this gate unsatisfiable for dispatch-authorized work.
+        #
+        # The two branches above are retained deliberately. Neither is an
+        # authorization question: one reports that the approved proposal could not
+        # be resolved, the other denies a report whose durable targets were never
+        # approved. Both remain blocking.
+        pauth_operation_time = {
+            "applicable": False,
+            "phase": pauth_phase,
+            "status": "not_applicable",
+            "requested_operations": [],
+            "cohort": pauth_cohort,
+            "coordination_paths": coordination_paths,
+            "allowed": None,
+            "reason_code": "not_applicable",
+            # Retained provenance: this names the file the reported phase and its
+            # cohort were resolved from. That is a real fact about resolution, not
+            # an authorization claim, and consumers rely on it.
+            "authorization_source": authorization_source,
+            "decisions": [],
+        }
+        pauth_errors = []
     blocking_errors.extend(pauth_errors)
     packet: dict[str, Any] = {
         "packet_hash_schema_version": PACKET_HASH_SCHEMA_VERSION,
@@ -1430,19 +1198,13 @@ def build_packet(
         "declared_target_paths": sorted(declared_target_paths),
         "applicability_path_evidence": sorted(applicability_path_evidence),
         "warnings": {
-            "missing_parent_dirs": compute_missing_parent_dir_warnings(
-                project_root, cited_implementation_paths
-            ),
+            "missing_parent_dirs": compute_missing_parent_dir_warnings(project_root, cited_implementation_paths),
             "spec_links_section": classify_spec_links_section(content),
             "author_metadata_warnings": _check_author_metadata_presence(content),
-            "unclassified_target_paths": _check_unclassified_target_paths(
-                declared_target_paths
-            ),
+            "unclassified_target_paths": _check_unclassified_target_paths(declared_target_paths),
         },
         "work_items": work_items,
-        "applicable_specs": {
-            sid: asdict(item) for sid, item in sorted(applicable.items())
-        },
+        "applicable_specs": {sid: asdict(item) for sid, item in sorted(applicable.items())},
         "missing_required_specs": missing_required,
         "missing_advisory_specs": advisory_missing,
         "project_authorization_operation_time": pauth_operation_time,
@@ -1450,12 +1212,8 @@ def build_packet(
         "preflight_passed": not missing_required and not blocking_errors,
     }
     packet["packet_hash_material"] = _packet_hash_material(packet, applicable)
-    canonical = json.dumps(
-        packet["packet_hash_material"], sort_keys=True, separators=(",", ":")
-    )
-    packet["packet_hash"] = (
-        "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    )
+    canonical = json.dumps(packet["packet_hash_material"], sort_keys=True, separators=(",", ":"))
+    packet["packet_hash"] = "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return packet
 
 
@@ -1534,10 +1292,7 @@ def format_markdown(packet: dict[str, Any]) -> str:
                 f"`{str(decision.get('allowed')).lower()}` | "
                 f"`{decision.get('reason_code')}` | {reason} |"
             )
-    if (
-        packet.get("missing_required_specs")
-        and spec_links_diag.get("status") == "heading_unrecognized"
-    ):
+    if packet.get("missing_required_specs") and spec_links_diag.get("status") == "heading_unrecognized":
         lines.append(
             "- NOTE: a Specification-Links-like heading "
             f"({json.dumps(spec_links_diag.get('candidate_heading'))}) was found "
@@ -1553,9 +1308,7 @@ def format_markdown(packet: dict[str, Any]) -> str:
     cited = set(packet["cited_specs"])
     for spec_id, item in packet["applicable_specs"].items():
         matched = ", ".join(item["matched_by"])
-        lines.append(
-            f"| `{spec_id}` | `{item['severity']}` | `{'yes' if spec_id in cited else 'no'}` | {matched} |"
-        )
+        lines.append(f"| `{spec_id}` | `{item['severity']}` | `{'yes' if spec_id in cited else 'no'}` | {matched} |")
     return "\n".join(lines) + "\n"
 
 
@@ -1570,16 +1323,10 @@ def prepare_verdict_candidate(
     """Rebuild exact-source applicability evidence for final verdict bytes."""
 
     normalized = _normalize_lf(content)
-    status = next(
-        (line.strip().upper() for line in normalized.splitlines() if line.strip()), ""
-    )
+    status = next((line.strip().upper() for line in normalized.splitlines() if line.strip()), "")
     if status not in VERDICT_CANDIDATE_STATUSES:
-        raise VerdictCandidatePreparationError(
-            "candidate preparation is limited to GO, NO-GO, and VERIFIED verdicts"
-        )
-    candidate_relative, _ = normalize_verdict_candidate_path(
-        candidate_path, project_root
-    )
+        raise VerdictCandidatePreparationError("candidate preparation is limited to GO, NO-GO, and VERIFIED verdicts")
+    candidate_relative, _ = normalize_verdict_candidate_path(candidate_path, project_root)
     source_relative, source_path, bridge_id = resolve_verdict_responds_to_source(
         candidate_path=candidate_relative,
         content=normalized,
@@ -1589,26 +1336,20 @@ def prepare_verdict_candidate(
     packet = build_packet(
         bridge_id=bridge_id,
         bridge_dir=project_root / "bridge",
-        config_path=config_path
-        or project_root / "config" / "governance" / "spec-applicability.toml",
+        config_path=config_path or project_root / "config" / "governance" / "spec-applicability.toml",
         db_path=db_path or project_root / "groundtruth.db",
         content_file=source_path,
     )
     rebuilt_section = format_markdown(packet)
     content_anchor = f"- content_file: `{source_relative}`"
     if content_anchor not in rebuilt_section:
-        raise VerdictCandidatePreparationError(
-            "rebuilt applicability packet did not bind the exact Responds to source"
-        )
+        raise VerdictCandidatePreparationError("rebuilt applicability packet did not bind the exact Responds to source")
     packet_hash_line = f"- packet_hash: `{packet['packet_hash']}`\n"
     if rebuilt_section.count(packet_hash_line) != 1:
-        raise VerdictCandidatePreparationError(
-            "rebuilt applicability packet has an ambiguous packet_hash field"
-        )
+        raise VerdictCandidatePreparationError("rebuilt applicability packet has an ambiguous packet_hash field")
     rebuilt_section = rebuilt_section.replace(
         packet_hash_line,
-        packet_hash_line
-        + f"- candidate_evidence_hash: `{CANDIDATE_EVIDENCE_HASH_SENTINEL}`\n",
+        packet_hash_line + f"- candidate_evidence_hash: `{CANDIDATE_EVIDENCE_HASH_SENTINEL}`\n",
         1,
     )
     prefix = normalized[:section_start]
@@ -1624,9 +1365,7 @@ def prepare_verdict_candidate(
         prepared,
     )
     if replacements != 1:  # pragma: no cover - construction invariant
-        raise VerdictCandidatePreparationError(
-            "candidate evidence insertion was not singular"
-        )
+        raise VerdictCandidatePreparationError("candidate evidence insertion was not singular")
     return prepared
 
 
@@ -1656,9 +1395,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--bridge-dir", type=Path, default=DEFAULT_BRIDGE_DIR)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
-    parser.add_argument(
-        "--json", action="store_true", help="Emit JSON instead of Markdown."
-    )
+    parser.add_argument("--json", action="store_true", help="Emit JSON instead of Markdown.")
     return parser
 
 
@@ -1667,13 +1404,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.prepare_verdict_candidate:
         if args.content_file is None or args.candidate_path is None:
-            parser.error(
-                "--prepare-verdict-candidate requires --content-file and --candidate-path"
-            )
+            parser.error("--prepare-verdict-candidate requires --content-file and --candidate-path")
         if args.json:
-            parser.error(
-                "--prepare-verdict-candidate is incompatible with --json report output"
-            )
+            parser.error("--prepare-verdict-candidate is incompatible with --json report output")
         try:
             prepared = prepare_verdict_candidate(
                 candidate_path=args.candidate_path,
@@ -1715,9 +1448,7 @@ def main(argv: list[str] | None = None) -> int:
             + ", ".join(str(path) for path in missing_parent_dirs)
             + "\n"
         )
-    pauth_status = (packet.get("project_authorization_operation_time") or {}).get(
-        "status"
-    )
+    pauth_status = (packet.get("project_authorization_operation_time") or {}).get("status")
     if pauth_status == "error":
         return 6
     return 0 if packet["preflight_passed"] else 5

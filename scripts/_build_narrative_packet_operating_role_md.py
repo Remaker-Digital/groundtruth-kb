@@ -1,4 +1,4 @@
-"""Build the narrative-artifact-approval packet for .claude/rules/operating-role.md
+"""Build the narrative-artifact-approval packet for .harness-baseline-configuration/rules/operating-role.md
 amendment (role-SET active authority + backward-compat).
 
 Auto-approval mode per AUQ S343 2026-05-12 (scope:
@@ -117,7 +117,7 @@ scalar reads during the transition window.
 
 The legacy **compatibility/provenance value** `acting-prime-builder` is
 accepted on READ (per `GOV-ACTING-PRIME-BUILDER-001` +
-`.claude/rules/acting-prime-builder.md` § Compatibility/Provenance
+`.harness-baseline-configuration/rules/acting-prime-builder.md` § Compatibility/Provenance
 Classification) but rejected on SET; only `prime-builder` and
 `loyal-opposition` are valid SET targets via `scripts/harness_roles.py`.
 
@@ -132,7 +132,7 @@ PACKET = {
     "artifact_type": "narrative_artifact",
     "artifact_id": "claude-rules-operating-role-md-slice-1-role-set-schema",
     "action": "amend",
-    "target_path": ".claude/rules/operating-role.md",
+    "target_path": ".harness-baseline-configuration/rules/operating-role.md",
     "source_ref": "bridge:gtkb-single-harness-bridge-dispatcher-001-013:IP-4",
     "full_content": NEW_CONTENT,
     "full_content_sha256": hashlib.sha256(NEW_CONTENT.encode("utf-8")).hexdigest(),
@@ -143,7 +143,7 @@ PACKET = {
     "transcript_captured": True,
     "explicit_change_request": (
         "Implement IP-4 of bridge/gtkb-single-harness-bridge-dispatcher-001-013.md "
-        "(REVISED-6, Codex GO at -014): amend .claude/rules/operating-role.md to land "
+        "(REVISED-6, Codex GO at -014): amend .harness-baseline-configuration/rules/operating-role.md to land "
         "the role-SET schema as ACTIVE authority (Path 2 atomic migration), add the "
         "single-harness topology assignment rule, add the Role Set Schema section, "
         "and add the Backward Compatibility section covering legacy scalar reads + "

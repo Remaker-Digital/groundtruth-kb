@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Claude Code Stop hook -- Advisory-to-Backlog Router scan.
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+"""Stop hook -- Advisory-to-Backlog Router scan.
 
 Thin wrapper that invokes ``scripts/advisory_backlog_router.py`` on Stop
 events. Reads the last-scan timestamp from
@@ -69,7 +75,7 @@ def _since_from_last_scan() -> date | None:
         return None
     # Re-scan a small window so a backdated INSIGHTS file added retroactively
     # is not silently skipped.
-    return (parsed.date() - timedelta(days=DEFAULT_SCAN_HORIZON_DAYS))
+    return parsed.date() - timedelta(days=DEFAULT_SCAN_HORIZON_DAYS)
 
 
 def main() -> None:

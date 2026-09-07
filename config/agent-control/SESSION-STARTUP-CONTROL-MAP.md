@@ -43,15 +43,15 @@ session start.
 |---|---|---|---|
 | Platform rules & behavior | `CLAUDE.md` | active | Top-level platform guidance; GOV-01 ≤300-line cap. |
 | Loyal Opposition / cross-harness rules | `AGENTS.md` | active | Codex-side startup contract; dispatcher/default role disclosure. |
-| Canonical glossary | `.claude/rules/canonical-terminology.md` | active | Base startup loads the core primer subset only; full corpus and activity-specific terms load on `::open <activity>` (SPEC-INTAKE-46594e). |
-| Codex session bootstrap | `.claude/rules/codex-session-bootstrap.md` | active | Phase A bridge/global; Phase B defers activity-only Codex surfaces (WI-4949). |
-| Codex standing priorities | `.claude/rules/codex-standing-priorities.md` | active | **activity_only** — load on `::open project` per `activity-envelope-sharding.toml`. |
-| Codex review operating contract | `.claude/rules/codex-review-operating-contract.md` | active | **activity_only** — load on `::open build|test`. |
-| Codex LO runbook | `.claude/rules/codex-loyal-opposition-runbook.md` | active | **activity_only** — load on `::open build|test`. |
-| Codex knowledge-base index | `.claude/rules/codex-knowledge-base-index.md` | active | **explicit_query** — on-demand navigation; not base startup. |
-| Durable operating-role guidance | `.claude/rules/operating-role.md` | active | Human-readable role-resolution guidance; not the role record. |
-| File-bridge protocol | `.claude/rules/file-bridge-protocol.md` | active | Bridge statuses, gates, claim/preflight contract. |
-| Deliberation protocol | `.claude/rules/deliberation-protocol.md` | active | When to search/archive deliberations. |
+| Canonical glossary | `.harness-baseline-configuration/rules/canonical-terminology.md` | active | Base startup loads the core primer subset only; full corpus and activity-specific terms load on `::open <activity>` (SPEC-INTAKE-46594e). |
+| Codex session bootstrap | `.harness-baseline-configuration/rules/session-bootstrap.md` | active | Phase A bridge/global; Phase B defers activity-only Codex surfaces (WI-4949). |
+| Codex standing priorities | `.harness-baseline-configuration/rules/standing-priorities.md` | active | **activity_only** — load on `::open project` per `activity-envelope-sharding.toml`. |
+| Codex review operating contract | `.harness-baseline-configuration/rules/review-operating-contract.md` | active | **activity_only** — load on `::open build|test`. |
+| Codex LO runbook | `.harness-baseline-configuration/rules/loyal-opposition-runbook.md` | active | **activity_only** — load on `::open build|test`. |
+| Codex knowledge-base index | `.harness-baseline-configuration/rules/loyal-opposition-knowledge-base-index.md` | active | **explicit_query** — on-demand navigation; not base startup. |
+| Durable operating-role guidance | `.harness-baseline-configuration/rules/operating-role.md` | active | Human-readable role-resolution guidance; not the role record. |
+| File-bridge protocol | `.harness-baseline-configuration/rules/file-bridge-protocol.md` | active | Bridge statuses, gates, claim/preflight contract. |
+| Deliberation protocol | `.harness-baseline-configuration/rules/deliberation-protocol.md` | active | When to search/archive deliberations. |
 | Activity envelope sharding taxonomy | `config/agent-control/activity-envelope-sharding.toml` | active | Machine-readable boundary between `global_baseline`, `activity_only`, `explicit_query`, and `never_startup` payloads. |
 | Activity disposition profiles | `config/agent-control/activity-disposition-profiles.toml` | active | Six activity profiles; payload classes declare whether skills, terminology, history state, and direction are activity-only or explicit-query. |
 | Generated startup service | `scripts/session_self_initialization.py` | active | Emits the startup disclosure payload (its output is generated). |
@@ -107,7 +107,7 @@ per advisory F9; deletion is a separately owner-gated follow-on (NOT this slice)
 <!-- inventory -->
 | Surface | Path | Classification | Notes |
 |---|---|---|---|
-| Smart-poller bridge-poller template | `.claude/rules/bridge-poller-canonical.md` | deprecated | DEPRECATED stub; smart poller retired 2026-05-09. |
+| Smart-poller bridge-poller template | `.harness-baseline-configuration/rules/bridge-poller-canonical.md` | deprecated | DEPRECATED stub; smart poller retired 2026-05-09. |
 | Legacy OS-poller setup prompt | `templates/bridge-os-poller-setup-prompt.md` | deprecated | Legacy "OS poller" framing; the retired OS poller must not be restored. |
 | Smart-poller runtime archive | `archive/smart-poller-2026-05-09/` | archive | Archived VBS daemon / runner / install scripts; historical only. |
 <!-- /inventory -->

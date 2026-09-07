@@ -27,14 +27,15 @@ classification) lives in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`
 2. **Role overlay** — load the role-specific overlay:
    `config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md` or
    `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md`.
-2.5. **Session envelope (pre-flight)** — if the resolved role requires
-   worker-role provenance for KB writes (Prime Builder and Loyal Opposition
-   both do), verify an open session envelope exists. Open one with:
-   `python -m groundtruth_kb session envelope open --harness-name <name> --harness-id <id> --init-keyword "::init gtkb pb" --subject gtkb --role prime-builder`
-   before any `gt backlog`, `gt bridge`, or `implementation_authorization.py`
-   command.
+2.5. **Exact-init binding (pre-flight)** — role and activity come from the
+   owner `::init` / `::open` markers. Those lines are hook markers, not
+   instructions to create a filesystem envelope object. When the owner's
+   prompt is exactly `::init gtkb pb` or `::init gtkb lo` (full-prompt match),
+   `bind_exact_init` writes the immutable session-init binding row (WI-6499).
+   Workers must not mint or consult an on-disk session envelope as identity
+   before `gt backlog`, `gt bridge`, or `implementation_authorization.py`.
 3. **Canonical terminology** — load the **core GT-KB primer subset** from
-   `.claude/rules/canonical-terminology.md` at base startup (bounded by
+   `.harness-baseline-configuration/rules/canonical-terminology.md` at base startup (bounded by
    `required_primer_terms` in `canonical-terminology.toml`). Activity-specific
    terminology and skill recommendations load only when an agent opens the
    corresponding activity envelope with `::open <activity>` per

@@ -9,7 +9,7 @@ write gates. This read-only guard scans its `permissions.allow` / `deny` entries
 for forbidden pattern classes and exits non-zero (with a redacted report) when
 any are present, so the cleaned-up state cannot be silently re-introduced.
 
-Forbidden pattern classes (per `.claude/rules/project-root-boundary.md` and the
+Forbidden pattern classes (per `.harness-baseline-configuration/rules/project-root-boundary.md` and the
 credential-safety discipline of `GOV-ARTIFACT-APPROVAL-001`):
 
 - legacy-archive path references (the out-of-root `Claude-Playground` archive),

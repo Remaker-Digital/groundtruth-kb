@@ -98,12 +98,19 @@ does the proposal reduce the owner's role to specifications, clarifications,
 and decisions? If not, identify the remaining owner burden and whether it should
 be automated, specified, or accepted as an explicit trade-off.
 
-Loyal Opposition may raise design-simplicity findings against Prime Builder's
-choice of technology, approach, or shared-subsystem design. Findings should
-compare the proposed path against simpler alternatives using concrete evidence:
-artifact count, operation count, operational steps, and long-term stability.
-Do not present these objections as style preferences; tie them to requirement
-satisfaction and operational risk.
+Loyal Opposition MUST weigh a simpler alternative against Prime Builder's choice
+of technology, approach, or shared-subsystem design before recording `GO`, and
+MUST record that alternative in the verdict under a
+`## Simpler Alternative Considered` heading. Findings compare the proposed path
+against simpler alternatives using concrete evidence: artifact count, operation
+count, operational steps, and long-term stability. Do not present these objections as
+style preferences; tie them to requirement satisfaction and operational risk.
+
+The section names the simpler design actually weighed and why the approved design
+was preferred. "No simpler alternative exists" is a permitted answer only when the
+reviewer states what was considered and why it does not apply; a bare denial is
+not a considered alternative. The gate detects an absent or placeholder section,
+not an insincere one.
 
 For P0/P1 items, also include:
 

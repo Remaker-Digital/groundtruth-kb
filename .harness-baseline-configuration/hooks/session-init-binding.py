@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Exact-init role attestation binding (UserPromptSubmit).
+"""Exact-init session binding (UserPromptSubmit).
 
-Writes the session-init binding and its initial role attestation at the only
-point where the literal canonical init line exists: the owner's prompt.
+Writes the session-init binding at the only point where the literal canonical
+init line exists: the owner's prompt. The binding carries the role; there is no
+separate attestation. WI-6940 removed that surface because the retirement of
+``ADR-SESSION-ROLE-ATTESTATION-SERVICE-001`` forbids retaining it, and
+``DCL-SESSION-ROLE-RESOLUTION-001`` v9 resolves role from the immutable binding
+alone.
 
 Why this hook exists (WI-6499). ``bind_exact_init`` is the sole writer of the
 ``session_init_bindings`` table, and its only prior production caller was
@@ -27,9 +31,11 @@ key for the ``envelope_id`` column. No envelope object is created, read, or
 required. The column name is legacy vocabulary only, so this hook does not
 depend on the envelope-as-object model.
 
-Hook transport remains non-blocking, but a recognized exact init that cannot be
-bound emits a visible ``systemMessage``. A binding that already exists is the
-normal re-entry case, not a fault.
+Hook transport remains non-blocking, and silence is reserved for prompts that
+are not init attempts at all. A recognized exact init that cannot be bound emits
+a visible ``systemMessage``, and so does a near-canonical init that binds
+nothing, so a session is never left believing it declared a role it does not
+hold. A binding that already exists is the normal re-entry case, not a fault.
 """
 
 from __future__ import annotations
@@ -43,6 +49,40 @@ from pathlib import Path
 # as a cheap pre-filter so the common non-init prompt costs no import; the
 # service applies the authoritative match.
 _INIT_PREFILTER = re.compile(r"^::init (gtkb|application) (pb|lo)$")
+
+# Deliberately looser than the pre-filter above, and used for nothing except
+# deciding whether a rejected prompt deserves an explanation. Matching this and
+# not `_INIT_PREFILTER` is the definition of a near miss.
+_NEAR_INIT_RE = re.compile(r"^[ \t]*::init\b", re.MULTILINE)
+
+
+def near_miss_disclosure(prompt: object) -> dict:
+    """Explain a near-canonical init that created nothing (WI-6499).
+
+    A prompt that resembles the canonical init but does not match it exactly is
+    rejected by ``_INIT_PREFILTER`` and previously returned an empty payload.
+    Nothing was wrong with the rejection; the silence was the defect. A session
+    that types the init line with anything else in the same message proceeds
+    believing it declared a role, and learns otherwise only later, when an
+    unrelated governed CLI refuses with a typed ``no_session_binding``. By then
+    the cause is several steps behind the symptom.
+
+    This names the miss where it happens. It binds nothing, writes nothing, and
+    relaxes no parse: ``_INIT_PREFILTER`` and ``bind_exact_init`` stay strict,
+    so a near miss still creates no binding, no session id, and no role.
+    """
+    if not isinstance(prompt, str) or _NEAR_INIT_RE.search(prompt) is None:
+        return {}
+    return {
+        "systemMessage": (
+            "GT-KB saw text resembling the canonical init but not matching it exactly, so no "
+            "session binding was created and governed role-sensitive work remains unavailable "
+            "for this session. The binding requires the complete message "
+            "'::init <gtkb|application> <pb|lo>' and nothing else: no leading or trailing "
+            "whitespace, no trailing text, and no additional lines. Send that line as its own "
+            "message to establish the binding."
+        )
+    }
 
 
 def discover_project_root(start: Path | None = None) -> Path | None:
@@ -59,17 +99,6 @@ def discover_project_root(start: Path | None = None) -> Path | None:
     return None
 
 
-def _log_bind_failure(project_root: Path, session_id: str, code: str) -> None:
-    """Record an unexpected binding failure without breaking the turn."""
-    try:
-        log_dir = project_root / ".gtkb-state" / "session-attestation"
-        log_dir.mkdir(parents=True, exist_ok=True)
-        with (log_dir / "bind-failures.jsonl").open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps({"session_id": session_id, "code": code, "issuer": "hook:init"}) + "\n")
-    except Exception:  # noqa: BLE001 - logging must never break the turn
-        pass
-
-
 def main() -> int:
     """Hook entry point."""
     try:
@@ -80,11 +109,27 @@ def main() -> int:
     try:
         prompt = payload.get("prompt") or payload.get("user_prompt") or ""
         if not isinstance(prompt, str) or _INIT_PREFILTER.fullmatch(prompt) is None:
-            print(json.dumps({}))
+            # Silent for an ordinary prompt, explanatory for a near miss. The
+            # rejection itself is unchanged either way.
+            print(json.dumps(near_miss_disclosure(prompt)))
             return 0
         init_command = prompt
 
-        session_id = (payload.get("session_id") or "").strip()
+        project_root = discover_project_root()
+        if project_root is not None and str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+        try:
+            from scripts.gtkb_session_id import (  # noqa: PLC0415
+                BRIDGE_WORK_INTENT_ORDER,
+                resolve_session_id,
+            )
+
+            resolved = resolve_session_id(order=BRIDGE_WORK_INTENT_ORDER)
+        except Exception:
+            resolved = ""
+        # WI-6499 bound the hook-transport id; every consumer resolves the
+        # harness env id. Bind what consumers read, so they agree by construction.
+        session_id = (resolved or payload.get("session_id") or "").strip()
         project_root = discover_project_root()
         if not session_id or project_root is None:
             print(
@@ -119,7 +164,6 @@ def main() -> int:
             # An already-bound context is the expected re-entry case: the binding
             # is immutable by design, so a second init is a no-op, not a fault.
             if exc.code != "session_already_initialized":
-                _log_bind_failure(project_root, session_id, exc.code)
                 print(
                     json.dumps(
                         {

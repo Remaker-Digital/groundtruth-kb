@@ -225,10 +225,17 @@ def discover(project_root: Path = PROJECT_ROOT) -> list[ProjectClassification]:
 
     db = KnowledgeDB(project_root / "groundtruth.db")
     try:
-        active = db.list_project_authorizations(status="active")
+        # WI-7657: enumerate active projects directly instead of deriving the
+        # project set from active project_authorizations rows. The gating set
+        # itself is unchanged -- _project_membership_work_item_ids already
+        # sources it from active membership links, not from an authorization
+        # envelope's included_work_item_ids, per
+        # GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2. Only the way the
+        # project list was obtained referenced the retired table.
         gating_by_project: dict[str, list[str]] = {}
-        for authorization in active:
-            project_id = str(authorization.get("project_id") or "")
+        active_projects = db.list_projects(status="active")
+        for project in active_projects:
+            project_id = str(project.get("id") or "")
             if project_id and project_id not in gating_by_project:
                 gating_by_project[project_id] = _project_membership_work_item_ids(db, project_id)
     finally:
@@ -236,8 +243,8 @@ def discover(project_root: Path = PROJECT_ROOT) -> list[ProjectClassification]:
 
     results: list[ProjectClassification] = []
     seen_projects: set[str] = set()
-    for authorization in active:
-        project_id = str(authorization.get("project_id") or "")
+    for project in active_projects:
+        project_id = str(project.get("id") or "")
         if not project_id or project_id in seen_projects:
             continue
         seen_projects.add(project_id)
@@ -268,7 +275,8 @@ def discover(project_root: Path = PROJECT_ROOT) -> list[ProjectClassification]:
         results.append(
             ProjectClassification(
                 project_id=project_id,
-                authorization_id=str(authorization.get("id") or ""),
+                # WI-7657: legacy field name; carries project identity now.
+                authorization_id=project_id,
                 gating_work_items=gating,
                 classification=classification,
                 resolved_links=resolved_links,

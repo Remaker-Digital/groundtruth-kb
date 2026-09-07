@@ -3,10 +3,10 @@
 ``gt spec update`` is the governed companion to ``gt spec record``. Where
 ``record`` is create-only, ``update`` produces a NEW VERSION of an existing
 spec via :meth:`KnowledgeDB.update_spec`. Like ``record`` it is an in-process
-deterministic service: owner/AUQ evidence is validated and a formal-artifact
-approval packet is written before any DB mutation. The raw ``update_spec(...)``
-mutation pattern remains protected by the existing PreToolUse hook for
-direct-API callers; this governed CLI path writes its own approval packet.
+deterministic service: the caller supplies the exact expected current version and
+the mutation proceeds only when that version still holds. Persistence is
+intrinsic, so no packet, receipt, approval field, or approvals-directory artifact
+is constructed, written, or read. A stale expected version leaves zero effect.
 
 Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 Licensed under AGPL-3.0-or-later.
@@ -17,13 +17,11 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
-from groundtruth_kb.governance.approval_packet import construct_approval_packet, validate_packet
 
 _POSTIMAGE_FIELD_NAMES = (
     "title",
@@ -52,10 +50,7 @@ class SpecUpdateRequest:
     spec_id: str
     content_file: Path
     change_reason: str
-    auq_id: str
-    auq_answer: str
-    owner_presented: bool
-    approved_by: str | None
+    expected_version: int
     title: str | None
     status: str | None
     priority: str | None
@@ -88,18 +83,6 @@ def _changed_by() -> str:
     return "gt-cli"
 
 
-def _approval_packet_path(project_root: Path, artifact_id: str, new_version: int) -> Path:
-    """Return the update-time approval-packet path.
-
-    The ``-v<new_version>`` suffix avoids collision with the Slice-2
-    create-time packet (``<date>-<artifact_id>.json``) for the same spec id.
-    """
-    date_prefix = datetime.now(UTC).strftime("%Y-%m-%d")
-    return (
-        project_root / ".groundtruth" / "formal-artifact-approvals" / f"{date_prefix}-{artifact_id}-v{new_version}.json"
-    )
-
-
 def _parse_json_option(raw: str | None, option_name: str, expected_type: type) -> Any:
     if raw is None:
         return None
@@ -121,12 +104,11 @@ def _parse_json_dict(raw: str | None, option_name: str) -> dict[str, Any] | None
 
 
 def _validate_request_evidence(request: SpecUpdateRequest) -> None:
-    if not request.owner_presented:
-        raise SpecUpdateError("--owner-presented is required before updating a spec")
-    if not request.auq_id.strip():
-        raise SpecUpdateError("--auq-id must be non-empty")
-    if not request.auq_answer.strip():
-        raise SpecUpdateError("--auq-answer must be non-empty")
+    if request.expected_version < 1:
+        raise SpecUpdateError(
+            "--expected-version must be the exact current version, which is at least 1 for an "
+            "existing specification; use `gt spec record --expected-version 0` to create one"
+        )
     if not request.change_reason.strip():
         raise SpecUpdateError("--change-reason must be non-empty")
 
@@ -145,32 +127,6 @@ def _validate_assertions(value: list[Any] | None) -> list[dict[str, Any]] | None
     if not all(isinstance(item, dict) for item in value):
         raise SpecUpdateError("--assertions-json must be a JSON list of objects")
     return list(value)
-
-
-def _build_packet(
-    *,
-    request: SpecUpdateRequest,
-    artifact_type: str,
-    current_version: int,
-    full_content: str,
-    changed_by: str,
-    postimage_fields: dict[str, Any],
-) -> dict[str, object]:
-    return construct_approval_packet(
-        artifact_type=artifact_type,
-        artifact_id=request.spec_id,
-        action="update",
-        source_ref=f"{request.spec_id}@v{current_version}",
-        full_content=full_content,
-        approval_mode="approve",
-        presented_to_user=request.owner_presented,
-        transcript_captured=True,
-        explicit_change_request=f"AUQ {request.auq_id}: {request.auq_answer}",
-        approved_by=request.approved_by or "owner",
-        changed_by=changed_by,
-        change_reason=request.change_reason,
-        postimage_fields=postimage_fields,
-    )
 
 
 def _normalized_postimage_fields(
@@ -213,8 +169,33 @@ def _normalized_postimage_fields(
     return fields
 
 
+def _matches_postimage(row: dict[str, Any], full_content: str, postimage_fields: dict[str, Any]) -> bool:
+    """Return True when the stored row already equals the requested postimage exactly."""
+
+    def _norm(value: Any) -> Any:
+        # Storage normalizes an empty JSON container to NULL, so an identical
+        # request round-trips to None. Comparing without this would report a
+        # false difference and turn an exact replay into a spurious collision.
+        if isinstance(value, (list, dict)) and not value:
+            return None
+        return value
+
+    if (row.get("description") or "") != full_content:
+        return False
+    for name, value in postimage_fields.items():
+        parsed_key = f"{name}_parsed"
+        stored = row[parsed_key] if parsed_key in row else row.get(name)
+        if _norm(stored) != _norm(value):
+            return False
+    return True
+
+
 def update_spec(config: GTConfig, request: SpecUpdateRequest) -> dict[str, Any]:
-    """Validate evidence, write an approval packet, and version an existing spec."""
+    """Version an existing spec under exact expected-version CAS.
+
+    Persistence is intrinsic: the canonical row is the record. A stale expected
+    version leaves zero effect, and no packet or approvals artifact is involved.
+    """
 
     _validate_request_evidence(request)
 
@@ -242,9 +223,8 @@ def update_spec(config: GTConfig, request: SpecUpdateRequest) -> dict[str, Any]:
     if current is None:
         raise SpecUpdateError(f"spec {request.spec_id} does not exist; use 'gt spec record' to create a new spec")
 
-    # The packet's artifact_type is the live spec row's stored type, NOT a
-    # value derived from the id prefix. This preserves the canonical type
-    # assignment made at create time.
+    # artifact_type is the live spec row's stored type, NOT a value derived from
+    # the id prefix. This preserves the canonical type assignment made at create time.
     artifact_type = current["type"]
     current_version = int(current["version"])
     new_version = current_version + 1
@@ -260,20 +240,38 @@ def update_spec(config: GTConfig, request: SpecUpdateRequest) -> dict[str, Any]:
     )
     merged_fields = {"description": full_content, **postimage_fields}
 
-    changed_by = _changed_by()
-    packet = _build_packet(
-        request=request,
-        artifact_type=artifact_type,
-        current_version=current_version,
-        full_content=full_content,
-        changed_by=changed_by,
-        postimage_fields=postimage_fields,
-    )
-    validation = validate_packet(packet)
-    if not validation.is_valid:
-        raise SpecUpdateError("; ".join(validation.errors))
+    if current_version != request.expected_version:
+        # Exact replay is read-only: when the requested postimage is already the
+        # current row and the expected version names the version it replaced, the
+        # update has already succeeded and nothing is appended.
+        if current_version == request.expected_version + 1 and _matches_postimage(
+            current, full_content, postimage_fields
+        ):
+            return {
+                "updated": False,
+                "dry_run": request.dry_run,
+                "replayed": True,
+                "id": current["id"],
+                "row": current,
+                "from_version": request.expected_version,
+                "to_version": current_version,
+                "expected_version": request.expected_version,
+                "merged_fields": sorted(merged_fields),
+                "db_operation": {
+                    "method": "update_spec",
+                    "id": request.spec_id,
+                    "type": artifact_type,
+                    "from_version": request.expected_version,
+                    "to_version": current_version,
+                },
+            }
+        raise SpecUpdateError(
+            f"stale_expected_version: {request.spec_id} is at version {current_version}, "
+            f"but --expected-version was {request.expected_version}; re-read the "
+            "specification and retry. No effect was applied."
+        )
 
-    packet_path = _approval_packet_path(project_root, request.spec_id, new_version)
+    changed_by = _changed_by()
     db_operation = {
         "method": "update_spec",
         "id": request.spec_id,
@@ -285,20 +283,15 @@ def update_spec(config: GTConfig, request: SpecUpdateRequest) -> dict[str, Any]:
         return {
             "updated": False,
             "dry_run": True,
+            "replayed": False,
             "id": request.spec_id,
             "row": None,
             "from_version": current_version,
             "to_version": new_version,
-            "approval_packet_path": str(packet_path),
-            "approval_packet": packet,
+            "expected_version": request.expected_version,
             "merged_fields": sorted(merged_fields),
             "db_operation": db_operation,
         }
-
-    if packet_path.exists():
-        raise SpecUpdateError(f"approval packet already exists: {packet_path}")
-    packet_path.parent.mkdir(parents=True, exist_ok=True)
-    packet_path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     try:
         row = db.update_spec(
@@ -315,12 +308,12 @@ def update_spec(config: GTConfig, request: SpecUpdateRequest) -> dict[str, Any]:
     return {
         "updated": True,
         "dry_run": False,
+        "replayed": False,
         "id": row["id"],
         "row": row,
         "from_version": current_version,
         "to_version": int(row["version"]),
-        "approval_packet_path": str(packet_path),
-        "approval_packet": packet,
+        "expected_version": request.expected_version,
         "merged_fields": sorted(merged_fields),
         "db_operation": db_operation,
     }

@@ -13,7 +13,7 @@ Authority:
 - bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-006.md Codex GO
 - Specific AskUserQuestion approval S341 (2026-05-11): "Approve adding a new
   Claude-side bridge automation (UserPromptSubmit hook for AXIS 2 in-session
-  bridge surfacing)?" → "Approve" (satisfies .claude/rules/bridge-essential.md
+  bridge surfacing)?" → "Approve" (satisfies .harness-baseline-configuration/rules/bridge-essential.md
   :148-154 specific-approval requirement).
 
 Behavior:

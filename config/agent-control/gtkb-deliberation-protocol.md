@@ -15,7 +15,7 @@ the GT-KB checkout, repo-root in scaffolded adopter projects per the
 harness-memory vs dual-agent profile distinction) / **Deliberation Archive**
 (this file's subject — design-reasoning record). Canonical-term references
 to MemBase, MEMORY.md, and Deliberation Archive must use these exact forms;
-see `.claude/rules/canonical-terminology.md` for the full glossary. Doctor's
+see `.harness-baseline-configuration/rules/canonical-terminology.md` for the full glossary. Doctor's
 canonical-terminology check enforces these strings in this rule file as part
 of the dual-agent / harness-memory `required_files` contract.
 

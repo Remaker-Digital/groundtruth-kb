@@ -17,34 +17,36 @@ from typing import Any
 
 try:
     from scripts.implementation_authorization import (
+        BOOTSTRAP_BRIDGE_IDS,
         AuthorizationError,
         assess_packet_terminal_evidence,
+        bridge_entry,
         canonical_project_root,
         cross_claim_path_collision_reason,
+        extract_target_paths,
         finalization_target_paths_for_verified,
         normalize_relative_path,
         packet_path_for_bridge,
         path_authorized_by_target_paths,
         peer_report_dirty_path_collision_reason,
         resolve_work_intent_session_id,
-        validate_packet_project_authorization_operation,
-        validate_targets,
         work_intent_claim_block_reason,
     )
 except ImportError:  # pragma: no cover - direct script execution path
     from implementation_authorization import (
+        BOOTSTRAP_BRIDGE_IDS,
         AuthorizationError,
         assess_packet_terminal_evidence,
+        bridge_entry,
         canonical_project_root,
         cross_claim_path_collision_reason,
+        extract_target_paths,
         finalization_target_paths_for_verified,
         normalize_relative_path,
         packet_path_for_bridge,
         path_authorized_by_target_paths,
         peer_report_dirty_path_collision_reason,
         resolve_work_intent_session_id,
-        validate_packet_project_authorization_operation,
-        validate_targets,
         work_intent_claim_block_reason,
     )
 
@@ -55,48 +57,6 @@ except ImportError:  # pragma: no cover - direct script execution path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-
-def _record_gate_denial(pattern_id: str, subject: str, reason: str) -> None:
-    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl"))
-    if not path.is_absolute():
-        path = PROJECT_ROOT / path
-    record = {
-        "schema_version": 1,
-        "timestamp_utc": _dt.datetime.now(tz=_dt.UTC).isoformat().replace("+00:00", "Z"),
-        "gate": "implementation-start-gate",
-        "pattern_id": pattern_id,
-        "command_hash": hashlib.sha256(subject.encode("utf-8")).hexdigest(),
-        "reason": reason,
-    }
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(record, sort_keys=True) + "\n")
-    except OSError:
-        pass
-
-
-def _record_gate_exemption(pattern_id: str, subject: str, reason: str, paths: list[str]) -> None:
-    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl"))
-    if not path.is_absolute():
-        path = PROJECT_ROOT / path
-    record = {
-        "schema_version": 1,
-        "timestamp_utc": _dt.datetime.now(tz=_dt.UTC).isoformat().replace("+00:00", "Z"),
-        "gate": "implementation-start-gate",
-        "event": "exemption",
-        "pattern_id": pattern_id,
-        "command_hash": hashlib.sha256(subject.encode("utf-8")).hexdigest(),
-        "paths": sorted(paths),
-        "reason": reason,
-    }
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(record, sort_keys=True) + "\n")
-    except OSError:
-        pass
 
 
 try:
@@ -130,6 +90,7 @@ BRIDGE_FUNCTION_EXACT = {
     ".claude/settings.json",
     ".codex/hooks.json",
     "scripts/bridge_claim_cli.py",
+    "scripts/bridge_lifecycle_resolver.py",
     "scripts/check_protected_commit_authorization.py",
     "scripts/dispatcher_runtime.py",
     "scripts/gtkb_bridge_writer.py",
@@ -172,6 +133,14 @@ DIRECT_GIT_READ_ONLY_SUBCOMMANDS = frozenset(
         "cherry",
         "describe",
         "diff",
+        # Read-only ref enumeration. Reviewers must be able to inspect branch
+        # topology to verify claims about it; blocking that degrades review
+        # quality without preventing any effect. `branch` is deliberately NOT
+        # listed: `git branch -d/-D/-m/-M/--set-upstream-to` mutate, so it
+        # cannot be allow-listed by subcommand name alone. Covered by
+        # test_change7_drops_argument_position_false_positives.
+        "for-each-ref",
+        "show-ref",
         "help",
         "log",
         "ls-files",
@@ -206,8 +175,33 @@ MUTATING_COMMAND_RE = re.compile(
     # trip the gate. (Per Codex NO-GO -006: extracting the path without
     # firing `_is_mutating_command` left those commands silently allowed.)
     r"apply_patch|git\s+(?:add|rm|restore|commit|reset|checkout|merge|rebase|tag|push)|"
+    # F10: POSIX write verbs. The original alternation covered only the
+    # PowerShell surface (set-content/remove-item/move-item/copy-item), so on
+    # the Bash surface `sed -i`, `touch`, `tee`, `cp`, `mv`, `rm` and friends
+    # were never classified as mutations and passed the gate unconditionally,
+    # while read-only inspection was refused. Quoted spans are masked by
+    # _has_mutating_signal before this regex runs, so verbs appearing inside
+    # quoted prose do not false-positive.
+    r"sed\s+(?:[^|;&]*\s)?-i\b|awk\s+[^|;&]*-i\s+inplace\b|"
     r"python\s+.*(?:write_text|open\(.+,\s*['\"]w|sqlite3|insert_|update_|delete_)"
-    r")\b",
+    r")\b"
+    # Change 7 (WI-6821): bare POSIX write verbs are matched only at COMMAND
+    # POSITION -- start of string, or after a pipe/semicolon/ampersand/newline,
+    # or after an opening paren. The unanchored form these replace matched the
+    # verbs anywhere, so ordinary prose in an argument (`git log --grep=rm`, a
+    # `--filter` value, a quoted sentence) tripped a fail-closed gate. Quoted
+    # spans are masked by `_has_mutating_signal` before this regex runs; the
+    # anchor is the second, independent guard against argument-position text.
+    #
+    # This alternative sits OUTSIDE the `\b( ... )\b` group above, deliberately.
+    # Inside it, the group's leading `\b` must match immediately before the
+    # anchor, and a space-to-pipe transition is not a word boundary -- so
+    # `cat x | tee <path>`, `true && rm <path>`, and `(cd d && rm <path>)` all
+    # silently stopped matching. Hoisting it to a top-level alternative keeps
+    # every real detection while dropping the argument-position false
+    # positives. Regression coverage for both directions lives in
+    # platform_tests/scripts/test_implementation_start_gate.py.
+    r"|(?:^|[|;&\n]|\()\s*(?:tee|touch|truncate|shred|install|patch|dd|cp|mv|rm|ln)\b",
     re.IGNORECASE,
 )
 # A shell redirection operator token: `>` / `>>`, or the combined-stream
@@ -316,12 +310,21 @@ def _is_bridge_function_path(relative_path: str) -> bool:
     return rel in BRIDGE_FUNCTION_EXACT or any(rel.startswith(prefix) for prefix in BRIDGE_FUNCTION_PREFIXES)
 
 
+_BRIDGE_ARTIFACT_DEPOSIT_RE = re.compile(r"^bridge/[A-Za-z0-9][A-Za-z0-9._-]*-\d{3}\.md$")
+
+
+def _is_bridge_artifact_deposit_path(relative_path: str) -> bool:
+    """Bridge-artifact deposit under the canon transition provision (WI-7030)."""
+    rel = _preserve_dot_prefixed_relative_path(relative_path).replace("\\", "/")
+    return bool(_BRIDGE_ARTIFACT_DEPOSIT_RE.match(rel))
+
+
 def _emergency_bridge_repair_applies(protected_paths: list[str]) -> bool:
     if os.environ.get(EMERGENCY_BRIDGE_REPAIR_ENV_VAR) != "1":
         return False
     if not protected_paths or "<unknown-mutating-target>" in protected_paths:
         return False
-    return all(_is_bridge_function_path(path) for path in protected_paths)
+    return all(_is_bridge_function_path(path) or _is_bridge_artifact_deposit_path(path) for path in protected_paths)
 
 
 def _dispatcher_config_direct_edit_targets(paths: list[str]) -> list[str]:
@@ -444,6 +447,33 @@ def _extract_powershell_both_paths(tokens: list[str]) -> list[str]:
     return flag_paths + positional
 
 
+_POSIX_PATH_ARG_VERBS = frozenset({"sed", "awk", "tee", "touch", "truncate", "rm", "shred", "install", "patch"})
+
+_POSIX_BOTH_PATHS_VERBS = frozenset({"cp", "mv", "ln", "dd"})
+
+
+def _extract_posix_paths(tokens: list[str]) -> list[str]:
+    """Every non-flag operand of a POSIX write verb, plus ``dd`` ``of=`` targets.
+
+    Deliberately over-collects: a non-path operand (a ``sed`` script such as
+    ``s/a/b/``, or a ``dd`` ``if=`` source) simply fails to match any protected
+    glob and is inert. Under-collecting is the dangerous direction -- a missed
+    operand degrades to ``<unknown-mutating-target>``, which both refuses the
+    emergency-repair exemption and hides which path was actually at risk.
+    """
+    paths: list[str] = []
+    for token in tokens[1:]:
+        if token.startswith("-"):
+            continue
+        if "=" in token and "/" not in token.split("=", 1)[0]:
+            key, _, value = token.partition("=")
+            if key.lower() == "of" and value:
+                paths.append(value)
+            continue
+        paths.append(token)
+    return paths
+
+
 _GIT_NON_MUTATING_SUBCOMMANDS = DIRECT_GIT_READ_ONLY_SUBCOMMANDS
 
 _GIT_MUTATING_EXTRACTORS = {
@@ -480,6 +510,8 @@ MUTATING_VERB_TABLE = {
     "git_non_mutating": tuple(_GIT_NON_MUTATING_SUBCOMMANDS),
     "powershell_path_arg": tuple(_POWERSHELL_PATH_ARG_VERBS),
     "powershell_both_paths": tuple(_POWERSHELL_BOTH_PATHS_VERBS),
+    "posix_path_arg": tuple(_POSIX_PATH_ARG_VERBS),
+    "posix_both_paths": tuple(_POSIX_BOTH_PATHS_VERBS),
 }
 
 
@@ -511,6 +543,8 @@ def _classify_command_verb(tokens: list[str]):
         return _extract_powershell_path_arg, relevant
     if verb in _POWERSHELL_BOTH_PATHS_VERBS:
         return _extract_powershell_both_paths, relevant
+    if verb in _POSIX_PATH_ARG_VERBS or verb in _POSIX_BOTH_PATHS_VERBS:
+        return _extract_posix_paths, relevant
 
     return None
 
@@ -1816,13 +1850,6 @@ def _registry_observation_intent(
             or None,
             "observed_at": _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
-        try:
-            destination = root / ".gtkb-state" / "sot-registry" / "audit-gaps.jsonl"
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            with destination.open("a", encoding="utf-8", newline="\n") as handle:
-                handle.write(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n")
-        except OSError:
-            pass
         return {"audit_gap": row}
 
     registry_path = root / "config" / "registry" / "sot-artifacts.toml"
@@ -1934,6 +1961,73 @@ def _registry_observation_intent(
         return audit_gap("registry_observation_setup_failed", f"{type(exc).__name__}: {exc}")
 
 
+def _claimed_bridge_id(root: Path, session_id: str | None) -> str:
+    """Return the bridge id this session holds a work-intent claim for.
+
+    WI-7751: the gate previously read ``bridge_id`` out of an implementation-start
+    packet. ``GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`` v5 retires that
+    instrument, so the id is read from the work-intent registry instead — which is
+    already authoritative for it, as ``validate_targets`` demonstrates under WI-4443
+    by consulting the registry before any packet.
+
+    Fails closed. An absent session id, an absent claim, or a registry read error all
+    yield ``""``, which is not a bootstrap id, so ``work_intent_claim_block_reason``
+    then produces the denial. This function never authorizes on its own.
+    """
+    if not session_id or not session_id.strip():
+        return ""
+    try:
+        claimed = bridge_work_intent_registry.current_claimed_bridge_id(session_id, project_root=root)
+    except Exception:  # noqa: BLE001 - a registry read failure must deny, never authorize
+        return ""
+    return str(claimed or "")
+
+
+def _authorized_target_paths(root: Path, bridge_id: str) -> list[str]:
+    """Return the GO-approved proposal's ``target_paths`` for a live bridge thread.
+
+    WI-7751: ``GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`` v5 retires the
+    implementation-start packet but explicitly RETAINS change scope — "change scope
+    is the implementation proposal's declared ``target_paths`` together with the
+    applicable active formal authority". This derives that scope directly from the
+    proposal the latest GO authorized, in the chain the session is currently
+    implementing, and mints nothing.
+
+    Mirrors ``finalization_target_paths_for_verified``, which already derives the
+    same set for the post-``VERIFIED`` staging corridor without minting a packet;
+    this is the live-GO counterpart of that read.
+
+    Fails closed. Absence of a GO, of an approved proposal file, of a readable
+    proposal, or of declared ``target_paths`` all raise
+    :class:`AuthorizationError`, so scope can never widen by omission.
+    """
+    entry = bridge_entry(root, bridge_id)
+    go_index = next(
+        (index for index, (status, _) in enumerate(entry.versions) if status == "GO"),
+        None,
+    )
+    if go_index is None:
+        raise AuthorizationError(
+            f"No GO is present in the bridge chain for {entry.bridge_id}; found latest status {entry.latest_status}."
+        )
+    approved_proposal_file = next(
+        (path for status, path in entry.versions[go_index + 1 :] if status in {"NEW", "REVISED"}),
+        None,
+    )
+    if approved_proposal_file is None:
+        raise AuthorizationError(f"No approved proposal file found under GO for {entry.bridge_id}.")
+    try:
+        markdown = (root / approved_proposal_file).read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError) as exc:
+        raise AuthorizationError(
+            f"Approved proposal file is unreadable for scope derivation: {approved_proposal_file}"
+        ) from exc
+    target_paths = extract_target_paths(markdown)
+    if not target_paths:
+        raise AuthorizationError(f"Approved proposal for {entry.bridge_id} declares no target_paths.")
+    return target_paths
+
+
 def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     invalid_payload_reason = payload.get(INVALID_HOOK_PAYLOAD_KEY)
     if isinstance(invalid_payload_reason, str) and invalid_payload_reason:
@@ -1962,7 +2056,7 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     if not mutating:
         return {}
     if not paths:
-        protected = [UNKNOWN_MUTATING_TARGET]
+        protected = [UNKNOWN_MUTATING_TARGET]  # mutating, but no target extractable → fabricate sentinel → deny
     else:
         protected = [path for path in paths if is_protected_path(path)]
     if not protected:
@@ -1984,12 +2078,6 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     if dispatcher_config_targets:
         return _dispatcher_config_cli_only_block(dispatcher_config_targets)
     if _emergency_bridge_repair_applies(protected):
-        _record_gate_exemption(
-            "emergency-bridge-repair",
-            json.dumps(payload, sort_keys=True),
-            "owner-authorized emergency bridge repair exemption",
-            protected,
-        )
         return {}
     # WI-4837: post-VERIFIED finalization staging clearance (automatic parity per
     # DELIB-WI4837-AUTOMATIC-PARITY-20260707). A narrow `git add` of the thread's
@@ -2000,12 +2088,6 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     # ordinary post-VERIFIED mutation still falls through and is blocked below.
     finalization_reason = _post_verified_finalization_clearance(root, payload)
     if finalization_reason is not None:
-        _record_gate_exemption(
-            "post-verified-finalization-staging",
-            json.dumps(payload, sort_keys=True),
-            finalization_reason,
-            protected,
-        )
         return {}
     # WI-5694 cycle 2: verification-finalization terminal-evidence clearance
     # (owner decision DELIB-202667723). The canonical `write_verdict.py
@@ -2018,38 +2100,57 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     # falls through to the unchanged path below.
     evidence_reason = _verification_finalization_evidence_clearance(root, payload, protected)
     if evidence_reason is not None:
-        _record_gate_exemption(
-            "verification-finalization-terminal-evidence",
-            json.dumps(payload, sort_keys=True),
-            evidence_reason,
-            protected,
-        )
         return {}
     try:
-        # WI-4443: resolve the work-intent session BEFORE packet resolution so
-        # validate_targets can prefer this session's OWN claimed by-bridge packet
-        # over the global current.json pointer (which thrashes under concurrent
-        # Prime Builders). The block-reason check below is unchanged — it now
-        # operates on the session-correct packet.
+        # WI-7751: the gate no longer resolves an implementation-start packet and no
+        # longer re-evaluates a packet-bound project authorization.
+        # GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001 v5 states that no authorization
+        # instrument exists and that a surface requiring one is defective and must be
+        # repaired rather than satisfied. The readiness controls v5 RETAINS — a matching
+        # live work-intent claim, and the WI-4471/peer-report concurrency checks — stay
+        # exactly as they were. They only ever needed the session's claimed bridge id,
+        # which the work-intent registry is already authoritative for; validate_targets
+        # itself consults the registry first under WI-4443, before any packet.
         session_id = resolve_work_intent_session_id(payload)
-        result = validate_targets(root, protected, session_id=session_id)
-        packet = result.get("packet", {})
-        project_authorization = validate_packet_project_authorization_operation(
-            root,
-            packet,
-            requested_operations=["implementation_start", "protected_mutation"],
-            target_paths=[str(path) for path in result.get("targets", protected)],
-        )
-        if project_authorization is None:
-            raise AuthorizationError(
-                "Project Authorization is required before every protected source, test, or configuration mutation."
-            )
-        bridge_id = str(packet.get("bridge_id") or "")
-        block_reason = work_intent_claim_block_reason(root, bridge_id, session_id)
+        bridge_id = _claimed_bridge_id(root, session_id)
+        # WI-7751: the retired packet path ran first and its broad handler absorbed
+        # registry faults before the claim check ever ran. With that path gone, an
+        # unexpected registry error would escape gate_decision and be reported as a
+        # crash rather than a denial, which is fail-open at the hook boundary. Convert
+        # it to a denial here so a registry fault still refuses the mutation.
+        try:
+            block_reason = work_intent_claim_block_reason(root, bridge_id, session_id)
+        except AuthorizationError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - a registry fault must deny, never authorize
+            raise AuthorizationError(f"Could not verify the bridge work-intent claim for {bridge_id!r}: {exc}") from exc
         if block_reason:
             raise AuthorizationError(block_reason)
+        # WI-7751: change scope is RETAINED by v5 — "change scope is the
+        # implementation proposal's declared target_paths". The packet used to carry
+        # that set; with the packet retired, the set is derived from the GO-approved
+        # proposal of the thread this session is implementing. WI-7761 records the
+        # correction this stands in for: the work-intent claim should carry the
+        # authorized paths, captured when the claim is taken against the GO, so the
+        # gate needs no bridge read at mutation time.
+        # Bootstrap threads are exempt for the same reason work_intent_claim_block_reason
+        # exempts them: they exist to bring the gate's own authority surface into being
+        # and therefore cannot have a GO'd proposal to derive scope from.
+        if bridge_id not in BOOTSTRAP_BRIDGE_IDS:
+            authorized_paths = _authorized_target_paths(root, bridge_id)
+            unauthorized = [
+                path
+                for path in protected
+                if not path_authorized_by_target_paths(authorized_paths, normalize_relative_path(root, path))
+            ]
+            if unauthorized:
+                raise AuthorizationError(
+                    "Protected target(s) outside the approved proposal's target_paths for "
+                    f"{bridge_id!r}: {', '.join(sorted(unauthorized))}. Authorized paths: "
+                    f"{', '.join(sorted(authorized_paths))}."
+                )
         # WI-4471: cross-claim path-collision check — block if a different session's
-        # active claim+packet already reserves any of the same target paths.
+        # active claim already reserves any of the same target paths.
         collision_reason = cross_claim_path_collision_reason(
             root, targets=protected, bridge_id=bridge_id, session_id=session_id
         )
@@ -2068,8 +2169,8 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
             protected,
             session_id=session_id or "",
             bridge_id=bridge_id,
-            packet=packet,
-            project_authorization=project_authorization,
+            packet={},
+            project_authorization={},
         )
     except AuthorizationError as exc:
         classifications = ", ".join(sorted({_protected_path_classification(path) for path in protected}))
@@ -2123,7 +2224,6 @@ def main() -> int:
         return 0
     if result.get("decision") == "block":
         reason = result.get("reason") or "BLOCKED (GTKB-IMPLEMENTATION-START-GATE)"
-        _record_gate_denial("protected-target-without-go", json.dumps(payload, sort_keys=True), reason)
         print(
             json.dumps(
                 {

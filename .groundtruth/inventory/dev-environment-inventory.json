@@ -5,7 +5,7 @@
     "script_hash": "sha256:dcd84fc545cab6a5e9adeae7915b7f3c56abfc14d672728aaab1cf4a2a3362ec",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-09-03T23:36:20Z",
+  "generated_at": "2026-09-07T21:12:30Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -631,7 +631,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.1.1"
+      "version": "9.0.3"
     },
     "python": {
       "classification": "verified",
@@ -645,7 +645,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.20"
+      "version": "0.15.12"
     }
   },
   "verification": {

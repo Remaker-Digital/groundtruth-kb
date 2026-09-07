@@ -44,7 +44,7 @@ These priorities remain active across sessions unless Mike explicitly suspends t
 ## File Bridge Operating Note
 
 - The active Prime Builder / Loyal Opposition bridge is TAFE-backed bridge
-  state, with `.claude/rules/file-bridge-protocol.md` retained for legacy helper
+  state, with `.harness-baseline-configuration/rules/file-bridge-protocol.md` retained for legacy helper
   behavior and historical audit interpretation.
 - Aggregate queue artifacts are not the authoritative review queue.
 - Bridge reliability maintenance is no longer a standing priority unless the
@@ -54,7 +54,7 @@ These priorities remain active across sessions unless Mike explicitly suspends t
 
 ## Cross-Cutting Directive - GroundTruth KB Vision
 
-- Load `.claude/rules/groundtruth-kb-vision.md` as persistent context for GroundTruth-related reviews and proposals.
+- Load `.harness-baseline-configuration/rules/groundtruth-kb-vision.md` as persistent context for GroundTruth-related reviews and proposals.
 - Use the GroundTruth KB vision as a decision filter: does this reduce the owner's role to specifications, clarifications, and decisions?
 - Prefer options that move routine owner burden into specifications, automated checks, traceability, agent workflows, and Azure deployment-readiness evidence.
 - Flag approaches that leave the owner supervising routine implementation, deployment plumbing, spec/code reconciliation, generated-artifact inspection, or cross-agent process state.

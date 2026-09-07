@@ -16,10 +16,13 @@ Filter rules (per ``.harness-baseline-configuration/rules/file-bridge-protocol.m
   must revise).
 - ``loyal-opposition`` acts on latest ``NEW``, latest ``REVISED``, and latest
   ``NO-ACTION`` (review), unaffected by terminal-kind classification.
-- ``ADVISORY`` is actionable for ``prime-builder`` only (advisory disposition
-  requires Prime owner-deliberation/UAQ work); it is non-actionable for
-  ``loyal-opposition`` and is non-dispatchable for headless dispatch (see the
-  ``_derive_dispatchable`` invariant in ``groundtruth_kb.bridge.notify``).
+- ``ADVISORY`` is owner-visible informational input for both roles. It is not
+  Prime-actionable, not Loyal-Opposition-actionable, never assigned, and
+  non-dispatchable for headless dispatch (see the ``_derive_dispatchable``
+  invariant in ``groundtruth_kb.bridge.notify``). Latest ``ADVISORY`` threads
+  appear in ``owner_visible``, not in ``actionable``.
+- Prime ``actionable`` threads are ordered oldest-first by the latest file
+  ``Date:`` header when present, else mtime, else slug.
 - ``VERIFIED`` is terminal for both roles. ``DEFERRED`` and ``WITHDRAWN`` are
   non-actionable for both roles. VERIFIED threads are surfaced in
   ``terminal_verified`` for context, not in ``actionable``.
@@ -83,6 +86,7 @@ if str(PACKAGE_SRC_DIR) not in sys.path:
 from groundtruth_kb.bridge.disposition import (  # noqa: E402, I001
     BRIDGE_KIND_TERMINAL_TOKENS as MATRIX_BRIDGE_KIND_TERMINAL_TOKENS,
     LOYAL_OPPOSITION_ACTIONABLE_STATUSES as MATRIX_LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
+    OWNER_VISIBLE_STATUSES as MATRIX_OWNER_VISIBLE_STATUSES,
     PRIME_ACTIONABLE_STATUSES as MATRIX_PRIME_ACTIONABLE_STATUSES,
     VERIFIED_CONTEXT_STATUSES as MATRIX_VERIFIED_CONTEXT_STATUSES,
     disposition_for_status,
@@ -93,15 +97,14 @@ Role = Literal["prime-builder", "loyal-opposition"]
 
 PRIME_ACTIONABLE_STATUSES = MATRIX_PRIME_ACTIONABLE_STATUSES
 LO_ACTIONABLE_STATUSES = MATRIX_LOYAL_OPPOSITION_ACTIONABLE_STATUSES
+OWNER_VISIBLE_STATUSES = MATRIX_OWNER_VISIBLE_STATUSES
 TERMINAL_STATUSES = MATRIX_VERIFIED_CONTEXT_STATUSES
 
 # Prime-authored proposal statuses. ``bridge_kind`` metadata lives on the
 # operative Prime proposal (latest NEW/REVISED), NOT on the Loyal Opposition GO verdict.
 _PRIME_VERSION_STATUSES = frozenset({"NEW", "REVISED"})
 _NONTERMINAL_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO", "NO-ACTION"})
-_ARCHIVE_TERMINAL_STATUSES = frozenset(
-    {"VERIFIED", "WITHDRAWN", "DEFERRED", "ADVISORY", "ACCEPTED"}
-)
+_ARCHIVE_TERMINAL_STATUSES = frozenset({"VERIFIED", "WITHDRAWN", "DEFERRED", "ADVISORY", "ACCEPTED"})
 _IMPLEMENTATION_SIBLING_SUFFIX = "-implementation"
 
 # Terminal-kind ``bridge_kind`` substring tokens. MIRROR of
@@ -114,6 +117,7 @@ _KIND_TERMINAL_TOKENS = MATRIX_BRIDGE_KIND_TERMINAL_TOKENS
 
 # Header read budget (bytes). ``bridge_kind`` is always in the header section.
 _HEADER_READ_BUDGET_BYTES = 4096
+_DATE_HEADER_RE = re.compile(r"^Date:\s*(.+)$", re.MULTILINE | re.IGNORECASE)
 _COMPLETION_BOUND_ENV = "GTKB_SCAN_BRIDGE_COMPLETION_BOUND_SECONDS"
 _DEFAULT_COMPLETION_BOUND_SECONDS = 60.0
 SCAN_BRIDGE_COMPLETION_BOUND_EXCEEDED = "SCAN_BRIDGE_COMPLETION_BOUND_EXCEEDED"
@@ -127,9 +131,7 @@ class ScanBridgeCompletionBoundExceeded(RuntimeError):
     def __init__(self, elapsed_seconds: float, limit_seconds: float) -> None:
         self.elapsed_seconds = elapsed_seconds
         self.limit_seconds = limit_seconds
-        super().__init__(
-            f"{self.token}: elapsed {elapsed_seconds:.3f}s exceeds limit {limit_seconds:.3f}s"
-        )
+        super().__init__(f"{self.token}: elapsed {elapsed_seconds:.3f}s exceeds limit {limit_seconds:.3f}s")
 
 
 @dataclass(frozen=True)
@@ -139,9 +141,7 @@ class _ScanDeadline:
 
     @classmethod
     def start(cls) -> _ScanDeadline:
-        raw = os.environ.get(
-            _COMPLETION_BOUND_ENV, str(_DEFAULT_COMPLETION_BOUND_SECONDS)
-        )
+        raw = os.environ.get(_COMPLETION_BOUND_ENV, str(_DEFAULT_COMPLETION_BOUND_SECONDS))
         try:
             limit = float(raw)
         except ValueError:
@@ -251,9 +251,7 @@ def _parse_index(index_text: str) -> list[ThreadEntry]:
             continue
         m_status = _STATUS_LINE_RE.match(line)
         if m_status and current_doc is not None:
-            current_versions.append(
-                VersionEntry(status=m_status.group(1), path=m_status.group(2))
-            )
+            current_versions.append(VersionEntry(status=m_status.group(1), path=m_status.group(2)))
     flush()
     return threads
 
@@ -274,14 +272,9 @@ def _status_from_bridge_file(path: Path) -> str | None:
     return None
 
 
-def _thread_from_rows(
-    slug: str, rows: list[tuple[int, str, str]]
-) -> ThreadEntry | None:
+def _thread_from_rows(slug: str, rows: list[tuple[int, str, str]]) -> ThreadEntry | None:
     ordered = sorted(rows, key=lambda row: row[0], reverse=True)
-    versions = tuple(
-        VersionEntry(status=status, path=rel_path)
-        for _version, status, rel_path in ordered
-    )
+    versions = tuple(VersionEntry(status=status, path=rel_path) for _version, status, rel_path in ordered)
     if not versions:
         return None
     return ThreadEntry(
@@ -377,9 +370,7 @@ def _compact_threads_from_version_files(
     physical_latest_statuses: dict[str, str | None] = {}
     for slug, version_files in inventory.items():
         _check_deadline()
-        thread, physical_latest_status = _compact_thread_from_version_files(
-            slug, version_files, role
-        )
+        thread, physical_latest_status = _compact_thread_from_version_files(slug, version_files, role)
         physical_latest_statuses[slug] = physical_latest_status
         if thread is not None:
             threads_by_slug[slug] = thread
@@ -397,9 +388,7 @@ def _compact_threads_from_version_files(
     for slug, physical_status in physical_latest_statuses.items():
         if physical_status not in _NONTERMINAL_STATUSES:
             continue
-        sibling_status = physical_latest_statuses.get(
-            f"{slug}{_IMPLEMENTATION_SIBLING_SUFFIX}"
-        )
+        sibling_status = physical_latest_statuses.get(f"{slug}{_IMPLEMENTATION_SIBLING_SUFFIX}")
         if slug in acknowledged or sibling_status in _ARCHIVE_TERMINAL_STATUSES:
             archived_slugs.add(slug)
 
@@ -452,18 +441,14 @@ def _render_state_from_version_files_with_archived(
                 excluded_archived.append(thread)
             continue
         lines.append(f"Document: {slug}")
-        for _version, status, rel_path in sorted(
-            grouped[slug], key=lambda row: row[0], reverse=True
-        ):
+        for _version, status, rel_path in sorted(grouped[slug], key=lambda row: row[0], reverse=True):
             lines.append(f"{status}: {rel_path}")
         lines.append("")
     return "\n".join(lines), excluded_archived
 
 
 def _render_state_from_version_files(project_root: Path) -> str:
-    text, _excluded_archived = _render_state_from_version_files_with_archived(
-        project_root
-    )
+    text, _excluded_archived = _render_state_from_version_files_with_archived(project_root)
     return text
 
 
@@ -528,8 +513,7 @@ def _go_activatable(project_root: Path, bridge_id: str) -> tuple[bool, list[str]
         if (
             "Bridge document not found as exact numbered files" in message
             or "Bridge document not found as versioned files" in message
-            or "Implementation authorization requires a GO in the bridge chain"
-            in message
+            or "Implementation authorization requires a GO in the bridge chain" in message
             or "No approved proposal file found under GO" in message
         ):
             return True, []
@@ -549,15 +533,14 @@ def _role_filter(
     For ``prime-builder``, a latest ``GO`` whose operative Prime proposal carries
     a terminal-kind ``bridge_kind`` is excluded — the GO is the deliverable with
     no Prime implementation follow-up. A latest ``NO-GO`` is never excluded
-    (Prime must revise regardless of kind). ``loyal-opposition`` is unaffected.
+    (Prime must revise regardless of kind). Latest ``ADVISORY`` is not Prime-
+    actionable. ``loyal-opposition`` is unaffected.
     Compact scans skip ``_go_activatable`` / packet mint (WI-6607); latest GO
     threads stay in the compact actionable list. Activatability remains an
     implementation-start concern.
     """
     if role not in {"prime-builder", "loyal-opposition"}:
-        raise ValueError(
-            f"Unknown role {role!r}; expected 'prime-builder' or 'loyal-opposition'"
-        )
+        raise ValueError(f"Unknown role {role!r}; expected 'prime-builder' or 'loyal-opposition'")
 
     actionable: list[ThreadEntry] = []
     blocked_non_activatable: list[dict[str, Any]] = []
@@ -582,6 +565,36 @@ def _role_filter(
     return actionable, terminal_verified, blocked_non_activatable
 
 
+def _latest_file_sort_key(thread: ThreadEntry, project_root: Path) -> tuple[int, str, str]:
+    """Oldest-first key: Date header, else mtime, else slug."""
+    path = project_root / thread.latest_path
+    date_text = ""
+    mtime_text = "0"
+    if path.is_file():
+        try:
+            header = path.read_bytes()[:_HEADER_READ_BUDGET_BYTES].decode("utf-8", errors="replace")
+        except OSError:
+            header = ""
+        match = _DATE_HEADER_RE.search(header)
+        if match:
+            date_text = match.group(1).strip()
+        try:
+            mtime_text = f"{path.stat().st_mtime:020.6f}"
+        except OSError:
+            mtime_text = "0"
+    if date_text:
+        return (0, date_text, thread.document)
+    return (1, mtime_text, thread.document)
+
+
+def _sort_prime_actionable_oldest_first(actionable: list[ThreadEntry], project_root: Path) -> list[ThreadEntry]:
+    return sorted(actionable, key=lambda thread: _latest_file_sort_key(thread, project_root))
+
+
+def _owner_visible_threads(threads: list[ThreadEntry]) -> list[ThreadEntry]:
+    return [t for t in threads if t.latest_status in OWNER_VISIBLE_STATUSES]
+
+
 def _summary_counts(threads: list[ThreadEntry]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for t in threads:
@@ -598,12 +611,10 @@ def _compact_scan_result(result: dict[str, Any]) -> dict[str, Any]:
     """Suppress terminal VERIFIED/archive payloads; keep actionable summaries only."""
     compact = dict(result)
     compact["compact"] = True
-    compact["actionable"] = [
-        _compact_thread_dict(thread) for thread in result.get("actionable", [])
-    ]
+    compact["actionable"] = [_compact_thread_dict(thread) for thread in result.get("actionable", [])]
+    compact["owner_visible"] = [_compact_thread_dict(thread) for thread in result.get("owner_visible", [])]
     compact["blocked_non_activatable"] = [
-        _compact_thread_dict(thread)
-        for thread in result.get("blocked_non_activatable", [])
+        _compact_thread_dict(thread) for thread in result.get("blocked_non_activatable", [])
     ]
     compact["terminal_verified_count"] = len(result.get("terminal_verified", []))
     compact["excluded_archived_count"] = len(result.get("excluded_archived", []))
@@ -631,6 +642,7 @@ def scan(
         Dict with keys:
           - ``role``: the role filter applied.
           - ``actionable``: list of thread dicts the role should act on.
+          - ``owner_visible``: latest ``ADVISORY`` threads (informational; not queue work).
           - ``terminal_verified``: list of VERIFIED thread dicts (context only).
           - ``summary``: counts by latest-status across all threads.
           - ``generated_at``: ISO-8601 UTC timestamp.
@@ -640,19 +652,11 @@ def scan(
         _check_deadline()
         threads: list[ThreadEntry] | None = None
         if index_text is None:
-            project_root = (
-                index_path.resolve().parent.parent
-                if index_path is not None
-                else PROJECT_ROOT
-            )
+            project_root = index_path.resolve().parent.parent if index_path is not None else PROJECT_ROOT
             if compact:
-                threads, excluded_archived = _compact_threads_from_version_files(
-                    project_root, role
-                )
+                threads, excluded_archived = _compact_threads_from_version_files(project_root, role)
             else:
-                index_text, excluded_archived = (
-                    _render_state_from_version_files_with_archived(project_root)
-                )
+                index_text, excluded_archived = _render_state_from_version_files_with_archived(project_root)
         elif index_path is not None:
             # Inline text but an explicit index path: resolve operative bridge files
             # relative to that path's project root (used by terminal-kind tests).
@@ -669,10 +673,13 @@ def scan(
         actionable, terminal_verified, blocked_non_activatable = _role_filter(
             threads, role, project_root, check_activatable=not compact
         )
+        if role == "prime-builder":
+            actionable = _sort_prime_actionable_oldest_first(actionable, project_root)
 
         result = {
             "role": role,
             "actionable": [t.to_dict() for t in actionable],
+            "owner_visible": [t.to_dict() for t in _owner_visible_threads(threads)],
             "blocked_non_activatable": blocked_non_activatable,
             "excluded_archived": [t.to_dict() for t in excluded_archived],
             "terminal_verified": [t.to_dict() for t in terminal_verified],
@@ -704,15 +711,19 @@ def _format_markdown(result: dict[str, Any]) -> str:
     lines.append("")
     if result["actionable"]:
         for thread in result["actionable"]:
-            lines.append(
-                f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`"
-            )
+            lines.append(f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`")
     else:
         lines.append("- (none)")
     lines.append("")
-    lines.append(
-        f"## Blocked (non-activatable GO) ({len(result.get('blocked_non_activatable', []))})"
-    )
+    lines.append(f"## Owner-visible ADVISORY ({len(result.get('owner_visible', []))})")
+    lines.append("")
+    if result.get("owner_visible"):
+        for thread in result["owner_visible"]:
+            lines.append(f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`")
+    else:
+        lines.append("- (none)")
+    lines.append("")
+    lines.append(f"## Blocked (non-activatable GO) ({len(result.get('blocked_non_activatable', []))})")
     lines.append("")
     if result.get("blocked_non_activatable"):
         for thread in result["blocked_non_activatable"]:
@@ -723,43 +734,27 @@ def _format_markdown(result: dict[str, Any]) -> str:
         lines.append("- (none)")
     lines.append("")
     if result.get("compact"):
-        lines.append(
-            f"## Excluded Archived Nonterminal (count only, {result.get('excluded_archived_count', 0)})"
-        )
+        lines.append(f"## Excluded Archived Nonterminal (count only, {result.get('excluded_archived_count', 0)})")
         lines.append("")
-        lines.append(
-            "- Full archived payloads omitted in compact mode; rerun without `--compact` for archival detail."
-        )
+        lines.append("- Full archived payloads omitted in compact mode; rerun without `--compact` for archival detail.")
         lines.append("")
-        lines.append(
-            f"## Terminal VERIFIED (count only, {result.get('terminal_verified_count', 0)})"
-        )
+        lines.append(f"## Terminal VERIFIED (count only, {result.get('terminal_verified_count', 0)})")
         lines.append("")
-        lines.append(
-            "- Full VERIFIED payloads omitted in compact mode; rerun without `--compact` for archival detail."
-        )
+        lines.append("- Full VERIFIED payloads omitted in compact mode; rerun without `--compact` for archival detail.")
     else:
-        lines.append(
-            f"## Excluded Archived Nonterminal ({len(result.get('excluded_archived', []))})"
-        )
+        lines.append(f"## Excluded Archived Nonterminal ({len(result.get('excluded_archived', []))})")
         lines.append("")
         if result.get("excluded_archived"):
             for thread in result["excluded_archived"]:
-                lines.append(
-                    f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`"
-                )
+                lines.append(f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`")
         else:
             lines.append("- (none)")
         lines.append("")
-        lines.append(
-            f"## Terminal VERIFIED (context, {len(result['terminal_verified'])})"
-        )
+        lines.append(f"## Terminal VERIFIED (context, {len(result['terminal_verified'])})")
         lines.append("")
         if result["terminal_verified"]:
             for thread in result["terminal_verified"]:
-                lines.append(
-                    f"- {thread['document']} -- VERIFIED at `{thread['latest_path']}`"
-                )
+                lines.append(f"- {thread['document']} -- VERIFIED at `{thread['latest_path']}`")
         else:
             lines.append("- (none)")
     return "\n".join(lines)
@@ -767,9 +762,7 @@ def _format_markdown(result: dict[str, Any]) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--role", required=True, choices=["prime-builder", "loyal-opposition"]
-    )
+    parser.add_argument("--role", required=True, choices=["prime-builder", "loyal-opposition"])
     parser.add_argument(
         "--index-path",
         default=None,

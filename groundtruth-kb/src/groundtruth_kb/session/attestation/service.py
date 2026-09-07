@@ -22,8 +22,9 @@ concepts are vacuous. ``ADR-SESSION-ROLE-ATTESTATION-SERVICE-001`` is retired
 and its retirement forbids retaining that separate attestation log,
 role-change, registry fallback, or migration design.
 
-Storage is the canonical MemBase (``groundtruth.db``), append-only with no
-UPDATE/DELETE paths, per the platform's change-control doctrine.
+Storage is the canonical MemBase (``groundtruth.db``). Bindings have no UPDATE
+path; the only terminal mutation is ``retire_binding``, which deletes the live
+binding and retains no sidecar or terminal identity.
 """
 
 from __future__ import annotations
@@ -187,3 +188,30 @@ def binding_for_context(db_path: Path, native_context_id: str) -> Binding:
             f"binding for {native_context_id!r} carries unsupported role {binding.role!r}",
         )
     return binding
+
+
+def retire_binding(db_path: Path, native_context_id: str) -> str:
+    """Retire one binding through the canonical service boundary.
+
+    Retirement removes the live binding and retains no sidecar or terminal
+    identity. A replay is therefore the typed ``no_session_binding`` outcome,
+    not an idempotent success.
+    """
+    if not native_context_id or not native_context_id.strip():
+        raise RoleAttestationError("invalid_native_context_id", "native session context is required")
+
+    conn = _connect(db_path)
+    try:
+        with conn:
+            cursor = conn.execute(
+                "DELETE FROM session_init_bindings WHERE native_context_id = ?",
+                (native_context_id,),
+            )
+            if cursor.rowcount != 1:
+                raise RoleAttestationError(
+                    "no_session_binding",
+                    f"no session-init binding exists for native context {native_context_id!r}",
+                )
+    finally:
+        conn.close()
+    return "retired"

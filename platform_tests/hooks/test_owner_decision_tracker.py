@@ -826,10 +826,22 @@ def test_worker_stop_writes_owner_decision_artifact_instead_of_blocking(tmp_path
 
     assert result.returncode == 0, f"stderr: {result.stderr}"
     assert result.stdout == "", "worker Stop hook must not emit an interactive block"
+    # Canon s17: the worker artifact is session-scoped scratch, never `.gtkb-state`
+    # (and never the retired bridge-poller tree). The hook subprocess resolves its
+    # session from GTKB_BRIDGE_POLLER_RUN_ID -- first in BRIDGE_WORK_INTENT_ORDER --
+    # so the run id IS the session component here. Passing it explicitly resolves
+    # through the same single authority the hook uses, rather than re-deriving it.
+    from scripts.gtkb_session_id import session_scratch_dirname
+
     artifact_path = (
-        project / ".gtkb-state" / "bridge-poller" / "dispatch-runs" / f"{run_id}.owner-decision-requested.json"
+        project
+        / "scratchpad"
+        / session_scratch_dirname(run_id)
+        / "dispatch-runs"
+        / f"{run_id}.owner-decision-requested.json"
     )
     assert artifact_path.is_file()
+    assert not (project / ".gtkb-state").exists()
     payload = json.loads(artifact_path.read_text(encoding="utf-8"))
     assert payload["decision"] == "requires_owner_decision"
     assert payload["run_id"] == run_id
@@ -1540,17 +1552,21 @@ def _run_hook_isolated(
     )
 
 
-def test_slice4_auto_archive_enabled_writes_failure_log_when_service_unavailable(
+def test_slice4_auto_archive_enabled_fails_soft_when_service_unavailable(
     tmp_path: Path,
 ) -> None:
-    """Env-gate-on + archive temp-dir unavailable -> graceful failure-log write.
+    """Env-gate-on + archive temp-dir unavailable -> graceful degradation.
 
     Post NO-GO -007 F1+F2 fix: subprocess runs with cwd=tmp_path AND
     CLAUDE_PROJECT_DIR=tmp_path. The archive temp path is blocked with a file,
     so archive_decision raises before service writes can proceed. The tracker
-    catches the exception and writes a JSONL record to
-    <tmp_path>/.gtkb-state/owner-decision-auto-archive/failures.jsonl. The
-    notepad-tier write remains load-bearing (exit 0).
+    catches the exception, exits 0, and the notepad-tier write remains
+    load-bearing.
+
+    The `.gtkb-state/owner-decision-auto-archive/failures.jsonl` record this
+    test previously asserted was removed with its writer (owner-directed
+    `.gtkb-state` removal, 2026-09-05). Auto-archive failures are now silent;
+    the fail-soft guarantee below is what remains verifiable.
     """
     project = _setup_project(tmp_path)
     (project / ".tmp").write_text("archive temp directory unavailable\n", encoding="utf-8")
@@ -1565,16 +1581,10 @@ def test_slice4_auto_archive_enabled_writes_failure_log_when_service_unavailable
     pending = _read_pending_file(project)
     assert "DECISION-" in pending, "notepad write must remain load-bearing"
 
-    failure_log = project / ".gtkb-state" / "owner-decision-auto-archive" / "failures.jsonl"
-    assert failure_log.exists(), f"failure log must be written when service is unavailable; checked {failure_log}"
-    lines = [ln for ln in failure_log.read_text(encoding="utf-8").splitlines() if ln.strip()]
-    assert lines, "failure log must contain at least one JSONL record"
-    record = json.loads(lines[0])
-    assert "decision_id" in record, "failure record must cite the decision id"
-    assert record["decision_id"].startswith("DECISION-"), "decision_id format"
-    assert "error_type" in record, "failure record must name the exception type"
-    assert "error_message" in record, "failure record must capture the error message"
-    assert len(record["error_message"]) <= 500, "error_message must be bounded"
+    # The failure log and its writer were removed; assert the replacement
+    # guarantee instead -- the hook degrades silently and creates no
+    # `.gtkb-state` tree on the way out.
+    assert not (project / ".gtkb-state").exists(), "auto-archive failure must not recreate .gtkb-state"
 
 
 def test_slice4_hook_does_not_touch_live_repo_state(tmp_path: Path) -> None:

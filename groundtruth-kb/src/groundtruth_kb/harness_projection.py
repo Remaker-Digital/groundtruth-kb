@@ -453,16 +453,23 @@ def generate_harness_projection(
 def _resolve_project_root(project_root: Path | None) -> Path:
     """Resolve project_root for the canonical reader entrypoints.
 
-    Order: explicit argument > ``GTKB_PROJECT_ROOT`` env var > current
-    working directory's resolved absolute path. Mirrors the resolution
-    pattern used by sibling generator surfaces.
+    Order: explicit argument > ``GTKB_PROJECT_ROOT`` env var > host-root
+    resolution via ``groundtruth_kb.bridge.paths.resolve_project_root``.
+
+    The CWD fallback is host-root aware (WI-6452 / WI-6587): when no explicit
+    root or env var is supplied, the same fail-closed host-root walk used by
+    ``bridge.paths.resolve_project_root`` applies, so a reader invoked from an
+    in-root subdirectory resolves the canonical ``groundtruth.toml`` host root
+    rather than the subdirectory itself.
     """
     if project_root is not None:
         return project_root.expanduser().resolve()
     env_root = os.environ.get("GTKB_PROJECT_ROOT")
     if env_root:
         return Path(env_root).expanduser().resolve()
-    return Path.cwd().resolve()
+    from groundtruth_kb.bridge.paths import resolve_project_root
+
+    return resolve_project_root()
 
 
 def read_roles(project_root: Path | None = None) -> dict[str, Any]:
@@ -480,8 +487,8 @@ def read_roles(project_root: Path | None = None) -> dict[str, Any]:
     path = harness_registry_path(root)
     try:
         text = path.read_text(encoding="utf-8")
-    except FileNotFoundError as exc:
-        raise HarnessStateError(f"harness-state SoT file missing: {path}") from exc
+    except FileNotFoundError:
+        return _roles_from_database(root)
     except OSError as exc:
         raise HarnessStateError(f"harness-state SoT file unreadable ({path}): {exc}") from exc
     try:
@@ -498,20 +505,25 @@ def read_roles(project_root: Path | None = None) -> dict[str, Any]:
 def read_identity(project_root: Path | None = None) -> dict[str, Any]:
     """Read the harness identities SoT (``harness-state/harness-identities.json``).
 
-    Canonical reader entrypoint per
-    ``DCL-HARNESS-STATE-SOT-READER-CONTRACT-001``. Direct file reads
-    of the identities file in committed code outside this module are
-    doctor findings.
+    Canonical reader entrypoint per ``DCL-HARNESS-STATE-SOT-READER-CONTRACT-001``.
+    Direct file reads of the identities file in committed code outside this
+    module are doctor findings.
 
-    Raises :class:`HarnessStateError` when the SoT file is missing,
-    unreadable, malformed JSON, or non-mapping at the top level.
+    WI-7016: when the identities file is absent, the document is derived from the
+    DB-backed registry projection instead of failing. WI-3342 IP-5 removed the
+    identities-file write path and made the registry the authoritative identity
+    surface, so a missing file is expected steady state, not corruption. Deriving
+    keeps ``resolve_changed_by`` — and therefore every MemBase write — working.
+
+    Raises :class:`HarnessStateError` only when the file is present but
+    unreadable/malformed, or when neither the file nor the registry resolves.
     """
     root = _resolve_project_root(project_root)
     path = root / HARNESS_IDENTITIES_RELATIVE_PATH
     try:
         text = path.read_text(encoding="utf-8")
-    except FileNotFoundError as exc:
-        raise HarnessStateError(f"harness-state SoT file missing: {path}") from exc
+    except FileNotFoundError:
+        return _identities_from_registry(root)
     except OSError as exc:
         raise HarnessStateError(f"harness-state SoT file unreadable ({path}): {exc}") from exc
     try:
@@ -523,6 +535,58 @@ def read_identity(project_root: Path | None = None) -> dict[str, Any]:
             f"harness-state SoT file expected a JSON object at top level ({path}); got {type(data).__name__}"
         )
     return data
+
+
+def _roles_from_database(root: Path) -> dict[str, Any]:
+    """Project the roles document from the canonical DB registry."""
+    from groundtruth_kb.db import KnowledgeDB  # local import: avoids any cycle
+
+    records: list[dict[str, Any]] = []
+    for row in KnowledgeDB(root / "groundtruth.db").list_harnesses():
+        record = dict(row)
+        for field in ("role", "invocation_surfaces"):
+            value = record.get(field)
+            if isinstance(value, str) and value.strip():
+                try:
+                    record[field] = json.loads(value)
+                except json.JSONDecodeError:
+                    pass
+        records.append(record)
+    if not records:
+        raise HarnessStateError(
+            "harness roles unavailable: registry file missing and DB registry yielded no harness records"
+        )
+    return {
+        "schema_version": 1,
+        "source_of_truth": "GT-KB harness registry (database)",
+        "description": "Derived from current_harnesses; registry file absent.",
+        "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "harnesses": records,
+    }
+
+
+def _identities_from_registry(root: Path) -> dict[str, Any]:
+    """Project the identities document from the DB-backed registry (WI-7016)."""
+    registry = read_roles(root)
+    harnesses: dict[str, Any] = {}
+    for record in registry.get("harnesses") or []:
+        if not isinstance(record, dict):
+            continue
+        name = str(record.get("harness_name") or "").strip().lower()
+        harness_id = str(record.get("id") or "").strip().upper()
+        if name and harness_id:
+            harnesses[name] = {"id": harness_id}
+    if not harnesses:
+        raise HarnessStateError(
+            "harness identities unavailable: identities file missing and registry projection yielded no harness records"
+        )
+    return {
+        "schema_version": registry.get("schema_version", 1),
+        "source_of_truth": "GT-KB harness installation identities",
+        "description": "Derived from the DB-backed harness registry projection (WI-7016).",
+        "generated_at": registry.get("generated_at"),
+        "harnesses": harnesses,
+    }
 
 
 def read_capabilities(project_root: Path | None = None) -> dict[str, Any]:

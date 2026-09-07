@@ -131,30 +131,28 @@ def test_startup_decision_value_drift_caught_as_parity_error(tmp_path: Path) -> 
 
 
 def test_cache_writer_regression_to_role_set_iteration_caught(tmp_path: Path) -> None:
-    """If ``_write_role_scoped_startup_relay_caches`` regresses to iterating
-    ``_resolve_own_role_set()`` instead of ``_MODE_TO_ROLE_PROFILE`` keys,
+    """If a startup-disclosure cache writer is reintroduced into the core,
     the parity tool must catch it.
 
-    Real-world failure scenario: a well-intentioned refactor "consolidates"
-    the cache-writer to consult the durable role set, breaking the
-    ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 Decision 2 contract that
-    BOTH -pb and -lo caches are generated unconditionally so the
-    UserPromptSubmit init-keyword matcher's keyword-keyed lookup succeeds
-    regardless of the harness's durable role.
+    Inverted by WI-7318. The prior scenario was a refactor that consolidated
+    the cache-writer onto the durable role set. The cache itself is now gone:
+    caching a startup disclosure contradicts the real-time generation mandate
+    and wrote into generated projection trees. The real-world failure scenario
+    is therefore a well-intentioned restoration of the writer, which would
+    silently reintroduce both violations.
     """
     staged_root = _stage_canonical_tree(tmp_path)
     _mutate(
         staged_root / _CORE,
-        "for mode in sorted(_MODE_TO_ROLE_PROFILE):",
-        "for role in sorted(_resolve_own_role_set()):",
+        "def _render_role_startup_report(",
+        "def _write_role_scoped_startup_relay_caches(additional_context):\n    return None\n\n\n"
+        "def _render_role_startup_report(",
     )
     errors = parity._resolution_table_parity_errors(staged_root)
-    assert errors, "drift-class regression: parity tool returned no errors despite cache-writer regression"
-    # The mutation triggers both the loop-shape error AND the forbidden-
-    # reference error per assertion 9; assert the loop error specifically.
+    assert errors, "drift-class regression: parity tool returned no errors despite cache-writer reintroduction"
     assert any(
-        _CORE_LABEL in e and "_write_role_scoped_startup_relay_caches" in e and "must iterate" in e for e in errors
-    ), f"expected cache-writer loop-shape error in {errors!r}"
+        _CORE_LABEL in e and "_write_role_scoped_startup_relay_caches" in e and "must NOT define" in e for e in errors
+    ), f"expected cache-writer reintroduction error in {errors!r}"
 
 
 # ---------------------------------------------------------------------------

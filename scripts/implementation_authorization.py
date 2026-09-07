@@ -22,6 +22,12 @@ from typing import Any
 
 from groundtruth_kb.bridge.versioned_files import parse_bridge_header_block
 from groundtruth_kb.bridge.vocabulary import ACCEPTED_ON_READ as _VOCABULARY_ACCEPTED_ON_READ
+from groundtruth_kb.bridge.vocabulary import (
+    LOYAL_OPPOSITION_ACTIONABLE_STATUSES as _VOCABULARY_LO_ACTIONABLE,
+)
+from groundtruth_kb.bridge.vocabulary import (
+    PRIME_ACTIONABLE_STATUSES as _VOCABULARY_PRIME_ACTIONABLE,
+)
 
 try:
     from scripts import bridge_lifecycle_resolver, bridge_work_intent_registry, gtkb_session_id
@@ -80,6 +86,19 @@ VERIFICATION_TEST_EVIDENCE_RE = re.compile(
 BRIDGE_FILE_STATUS_RE = re.compile(
     "^(" + "|".join(re.escape(status) for status in sorted(_VOCABULARY_ACCEPTED_ON_READ)) + ")$"
 )
+# WI-7744. Canon section 6 gives a thread a report phase after its GO: the report is READY and
+# its rejection is NOT-READY. Both sets are derived from the vocabulary module rather than
+# restated, for the reason WI-7684 gave when it replaced the status literal above: a
+# hand-maintained status set in this module drifts the next time the vocabulary changes.
+#
+# A rejection routes the thread back to Prime Builder and leaves the authorizing GO resumable.
+# NOT-READY is the report-phase form; NO-GO is the proposal-phase form and the historical
+# report-phase form. GO is the approval and is excluded.
+_RESUMABLE_REJECTION_STATUSES = _VOCABULARY_PRIME_ACTIONABLE - {"GO"}
+
+# A filed artifact in any of these statuses is awaiting Loyal Opposition review. Mutating source
+# then would invalidate the snapshot the reviewer is reading, so READY must NOT be resumable.
+_AWAITING_REVIEW_STATUSES = _VOCABULARY_LO_ACTIONABLE
 REQUIREMENT_GAP_PHRASE = "New or revised requirement required before implementation"
 REQUIREMENT_SUFFICIENCY_PHRASES = (
     "Existing requirements sufficient",
@@ -386,9 +405,9 @@ def _post_go_chain_state(statuses_after_go: list[str]) -> str:
     if not statuses_after_go:
         return "latest_is_go"
     latest = statuses_after_go[0]
-    if latest == "NO-GO":
+    if latest in _RESUMABLE_REJECTION_STATUSES:
         return "resumable"
-    if latest in {"NEW", "REVISED"}:
+    if latest in _AWAITING_REVIEW_STATUSES:
         return "awaiting_review"
     if latest == "VERIFIED":
         return "terminal"
@@ -461,7 +480,7 @@ def _report_no_go_resumption_authority(
         return None
 
     entry = bridge_entry(project_root, bridge_id)
-    if entry.latest_status != "NO-GO" or len(entry.versions) < 2:
+    if entry.latest_status not in _RESUMABLE_REJECTION_STATUSES or len(entry.versions) < 2:
         return None
 
     go_index = next(
@@ -473,7 +492,7 @@ def _report_no_go_resumption_authority(
 
     no_go_file = entry.latest_path
     report_status, report_file = entry.versions[1]
-    if report_status not in {"NEW", "REVISED"}:
+    if report_status not in _AWAITING_REVIEW_STATUSES:
         return None
     try:
         report_text = (project_root / report_file).read_text(encoding="utf-8-sig")

@@ -16,10 +16,13 @@ Filter rules (per ``.claude/rules/file-bridge-protocol.md``):
   must revise).
 - ``loyal-opposition`` acts on latest ``NEW`` and latest ``REVISED`` (review),
   unaffected by terminal-kind classification.
-- ``ADVISORY`` is actionable for ``prime-builder`` only (advisory disposition
-  requires Prime owner-deliberation/UAQ work); it is non-actionable for
-  ``loyal-opposition`` and is non-dispatchable for headless dispatch (see the
-  ``_derive_dispatchable`` invariant in ``groundtruth_kb.bridge.notify``).
+- ``ADVISORY`` is owner-visible informational input for both roles. It is not
+  Prime-actionable, not Loyal-Opposition-actionable, never assigned, and
+  non-dispatchable for headless dispatch (see the ``_derive_dispatchable``
+  invariant in ``groundtruth_kb.bridge.notify``). Latest ``ADVISORY`` threads
+  appear in ``owner_visible``, not in ``actionable``.
+- Prime ``actionable`` threads are ordered oldest-first by the latest file
+  ``Date:`` header when present, else mtime, else slug.
 - ``VERIFIED`` is terminal for both roles. ``DEFERRED`` and ``WITHDRAWN`` are
   non-actionable for both roles. VERIFIED threads are surfaced in
   ``terminal_verified`` for context, not in ``actionable``.
@@ -59,8 +62,9 @@ DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
 
 Role = Literal["prime-builder", "loyal-opposition"]
 
-PRIME_ACTIONABLE_STATUSES = frozenset({"NO-GO", "GO", "ADVISORY"})
+PRIME_ACTIONABLE_STATUSES = frozenset({"NO-GO", "GO"})
 LO_ACTIONABLE_STATUSES = frozenset({"NEW", "REVISED"})
+OWNER_VISIBLE_STATUSES = frozenset({"ADVISORY"})
 TERMINAL_STATUSES = frozenset({"VERIFIED"})
 
 # Prime-authored proposal statuses. ``bridge_kind`` metadata lives on the
@@ -92,6 +96,7 @@ _KIND_TERMINAL_TOKENS = (
 
 # Header read budget (bytes). ``bridge_kind`` is always in the header section.
 _HEADER_READ_BUDGET_BYTES = 4096
+_DATE_HEADER_RE = re.compile(r"^Date:\s*(.+)$", re.MULTILINE | re.IGNORECASE)
 
 _STATUS_LINE_RE = re.compile(
     r"^(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED):\s*(bridge/.+\.md)\s*$"
@@ -441,6 +446,36 @@ def _role_filter(
     return actionable, terminal_verified, blocked_non_activatable
 
 
+def _latest_file_sort_key(thread: ThreadEntry, project_root: Path) -> tuple[int, str, str]:
+    """Oldest-first key: Date header, else mtime, else slug."""
+    path = project_root / thread.latest_path
+    date_text = ""
+    mtime_text = "0"
+    if path.is_file():
+        try:
+            header = path.read_bytes()[:_HEADER_READ_BUDGET_BYTES].decode("utf-8", errors="replace")
+        except OSError:
+            header = ""
+        match = _DATE_HEADER_RE.search(header)
+        if match:
+            date_text = match.group(1).strip()
+        try:
+            mtime_text = f"{path.stat().st_mtime:020.6f}"
+        except OSError:
+            mtime_text = "0"
+    if date_text:
+        return (0, date_text, thread.document)
+    return (1, mtime_text, thread.document)
+
+
+def _sort_prime_actionable_oldest_first(actionable: list[ThreadEntry], project_root: Path) -> list[ThreadEntry]:
+    return sorted(actionable, key=lambda thread: _latest_file_sort_key(thread, project_root))
+
+
+def _owner_visible_threads(threads: list[ThreadEntry]) -> list[ThreadEntry]:
+    return [t for t in threads if t.latest_status in OWNER_VISIBLE_STATUSES]
+
+
 def _summary_counts(threads: list[ThreadEntry]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for t in threads:
@@ -458,6 +493,7 @@ def _compact_scan_result(result: dict[str, Any]) -> dict[str, Any]:
     compact = dict(result)
     compact["compact"] = True
     compact["actionable"] = [_compact_thread_dict(thread) for thread in result.get("actionable", [])]
+    compact["owner_visible"] = [_compact_thread_dict(thread) for thread in result.get("owner_visible", [])]
     compact["blocked_non_activatable"] = [
         _compact_thread_dict(thread) for thread in result.get("blocked_non_activatable", [])
     ]
@@ -485,6 +521,7 @@ def scan(
         Dict with keys:
           - ``role``: the role filter applied.
           - ``actionable``: list of thread dicts the role should act on.
+          - ``owner_visible``: latest ``ADVISORY`` threads (informational; not queue work).
           - ``terminal_verified``: list of VERIFIED thread dicts (context only).
           - ``summary``: counts by latest-status across all threads.
           - ``generated_at``: ISO-8601 UTC timestamp.
@@ -508,10 +545,13 @@ def scan(
     if threads is None:
         threads = _parse_index(index_text)
     actionable, terminal_verified, blocked_non_activatable = _role_filter(threads, role, project_root)
+    if role == "prime-builder":
+        actionable = _sort_prime_actionable_oldest_first(actionable, project_root)
 
     result = {
         "role": role,
         "actionable": [t.to_dict() for t in actionable],
+        "owner_visible": [t.to_dict() for t in _owner_visible_threads(threads)],
         "blocked_non_activatable": blocked_non_activatable,
         "terminal_verified": [t.to_dict() for t in terminal_verified],
         "summary": _summary_counts(threads),
@@ -540,6 +580,14 @@ def _format_markdown(result: dict[str, Any]) -> str:
     lines.append("")
     if result["actionable"]:
         for thread in result["actionable"]:
+            lines.append(f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`")
+    else:
+        lines.append("- (none)")
+    lines.append("")
+    lines.append(f"## Owner-visible ADVISORY ({len(result.get('owner_visible', []))})")
+    lines.append("")
+    if result.get("owner_visible"):
+        for thread in result["owner_visible"]:
             lines.append(f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`")
     else:
         lines.append("- (none)")

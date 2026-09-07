@@ -107,23 +107,6 @@ forbidden_substitutes = []
 notes = "First-class project records grouping work items."
 
 [[artifacts]]
-id = "membase-pauths"
-domain = "specifications"
-lifecycle = "active"
-storage_path = "membase:project_authorizations"
-coverage_mode = "virtual"
-authority_spec_id = "GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001"
-mutation_api = "gt projects authorize; gt projects revoke-authorization"
-versioning_policy = "append_only_versioned"
-backup_policy = "membase_export"
-restore_action = "membase_export_restore"
-health_check_function = "_check_standing_backlog_health"
-owner_role = "owner_only"
-depends_on = []
-forbidden_substitutes = []
-notes = "Project implementation authorization envelopes; cited as PAUTH-* in bridge proposals."
-
-[[artifacts]]
 id = "membase-assertion-runs"
 domain = "runtime_state"
 lifecycle = "active"
@@ -164,7 +147,7 @@ lifecycle = "active"
 storage_path = "CLAUDE.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-ARTIFACT-APPROVAL-001"
-mutation_api = "Bridge proposal + formal-artifact-approval packet (narrative_artifact_approval_gate)"
+mutation_api = "Governed canonical writer after explicit owner approval"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
 restore_action = "git_restore"
@@ -181,7 +164,7 @@ lifecycle = "active"
 storage_path = "AGENTS.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-ARTIFACT-APPROVAL-001"
-mutation_api = "Bridge proposal + formal-artifact-approval packet"
+mutation_api = "Governed canonical writer after explicit owner approval"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
 restore_action = "git_restore"
@@ -198,7 +181,7 @@ lifecycle = "active"
 storage_path = ".claude/rules/canonical-terminology.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-GLOSSARY-AS-DA-READ-SURFACE-001"
-mutation_api = "Bridge proposal + formal-artifact-approval packet"
+mutation_api = "Governed canonical writer after explicit owner approval"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
 restore_action = "git_restore"
@@ -215,7 +198,7 @@ lifecycle = "active"
 storage_path = ".claude/rules/operating-model.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-ARTIFACT-APPROVAL-001"
-mutation_api = "Bridge proposal + formal-artifact-approval packet"
+mutation_api = "Governed canonical writer after explicit owner approval"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
 restore_action = "git_restore"
@@ -232,7 +215,7 @@ lifecycle = "active"
 storage_path = ".claude/rules/file-bridge-protocol.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
-mutation_api = "Bridge proposal + formal-artifact-approval packet"
+mutation_api = "Governed canonical writer after explicit owner approval"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
 restore_action = "git_restore"
@@ -9514,7 +9497,7 @@ lifecycle = "active"
 storage_path = ".groundtruth/formal-artifact-approvals/"
 coverage_mode = "recursive"
 authority_spec_id = "GOV-ARTIFACT-APPROVAL-001"
-mutation_api = "formal artifact approval packet writer"
+mutation_api = "governed canonical writer after explicit owner approval"
 versioning_policy = "immutable_archive"
 backup_policy = "external_backup"
 restore_action = "manual"
@@ -24585,3 +24568,649 @@ owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
 notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "baseline-rule-acting-prime-builder"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/acting-prime-builder.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-active-workspace"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/active-workspace.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-auto-finalization-sweep"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/auto-finalization-sweep.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-backlog-approval-state"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/backlog-approval-state.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-bridge-essential"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/bridge-essential.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-bridge-permanent-operations-runbook"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/bridge-permanent-operations-runbook.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-bridge-poller-canonical"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/bridge-poller-canonical.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-canonical-terminology"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/canonical-terminology.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-counterpart-review-gate"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/counterpart-review-gate.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-dead-ends-and-false-positives"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/dead-ends-and-false-positives.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-decision-ledger"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/decision-ledger.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-deliberation-protocol"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/deliberation-protocol.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-dispatcher-daemon-substrate-rollback-runbook"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/dispatcher-daemon-substrate-rollback-runbook.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-file-bridge-protocol"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/file-bridge-protocol.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-governance-emergency-bootstrap-protocol"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/governance-emergency-bootstrap-protocol.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-governance-principles"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/governance-principles.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-groundtruth-kb-vision"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/groundtruth-kb-vision.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-gtkb-capability-import-policy"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/gtkb-capability-import-policy.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-loyal-opposition-knowledge-base-index"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/loyal-opposition-knowledge-base-index.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-loyal-opposition-review-checklists"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/loyal-opposition-review-checklists.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-loyal-opposition-runbook"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/loyal-opposition-runbook.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-loyal-opposition"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/loyal-opposition.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-operating-model"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/operating-model.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-operating-role"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/operating-role.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-peer-solution-advisory-loop"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/peer-solution-advisory-loop.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-prime-bridge-collaboration-protocol"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/prime-bridge-collaboration-protocol.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-prime-builder-role"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/prime-builder-role.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-prime-builder"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/prime-builder.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-project-root-boundary"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/project-root-boundary.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-report-depth-prime-builder-context"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/report-depth-prime-builder-context.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-report-depth"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/report-depth.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-review-operating-contract"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/review-operating-contract.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-session-bootstrap"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/session-bootstrap.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-sot-read-discipline"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/sot-read-discipline.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-standing-priorities"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/standing-priorities.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-template-code-review"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/template-code-review.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-template-decision-memo"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/template-decision-memo.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+
+[[artifacts]]
+id = "baseline-rule-way-of-working"
+domain = "narrative_authority"
+lifecycle = "active"
+storage_path = ".harness-baseline-configuration/rules/way-of-working.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "Governed canonical writer after explicit owner approval"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."

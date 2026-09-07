@@ -20,8 +20,8 @@ _SCRIPTS_DIR = str(Path(__file__).resolve().parents[2] / "scripts")
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
-from _env import load_env_local  # noqa: E402
-from dispatcher_runtime import DISPATCH_AUTH_ENV_KEYS  # noqa: E402
+from scripts._env import load_env_local  # noqa: E402
+from scripts.dispatcher_runtime import DISPATCH_AUTH_ENV_KEYS  # noqa: E402
 
 
 def _inject_dispatch_auth(env: dict[str, str], env_file: Path) -> dict[str, str]:

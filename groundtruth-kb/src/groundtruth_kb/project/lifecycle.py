@@ -12,11 +12,9 @@ from typing import Any
 
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.governance.approval_packet import parse_packet_path_from_change_reason, validate_packet
-from groundtruth_kb.project.authorization import ACTIVE_PROJECT_AUTHORIZATION_STATUS
 
 PROJECT_TERMINAL_STATUS = "retired"
 PROJECT_TERMINAL_STATUSES = frozenset({"completed", "retired", "cancelled"})
-COMPLETED_PROJECT_AUTHORIZATION_STATUS = "completed"
 PROJECTS_CHANGED_BY = "gt-projects"
 WORK_ITEM_TERMINAL_RESOLUTION_STATUSES = frozenset({"verified", "resolved", "retired", "wont_fix", "not_a_defect"})
 LOGGER = logging.getLogger(__name__)
@@ -45,11 +43,6 @@ _WORK_ITEM_LINE_RE = re.compile(
     re.MULTILINE,
 )
 _PROJECT_LINE_RE = re.compile(r"^Project:\s*`?([^`\r\n]+)`?\s*$", re.MULTILINE)
-_PROJECT_AUTHORIZATION_LINE_RE = re.compile(
-    r"^Project Authorization:\s*`?([^`\r\n]+)`?\s*$",
-    re.MULTILINE,
-)
-_PROJECT_RETIREMENT_BLOCKING_BRIDGE_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO"})
 _COMPLETION_GUARD_RELATIONSHIP = "plan_incomplete"
 _COMPLETION_KEEP_OPEN_ARTIFACT_TYPE = "completion_guard"
 _COMPLETION_BLOCKING_ARTIFACT_TYPE = "bridge_thread"
@@ -213,7 +206,6 @@ class ProjectLifecycleService:
             "work_items": self.db.list_project_work_items(project["id"]),
             "dependencies": self.list_project_dependencies(project["id"]),
             "artifact_links": self.db.list_project_artifact_links(project["id"]),
-            "authorizations": self.db.list_project_authorizations(project["id"]),
         }
 
     def update_project(
@@ -227,6 +219,16 @@ class ProjectLifecycleService:
         current = self.db.get_project(_require_nonempty(project_id, "project_id"))
         if current is None:
             raise ProjectLifecycleError(f"Project not found: {project_id}")
+
+        if "authorization" in fields:
+            from groundtruth_kb.db import _VALID_AUTHORIZATION_VALUES
+
+            candidate = str(fields["authorization"] or "").strip()
+            if candidate not in _VALID_AUTHORIZATION_VALUES:
+                raise ProjectLifecycleError(
+                    f"authorization must be one of {sorted(_VALID_AUTHORIZATION_VALUES)}; got {candidate!r}"
+                )
+            fields["authorization"] = candidate
 
         allowed_fields = {
             "name",
@@ -242,6 +244,12 @@ class ProjectLifecycleService:
             "notes",
             "source_project_name",
             "source_subproject_name",
+            # WI-7657: authorization is a field on the project row, and this is
+            # the governed path that sets it. Before this, WI-7611 added the
+            # column but shipped no writer other than its own one-time
+            # migration, so the value the model calls authoritative could not be
+            # changed by the owner at all.
+            "authorization",
         }
         unknown = sorted(set(fields) - allowed_fields)
         if unknown:
@@ -294,57 +302,6 @@ class ProjectLifecycleService:
             raise ProjectLifecycleError("Project update did not return a current project")
         return project
 
-    @staticmethod
-    def _authorization_json_list(row: dict[str, Any], key: str) -> list[str] | None:
-        parsed = row.get(f"{key}_parsed")
-        if isinstance(parsed, list):
-            values = [str(item) for item in parsed if str(item).strip()]
-            return values or None
-        return None
-
-    def _append_reauthorization_for_membership_event(
-        self,
-        project_id: str,
-        *,
-        changed_by: str,
-        change_reason: str,
-    ) -> None:
-        """C3: append a new current authorization version when one already exists.
-
-        A project with no current authorization must not mint one as a side
-        effect of membership-only change (WI-6617).
-        """
-        current_auths = list(self.db.list_project_authorizations(project_id))
-        if not current_auths:
-            return
-        membership_reason = (
-            f"{change_reason} (DCL-PROJECT-AUTHORIZATION-EVENT-TRANSACTION-001 C3 membership re-authorization)"
-        )
-        for auth in current_auths:
-            try:
-                inserted = self.db.insert_project_authorization(
-                    str(auth["project_id"]),
-                    str(auth.get("authorization_name") or ""),
-                    str(auth.get("owner_decision_deliberation_id") or ""),
-                    str(auth.get("scope_summary") or ""),
-                    changed_by,
-                    membership_reason,
-                    id=str(auth["id"]),
-                    status=ACTIVE_PROJECT_AUTHORIZATION_STATUS,
-                    allowed_mutation_classes=self._authorization_json_list(auth, "allowed_mutation_classes"),
-                    forbidden_operations=self._authorization_json_list(auth, "forbidden_operations"),
-                    included_work_item_ids=None,
-                    excluded_work_item_ids=None,
-                    included_spec_ids=self._authorization_json_list(auth, "included_spec_ids"),
-                    excluded_spec_ids=self._authorization_json_list(auth, "excluded_spec_ids"),
-                    expires_at=auth.get("expires_at"),
-                    commit=False,
-                )
-            except ValueError as exc:
-                raise ProjectLifecycleError(str(exc)) from exc
-            if inserted is None:
-                raise ProjectLifecycleError("Membership re-authorization insert did not return a current authorization")
-
     def _link_membership_with_reauthorization(
         self,
         *,
@@ -359,11 +316,12 @@ class ProjectLifecycleService:
             membership = link()
             if membership is None:
                 raise ProjectLifecycleError(missing_message)
-            self._append_reauthorization_for_membership_event(
-                project_id,
-                changed_by=changed_by,
-                change_reason=change_reason,
-            )
+            # WI-7657: the same-transaction reauthorization is gone. A membership
+            # change appended a new project_authorizations version as a side
+            # effect, which both wrote to a retired table and had an agent
+            # setting authorization -- something only owner direction does.
+            # Membership is now recorded on its own, and the project's
+            # authorization is untouched by it.
             conn.commit()
         except Exception:
             conn.rollback()
@@ -1137,145 +1095,6 @@ class ProjectLifecycleService:
             raise ProjectLifecycleError("Project artifact link insert did not return a current link")
         return link
 
-    def authorize_project(
-        self,
-        project_id: str,
-        *,
-        owner_decision: str,
-        name: str,
-        scope: str,
-        changed_by: str = PROJECTS_CHANGED_BY,
-        change_reason: str,
-        authorization_id: str | None = None,
-        allowed_mutation_classes: list[str] | None = None,
-        forbidden_operations: list[str] | None = None,
-        included_work_item_ids: list[str] | None = None,
-        excluded_work_item_ids: list[str] | None = None,
-        included_spec_ids: list[str] | None = None,
-        excluded_spec_ids: list[str] | None = None,
-        expires_at: str | None = None,
-        plan_incomplete: bool = False,
-    ) -> dict[str, Any]:
-        self._require_project_dependency_gate_ready(project_id, "authorization")
-        try:
-            from groundtruth_kb.project.authorization import reject_authorization_creation_c2_c4
-
-            existing = self.db.get_project_authorization(authorization_id) if authorization_id else None
-            reject_authorization_creation_c2_c4(
-                authorization_id=authorization_id,
-                scope_summary=scope,
-                included_work_item_ids=included_work_item_ids,
-                excluded_work_item_ids=excluded_work_item_ids,
-                new_identity=existing is None,
-            )
-            authorization = self.db.insert_project_authorization(
-                _require_nonempty(project_id, "project_id"),
-                _require_nonempty(name, "name"),
-                _require_nonempty(owner_decision, "owner_decision"),
-                _require_nonempty(scope, "scope"),
-                _require_nonempty(changed_by, "changed_by"),
-                _require_nonempty(change_reason, "change_reason"),
-                id=authorization_id,
-                status=ACTIVE_PROJECT_AUTHORIZATION_STATUS,
-                allowed_mutation_classes=allowed_mutation_classes,
-                forbidden_operations=forbidden_operations,
-                included_spec_ids=included_spec_ids,
-                excluded_spec_ids=excluded_spec_ids,
-                expires_at=expires_at,
-            )
-        except ValueError as exc:
-            message = str(exc)
-            # WI-3312: the spec-linkage validator's ValueError cites the source
-            # spec; re-raise it as the typed subclass so the CLI can map it to a
-            # usage error. All other ValueErrors stay generic lifecycle errors.
-            if "GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001" in message:
-                raise ProjectAuthorizationSpecLinkageError(message) from exc
-            raise ProjectLifecycleError(message) from exc
-        if authorization is None:
-            raise ProjectLifecycleError("Project authorization insert did not return a current authorization")
-        if plan_incomplete:
-            authorization_id_for_guard = str(authorization.get("id") or "")
-            try:
-                self.db.add_project_artifact_link(
-                    str(authorization.get("project_id") or project_id),
-                    _COMPLETION_KEEP_OPEN_ARTIFACT_TYPE,
-                    _authorization_keep_open_guard_ref(authorization_id_for_guard),
-                    _require_nonempty(changed_by, "changed_by"),
-                    (
-                        f"{_require_nonempty(change_reason, 'change_reason')} "
-                        f"(plan-incomplete keep-open guard for {authorization_id_for_guard})"
-                    ),
-                    relationship=_COMPLETION_GUARD_RELATIONSHIP,
-                    notes=(
-                        f"Authorization {authorization_id_for_guard} elected plan-incomplete keep-open; "
-                        "complete the authorization without retiring the project, then deactivate this guard."
-                    ),
-                )
-            except ValueError as exc:
-                raise ProjectLifecycleError(str(exc)) from exc
-        return authorization
-
-    def amend_authorization(
-        self,
-        authorization_id: str,
-        *,
-        owner_decision: str,
-        change_reason: str,
-        changed_by: str = PROJECTS_CHANGED_BY,
-        add_work_items: list[str] | None = None,
-        remove_work_items: list[str] | None = None,
-        add_spec_ids: list[str] | None = None,
-        remove_spec_ids: list[str] | None = None,
-        dry_run: bool = False,
-    ) -> dict[str, Any]:
-        """Amendment is not an authorization path (GOV v3 / WI-6617).
-
-        Scope change requires a new current version under direct owner approval
-        of the complete proposed envelope. Include-list deltas are rejected.
-        Historical authorization rows are not deleted.
-        """
-        _require_nonempty(authorization_id, "authorization_id")
-        _require_nonempty(owner_decision, "owner_decision")
-        _require_nonempty(change_reason, "change_reason")
-        _require_nonempty(changed_by, "changed_by")
-        raise ProjectLifecycleError(
-            "Amendment of an existing authorization version is not an authorization "
-            "path (GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001 v3). Scope change "
-            "requires a new current version under direct owner approval of the "
-            "complete proposed envelope."
-        )
-
-    def list_project_authorizations(
-        self,
-        project_id: str,
-        *,
-        include_terminal: bool = False,
-    ) -> list[dict[str, Any]]:
-        normalized_project_id = _require_nonempty(project_id, "project_id")
-        if self.db.get_project(normalized_project_id) is None:
-            raise ProjectLifecycleError(f"Project not found: {normalized_project_id}")
-        return self.db.list_project_authorizations(normalized_project_id, include_terminal=include_terminal)
-
-    def revoke_project_authorization(
-        self,
-        authorization_id: str,
-        *,
-        changed_by: str = PROJECTS_CHANGED_BY,
-        change_reason: str,
-    ) -> dict[str, Any]:
-        try:
-            authorization = self.db.update_project_authorization(
-                _require_nonempty(authorization_id, "authorization_id"),
-                _require_nonempty(changed_by, "changed_by"),
-                _require_nonempty(change_reason, "change_reason"),
-                status="revoked",
-            )
-        except ValueError as exc:
-            raise ProjectLifecycleError(str(exc)) from exc
-        if authorization is None:
-            raise ProjectLifecycleError("Project authorization update did not return a current authorization")
-        return authorization
-
     def _project_membership_work_item_ids(self, project_id: str) -> list[str]:
         """Return the work-item ids linked to ``project_id`` via an active
         project-to-work-item membership link.
@@ -1303,20 +1122,18 @@ class ProjectLifecycleService:
         signal is: current project is active, at least one current authorization
         is completed, and no current authorization remains active.
         """
-        normalized_project_id = _require_nonempty(project_id, "project_id")
-        project = self.db.get_project(normalized_project_id)
-        if project is None or str(project.get("status") or "").strip().lower() != "active":
-            return False
-        authorizations = self.db.list_project_authorizations(normalized_project_id, include_terminal=True)
-        has_completed = any(
-            str(authorization.get("status") or "").strip().lower() == COMPLETED_PROJECT_AUTHORIZATION_STATUS
-            for authorization in authorizations
-        )
-        has_active = any(
-            str(authorization.get("status") or "").strip().lower() == ACTIVE_PROJECT_AUTHORIZATION_STATUS
-            for authorization in authorizations
-        )
-        return has_completed and not has_active
+        # WI-7657: no keep-open election can exist any more, so this is False.
+        #
+        # The election was never stored directly. It was INFERRED from
+        # authorization state: a project was "kept open" when at least one of
+        # its authorizations was completed and none remained active, which is
+        # what completing an authorization with retire_project=False produced.
+        # Both the authorization records and the method that produced that
+        # shape are gone, so the inference has no inputs. Returning False is
+        # the honest answer rather than a guess: with no way to elect keep-open,
+        # no project has elected it.
+        _require_nonempty(project_id, "project_id")
+        return False
 
     def member_completion_status(self, project_id: str, *, project_root: Path | None = None) -> dict[str, Any]:
         """Return the v6 member-WI automatic-retirement readiness record.
@@ -1325,9 +1142,10 @@ class ProjectLifecycleService:
         active project automatically only when it has active member WIs, every
         active member WI has a terminal ``resolution_status``, no active
         ``plan_incomplete`` guard exists, no caller has taken the keep-open
-        election, and, when a project root is available, every member WI has
-        project-scoped VERIFIED bridge evidence.
+        election, and every closure dependency is satisfied. ``project_root``
+        remains an ignored compatibility argument for existing callers.
         """
+        _ = project_root
         normalized_project_id = _require_nonempty(project_id, "project_id")
         project = self.db.get_project(normalized_project_id)
         if project is None:
@@ -1351,28 +1169,12 @@ class ProjectLifecycleService:
 
         guard_refs = self._project_completion_guard_refs(normalized_project_id)
         keep_open_elected = self._project_keep_open_elected(normalized_project_id)
-        non_verified_implements: list[str] = []
-        open_project_authorization_threads: list[str] = []
-        unverified_bridge_member_ids: list[str] = []
-        if project_root is not None:
-            non_verified_implements = sorted(
-                self._non_verified_implements_threads_by_project(project_root).get(normalized_project_id, set())
-            )
-            open_project_authorization_threads = sorted(
-                self._open_project_authorization_threads_by_project(project_root).get(normalized_project_id, set())
-            )
-            verified = self._verified_work_items_by_project(project_root).get(normalized_project_id, set())
-            unverified_bridge_member_ids = [work_item_id for work_item_id in member_ids if work_item_id not in verified]
-        verified_bridge_ready = project_root is None or (
-            not non_verified_implements and not open_project_authorization_threads and not unverified_bridge_member_ids
-        )
         closure_dependency_gate = self.project_dependency_gate_readiness(normalized_project_id, "closure")
         completion_ready = (
             bool(member_ids)
             and not nonterminal_ids
             and not guard_refs
             and not keep_open_elected
-            and verified_bridge_ready
             and closure_dependency_gate["ready"]
         )
         exclusion_reasons: list[str] = []
@@ -1384,12 +1186,6 @@ class ProjectLifecycleService:
             exclusion_reasons.append("plan_incomplete_guard")
         if keep_open_elected:
             exclusion_reasons.append("keep_open_election")
-        if non_verified_implements:
-            exclusion_reasons.append("non_verified_implements_bridge_threads")
-        if open_project_authorization_threads:
-            exclusion_reasons.append("open_project_authorization_bridge_threads")
-        if unverified_bridge_member_ids:
-            exclusion_reasons.append("missing_verified_bridge_evidence")
         if not closure_dependency_gate["ready"]:
             exclusion_reasons.append("unsatisfied_project_dependencies")
 
@@ -1402,11 +1198,6 @@ class ProjectLifecycleService:
             "completion_guarded": bool(guard_refs),
             "completion_guard_refs": guard_refs,
             "keep_open_elected": keep_open_elected,
-            "verified_bridge_evidence_required": project_root is not None,
-            "verified_bridge_evidence_ready": verified_bridge_ready,
-            "non_verified_implements_bridge_threads": non_verified_implements,
-            "open_project_authorization_bridge_threads": open_project_authorization_threads,
-            "unverified_bridge_work_item_ids": unverified_bridge_member_ids,
             "closure_dependency_gate": closure_dependency_gate,
             "completion_ready": completion_ready,
             "exclusion_reasons": exclusion_reasons,
@@ -1415,48 +1206,6 @@ class ProjectLifecycleService:
     def member_completion_ready(self, project_id: str, *, project_root: Path | None = None) -> bool:
         """Return true when a project satisfies the v6 member-WI criterion."""
         return bool(self.member_completion_status(project_id, project_root=project_root)["completion_ready"])
-
-    def _authorization_completion_ready(
-        self,
-        authorization: dict[str, Any],
-        verified_for_project: set[str],
-        guarded_project_ids: set[str] | None = None,
-        non_verified_implements_by_project: dict[str, set[str]] | None = None,
-        open_project_authorization_threads_by_project: dict[str, set[str]] | None = None,
-    ) -> bool:
-        """True when ``authorization`` is active and every gating work item is in
-        ``verified_for_project`` and every active addressing thread is VERIFIED.
-
-        ``verified_for_project`` is the PROJECT-SCOPED verified set for this
-        authorization's project (per ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001``
-        v4): the caller looks it up by ``project_id`` from
-        ``_verified_work_items_by_project()``. Passing a project-scoped set
-        (not a global one) is the NO-GO -012 F1 fix — coverage from one
-        project's implements-linked threads cannot satisfy another project's
-        authorization. (The fail-safe diagnostic deliberately passes the global
-        v3 baseline instead, to compute "what v3 would have completed".)
-
-        The gating set is the project's active membership-linked work items
-        (GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001). An authorization
-        whose project has no active membership links is not completion-ready.
-        """
-        if authorization.get("status") != ACTIVE_PROJECT_AUTHORIZATION_STATUS:
-            return False
-        project_id = str(authorization.get("project_id") or "")
-        if not project_id:
-            return False
-        if guarded_project_ids is not None and project_id in guarded_project_ids:
-            return False
-        if non_verified_implements_by_project and non_verified_implements_by_project.get(project_id):
-            return False
-        if open_project_authorization_threads_by_project and open_project_authorization_threads_by_project.get(
-            project_id
-        ):
-            return False
-        if not self.project_dependency_gate_readiness(project_id, "closure")["ready"]:
-            return False
-        included = self._project_membership_work_item_ids(project_id)
-        return bool(included) and all(work_item in verified_for_project for work_item in included)
 
     def _completion_guards_by_project(
         self,
@@ -1503,14 +1252,6 @@ class ProjectLifecycleService:
 
     def _project_completion_blocker_refs(self, project_id: str) -> list[dict[str, Any]]:
         return self._project_completion_guard_refs(project_id, (_COMPLETION_BLOCKING_ARTIFACT_TYPE,))
-
-    def _authorization_keep_open_guard_refs(self, project_id: str, authorization_id: str) -> list[dict[str, Any]]:
-        guard_ref = _authorization_keep_open_guard_ref(authorization_id)
-        return [
-            ref
-            for ref in self._project_completion_guard_refs(project_id, (_COMPLETION_KEEP_OPEN_ARTIFACT_TYPE,))
-            if ref.get("artifact_ref") == guard_ref
-        ]
 
     def _deactivate_completion_guard_refs(
         self,
@@ -1586,54 +1327,6 @@ class ProjectLifecycleService:
             slug: status_from_bridge_file(max(versioned_files, key=lambda item: item[0])[1])
             for slug, versioned_files in grouped.items()
         }
-
-    def _open_project_authorization_threads_by_project(self, project_root: Path) -> dict[str, set[str]]:
-        """Return PAUTH-backed bridge threads that must keep their project active."""
-        from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
-
-        root = Path(project_root)
-        bridge_dir = root / "bridge"
-        if not bridge_dir.is_dir():
-            return {}
-        grouped: dict[str, list[tuple[int, Path]]] = {}
-        bridge_file_re = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3})\.md$")
-        for path in bridge_dir.glob("*.md"):
-            match = bridge_file_re.match(path.name)
-            if match is None:
-                continue
-            grouped.setdefault(match.group("slug"), []).append((int(match.group("version")), path))
-
-        blocked_by_project: dict[str, set[str]] = {}
-        for slug, versioned_files in grouped.items():
-            latest_path = max(versioned_files, key=lambda item: item[0])[1]
-            if status_from_bridge_file(latest_path) not in _PROJECT_RETIREMENT_BLOCKING_BRIDGE_STATUSES:
-                continue
-            project_ids: set[str] = set()
-            authorization_ids: set[str] = set()
-            for _version, file_path in sorted(versioned_files):
-                if not file_path.is_file():
-                    continue
-                text = file_path.read_text(encoding="utf-8", errors="replace")
-                project_ids.update(match.group(1).strip() for match in _PROJECT_LINE_RE.finditer(text))
-                authorization_ids.update(
-                    match.group(1).strip() for match in _PROJECT_AUTHORIZATION_LINE_RE.finditer(text)
-                )
-            if not project_ids or not authorization_ids:
-                continue
-            for authorization_id in authorization_ids:
-                authorization = self.db.get_project_authorization(authorization_id)
-                if authorization is None:
-                    continue
-                if authorization.get("status") != ACTIVE_PROJECT_AUTHORIZATION_STATUS:
-                    continue
-                authorization_project_id = str(authorization.get("project_id") or "").strip()
-                target_project_ids = set(project_ids)
-                if authorization_project_id:
-                    target_project_ids.add(authorization_project_id)
-                for project_id in target_project_ids:
-                    if project_id:
-                        blocked_by_project.setdefault(project_id, set()).add(slug)
-        return blocked_by_project
 
     def _non_verified_implements_threads_by_project(self, project_root: Path) -> dict[str, set[str]]:
         """Return active ``implements`` bridge threads whose latest status is not VERIFIED."""
@@ -1817,270 +1510,6 @@ class ProjectLifecycleService:
             )
             retired_work_items.append(work_item_id)
         return retired_work_items
-
-    def complete_project_authorization(
-        self,
-        authorization_id: str,
-        *,
-        project_root: Path,
-        changed_by: str = PROJECTS_CHANGED_BY,
-        change_reason: str,
-        retire_project: bool = True,
-    ) -> dict[str, Any]:
-        """Transition an active project authorization to ``completed`` and, when
-        elected by the caller and it was the project's sole active authorization,
-        retire the project and collectively retire its associated work items and
-        membership links.
-
-        ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v5: completion and
-        retirement are automatic once every gating work item is VERIFIED. There
-        is no owner-confirmation gate - owner AUQ governs project START
-        (authorization creation and approval), not completion. The gating set
-        is the project's explicitly-linked work items: the active
-        project-to-work-item membership links (v2's "explicitly linked"
-        definition), not the authorization envelope's ``included_work_item_ids``.
-        ``retire_project=False`` is the explicit v5 keep-open caller election;
-        the default preserves automatic project retirement.
-        """
-        norm_auth_id = _require_nonempty(authorization_id, "authorization_id")
-
-        # Step 1: load the authorization; it must be active.
-        authorization = self.db.get_project_authorization(norm_auth_id)
-        if authorization is None:
-            raise ProjectLifecycleError(f"Project authorization not found: {norm_auth_id}")
-        if authorization.get("status") != ACTIVE_PROJECT_AUTHORIZATION_STATUS:
-            raise ProjectLifecycleError(
-                f"Project authorization {norm_auth_id} is not active "
-                f"(status={authorization.get('status')!r}); cannot complete."
-            )
-        project_id = str(authorization.get("project_id") or "")
-
-        # Step 2: readiness check - every gating work item must be VERIFIED.
-        # The gating set is the project's active membership-linked work items
-        # (GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 "explicitly linked").
-        self._require_project_dependency_gate_ready(project_id, "closure")
-        blocker_refs = self._project_completion_blocker_refs(project_id)
-        if blocker_refs:
-            refs = ", ".join(
-                f"{ref['artifact_type']}:{ref['artifact_ref']} ({ref['relationship']})" for ref in blocker_refs
-            )
-            raise ProjectLifecycleError(
-                f"Project {project_id} has an active plan_incomplete completion guard; "
-                f"authorization {norm_auth_id} cannot be completed until it is removed or superseded. "
-                f"Guard refs: {refs}."
-            )
-        own_keep_open_guard_refs = self._authorization_keep_open_guard_refs(project_id, norm_auth_id)
-        included = self._project_membership_work_item_ids(project_id)
-        if not included:
-            raise ProjectLifecycleError(
-                f"Project {project_id} has no active membership-linked work items; "
-                "completion readiness cannot be established."
-            )
-        non_verified_implements = sorted(
-            self._non_verified_implements_threads_by_project(project_root).get(project_id, set())
-        )
-        if non_verified_implements:
-            raise ProjectLifecycleError(
-                f"Project authorization {norm_auth_id} is not completion-ready; active implements "
-                f"bridge thread(s) are not VERIFIED: {', '.join(non_verified_implements)}."
-            )
-        open_project_authorization_threads = sorted(
-            self._open_project_authorization_threads_by_project(project_root).get(project_id, set())
-        )
-        if open_project_authorization_threads:
-            raise ProjectLifecycleError(
-                f"Project authorization {norm_auth_id} is not completion-ready; active project-authorization "
-                f"bridge thread(s) are not terminal: {', '.join(open_project_authorization_threads)}."
-            )
-        # Project-scoped verified set (v4 F1 fix): only THIS project's own
-        # implements-linked VERIFIED threads count toward its completion.
-        verified = self._verified_work_items_by_project(project_root).get(project_id, set())
-        unverified = [wi for wi in included if wi not in verified]
-        if unverified:
-            raise ProjectLifecycleError(
-                f"Project authorization {norm_auth_id} is not completion-ready; work item(s) "
-                f"without a VERIFIED bridge thread: {', '.join(unverified)}."
-            )
-
-        # Step 3: transition the authorization to completed (status-only change).
-        try:
-            completed = self.db.update_project_authorization(
-                norm_auth_id,
-                _require_nonempty(changed_by, "changed_by"),
-                _require_nonempty(change_reason, "change_reason"),
-                status=COMPLETED_PROJECT_AUTHORIZATION_STATUS,
-            )
-        except ValueError as exc:
-            raise ProjectLifecycleError(str(exc)) from exc
-        if completed is None:
-            raise ProjectLifecycleError("Project authorization completion did not return a current authorization")
-        deactivated_keep_open_guards = self._deactivate_completion_guard_refs(
-            own_keep_open_guard_refs,
-            changed_by=_require_nonempty(changed_by, "changed_by"),
-            change_reason=(
-                f"Deactivated plan-incomplete keep-open guard after authorization {norm_auth_id} completed."
-            ),
-        )
-
-        # Step 4: retire the project iff no other active authorization remains,
-        # and collectively retire the project's associated work items and
-        # membership links (GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001:
-        # retirement is collective - project, authorization, and associated
-        # VERIFIED work items retire together).
-        other_active = [
-            a for a in self.db.list_project_authorizations(project_id, status="active") if a.get("id") != norm_auth_id
-        ]
-        remaining_keep_open_guards = self._project_completion_guard_refs(
-            project_id,
-            (_COMPLETION_KEEP_OPEN_ARTIFACT_TYPE,),
-        )
-        keep_open_guard_elected = bool(own_keep_open_guard_refs)
-        project_retired = False
-        retired_work_items: list[str] = []
-        if retire_project and not other_active and not keep_open_guard_elected and not remaining_keep_open_guards:
-            self.retire_project(
-                project_id,
-                changed_by=changed_by,
-                change_reason=(
-                    f"Auto-retired: sole active authorization {norm_auth_id} completed "
-                    "(GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v3 automatic collective retirement)."
-                ),
-            )
-            project_retired = True
-            retired_work_items = self._retire_project_work_items(
-                project_id,
-                completed_authorization_id=norm_auth_id,
-                changed_by=changed_by,
-            )
-
-        return {
-            "authorization": completed,
-            "project_retired": project_retired,
-            "retired_work_items": retired_work_items,
-            "deactivated_completion_guards": deactivated_keep_open_guards,
-        }
-
-    def auto_complete_ready_authorizations(
-        self,
-        *,
-        project_root: Path,
-        changed_by: str = PROJECTS_CHANGED_BY,
-        change_reason: str = (
-            "Auto-completed: all membership-linked work items VERIFIED "
-            "(GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v4 automatic completion)."
-        ),
-        include_fail_safe_pauses: bool = False,
-    ) -> list[dict[str, Any]]:
-        """Scan every active project authorization; auto-complete those whose
-        gating work items are all covered by an implements-linked VERIFIED
-        bridge thread; optionally emit fail-safe manual-review records for
-        those that would have completed under v3 but are paused under v4.
-
-        ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v4: completion and
-        retirement are automatic on the implements-linked all-WI-VERIFIED
-        condition (clause (a)+(b)+(c)). When a project has gating WIs but no
-        implements-linked VERIFIED thread covers them, the auto-completion
-        pass does NOT fire and the condition is surfaced as a manual-review
-        record (clause (d): the fail-safe direction is "auto-completion
-        paused" rather than "spurious retirement").
-
-        The fail-safe surface is opt-in (``include_fail_safe_pauses=True``)
-        so existing callers - notably the byte-identical
-        ``project-completion-surface`` hooks per ADR-CODEX-HOOK-PARITY-FALLBACK-001
-        - receive the historical return shape unchanged. New callers (tests,
-        diagnostic surfaces, future hook upgrades) opt in to receive both
-        kinds of records, distinguished by the ``outcome`` key.
-
-        Return record shape:
-          ``outcome="completed"`` - existing shape + new outcome key:
-              ``authorization_id``, ``project_id``, ``project_retired``,
-              ``retired_work_items``, ``outcome="completed"``.
-          ``outcome="manual_review_required"`` (opt-in only):
-              ``authorization_id``, ``project_id``, ``outcome``, ``reason``,
-              ``gating_work_items``, ``covered_under_v3``, ``missing_under_v4``.
-
-        Idempotent: a completed authorization is no longer active, so a re-run
-        does not re-process it. The fail-safe records are read-only (no
-        mutation); a re-run yields the same set until ``implements`` links are
-        backfilled (Phase-2).
-        """
-        # Project-scoped decision map (v4 F1 fix): {project_id: {verified WI}}.
-        verified_by_project = self._verified_work_items_by_project(project_root)
-        non_verified_implements_by_project = self._non_verified_implements_threads_by_project(project_root)
-        open_project_authorization_threads_by_project = self._open_project_authorization_threads_by_project(
-            project_root
-        )
-        guards_by_project = self._completion_guards_by_project((_COMPLETION_BLOCKING_ARTIFACT_TYPE,))
-        guarded_project_ids = set(guards_by_project)
-        # Global v3 baseline (over-broad, project-blind) used ONLY for the
-        # fail-safe diagnostic — never for a completion decision.
-        verified_global_v3: set[str] | None = (
-            self._all_verified_work_items(project_root) if include_fail_safe_pauses else None
-        )
-        records: list[dict[str, Any]] = []
-        for project in self.db.list_projects(include_terminal=False):
-            project_id = str(project.get("id") or "")
-            if not project_id:
-                continue
-            project_verified = verified_by_project.get(project_id, set())
-            for authorization in self.db.list_project_authorizations(project_id, status="active"):
-                authorization_id = str(authorization["id"])
-                if self._authorization_completion_ready(
-                    authorization,
-                    project_verified,
-                    guarded_project_ids,
-                    non_verified_implements_by_project,
-                    open_project_authorization_threads_by_project,
-                ):
-                    result = self.complete_project_authorization(
-                        authorization_id,
-                        project_root=project_root,
-                        changed_by=changed_by,
-                        change_reason=change_reason,
-                    )
-                    records.append(
-                        {
-                            "outcome": "completed",
-                            "authorization_id": authorization_id,
-                            "project_id": project_id,
-                            "project_retired": result["project_retired"],
-                            "retired_work_items": result.get("retired_work_items", []),
-                        }
-                    )
-                    continue
-                if not include_fail_safe_pauses or verified_global_v3 is None:
-                    continue
-                # v4 clause (d) fail-safe: emit manual-review record when the
-                # authorization would have completed under v3 (over-broad,
-                # project-blind, incidental-citation-inclusive) but is correctly
-                # held under v4's project-scoped set. This precisely targets the
-                # transition-window cases that need Phase-2 backfill: the auths
-                # that WOULD have auto-retired under v3 and are now paused for
-                # safety. The v3 baseline is the global verified set; the v4
-                # decision is the project-scoped set.
-                if not self._authorization_completion_ready(
-                    authorization,
-                    verified_global_v3,
-                    guarded_project_ids,
-                    non_verified_implements_by_project,
-                    open_project_authorization_threads_by_project,
-                ):
-                    continue
-                gating = self._project_membership_work_item_ids(project_id)
-                missing_under_v4 = [wi for wi in gating if wi not in project_verified]
-                covered_under_v3 = [wi for wi in gating if wi in verified_global_v3]
-                records.append(
-                    {
-                        "outcome": "manual_review_required",
-                        "authorization_id": authorization_id,
-                        "project_id": project_id,
-                        "reason": "no_implements_linked_thread_covers_gating_wis",
-                        "gating_work_items": gating,
-                        "covered_under_v3": covered_under_v3,
-                        "missing_under_v4": missing_under_v4,
-                    }
-                )
-        return records
 
     def auto_retire_completed_projects(
         self,

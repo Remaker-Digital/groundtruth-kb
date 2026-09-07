@@ -255,7 +255,7 @@ def render(rows: list[sqlite3.Row], inventory_path: Path) -> str:
             "",
             "- Path A (retroactive DELIB capture of the bulk operation as accepted), or",
             "- Path B (selective per-WI revert), or",
-            "- Whether to file a forward-fix rule clause in `.claude/rules/operating-model.md`.",
+            "- Whether to file a forward-fix rule clause in `.harness-baseline-configuration/rules/operating-model.md`.",
             "",
             "Each of those is a separate bridge proposal filed AFTER owner review of",
             "this inventory + packet.",

@@ -34,7 +34,6 @@ from groundtruth_kb.harness_projection import (  # noqa: E402
 )
 from groundtruth_kb.mode_switch.pending import (  # noqa: E402
     apply_pending,
-    defer_role_switch,
     list_pending,
 )
 
@@ -93,15 +92,6 @@ def project_root(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_defer_role_switch_writes_pending_file(project_root: Path) -> None:
-    _seed_workspace(project_root)
-    path = defer_role_switch(project_root, "claude", "prime-builder", change_reason="defer test")
-    assert path.exists()
-    data = json.loads(path.read_text(encoding="utf-8"))
-    assert data["harness_id_or_name"] == "claude"
-    assert data["role"] == "prime-builder"
-
-
 def test_list_pending_returns_empty_when_no_queue(project_root: Path) -> None:
     assert list_pending(project_root) == []
 
@@ -111,42 +101,36 @@ def test_apply_pending_idempotent_on_empty_queue(project_root: Path) -> None:
     assert apply_pending(project_root) == []
 
 
-def test_apply_pending_drains_and_archives(project_root: Path) -> None:
-    _seed_workspace(project_root)
-    # WI-3342 IP-6: target harness B (claude) by its durable id — apply_role_switch
-    # resolves the registry projection by harness id (records carry harness_name,
-    # not the legacy ``name`` key).
-    pending_path = defer_role_switch(project_root, "B", "prime-builder", change_reason="drain test")
-    results = apply_pending(project_root)
-    assert len(results) == 1
-    assert results[0].applied is True
-    assert not pending_path.exists()
-    applied_dir = project_root / ".gtkb-state" / "mode-switches" / "applied"
-    assert applied_dir.is_dir()
-    assert any(applied_dir.iterdir())
+def test_apply_pending_refuses_a_role_axis_entry(project_root: Path) -> None:
+    """WI-7823: the queue carries no role axis and fails closed on one.
 
-
-def test_apply_pending_leaves_failed_in_pending_with_logged_error(project_root: Path) -> None:
-    """Failed pending entries stay in pending/ with an error captured."""
+    No writer can create a role entry any more, so this seeds the file directly to
+    prove the applier refuses it rather than silently applying a session role. An
+    entry with no ``axis`` key defaults to ``role`` and must be refused the same way.
+    """
     _seed_workspace(project_root)
-    # Defer with an invalid role; apply will fail validation.
-    pending_path = defer_role_switch(project_root, "claude", "no-such-role", change_reason="fail test")
+    pending_dir = project_root / ".gtkb-state" / "mode-switches" / "pending"
+    pending_dir.mkdir(parents=True, exist_ok=True)
+    pending_path = pending_dir / "20260907T000000Z-legacyrole.json"
+    pending_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "record_id": "legacyrole",
+                "harness_id_or_name": "B",
+                "role": "prime-builder",
+                "change_reason": "legacy role entry",
+                "scheduled_at": "2026-09-07T00:00:00Z",
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     results = apply_pending(project_root)
     assert len(results) == 1
     assert results[0].applied is False
     assert results[0].error is not None
-    assert pending_path.exists()  # still in pending/
-
-
-def test_next_session_initialization_applies_pending_and_state_matches_deferred_request(
-    project_root: Path,
-) -> None:
-    """Acceptance criterion #6: deferred request becomes effective at next session start."""
-    _seed_workspace(project_root)
-    # WI-3342 IP-6: target harness B (claude) by its durable id.
-    defer_role_switch(project_root, "B", "prime-builder", change_reason="next-session test")
-    apply_pending(project_root)
-    # WI-3342 IP-6: the post-switch role surface is the regenerated registry
-    # projection, not the retired role-assignments.json.
-    role_map = _read_role_map(project_root)
-    assert role_map["B"] == ["prime-builder"]
+    assert "role" in results[0].error
+    assert pending_path.exists()  # refused entries stay in pending/

@@ -362,12 +362,7 @@ def _harness_inventory(project_root: Path) -> dict[str, Any]:
     # collector needs ``harness_type``, which the IP-3 foundational loaders
     # strip, so it reads the projection directly via load_harness_projection
     # rather than through scripts.harness_roles / scripts.harness_identity.
-    try:
-        from scripts.harness_projection_reader import load_harness_projection
-    except ImportError:  # pragma: no cover - direct script execution path
-        from harness_projection_reader import (  # type: ignore[no-redef]
-            load_harness_projection,
-        )
+    from scripts.harness_projection_reader import load_harness_projection
 
     projection = load_harness_projection(project_root)
     identities: dict[str, dict[str, Any]] = {}
@@ -495,7 +490,8 @@ def _compatibility_matrix(
                         f"{'.codex/hooks.json' if harness == 'codex' else '.claude/settings.json'} SessionStart",
                     ),
                     "canonical_terminology_load": _capability(
-                        "configured" if canonical_terms else "unknown", ".claude/rules/canonical-terminology.md"
+                        "configured" if canonical_terms else "unknown",
+                        ".harness-baseline-configuration/rules/canonical-terminology.md",
                     ),
                     "role_record_resolution": _capability(
                         "verified" if harnesses.get("role_assignment_source", {}).get("present") else "unknown",

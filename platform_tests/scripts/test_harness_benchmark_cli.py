@@ -189,5 +189,10 @@ def test_benchmark_module_cadence_report_writes_json_and_markdown(tmp_path, caps
     assert exit_code == 0
     paths = json.loads(capsys.readouterr().out)
     assert paths["run_id"] == "RUN-WRITE-OUT"
-    assert (tmp_path / ".gtkb-state/benchmarks/RUN-WRITE-OUT/harness-quality-cadence-report.json").is_file()
-    assert (tmp_path / ".gtkb-state/benchmarks/RUN-WRITE-OUT/harness-quality-cadence-report.md").is_file()
+    # Canon s17: benchmark output is session-scoped scratch, never `.gtkb-state`.
+    from scripts.gtkb_session_id import session_scratch_dirname
+
+    out_root = tmp_path / "scratchpad" / session_scratch_dirname() / "benchmarks" / "RUN-WRITE-OUT"
+    assert (out_root / "harness-quality-cadence-report.json").is_file()
+    assert (out_root / "harness-quality-cadence-report.md").is_file()
+    assert not (tmp_path / ".gtkb-state").exists()

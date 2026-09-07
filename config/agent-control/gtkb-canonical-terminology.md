@@ -161,7 +161,7 @@ Adopter projects also define their own application-instance term (e.g., the
 project_name itself); GT-KB's own checkout adds the instance term in its
 self-install. Multi-source attribution per Codex
 `gtkb-gov-term-primer-startup-2026-05-02-002.md` F3: each entry cites its
-authoritative source. Sources include `.claude/rules/operating-model.md` Â§2
+authoritative source. Sources include `.harness-baseline-configuration/rules/operating-model.md` Â§2
 (canonical for most terms), `AGENTS.md`, role rules, and
 `DELIB-GTKB-IDP-TERMINOLOGY`.
 
@@ -201,7 +201,7 @@ Platform (IDP) that supports the application lifecycle.
 **Not to be confused with:** hosted application (the platform manages
 applications, is not one); cloud platform (e.g., AWS) which is unrelated.
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "platform";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "platform";
 `DELIB-GTKB-IDP-TERMINOLOGY`.
 
 ### application
@@ -215,7 +215,7 @@ when GT-KB is the active application.
 application; see "project" below); platform (GT-KB itself; see above);
 hosted application (an application in service).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "application".
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "application".
 
 ### hosted application
 
@@ -226,7 +226,7 @@ of an application (vs. the lifecycle record managed by GT-KB).
 **Not to be confused with:** application (the lifecycle object); platform
 (GT-KB itself).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "hosted application".
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "hosted application".
 
 ### Agent Red
 
@@ -282,7 +282,7 @@ Retired terms remain historical only; new narrative MUST use **activity envelope
 **Source:** `DELIB-20260637`; `DELIB-20265287`; `SPEC-TOPIC-ENVELOPE-ROUTER-001`;
 WI-4482.
 
-**Implementation pointer:** `.claude/session/envelope.json` `topics` array;
+**Implementation pointer:** `.gtkb-state/session-envelopes/<session_id>.json` `topics` array;
 `groundtruth_kb.session.envelope`; `groundtruth_kb.session.topic_router`.
 
 ### adopter
@@ -291,7 +291,7 @@ WI-4482.
 application that uses GT-KB as its governance/lifecycle infrastructure,
 e.g., by running `gt project init` to scaffold its repository or by
 linking to GT-KB-managed artifacts. Adopter projects receive scaffolded
-templates (CLAUDE.md, MEMORY.md, `.claude/rules/canonical-terminology.md`,
+templates (CLAUDE.md, MEMORY.md, `.harness-baseline-configuration/rules/canonical-terminology.md`,
 etc.) under their own root.
 
 **Not to be confused with:** the GT-KB platform itself; tenants of an
@@ -312,7 +312,7 @@ workstream/program grouping; not the hosted application.
 applications contain projects); platform (GT-KB itself); work item (the
 atomic known-work unit).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "project"; owner
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "project"; owner
 clarification, 2026-05-06.
 
 ### project authorization
@@ -348,7 +348,7 @@ grouping, and continuation context.
 **Not to be confused with:** project or sub-project (groupings of work
 items); external issue or ticket records.
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "work item";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "work item";
 `work_items` table in MemBase; owner clarification, 2026-05-06.
 
 ### backlog
@@ -387,7 +387,7 @@ read with `gt bridge state-report`); ignore list or deprecated work (forbidden
 uses per operating-model Â§2); backlog snapshot (point-in-time export);
 a separate `backlog_items` conceptual class distinct from work items.
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "backlog";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "backlog";
 `GOV-STANDING-BACKLOG-001` (governance contract); owner clarification,
 2026-05-06.
 
@@ -400,7 +400,7 @@ recorded in MemBase as one of the spec subtypes (`SPEC-NNNN`, `GOV-NNN`,
 **Not to be confused with:** technical-design document; implementation
 proposal (a different bridge artifact); test (a verification artifact).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "specification";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "specification";
 `specifications` table in MemBase.
 
 ### requirement
@@ -414,7 +414,7 @@ requires owner-visible confirmation per `GOV-SPEC-CAPTURE-TRANSPARENCY-001`.
 behavior (must not be silently promoted to requirement per
 operating-model Â§1).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "requirement".
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "requirement".
 
 ### implementation proposal
 
@@ -423,13 +423,13 @@ through the file bridge for pre-implementation review. Filed as
 `bridge/<topic>-NNN.md` with `NEW` or `REVISED` status. Must include
 `Specification Links`, `Prior Deliberations`, test plan, acceptance
 criteria, and risk/rollback per
-`.claude/rules/file-bridge-protocol.md`.
+`.harness-baseline-configuration/rules/file-bridge-protocol.md`.
 
 **Not to be confused with:** specification (a different artifact type);
 implementation report (post-implementation; below).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "implementation proposal";
-`.claude/rules/file-bridge-protocol.md`.
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "implementation proposal";
+`.harness-baseline-configuration/rules/file-bridge-protocol.md`.
 
 ### implementation report
 
@@ -438,14 +438,14 @@ through the file bridge for post-implementation verification. Filed as
 the next bridge version after implementation completes; must carry
 forward Spec Links + provide spec-to-test mapping + verification
 evidence + acceptance-criteria check per
-`.claude/rules/file-bridge-protocol.md` Mandatory Specification-Derived
+`.harness-baseline-configuration/rules/file-bridge-protocol.md` Mandatory Specification-Derived
 Verification Gate.
 
 **Not to be confused with:** implementation proposal (pre-implementation);
 test (an independent artifact).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "implementation report";
-`.claude/rules/file-bridge-protocol.md`.
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "implementation report";
+`.harness-baseline-configuration/rules/file-bridge-protocol.md`.
 
 ### verification
 
@@ -459,7 +459,7 @@ that a specification exists or has been claimed.
 verification can require many tests); validation (testing against
 real-world use; verification is internal-spec compliance).
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "verification".
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "verification".
 
 ### dashboard
 
@@ -473,7 +473,7 @@ access to MemBase.
 **Not to be confused with:** static documentation (dashboard implies
 live data + interaction); non-interactive README-style views.
 
-**Source:** `.claude/rules/operating-model.md` Â§2 "dashboard";
+**Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "dashboard";
 `GTKB-DASHBOARD-002` (slice progression).
 
 ### bridge
@@ -492,7 +492,7 @@ or bridge-state authority. Implementation never proceeds without GO.
 Bare `bridge`, `bridge work`, `bridge-related`, `TAFE`, or `harness` topic
 language does not by itself select the bridge queue.
 
-**Source:** dispatcher/TAFE bridge-state surfaces; `.claude/rules/file-bridge-protocol.md`
+**Source:** dispatcher/TAFE bridge-state surfaces; `.harness-baseline-configuration/rules/file-bridge-protocol.md`
 for legacy helper behavior; `AGENTS.md` (Codex-side rule).
 
 ### bridge queue
@@ -577,7 +577,7 @@ reach-patterns rather than fighting agent defaults.
 ### glossary as DA read surface
 
 **Definition:** The architectural role assigned to
-`.claude/rules/canonical-terminology.md` by
+`.harness-baseline-configuration/rules/canonical-terminology.md` by
 `GOV-GLOSSARY-AS-DA-READ-SURFACE-001`: the glossary is the agent-side primary
 read path for prior-decision consultation; the Deliberation Archive is the
 substrate the glossary cites. Direct DA semantic search is the long-tail /
@@ -625,7 +625,7 @@ fallback, or lifecycle semantics.
 
 **Not to be confused with:** the SoT artifact registry (the data; this is the read-time enforcement) or `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` (the governance principle this enforces).
 
-**Source:** `DCL-SOT-READ-HOOK-CONTRACT-001` v1; `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` v2; narrative authority `.claude/rules/sot-read-discipline.md`; `DELIB-20260673` (parallel-session fragmentation motivation).
+**Source:** `DCL-SOT-READ-HOOK-CONTRACT-001` v1; `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` v2; narrative authority `.harness-baseline-configuration/rules/sot-read-discipline.md`; `DELIB-20260673` (parallel-session fragmentation motivation).
 
 **Implementation pointer:** `.claude/hooks/sot-read-discipline.py` (Claude surface) + `.codex/gtkb-hooks/sot-read-discipline-bash-adapter.py` (Codex surface); doctor `_check_sot_read_discipline`; owner-authorized bypass `GTKB_SOT_READ_DISCIPLINE_BYPASS`.
 
@@ -822,8 +822,8 @@ owner decisions).
 ### operating model
 
 **Definition:** The canonical operating-model artifact for GT-KB at
-`.claude/rules/operating-model.md`. Carries rule-cited soft authority:
-cited by `.claude/rules/loyal-opposition.md` and `AGENTS.md` as the
+`.harness-baseline-configuration/rules/operating-model.md`. Carries rule-cited soft authority:
+cited by `.harness-baseline-configuration/rules/loyal-opposition.md` and `AGENTS.md` as the
 operating-model reference; its terminology and framing are the alignment
 baseline for future remediation work. No hook or test mechanically enforces
 compliance with this artifact's text.
@@ -906,10 +906,12 @@ session, opened by an init-keyword family explicit hint (typically `::init gtkb 
 zero or more nested activity envelopes. Conforms to the three-part anatomy
 (invocation, intent_hint, payload) per `ADR-ENVELOPE-META-MODEL-001`.
 
-**Source:** `ADR-ENVELOPE-META-MODEL-001`; `DCL-SESSION-ENVELOPE-DURABILITY-001`.
+**Source:** `ADR-ENVELOPE-META-MODEL-001`; `DCL-SESSION-ENVELOPE-SINGLE-CONTEXT-001`.
 
-**Implementation pointer:** `.claude/session/envelope.json`; archive under
-`.claude/session/archive/`.
+**Implementation pointer:** `groundtruth_kb.session.envelope`; live document at
+`.gtkb-state/session-envelopes/<session_id>.json`; archive at
+`.gtkb-state/session-envelopes/archive/<session_id>.json`; handoff generation through
+`groundtruth_kb.session.handoff`.
 
 ### smart poller
 

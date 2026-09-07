@@ -222,7 +222,9 @@ def _manifest_content(adapters: list[ApiSkillAdapter]) -> str:
     payload = {
         "schema_version": 1,
         "generated_by": "scripts/generate_api_skill_adapters.py",
-        "source_of_truth": ".agents/skills/*/SKILL.md",
+        # WI-6228 Change C — the harness baseline is
+        # `.harness-baseline-configuration`, not the retired tree.
+        "source_of_truth": ".harness-baseline-configuration/skills/*/SKILL.md",
         "adapter_contract": "compact pointer; read canonical source before applying skill",
         "adapters": [asdict(adapter) for adapter in adapters],
     }

@@ -1,3 +1,9 @@
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Helper for the /gtkb-bridge-propose skill.
 
@@ -379,7 +385,9 @@ def _run_bridge_compliance_audit(
     project_root: Path,
 ) -> dict[str, Any]:
     """Run bridge-compliance-gate.py in audit mode for in-memory content."""
-    gate_path = PROJECT_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
+    gate_path = PROJECT_ROOT / ".harness-baseline-configuration" / "hooks" / "bridge-compliance-gate.py"
+    if not gate_path.is_file():
+        gate_path = PROJECT_ROOT / "scripts" / "bridge-compliance-gate.py"
     payload = {
         "cwd": str(project_root.resolve()),
         "tool_input": {
@@ -438,7 +446,7 @@ def propose_bridge(
     GTKB-DA-READ-SURFACE-CORRECTION): when
     ``pre_populate_prior_deliberations=True`` (default), call
     :func:`pre_populate_prior_deliberations` on ``body`` before scanning.
-    Glossary-source seeding from ``.claude/rules/canonical-terminology.md``
+    Glossary-source seeding from ``.harness-baseline-configuration/rules/canonical-terminology.md``
     plus optional semantic search (when ``db`` is provided) populates the
     proposal's ``## Prior Deliberations`` section. Authors review and
     prune. Set ``pre_populate_prior_deliberations=False`` to opt out;
@@ -469,7 +477,7 @@ def propose_bridge(
             stage of pre-population. ``None`` skips semantic search;
             glossary-source seeding still runs.
         glossary_path: Override the glossary path used for seeding.
-            Defaults to ``.claude/rules/canonical-terminology.md``.
+            Defaults to ``.harness-baseline-configuration/rules/canonical-terminology.md``.
         pre_populate_log_path: Override the audit-log path. ``None``
             (default) writes to ``.gtkb-state/bridge-propose-helper/
             last-prepopulation.json``; ``False`` disables logging.

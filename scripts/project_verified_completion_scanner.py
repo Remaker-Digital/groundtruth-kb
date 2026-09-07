@@ -126,10 +126,6 @@ class MemberCompletionReadiness:
     completion_guarded: bool
     completion_guard_refs: list[dict[str, Any]]
     keep_open_elected: bool
-    verified_bridge_evidence_required: bool
-    verified_bridge_evidence_ready: bool
-    non_verified_implements_bridge_threads: list[str]
-    unverified_bridge_work_item_ids: list[str]
     completion_ready: bool
     exclusion_reasons: list[str]
 
@@ -144,10 +140,6 @@ class MemberCompletionReadiness:
             completion_guarded=bool(status.get("completion_guarded")),
             completion_guard_refs=list(status.get("completion_guard_refs") or []),
             keep_open_elected=bool(status.get("keep_open_elected")),
-            verified_bridge_evidence_required=bool(status.get("verified_bridge_evidence_required")),
-            verified_bridge_evidence_ready=bool(status.get("verified_bridge_evidence_ready")),
-            non_verified_implements_bridge_threads=list(status.get("non_verified_implements_bridge_threads") or []),
-            unverified_bridge_work_item_ids=list(status.get("unverified_bridge_work_item_ids") or []),
             completion_ready=bool(status.get("completion_ready")),
             exclusion_reasons=list(status.get("exclusion_reasons") or []),
         )
@@ -162,10 +154,6 @@ class MemberCompletionReadiness:
             "completion_guarded": self.completion_guarded,
             "completion_guard_refs": self.completion_guard_refs,
             "keep_open_elected": self.keep_open_elected,
-            "verified_bridge_evidence_required": self.verified_bridge_evidence_required,
-            "verified_bridge_evidence_ready": self.verified_bridge_evidence_ready,
-            "non_verified_implements_bridge_threads": self.non_verified_implements_bridge_threads,
-            "unverified_bridge_work_item_ids": self.unverified_bridge_work_item_ids,
             "completion_ready": self.completion_ready,
             "exclusion_reasons": self.exclusion_reasons,
         }
@@ -426,10 +414,17 @@ def scan(project_root: Path = PROJECT_ROOT) -> list[AuthorizationReadiness]:
 
     db = KnowledgeDB(project_root / "groundtruth.db")
     try:
-        active = db.list_project_authorizations(status="active")
+        # WI-7657: enumerate active projects directly instead of deriving the
+        # project set from active project_authorizations rows. The gating set
+        # itself is unchanged -- _project_membership_work_item_ids already
+        # sources it from active membership links, not from an authorization
+        # envelope's included_work_item_ids, per
+        # GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2. Only the way the
+        # project list was obtained referenced the retired table.
         gating_by_project: dict[str, list[str]] = {}
-        for authorization in active:
-            project_id = str(authorization.get("project_id") or "")
+        active_projects = db.list_projects(status="active")
+        for project in active_projects:
+            project_id = str(project.get("id") or "")
             if project_id and project_id not in gating_by_project:
                 gating_by_project[project_id] = _project_membership_work_item_ids(db, project_id)
     finally:
@@ -439,8 +434,11 @@ def scan(project_root: Path = PROJECT_ROOT) -> list[AuthorizationReadiness]:
     guards_by_project = _completion_guards_by_project(project_root)
     blockers_by_project = _completion_guards_by_project(project_root, (_COMPLETION_BLOCKING_ARTIFACT_TYPE,))
     results: list[AuthorizationReadiness] = []
-    for authorization in active:
-        project_id = str(authorization.get("project_id") or "")
+    # WI-7657: iterate active projects. The AuthorizationReadiness field names
+    # below are legacy shape retained so existing consumers keep working; they
+    # now carry project identity, which is what actually gates completion.
+    for project in active_projects:
+        project_id = str(project.get("id") or "")
         included = gating_by_project.get(project_id, [])
         # Project-scoped (v4 F1 fix): a WI counts as verified for THIS project
         # only via this project's own implements-linked VERIFIED threads.
@@ -453,9 +451,9 @@ def scan(project_root: Path = PROJECT_ROOT) -> list[AuthorizationReadiness]:
         completion_ready = bool(included) and not unverified_ids and not blocker_refs
         results.append(
             AuthorizationReadiness(
-                authorization_id=str(authorization.get("id") or ""),
+                authorization_id=project_id,
                 project_id=project_id,
-                authorization_name=str(authorization.get("authorization_name") or ""),
+                authorization_name=str(project.get("name") or ""),
                 included_work_item_ids=included,
                 verified_work_item_ids=verified_ids,
                 unverified_work_item_ids=unverified_ids,
@@ -538,10 +536,6 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"         completion guard: {refs}")
             if r.keep_open_elected:
                 print("         keep-open election: yes")
-            if r.non_verified_implements_bridge_threads:
-                print(f"         non-VERIFIED bridge threads: {', '.join(r.non_verified_implements_bridge_threads)}")
-            if r.unverified_bridge_work_item_ids:
-                print(f"         missing VERIFIED bridge evidence: {', '.join(r.unverified_bridge_work_item_ids)}")
             if r.exclusion_reasons:
                 print(f"         exclusion reasons: {', '.join(r.exclusion_reasons)}")
         return 0

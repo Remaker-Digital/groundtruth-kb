@@ -43,17 +43,17 @@ When the local hooks support review mode, the active mode should:
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
 4. `AGENTS.md`
-5. `.claude/rules/codex-way-of-working.md`
-6. `.claude/rules/codex-review-operating-contract.md`
-7. `.claude/rules/codex-loyal-opposition-runbook.md`
-8. `.claude/rules/codex-knowledge-base-index.md`
+5. `.harness-baseline-configuration/rules/way-of-working.md`
+6. `.harness-baseline-configuration/rules/review-operating-contract.md`
+7. `.harness-baseline-configuration/rules/loyal-opposition-runbook.md`
+8. `.harness-baseline-configuration/rules/loyal-opposition-knowledge-base-index.md`
 
 ## Deliverables
 
 Use:
 
-- `.claude/rules/template-code-review.md`
-- `.claude/rules/template-decision-memo.md`
+- `.harness-baseline-configuration/rules/template-code-review.md`
+- `.harness-baseline-configuration/rules/template-decision-memo.md`
 - Advisory Proposal bridge entries / Deliberation Archive records
   (`independent-progress-assessments/` is retired; do not write there)
 

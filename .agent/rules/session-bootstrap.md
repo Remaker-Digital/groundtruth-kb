@@ -2,7 +2,7 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project antigravity`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
@@ -41,7 +41,7 @@ this workspace and reads `AGENTS.md`:
 - Prime Builder / Loyal Opposition coordination uses the file bridge in
   `bridge/`.
 - Both Prime Builder and Loyal Opposition startup procedures load
-  `.claude/rules/canonical-terminology.md` so the live glossary is available
+  `.agent/rules/canonical-terminology.md` so the live glossary is available
 - Both Prime Builder and Loyal Opposition startup disclosures surface the
   strategic self-improvement directive: noticed fix-worthy issues and useful
   workflow enhancements should be captured as standing backlog/work items for
@@ -127,7 +127,7 @@ Optional local environment overrides remain available:
 6. In Prime Builder mode, identify latest `GO` or `NO-GO` entries and include
    them in "Continue Last Session" scope.
 7. In Loyal Opposition mode, process latest `NEW` or `REVISED` entries from
-   oldest to newest using `.claude/rules/file-bridge-protocol.md`.
+   oldest to newest using `.agent/rules/file-bridge-protocol.md`.
 8. In Prime Builder mode, do not process latest `NEW`, `REVISED`, or
    `VERIFIED` entries as actionable queue work. Prime Builder bridge handling is
    limited to latest `GO` or `NO-GO` entries.
@@ -145,9 +145,9 @@ Optional local environment overrides remain available:
    - `AGENTS.md`
    - `harness-state/harness-identities.json`
    - `harness-state/harness-registry.json`
-   - `.claude/rules/operating-role.md` guidance
-   - `.claude/rules/canonical-terminology.md` (core primer subset only)
-   - `.claude/rules/file-bridge-protocol.md`
+   - `.agent/rules/operating-role.md` guidance
+   - `.agent/rules/canonical-terminology.md` (core primer subset only)
+   - `.agent/rules/file-bridge-protocol.md`
    - `config/agent-control/SESSION-STARTUP-INDEX.md` + role overlay
 11. **Do not** load activity-only Loyal Opposition surfaces at base startup. Open the matching
     activity envelope first (`::open build|test|project|deliberation|spec|ops`) and
@@ -159,9 +159,9 @@ Optional local environment overrides remain available:
     - `::open project` → `standing-priorities.md`, `groundtruth-kb-vision.md`
     - `::open deliberation` → `way-of-working.md`
 12. For substantial LO review work inside an opened activity envelope, use:
-   - `.claude/rules/review-checklists.md`
-   - `.claude/rules/template-code-review.md`
-   - `.claude/rules/template-decision-memo.md`
+   - `.agent/rules/review-checklists.md`
+   - `.agent/rules/template-code-review.md`
+   - `.agent/rules/template-decision-memo.md`
 13. In Loyal Opposition mode, include the standard project-state startup
     report after bridge verification:
     - direct `git status --short --branch`
@@ -199,8 +199,8 @@ recorded for that harness ID in `harness-state/harness-registry.json`, read
 through `groundtruth_kb.harness_projection.read_roles` or the `roles`
 subcommand under `gt harness`.
 Load AGENTS.md, the harness identity map, the role assignment map,
-.claude/rules/canonical-terminology.md (core primer subset),
-.claude/rules/file-bridge-protocol.md,
+.agent/rules/canonical-terminology.md (core primer subset),
+.agent/rules/file-bridge-protocol.md,
 config/agent-control/SESSION-STARTUP-INDEX.md, and the active role overlay.
 Defer activity-only Loyal Opposition surfaces (standing priorities, review contract,
 loyal-opposition runbook, way-of-working, checklists) until `::open <activity>`
@@ -228,7 +228,7 @@ When Loyal Opposition review mode is active, the local hook behavior should:
 
 ## Boundary
 
-- The `.claude` skills and hook changes are local-only because `.claude` is git-ignored in this repo.
+- The `.agent` skills and hook changes are local-only because `.agent` is git-ignored in this repo.
 - The tracked baseline for intended setup lives in `config/agent-control/`.
 
 ---

@@ -63,19 +63,20 @@ def work_item_summary(project_root: Path) -> dict[str, Any]:
     connection = sqlite3.connect(db_path)
     connection.row_factory = sqlite3.Row
     try:
-        active_authorized_work_item_ids: set[str] = set()
-        for row in connection.execute(
-            "SELECT included_work_item_ids FROM current_project_authorizations WHERE status = 'active'"
-        ):
-            raw_ids = row["included_work_item_ids"]
-            if not raw_ids:
-                continue
-            try:
-                parsed_ids = json.loads(raw_ids)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(parsed_ids, list):
-                active_authorized_work_item_ids.update(str(item_id) for item_id in parsed_ids)
+        # WI-7657: a work item is authorized when it is an active member of a
+        # project whose authorization is 'authorized'. Previously this set
+        # was read from an authorization row's included_work_item_ids list,
+        # which enumerated membership in a second place; membership itself is
+        # now the only answer, so the list is read from the membership relation.
+        active_authorized_work_item_ids: set[str] = {
+            str(row["work_item_id"])
+            for row in connection.execute(
+                """SELECT DISTINCT m.work_item_id
+                   FROM current_project_work_item_memberships m
+                   JOIN current_projects p ON p.id = m.project_id
+                   WHERE m.status = 'active' AND p.authorization = 'authorized'"""
+            )
+        }
 
         status_counts = {
             row["resolution_status"]: row["count"]
@@ -97,9 +98,7 @@ def work_item_summary(project_root: Path) -> dict[str, Any]:
             )
         ]
         authorization_status_counts = Counter(
-            "covered_by_active_authorization"
-            if row["id"] in active_authorized_work_item_ids
-            else "not_in_active_authorization"
+            "in_authorized_project" if row["id"] in active_authorized_work_item_ids else "not_in_authorized_project"
             for row in non_terminal_rows
         )
         priority_counts = {
@@ -180,7 +179,7 @@ def main(argv: list[str] | None = None) -> int:
     for entry in bridge["actionable"]:
         print(f"- {entry['status']}: {entry['document']} ({entry['path']})")
     print(f"Work item status counts: {work_items['status_counts']}")
-    print(f"Work item authorization coverage: {work_items['authorization_status_counts']}")
+    print(f"Work item authorized-project coverage: {work_items['authorization_status_counts']}")
     print("Release blockers:")
     for blocker in audit["release_blockers"]:
         print(f"- {blocker}")

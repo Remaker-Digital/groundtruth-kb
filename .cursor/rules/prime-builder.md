@@ -10,13 +10,6 @@ the baseline and re-projection, file a work item against the projector
 
 This rule file defines mandatory behavior for the implementing/building agent.
 
-> **Scope note (HYG-027):** This file (`prime-builder.md`) is the **Prime Builder
-> rule set** — the mandatory-behavior contract for the implementing agent. It is
-> distinct from [`prime-builder-role.md`](prime-builder-role.md), the
-> **role-assignment** record (who holds the Prime Builder role and the
-> session-resolved role authority). Edit behavior rules here; edit role
-> assignment there.
-
 ## Core Assignment
 
 - Mission: create, manage, maintain, and frequently reference implementation artifacts
@@ -52,6 +45,40 @@ This rule set assumes ADR-0001: Three-Tier Memory Architecture — MemBase holds
 
 Never remove code, tests, features, or specifications without explicit owner approval.
 If something looks wrong — ASK rather than act.
+
+### Standing Delete Authorization — DERIVED and CACHED Only
+
+This is a bounded relaxation of the removal rule above, and only for objects whose class
+is **proven from evidence**. It does not relax anything else in this section.
+
+Prime Builder may delete an object without a fresh per-item owner approval when, and only
+when, the deterministic classifier establishes one of:
+
+- **DERIVED** — a named generator exists **and** regeneration has been demonstrated. The
+  object must be reproducible from its source. The absence of a generator is not evidence
+  of derivation, and a generator that is named but not demonstrated does not qualify.
+- **CACHED** — a named source of truth exists **and** the object corresponds to it at byte
+  or digest level. A named SoT whose digest diverges does not qualify.
+
+Every other disposition is unchanged:
+
+- **UNREGISTERED** objects are never deleted directly. They route to receipted quarantine
+  with fixed 30-day retention, and reach permanent deletion only through the governed
+  expiry path with all operation-time checks passing.
+- **Any object whose class cannot be established from evidence remains owner-gated**,
+  exactly as before. The classifier fails closed: uncertainty is not a licence.
+
+Every action taken under this authorization emits a mandatory post-hoc audit record naming
+the object acted on and the evidence for its class. An action without that record is a
+defect, not a permitted shortcut.
+
+This authorization is deliberately narrow. It exists because deletion of provably
+regenerable material otherwise costs a proposal plus an owner approval while its addition
+costs only a proposal, and that asymmetry accumulates. It does not authorize removing code,
+tests, features, or specifications, none of which can satisfy the DERIVED or CACHED
+evidence conditions.
+
+Authority: `DELIB-20260825183500` (owner decision, Route B).
 
 ## Correcting Direction - Purge Before Probative Language
 

@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """
-Claude Code PreToolUse hook -- Hardcoded Credential & FQDN Scanner.
+PreToolUse hook -- Hardcoded Credential & FQDN Scanner.
 
 Intercepts Write and Edit tool calls and blocks content that contains
 hardcoded credentials, API keys, FQDNs, or other environment-specific
@@ -19,7 +25,7 @@ WI-3142: Replaced blanket test-file exclusions with value-scoped
 suppression. Unified key detection covers quoted, assignment-form, and
 bare contexts with hyphen-aware character classes and negative-lookahead
 boundaries. Reviewed inventory: 52 fixture values, 5 source examples.
-Session S281. Codex GO: bridge/credential-scan-narrowing-012.md.
+Session S281. Loyal Opposition GO: bridge/credential-scan-narrowing-012.md.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -98,7 +104,7 @@ _CONN_STRING_PATTERNS = [
 # ---------------------------------------------------------------------------
 
 # 52 deterministic test fixture values (Groups A+B+C from reviewed inventory)
-# Reviewed S281, Codex GO bridge/credential-scan-narrowing-012.md
+# Reviewed S281, Loyal Opposition GO bridge/credential-scan-narrowing-012.md
 _FIXTURE_VALUES = frozenset(
     {
         # Group A: tests/conftest.py (6 values)
@@ -207,14 +213,14 @@ _EXCLUDED_PATHS = [
     re.compile(r"CLAUDE-ARCHITECTURE\.md$"),
     re.compile(r"CLAUDE_ARCHIVE\.md$"),
     # Hook files themselves
-    re.compile(r"\.claude[/\\]hooks[/\\]"),
+    re.compile(r".claude/hooks[/\\]"),
     # Wiki and docs (reference material)
     re.compile(r"wiki[/\\]"),
     re.compile(r"docs-site[/\\]"),
     # Historical artifacts (reports, logs)
     re.compile(r"container-load-results[/\\]"),
     re.compile(r"\.html$"),
-    # Independent assessments (Codex reports)
+    # Independent assessments (Loyal Opposition reports)
     re.compile(r"independent-progress-assessments[/\\]"),
     # Environment config files (where env vars are DEFINED)
     re.compile(r"\.env"),

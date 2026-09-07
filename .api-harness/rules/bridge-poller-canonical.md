@@ -2,7 +2,7 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project openrouter`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
@@ -19,8 +19,8 @@ The canonical bridge dispatch automation is now the **cross-harness
 event-driven trigger** at `scripts/gtkb_dispatcher_daemon.py`,
 registered in:
 
-- `.api-harness/settings.json` — `PostToolUse` and `Stop` hook arrays.
-- `.api-harness/hooks.json` — Codex-side parity (forward-compatible per
+- `settings.json` (or projected harness config) — `PostToolUse` and `Stop` hook arrays.
+- harness hooks configuration — Codex-side parity (forward-compatible per
   `ADR-CODEX-HOOK-PARITY-FALLBACK-001`).
 
 The replacement contract is described in:

@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """
-Claude Code UserPromptSubmit hook — Bridge AXIS 2 in-session surface.
+UserPromptSubmit hook — Bridge AXIS 2 in-session surface.
 
 Closes the AXIS 2 (non-dispatchable, interactive notification) in-session
 surface gap called out in .claude/rules/bridge-essential.md. Dispatchable bridge
@@ -10,7 +16,7 @@ as additionalContext.
 
 Authority:
 - bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-005.md REVISED-2
-- bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-006.md Codex GO
+- bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-006.md Loyal Opposition GO
 - Specific AskUserQuestion approval S341 (2026-05-11): "Approve adding a new
   Claude-side bridge automation (UserPromptSubmit hook for AXIS 2 in-session
   bridge surfacing)?" → "Approve" (satisfies .claude/rules/bridge-essential.md
@@ -21,7 +27,7 @@ Behavior:
    bridge files.
 2. Compute the role-actionable signature using the no-index bridge scanner.
 3. Read session-scoped surface cache at
-   .gtkb-state/bridge-poller/axis-2-surface/<session-id>.json.
+   scratchpad/<session>/axis-2-surface/<session-id>.json.
 4. If current_signature != last_surfaced_signature AND selected_count > 0:
    emit additionalContext markdown block; update cache atomically.
 5. Otherwise: silent no-op.
@@ -32,9 +38,9 @@ Suppression:
 - Env var GTKB_NO_AXIS_2_SURFACE=1 → hook no-ops immediately (emergency stop).
 
 Fire-and-forget: always exits 0. Errors append to
-.gtkb-state/bridge-poller/axis-2-surface/errors.jsonl for diagnosis.
+scratchpad/<session>/axis-2-surface/errors.jsonl for diagnosis.
 
-Stdin:  JSON hook event payload per https://code.claude.com/docs/en/hooks
+Stdin:  JSON hook event payload (harness hook-event contract)
 Stdout: empty (silent no-op) or markdown additionalContext block.
 Exit:   Always 0.
 
@@ -72,8 +78,6 @@ _ROLE_HEADING = {
     ROLE_LO: "Loyal Opposition",
 }
 
-STATE_DIR_REL = ".gtkb-state/bridge-poller/axis-2-surface"
-ERRORS_LOG_REL = ".gtkb-state/bridge-poller/axis-2-surface/errors.jsonl"
 # Session-id env-var membership is owned by scripts/gtkb_session_id.py
 # (WI-4270 shared resolver unification; bridge/gtkb-session-id-shared-resolver-
 # unification-003 GO at -004). Import the canonical bridge work-intent order;
@@ -94,6 +98,19 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
         "ANTIGRAVITY_SESSION_ID",
         "GTKB_SESSION_ID",
     )
+
+try:
+    from scripts.gtkb_session_id import session_scratch_dirname as _session_scratch_dirname
+except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
+
+    def _session_scratch_dirname() -> str:
+        return "unknown"
+
+
+# Canon s17: axis-2 surface state is session-scoped scratch under the canonical
+# scratchpad root, never `.gtkb-state` (and never the retired bridge-poller tree).
+STATE_DIR_REL = f"scratchpad/{_session_scratch_dirname()}/axis-2-surface"
+ERRORS_LOG_REL = f"{STATE_DIR_REL}/errors.jsonl"
 
 
 def _now_iso() -> str:
@@ -116,12 +133,7 @@ def _log_error(payload: dict[str, Any]) -> None:
 
 
 def _load_scan_bridge_helper() -> Any:
-    helper_path = PROJECT_ROOT / ".claude" / "skills" / "gtkb-bridge" / "helpers" / "scan_bridge.py"
-    if not helper_path.is_file():
-        # WI-5661: fall back to the pre-rename skill dir (WI-5651 renamed bridge -> gtkb-bridge).
-        _legacy = PROJECT_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
-        if _legacy.is_file():
-            helper_path = _legacy
+    helper_path = PROJECT_ROOT / "scripts" / "skill-helpers" / "gtkb-bridge" / "scan_bridge.py"
     spec = importlib.util.spec_from_file_location("_gtkb_axis2_scan_bridge", helper_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"scan helper could not be loaded from {helper_path}")
@@ -198,7 +210,7 @@ def _write_cache(cache_path: Path, payload: dict[str, Any]) -> None:
 
 
 def _resolve_session_id(payload: dict[str, Any]) -> str:
-    """Use Claude Code session_id from payload if present; else fall back to
+    """Use the harness session_id from payload if present; else fall back to
     a stable host-scoped default. The cache is per-session by design so
     multi-session boxes don't cross-contaminate."""
     sid = str(payload.get("session_id") or "").strip()

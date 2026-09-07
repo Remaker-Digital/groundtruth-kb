@@ -333,9 +333,9 @@ def _hook_command(profile: dict, hook: dict, tokens: dict[str, str], gaps: list[
         target = f"{profile['hooks_dir']}/{hook['script']}"
     adapter = str(profile.get("stdin_adapter") or "").strip()
     if adapter:
-        command = f'"{interpreter}" {adapter} {target}'
+        command = f'"{interpreter}" -B {adapter} {target}'
     else:
-        command = f'"{interpreter}" {target}'
+        command = f'"{interpreter}" -B {target}'
     for arg in hook.get("args", []):
         command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
     return command
@@ -351,6 +351,32 @@ def apply_leftover_removes(plan: Plan, profile: dict) -> None:
             continue
         seen.add(normalized)
         plan.removes.append(normalized)
+
+    # WI-7685 class 1. Bytecode is an interpreter side effect of executing code
+    # from inside the projection tree; it is never projector output, and it has
+    # no readers.
+    #
+    # The `-B` flag above prevents it only where the projector controls the
+    # command line. It cannot cover an importer the projector does not invoke,
+    # and that is not hypothetical: `.cursor` was measured at zero surplus,
+    # projected clean, and held `__pycache__/write_bridge.cpython-314.pyc`
+    # within the hour, created by something importing a projected helper. A
+    # projection run then reported "0 leftovers removed" because bytecode was
+    # not a leftover. Prevention and cleanup are both required; either alone
+    # leaves the property holding only most of the time.
+    config_dir = str(profile.get("config_dir") or "").strip()
+    if config_dir:
+        projection_root = PROJECT_ROOT / config_dir
+        if projection_root.is_dir():
+            stale = list(projection_root.rglob("__pycache__")) + list(projection_root.rglob("*.pyc"))
+            for path in sorted(stale):
+                if not path.exists():
+                    continue
+                normalized = normalize_planned_rel(path.relative_to(PROJECT_ROOT).as_posix())
+                if not normalized or normalized in seen or normalized in owned:
+                    continue
+                seen.add(normalized)
+                plan.removes.append(normalized)
 
 
 def remove_planned_path(target: Path) -> bool:
@@ -460,9 +486,9 @@ def render_hooks_registration(
                 continue
             interpreter = projected_interpreter(windowless=False)
             if hook.get("script_root") == "project_scripts":
-                command = f'"{interpreter}" scripts/{hook["script"]}'
+                command = f'"{interpreter}" -B scripts/{hook["script"]}'
             else:
-                command = f'"{interpreter}" {profile["hooks_dir"]}/{hook["script"]}'
+                command = f'"{interpreter}" -B {profile["hooks_dir"]}/{hook["script"]}'
             for arg in hook.get("args", []):
                 command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
             entry: dict = {"command": command}
@@ -492,7 +518,7 @@ def render_hooks_registration(
             else:
                 script_path = f"${profile['project_dir_var']}/{profile['hooks_dir']}/{hook['script']}"
             interpreter = projected_interpreter(windowless=True, project_dir_var=profile["project_dir_var"])
-            command = f'"{interpreter}" "{script_path}"'
+            command = f'"{interpreter}" -B "{script_path}"'
             for arg in hook.get("args", []):
                 command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
             entry = {"type": "command", "command": command}

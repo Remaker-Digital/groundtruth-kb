@@ -38,7 +38,7 @@ This is an **activity-envelope-only** skill. Use it only after the current worke
 - The managed-artifact proposal bridge file (NEW or REVISED).
 - The relevant managed-artifact registry entry (if any exists).
 - The `target_paths` declared in the proposal.
-- Project authorization covering the artifact class.
+- The parent project record and its current `activation-status` field.
 - Recent bridge history for the same artifact class to detect stale assumptions.
 
 ## Structural Review Checklist
@@ -49,8 +49,8 @@ This is an **activity-envelope-only** skill. Use it only after the current worke
 - [ ] Does the proposal cite the registry entry that authorizes (or will
   authorize) the artifact?
 - [ ] Is there a competing or duplicate registration?
-- [ ] Does the registry require owner approval or project authorization for new
-  or revised entries, and is that approval chain documented?
+- [ ] Does the parent project's current `activation-status` permit dispatch of
+  this work, without inventing a separate authorization carrier?
 
 ### 2. Target-Path Completeness
 
@@ -119,8 +119,8 @@ bridge verdict file.
 
 If the structural review detects issues:
 
-- **Registry authority gap**: route to `specification intake` or
-  `project authorization` (see `advisory-disposition` skill decision tree).
+- **Registry authority gap**: route to specification intake or an owner-directed
+  project `activation-status` update (see `advisory-disposition` skill decision tree).
 - **Missing target paths**: require the Prime Builder to amend the proposal with
   complete target paths before re-filing.
 - **Stale assumptions**: require the Prime Builder to address each stale
@@ -135,5 +135,4 @@ If the structural review detects issues:
 
 - WI-4841, motivated by repeated bridge NO-GOs around managed-artifact registry
   authority, target_paths omission, and stale Tier A registry assumptions.
-- PAUTH-PROJECT-GTKB-SKILL-ACTIVATION-ENFORCEMENT-SKILL-SCAFFOLDS-WI-4839-4842
 - DELIB-20265883, DELIB-20266596

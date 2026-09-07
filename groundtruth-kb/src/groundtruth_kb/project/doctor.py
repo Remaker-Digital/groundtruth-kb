@@ -6969,17 +6969,20 @@ def _bridge_file_date(path: Path) -> datetime | None:
 
 
 def _active_authorized_work_item_ids(db: Any) -> set[str]:
-    authorized: set[str] = set()
-    for authorization in db.list_project_authorizations(status="active"):
-        raw_ids = (
-            authorization.get("included_work_item_ids_parsed")
-            or authorization.get("_included_work_item_ids_parsed")
-            or []
-        )
-        if not isinstance(raw_ids, list):
-            continue
-        authorized.update(str(item_id) for item_id in raw_ids if str(item_id).strip())
-    return authorized
+    """Work items whose project is authorized.
+
+    WI-7657: previously read an authorization row's included_work_item_ids
+    list. Authorization is now a field on the project row, and work-item scope
+    is project membership, so the same set comes from joining active
+    memberships to projects whose authorization is 'authorized'.
+    """
+    rows = db._get_conn().execute(
+        """SELECT DISTINCT m.work_item_id
+           FROM current_project_work_item_memberships m
+           JOIN current_projects p ON p.id = m.project_id
+           WHERE m.status = 'active' AND p.authorization = 'authorized'"""
+    )
+    return {str(row[0]) for row in rows if str(row[0]).strip()}
 
 
 def _is_implementation_active_work_item(item: dict[str, Any]) -> bool:
@@ -7150,242 +7153,6 @@ def _check_standing_backlog_health(target: Path) -> ToolCheck:
     return ToolCheck(
         name="Standing backlog health",
         required=True,
-        found=True,
-        status="fail" if payload["status"] == "fail" else "warning" if payload["status"] == "warning" else "pass",
-        message=message,
-    )
-
-
-def check_project_authorization_hygiene(target: Path) -> dict[str, Any]:
-    """Return a machine-readable project-authorization population hygiene payload.
-
-    WI-5762 additive detection slice. Computed from the existing production
-    read surface ``list_project_authorizations(status="active")`` and
-    work-item terminality via ``WORK_ITEM_TERMINAL_RESOLUTION_STATUSES``.
-
-    Finding kinds:
-    - WARN ``multi-coverage`` — a work item listed in the included set of two
-      or more active authorizations, with the full covering id set.
-    - FAIL ``contradictory-authorization-set`` — a multi-covered work item
-      whose covering active authorizations carry two or more distinct
-      ``forbidden_operations`` sets. Per-authorization forbidden and allowed
-      classes are exposed in the finding payload.
-    - WARN ``completion-candidate`` — an active authorization whose non-empty
-      included work items are all terminal.
-    - FAIL ``missing-evidence`` — missing groundtruth.db or unreadable rows.
-    """
-    from groundtruth_kb.db import WORK_ITEM_TERMINAL_RESOLUTION_STATUSES, KnowledgeDB
-
-    target = target.resolve()
-    findings: list[dict[str, Any]] = []
-    summary_counts: dict[str, int] = {
-        "active_total": 0,
-        "active_with_expires_at": 0,
-        "membership_wide_total": 0,
-        "multi_coverage_count": 0,
-        "contradictory_set_count": 0,
-        "completion_candidate_count": 0,
-        "missing_evidence_count": 0,
-    }
-
-    db_path = target / "groundtruth.db"
-    if not db_path.is_file():
-        findings.append(
-            {
-                "kind": "missing-evidence",
-                "severity": "FAIL",
-                "message": "groundtruth.db is missing; cannot evaluate project-authorization population hygiene.",
-                "path": "groundtruth.db",
-            }
-        )
-        summary_counts["missing_evidence_count"] = 1
-        status = "fail"
-        return {
-            "schema_version": 1,
-            "check": "project_authorization_hygiene",
-            "status": status,
-            "summary": summary_counts,
-            "findings": findings,
-        }
-
-    db = KnowledgeDB(db_path)
-    try:
-        authorizations = db.list_project_authorizations(status="active")
-        work_items = db.list_work_items()
-    except Exception as exc:  # intentional-catch: doctor payload, error -> FAIL finding
-        findings.append(
-            {
-                "kind": "missing-evidence",
-                "severity": "FAIL",
-                "message": f"Could not read project-authorization or work-item state: {exc}",
-                "path": "groundtruth.db",
-            }
-        )
-        summary_counts["missing_evidence_count"] = 1
-        return {
-            "schema_version": 1,
-            "check": "project_authorization_hygiene",
-            "status": "fail",
-            "summary": summary_counts,
-            "findings": findings,
-        }
-    finally:
-        db.close()
-
-    terminal_statuses = set(WORK_ITEM_TERMINAL_RESOLUTION_STATUSES)
-    work_item_status: dict[str, str | None] = {}
-    for item in work_items:
-        item_id = str(item.get("id") or "").strip()
-        if item_id:
-            work_item_status[item_id] = str(item.get("resolution_status") or "").strip()
-
-    def _terminal(item_id: str) -> bool:
-        status = work_item_status.get(item_id)
-        return status is not None and status in terminal_statuses
-
-    # Normalize authorizations: explicit-list vs membership-wide.
-    explicit: list[dict[str, Any]] = []
-    membership_wide: list[dict[str, Any]] = []
-    for auth in authorizations:
-        auth_id = str(auth.get("id") or "").strip()
-        included = auth.get("included_work_item_ids_parsed") or auth.get("_included_work_item_ids_parsed") or []
-        if not isinstance(included, list):
-            included = []
-        included_ids = [str(i) for i in included if str(i).strip()]
-        expires_at = str(auth.get("expires_at") or "").strip()
-        if expires_at:
-            summary_counts["active_with_expires_at"] += 1
-        if not included_ids:
-            membership_wide.append(auth)
-            summary_counts["membership_wide_total"] += 1
-            continue
-        explicit.append(
-            {
-                "id": auth_id,
-                "included_work_item_ids": included_ids,
-                "forbidden_operations": (
-                    auth.get("forbidden_operations_parsed") or auth.get("_forbidden_operations_parsed") or []
-                ),
-                "allowed_mutation_classes": (
-                    auth.get("allowed_mutation_classes_parsed") or auth.get("_allowed_mutation_classes_parsed") or []
-                ),
-            }
-        )
-    summary_counts["active_total"] = len(authorizations)
-
-    # Map each covered work item -> covering authorizations.
-    coverage: dict[str, list[dict[str, Any]]] = {}
-    for entry in explicit:
-        for item_id in entry["included_work_item_ids"]:
-            coverage.setdefault(item_id, []).append(entry)
-
-    # Multi-coverage WARN + contradictory-set FAIL.
-    multi_covered_items: set[str] = set()
-    contradictory_items: set[str] = set()
-    for item_id, covering in coverage.items():
-        if len(covering) < 2:
-            continue
-        multi_covered_items.add(item_id)
-        forbidden_sets: list[frozenset[str]] = []
-        for entry in covering:
-            raw_forbidden = entry["forbidden_operations"]
-            forbidden_sets.append(
-                frozenset(str(v).strip() for v in raw_forbidden if str(v).strip())
-                if isinstance(raw_forbidden, list)
-                else frozenset()
-            )
-        distinct = {fs for fs in forbidden_sets}
-        if len(distinct) > 1:
-            contradictory_items.add(item_id)
-            findings.append(
-                {
-                    "kind": "contradictory-authorization-set",
-                    "severity": "FAIL",
-                    "work_item_id": item_id,
-                    "covering_authorizations": [
-                        {
-                            "authorization_id": entry["id"],
-                            "forbidden_operations": list(entry["forbidden_operations"]),
-                            "allowed_mutation_classes": list(entry["allowed_mutation_classes"]),
-                        }
-                        for entry in covering
-                    ],
-                    "message": (
-                        f"Work item {item_id} is covered by active authorizations with "
-                        f"{len(distinct)} distinct forbidden_operations sets."
-                    ),
-                }
-            )
-            summary_counts["contradictory_set_count"] += 1
-
-    for item_id in multi_covered_items:
-        covering_ids = sorted(entry["id"] for entry in coverage[item_id])
-        if item_id in contradictory_items:
-            # The FAIL finding already carries the full covering set; do not
-            # emit a duplicate multi-coverage WARN for the same work item.
-            continue
-        findings.append(
-            {
-                "kind": "multi-coverage",
-                "severity": "WARN",
-                "work_item_id": item_id,
-                "covering_authorization_ids": covering_ids,
-                "message": (
-                    f"Work item {item_id} is listed in {len(covering_ids)} active "
-                    "project authorizations: " + ", ".join(covering_ids) + "."
-                ),
-            }
-        )
-        summary_counts["multi_coverage_count"] += 1
-
-    # Completion-candidate WARN.
-    for entry in explicit:
-        included_ids = entry["included_work_item_ids"]
-        if not included_ids:
-            continue
-        if all(_terminal(item_id) for item_id in included_ids):
-            findings.append(
-                {
-                    "kind": "completion-candidate",
-                    "severity": "WARN",
-                    "authorization_id": entry["id"],
-                    "resolved_work_item_ids": included_ids,
-                    "message": (
-                        f"Active authorization {entry['id']} covers only terminal "
-                        "work items; candidate for `gt projects complete-authorization`."
-                    ),
-                }
-            )
-            summary_counts["completion_candidate_count"] += 1
-
-    fail_count = sum(1 for finding in findings if finding["severity"] == "FAIL")
-    warn_count = sum(1 for finding in findings if finding["severity"] == "WARN")
-    status = "fail" if fail_count else "warning" if warn_count else "pass"
-    return {
-        "schema_version": 1,
-        "check": "project_authorization_hygiene",
-        "status": status,
-        "summary": summary_counts,
-        "findings": findings,
-    }
-
-
-def _check_project_authorization_hygiene(target: Path) -> ToolCheck:
-    """Render PAUTH population-hygiene count summaries only (never a finding dump)."""
-    payload = check_project_authorization_hygiene(target)
-    summary = payload["summary"]
-    if payload["status"] == "pass":
-        message = "PAUTH hygiene: no findings"
-    else:
-        message = (
-            "PAUTH hygiene: "
-            f"{summary['contradictory_set_count']} contradictory-set FAIL, "
-            f"{summary['multi_coverage_count']} multi-coverage WARN, "
-            f"{summary['completion_candidate_count']} completion candidates"
-        )
-    return ToolCheck(
-        name="PAUTH population hygiene",
-        required=False,
         found=True,
         status="fail" if payload["status"] == "fail" else "warning" if payload["status"] == "warning" else "pass",
         message=message,
@@ -7869,7 +7636,6 @@ def run_doctor(
         checks.append(_check_session_wrap_had_orient(target))
         checks.append(_check_da_harvest_coverage(target))
         checks.append(_check_standing_backlog_health(target))
-        checks.append(_check_project_authorization_hygiene(target))
         checks.append(_check_orphan_citations(target))
         checks.append(_check_tafe_schema(target))
         checks.append(_check_tafe_flow_definitions(target))

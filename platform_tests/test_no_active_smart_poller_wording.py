@@ -8,8 +8,9 @@ wording outside an explicit archive-context allowlist and fails if any
 current-use match remains.
 
 The forbidden patterns describe the smart poller as if it were the active
-mechanism; post-Slice-4, that wording is misleading because the smart poller
-was retired in favor of the dispatcher daemon.
+mechanism. The smart poller is retired. Until Dispatcher Next is activated,
+the owner dispatches work manually. Do not describe gtkb_dispatcher_daemon
+or TAFE as the live replacement.
 
 REVISED-7 allowlist:
 - ``groundtruth-kb/release-notes-*.md`` — frozen release evidence.
@@ -247,9 +248,10 @@ def test_no_current_use_smart_poller_wording_in_repo() -> None:
 
     assert not offenses, (
         "Live-instruction smart-poller wording found outside the Slice 4 "
-        "allowlist. Either: (a) update the offending line to reference the "
-        "dispatcher daemon; (b) add an explicit "
-        "'# HISTORICAL: ...' comment prefix when the historical reference is "
-        "deliberate; or (c) widen the allowlist if the file is a frozen "
-        "historical artifact.\n\nOffenses:\n" + "\n".join(offenses)
+        "allowlist. Either: (a) retire the current-use wording (smart poller "
+        "retired; owner-manual dispatch until Dispatcher Next is activated; "
+        "do not teach gtkb_dispatcher_daemon or TAFE as live); (b) add an "
+        "explicit '# HISTORICAL: ...' comment prefix when the historical "
+        "reference is deliberate; or (c) widen the allowlist if the file is a "
+        "frozen historical artifact.\n\nOffenses:\n" + "\n".join(offenses)
     )

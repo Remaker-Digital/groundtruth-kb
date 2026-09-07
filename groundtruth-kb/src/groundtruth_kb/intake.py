@@ -230,8 +230,8 @@ def ensure_backlog_for_confirmed_spec(
     changed_by: str,
 ) -> dict[str, Any]:
     """Create/link backlog work for one newly confirmed implementation-bearing spec."""
-    if spec.get("status") != "specified":
-        return {"action": "skipped", "reason": "spec status is not specified", "spec_id": spec.get("id")}
+    if spec.get("status") not in ("active", "specified"):
+        return {"action": "skipped", "reason": "spec status is not active/specified", "spec_id": spec.get("id")}
     if not _is_implementation_bearing_spec(spec):
         return {"action": "skipped", "reason": "spec is not implementation-bearing", "spec_id": spec.get("id")}
 
@@ -419,7 +419,7 @@ def confirm_intake(
         id=spec_id,
         title=content.get("proposed_title", "Untitled"),
         description=content.get("raw_text"),
-        status="specified",
+        status="active",
         changed_by=changed_by,
         change_reason=f"Confirmed from intake {deliberation_id}",
         section=content.get("proposed_section"),

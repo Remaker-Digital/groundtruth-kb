@@ -6,7 +6,6 @@ Licensed under AGPL-3.0-or-later.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sqlite3
 import sys
@@ -57,16 +56,19 @@ def _record_args(config: Path, content: Path, *extra: str, spec_id: str = "GOV-U
         str(content),
         "--change-reason",
         "record owner-approved spec",
-        "--auq-id",
-        "S350-AUQ-SEED-1",
-        "--auq-answer",
-        "Approved",
-        "--owner-presented",
+        "--expected-version",
+        "0",
         *extra,
     ]
 
 
-def _update_args(config: Path, content: Path, *extra: str, spec_id: str = "GOV-UPD-001") -> list[str]:
+def _update_args(
+    config: Path,
+    content: Path,
+    *extra: str,
+    spec_id: str = "GOV-UPD-001",
+    expected_version: int = 1,
+) -> list[str]:
     return [
         "--config",
         str(config),
@@ -78,10 +80,8 @@ def _update_args(config: Path, content: Path, *extra: str, spec_id: str = "GOV-U
         str(content),
         "--change-reason",
         "update owner-approved spec",
-        "--auq-id",
-        "S350-AUQ-UPD-1",
-        "--auq-answer",
-        "Approved",
+        "--expected-version",
+        str(expected_version),
         *extra,
     ]
 
@@ -150,36 +150,45 @@ def _seed_spec(config: Path, content: Path, *extra: str, spec_id: str = "GOV-UPD
     assert result.exit_code == 0, result.output
 
 
-# --- T-SU-1: missing --owner-presented -------------------------------------
+# --- T-SU-1: missing --expected-version -------------------------------------
 
 
-def test_update_requires_owner_presented_before_packet_or_db_write(tmp_path: Path) -> None:
+def test_update_requires_expected_version_before_any_write(tmp_path: Path) -> None:
+    """Omitting the CAS assertion blocks the update instead of defaulting."""
+
     root, config, content = _project(tmp_path)
     _seed_spec(config, content)
-    before = _packet_files(root)
-    result = CliRunner().invoke(main, _update_args(config, content))
-    assert result.exit_code != 0
-    assert "--owner-presented" in result.output
-    # No new version, no new packet beyond the seed create-time packet.
-    assert _spec_versions(root / "groundtruth.db", "GOV-UPD-001") == [1]
-    assert _packet_files(root) == before
-
-
-# --- T-SU-2: missing AUQ evidence ------------------------------------------
-
-
-def test_update_requires_auq_evidence_before_packet_or_db_write(tmp_path: Path) -> None:
-    root, config, content = _project(tmp_path)
-    _seed_spec(config, content)
-    before = _packet_files(root)
-    args = _update_args(config, content, "--owner-presented")
-    args.remove("--auq-id")
-    args.remove("S350-AUQ-UPD-1")
+    args = _update_args(config, content)
+    args.remove("--expected-version")
+    args.remove("1")
     result = CliRunner().invoke(main, args)
     assert result.exit_code != 0
-    assert "Missing option '--auq-id'" in result.output
+    assert "--expected-version" in result.output
     assert _spec_versions(root / "groundtruth.db", "GOV-UPD-001") == [1]
-    assert _packet_files(root) == before
+    assert _packet_files(root) == []
+
+
+# --- T-SU-2: stale expected version ------------------------------------------
+
+
+def test_stale_expected_version_leaves_zero_effect(tmp_path: Path) -> None:
+    """A stale CAS assertion is refused by typed reason and appends nothing."""
+
+    root, config, content = _project(tmp_path)
+    _seed_spec(config, content)
+    v2 = _content(root, "v2.md", "Version two body.\n")
+    first = CliRunner().invoke(main, _update_args(config, v2, expected_version=1))
+    assert first.exit_code == 0, first.output
+    assert _spec_versions(root / "groundtruth.db", "GOV-UPD-001") == [1, 2]
+
+    before = _semantic_postimage(_current_row(root / "groundtruth.db", "GOV-UPD-001"))
+    stale_body = _content(root, "stale.md", "Stale conflicting body.\n")
+    stale = CliRunner().invoke(main, _update_args(config, stale_body, expected_version=1))
+    assert stale.exit_code != 0
+    assert "stale_expected_version" in stale.output
+    assert _spec_versions(root / "groundtruth.db", "GOV-UPD-001") == [1, 2]
+    assert _semantic_postimage(_current_row(root / "groundtruth.db", "GOV-UPD-001")) == before
+    assert _packet_files(root) == []
 
 
 # --- T-SU-3: missing --change-reason ---------------------------------------
@@ -188,7 +197,7 @@ def test_update_requires_auq_evidence_before_packet_or_db_write(tmp_path: Path) 
 def test_update_requires_change_reason(tmp_path: Path) -> None:
     root, config, content = _project(tmp_path)
     _seed_spec(config, content)
-    args = _update_args(config, content, "--owner-presented")
+    args = _update_args(config, content)
     args.remove("--change-reason")
     args.remove("update owner-approved spec")
     result = CliRunner().invoke(main, args)
@@ -197,116 +206,72 @@ def test_update_requires_change_reason(tmp_path: Path) -> None:
     assert _spec_versions(root / "groundtruth.db", "GOV-UPD-001") == [1]
 
 
-# --- T-SU-4: dry-run constructs a valid packet and writes nothing ----------
+# --- T-SU-4: dry-run reports the transition and writes nothing ----------
 
 
-def test_dry_run_constructs_valid_update_packet_and_writes_nothing(tmp_path: Path) -> None:
+def test_dry_run_reports_version_transition_and_writes_nothing(tmp_path: Path) -> None:
+    """A dry run reports the intended version transition and appends nothing."""
+
     root, config, content = _project(tmp_path)
     _seed_spec(config, content)
-    before = _packet_files(root)
-    new_body = _content(root, "new.md", "Dry-run updated body.\n")
-    result = CliRunner().invoke(main, _update_args(config, new_body, "--owner-presented", "--dry-run", "--json"))
+    new_body = _content(root, "v2.md", "Version two body.\n")
+
+    result = CliRunner().invoke(main, _update_args(config, new_body, "--dry-run", "--json"))
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    packet = payload["approval_packet"]
-    assert packet["action"] == "update"
-    assert packet["artifact_id"] == "GOV-UPD-001"
-    assert packet["artifact_type"] == "governance"
-    assert packet["full_content"] == new_body.read_text(encoding="utf-8")
-    assert (
-        packet["full_content_sha256"]
-        == hashlib.sha256(new_body.read_text(encoding="utf-8").encode("utf-8")).hexdigest()
-    )
-    assert packet["postimage_fields"] == {
-        "title": "Seed spec",
-        "status": "specified",
-        "priority": None,
-        "scope": None,
-        "section": None,
-        "handle": None,
-        "tags": None,
-        "assertions": None,
-        "constraints": None,
-        "affected_by": None,
-        "testability": None,
-        "source_paths": None,
-        "application_scope": None,
-    }
+
+    assert payload["updated"] is False
     assert payload["dry_run"] is True
+    assert payload["replayed"] is False
+    assert payload["expected_version"] == 1
+    assert payload["from_version"] == 1
     assert payload["to_version"] == 2
-    # No DB write, no new packet file.
+    assert payload["db_operation"]["method"] == "update_spec"
+    assert "approval_packet" not in payload
+    assert "approval_packet_path" not in payload
     assert _spec_versions(root / "groundtruth.db", "GOV-UPD-001") == [1]
-    assert _packet_files(root) == before
+    assert _packet_files(root) == []
 
 
-def test_structured_update_packet_matches_dry_run_and_persisted_postimage(tmp_path: Path) -> None:
+def test_structured_update_postimage_matches_persisted_row(tmp_path: Path) -> None:
+    """The dry-run intent and the persisted row agree, and a replay is read-only."""
+
     root, config, content = _project(tmp_path)
     _seed_spec(config, content)
-    new_body = _content(root, "structured.md", "Structured update body.\n")
-    structured_args = (
+    new_body = _content(root, "v2.md", "Version two body.\n")
+    structured = (
         "--title",
-        "Structured title",
-        "--status",
-        "implemented",
+        "Updated title",
         "--priority",
         "P1",
-        "--scope",
-        "platform",
-        "--section",
-        "Governance",
-        "--handle",
-        "structured-handle",
         "--tags-json",
-        '["approval", "café"]',
-        "--assertions-json",
-        '[{"type": "file_exists", "file": "README.md"}]',
-        "--constraints-json",
-        '{"mode": "strict"}',
-        "--affected-by-json",
-        '["ADR-TEST-001"]',
-        "--testability",
-        "structural",
-        "--source-paths-json",
-        '["groundtruth-kb/src/**/*.py"]',
-        "--application-scope",
-        "gtkb_platform",
+        '["updated"]',
     )
-    expected = {
-        "title": "Structured title",
-        "status": "implemented",
-        "priority": "P1",
-        "scope": "platform",
-        "section": "Governance",
-        "handle": "structured-handle",
-        "tags": ["approval", "café"],
-        "assertions": [{"type": "file_exists", "file": "README.md"}],
-        "constraints": {"mode": "strict"},
-        "affected_by": ["ADR-TEST-001"],
-        "testability": "structural",
-        "source_paths": ["groundtruth-kb/src/**/*.py"],
-        "application_scope": "gtkb_platform",
-    }
 
-    dry_result = CliRunner().invoke(
-        main,
-        _update_args(config, new_body, "--owner-presented", "--dry-run", "--json", *structured_args),
-    )
-    assert dry_result.exit_code == 0, dry_result.output
-    dry_payload = json.loads(dry_result.output)
-    assert dry_payload["approval_packet"]["postimage_fields"] == expected
+    dry = CliRunner().invoke(main, _update_args(config, new_body, "--dry-run", "--json", *structured))
+    assert dry.exit_code == 0, dry.output
+    assert json.loads(dry.output)["to_version"] == 2
+    assert _spec_versions(root / "groundtruth.db", "GOV-UPD-001") == [1]
 
-    write_result = CliRunner().invoke(
-        main,
-        _update_args(config, new_body, "--owner-presented", "--json", *structured_args),
-    )
-    assert write_result.exit_code == 0, write_result.output
-    write_payload = json.loads(write_result.output)
-    assert write_payload["approval_packet"]["postimage_fields"] == expected
-    assert write_payload["approval_packet"]["postimage_sha256"] == dry_payload["approval_packet"]["postimage_sha256"]
+    write = CliRunner().invoke(main, _update_args(config, new_body, "--json", *structured))
+    assert write.exit_code == 0, write.output
+    written = json.loads(write.output)
+    assert written["updated"] is True
+    assert written["replayed"] is False
+    assert written["to_version"] == 2
 
     row = _current_row(root / "groundtruth.db", "GOV-UPD-001")
     assert row is not None
-    assert _semantic_postimage(row) == expected
+    postimage = _semantic_postimage(row)
+    assert postimage["title"] == "Updated title"
+    assert postimage["priority"] == "P1"
+    assert postimage["tags"] == ["updated"]
+
+    replay = CliRunner().invoke(main, _update_args(config, new_body, "--json", *structured))
+    assert replay.exit_code == 0, replay.output
+    assert json.loads(replay.output)["replayed"] is True
+    assert _spec_versions(root / "groundtruth.db", "GOV-UPD-001") == [1, 2]
+    assert _packet_files(root) == []
 
 
 def test_update_postimage_preserves_explicit_empty_collections(tmp_path: Path) -> None:
@@ -331,7 +296,6 @@ def test_update_postimage_preserves_explicit_empty_collections(tmp_path: Path) -
         _update_args(
             config,
             new_body,
-            "--owner-presented",
             "--json",
             "--tags-json",
             "[]",
@@ -347,7 +311,10 @@ def test_update_postimage_preserves_explicit_empty_collections(tmp_path: Path) -
     )
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    postimage = payload["approval_packet"]["postimage_fields"]
+    assert payload["updated"] is True
+    row = _current_row(root / "groundtruth.db", "GOV-UPD-001")
+    assert row is not None
+    postimage = _semantic_postimage(row)
     assert {name: postimage[name] for name in ("tags", "assertions", "constraints", "affected_by", "source_paths")} == {
         "tags": [],
         "assertions": [],
@@ -377,16 +344,18 @@ def test_description_only_update_carries_current_semantic_postimage(tmp_path: Pa
     expected = _semantic_postimage(current)
     new_body = _content(root, "description-only.md", "Description only.\n")
 
-    result = CliRunner().invoke(
-        main,
-        _update_args(config, new_body, "--owner-presented", "--dry-run", "--json"),
-    )
+    result = CliRunner().invoke(main, _update_args(config, new_body, "--json"))
     assert result.exit_code == 0, result.output
-    packet = json.loads(result.output)["approval_packet"]
+    payload = json.loads(result.output)
+    assert payload["updated"] is True
 
-    assert packet["full_content"] == "Description only.\n"
-    assert packet["full_content_sha256"] == hashlib.sha256(b"Description only.\n").hexdigest()
-    assert packet["postimage_fields"] == expected
+    # Persistence is intrinsic, so the stored row is the record of the postimage:
+    # the new description lands and every omitted field carries forward unchanged.
+    updated_row = _current_row(root / "groundtruth.db", "GOV-UPD-001")
+    assert updated_row is not None
+    assert updated_row["description"] == "Description only.\n"
+    assert _semantic_postimage(updated_row) == expected
+    assert _packet_files(root) == []
 
 
 # --- T-SU-5: content file outside project root is rejected -----------------
@@ -397,7 +366,7 @@ def test_content_file_outside_project_root_is_rejected(tmp_path: Path) -> None:
     _seed_spec(config, content)
     outside = tmp_path / "outside.md"
     outside.write_text("outside\n", encoding="utf-8")
-    result = CliRunner().invoke(main, _update_args(config, outside, "--owner-presented"))
+    result = CliRunner().invoke(main, _update_args(config, outside))
     assert result.exit_code != 0
     assert "inside project root" in result.output
     assert _spec_versions(root / "groundtruth.db", "GOV-UPD-001") == [1]
@@ -409,7 +378,7 @@ def test_content_file_outside_project_root_is_rejected(tmp_path: Path) -> None:
 def test_update_of_nonexistent_spec_is_rejected(tmp_path: Path) -> None:
     root, config, content = _project(tmp_path)
     # No seed: spec does not exist.
-    result = CliRunner().invoke(main, _update_args(config, content, "--owner-presented", spec_id="GOV-MISSING-001"))
+    result = CliRunner().invoke(main, _update_args(config, content, spec_id="GOV-MISSING-001"))
     assert result.exit_code != 0
     assert "does not exist" in result.output
     assert "gt spec record" in result.output
@@ -420,14 +389,13 @@ def test_update_of_nonexistent_spec_is_rejected(tmp_path: Path) -> None:
 # --- T-SU-7: successful update creates one new packet + new version --------
 
 
-def test_successful_update_creates_versioned_row_and_suffixed_packet(tmp_path: Path) -> None:
+def test_successful_update_creates_versioned_row_and_no_packet(tmp_path: Path) -> None:
     root, config, content = _project(tmp_path)
     _seed_spec(config, content)
-    create_packets = _packet_files(root)
-    assert len(create_packets) == 1  # the Slice-2 create-time packet
+    assert _packet_files(root) == []
 
     new_body = _content(root, "v2.md", "Version two body.\n")
-    result = CliRunner().invoke(main, _update_args(config, new_body, "--owner-presented"))
+    result = CliRunner().invoke(main, _update_args(config, new_body))
     assert result.exit_code == 0, result.output
     assert result.output.strip() == "GOV-UPD-001 v2"
 
@@ -437,15 +405,8 @@ def test_successful_update_creates_versioned_row_and_suffixed_packet(tmp_path: P
     assert row is not None
     assert int(row["version"]) == 2
     assert row["description"] == new_body.read_text(encoding="utf-8")
-
-    packets = _packet_files(root)
-    assert len(packets) == 2  # create-time + update-time, distinct files
-    update_packet = next(p for p in packets if p not in create_packets)
-    # The -v<new_version> suffix prevents collision with the create-time packet.
-    assert update_packet.name.endswith("-GOV-UPD-001-v2.json")
-    packet = json.loads(update_packet.read_text(encoding="utf-8"))
-    assert packet["action"] == "update"
-    assert packet["artifact_id"] == "GOV-UPD-001"
+    assert _packet_files(root) == []
+    assert not (root / ".groundtruth" / "formal-artifact-approvals").exists()
 
 
 # --- T-SU-8: carry-forward semantics for omitted optional fields -----------
@@ -463,7 +424,7 @@ def test_omitted_optional_fields_carry_forward_previous_values(tmp_path: Path) -
 
     new_body = _content(root, "v2.md", "Version two body.\n")
     # Update supplies neither --priority nor --title: both must carry forward.
-    result = CliRunner().invoke(main, _update_args(config, new_body, "--owner-presented"))
+    result = CliRunner().invoke(main, _update_args(config, new_body))
     assert result.exit_code == 0, result.output
 
     row = _current_row(db_path, "GOV-UPD-001")
@@ -492,58 +453,64 @@ def test_artifact_type_is_derived_from_live_spec_row_not_id_prefix(tmp_path: Pat
     new_body = _content(root, "dcl-v2.md", "## Constraint\nThe invariant is now stricter.\n")
     result = CliRunner().invoke(
         main,
-        _update_args(config, new_body, "--owner-presented", "--dry-run", "--json", spec_id="DCL-UPD-001"),
+        _update_args(config, new_body, "--dry-run", "--json", spec_id="DCL-UPD-001"),
     )
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     # artifact_type comes from the stored row, NOT from a DCL- prefix lookup.
-    assert payload["approval_packet"]["artifact_type"] == "design_constraint"
+    assert payload["db_operation"]["type"] == "design_constraint"
 
 
 # --- T-SU-10: source_ref anchors to the previous version -------------------
 
 
-def test_packet_source_ref_anchors_to_previous_version(tmp_path: Path) -> None:
+def test_result_anchors_the_version_transition(tmp_path: Path) -> None:
+    """The result names the exact version it replaced and the version it produced."""
+
     root, config, content = _project(tmp_path)
     _seed_spec(config, content)
     new_body = _content(root, "v2.md", "Version two body.\n")
-    result = CliRunner().invoke(main, _update_args(config, new_body, "--owner-presented"))
-    assert result.exit_code == 0, result.output
 
-    update_packet = next(p for p in _packet_files(root) if p.name.endswith("-v2.json"))
-    packet = json.loads(update_packet.read_text(encoding="utf-8"))
-    # source_ref anchors the update to the version being superseded (v1).
-    assert packet["source_ref"] == "GOV-UPD-001@v1"
+    result = CliRunner().invoke(main, _update_args(config, new_body, "--json"))
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["from_version"] == 1
+    assert payload["to_version"] == 2
+    assert payload["expected_version"] == 1
+    assert payload["db_operation"]["from_version"] == 1
+    assert payload["db_operation"]["to_version"] == 2
+    assert _packet_files(root) == []
 
 
 # --- T-SU-11: --approved-by overrides the default manual identity ----------
 
 
-def test_approved_by_overrides_default_identity(tmp_path: Path) -> None:
+def test_update_output_carries_no_approval_fields(tmp_path: Path) -> None:
+    """The update result exposes no approval identity, packet, or evidence field."""
+
     root, config, content = _project(tmp_path)
     _seed_spec(config, content)
     new_body = _content(root, "v2.md", "Version two body.\n")
-    result = CliRunner().invoke(main, _update_args(config, new_body, "--owner-presented", "--approved-by", "Mike"))
+    result = CliRunner().invoke(main, _update_args(config, new_body, "--json"))
     assert result.exit_code == 0, result.output
-    update_packet = next(p for p in _packet_files(root) if p.name.endswith("-v2.json"))
-    packet = json.loads(update_packet.read_text(encoding="utf-8"))
-    assert packet["approved_by"] == "Mike"
+    payload = json.loads(result.output)
+    for forbidden in ("approval_packet", "approval_packet_path", "approved_by", "auq_id", "auq_answer"):
+        assert forbidden not in payload
+    assert _packet_files(root) == []
 
 
 # --- T-SU-12: invalid --assertions-json raises before packet write ---------
 
 
-def test_invalid_assertions_json_raises_before_packet_write(tmp_path: Path) -> None:
+def test_invalid_assertions_json_raises_before_any_write(tmp_path: Path) -> None:
     root, config, content = _project(tmp_path)
     _seed_spec(config, content)
-    before = _packet_files(root)
     new_body = _content(root, "v2.md", "Version two body.\n")
     result = CliRunner().invoke(
         main,
-        _update_args(config, new_body, "--owner-presented", "--assertions-json", '{"not": "a list"}'),
+        _update_args(config, new_body, "--assertions-json", '["not-an-object"]'),
     )
     assert result.exit_code != 0
     assert "--assertions-json" in result.output
-    # No new version, no new packet file.
     assert _spec_versions(root / "groundtruth.db", "GOV-UPD-001") == [1]
-    assert _packet_files(root) == before
+    assert _packet_files(root) == []

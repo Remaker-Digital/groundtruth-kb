@@ -145,7 +145,6 @@ terminology = [
     "NO-GO",
     "VERIFIED",
     "target_paths",
-    "PAUTH",
     "Advisory Proposal",
     "ADVISORY bridge entry",
     "advisory intake/disposition",
@@ -156,7 +155,7 @@ terminology = [
 [activities.build.history_state]
 sources = [
     "GO'd bridge proposals",
-    "active PAUTH authorizations",
+    "authorized parent project records",
     "recent implementation commits",
     "backlog priority order",
     "open NO-GO items",
@@ -285,13 +284,13 @@ stance = "capture-before-implement"
 guardrails = [
     "no implementation before specifications are recorded and linked",
     "apply interrogative default to owner factual claims",
-    "formal artifact approval required before canonical insertion",
+    "explicit owner approval required before canonical insertion",
 ]
 manipulates = [
     "MemBase specification rows",
     "Deliberation Archive records",
     "work item backlog",
-    "approval packets",
+    "formal artifact records",
 ]
 
 [activities.project]
@@ -308,8 +307,7 @@ terminology = [
     "sub-project",
     "backlog",
     "work item",
-    "project authorization",
-    "PAUTH",
+    "project activation-status authorization field",
     "project completion",
     "retired project",
 ]
@@ -319,7 +317,7 @@ sources = [
     "active project status",
     "backlog priority order",
     "blocked work items",
-    "project authorization expiry",
+    "project activation-status",
     "recent project completions",
 ]
 
@@ -339,6 +337,6 @@ guardrails = [
 manipulates = [
     "project records",
     "backlog ordering",
-    "project authorization packets",
+    "project activation-status field",
     "session focus decisions",
 ]

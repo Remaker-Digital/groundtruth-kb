@@ -139,7 +139,22 @@ all = ""
 # slices (Phase D of the parent bridge thread).
 [harnesses.codex]
 config_dir = ".codex"
-status = "profile_pending"
+skills_dir = ".codex/skills"
+rules_dir = ".codex/rules"
+hooks_dir = ".codex/hooks"
+project_dir_var = "CODEX_PROJECT_DIR"
+session_id_var = "CODEX_SESSION_ID"
+# Full native skill bodies, as for Antigravity and Goose.
+skill_body = "full"
+rules_projection = true
+# No leftover_paths / leftover_trees are declared by this slice (WI-5960 Slice 1).
+# .codex carries superseded residue -- hooks.json, routing.toml, config.toml,
+# settings.json.rolegate-bak, commands/registry.json, plugins/, gtkb-hooks/ -- and
+# also .codex/session/, which is LIVE runtime state of an active role-holding
+# harness. Retiring residue is a deletion class that deserves its own evidence and
+# owner visibility, exactly as WI-7112 kept baseline cleanup separate from the
+# exclusion filter. Activation does not require it: the render is correct without
+# deleting anything. Residue retirement belongs in its own governed change.
 [harnesses.cursor]
 config_dir = ".cursor"
 skills_dir = ".cursor/skills"
@@ -192,8 +207,22 @@ rules_projection = true
 config_dir = ".api-harness"
 status = "profile_pending"
 [harnesses.openrouter]
+# WI-5960 Slice 2. Three registered identities -- ollama (D, suspended), openrouter
+# (F, active), alibaba-cloud-studio (H, suspended) -- share this one projection
+# surface. Only openrouter is active, so it is the renderer: activating more than
+# one would collide, because each would substitute its own project_dir_var and
+# session_id_var into the same files and overwrite the others' ownership manifest,
+# whose path the engine derives from config_dir. Restoring H is tracked separately
+# as WI-5231. Leftovers are deliberately not declared; see the codex slice for the
+# same reasoning.
 config_dir = ".api-harness"
-status = "profile_pending"
+skills_dir = ".api-harness/skills"
+rules_dir = ".api-harness/rules"
+hooks_dir = ".api-harness/hooks"
+project_dir_var = "OPENROUTER_PROJECT_DIR"
+session_id_var = "OPENROUTER_SESSION_ID"
+skill_body = "full"
+rules_projection = true
 [harnesses.alibaba-cloud-studio]
 config_dir = ".api-harness"
 status = "profile_pending"

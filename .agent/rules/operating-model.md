@@ -2,7 +2,7 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project antigravity`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
@@ -10,7 +10,7 @@ the baseline and re-projection, file a work item against the projector
 
 **Status:** Canonical (rule-cited soft authority). Active.
 
-it is cited by `.claude/rules/loyal-opposition.md` and `AGENTS.md` as the operating-model reference
+it is cited by `.agent/rules/loyal-opposition.md` and `AGENTS.md` as the operating-model reference
 
 **Source:** Owner verbatim text captured at `bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-001.md` §10. Five substantive clarifying decisions per S324 AskUserQuestion answers archived as `DELIB-S324-OM-DELTA-{0001,0003,0004,0007,0032}-CHOICE` (`source_type='owner_conversation'`, `outcome='owner_decision'`, `session_id='S324'`). The Slice 0 inventory was a retired local report; canonical authority now rests on the owner decisions and bridge thread. Slice 1 bridge thread at `bridge/gtkb-operating-model-slice-1-canonical-artifact-2026-04-30-*.md`.
 

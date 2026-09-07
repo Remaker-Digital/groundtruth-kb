@@ -15,7 +15,7 @@ Purpose: persistent record of owner decisions and standing operating choices tha
 - source:
   Owner directive in session on 2026-05-02.
 - decision:
-  `.claude/rules/canonical-terminology.md` must be included in the session
+  `.harness-baseline-configuration/rules/canonical-terminology.md` must be included in the session
   start procedure for both Loyal Opposition and Prime Builder roles.
 - impact:
   Future Prime Builder and Loyal Opposition sessions should load the live

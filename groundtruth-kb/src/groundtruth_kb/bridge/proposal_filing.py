@@ -5,13 +5,14 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from types import ModuleType
 from typing import Any
 
@@ -28,7 +29,6 @@ from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.governance.project_authorization_operation_time import (
     classify_target,
-    evaluate_envelope,
     evaluator_sha256,
     load_operation_taxonomy,
     normalize_operation,
@@ -57,6 +57,29 @@ NONIMPAIRMENT_REQUIRED_FIELDS = (
 )
 
 
+#: Artifact-head envelope emitted on every generated implementation proposal.
+#: A Prime-authored ``NEW`` proposal is dispatched to Loyal Opposition for review,
+#: so line 2 names the RECIPIENT role, not the author's.
+#: Authority: ADR-BRIDGE-ARTIFACT-HEAD-ENVELOPE-001,
+#: DCL-BRIDGE-ENVELOPE-LINE-AUTHORING-PLACEMENT-001 (WI-7326 defect 2).
+PROPOSAL_RECIPIENT_INIT_MARKER = "::init gtkb lo"
+PROPOSAL_ACTIVITY_MARKER = "::open build"
+
+#: Knowledge-base filename used to derive ``kb_mutation_in_scope`` (WI-7326 defect 4).
+KB_DB_FILENAME = "groundtruth.db"
+
+#: Author audit metadata lines every bridge artifact must carry.
+#: Authority: owner emergency audit directive 2026-05-19 (WI-7326 defect 3).
+AUTHOR_METADATA_FIELDS: tuple[str, ...] = (
+    "author_identity",
+    "author_harness_id",
+    "author_session_context_id",
+    "author_model",
+    "author_model_version",
+    "author_model_configuration",
+)
+
+
 class ProposalFilingError(RuntimeError):
     """Raised when a dispatchable implementation proposal cannot be filed."""
 
@@ -78,6 +101,7 @@ class FilingRequest:
     acceptance_criteria: tuple[str, ...] = ()
     verification: tuple[str, ...] = ()
     cross_harness_dispositions: tuple[str, ...] = ()
+    simplification: tuple[str, ...] = ()
     summary: str | None = None
     create_missing_state: bool = False
     dry_run: bool = False
@@ -133,11 +157,7 @@ class FilingResult:
 @dataclass(frozen=True)
 class _ProjectState:
     project_id: str
-    project_authorization_id: str
-    project_authorization_candidates: tuple[AuthorizationCandidateRank, ...]
-    authorization_decision: dict[str, Any]
     membership_created: bool
-    authorization_created: bool
 
 
 def _require(value: str | None, name: str) -> str:
@@ -285,10 +305,16 @@ def _resolve_actor_context(project_root: Path) -> dict[str, str]:
         raise ProposalFilingError(
             f"Implementation-proposal filing requires prime-builder role, got {role or '<missing>'}"
         )
-    return {
+    context = {
         "session_context_id": session_context_id,
         "role": role,
     }
+    # WI-7326 defect 3: the six audit-metadata values are already resolved here for
+    # role validation. Carry them out so ``_build_content`` can emit them instead of
+    # re-deriving (or, as before, omitting) them.
+    for field_name in AUTHOR_METADATA_FIELDS:
+        context[field_name] = str(metadata.get(field_name) or "")
+    return context
 
 
 def _bridge_invalidation_inputs(project_root: Path, slug: str) -> dict[str, Any]:
@@ -456,269 +482,6 @@ def _decision_invalidation_fingerprint(decision: dict[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(material).hexdigest()
 
 
-def _active_authorization_for_work_item(
-    db: KnowledgeDB,
-    project_root: Path,
-    request: FilingRequest,
-    *,
-    project_id: str,
-    membership_active: bool,
-    spec_links: list[str],
-    actor: dict[str, str],
-    invalidation_inputs: dict[str, Any],
-    decision_time: datetime,
-    authorizations: list[dict[str, Any]] | None = None,
-) -> tuple[dict[str, Any] | None, tuple[AuthorizationCandidateRank, ...], dict[str, Any] | None]:
-    rows = (
-        authorizations
-        if authorizations is not None
-        else db.list_project_authorizations(project_id, include_terminal=True)
-    )
-    evaluations: list[dict[str, Any]] = []
-    for authorization in rows:
-        try:
-            candidate = _authorization_candidate_rank(
-                authorization,
-                request.wi_id,
-                membership_active=membership_active,
-                decision_time=decision_time,
-            )
-        except ValueError as exc:
-            decision = _decision_payload(
-                project_root=project_root,
-                request=request,
-                project_id=project_id,
-                spec_links=spec_links,
-                actor=actor,
-                invalidation_inputs=invalidation_inputs,
-                candidates=(),
-                best_rank=None,
-                authorization=None,
-                allowed=False,
-                reason_code="malformed_authorization_envelope",
-                reason=f"Project authorization {authorization.get('id')} has malformed list fields: {exc}",
-                recovery="Append a valid owner-approved PAUTH successor whose list fields are JSON arrays of strings.",
-                decision_time=decision_time,
-            )
-            raise ProposalFilingError(
-                f"Malformed project authorization {authorization.get('id')}: {exc}", decision=decision
-            ) from exc
-        evaluations.append({"authorization": authorization, "candidate": candidate})
-
-    def candidates_tuple() -> tuple[AuthorizationCandidateRank, ...]:
-        return tuple(
-            item["candidate"]
-            for item in sorted(
-                evaluations,
-                key=lambda value: (
-                    value["candidate"].specificity_rank is None,
-                    value["candidate"].specificity_rank or (99, 99),
-                    value["candidate"].project_authorization_id,
-                ),
-            )
-        )
-
-    def deny(
-        code: str,
-        reason: str,
-        recovery: str,
-        *,
-        best_rank: tuple[int, int] | None = None,
-        authorization: dict[str, Any] | None = None,
-        envelope_decision: dict[str, Any] | None = None,
-    ) -> None:
-        decision = _decision_payload(
-            project_root=project_root,
-            request=request,
-            project_id=project_id,
-            spec_links=spec_links,
-            actor=actor,
-            invalidation_inputs=invalidation_inputs,
-            candidates=candidates_tuple(),
-            best_rank=best_rank,
-            authorization=authorization,
-            allowed=False,
-            reason_code=code,
-            reason=reason,
-            recovery=recovery,
-            decision_time=decision_time,
-            envelope_decision=envelope_decision,
-        )
-        raise ProposalFilingError(f"{reason} [{code}]", decision=decision)
-
-    excluded = [item for item in evaluations if item["candidate"].disposition == "work_item_excluded"]
-    if excluded:
-        denied = excluded[0]["authorization"]
-        deny(
-            "work_item_excluded",
-            f"Project authorization {denied.get('id')} excludes {request.wi_id}",
-            "Correct the exclusion through governed owner-approved PAUTH lifecycle, then retry.",
-            authorization=denied,
-        )
-
-    malformed = [item for item in evaluations if item["candidate"].currentness == "malformed"]
-    if malformed:
-        denied = malformed[0]["authorization"]
-        deny(
-            "malformed_authorization_expiry",
-            f"Project authorization {denied.get('id')} has a malformed or timezone-naive expires_at value",
-            "Append an owner-approved PAUTH successor with a timezone-aware ISO-8601 expiry.",
-            authorization=denied,
-        )
-
-    covering = [item for item in evaluations if item["candidate"].specificity_rank is not None]
-    if not covering:
-        if request.project_authorization_id:
-            selected = db.get_project_authorization(request.project_authorization_id)
-            if selected is None or selected.get("project_id") != project_id:
-                deny(
-                    "selected_authorization_unknown_or_cross_project",
-                    f"Selected project authorization {request.project_authorization_id} is unknown or belongs to another project",
-                    "Select a current same-project authorization that covers the requested work item.",
-                )
-        return None, candidates_tuple(), None
-
-    best_rank = min(item["candidate"].specificity_rank for item in covering)
-    best = [item for item in covering if item["candidate"].specificity_rank == best_rank]
-    for item in covering:
-        candidate = item["candidate"]
-        if candidate.specificity_rank != best_rank:
-            item["candidate"] = replace(candidate, disposition="lower_rank")
-
-    current_best: list[dict[str, Any]] = []
-    for item in best:
-        candidate = item["candidate"]
-        if candidate.currentness in {"expired", "superseded", "inactive"}:
-            item["candidate"] = replace(candidate, disposition=f"best_rank_{candidate.currentness}")
-        else:
-            item["candidate"] = replace(candidate, disposition="best_rank_current")
-            current_best.append(item)
-
-    if not current_best:
-        deny(
-            "best_rank_cohort_stale",
-            f"The best authorization specificity cohort {list(best_rank)} contains no current candidate",
-            "Renew or replace the stale best-rank PAUTH; broader authorization fallback is prohibited.",
-            best_rank=best_rank,
-        )
-
-    for item in current_best:
-        authorization = item["authorization"]
-        owner_id = str(authorization.get("owner_decision_deliberation_id") or "").strip()
-        owner = db.get_deliberation(owner_id) if owner_id else None
-        if owner is None or owner.get("source_type") != "owner_conversation":
-            deny(
-                "owner_decision_unresolvable",
-                f"Project authorization {authorization.get('id')} lacks a resolvable owner decision",
-                "Attach a current owner_conversation decision to a governed PAUTH successor.",
-                best_rank=best_rank,
-                authorization=authorization,
-            )
-        authorization["_owner_decision_snapshot"] = {
-            "id": owner.get("id"),
-            "version": owner.get("version"),
-            "source_type": owner.get("source_type"),
-            "outcome": owner.get("outcome"),
-        }
-        excluded_specs = set(_strict_authorization_list(authorization, "excluded_spec_ids"))
-        blocked_specs = sorted(excluded_specs.intersection(spec_links))
-        if blocked_specs:
-            deny(
-                "linked_specification_excluded",
-                f"Project authorization {authorization.get('id')} excludes linked specification(s): {', '.join(blocked_specs)}",
-                "Use an owner-approved PAUTH whose exclusions do not conflict with the proposal's linked specifications.",
-                best_rank=best_rank,
-                authorization=authorization,
-            )
-        envelope = _authorization_envelope(authorization)
-        # WI-6673: filing writes only the bridge file; request.target_paths describe
-        # a later implementation session and are evaluated at implementation_packet_create.
-        evaluated = evaluate_envelope(
-            envelope,
-            requested_operation=FILING_OPERATION,
-            target_paths=(f"bridge/{request.slug}-001.md",),
-            decision_time=decision_time,
-            taxonomy=load_operation_taxonomy(project_root),
-        )
-        if not evaluated.allowed:
-            deny(
-                evaluated.reason_code,
-                evaluated.reason,
-                evaluated.recovery,
-                best_rank=best_rank,
-                authorization=authorization,
-                envelope_decision=evaluated.as_dict(),
-            )
-        item["envelope_decision"] = evaluated.as_dict()
-
-    if request.project_authorization_id:
-        selected_item = next(
-            (
-                item
-                for item in current_best
-                if item["candidate"].project_authorization_id == request.project_authorization_id
-            ),
-            None,
-        )
-        if selected_item is None:
-            requested_item = next(
-                (
-                    item
-                    for item in evaluations
-                    if item["candidate"].project_authorization_id == request.project_authorization_id
-                ),
-                None,
-            )
-            selected_authorization = requested_item["authorization"] if requested_item is not None else None
-            deny(
-                "selected_authorization_not_best_current_covering",
-                f"Selected project authorization {request.project_authorization_id} is not an equally best-ranked current covering candidate",
-                "Select one of the disclosed equally best-ranked current candidates.",
-                best_rank=best_rank,
-                authorization=selected_authorization,
-            )
-    else:
-        if len(current_best) > 1:
-            authorization_ids = ", ".join(item["candidate"].project_authorization_id for item in current_best)
-            deny(
-                "ambiguous_best_rank",
-                f"Ambiguous active project authorizations cover {request.wi_id} at specificity rank "
-                f"{list(best_rank)}: {authorization_ids}",
-                "Pass --project-authorization with one disclosed equally best-ranked current candidate.",
-                best_rank=best_rank,
-            )
-        selected_item = current_best[0]
-
-    selected_id = selected_item["candidate"].project_authorization_id
-    for item in evaluations:
-        candidate = item["candidate"]
-        item["candidate"] = replace(
-            candidate,
-            disposition="selected" if candidate.project_authorization_id == selected_id else candidate.disposition,
-            selected=candidate.project_authorization_id == selected_id,
-        )
-    selected_authorization = selected_item["authorization"]
-    selected_envelope = selected_item.get("envelope_decision")
-    decision = _decision_payload(
-        project_root=project_root,
-        request=request,
-        project_id=project_id,
-        spec_links=spec_links,
-        actor=actor,
-        invalidation_inputs=invalidation_inputs,
-        candidates=candidates_tuple(),
-        best_rank=best_rank,
-        authorization=selected_authorization,
-        allowed=True,
-        reason_code="allowed",
-        reason="The selected current authorization covers the work item, operation, targets, and linked-spec exclusions.",
-        recovery="Re-evaluate from fresh state if any invalidation input changes before filing.",
-        decision_time=decision_time,
-        envelope_decision=selected_envelope,
-    )
-    return selected_authorization, candidates_tuple(), decision
-
-
 def _require_owner_decision(db: KnowledgeDB, owner_decision: str | None) -> str:
     delib_id = _require(owner_decision, "owner_decision")
     deliberation = db.get_deliberation(delib_id)
@@ -809,25 +572,29 @@ def _resolve_project_state(
             "Choose a fresh bridge slug or continue the existing thread through its role-correct workflow.",
         )
 
-    authorization, authorization_candidates, authorization_decision = _active_authorization_for_work_item(
-        db,
-        project_root,
-        request,
-        project_id=project_id,
-        membership_active=membership is not None,
-        spec_links=spec_links,
-        actor=actor,
-        invalidation_inputs=invalidation_inputs,
-        decision_time=decision_time,
-    )
+    # WI-7657: no authorization is selected, evaluated, or created here.
+    #
+    # This block used to rank candidate authorization rows, deny with
+    # no_current_covering_authorization when none covered the work item, and --
+    # under --create-missing-state -- mint a bounded PAUTH row for the filing.
+    # All three are gone. There is no authorization record to select, denying
+    # on its absence refused lawful work, and minting one reinstated the object
+    # being removed.
+    #
+    # What survives is the part that was always doing the real work: project
+    # membership. Work-item scope IS membership, so an absent membership is
+    # still a genuine blocker and is still creatable under owner-decision
+    # evidence. Authorization is a field on the project row, set by owner
+    # direction through gt projects update --activation-status, and gates
+    # dispatch rather than filing.
     membership_created = False
-    authorization_created = False
-    if authorization is None:
+    if membership is None:
         if not request.create_missing_state:
             deny_state(
-                "no_current_covering_authorization",
-                f"No current project authorization covers {request.wi_id} in {project_id}",
-                "Pass --create-missing-state with owner-decision evidence, or create a governed bounded PAUTH.",
+                "no_active_project_membership",
+                f"Work item {request.wi_id} has no active membership in {project_id}",
+                "Add the membership with gt projects add-item, or pass --create-missing-state "
+                "with owner-decision evidence.",
             )
         try:
             owner_decision = _require_owner_decision(db, request.owner_decision)
@@ -835,117 +602,21 @@ def _resolve_project_state(
             deny_state(
                 "owner_decision_unresolvable",
                 str(exc),
-                "Supply a resolvable owner_conversation deliberation id before creating authorization state.",
+                "Supply a resolvable owner_conversation deliberation id before creating membership state.",
             )
-        approved_specs = _approved_existing_specs(db, spec_links)
-        if not approved_specs:
-            deny_state(
-                "no_approved_linked_specification",
-                "Cannot create an active project authorization because no linked spec is approved",
-                "Approve and link at least one governing specification before creating authorization state.",
-            )
-        authorization_id = "PAUTH-" + re.sub(
-            r"[^A-Z0-9]+", "-", f"{project_id}-{request.wi_id}-BRIDGE-PROPOSAL-FILING".upper()
-        ).strip("-")
-        virtual_authorization: dict[str, Any] = {
-            "id": authorization_id,
-            "version": 1,
-            "project_id": project_id,
-            "status": "active",
-            "authorization_name": f"{request.wi_id} implementation proposal filing",
-            "owner_decision_deliberation_id": owner_decision,
-            "scope_summary": f"Bounded implementation-proposal filing authorization for {request.wi_id}.",
-            "allowed_mutation_classes": ["bridge", "metadata"],
-            "forbidden_operations": [],
-            "included_work_item_ids": [request.wi_id],
-            "excluded_work_item_ids": [],
-            "included_spec_ids": approved_specs,
-            "excluded_spec_ids": [],
-            "expires_at": None,
-            "supersedes": [],
-            "superseded_by": [],
-        }
-        authorization, authorization_candidates, authorization_decision = _active_authorization_for_work_item(
-            db,
-            project_root,
-            request,
-            project_id=project_id,
-            membership_active=membership is not None,
-            spec_links=spec_links,
-            actor=actor,
-            invalidation_inputs=invalidation_inputs,
-            decision_time=decision_time,
-            authorizations=[virtual_authorization],
-        )
-        if authorization is None or authorization_decision is None:
-            raise ProposalFilingError("Virtual project authorization evaluation returned no decision")
-
         if not request.dry_run and allow_state_creation:
-            conn = db._get_conn()
-            try:
-                if membership is None:
-                    db.link_project_work_item(
-                        project_id,
-                        request.wi_id,
-                        CHANGED_BY,
-                        f"gt bridge file-implementation-proposal membership creation approved by {owner_decision}",
-                        source="gt bridge file-implementation-proposal",
-                        commit=False,
-                    )
-                    membership_created = True
-                authorization = db.insert_project_authorization(
-                    project_id,
-                    f"{request.wi_id} implementation proposal filing",
-                    owner_decision,
-                    f"Bounded implementation-proposal filing authorization for {request.wi_id}.",
-                    CHANGED_BY,
-                    f"gt bridge file-implementation-proposal PAUTH creation approved by {owner_decision}",
-                    id=authorization_id,
-                    included_work_item_ids=[request.wi_id],
-                    included_spec_ids=approved_specs,
-                    allowed_mutation_classes=["bridge", "metadata"],
-                    forbidden_operations=[],
-                    excluded_work_item_ids=[],
-                    excluded_spec_ids=[],
-                    supersedes=[],
-                    superseded_by=[],
-                )
-            except Exception as exc:  # noqa: BLE001 - rollback must cover every database/service failure
-                conn.rollback()
-                denied = _deny_from_decision(
-                    authorization_decision,
-                    reason_code="authorization_state_creation_failed",
-                    reason=f"Atomic membership/authorization creation failed: {exc}",
-                    recovery="Correct the database failure and retry; no bridge publication was attempted.",
-                )
-                raise ProposalFilingError(
-                    "Atomic project membership and authorization creation failed", decision=denied
-                ) from exc
-            authorization_created = True
-            persisted_state = _resolve_project_state(
-                db,
-                project_root,
-                request,
-                spec_links=spec_links,
-                decision_time=decision_time,
-                allow_state_creation=False,
+            db.link_project_work_item(
+                project_id,
+                request.wi_id,
+                CHANGED_BY,
+                f"gt bridge file-implementation-proposal membership creation approved by {owner_decision}",
+                source="gt bridge file-implementation-proposal",
             )
-            return replace(
-                persisted_state,
-                membership_created=membership_created,
-                authorization_created=True,
-            )
-
-    if authorization is None or authorization_decision is None:
-        raise ProposalFilingError("Project authorization insert did not return a current row")
+            membership_created = True
 
     return _ProjectState(
         project_id=project_id,
-        project_authorization_id=str(authorization.get("id") or ""),
-        project_authorization_candidates=authorization_candidates,
-        authorization_decision=authorization_decision,
         membership_created=membership_created,
-        authorization_created=authorization_created,
     )
 
 
@@ -1111,6 +782,111 @@ def render_nonimpairment_disposition(disposition: dict[str, Any]) -> str:
     )
 
 
+def _session_scratch_dirname() -> str:
+    """Session-scoped scratch subdirectory name per Compact Guidance section 17."""
+    for env_var in (
+        "GTKB_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "CODEX_THREAD_ID",
+        "CURSOR_CONVERSATION_ID",
+        "GOOSE_SESSION_ID",
+        "ANTIGRAVITY_SESSION_ID",
+    ):
+        value = str(os.environ.get(env_var) or "").strip()
+        if value:
+            return re.sub(r"[^A-Za-z0-9._-]", "-", value)[:120]
+    return "proposal-filing-no-session"
+
+
+def _derive_kb_mutation_in_scope(
+    target_paths: tuple[str, ...],
+    authorization_decision: dict[str, Any],
+) -> bool:
+    """Derive ``kb_mutation_in_scope`` from declared targets and cross-check the decision.
+
+    WI-7326 defect 4. The flag was previously hard-coded ``false``. It is now derived
+    from ``target_paths`` and cross-checked against the classified mutation targets the
+    authorization evaluator already produced; a disagreement fails closed rather than
+    emitting a flag the decision does not corroborate.
+    """
+    kb_targets = tuple(
+        path for path in target_paths if PurePosixPath(str(path).replace("\\", "/")).name == KB_DB_FILENAME
+    )
+    if not kb_targets:
+        return False
+    classified = {str(entry.get("path")) for entry in (authorization_decision.get("classified_targets") or ())}
+    uncorroborated = [path for path in kb_targets if path not in classified]
+    if uncorroborated:
+        raise ProposalFilingError(
+            "kb_mutation_in_scope derivation disagrees with the authorization decision: "
+            f"{uncorroborated} declared as targets but absent from classified_targets. "
+            "Re-run filing from a fresh authorization snapshot."
+        )
+    return True
+
+
+def _compliance_gate_script(project_root: Path) -> Path:
+    """Canonical baseline bridge compliance gate. Projections are never invoked here."""
+    return project_root / ".harness-baseline-configuration" / "hooks" / "bridge-compliance-gate.py"
+
+
+def _run_compliance_gate(project_root: Path, slug: str, content: str) -> PreflightResult:
+    """Evaluate the real baseline compliance gate against generated content.
+
+    WI-7326 defect 5. The gate previously ran only inside the bridge writer, so the
+    ``--dry-run`` path evaluated strictly fewer gates than the write it previewed and
+    reported success for content the write rejected. Both paths now call this, so the
+    two verdicts cannot disagree for identical inputs.
+
+    Absence of the baseline gate in ``project_root`` is reported as ``not_evaluated``
+    rather than raised. Parity is the contract: where no baseline gate exists, the
+    writer path is not gated either, so gating only the preview would make the two
+    paths disagree in the opposite direction. This does not modify any gate's deny
+    logic; a gate that is present is always evaluated and always fails closed.
+    """
+    script = _compliance_gate_script(project_root)
+    if not script.is_file():
+        return PreflightResult(
+            name="compliance_gate",
+            returncode=0,
+            stdout="not_evaluated: no baseline bridge compliance gate in this project root",
+            stderr="",
+        )
+    payload = json.dumps(
+        {
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": str(project_root / "bridge" / f"{slug}-001.md"),
+                "content": content,
+            },
+        }
+    )
+    result = subprocess.run(
+        [sys.executable, str(script)],
+        input=payload,
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    raw = (result.stdout or "").strip()
+    gate_result = PreflightResult(
+        name="compliance_gate", returncode=result.returncode, stdout=raw, stderr=result.stderr or ""
+    )
+    if not raw:
+        return gate_result
+    try:
+        decision = json.loads(raw).get("hookSpecificOutput") or {}
+    except json.JSONDecodeError as exc:
+        raise ProposalFilingError(f"Bridge compliance gate emitted unparseable output: {raw[:400]}") from exc
+    verdict = str(decision.get("permissionDecision") or "").strip().lower()
+    if verdict in {"deny", "ask"}:
+        raise ProposalFilingError(
+            f"Bridge compliance gate returned {verdict}: {decision.get('permissionDecisionReason') or ''}"
+        )
+    return gate_result
+
+
 def _build_content(
     db: KnowledgeDB,
     project_root: Path,
@@ -1162,8 +938,18 @@ def _build_content(
             spec_links=spec_links,
         )
     )
+    actor = _resolve_actor_context(project_root)
+    author_metadata_block = chr(10).join(f"{name}: {actor.get(name, '')}" for name in AUTHOR_METADATA_FIELDS)
+    kb_mutation_in_scope = _derive_kb_mutation_in_scope(request.target_paths, project_state.authorization_decision)
+    simplification = request.simplification or (
+        "No net reduction is claimed: this change adds capability without removing "
+        "artifacts, lines, state locations, or concepts. Supply `--simplification` to "
+        "state what actually gets smaller.",
+    )
     date = f"{datetime.now(UTC).date().isoformat()} UTC"
     return f"""NEW
+{PROPOSAL_RECIPIENT_INIT_MARKER}
+{PROPOSAL_ACTIVITY_MARKER}
 
 # Implementation Proposal - {title}
 
@@ -1171,6 +957,8 @@ bridge_kind: {BridgeKind.PRIME_PROPOSAL.value}
 Document: {request.slug}
 Version: 001
 Date: {date}
+
+{author_metadata_block}
 
 Project Authorization: {project_state.project_authorization_id}
 Project Authorization Candidates: {json.dumps([candidate.to_dict() for candidate in project_state.project_authorization_candidates], ensure_ascii=True, separators=(",", ":"))}
@@ -1185,7 +973,7 @@ target_paths: {target_paths_json}
 implementation_scope: source
 requires_review: true
 requires_verification: true
-kb_mutation_in_scope: false
+kb_mutation_in_scope: {str(kb_mutation_in_scope).lower()}
 
 ## Summary
 
@@ -1216,6 +1004,10 @@ Existing requirements are sufficient for filing this proposal. The work item and
 ## Owner Decisions / Input
 
 {_format_bullets(owner_decisions, empty="_No owner-decision evidence required for existing active authorization reuse._")}
+
+## Simplification Accounting
+
+{_format_bullets(simplification, empty="_No simplification accounting supplied._")}
 
 ## Proposed Scope
 
@@ -1296,7 +1088,9 @@ def _run_preflight_command(
 
 
 def _run_candidate_preflights(project_root: Path, content: str) -> tuple[PreflightResult, ...]:
-    scratch_root = project_root / ".gtkb-state" / "proposal-filing-preflight"
+    # WI-7326 defect 6: ``.gtkb-state`` is a forbidden directory. Candidate-preflight
+    # scratch belongs in the canonical in-root scratchpad, in a session-scoped subdirectory.
+    scratch_root = project_root / "scratchpad" / _session_scratch_dirname() / "proposal-filing-preflight"
     scratch_root.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="candidate-", dir=scratch_root) as tmp:
         content_file = Path(tmp) / "proposal.md"
@@ -1375,6 +1169,9 @@ def file_implementation_proposal(
             recovery="Restart proposal filing from a fresh snapshot; do not reuse the stale authorization decision.",
         )
         raise ProposalFilingError("Authorization inputs changed before bridge filing", decision=denied)
+    # WI-7326 defect 5: evaluate the same gate the writer evaluates, on both paths, so a
+    # dry-run verdict and a write verdict cannot disagree for identical inputs.
+    preflight_results.append(_run_compliance_gate(project_root, request.slug, content))
     if request.dry_run:
         return FilingResult(
             bridge_path=None,

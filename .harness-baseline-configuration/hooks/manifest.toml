@@ -45,13 +45,6 @@ blocking = true
 [[hook]]
 event = "pre_tool_use"
 intents = ["file_write", "shell_exec"]
-script = "formal-artifact-approval-gate.py"
-blocking = true
-timeout_seconds = 5
-
-[[hook]]
-event = "pre_tool_use"
-intents = ["file_write", "shell_exec"]
 script = "document_author_provenance_gate.py"
 blocking = true
 timeout_seconds = 5
@@ -131,13 +124,6 @@ timeout_seconds = 5
 [[hook]]
 event = "pre_tool_use"
 intents = ["file_write", "shell_exec"]
-script = "narrative-artifact-approval-gate.py"
-blocking = true
-timeout_seconds = 5
-
-[[hook]]
-event = "pre_tool_use"
-intents = ["file_write", "shell_exec"]
 script = "code-quality-baseline-proposal-check.py"
 blocking = true
 timeout_seconds = 5
@@ -206,8 +192,10 @@ timeout_seconds = 10
 
 # Must run first among prompt_submit hooks: it writes the session-init binding
 # that later gates (work-intent claim, implementation-start packet, verdict
-# filing) resolve. Hook transport is non-blocking, but a recognized exact init
-# that cannot bind emits a visible failure instead of reporting success
+# filing) resolve. Hook transport is non-blocking, but neither a recognized
+# exact init that cannot bind nor a near-canonical init that binds nothing
+# reports success: both emit a visible message, so a session never proceeds
+# believing it declared a role it does not hold
 # (WI-6499 / owner-authorized emergency repair 2026-08-16).
 [[hook]]
 event = "prompt_submit"
@@ -240,14 +228,6 @@ event = "prompt_submit"
 intents = ["all"]
 script = "gov09-capture.py"
 blocking = false
-
-[[hook]]
-event = "prompt_submit"
-intents = ["all"]
-script = "owner-decision-tracker.py"
-args = ["--mode", "user-prompt-submit"]
-blocking = false
-timeout_seconds = 5
 
 [[hook]]
 event = "prompt_submit"

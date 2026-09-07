@@ -21,8 +21,6 @@ decision logic is reviewed and tested on its own (the same split used for ``brid
 
 from __future__ import annotations
 
-import datetime as _dt
-import hashlib
 import json
 import os
 import sys
@@ -122,27 +120,6 @@ def gate_decision(tool_name: str, target_path: str, *, bypass: bool = False) -> 
     return GateDecision(block=True, protected_class=protected_class, reason=reason)
 
 
-def _record_gate_denial(pattern_id: str, subject: str, reason: str) -> None:
-    """Append a denial/bypass record to the gate-denials JSONL (best-effort, never raises)."""
-    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl"))
-    if not path.is_absolute():
-        path = PROJECT_ROOT / path
-    record = {
-        "schema_version": 1,
-        "timestamp_utc": _dt.datetime.now(tz=_dt.UTC).isoformat().replace("+00:00", "Z"),
-        "gate": "dispatch-blackbox-gate",
-        "pattern_id": pattern_id,
-        "command_hash": hashlib.sha256(subject.encode("utf-8")).hexdigest(),
-        "reason": reason,
-    }
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(record, sort_keys=True) + "\n")
-    except OSError:
-        pass
-
-
 def _read_payload() -> dict:
     try:
         raw = sys.stdin.read()
@@ -228,16 +205,8 @@ def main() -> int:
         )
         return 0
 
-    if decision.bypass_audited:
-        _record_gate_denial(
-            "dispatch-blackbox-bypass",
-            json.dumps(payload, sort_keys=True),
-            f"OWNER BYPASS (GTKB_DISPATCH_BLACKBOX_BYPASS=1): {tool_name} to {decision.protected_class} allowed",
-        )
-
     if decision.block:
         reason = decision.reason or "BLOCKED (GTKB-DISPATCH-BLACKBOX-GATE)"
-        _record_gate_denial("dispatch-blackbox-protected-write", json.dumps(payload, sort_keys=True), reason)
         print(
             json.dumps(
                 {

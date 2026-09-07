@@ -61,7 +61,7 @@ def test_attestation_metadata_carries_the_attested_role(bound_root):
     metadata = verdict_filing._metadata_from_attestation(context, root, CONTENT)
     assert metadata["author_identity"].startswith("prime-builder/")
     assert metadata["author_session_context_id"] == context
-    assert metadata["author_session_envelope_id"].startswith("SENV-")
+    assert "author_session_envelope_id" not in metadata
 
 
 def test_attestation_metadata_persists_the_evidence_reference(bound_root):
@@ -102,10 +102,9 @@ def test_model_fields_omitted_when_the_artifact_declares_none(bound_root):
     assert "author_model" not in metadata
 
 
-def test_unbound_context_fails_closed_without_legacy_fallback(bound_root):
+def test_unbound_context_returns_no_attestation_for_ordered_migration_fallback(bound_root):
     root, _context = bound_root
-    with pytest.raises(verdict_filing.VerdictFilingError, match="session-init binding exists"):
-        verdict_filing._metadata_from_attestation("not-a-bound-context", root, CONTENT)
+    assert verdict_filing._metadata_from_attestation("not-a-bound-context", root, CONTENT) is None
 
 
 def test_bound_context_with_unresolvable_role_raises_rather_than_falling_through(

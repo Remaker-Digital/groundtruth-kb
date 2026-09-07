@@ -12,7 +12,6 @@ alongside the pre-existing aliases, classifies candidate write targets as
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import queue
@@ -110,13 +109,11 @@ LIFECYCLE_GUARD_RELATIVE_PATH = Path(".claude") / "hooks" / ".session-lifecycle-
 STARTUP_REPORT_RELATIVE_PATH = Path("docs") / "gtkb-dashboard" / "session-startup-report.md"
 DEFAULT_DASHBOARD_PREFERENCES_PATH = GTKB_HARNESS_STATE_ROOT / "codex" / "session-startup-preferences.json"
 STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS = 30 * 60
-STARTUP_RELAY_CACHE_MAX_AGE_SECONDS = STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS
-STARTUP_RELAY_CACHE_FUTURE_SKEW_SECONDS = 5 * 60
 _STARTUP_INPUT_CONTENT_STATE_FIELDS = frozenset({"startup_prompt_preview"})
 # Local startup-report rendering can exceed two seconds while remaining well
 # within the interactive hook budget. Keep this bounded and overrideable for
 # fail-visible timeout coverage.
-STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS = 5.0
+STARTUP_RELAY_RENDER_TIMEOUT_SECONDS = 5.0
 # WI-5083: SessionStart 'source' values that mark a mid-session continuation
 # (resume/compact). A startup-input gate armed under one of these is never a
 # legitimate fresh-start relay window. Duplicated (not imported) in
@@ -261,12 +258,16 @@ CURRENT_REPO_BRIDGE_OR_GOVERNANCE_PREFIXES = (
     # application product. classify_root matches governance prefixes BEFORE
     # the blanket ``config/`` APPLICATION_PREFIXES entry, so carving these out
     # lets GT-KB-subject sessions edit platform config (dispatcher rules,
-    # governance preflight configs, SoT registry, agent-control config, etc.).
+    # governance preflight configs, SoT registry, agent-control config, hook
+    # implementations, etc.).
     # Any ``config/<other>`` path still falls through to application_product.
     "config/agent-control/",
     "config/dispatcher/",
+    "config/dispatcher-next/",
+    "config/file-reference-migration/",
     "config/governance/",
     "config/harness-parity/",
+    "config/hooks/",
     "config/membase-dump/",
     "config/project-templates/",
     "config/registry/",
@@ -1563,66 +1564,21 @@ def _startup_diagnostic_dir(project_root: Path | None = None) -> Path:
     return root / ".codex" / "gtkb-hooks"
 
 
-STARTUP_RELAY_CACHE_NAME = "last-user-visible-startup.md"
-STARTUP_RELAY_META_NAME = "last-user-visible-startup.meta.json"
-_STARTUP_CACHE_READ_COMMAND_RE = re.compile(
-    r"^\s*Get-Content\s+"
-    r"(?:(?:-Raw\s+)?-LiteralPath\s+(?P<path_a>'[^']+'|\"[^\"]+\"|[^\s]+)(?:\s+-Raw)?"
-    r"|-LiteralPath\s+(?P<path_b>'[^']+'|\"[^\"]+\"|[^\s]+)\s+-Raw"
-    r"|-Raw\s+(?P<path_c>'[^']+'|\"[^\"]+\"|[^\s]+))"
-    r"\s*$",
-    re.IGNORECASE,
-)
-_STARTUP_CACHE_READ_FORBIDDEN_TOKENS = (";", "|", "&", ">", "<", "`", "$(")
-
-
-def _startup_relay_cache_paths(root: Path, role_mode: str | None = None) -> tuple[Path, Path]:
-    """Harness-scoped startup-disclosure relay cache file and metadata sidecar.
-
-    The cache is harness-scoped (under the active harness's hooks directory),
-    so a Loyal Opposition session never reads a Prime Builder disclosure and
-    vice versa.
-    """
-    diag = _startup_diagnostic_dir(root)
-    if role_mode in {"pb", "lo"}:
-        return (
-            diag / f"last-user-visible-startup-{role_mode}.md",
-            diag / f"last-user-visible-startup-{role_mode}.meta.json",
-        )
-    return (diag / STARTUP_RELAY_CACHE_NAME, diag / STARTUP_RELAY_META_NAME)
-
-
-def _startup_relay_cache_fresh(meta: dict[str, Any], project_root: Path) -> bool:
-    """Return true when relay cache metadata belongs to the active startup gate."""
-
-    generated_at = _parse_iso8601(meta.get("generated_at"))
-    if generated_at is None:
-        return False
-    state = _read_lifecycle_guard(project_root)
-    reference_at = _parse_iso8601(state.get("startup_prompt_discarded_at") or state.get("armed_at"))
-    if reference_at is None:
-        reference_at = datetime.now(UTC)
-    age_seconds = (reference_at - generated_at).total_seconds()
-    if age_seconds > STARTUP_RELAY_CACHE_MAX_AGE_SECONDS:
-        return False
-    return -age_seconds <= STARTUP_RELAY_CACHE_FUTURE_SKEW_SECONDS
-
-
-def _startup_relay_refresh_timeout_seconds() -> float:
-    raw_value = os.environ.get("GTKB_STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS")
+def _startup_relay_render_timeout_seconds() -> float:
+    raw_value = os.environ.get("GTKB_STARTUP_RELAY_RENDER_TIMEOUT_SECONDS")
     if raw_value is None:
-        return STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS
+        return STARTUP_RELAY_RENDER_TIMEOUT_SECONDS
     try:
         value = float(raw_value)
     except ValueError:
-        return STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS
-    return max(0.01, min(value, STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS))
+        return STARTUP_RELAY_RENDER_TIMEOUT_SECONDS
+    return max(0.01, min(value, STARTUP_RELAY_RENDER_TIMEOUT_SECONDS))
 
 
-STARTUP_RELAY_REFRESH_DIAGNOSTIC_NAME = "startup-relay-refresh.jsonl"
+STARTUP_RELAY_RENDER_DIAGNOSTIC_NAME = "startup-relay-render.jsonl"
 
 
-def _record_startup_relay_refresh(
+def _record_startup_relay_render(
     root: Path,
     *,
     outcome: str,
@@ -1630,7 +1586,7 @@ def _record_startup_relay_refresh(
     budget_seconds: float,
     role_mode: str | None,
 ) -> None:
-    """Append a fail-soft diagnostic record for one bounded relay-refresh attempt.
+    """Append a fail-soft diagnostic record for one bounded disclosure render.
 
     Records the outcome (``completed`` / ``timeout_abandoned`` / ``error``), the
     measured wall-clock duration, the budget in force, and the role mode to the
@@ -1648,194 +1604,104 @@ def _record_startup_relay_refresh(
         }
         diag = _startup_diagnostic_dir(root)
         diag.mkdir(parents=True, exist_ok=True)
-        with (diag / STARTUP_RELAY_REFRESH_DIAGNOSTIC_NAME).open("a", encoding="utf-8") as handle:
+        with (diag / STARTUP_RELAY_RENDER_DIAGNOSTIC_NAME).open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record) + "\n")
     except Exception:  # noqa: BLE001 - fail-soft: diagnostic write must never break the hook.
         pass
 
 
-def _refresh_startup_relay_cache_bounded(root: Path, *, role_mode: str | None, meta: dict[str, Any]) -> bool:
-    """Best-effort stale relay-cache refresh, bounded for UserPromptSubmit hooks."""
+def _render_startup_disclosure_bounded(root: Path, *, role_mode: str | None) -> str | None:
+    """Render the owner-visible startup disclosure now, bounded for hook use.
 
-    result_queue: queue.Queue[bool] = queue.Queue(maxsize=1)
+    WI-7318: the disclosure was previously served from a harness-scoped cache
+    file that this function refreshed when it went stale. Caching a startup
+    disclosure contradicts the real-time generation mandate, so there is no
+    cache and nothing to refresh: every relay renders from live sources.
+
+    The time bound is retained because rendering is the slow step and this runs
+    inside a UserPromptSubmit hook. An overrun must fail closed with a
+    diagnostic rather than hang the session.
+    """
+
+    result_queue: queue.Queue[str | None] = queue.Queue(maxsize=1)
     cancel = threading.Event()
 
-    def _refresh() -> None:
+    def _render() -> None:
         try:
             try:
                 from scripts import session_start_dispatch_core as _core
             except ImportError:
                 import session_start_dispatch_core as _core
             _core.HARNESS_NAME = _resolved_harness_name() or "codex"
-            _core.OUT_DIR = _startup_diagnostic_dir(root)
-            role_mode_to_use = role_mode or meta.get("role_mode") or "pb"
-            role_profile = _core._MODE_TO_ROLE_PROFILE.get(role_mode_to_use)
+            role_profile = _core._MODE_TO_ROLE_PROFILE.get(role_mode or "pb")
             if not role_profile:
-                result_queue.put(False)
+                result_queue.put(None)
                 return
             report = _core._render_role_startup_report(role_profile)
-            if not report or cancel.is_set():
-                result_queue.put(False)
-                return
-            _core._write_startup_relay_cache(report, role_mode=role_mode)
-            result_queue.put(True)
+            result_queue.put(None if cancel.is_set() or not report else report)
         except Exception:
             try:
-                result_queue.put(False)
+                result_queue.put(None)
             except queue.Full:
                 pass
 
-    budget_seconds = _startup_relay_refresh_timeout_seconds()
-    effective_role_mode = role_mode if role_mode is not None else meta.get("role_mode")
-    worker = threading.Thread(target=_refresh, name="gtkb-startup-relay-refresh", daemon=True)
+    budget_seconds = _startup_relay_render_timeout_seconds()
+    worker = threading.Thread(target=_render, name="gtkb-startup-relay-render", daemon=True)
     started_at = time.monotonic()
     worker.start()
     worker.join(budget_seconds)
     if worker.is_alive():
         cancel.set()
-        _record_startup_relay_refresh(
+        _record_startup_relay_render(
             root,
             outcome="timeout_abandoned",
             elapsed_seconds=time.monotonic() - started_at,
             budget_seconds=budget_seconds,
-            role_mode=effective_role_mode,
+            role_mode=role_mode,
         )
-        return False
+        return None
     elapsed_seconds = time.monotonic() - started_at
     try:
-        refreshed = result_queue.get_nowait()
+        report = result_queue.get_nowait()
     except queue.Empty:
-        _record_startup_relay_refresh(
-            root,
-            outcome="error",
-            elapsed_seconds=elapsed_seconds,
-            budget_seconds=budget_seconds,
-            role_mode=effective_role_mode,
-        )
-        return False
-    _record_startup_relay_refresh(
+        report = None
+    _record_startup_relay_render(
         root,
-        outcome="completed" if refreshed else "error",
+        outcome="completed" if report else "error",
         elapsed_seconds=elapsed_seconds,
         budget_seconds=budget_seconds,
-        role_mode=effective_role_mode,
+        role_mode=role_mode,
     )
-    return refreshed
+    return report
 
 
-def _allowed_startup_relay_cache_reads(root: Path) -> set[Path]:
-    allowed: set[Path] = set()
-    for role_mode in (None, "pb", "lo"):
-        cache_path, _meta_path = _startup_relay_cache_paths(root, role_mode)
-        allowed.add(cache_path.resolve())
-    return allowed
+def _startup_disclosure(project_root: Path | None = None, *, role_mode: str | None = None) -> dict[str, Any] | None:
+    """Render the owner-visible startup disclosure from live sources.
 
+    WI-7318: this previously read a harness-scoped cache file plus a metadata
+    sidecar, then validated sha256, byte length, harness identity, role and
+    freshness before relaying, and self-healed a stale cache in-band. None of
+    that has a subject once the disclosure is generated per invocation: there
+    is no stored copy that can drift from its metadata and no age to measure.
 
-def _candidate_startup_cache_read_path(raw_path: str, root: Path) -> Path | None:
-    path_text = raw_path.strip().strip("'\"")
-    if not path_text:
-        return None
-    candidate = Path(path_text)
-    if not candidate.is_absolute():
-        candidate = root / candidate
-    return candidate.resolve()
-
-
-def _is_startup_relay_cache_read(payload: dict[str, Any], project_root: Path | None = None) -> bool:
-    """Allow the one read needed to relay an init-keyword startup disclosure."""
-
-    tool_name = str(payload.get("tool_name") or "")
-    if tool_name not in {"Bash", "shell_command"}:
-        return False
-    tool_input = payload.get("tool_input") or {}
-    if not isinstance(tool_input, dict):
-        return False
-    command = str(tool_input.get("command") or "")
-    if not command.strip():
-        return False
-    if any(token in command for token in _STARTUP_CACHE_READ_FORBIDDEN_TOKENS):
-        return False
-    match = _STARTUP_CACHE_READ_COMMAND_RE.match(command)
-    if match is None:
-        return False
-    raw_path = match.group("path_a") or match.group("path_b") or match.group("path_c")
-    if raw_path is None:
-        return False
-    root = (project_root or _project_root_from_env()).resolve()
-    candidate = _candidate_startup_cache_read_path(raw_path, root)
-    return candidate in _allowed_startup_relay_cache_reads(root)
-
-
-def _startup_relay_pointer(project_root: Path | None = None, *, role_mode: str | None = None) -> dict[str, Any] | None:
-    """Read the harness-scoped startup-disclosure relay cache and metadata.
-
-    Returns a bounded pointer dict, or None when the cache file or its
-    metadata sidecar is missing, empty, or malformed. The relay path consults
-    only this harness-scoped cache: bridge auto-dispatch SessionStart payloads
-    never populate it, and the shared dashboard report is not a fallback.
+    Returns the rendered disclosure body, or None when rendering fails, exceeds
+    its budget, or does not produce a startup-disclosure-shaped document.
     """
     root = (project_root or _project_root_from_env()).resolve()
-    cache_path, meta_path = _startup_relay_cache_paths(root, role_mode)
-    try:
-        body = cache_path.read_text(encoding="utf-8")
-    except OSError:
+    report = _render_startup_disclosure_bounded(root, role_mode=role_mode)
+    if not report or not report.strip():
         return None
-    if not body.strip():
+    marker = "## User-Visible Startup Message"
+    body = report.split(marker, 1)[1].strip() if marker in report else report.strip()
+    if not body:
         return None
-    try:
-        meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    if "# GroundTruth-KB Fresh Session Startup" not in body or "## Startup Disclosure" not in body:
         return None
-    if not isinstance(meta, dict):
-        return None
-    actual_bytes = body.encode("utf-8")
-    actual_sha = hashlib.sha256(actual_bytes).hexdigest()
-    harness_ok = meta.get("harness_name") in (None, _resolved_harness_name())
-    harness_id = _resolved_harness_id(root)
-    harness_id_ok = meta.get("harness_id") in (None, harness_id)
-    role_ok = role_mode is None or meta.get("role_mode") == role_mode
-    disclosure_ok = "# GroundTruth-KB Fresh Session Startup" in body and "## Startup Disclosure" in body
-    relay_identity_ok = harness_ok and harness_id_ok and role_ok and disclosure_ok
-    content_matches_meta = meta.get("sha256") == actual_sha and meta.get("byte_length") == len(actual_bytes)
-    consistent_except_freshness = relay_identity_ok and content_matches_meta
-    freshness_ok = _startup_relay_cache_fresh(meta, root)
-    headless_dispatch = bool(os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID"))
-    recoverable_content_drift = relay_identity_ok and not content_matches_meta
-
-    if relay_identity_ok and (not freshness_ok or recoverable_content_drift) and not headless_dispatch:
-        refreshed = _refresh_startup_relay_cache_bounded(root, role_mode=role_mode, meta=meta)
-        if refreshed:
-            try:
-                body = cache_path.read_text(encoding="utf-8")
-                meta = json.loads(meta_path.read_text(encoding="utf-8"))
-                actual_bytes = body.encode("utf-8")
-                actual_sha = hashlib.sha256(actual_bytes).hexdigest()
-                harness_ok = meta.get("harness_name") in (None, _resolved_harness_name())
-                harness_id_ok = meta.get("harness_id") in (None, harness_id)
-                role_ok = role_mode is None or meta.get("role_mode") == role_mode
-                disclosure_ok = "# GroundTruth-KB Fresh Session Startup" in body and "## Startup Disclosure" in body
-                relay_identity_ok = harness_ok and harness_id_ok and role_ok and disclosure_ok
-                content_matches_meta = meta.get("sha256") == actual_sha and meta.get("byte_length") == len(actual_bytes)
-                consistent_except_freshness = relay_identity_ok and content_matches_meta
-                freshness_ok = _startup_relay_cache_fresh(meta, root)
-            except (OSError, json.JSONDecodeError):
-                pass
-
-    consistent = consistent_except_freshness and freshness_ok
-    try:
-        rel_path = cache_path.relative_to(root).as_posix()
-    except ValueError:
-        rel_path = cache_path.as_posix()
     return {
-        "cache_path": rel_path,
-        "byte_length": len(actual_bytes),
-        "sha256": actual_sha,
-        "harness_id": meta.get("harness_id"),
-        "role_mode": meta.get("role_mode"),
-        "generated_at": meta.get("generated_at"),
-        "fresh": freshness_ok,
-        "consistent_except_freshness": consistent_except_freshness,
-        "consistent": consistent,
+        "body": body,
+        "byte_length": len(body.encode("utf-8")),
+        "role_mode": role_mode,
+        "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
 
@@ -1879,21 +1745,21 @@ def _startup_gate_action_guard(role_mode: str | None) -> str:
 def _startup_gate_followup_instruction(role_mode: str | None, init_mode: str | None) -> str:
     if role_mode == "lo" and init_mode == "advisory":
         return (
-            "After relaying the cached disclosure, continue only with the harness-only Loyal Opposition "
+            "After relaying the disclosure, continue only with the harness-only Loyal Opposition "
             "advisory startup action: read current TAFE/dispatcher bridge state and status-bearing versioned "
             "files under `bridge/`, report the live scan result, and ask Mike whether to switch to "
             "auto-process. Do not write verdict files or auto-process bridge entries in advisory mode."
         )
     if role_mode == "lo":
         return (
-            "After relaying the cached disclosure, continue with the harness-only Loyal Opposition startup "
+            "After relaying the disclosure, continue with the harness-only Loyal Opposition startup "
             "action: read current TAFE/dispatcher bridge state and status-bearing versioned files under "
             "`bridge/`, report the live scan result, and process actionable latest `NEW` / `REVISED` bridge "
             "entries oldest-to-newest by default. Do not stop after disclosure relay when the bridge startup "
             "action is still pending."
         )
     return (
-        "After relaying the cached disclosure, stop and wait for the next owner message. Prime Builder startup "
+        "After relaying the disclosure, stop and wait for the next owner message. Prime Builder startup "
         "must not choose, map, or begin session work until Mike supplies focus or an unambiguous concrete task."
     )
 
@@ -1903,10 +1769,9 @@ def _startup_gate_message(role_mode: str | None = None, *, init_mode: str | None
         "GTKB STARTUP INPUT GATE (init-keyword match): the prompt matched the "
         "GroundTruth-KB init keyword, so the startup-disclosure relay path is active. "
         f"{_startup_gate_action_guard(role_mode)} "
-        "The owner-visible startup disclosure is NOT inlined in this payload; it is held in a harness-scoped "
-        "cache file so this payload stays bounded. If the startup disclosure is not already fully present in "
-        "model context, perform exactly one read-only filesystem read of the cache file named below, then relay "
-        "its content verbatim as the owner-visible startup disclosure. "
+        "The owner-visible startup disclosure was generated for this turn and is inlined below. Relay it "
+        "verbatim as the owner-visible startup disclosure; do not summarize, paraphrase, shorten, reorder or "
+        "omit it, and do not read it from any file. "
         f"{_startup_gate_followup_instruction(role_mode, init_mode)} "
         "Do not replace the disclosure with a short acknowledgement."
     )
@@ -1929,13 +1794,19 @@ def _startup_gate_response(
     role_mode: str | None = None,
     init_mode: str | None = None,
 ) -> tuple[dict[str, Any], bool]:
-    """Build the relay response and report whether its disclosure source validated."""
-    pointer = _startup_relay_pointer(project_root, role_mode=role_mode)
-    if pointer is None and role_mode is not None:
-        pointer = _startup_relay_pointer(project_root, role_mode=None)
-    if pointer is None:
+    """Build the relay response and report whether its disclosure rendered.
+
+    WI-7318: the disclosure is now generated for this turn and inlined here.
+    There is no cache file to point at and no separate read for the agent to
+    perform, so the relay cannot present a stale or wrong-role document.
+    """
+    disclosure = _startup_disclosure(project_root, role_mode=role_mode)
+    if disclosure is None and role_mode is not None:
+        disclosure = _startup_disclosure(project_root, role_mode=None)
+    if disclosure is None:
         diagnostic = _startup_relay_failure_context(
-            "the cache file or its metadata sidecar is missing, empty, or malformed"
+            "the disclosure could not be rendered within its budget, or the rendered "
+            "document was not startup-disclosure shaped"
         )
         return (
             {
@@ -1947,46 +1818,20 @@ def _startup_gate_response(
             },
             False,
         )
-    message = _startup_gate_message(role_mode or pointer.get("role_mode"), init_mode=init_mode)
-    if not pointer["consistent"]:
-        if pointer.get("consistent_except_freshness"):
-            diagnostic = _startup_relay_failure_context(
-                f"cache file {pointer['cache_path']} is identity-intact and content-consistent with its "
-                f"metadata sidecar but STALE: its generated-at timestamp is older than the "
-                f"{STARTUP_RELAY_CACHE_MAX_AGE_SECONDS}s freshness TTL, and the bounded self-heal refresh was "
-                f"abandoned after its {_startup_relay_refresh_timeout_seconds():g}s budget. The disclosure is "
-                "well-formed but simply too old to relay"
-            )
-        else:
-            diagnostic = _startup_relay_failure_context(
-                f"cache file {pointer['cache_path']} does not match its metadata sidecar "
-                "(sha256, byte-length, harness id, role, freshness, or startup-disclosure shape mismatch); "
-                "it may be stale, wrong-role, or displaced by a non-disclosure payload"
-            )
-        return (
-            {
-                "systemMessage": diagnostic,
-                "hookSpecificOutput": {
-                    "hookEventName": "UserPromptSubmit",
-                    "additionalContext": diagnostic,
-                },
-            },
-            False,
-        )
-    pointer_block = (
-        "\n\n## Startup Disclosure Relay Source\n\n"
-        f"- cache file: {pointer['cache_path']}\n"
-        f"- byte length: {pointer['byte_length']}\n"
-        f"- sha256: {pointer['sha256']}\n\n"
-        "Read that cache file once (a single read-only filesystem read), then "
-        "relay its full content verbatim as the owner-visible startup disclosure."
+    message = _startup_gate_message(role_mode or disclosure.get("role_mode"), init_mode=init_mode)
+    disclosure_block = (
+        "\n\n## Startup Disclosure (generated for this turn)\n\n"
+        f"- generated at: {disclosure['generated_at']}\n"
+        f"- byte length: {disclosure['byte_length']}\n\n"
+        "Relay the content below verbatim as the owner-visible startup disclosure.\n\n"
+        f"{disclosure['body']}"
     )
     return (
         {
             "systemMessage": message,
             "hookSpecificOutput": {
                 "hookEventName": "UserPromptSubmit",
-                "additionalContext": f"{message}{pointer_block}",
+                "additionalContext": f"{message}{disclosure_block}",
             },
         },
         True,
@@ -2283,6 +2128,44 @@ def classify_path(path_text: str, project_root: Path | None = None) -> str:
     return "neutral"
 
 
+def _known_path_mentioned(known_path: str, normalized_command: str) -> bool:
+    """Return True when ``known_path`` appears at a path-segment boundary.
+
+    WI-6556. The prior implementation used a bare substring test
+    (``known_path.rstrip("/") in normalized_command``), which matches a known
+    prefix anywhere in the raw command text — including inside an unrelated
+    word. The prefix ``config/`` therefore matched
+    ``.harness-baseline-configuration/rules/...`` because the *word*
+    ``configuration`` contains ``config``, and a read-only ``ls`` of a
+    GT-KB baseline path was refused as an application-product write.
+
+    Matching is anchored on both sides instead:
+
+    * the segment must start at the beginning of the command, or immediately
+      after a character that cannot be part of a path segment — whitespace, a
+      quote, ``=``, ``(``, ``:``, ``;``, ``|``, ``&``, or ``,``;
+    * it must end at a ``/`` for directory prefixes, or at a
+      non-path character for exact file names.
+
+    This keeps every genuine mention (``bridge/x.md``, ``./config/y``,
+    ``"config/z"``) while rejecting the substring collisions that produced the
+    recurring false-positive family this work item exists to close.
+    """
+
+    stem = known_path.rstrip("/")
+    if not stem:
+        return False
+    is_directory_prefix = known_path.endswith("/")
+    boundary_before = r"(?:^|(?<=[\s'\"=(:;|&,]))"
+    if is_directory_prefix:
+        # A directory prefix is only a real mention when a path separator follows.
+        pattern = rf"{boundary_before}\.?/?{re.escape(stem)}/"
+    else:
+        # An exact file name must not be a prefix of a longer path segment.
+        pattern = rf"{boundary_before}\.?/?{re.escape(stem)}(?![^\s'\"=(:;|&,])"
+    return re.search(pattern, normalized_command) is not None
+
+
 def _path_mentions_from_command(command: str) -> list[str]:
     """Extract path-like mentions from a mutating shell command.
 
@@ -2303,7 +2186,7 @@ def _path_mentions_from_command(command: str) -> list[str]:
     )
     normalized_command = command.replace("\\", "/")
     for path in known_paths:
-        if path.rstrip("/") in normalized_command:
+        if _known_path_mentioned(path, normalized_command):
             mentions.append(path)
     for raw_token in re.split(r"\s+", normalized_command):
         token = raw_token.strip(" '\"`;,")
@@ -2389,9 +2272,9 @@ def guard_tool_use(
     * ``gtkb_infrastructure`` subject blocks ``application_product`` targets.
     """
 
-    if _startup_response_pending(
-        project_root, caller_session_id=payload.get("session_id")
-    ) and not _is_startup_relay_cache_read(payload, project_root):
+    # WI-7318: the disclosure is inlined in the relay payload, so there is no
+    # cache file for the agent to read and no read to carve out of this gate.
+    if _startup_response_pending(project_root, caller_session_id=payload.get("session_id")):
         return {
             "decision": "block",
             "reason": (

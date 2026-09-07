@@ -16,7 +16,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from groundtruth_kb.bridge.disposition import LOYAL_OPPOSITION_ACTIONABLE_STATUSES
+from groundtruth_kb.bridge.disposition import LOYAL_OPPOSITION_ACTIONABLE_STATUSES, PRIME_ACTIONABLE_STATUSES
+from groundtruth_kb.bridge.notify import resolve_thread_actionability_annotations
 from groundtruth_kb.harness_projection import read_roles
 from groundtruth_kb.project.registry_control_plane import (
     RegistryPaths,
@@ -43,6 +44,8 @@ def build_state_report(project_root: Path) -> dict[str, Any]:
         "harnesses": _harness_section(root),
         "source_authority": {
             "bridge": "status-bearing numbered bridge files via scripts/bridge_thread_files.py",
+            "work_item_annotations": "current_work_items in groundtruth.db (advisory; never suppressive)",
+            "git_terminality": "exact singleton Work-Item metadata in commits reachable from HEAD",
             "registry_publication": "registry_currentness scoped to bridge-versioned-files",
             "harnesses": "harness-state/harness-registry.json via groundtruth_kb.harness_projection.read_roles",
         },
@@ -60,6 +63,12 @@ def render_markdown(report: dict[str, Any]) -> str:
         ("TOTAL_THREADS", str(bridge["total_thread_count"])),
     ]
     bridge_rows.extend((row["status"], str(row["count"])) for row in bridge["status_mix"])
+    bridge_rows.append(
+        (
+            "PRIME_ACTIONABLE_LATEST_GO_NO_GO",
+            _actionable_summary(bridge["prime_actionable"]),
+        )
+    )
     bridge_rows.append(
         (
             "LO_ACTIONABLE_LATEST_NEW_REVISED_NO_ACTION",
@@ -160,6 +169,10 @@ def _registry_publication_section(root: Path) -> dict[str, Any]:
 def _bridge_section(root: Path) -> dict[str, Any]:
     helper = _load_bridge_thread_helper(root)
     index = helper.index_bridge_thread_files_archive_aware(root)
+    annotations = resolve_thread_actionability_annotations(
+        root,
+        {slug: tuple(item.path for item in reversed(files)) for slug, files in index.items() if files},
+    )
     status_counts: Counter[str] = Counter()
     threads: list[dict[str, Any]] = []
 
@@ -168,6 +181,7 @@ def _bridge_section(root: Path) -> dict[str, Any]:
             continue
         latest = files[-1]
         status = helper.status_from_bridge_file(latest.path) or "UNKNOWN"
+        annotation = annotations[slug]
         status_counts[status] += 1
         threads.append(
             {
@@ -176,13 +190,31 @@ def _bridge_section(root: Path) -> dict[str, Any]:
                 "latest_path": _relative_path(latest.path, root),
                 "latest_version": latest.version,
                 "version_count": len(files),
+                "work_item_id": annotation.work_item_id,
+                "work_item_stage": annotation.stage,
+                "work_item_resolution_status": annotation.resolution_status,
+                "work_item_status_detail": annotation.status_detail,
+                "git_terminality": annotation.git_terminality,
+                "terminal_commit": annotation.terminal_commit,
+                "terminality_diagnostic": annotation.terminality_diagnostic,
+                "suppressed_by_git_terminality": annotation.git_terminality == "confirmed",
             }
         )
 
-    lo_actionable = [row for row in threads if row["latest_status"] in LOYAL_OPPOSITION_ACTIONABLE_STATUSES]
+    prime_actionable = [
+        row
+        for row in threads
+        if row["latest_status"] in PRIME_ACTIONABLE_STATUSES and not row["suppressed_by_git_terminality"]
+    ]
+    lo_actionable = [
+        row
+        for row in threads
+        if row["latest_status"] in LOYAL_OPPOSITION_ACTIONABLE_STATUSES and not row["suppressed_by_git_terminality"]
+    ]
     return {
         "total_thread_count": len(threads),
         "status_mix": _status_mix(status_counts),
+        "prime_actionable": prime_actionable,
         "lo_actionable": lo_actionable,
         "threads": threads,
     }
@@ -319,7 +351,11 @@ def _actionable_summary(rows: list[dict[str, Any]]) -> str:
     if not rows:
         return "0: (none)"
     entries = [
-        f"{row['slug']} ({row['latest_status']} at {row['latest_path']})"
+        f"{row['slug']} ({row['latest_status']} at {row['latest_path']}; "
+        f"work_item={row.get('work_item_id') or '(unresolved)'}; "
+        f"state={row.get('work_item_stage') or '(unknown)'}/"
+        f"{row.get('work_item_resolution_status') or '(unknown)'}; "
+        f"git_terminality={row.get('git_terminality') or 'ambiguous'})"
         for row in sorted(rows, key=lambda item: str(item["slug"]))
     ]
     return f"{len(entries)}: " + "; ".join(entries)

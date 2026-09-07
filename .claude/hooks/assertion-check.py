@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """
-Claude Code SessionStart hook — Knowledge Database assertion check + quality dashboard + session handoff.
+SessionStart hook — Knowledge Database assertion check + quality dashboard + session handoff.
 
 Three responsibilities:
 1. Run feature assertions and return a summary (regression guard).
@@ -50,7 +56,7 @@ def _workspace_loyal_opposition_mode() -> bool:
 
 def _review_readonly_mode() -> bool:
     """Return True when the session should avoid mutating state."""
-    for name in ("LOYAL_OPPOSITION_READONLY", "CODEX_REVIEW_MODE"):
+    for name in ("LOYAL_OPPOSITION_READONLY", "GTKB_REVIEW_MODE"):
         parsed = _env_flag(name)
         if parsed is not None:
             return parsed

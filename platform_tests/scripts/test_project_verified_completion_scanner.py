@@ -11,6 +11,7 @@ dependency on the live repo is the script import path.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -573,8 +574,8 @@ def test_wi4737_two_sided_guard_rejects_unlinked_and_unverified(scanner, tmp_pat
     assert verified == set(), f"two-sided guard breached: {verified}"
 
 
-def test_member_completion_ignores_verified_draft_bridge_file(scanner, tmp_path):
-    """A noncanonical ``*-draft.md`` file must not satisfy VERIFIED evidence."""
+def test_member_completion_ignores_bridge_files_and_omits_bridge_fields(scanner, tmp_path):
+    """Member completion is canonical-state-only even with bridge-shaped inputs."""
     bridge = tmp_path / "bridge"
     bridge.mkdir(parents=True, exist_ok=True)
     (bridge / "gtkb-draft-thread-001.md").write_text("NEW\n\nWork Item: WI-1\n", encoding="utf-8")
@@ -597,7 +598,52 @@ def test_member_completion_ignores_verified_draft_bridge_file(scanner, tmp_path)
 
     result = scanner.member_completion_scan(tmp_path)[0]
 
-    assert result.completion_ready is False
-    assert result.non_verified_implements_bridge_threads == ["gtkb-draft-thread"]
-    assert result.unverified_bridge_work_item_ids == ["WI-1"]
-    assert "missing_verified_bridge_evidence" in result.exclusion_reasons
+    assert result.completion_ready is True
+    result_dict = result.as_dict()
+    for removed_field in (
+        "verified_bridge_evidence_required",
+        "verified_bridge_evidence_ready",
+        "non_verified_implements_bridge_threads",
+        "unverified_bridge_work_item_ids",
+    ):
+        assert removed_field not in result_dict
+    assert "missing_verified_bridge_evidence" not in result.exclusion_reasons
+    assert "non_verified_implements_bridge_threads" not in result.exclusion_reasons
+
+
+def test_member_completion_is_byte_identical_across_bridge_matrix(scanner, tmp_path):
+    """Absent, empty, NEW and VERIFIED bridge roots yield the same readiness bytes."""
+    encoded_results: list[bytes] = []
+    shapes = ("absent", "empty", "new", "verified")
+    for shape in shapes:
+        project_root = tmp_path / shape
+        project_root.mkdir()
+        db = KnowledgeDB(project_root / "groundtruth.db")
+        try:
+            db.insert_project("Matrix Project", "test", "seed", id="PROJECT-X", status="active")
+            db.insert_work_item("WI-1", "Member", "new", "backlog", "verified", "test", "seed")
+            db.link_project_work_item("PROJECT-X", "WI-1", "test", "seed")
+            db.add_project_artifact_link(
+                "PROJECT-X",
+                "bridge_thread",
+                "gtkb-matrix-thread",
+                "test",
+                "seed implements link",
+                relationship="implements",
+            )
+        finally:
+            db.close()
+
+        if shape != "absent":
+            bridge = project_root / "bridge"
+            bridge.mkdir()
+            if shape in {"new", "verified"}:
+                (bridge / "gtkb-matrix-thread-001.md").write_text(
+                    f"{shape.upper()}\n\nWork Item: WI-1\n",
+                    encoding="utf-8",
+                )
+
+        result = scanner.member_completion_scan(project_root)[0].as_dict()
+        encoded_results.append(json.dumps(result, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+
+    assert all(result == encoded_results[0] for result in encoded_results[1:])

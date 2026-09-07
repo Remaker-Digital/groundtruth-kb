@@ -49,6 +49,113 @@ _DETRITUS_CLASSES = frozenset(
         "stale_runtime_detritus",
     }
 )
+# Standing delete authorization is bounded to these two dispositions only, per
+# .harness-baseline-configuration/rules/prime-builder.md (WI-6743, Route B).
+# `unregistered` routes to receipted quarantine and `owner_gated` is the
+# fail-closed default; neither may be added here without a fresh owner decision.
+_STANDING_DELETE_AUTHORIZED = frozenset({"derived", "cached"})
+
+# WI-6743 F1. The governing rule states that code, tests, features and
+# specifications cannot satisfy the DERIVED or CACHED evidence conditions. The
+# classifier therefore hard-denies these classes on ``rel_path`` BEFORE any
+# evidence is weighed, so no combination of caller-supplied strings can
+# authorize deletion of a protected artifact. A false deny costs an owner
+# prompt; a false allow deletes protected source. The asymmetry is the reason
+# this list is deliberately broad.
+# Extensions that are unambiguously authored source in this repository. The
+# JS/TS family is deliberately ABSENT: bundlers legitimately emit ".js"/".ts"
+# as build output, which is the canonical DERIVED case this feature exists to
+# authorize. Denying by extension there would break the feature rather than
+# secure it, so JS/TS source is covered by the protected-tree rule below
+# instead of by suffix.
+_STANDING_DELETE_DENIED_SUFFIXES = frozenset(
+    {
+        ".bash",
+        ".c",
+        ".cc",
+        ".cfg",
+        ".cpp",
+        ".cs",
+        ".go",
+        ".h",
+        ".hpp",
+        ".ini",
+        ".java",
+        ".ps1",
+        ".psm1",
+        ".py",
+        ".pyi",
+        ".rb",
+        ".rs",
+        ".sh",
+        ".sql",
+        ".toml",
+    }
+)
+_STANDING_DELETE_DENIED_PARTS = frozenset(
+    {
+        ".harness-baseline-configuration",
+        "migrations",
+        "platform_tests",
+        "spec",
+        "specifications",
+        "specs",
+        "src",
+        "test",
+        "tests",
+    }
+)
+_STANDING_DELETE_DENIED_NAME_PREFIXES = (
+    "ADR-",
+    "DCL-",
+    "DELIB-",
+    "GOV-",
+    "PAUTH-",
+    "PB-",
+    "REQ-",
+    "SPEC-",
+    "WI-",
+)
+# Evidence is only trustworthy when a governed verifier issued it. Caller-
+# asserted generator/source-of-truth strings are inputs, not proof.
+_STANDING_DELETE_TRUSTED_EVIDENCE_SOURCES = frozenset(
+    {
+        "governed_regeneration_verifier",
+        "governed_sot_verifier",
+    }
+)
+
+
+def _standing_delete_protected_class(rel_path: str) -> str | None:
+    """Return the protected artifact class of ``rel_path``, or ``None``.
+
+    A non-``None`` result means the object may never receive an authorized
+    standing-delete disposition, regardless of the evidence supplied.
+    """
+    # ``removeprefix`` and not ``lstrip("./")``: lstrip strips any leading "."
+    # or "/" character, which silently converts ".claude/hooks/x" into
+    # "claude/hooks/x" and defeats every dot-prefixed protected path.
+    normalized = str(rel_path).replace("\\", "/").strip().removeprefix("./")
+    if not normalized:
+        return "unresolvable_path"
+    path = Path(normalized)
+    name = path.name
+
+    if name in _PROTECTED_EXACT:
+        return "protected_exact_artifact"
+    if normalized.startswith(_PROTECTED_PREFIXES):
+        return "protected_path_prefix"
+    if any(part in _STANDING_DELETE_DENIED_PARTS for part in path.parts):
+        return "protected_source_or_test_tree"
+    if path.suffix.lower() in _STANDING_DELETE_DENIED_SUFFIXES:
+        return "protected_code_or_config"
+    if name.startswith(_STANDING_DELETE_DENIED_NAME_PREFIXES):
+        return "protected_specification_or_governance"
+    if name.startswith("test_") or name.endswith(("_test.py", "_test.ts", "_test.go")):
+        return "protected_test"
+    return None
+
+
 _DIRECTORY_SOURCE_KINDS = frozenset({"worktree_directory"})
 _ROOT_DETRITUS_EXACT = frozenset(
     {
@@ -694,6 +801,158 @@ def _direct_detritus_class(rel_path: str, _state_prefix: str) -> str | None:
     if len(parts) == 2 and parts[0] == ".gtkb-state" and _is_state_detritus_name(parts[1]):
         return "stale_runtime_detritus"
     return None
+
+
+def classify_standing_delete(
+    *,
+    rel_path: str,
+    observed_digest: str | None = None,
+    generator: str | None = None,
+    regenerated_digest: str | None = None,
+    source_of_truth: str | None = None,
+    sot_digest: str | None = None,
+    registry_matches: list[str] | None = None,
+    evidence_source: str | None = None,
+) -> dict[str, Any]:
+    """Classify one object for standing delete authorization.
+
+    Implements the bounded relaxation in ``.harness-baseline-configuration/rules/
+    prime-builder.md`` section "Standing Delete Authorization - DERIVED and CACHED
+    Only" (WI-6743, Route B, ``DELIB-20260825183500``).
+
+    Returns a disposition dict carrying the class and the evidence that
+    established it. Dispositions:
+
+    ``derived``
+        A named generator exists AND regeneration reproduced the observed bytes.
+        Standing delete authorized.
+    ``cached``
+        A named source of truth exists AND the object corresponds to it at
+        digest level. Standing delete authorized.
+    ``unregistered``
+        Absent from the SoT registry. Routes to receipted quarantine; never a
+        direct delete.
+    ``owner_gated``
+        Everything else, including every case where class cannot be established
+        from evidence. The default.
+
+    Precedence: ``derived`` and ``cached`` are evaluated before ``unregistered``
+    because both require positive proof that the bytes are reproducible, which is
+    strictly stronger evidence than registry absence. An object that is both
+    registry-absent and demonstrably regenerable is ``derived``; registry absence
+    alone never upgrades a disposition.
+
+    The function performs no I/O and no deletion. It is a pure decision over
+    supplied evidence, so the decision is reproducible and testable independently
+    of the filesystem.
+    """
+    # WI-6743 F1, gate 1 of 2: protected artifact classes are denied on path
+    # alone, before any evidence is weighed. No supplied digest, generator or
+    # source-of-truth string can reach an authorized disposition from here.
+    protected_class = _standing_delete_protected_class(rel_path)
+    if protected_class is not None:
+        return _standing_delete_disposition(
+            rel_path,
+            "owner_gated",
+            "protected artifact class cannot satisfy the DERIVED or CACHED evidence conditions",
+            protected_class=protected_class,
+        )
+
+    # WI-6743 F1, gate 2 of 2: evidence must be attributed to a governed
+    # verifier. Caller-asserted strings are inputs, not proof, so an absent or
+    # unrecognized issuer can never establish a regenerable class.
+    evidence_trusted = evidence_source in _STANDING_DELETE_TRUSTED_EVIDENCE_SOURCES
+
+    if (
+        evidence_trusted
+        and generator
+        and regenerated_digest
+        and observed_digest
+        and regenerated_digest == observed_digest
+    ):
+        return _standing_delete_disposition(
+            rel_path,
+            "derived",
+            "named generator reproduced the observed bytes under governed verification",
+            generator=generator,
+            observed_digest=observed_digest,
+            regenerated_digest=regenerated_digest,
+            evidence_source=evidence_source,
+        )
+    if evidence_trusted and source_of_truth and sot_digest and observed_digest and sot_digest == observed_digest:
+        return _standing_delete_disposition(
+            rel_path,
+            "cached",
+            "object corresponds to a named source of truth at digest level under governed verification",
+            source_of_truth=source_of_truth,
+            observed_digest=observed_digest,
+            sot_digest=sot_digest,
+            evidence_source=evidence_source,
+        )
+    if not evidence_trusted and (generator or source_of_truth):
+        return _standing_delete_disposition(
+            rel_path,
+            "owner_gated",
+            "regenerability evidence was not issued by a governed verifier",
+            evidence_source=evidence_source,
+            registry_matches=list(registry_matches or []),
+        )
+    if not registry_matches:
+        return _standing_delete_disposition(
+            rel_path,
+            "unregistered",
+            "absent from the SoT registry; routes to receipted quarantine",
+        )
+    return _standing_delete_disposition(
+        rel_path,
+        "owner_gated",
+        "class could not be established from evidence",
+        registry_matches=list(registry_matches),
+    )
+
+
+def _standing_delete_disposition(
+    rel_path: str,
+    disposition: str,
+    reason: str,
+    **evidence: Any,
+) -> dict[str, Any]:
+    return {
+        "path": rel_path,
+        "disposition": disposition,
+        "standing_delete_authorized": disposition in _STANDING_DELETE_AUTHORIZED,
+        "reason": reason,
+        "evidence": dict(evidence),
+    }
+
+
+def standing_delete_audit_record(
+    disposition: dict[str, Any],
+    *,
+    action: str,
+    actor: str,
+    performed_at: datetime,
+) -> dict[str, Any]:
+    """Build the mandatory post-hoc audit record for a standing-delete action.
+
+    The governing rule makes this record mandatory: an action taken under the
+    standing authorization without a record naming the object and the evidence
+    for its class is a defect, not a permitted shortcut. The record therefore
+    carries the evidence verbatim rather than only the resulting class.
+    """
+    return {
+        "schema_version": _SCHEMA_VERSION,
+        "record_kind": "standing_delete_action",
+        "path": disposition["path"],
+        "disposition": disposition["disposition"],
+        "standing_delete_authorized": disposition["standing_delete_authorized"],
+        "reason": disposition["reason"],
+        "evidence": dict(disposition.get("evidence") or {}),
+        "action": action,
+        "actor": actor,
+        "performed_at": _iso(_as_utc(performed_at)),
+        "authority": "DELIB-20260825183500",
+    }
 
 
 def _scratch_class(rel_path: str) -> str | None:

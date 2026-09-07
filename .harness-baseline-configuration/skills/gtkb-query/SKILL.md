@@ -62,9 +62,6 @@ This pattern works on any workstation that has GT-KB checked out, without
 embedding a path literal. For pip-install scenarios (long-term direction),
 this becomes `from groundtruth_kb import KnowledgeDB`.
 
-## API Methods
-
-See `references/api-reference.md` for the complete Python API including: summary, specs (list/search/get/history/children), tests, work items, documents, procedures, assertions, test plans, testable elements, and write operations.
 
 ## Key Rules
 

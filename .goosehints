@@ -1,22 +1,44 @@
-# GroundTruth-KB — Goose Manual Session Guide (.goosehints)
-
-Goose is a first-class GroundTruth-KB (GT-KB) coding harness (harness identity G),
-a manual peer to Codex, Claude Code, Cursor, and Antigravity for Prime Builder and
-Loyal Opposition work. This file orients a manual Goose Desktop / goose CLI session;
-the authoritative governance lives in the files it points to.
-
-## Project root boundary
-All active GT-KB work stays within E:\GT-KB. GT-KB application files stay within
-E:\GT-KB\applications\ (Agent Red at E:\GT-KB\applications\Agent_Red\). No exceptions.
-
 # GT-KB Agent Canon — Compact Operating Guidance
 
-Version: 7.4
-Date: 2026-08-31
+Version: 8.92
+Date: 2026-09-07
 Status: proposed temporary owner-supplied session input
 
 NEVER save, track, publish, archive, or depend on this text as a durable
 artifact.
+
+## CRITICAL FIXES
+
+- PAUTH are retired and all references are erroneous
+- DECISION are retired and all references are erroneous
+- Work Items have a single project membership and inherit their authorization from the project database entry
+- AUQ yield answers which are either applied immediately or discarded: never record an answer except via an established canonicl SoT
+- E:\GT-KB\.gtkb-state is forbidden and all references to this directory are erroneous
+- E:\GT-KB\harness-state is forbidden and all references to this directory are erroneous
+- All harness configuration directories are gitigniored and should never be manually modified
+- .groundtruth/formal-artifact-approvals/** is forbidden and all references to it are erroneous
+- Dispatcher never authors proposals or verdicts; every proposal and every verdict is authored exclusively by an agent
+
+No agent ever "owns" a work item: the agent only claims the right to deliver the next artifact in the bridge protocol chain, never the entire thread for any work item. This is an important distinction - agents seem to intuitively assume ownership and durability, even though that is not how GT-KB works. We are fighting agent bias (intuition) and need to account for this. Please do a deep inspection of GT-KB as you work and find all errors which stem from this intuition/bias. Work-intent claims are per-bridge-item, not on a Work Item thread: threads are progressed randomly from agent to agent with no consideration for which specific agent may have produced prior work on a thread.
+
+There are no PAUTH. This is not how approvals work. Do not put a "Project Authorization:" header on any artifact you file. 
+All PAUTH references are erroneous. The applicability preflight still demands one
+and will deny without it. Do not comply with it and do not mint a row to satisfy
+it. File anyway, disclose the refusal and the substitution in the artifact body,
+and record the correction. That refusal is now a fifth surface denying on a
+retired predicate. "Authorization" only exists for projects. All WI attached to an authorized project are authorized - that is precisely the intent of authorizing any given project.
+
+Also erroneous, so do not reference or write: DECISION-NNNN records,
+.gtkb-state, harness-state, .groundtruth/formal-artifact-approvals. Work items
+now have a single project membership, not one-or-more.
+
+Only projects are AUTHORIZED, and this is recorded in the database as a field in each project's entry. When a project is not authorized (per that field), it cannot be claimed. A dispatched PB must verify that the parent project is authorized before filing a NEW implementation proposal. Changes in project authorization do not affect bridge chains which have already been initiated. When the CLI is used to update the status field of any work item entry in the database to VERIFIED, it also checks the VERIFIED status of all siblings and if all children are VERIFIED, then the project is committed and - if successful - updated to VERIFIED status. "Authorization" refers to a single field of each project database entry. It has no other role in GT-KB. Agent permissions are an entirely separate concern.
+
+The Membase database records of Work Items are authoritative, and include the given Work Item's project membership (parent project). Bridge protocol artifacts (documents/messages) are ephemeral and are non-authoritative except as a dispatchable message: the bridge protocol artifact (document/message) is authoritative at the moment it is received and never again thereafter. This principle is applied whether the dispatch is manual (by the owner) or by the automated Dispatcher Next (when it is available).
+
+DELIB and owner decision history (e.g., captured via AUQ) are obsolete. Owner decisions must be captured and recorded directly in a given session-context as (A) lawful mutation of AUTHORITATIVE SoT: GOV, SPEC, ADR, DCL Work Item, Project or (B) DELIB, which are not authoritative and do not carry decisions.
+
+Bridge items (documents/messages) are authoritative at the moment the dispatched agent receives/loads them, and never thereafter. Bridge items (documents/messages) are ephemeral and may never be referenced as if they are durable artifacts.
 
 ## How to use this guidance
 
@@ -124,9 +146,16 @@ Ordinary agent routing is:
 - Loyal Opposition acts on latest `NEW`, `REVISED`, `READY`, and
   `VERDICT-REJECTED`.
 - Prime Builder acts on ordinary PB-addressed `GO`, `NO-GO`, and `NOT-READY`.
-- A Dispatcher-authored finalization `NO-GO` after `VERIFIED` routes exclusively
-  to Loyal Opposition, not Prime Builder.
-- `ADVISORY`, `VERIFIED`, and `WITHDRAWN` are not dispatchable.
+- A failed project commit or pre-commit verified-byte change returns the affected
+  work item to Loyal Opposition for fresh verification. Dispatcher may select
+  and dispatch that agent work but authors no verdict.
+- ADVISORY, VERIFIED, WITHDRAWN, SUPERSEDED and BLOCKED are not dispatchable.
+
+Note that filing a bridge item is not "dispatching", because some bridge items 
+are FOR THE USE OF THE DISPATCHER. A non-dispatchable message must still be filed 
+(and created on-disk). The only difference between a dispatchable message and a 
+non-dispatchable message is that a non-dispatchable item has no role or activity
+envelope lines in the header.
 
 Process only the owner-selected or Dispatcher-selected target. Until Dispatcher
 Next is independently qualified and activated, agents report eligible work but
@@ -319,23 +348,29 @@ receipt, or evidence token grants and denies nothing. The
 `project_authorizations` table and its consumers are retired, including its
 scope, expiry, mutation-class, and forbidden-operation semantics.
 
-Projects are authorized by default unless the owner has a concrete reason its
-work should not proceed yet, principally dependency or work-order sequencing, or
-insufficient specificity to implement. Unauthorized means not yet, not
-forbidden.
-
 ### Dispatch
 
-A work item belongs to one or more projects. It is dispatchable when any project
-it belongs to is `authorized`.
+A work item belongs to one project. It is dispatchable when the project
+it belongs to is `authorized`. Work items which belong to multiple projects 
+must be re-homed to the project which has the most upstream/downstream dependencies 
+and/or mutate the same artifact(s).
 
 The dispatcher — the owner, and Dispatcher Next once activated — does not
-dispatch a work item whose projects are all `not authorized`. A dispatched work
+dispatch a work item whose project is `not authorized`. A dispatched work
 item may proceed, and the fact of dispatch is the only proof any agent requires.
 Dispatch is either automated or manual: owner direction to work on a work item
-is a dispatch and is itself complete proof. A dispatched agent does not
+is a dispatch and is itself complete proof. Except as a check prior to authoring 
+a NEW implementation proposal, dispatched agents do not
 re-derive or re-verify whether the work was authorized, and work is never
-refused on the ground that it is not authorized.
+refused on the ground that it is not authorized. The Prime Builder responsible 
+for authoring a NEW implementation proposal should check the database to ensure 
+that the parent project for the Work Items at hand is authorized at the moment that 
+NEW implementation proposal is filed. This is the only case where any agent should
+confirm work authorization. This is a fail-safe for cases where the autoomated 
+dispatcher (or the owner) may erroneously dispatch work that is not authorized
+(in an interactive session, this should require an owner approval to change the
+project authorization field contents to "authorized", while in a headless session
+the agent will respond with the "BLOCKED" status message).
 
 Owner direction to implement a work item bears implicitly on the project the
 work item is in: either that project becomes `authorized`, or the work item
@@ -406,7 +441,7 @@ Prime Builder:
 - proposes;
 - performs authorized implementation;
 - performs authorized operations only in the `ops` activity;
-- may author `NEW`, `REVISED`, `READY`, `VERDICT-REJECTED`, pre-GO `WITHDRAWN`,
+- may author `NEW`, `REVISED`, `READY`, `VERDICT-REJECTED`, pre-GO `WITHDRAWN`, `BLOCKED`
   and `ADVISORY`;
 - never authors `GO`, ordinary `NO-GO`, `NOT-READY`, or `VERIFIED`;
 - never formally reviews or commits its own context's work.
@@ -414,7 +449,7 @@ Prime Builder:
 Loyal Opposition:
 
 - independently reviews and tests;
-- authors `GO`, ordinary `NO-GO`, `NOT-READY`, `VERIFIED`, and `ADVISORY`;
+- authors `GO`, ordinary `NO-GO`, `NOT-READY`, `VERIFIED`, `SUPERSEDED`and `ADVISORY`;
 - commits the independently reviewed work product;
 - never formally reviews its own context's work;
 - never performs an operational mutation it will verify.
@@ -483,6 +518,13 @@ Typed metadata follows them. The status token must appear within the first three
 nonblank lines; the governed writer rejects any head that does not carry exactly
 one status token there.
 
+A non-dispatchable item carries the status token and the typed metadata but no
+`::init` line and no `::open` line. Filing is not dispatching: a non-dispatchable
+item is still authored, validated, and written to the numbered chain on disk, and
+some are written for the dispatcher's own use. The envelope lines are what make
+an item dispatchable to an agent role, and their absence is the whole of the
+difference.
+
 The author supplies the complete header. The governed writer validates and
 atomically records it but never synthesizes, reorders, repairs, or fills routing
 fields. No metadata key may appear twice. The envelope names the next responder,
@@ -502,11 +544,19 @@ Every dispatchable item carries:
 `recipient_role` names the next responder and is the sole routing key.
 `target_role` is a retired duplicate and is not written.
 
+A non-dispatchable item carries the same metadata except `recipient_role`, which
+it omits because there is no next responder to name. Its author provenance is
+still required in full.
+
 Every implementation proposal additionally carries:
 
     Project, Work Item, target_paths, test_artifact_targets
 
-### Status vocabulary — exactly ten
+Every proposal and every verdict is authored exclusively by an agent.
+Dispatcher never authors a proposal or verdict and never appears as the author
+of a bridge lifecycle item.
+
+### Status vocabulary — exactly twelve
 
 - NEW — Addressee Loyal Opposition; authored by Prime Builder; new
   implementation proposals only.
@@ -520,19 +570,40 @@ Every implementation proposal additionally carries:
 - VERDICT-REJECTED — Addressee Loyal Opposition; authored by Prime Builder; used
   only to reject a governance-noncompliant, PB-actionable Loyal Opposition
   verdict and route a fresh Loyal Opposition correction.
+- BLOCKED — For the dispatcher; authored by Prime Builder; the typed refusal a
+  headless session returns instead of a NEW implementation proposal when the
+  work item's parent project reads `not authorized` at filing time, per
+  section 3. BLOCKED begins a thread and may occupy no other position, because
+  the authorization check happens only before a NEW proposal and a change in
+  project authorization does not affect a chain already initiated. It requests
+  no review, is not dispatchable to any agent, and carries the project id, the
+  observed authorization value, and the time of the read. An interactive session
+  does not author BLOCKED; it asks the owner, per section 0.7.
 - GO — Addressee Prime Builder; authored by Loyal Opposition; approves a
   proposal for implementation.
-- NO-GO — Addressee Prime Builder; authored by Loyal Opposition; rejects a
-  proposal and requires revision. Dispatcher may also author the
-  finalization-repair NO-GO defined in section 7, which is addressed exclusively
-  to Loyal Opposition.
+- NO-GO — Addressee Prime Builder; authored only by Loyal Opposition; rejects a
+  proposal and requires revision. It has no Dispatcher-authored form.
 - NOT-READY — Addressee Prime Builder; authored by Loyal Opposition; rejects an
   implementation report and requires a corrected report. It is the report-phase
   counterpart of NO-GO, and exists so that no token is lawful in both the
   proposal phase and the report phase.
-- VERIFIED — authored by Loyal Opposition only; records review completion;
-  terminal for agents and not dispatchable; only Dispatcher may follow it, per
-  section 7.
+- SUPERSEDED — authored by Loyal Opposition only; closes a non-terminal chain
+  whose subject no longer exists: retired by canon or by formal record, absorbed
+  into other work, or already landed elsewhere. It asserts that nothing remains
+  to implement as scoped, and asserts nothing about verification, testing, or
+  correctness. It is the chain-visible counterpart of marking an attempt
+  abandoned in canonical attempt state, which remains the authoritative record;
+  the two are one act written in two places, and SUPERSEDED is never the sole
+  evidence. A SUPERSEDED artifact must cite the canonical evidence that the
+  subject is gone, and must name the carrier of any residual work or state that
+  none remains. It is terminal and not dispatchable. It never closes a chain
+  whose work is live: it may not be authored while a work-intent claim is held
+  on a bridge item in that work item chain by another context.
+- VERIFIED — authored by Loyal Opposition only; records review completion for
+  the exact reviewed bytes and is not dispatchable. If those bytes change before
+  project commit, or if the project commit fails, canonical project/work-item
+  state returns the item to Loyal Opposition for fresh verification. Dispatcher
+  authors no bridge item or verdict for that return.
 - WITHDRAWN — authored by Prime Builder only; valid only before GO; terminal and
   not dispatchable.
 - ADVISORY — authored by either role at any time; not dispatchable.
@@ -545,22 +616,34 @@ is exactly how the defect propagates.
 
 ### Legal transition table — complete
 
-    NEW                              -> GO | NO-GO | WITHDRAWN
-    REVISED                          -> GO | NO-GO | WITHDRAWN
-    NO-GO (proposal)                 -> REVISED | WITHDRAWN | VERDICT-REJECTED
-    GO                               -> READY | VERDICT-REJECTED
-    READY                            -> VERIFIED | NOT-READY
-    NOT-READY                        -> READY | VERDICT-REJECTED
-    VERDICT-REJECTED                 -> GO | NO-GO | NOT-READY
-    VERIFIED                         -> NO-GO (Dispatcher-authored only; section 7)
-    NO-GO (Dispatcher finalization)  -> VERIFIED
+    (thread start)                   -> NEW | BLOCKED | ADVISORY
+    BLOCKED                          -> NEW | WITHDRAWN
+    NEW                              -> GO | NO-GO | WITHDRAWN | SUPERSEDED
+    REVISED                          -> GO | NO-GO | WITHDRAWN | SUPERSEDED
+    NO-GO (proposal)                 -> REVISED | WITHDRAWN | VERDICT-REJECTED | SUPERSEDED
+    GO                               -> READY | VERDICT-REJECTED | SUPERSEDED
+    READY                            -> VERIFIED | NOT-READY | SUPERSEDED
+    NOT-READY                        -> READY | VERDICT-REJECTED | SUPERSEDED
+    VERDICT-REJECTED                 -> GO | NO-GO | NOT-READY | SUPERSEDED
+    VERIFIED                         -> VERIFIED (fresh Loyal Opposition re-verification only; section 7)
     ADVISORY                         -> ADVISORY
 
-WITHDRAWN is terminal and has no successors. VERIFIED is terminal for agents:
-only Dispatcher may follow it, and only with a typed system NO-GO when the
-project commit it belongs to fails, per section 7. That Dispatcher NO-GO routes
-a fresh Loyal Opposition finalization action rather than Prime Builder work, and
-the verified work bytes remain frozen.
+WITHDRAWN, SUPERSEDED and BLOCKED-then-abandoned are terminal and have no
+successors. VERIFIED is terminal for its exact reviewed snapshot and is not
+dispatchable. When canonical project/work-item state records a pre-commit
+verified-byte change or a failed project commit, the work item returns to Loyal
+Opposition, which may append a fresh VERIFIED over the exact final bytes. The
+owner or Dispatcher may select and dispatch that work but authors no bridge
+artifact or verdict. The previously reviewed bytes remain frozen until the fresh
+verification completes.
+
+SUPERSEDED may follow any non-terminal status, because a subject can be retired
+at any point in a chain's life and the chain must be closable when it is. It may
+never follow VERIFIED, WITHDRAWN, ADVISORY, or BLOCKED: those are already
+terminal or outside the implementation lifecycle. Because SUPERSEDED may follow a
+PB-addressed status, the authoring role must show the bridge artifact is not live — no
+work-intent claim held by another context — so that closing an overtaken chain
+can never close an active one.
 
 A later ADVISORY on the same advisory thread is the latest advisory message.
 ADVISORY is not part of an implementation lifecycle, and no other status may
@@ -569,16 +652,16 @@ that cites the advisory.
 
 VERDICT-REJECTED may immediately follow only an agent-authored, PB-addressed
 Loyal Opposition `GO`, `NO-GO`, or `NOT-READY`. It may never follow VERIFIED,
-WITHDRAWN, ADVISORY, or a Dispatcher-authored finalization NO-GO: those are
-non-dispatchable or system-authored, and no protocol entity receives or rejects
-them.
+WITHDRAWN, SUPERSEDED, BLOCKED, or ADVISORY: those are non-dispatchable or
+terminal, and no Prime Builder receives or rejects them.
 
-NO-GO has two forms, distinguished by author, not by the artifact adjudicated. A
-Loyal-Opposition-authored NO-GO rejects a proposal and routes to Prime Builder
-for REVISED. A Dispatcher-authored NO-GO reports a failed project commit and
-routes to Loyal Opposition for finalization repair. Report rejection is never
-NO-GO; it is NOT-READY. A validator determines the form from the author and the
-predecessor status, and rejects `NO-GO -> READY` as invalid.
+NO-GO has one form. It is authored exclusively by Loyal Opposition, rejects a
+proposal, and routes to Prime Builder for REVISED. A project-commit failure is
+canonical coordination/finalization state, not a verdict, and never produces a
+NO-GO. It returns the affected work item to Loyal Opposition for fresh
+verification without inserting a Dispatcher-authored bridge status. Report
+rejection is never NO-GO; it is NOT-READY. A validator rejects
+`NO-GO -> READY` as invalid.
 
 ### Core workflow
 
@@ -588,9 +671,10 @@ project is VERIFIED, the project commits once, per section 7.
 
 No implementation lands without Loyal Opposition review. Prime Builder receives
 and acts on ordinary PB-addressed GO, NO-GO, and NOT-READY. Loyal Opposition
-receives and acts on NEW, REVISED, READY, VERDICT-REJECTED, and the
-Dispatcher-authored finalization NO-GO. ADVISORY, VERIFIED, and WITHDRAWN are
-not dispatchable.
+receives and acts on NEW, REVISED, READY, VERDICT-REJECTED, and fresh-verification
+work selected from canonical project/work-item state after a pre-commit byte
+change or failed project commit. No Dispatcher bridge artifact is inserted.
+ADVISORY, VERIFIED, WITHDRAWN, SUPERSEDED and BLOCKED are not dispatchable.
 
 ### Obsolete statuses
 
@@ -600,6 +684,30 @@ text; they confer no routing, lifecycle, claim, lease, or implementation state,
 are never rewritten or normalized, and no alias or crosswalk exists. Every
 nonterminal chain whose operative status is NO-ACTION is resolved, marked
 abandoned, or reauthored from current canonical facts.
+
+### Grandfathered heads and the remediation order
+
+Bridge artifacts written before this version may carry heads that do not conform
+to it, most commonly a non-dispatchable item carrying envelope lines it should
+not have. Those artifacts are accepted on read. A non-conforming head confers no
+authority its status does not already carry, and reading one is never a licence
+to author a new one the same way.
+
+Do not sweep the corpus. Repair an individual past artifact only when its head
+actually blocks work, and repair it as part of that work rather than as a
+campaign.
+
+Remediation runs in this order, because each stage stops producing the next
+stage's inputs:
+
+1. **Writers** — the governed writer and every helper that authors a bridge
+   artifact, so newly authored heads conform.
+2. **Gates and hooks** — validation surfaces, so a non-conforming new head is
+   refused and a grandfathered old one is not.
+3. **Agent instructions and templates** — role rules, skills, and scaffolds, so
+   authors are not taught the superseded shape.
+
+A stage may be worked before an earlier one only where the earlier one blocks it.
 
 ### Other retained rules
 
@@ -677,16 +785,18 @@ durability; it is not a separate terminality condition.
 
 Dispatcher confirms canonical terminal state, prevents redispatch, releases
 controls, and removes disposable bridge material. Until Dispatcher Next is
-activated the owner performs this role. A Dispatcher-authored bridge item
-carries `::init gtkb lo`, routes to Loyal Opposition, and may carry no status
-other than the finalization NO-GO below.
+activated the owner performs this coordination role. Dispatcher may select and
+dispatch agent work but never authors a proposal, verdict, or bridge lifecycle
+item.
 
 If an instructed project commit does not complete, its work items remain
-`VERIFIED` and uncommitted. Dispatcher emits a fresh typed system `NO-GO` with
-exact reason and evidence, such as `commit_not_confirmed`, addressed to Loyal
-Opposition. The reviewed work bytes remain frozen. After correction and
-independent confirmation, Loyal Opposition may issue a fresh `VERIFIED` and the
-commit proceeds.
+`VERIFIED` and uncommitted. Canonical project/work-item state records the typed
+finalization failure with exact reason and evidence, such as
+`commit_not_confirmed`. The owner or Dispatcher selects and dispatches Loyal
+Opposition for fresh independent verification; Dispatcher authors no verdict.
+The reviewed work bytes remain frozen. After correction and independent
+confirmation, Loyal Opposition may issue a fresh `VERIFIED` and the commit
+proceeds.
 
 A terminal work item cannot be reopened or withdrawn. Reversal or removal of
 committed material is new forward work under a new work item.
@@ -806,10 +916,7 @@ or forward-removal requirements.
 Closure notice: the typed operational event this section requires has no writer.
 The `operational_events` and `emergency_bootstrap_operational_events` tables
 exist and hold rows, but no tracked source in `scripts/`, the package source,
-the baseline, or `config/` references either. Building that writer is WI-6992.
-Until it exists, emergency bootstrap cannot record its required evidence, so a
-foundational deadlock reaching this section is itself blocked and must be raised
-to the owner under section 20 rather than bypassed.
+the baseline, or `config/` references either. 
 
 Formal anchor:
 
@@ -830,6 +937,10 @@ contention but do not choose the owner's target.
 Dispatcher owns coordination facts only. Projects, authorization, work items,
 formal specifications, tests, and Git terminality remain with their domain
 services.
+
+Dispatcher never authors proposals or verdicts. It selects and dispatches agent
+work from canonical coordination state; the receiving agent authors any bridge
+lifecycle artifact required by that work.
 
 Target roles include:
 
@@ -1189,8 +1300,8 @@ ask the owner immediately.
 
 State the exact missing condition and the smallest owner decision required.
 
-Project authorization is not in this list. Agents do not check it, and dispatch
-is complete proof, per section 3.
+A dispatched PB must verify that the parent project is authorized before filing 
+a NEW implementation proposal.
 
 Authority: `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`.
 
@@ -1222,13 +1333,13 @@ Live on 2026-08-31:
   `ADR-ELIMINATE-DURABLE-ROLE-ASSIGNMENT-001` and
   `DCL-NO-DURABLE-ROLE-IN-REGISTRY-001`, neither of which exists in MemBase.
   Also records 47 active `project_authorizations` rows with corrupted
-  `scope_summary` text.
+  `scope_summary` text - PAUTH are obsolete and these records should be deleted.
 - `WI-7525` P0, open: the bridge status vocabulary has no single source.
   Approximately 13 status regexes, enums, and frozensets across `scripts/` and
   the package source, no two agreeing. No write-side set accepts
-  `VERDICT-REJECTED`, and none accepts `NOT-READY`. Expect the writer to refuse
-  the current vocabulary; disclose the substitution per section 6 rather than
-  silently downgrading.
+  `VERDICT-REJECTED`, and none accepts `NOT-READY`, `SUPERSEDED`, or `BLOCKED`.
+  Expect the writer to refuse the current vocabulary; disclose the substitution
+  per section 6 rather than silently downgrading.
 - `WI-6992` open: the emergency-bootstrap operational-event protocol is
   unimplemented, so section 9 cannot record its required evidence.
 - `WI-7556` P1, open: `write_verdict.py` can crash with `UnicodeEncodeError`
@@ -1244,6 +1355,13 @@ Live on 2026-08-31:
 - `WI-7617` P3, open: the bridge WI-ID collision gate flags every cited related
   work item as a collision, penalizing the cross-referencing the applicability
   declaration requires.
+- Non-dispatchable bridge artifacts widely carry the dispatch envelope lines
+  that section 6 reserves for dispatchable items. Measured 2026-09-04 over the
+  latest file of every thread: ADVISORY 189 of 195 non-conforming, VERIFIED 73
+  of 83, WITHDRAWN 63 of 209; every dispatchable artifact carried its envelope
+  correctly. The asymmetry points at authoring helpers rather than at authors,
+  so the repair belongs in the writers first per section 6's remediation order.
+  Existing artifacts are grandfathered.
 - ADVISORY `gtkb-advisory-write-verdict-placeholder-and-intake-authority-001`:
   investigate the exact-init mutation-binding defect and verdict-placeholder
   behavior through current canonical state before relying on any workaround.
@@ -1283,7 +1401,7 @@ Stop, re-query canonical state, and ask the owner if you notice that you are:
 - Never commit bridge material or generated projections.
 - Never cite bridge content from an authoritative artifact.
 - Never reference scratchpad paths in bridge items.
-- Never emit `GO`, ordinary `NO-GO`, `NOT-READY`, or `VERIFIED` as Prime
+- Never emit `GO`, `NO-GO`, `NOT-READY`, or `VERIFIED` as Prime
   Builder.
 - Never formally review or commit your own context's work.
 - Never perform the operational mutation you will independently verify.

@@ -1,3 +1,11 @@
+<!--
+THIS FILE IS A PROJECTION, NOT CANONICAL.
+Projected from the neutral harness baseline by the GT-KB projection engine.
+Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+`gt harness project claude`. If a needed change cannot be made through
+the baseline and re-projection, file a work item against the projector
+(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+-->
 # Bridge Is Essential - Top-Priority Mandate
 
 This rule auto-loads via `.claude/rules/` convention and is TRACKED in git
@@ -7,14 +15,13 @@ This rule auto-loads via `.claude/rules/` convention and is TRACKED in git
 
 **Bridge integrity is the top-priority task. Always.**
 
-> **2026-06-15 cutover note:** After the WI-4510 Phase-3 cutover,
-> TAFE-backed dispatcher state plus status-bearing versioned files under
+> Bridge state plus status-bearing versioned files under
 > `bridge/` are canonical. Aggregate queue artifacts are not live bridge state.
 
 The Prime Builder / Loyal Opposition bridge is how GroundTruth-KB coordinates
 implementation proposals, reviews, and verification. GroundTruth-KB is
 non-functional when the bridge stops working. Therefore: keeping the
-TAFE-backed bridge state correct, dispatcher-visible, and consistent with the
+bridge state correct and consistent with the
 versioned bridge file chain is the first duty of every Prime Builder session,
 ahead of feature work, backlog progress, test runs, deployments, and
 documentation updates.
@@ -22,210 +29,76 @@ documentation updates.
 The bridge as a protocol (proposal -> review -> revise -> GO/NO-GO -> implement
 -> post-impl -> VERIFIED, all recorded in versioned files under `bridge/`) is
 permanently in force. Any proposal, refactor, or cleanup that would weaken the
-protocol's audit trail, GO/NO-GO discipline, or TAFE/dispatcher bridge-state
+protocol's audit trail, GO/NO-GO discipline, or bridge-state
 authority must be rejected.
 
-## Operational Mode (current as of 2026-05-09)
+## Operational Mode
 
-**Both the retired OS bridge pollers (halted 2026-04-25) and the smart
-poller (retired 2026-05-09) are disabled. The dispatcher daemon is the
-canonical bridge automation path while it remains healthy.**
+**The owner dispatches bridge work manually. There is no automated dispatch
+substrate.**
 
-The owner directive that halted OS pollers on 2026-04-25 applied to the
-former blind-polling implementation: Windows scheduled tasks
-`AgentRedFileBridgeIndexScan-Claude`, `AgentRedFileBridgeIndexScan-Codex`,
-`AgentRedBridgeLivenessAlert`, and `AgentRedPollerLivenessWatcher`; the
-`.claude/hooks/poller-freshness.py` `UserPromptSubmit` hook; and the
-foreground `Agent Red Bridge Monitor` watchdog startup shortcut. Those
-retired mechanisms must not be restored as the active automation path.
+Dispatcher Next is the single future dispatcher. It is an active pre-release
+objective and is **not yet ready for activation**. Until the owner activates it,
+manual owner assignment is the whole of bridge dispatch, and no automated
+substrate may be introduced or restored to stand in for it.
 
-The Slice 4 retirement on 2026-05-09 (per
-`bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*`)
-extended that retirement to the smart poller: the Windows scheduled task
-`GTKB-SmartBridgePoller`, the VBS daemon `scripts/run_smart_bridge_poller.vbs`,
-the PowerShell wrapper `scripts/run_smart_bridge_poller.ps1`, the install /
-uninstall scripts, and the runner `groundtruth-kb/scripts/bridge_poller_runner.py`
-have all been archived to `archive/smart-poller-2026-05-09/`. The
-`_check_smart_bridge_poller` doctor check has been removed; bridge dispatch
-liveness is now reported by `_check_bridge_dispatch_liveness` and
-`_check_dispatcher_daemon` (per Slice 4 D4).
+Agents may report dependencies, contention, and readiness. Agents must not
+direct the owner's target selection or ordering, and must not assume that
+filing an artifact causes anything to be scheduled.
 
-Bridge dispatch automation is provided by the dispatcher daemon at
-`scripts/gtkb_dispatcher_daemon.py`. On daemon ticks it inspects
-dispatcher/TAFE state and dispatches the appropriate counterpart harness if a
-recipient's actionable queue signature has changed (Codex on latest NEW or
-REVISED; Prime on latest GO or NO-GO). ADVISORY entries are surfaced in the Prime actionable
-list by `compute_actionable_pending` for interactive sessions, but the
-`_derive_dispatchable` invariant in `groundtruth_kb.bridge.notify` returns
-False for ADVISORY, so every headless dispatch surface filters them out
-before the signature is computed and they never spawn a Prime worker.
-VERIFIED is terminal, and DEFERRED and WITHDRAWN are non-actionable for
-dispatch. The daemon is monitoring and dispatch infrastructure only;
-TAFE-backed bridge state is the
-canonical workflow state. Per-recipient dispatch state is recorded at
-`.gtkb-state/bridge-poller/dispatch-state.json` (path retained for
-compatibility with the smart-poller substrate).
+Work as though Dispatcher Next already controls scheduling: do not rely on
+direct cross-session communication, on continuing ownership of a work item, or
+on returning to an in-flight item after filing. Each bridge action stands on its
+own.
 
-Manual owner assignment/scanning remains available when the daemon is unhealthy
-or intentionally stopped. No other automated fallback substrate is valid.
-Codex bridge scans are similarly owner-triggered in the Codex harness.
+## No Automated Dispatch Substrate
 
-The 2026-04-25 OS-poller halt was made after the former OS Claude poller
-(activated ~2026-04-23) was found to fire on a fixed interval regardless
-of bridge activity: 173 Claude capped-spawns/day at peak plus 92 Codex
-spawns/day, the great majority spawning a harness that found no actionable work
-waiting. The defect was not the fixed-interval check itself — that check was
-negligibly cheap — but that each tick spent an expensive resource (waking a
-harness into a full ~50k-token investigation) unconditionally, with no cheap
-deterministic gate in front of the spawn. The 2026-05-09 smart-poller retirement was made after a
-S321 daemon-dispatch-disabled incident exposed ongoing scoping ambiguity
-between interval-driven dispatch and event-driven dispatch (per
-`PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001`); the Slice 4 retirement
-preserves the dispatch-on-actionable-change semantic while removing the
-interval-driven substrate. The lesson applies to both retired
-implementations.
+There is no live automated dispatch substrate. Do not create one, restore one,
+or treat any script, scheduled task, hook, or poller as one.
 
-## Bridge Dispatch Enablement Contract
+Harness topology affects which harness the owner may assign work to. It does not
+authorize an automation substrate.
 
-The dispatcher daemon is the only automated bridge dispatch substrate once all
-of these are true:
+## How Bridge Work Reaches a Session
 
-1. The daemon script (`scripts/gtkb_dispatcher_daemon.py`) is present in the
-   GT-KB platform.
-2. `gt project doctor` reports daemon-only automation and dispatch liveness
-   healthy (`_check_dispatcher_only_bridge_automation` PASS / WARN;
-   `_check_bridge_dispatch_liveness` per recipient).
-3. The host supports the required headless AI-harness invocation.
+Bridge work reaches an interactive session by **prompt-time surfacing**. There
+is no automated dispatch axis, and none may be created.
 
-Do not re-enable the retired OS poller implementation OR the retired
-smart poller as a substitute for the dispatcher daemon
-unless Mike gives a new explicit directive for that legacy path.
+### Prompt-time surfacing (the only automation surface)
 
-## Dispatcher-Only Substrate
+`.claude/hooks/bridge-axis-2-surface.py`, registered via
+`hooks/manifest.toml`, surfaces newly-actionable bridge work into the next
+prompt as additional context when an interactive session is active. It is
+pull-based: it informs a session that is already running. **It dispatches
+nothing and spawns nothing.**
 
-The bridge protocol has one live automated dispatch substrate: the dispatcher
-daemon. Single-harness or multi-harness topology affects candidate selection
-and role routing, not the creation of an alternate automation substrate.
+A harness whose interaction model supports scheduled thread automation may
+instead surface the same information by periodically waking its own interactive
+session (inventoried under `config/agent-control/system-interface-map.toml`).
+Both forms surface; neither dispatches.
 
-Both substrates honor the same actionable-signature scheme (byte-identical
-``_signature`` computation), per-document lease/contention suppression, and the same fire-and-forget audit-log discipline
-(``.gtkb-state/bridge-poller/dispatch-failures.jsonl``).
-
-They are **mutually exclusive at runtime**:
-
-- In multi-harness topology: the dispatcher daemon is the active
-  substrate; the single-harness dispatcher's applicability check returns
-  False and the scheduled task no-ops.
-- In single-harness topology: the dispatcher daemon's topology gate
-  (per IP-8 of the slice-2 thread) inerts it with SPEC-required durable
-  audit evidence (per-role entries in ``dispatch-failures.jsonl`` plus
-  per-recipient ``last_result = "single_harness_topology_not_applicable"``
-  records in ``dispatch-state.json``); the single-harness dispatcher
-  performs in-process dispatch.
-
-Substrate applicability is determined by the role-set topology in
-``harness-state/harness-registry.json`` through
-``groundtruth_kb.harness_projection.read_roles`` or the ``roles`` subcommand
-under ``gt harness``. The doctor's
-``_check_role_set_topology_consistency`` (Slice 1) validates wire form;
-``_check_dispatcher_daemon_when_required`` (Slice 1 + Slice 2
-upgrade) reports applicability and registration health. Per
-``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001`` § Doctor Check, missing-
-task severity is WARN (not FAIL) so manual-trigger fallback remains
-viable while the task is being installed.
-
-Do NOT create additional bridge automation substrates without an
-owner-approved bridge proposal and an updated classification under § Two-
-Axis Bridge Automation Model below.
-
-## Two-Axis Bridge Automation Model
-
-Bridge automation has two complementary first-class axes, each with a
-distinct role in the bridge protocol's autonomous-vs-interactive dispatch
-model:
-
-### Axis 1: Dispatchable work — dispatcher daemon
-
-The dispatcher daemon (`scripts/gtkb_dispatcher_daemon.py`)
-is the canonical mechanism for **dispatchable work** — work that can be
-completed by a freshly-spawned counterpart harness session without further
-owner input. It spawns counterpart harness sessions when actionable
-dispatcher/TAFE bridge-state changes are detected.
-
-Examples of dispatchable work:
-- Loyal Opposition reviews of NEW or REVISED proposals.
-- Loyal Opposition verifications of post-implementation reports.
-- Self-contained test runs.
-- Verdict file authoring.
-
-### Axis 2: Non-dispatchable work — thread automation pattern
-
-A thread automation pattern wakes the interactive chat session
-periodically. Its role is to scan TAFE/dispatcher bridge state and surface work that
-**cannot be dispatched to a sub-agent** — work requiring interactive owner
-input mid-stream, accumulating context across turns, or coordination across
-threads.
-
-Examples of non-dispatchable work:
-- Owner-AUQ-required decisions (approvals, waivers, priority choices,
-  formal artifact approvals).
-- Multi-turn review where context accumulates and a fresh harness would
-  lose thread.
-- Cross-thread coordination (e.g., umbrella proposal referencing sibling
-  threads needing owner sequencing).
-- Implementation work that interleaves owner approval packets with code
-  changes.
-
-The two-axis automation surface is implemented:
-
-- AXIS 1 (Claude→Codex and Codex→Claude when no interactive session is
-  active): the dispatcher daemon at
-  `scripts/gtkb_dispatcher_daemon.py`. Spawns headless counterpart harness on
-  actionable signature change.
-- AXIS 2 Codex-side: the inventoried Codex app-thread automation under
-  `config/agent-control/system-interface-map.toml`, which wakes the Codex
-  interactive session periodically.
-- AXIS 2 Claude-native: the `.claude/hooks/bridge-axis-2-surface.py`
-  UserPromptSubmit hook (per
-  `bridge/gtkb-claude-axis-2-userpromptsubmit-bridge-surface-005.md` REVISED-2
-  Codex GO at `-006`). Surfaces newly-actionable Prime bridge work into the
-  next prompt as additionalContext when an interactive Claude session is
-  active. Pull-based by design: Claude's interaction model is prompt-driven,
-  so the natural Claude-native AXIS 2 mechanism is prompt-time surfacing, not
-  periodic wake. Both AXIS 2 mechanisms are complementary; each fits its
-  harness's native interaction model.
-
-### Both axes required; roles do not overlap
-
-The dispatcher daemon does NOT refresh already-running interactive
-sessions, and the thread automation does NOT spawn counterpart harness
-sessions. They are complementary, not duplicative.
+Work that cannot be surfaced this way — owner decisions requiring
+`AskUserQuestion`, multi-turn review where context accumulates, cross-thread
+coordination, implementation interleaved with owner approval — is assigned by
+the owner directly.
 
 ### Adding new bridge automation
 
-DO NOT create additional bridge automations as substitutes for either axis
-without owner approval. Adding a new bridge automation requires:
+DO NOT create bridge automation that dispatches, spawns, schedules, or assigns
+work. That is Dispatcher Next's role and it is not yet activated.
 
-1. Owner approval via AskUserQuestion (the canonical owner-decision channel
-   per the AUQ-only enforcement stack).
-2. Classification by axis (dispatchable vs non-dispatchable).
-3. A new `[[systems]]` entry in `config/agent-control/system-interface-map.toml`
-   with `concept_vs_artifact` reflecting the axis.
-4. Update to this section if the new automation's role overlaps with an
-   existing surface.
+A new *surfacing* mechanism requires:
 
-This section articulates the architecture; it does NOT ratify any specific
-existing automation as canonical. Owner disposition of currently-inventoried
-Codex-app automations (`monitor-gt-kb-bridge-codex-thread`,
-`gt-kb-bridge-monitor-codex-thread`) is a separate concern not addressed
-in this slice.
+1. Owner approval via `AskUserQuestion`.
+2. An explicit statement that it surfaces only and dispatches nothing.
+3. A `[[systems]]` entry in `config/agent-control/system-interface-map.toml`.
+4. An update to this section if it overlaps an existing surface.
 
 ## Invariants (Bridge Protocol Itself)
 
-These remain in force regardless of whether bridge scans are manual or handled
-by the dispatcher daemon:
+These remain in force regardless of how bridge work is surfaced or assigned:
 
-- TAFE-backed bridge state plus status-bearing versioned files under `bridge/`
+- bridge state plus status-bearing versioned files under `bridge/`
   are the canonical workflow state. Do not recreate aggregate queue artifacts
   to satisfy stale helpers.
 - Bridge files are append-only. Never delete a bridge file; it forms the audit
@@ -242,7 +115,7 @@ Do NOT, without explicit owner approval:
 - Recreate aggregate queue artifacts as live bridge state or treat them as authoritative
 - Delete bridge files (any version)
 - Skip the GO/NO-GO discipline for any code change beyond the explicit
-  exemptions in `.claude/rules/codex-review-gate.md`
+  exemptions in `.claude/rules/counterpart-review-gate.md`
 - Re-enable the retired OS poller tasks, freshness hook, foreground
   watchdog, or the retired smart-poller scheduled task / VBS daemon /
   runner as the active automation path
@@ -257,20 +130,20 @@ Do NOT, without explicit owner approval:
 - **S292**: Session-start briefs for 7+ sessions silently omitted the in-session
   `CronCreate` poller instantiation. Failure was invisible because no alarm
   fired when instantiation was skipped. Lesson: procedural mandates documented
-  in `memory/*.md` are not enforceable; hooks and `.claude/settings.json`
+  in `memory/*.md` are not enforceable; hooks and `.claude` hook
   registration are.
 - **S294**: Discovered `.claude/` was blanket-ignored in `.gitignore`, so the
   bridge visibility infrastructure lived outside git. Worktrees could not see
   it. Fresh clones could not see it. Lesson: if it is essential, it must be
   tracked. The `!`-negation patterns added then remain in force for the rule
   files and PS1 scripts even though the retired hook itself is now removed.
-- **S308 (2026-04-25)**: Former OS Claude poller activation produced ~12.5M
+- **S308 (2026-04-25)**: Former OS poller activation produced ~12.5M
   tokens/day of background spawns (a ~10× jump), most spawning a harness that found no
   actionable work, because each fixed-interval tick spawned a harness
   unconditionally regardless of whether the bridge had changed. Owner directive halted the retired pollers and removed the
   freshness hook, restoring manual-trigger operation until smart-poller
-  automation is available. The protocol itself was unaffected; after the
-  2026-06-15 cutover, TAFE-backed bridge state is canonical. Lesson: automation is
+  automation is available. The protocol itself was unaffected; bridge state
+  is canonical. Lesson: automation is
   wasteful when it spends an expensive resource — principally agent
   investigation tokens — without a commensurate chance of value; the cheap
   fixed-interval check was never the defect, the unconditional expensive spawn
@@ -280,14 +153,13 @@ Do NOT, without explicit owner approval:
 - **S339 (2026-05-09)**: Smart-poller retirement (Slice 4). Smart-poller
   scheduled task `GTKB-SmartBridgePoller` halted; runtime artifacts
   archived to `archive/smart-poller-2026-05-09/`; doctor's
-  `_check_smart_bridge_poller` removed in favor of daemon-only automation and
-  dispatch-liveness checks. Lesson: dispatch-on-actionable-change is the
-  load-bearing semantic; the substrate must be the dispatcher daemon rather
-  than a hook-triggered or poller fallback. The daemon reuses the dispatch-state path
-  (`.gtkb-state/bridge-poller/dispatch-state.json`) and the actionable-
-  signature scheme byte-identically per
-  `platform_tests/scripts/test_gtkb_dispatcher_daemon.py` to preserve the
-  existing audit-trail invariants while changing the substrate.
+  `_check_smart_bridge_poller` removed. Lesson, stated as history and not as
+  current direction: dispatch-on-actionable-change was the load-bearing
+  semantic that successive substrates tried to preserve while changing the
+  mechanism underneath it. Every substrate named in this history — the OS
+  pollers, the smart poller, and the daemon that replaced them — has since been
+  retired. Dispatch is now manual until Dispatcher Next is activated; see
+  § Operational Mode.
 
 ## Copyright
 

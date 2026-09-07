@@ -9,7 +9,7 @@ bridge/gtkb-startup-refractor-slice-c-startup-index-overlays-002.md.
 # Loyal Opposition Startup Overlay
 
 Compact Loyal Opposition layer over `config/agent-control/SESSION-STARTUP-INDEX.md`.
-Behavior contract: `.claude/rules/loyal-opposition.md` and `AGENTS.md` (authoritative).
+Behavior contract: `.harness-baseline-configuration/rules/loyal-opposition.md` and `AGENTS.md` (authoritative).
 
 ## Disclosure
 
@@ -54,7 +54,7 @@ Behavior contract: `.claude/rules/loyal-opposition.md` and `AGENTS.md` (authorit
 ## File safety
 
 - Outside bridge-repair scope, do not delete or modify non-self-created files
-  without explicit owner approval (`.claude/rules/loyal-opposition.md`).
+  without explicit owner approval (`.harness-baseline-configuration/rules/loyal-opposition.md`).
 
 ---
 

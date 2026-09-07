@@ -29,7 +29,6 @@ authorized with an audit log entry to
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -67,7 +66,6 @@ STARTUP_SERVICE_TIMEOUT_BY_HARNESS = {
     # SessionStart envelope instead of being killed by the outer hook runtime.
     "claude": 55.0,
 }
-ROLE_SCOPED_STARTUP_RELAY_CACHE_SYNC_BUDGET_SECONDS = 25.0
 # Deadline guard for live hook budget
 # Parity marker for tests: Role: Prime Builder
 
@@ -738,49 +736,12 @@ def _valid_session_start_payload(text: str, request_started_at: str) -> bool:
     )
 
 
-def _startup_relay_cache_names(role_mode: str | None = None) -> tuple[str, str]:
-    if role_mode in _MODE_TO_ROLE_PROFILE:
-        return (
-            f"last-user-visible-startup-{role_mode}.md",
-            f"last-user-visible-startup-{role_mode}.meta.json",
-        )
-    return ("last-user-visible-startup.md", "last-user-visible-startup.meta.json")
-
-
 def _startup_body_role_mode(body: str) -> str | None:
     if "Role being assumed: Loyal Opposition" in body:
         return "lo"
     if "Role being assumed: Prime Builder" in body:
         return "pb"
     return None
-
-
-def _durable_registry_role_profiles() -> list[str]:
-    try:
-        modes = sorted(_resolve_own_role_set())
-    except Exception:
-        return []
-    return [_MODE_TO_ROLE_PROFILE[mode] for mode in modes if mode in _MODE_TO_ROLE_PROFILE]
-
-
-def _startup_relay_role_authority(role_mode: str | None) -> dict:
-    interactive_profile = _MODE_TO_ROLE_PROFILE.get(role_mode or "")
-    durable_profiles = _durable_registry_role_profiles()
-    return {
-        "interactive_resolved_role": interactive_profile,
-        "interactive_role_source": (
-            f"startup disclosure cache role mode {role_mode}; authoritative only when selected by "
-            "the owner transcript/init-keyword path"
-            if interactive_profile
-            else None
-        ),
-        "durable_registry_roles": durable_profiles,
-        "durable_registry_authority": (
-            "headless dispatch routing and interactive fallback only; non-overriding when a "
-            "transcript-defined interactive role is present"
-        ),
-        "authority_mode": "cache_only_pending_init_keyword" if interactive_profile else "unknown",
-    }
 
 
 def _render_role_startup_report(role_profile: str) -> str | None:
@@ -797,8 +758,8 @@ def _render_role_startup_report(role_profile: str) -> str | None:
             harness_id=_persistent_harness_id(),
             role_profile_explicit=False,
             interactive_role_source=(
-                f"startup disclosure cache role mode {role_mode}; authoritative only when selected by "
-                "the owner transcript/init-keyword path"
+                f"startup disclosure rendered for role mode {role_mode}; authoritative only when selected "
+                "by the owner transcript/init-keyword path"
             ),
             fast_hook=True,
         )
@@ -811,79 +772,11 @@ def _render_role_startup_report(role_profile: str) -> str | None:
         return None
 
 
-def _write_startup_relay_cache(additional_context: str, *, role_mode: str | None = None) -> None:
-    """Write the harness-scoped startup-disclosure relay cache and metadata.
-
-    Extracts the owner-visible startup message from a validated NORMAL_STARTUP
-    SessionStart payload and writes it to a harness-scoped cache file plus a
-    metadata sidecar (harness, timestamp, byte length, sha256). Called only on
-    the validated normal-startup path, so bridge auto-dispatch payloads never
-    populate the interactive startup-disclosure relay cache. Fails soft.
-    """
-    marker = "## User-Visible Startup Message"
-    if marker in additional_context:
-        body = additional_context.split(marker, 1)[1].strip()
-    else:
-        body = additional_context.strip()
-    if not body:
-        return
-    encoded = body.encode("utf-8")
-    effective_role_mode = role_mode or _startup_body_role_mode(body)
-    meta = {
-        "harness_name": HARNESS_NAME,
-        "harness_id": _persistent_harness_id(),
-        "role_mode": effective_role_mode,
-        "role_profile": _MODE_TO_ROLE_PROFILE.get(effective_role_mode or ""),
-        "role_authority": _startup_relay_role_authority(effective_role_mode),
-        "generated_at": _now_iso(),
-        "byte_length": len(encoded),
-        "sha256": hashlib.sha256(encoded).hexdigest(),
-    }
-    cache_name, meta_name = _startup_relay_cache_names(role_mode)
-    try:
-        (OUT_DIR / cache_name).write_text(body, encoding="utf-8", newline="\n")
-        (OUT_DIR / meta_name).write_text(json.dumps(meta, ensure_ascii=True, indent=2), encoding="utf-8", newline="\n")
-    except OSError:
-        pass
-
-
-def _write_role_scoped_startup_relay_caches(
-    additional_context: str,
-    *,
-    deadline_monotonic: float | None = None,
-) -> None:
-    marker = "## User-Visible Startup Message"
-    body = (
-        additional_context.split(marker, 1)[1].strip() if marker in additional_context else additional_context.strip()
-    )
-    primary_mode = _startup_body_role_mode(body)
-    if primary_mode:
-        _write_startup_relay_cache(body, role_mode=primary_mode)
-    # Per ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 Decision 2 and
-    # DCL-SESSION-ROLE-RESOLUTION-001: role-scoped startup-disclosure cache
-    # generation iterates the full role vocabulary regardless of this harness's
-    # dispatcher/default role set, so the UserPromptSubmit init-keyword matcher
-    # can look up either role when the owner declares a session-stated role via
-    # ``::init gtkb (pb|lo)``. Alternate-role rendering remains fail-soft under
-    # hook budget pressure; the primary role cache is written before that budget
-    # check. The dispatcher/default role set is NOT consulted here; registry
-    # role remains the authority for headless dispatch routing only.
-    for mode in sorted(_MODE_TO_ROLE_PROFILE):
-        if mode == primary_mode:
-            continue
-        if deadline_monotonic is not None and _monotonic_seconds() >= deadline_monotonic:
-            return
-        report = _render_role_startup_report(_MODE_TO_ROLE_PROFILE[mode])
-        if report:
-            _write_startup_relay_cache(report, role_mode=mode)
-
-
 def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     stdout_path = OUT_DIR / "last-session-start.json"
     stderr_path = OUT_DIR / "last-session-start.err"
     request_started_at = _now_iso()
-    request_started_monotonic = _monotonic_seconds()
     _purge_previous_diagnostics(stdout_path, stderr_path)
     # Invalidate only the legacy shared session-role marker before the dispatch
     # fork and before role rendering. Per-session markers and the session
@@ -905,19 +798,6 @@ def main() -> int:
         _swept_current_id = resolve_session_id(order=MARKER_CONTINUITY_ORDER) or None
         _sweep_stale_per_session_role_markers(current_session_id=_swept_current_id)
     except Exception:  # noqa: BLE001 - lifecycle hook must fail soft.
-        pass
-    # Slice 1 of gtkb-operating-mode-transaction-001: drain any pending
-    # mode-switch transactions BEFORE role resolution, so a next-session-
-    # effective mode/role switch takes effect for the dispatch decision
-    # below. Fail-soft per design: failures are logged but do not abort
-    # SessionStart.
-    try:
-        from pathlib import Path as _Path
-
-        from groundtruth_kb.mode_switch.pending import apply_pending as _apply_pending
-
-        _apply_pending(_Path(__file__).resolve().parents[2])
-    except Exception:  # noqa: BLE001 - fail-soft per spec acceptance criterion #6
         pass
     # IP-4: receiver-side StartupDecision dispatch per bridge -005.
     decision, _reason = _bridge_dispatch_keyword_check()
@@ -993,22 +873,9 @@ def main() -> int:
             payload = json.loads(process.stdout)
             hook_output = payload["hookSpecificOutput"]
             startup_context = hook_output["additionalContext"]
-            # WI-4361: prefer hookSpecificOutput.startupDisclosure for relay-cache
-            # writing when the startup service emits a new-shape payload (compact
-            # additionalContext + complete startupDisclosure). Legacy payloads
-            # without startupDisclosure fall back to the marker-split path inside
-            # _write_startup_relay_cache, which finds the embedded
-            # "## User-Visible Startup Message" body in additionalContext.
-            startup_disclosure = hook_output.get("startupDisclosure")
-            if isinstance(startup_disclosure, str) and startup_disclosure.strip():
-                relay_body = startup_disclosure
-            else:
-                relay_body = startup_context
-            _write_startup_relay_cache(relay_body)
-            _write_role_scoped_startup_relay_caches(
-                relay_body,
-                deadline_monotonic=(request_started_monotonic + ROLE_SCOPED_STARTUP_RELAY_CACHE_SYNC_BUDGET_SECONDS),
-            )
+            # WI-7318: the SessionStart path no longer writes a startup-disclosure
+            # relay cache. The UserPromptSubmit init-keyword relay renders the
+            # disclosure for its own turn, so there is nothing to persist here.
             print(
                 _dump_payload(
                     _session_start_payload(

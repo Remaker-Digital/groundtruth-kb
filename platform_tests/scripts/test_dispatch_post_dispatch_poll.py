@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import dispatcher_runtime as cht  # noqa: E402
+from scripts import dispatcher_runtime as cht  # noqa: E402
 
 
 def test_poll_dispatch_verdict_returns_path_and_latency_on_existing_file(tmp_path: Path) -> None:

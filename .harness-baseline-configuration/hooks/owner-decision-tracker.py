@@ -86,7 +86,6 @@ DECISION_ID_PREFIX = "DECISION-"
 # threshold without editing hook code.
 HISTORY_AGE_DAYS = 30
 OWNER_DECISION_ARCHIVE_DIR_REL = Path("memory") / "archive"
-OWNER_DECISION_RETENTION_FAILURE_LOG_REL = Path(".gtkb-state") / "owner-decision-retention" / "failures.jsonl"
 RUNTIME_RETENTION_CONFIG_REL = Path("config") / "governance" / "runtime-evidence-retention.toml"
 
 # question_hash uses sha256 of question + sorted option labels, truncated
@@ -104,7 +103,6 @@ for package_src in (PACKAGE_SRC, HOOK_REPO_SRC):
         sys.path.insert(0, str(package_src))
 
 PENDING_FILE_REL = "memory/pending-owner-decisions.md"
-DISPATCH_RUNS_REL = Path(".gtkb-state") / "bridge-poller" / "dispatch-runs"
 WORKER_RUN_ID_ENV_VAR = "GTKB_BRIDGE_POLLER_RUN_ID"
 PROJECT_ROOT_ENV_VAR = "GTKB_PROJECT_ROOT"
 
@@ -365,7 +363,17 @@ def _dispatch_artifact_path(run_id: str) -> Path:
     project_root_value = os.environ.get(PROJECT_ROOT_ENV_VAR, "").strip()
     project_root = Path(project_root_value).resolve() if project_root_value else PROJECT_ROOT
     safe_run_id = re.sub(r"[^A-Za-z0-9_.-]", "_", run_id)
-    return project_root / DISPATCH_RUNS_REL / f"{safe_run_id}.owner-decision-requested.json"
+    # Canon s17: the worker artifact is session-scoped scratch under the canonical
+    # scratchpad root, never `.gtkb-state` (and never the retired bridge-poller tree).
+    try:
+        from scripts.gtkb_session_id import session_scratch_dirname
+    except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
+
+        def session_scratch_dirname() -> str:
+            return "unknown"
+
+    dispatch_runs = Path("scratchpad") / session_scratch_dirname() / "dispatch-runs"
+    return project_root / dispatch_runs / f"{safe_run_id}.owner-decision-requested.json"
 
 
 def _write_worker_owner_decision_request(
@@ -477,9 +485,6 @@ def _quote_yaml(value: str) -> str:
     return f'"{s}"'
 
 
-_AUTO_ARCHIVE_FAILURE_LOG_REL = Path(".gtkb-state/owner-decision-auto-archive/failures.jsonl")
-
-
 def _auto_archive_if_enabled(entry: DecisionEntry, session_hint: str = "") -> None:
     """Slice 4: opt-in auto-archive of resolved AUQ to the Deliberation Archive.
 
@@ -487,9 +492,7 @@ def _auto_archive_if_enabled(entry: DecisionEntry, session_hint: str = "") -> No
     deterministic per ``SPEC-AUQ-NO-LLM-CLASSIFIER-001``. All filesystem and
     DB writes are anchored to ``PROJECT_ROOT`` (resolved from
     ``{{HARNESS_PROJECT_DIR_VAR}}`` at hook startup), never ``Path.cwd()``. Failures
-    are caught and appended to ``<PROJECT_ROOT>/.gtkb-state/owner-decision-
-    auto-archive/failures.jsonl``; the tracker's notepad-tier write remains
-    load-bearing.
+    are swallowed; the tracker's notepad-tier write remains load-bearing.
     """
     if os.environ.get("GTKB_AUQ_AUTO_ARCHIVE", "0") != "1":
         return
@@ -512,20 +515,8 @@ def _auto_archive_if_enabled(entry: DecisionEntry, session_hint: str = "") -> No
         ok, _reason = should_auto_archive(candidate)
         if ok:
             archive_decision(candidate, project_root=PROJECT_ROOT)
-    except Exception as exc:  # noqa: BLE001 - hook must never raise
-        try:
-            failure_log = PROJECT_ROOT / _AUTO_ARCHIVE_FAILURE_LOG_REL
-            failure_log.parent.mkdir(parents=True, exist_ok=True)
-            record = {
-                "timestamp": datetime.now(UTC).isoformat(),
-                "decision_id": entry.id,
-                "error_type": type(exc).__name__,
-                "error_message": str(exc)[:500],
-            }
-            with failure_log.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(record) + "\n")
-        except OSError:
-            pass
+    except Exception:  # noqa: BLE001 - hook must never raise
+        pass
 
 
 def _owner_decision_retention_age_days() -> int:
@@ -569,23 +560,6 @@ def _move_old_resolved_to_history(
     return mutated
 
 
-def _record_retention_archive_failure(entry: DecisionEntry, exc: Exception) -> None:
-    """Record DA-harvest failure without losing or rotating the ledger entry."""
-    try:
-        failure_log = PROJECT_ROOT / OWNER_DECISION_RETENTION_FAILURE_LOG_REL
-        failure_log.parent.mkdir(parents=True, exist_ok=True)
-        record = {
-            "timestamp": datetime.now(UTC).isoformat(),
-            "decision_id": entry.id,
-            "error_type": type(exc).__name__,
-            "error_message": str(exc)[:500],
-        }
-        with failure_log.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record, sort_keys=True) + "\n")
-    except OSError:
-        pass
-
-
 def _archive_decision_for_retention(entry: DecisionEntry) -> bool:
     """Harvest one resolved decision to the DA before sidecar rotation.
 
@@ -609,8 +583,7 @@ def _archive_decision_for_retention(entry: DecisionEntry) -> bool:
         )
         archive_decision(decision, project_root=PROJECT_ROOT)
         return True
-    except Exception as exc:  # noqa: BLE001 - hook must never raise
-        _record_retention_archive_failure(entry, exc)
+    except Exception:  # noqa: BLE001 - hook must never raise
         return False
 
 

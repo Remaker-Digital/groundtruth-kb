@@ -2,7 +2,7 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project codex`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
@@ -13,31 +13,6 @@ MemBase records `GOV-ACTING-PRIME-BUILDER-001`,
 `GOV-HARNESS-ROLE-PORTABILITY-001`, and
 `GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001` establish the current role mapping
 rules.
-
-## Compatibility/Provenance Classification
-
-Per bridge `gtkb-role-session-lifecycle-simplification-003` REVISED-1 GO at
-`-004` (2026-05-11 S341), `acting-prime-builder` is classified as
-**legacy/compatibility/provenance** language, NOT a new role-switch target.
-The canonical two-role set is `prime-builder` and `loyal-opposition`. The
-`acting-prime-builder` profile and rule file remain in place for:
-
-- Backward compatibility with role-map entries set in prior sessions or by
-  explicit owner-directed legacy-role-switch operations (READ accepted).
-- Narrative continuity describing the historical authority arrangement
-  (Codex-as-acting-Prime when canonical Prime Builder was unavailable).
-
-SET operations: `scripts/harness_roles.py` REJECTS `acting-prime-builder`
-as a target role; only `prime-builder` and `loyal-opposition` are valid
-SET targets. READ operations load role values from the canonical role registry
-at `harness-state/harness-registry.json` through
-`groundtruth_kb.harness_projection.read_roles` or the `roles` subcommand under
-`gt harness`; any
-legacy `acting-prime-builder` value encountered there continues to load
-without error for compatibility/provenance.
-
-Startup rendering for this profile labels it explicitly as
-"compatibility/provenance" (not "active operating role").
 
 ## General Principle
 
@@ -60,13 +35,6 @@ Any AI model harness may assume either role if it supports the operational
 capabilities needed for that role, including hooks, skills, plugins, CLI access,
 desktop/app access when needed, filesystem access, and related integration
 abilities.
-
-When a harness is assigned a role, all skills, plugins, hooks, directives, and
-responsibilities for that role must be enabled to the extent possible in that
-harness.
-
-When the bridge is available, the bridge counterpart is always Loyal Opposition
-and must be configured to behave accordingly.
 
 ## Agent Red Reference Adopter Application Boundary
 
@@ -96,13 +64,13 @@ GroundTruth-KB also includes five adopter fixtures in `groundtruth-kb/examples/`
 route unqualified GT-KB release, CI, bridge, source, or verification evidence to
 Agent Red surfaces; Agent Red work requires explicit scope.
 
-Owner decision `DELIB-S347-AGENT-RED-REFERENCE-ADOPTER-FRAMING-RESTORATION`
-explicitly confirms the "reference adopter" framing for Agent Red and authorizes
+Owner deliberation `DELIB-S347-AGENT-RED-REFERENCE-ADOPTER-FRAMING-RESTORATION`
+explicitly describes the "reference adopter" framing for Agent Red and authorizes
 this narrative edit.
 
 ## Formal Artifact Approval And Audit Principle
 
-Owner decision `DELIB-0835` and formal records
+Owner deliberation `DELIB-0835` and formal records
 `GOV-ARTIFACT-APPROVAL-001`, `PB-ARTIFACT-APPROVAL-001`,
 `ADR-ARTIFACT-FORMALIZATION-GATE-001`, and
 `DCL-ARTIFACT-APPROVAL-HOOK-001` establish a strict default for formal artifact
@@ -122,7 +90,7 @@ presented to the user and captured in the session transcript.
 
 ## Release And Adoption Governance Principle
 
-Owner decisions `DELIB-0828` and `DELIB-0829`, formalized as
+Owner deliberations `DELIB-0828` and `DELIB-0829`, formalized as
 `GOV-RELEASE-READINESS-GOVERNED-TESTING-001` and
 `GOV-GTKB-ADOPTION-ENFORCEMENT-001`, require production-release work to include
 governed release-readiness evidence. Any prior Agent Red adoption framing must
@@ -133,40 +101,6 @@ unless Agent Red is explicitly in scope.
 New candidate skills, plug-ins, or doctor checks identified during adoption
 work must be added to the top of the outstanding work queue until adopted,
 explicitly rejected, or superseded.
-
-## Harness Hook Parity Fallback Principle
-
-Owner acknowledgement `DELIB-0836` (predecessor — preserved as historical
-record), `ADR-CODEX-HOOK-PARITY-FALLBACK-001` v2 (current authority;
-supersedes v1), and `DELIB-S337-CODEX-HOOK-PARITY-STANCE-REFRESH-2026-05-08`
-(refresh deliberation) establish the current state: `.codex/config.toml` and
-`.codex/hooks.json` ARE a live Codex interception boundary on Windows for
-Codex CLI versions >= 0.128.0-alpha.1, where the `codex_hooks` feature flag
-is `stable, true` by default. The empirical foundation is
-`DELIB-S337-CODEX-HOOKS-WINDOWS-RETEST-2026-05-08` (rowid 1550): SessionStart,
-UserPromptSubmit, and Stop hooks all fired during a `codex exec` invocation
-on Windows.
-
-The fallback obligation persists for two cases: (1) older Codex CLI versions
-where the `codex_hooks` feature is not stable; (2) any future regression that
-re-disables the feature. In either case, sessions must verify the live state
-via `codex features list` (looking for `codex_hooks  stable  true`) before
-relying on `.codex/hooks.json` as a live interception boundary, and must use
-mechanical fallback (`scripts/check_codex_hook_parity.py` and Claude-side
-hooks where available) when verification fails.
-
-A regression test in `platform_tests/scripts/test_codex_hook_parity.py` (or successor;
-landed via `gtkb-bridge-poller-event-driven-replacement-001` Slice 2) invokes
-`codex exec --skip-git-repo-check "<sentinel prompt>"` against a fixture Stop
-hook and asserts hook firing; failure indicates the v1 fallback stance is
-again operative.
-
-## Session Formalization Audit Principle
-
-Owner request `DELIB-0837` and `GOV-SESSION-FORMALIZATION-AUDIT-001` require
-session decisions, directives, and principles to be audited against their
-respective Deliberation Archive, MemBase, rule, work queue, hook, and test
-artifacts when the owner asks for such an accounting.
 
 ## Standing Backlog Principle
 
@@ -262,35 +196,15 @@ First concrete manifestation: `GTKB-ARTIFACT-RECORDER-CLI`
 plumbing behind a `gt <artifact-type> record` CLI; reduces AI surface
 by ~85%.
 
-## Current GroundTruth-KB Mapping
-
-- The live Prime Builder assignment is the harness whose role record in
-  `harness-state/harness-registry.json` resolves to `prime-builder` (read via
-  `gt harness roles`); this compatibility/provenance rule does not itself pin
-  the current holder.
-- References in enabled GT-KB Prime Builder skills to `Prime Builder`,
-  `/gtkb-*` Prime workflows, or `changed_by="prime-builder/..."` apply to the
-  assigned Prime Builder harness while this assignment is active.
-- This rule is a local GroundTruth-KB role override. It does not change the
-  upstream GroundTruth-KB canonical role model.
-
-Operational requirements while this override is active:
-
-1. Preserve the intent of Prime Builder governance through durable records, tests, and explicit GO/NO-GO status.
-2. Record owner decisions in the Deliberation Archive.
-3. Keep MemBase / KnowledgeDB release-readiness records current.
-4. Do not treat bridge unavailability as a reason to skip evidence, regression tests, or release gates.
-5. When canonical Prime Builder availability is restored, hand off with a list of work performed under this acting-Prime exception.
-
 ## AskUserQuestion as the Only Valid Owner-Decision Channel
 
-(Active per S331 owner directive; mechanically enforced by `.codex/hooks/owner-decision-tracker.py` 
+(Active per S331 owner directive; mechanically enforced by `.harness-baseline-configuration/hooks/owner-decision-tracker.py` 
 per `bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-014.md` VERIFIED.)
 
 Prime Builder collects owner decisions through `AskUserQuestion` exclusively. Prose decision-asks are only acceptable if `AskUserQuestion` is unavailable, and then only as a fallback. The following rules apply:
 
 - The Stop-mode hook detects prose decision-ask patterns (`PROSE_DECISION_PATTERNS`) and emits `{"decision": "block", ...}` to refuse turn-end when no `AskUserQuestion` tool_use occurred in the same turn (per `bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-006.md` VERIFIED + Sub-slice A tightening).
-- All accepted owner decisions are recorded in `memory/pending-owner-decisions.md` with `detected_via: ask_user_question`.
+- All accepted owner decisions are recorded in the relevant Source-of-Truth: GOV, SPEC, DCL, ADR, Work Item database records, Project database records or system configuration. DELIB artifacts ARE NOT authoritative and authorize nothing: they are informational only and may b e useful for disambiguation of owner intent.
 
 In-scope decision classes (use `AskUserQuestion`, never prose):
 
@@ -309,4 +223,4 @@ When in doubt, ask via `AskUserQuestion`. Verbose status updates that mention pe
 
 ## Clean-Before-You-Leave Principle
 
-When implementation work is complete, all temp, ephemeral, or session-only artifacts must be cleaned up before the session ends. This includes: python temp files, `.codex` (or other harness) temp files, `memory/` temp files, and any other session-only artifacts. The session must leave the system in a clean state for the next session. All important information must be persisted in the Deliberation Archive, MemBase, bridge Advisory Proposals, or other formal artifact storage before cleanup. If new code or durable artifacts have been created as part of the work product of an implementation, those must be registered as formal artifacts (i.e., change controlled) before cleanup.
+When implementation work is complete, all temp, ephemeral, or session-only artifacts must be cleaned up before the session ends. This includes: python temp files, harness-local temp files, `memory/` temp files, and any other session-only artifacts. The session must leave the system in a clean state for the next session. All important information must be persisted in the Deliberation Archive, MemBase, bridge Advisory Proposals, or other formal artifact storage before cleanup. If new code or durable artifacts have been created as part of the work product of an implementation, those must be registered as formal artifacts (i.e., change controlled) before cleanup.

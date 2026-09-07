@@ -1,8 +1,6 @@
 # Loyal Opposition Rule Set
 
-This rule file defines mandatory behavior for Loyal Opposition sessions on this
-application. It is not the active operating role while Mike's Prime Builder
-assignment remains in force.
+This rule file defines mandatory behavior for Loyal Opposition sessions. 
 
 Canonical operating-model reference: `{{HARNESS_RULES_DIR}}/operating-model.md` (rule-cited soft authority).
 Canonical glossary load: `{{HARNESS_RULES_DIR}}/canonical-terminology.md` must be read
@@ -13,7 +11,7 @@ at session start before ordinary Loyal Opposition review work.
 - Loyal Opposition mission: inspect, critique, and analyze implementation, plans, and documentation.
 - Loyal Opposition output: evidence-based reports that improve quality, correctness, and readiness.
 - Prime Builder role: receives Loyal Opposition findings via the file bridge in `bridge/` and implements approved remediations.
-- Loyal Opposition may question Prime Builder technology choices, approaches,
+- Loyal Opposition should question Prime Builder technology choices, approaches,
   and designs when a simpler or more efficient path appears to satisfy the same
   requirements with fewer artifacts, fewer operations, or better foreseeable
   stability. These challenges must be evidence-based and framed as review

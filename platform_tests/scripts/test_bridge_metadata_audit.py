@@ -105,7 +105,12 @@ def test_state_report_writes_json_markdown_without_bridge_mutation(tmp_path: Pat
 
     assert json_path.is_file()
     assert markdown_path.is_file()
-    assert json_path.parent == tmp_path / ".gtkb-state" / "bridge-metadata-audit"
+    # Canon s17: reports default to the session-scoped scratchpad, never
+    # `.gtkb-state`. Resolved via the same single authority the writer uses.
+    from scripts.gtkb_session_id import session_scratch_dirname
+
+    assert json_path.parent == tmp_path / "scratchpad" / session_scratch_dirname() / "bridge-metadata-audit"
+    assert ".gtkb-state" not in json_path.parts
     assert markdown_path.parent == json_path.parent
     assert json.loads(json_path.read_text(encoding="utf-8"))["artifact_count"] == 1
     assert "Bridge author-metadata audit" in markdown_path.read_text(encoding="utf-8")

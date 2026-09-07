@@ -48,6 +48,7 @@ _AUTHOR_METADATA = (
 _PROJECT_METADATA = "Project Authorization: PAUTH-TEST-PROJECT-X\nProject: PROJECT-TEST-X\nWork Item: WI-9999\n"
 _SPEC_LINKS = "## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
 _REQ_SUFF = "## Requirement Sufficiency\n\nExisting requirements sufficient. Rationale prose here.\n"
+_SIMPLIFICATION = "## Simplification Accounting\n\nNothing gets smaller; this is a test fixture.\n"
 
 _HARNESS_SURFACE_TARGET = 'target_paths: [".claude/hooks/bridge-compliance-gate.py"]\n'
 _OFF_SURFACE_TARGET = 'target_paths: ["scripts/example.py"]\n'
@@ -101,6 +102,7 @@ def _proposal(
     parts.append(_SPEC_LINKS)
     parts.append("")
     parts.append(_REQ_SUFF)
+    parts.append(_SIMPLIFICATION)
     if disposition is not None:
         parts.append("")
         parts.append(disposition)

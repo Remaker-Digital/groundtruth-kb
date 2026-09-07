@@ -280,33 +280,26 @@ stripe
 # is intentionally NOT tracked here. The blanket .claude/* ignore covers it
 # without needing a separate name-specific rule. Each workstation regenerates
 # its own settings.local.json; do not migrate it across machines.
-.claude/*
-!.claude/settings.json
-!.claude/hooks/
-.claude/hooks/*
-!.claude/hooks/poller-freshness.py
-!.claude/hooks/credential-scan.py
-!.claude/hooks/*.py
-!.claude/rules/
-.claude/rules/*
-!.claude/rules/bridge-essential.md
-!.claude/rules/*.md
-# Dogfood install of canonical-terminology config for GT-KB self-doctor per
-# GTKB-GOV-TERM-PRIMER-STARTUP Slice 1 (S327, bridge -015 VERIFIED).
-!.claude/rules/canonical-terminology.toml
-!.claude/skills/
-.claude/skills/*
-!.claude/skills/*/
-!.claude/skills/*/SKILL.md
-!.claude/skills/*/references/
-!.claude/skills/*/references/*.md
-!.claude/skills/*/scripts/
-!.claude/skills/*/scripts/*.py
-!.claude/skills/*/helpers/
-!.claude/skills/*/helpers/*.py
-!.claude/commands/
-.claude/commands/*
-!.claude/commands/registry.json
+# Generated harness projection roots (WI-6691). Each root below is projected
+# from .harness-baseline-configuration by
+# scripts/harness_projection/project_harness.py, invoked per harness as
+#   python scripts/harness_projection/project_harness.py --harness <name>
+# (there is no `gt harness project` subcommand; `gt harness` exposes registry
+# operations only). The roster lives in scripts/harness_projection/profiles.toml. Per
+# GOV-HARNESS-NEUTRAL-BASELINE-001 the baseline is the tracked source of truth
+# and these are derived copies, so they are ignored rather than tracked.
+#
+# Do NOT re-add negation entries re-including projected paths. The S294 lesson
+# (if it is essential, it must be tracked) is satisfied at the baseline, which
+# is tracked; negations here re-enter every projected file into the
+# protected-commit population. Enforced by
+# platform_tests/scripts/test_projected_roots_untracked.py.
+.agent/
+.api-harness/
+.claude/
+.codex/
+.cursor/
+.goose/
 
 .kiro/
 cookies.txt
@@ -619,8 +612,14 @@ archive/worktrees/
 /.temp_draft_*.md
 /gtkb-wi*-draft.*
 # Bridge coordination files (ephemeral runtime state per Canon §1, GOV-FILE-BRIDGE-AUTHORITY-001, and WI-6530)
-bridge/
-bridge/*
+# WI-7671: anchored to the repository root. Unanchored, these patterns matched a
+# directory named `bridge` at ANY depth, so they silently ignored every new
+# module added to the Python package groundtruth-kb/src/groundtruth_kb/bridge/.
+# The 26 modules already there stayed tracked only because git ignores untracked
+# files alone, which hid the defect until WI-7118 tried to add the vocabulary
+# single source that SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001 clause 5 requires.
+/bridge/
+/bridge/*
 
 # Skill-helper verdict/body drafts (scratch produced while authoring verdicts).
 .claude/skills/gtkb-bridge/helpers/draft-*.md

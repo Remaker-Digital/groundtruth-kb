@@ -81,8 +81,6 @@ gt projects list --field source_project_name:"Backlog Triage and Hygiene" --json
 gt projects list --match name:*DISPATCHER* --sort rank --json
 gt projects show <PROJECT-ID>
 gt projects show <PROJECT-ID> --json
-gt projects authorizations <PROJECT-ID>
-gt projects authorizations <PROJECT-ID> --json
 ```
 
 Mutating operations require `--change-reason` and append a new MemBase version:
@@ -94,8 +92,8 @@ gt projects add-item <PROJECT-ID> <WI-ID> --order 1 --change-reason "<reason>"
 gt projects reorder <PROJECT-ID> <WI-ID> <WI-ID> --change-reason "<reason>"
 gt projects retire <PROJECT-ID> --change-reason "<reason>"
 gt projects link-bridge <PROJECT-ID> <bridge-thread-slug> --change-reason "<reason>"
-gt projects authorize <PROJECT-ID> --owner-decision <DELIB-ID> --name "<name>" --scope "<scope>" --change-reason "<reason>"
-gt projects revoke-authorization <PAUTH-ID> --change-reason "<reason>"
+gt projects update <PROJECT-ID> --activation-status authorized --change-reason "<owner-directed reason>"
+gt projects update <PROJECT-ID> --activation-status "not authorized" --change-reason "<owner-directed reason>"
 ```
 
 Use `--json` when another tool or agent needs machine-readable output.
@@ -150,7 +148,7 @@ values, and contradictory lifecycle transitions fail without mutation.
 Readiness output names the dependency, both endpoints, current and required
 states, satisfaction, the affected or blocked gate, provenance, and a recovery
 route. An unsatisfied edge blocks only its declared gate. Dependency
-satisfaction and ordering never grant project authorization, bridge `GO`, work
+satisfaction and ordering never change project `activation-status`, grant bridge `GO`, work
 intent, implementation-start authority, or protected-file mutation authority.
 Rendered DAGs and cached projections are views only; use
 `gt projects dependencies validate --json` when current authority is required.
@@ -170,9 +168,9 @@ Rendered DAGs and cached projections are views only; use
   membership set exactly, so omitted or extra work items fail closed.
 - If a requested operation would update multiple projects or bulk-update work
   items, stop and file a follow-on bridge proposal or dry-run inventory packet.
-- A project authorization is owner-approval evidence for a bounded project; it
-  does not bypass bridge proposal review, `GO`, `target_paths`, implementation
-  reports, or Loyal Opposition verification.
+- Only an owner-directed update may change the project's `activation-status`.
+  The field does not bypass bridge proposal review, `GO`, `target_paths`,
+  implementation reports, or Loyal Opposition verification.
 
 ## Verification
 

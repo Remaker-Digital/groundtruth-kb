@@ -12,6 +12,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
+from groundtruth_kb.bridge.vocabulary import (
+    LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
+    PRIME_ACTIONABLE_STATUSES,
+)
+
 PRIME_BUILDER_ROLE: Final[str] = "prime-builder"
 LOYAL_OPPOSITION_ROLE: Final[str] = "loyal-opposition"
 
@@ -20,13 +25,26 @@ STATUS_REVISED: Final[str] = "REVISED"
 STATUS_GO: Final[str] = "GO"
 STATUS_NO_GO: Final[str] = "NO-GO"
 STATUS_NO_ACTION: Final[str] = "NO-ACTION"
+STATUS_VERDICT_REJECTED: Final[str] = "VERDICT-REJECTED"
 STATUS_VERIFIED: Final[str] = "VERIFIED"
 STATUS_ADVISORY: Final[str] = "ADVISORY"
 STATUS_DEFERRED: Final[str] = "DEFERRED"
 STATUS_WITHDRAWN: Final[str] = "WITHDRAWN"
+STATUS_READY: Final[str] = "READY"
+STATUS_NOT_READY: Final[str] = "NOT-READY"
 
-PRIME_ACTIONABLE_STATUSES: Final[frozenset[str]] = frozenset({STATUS_GO, STATUS_NO_GO})
-LOYAL_OPPOSITION_ACTIONABLE_STATUSES: Final[frozenset[str]] = frozenset({STATUS_NEW, STATUS_REVISED, STATUS_NO_ACTION})
+# Re-exported from the canonical vocabulary rather than restated (WI-7705).
+#
+# These were independent literals until now, and they drifted: the sets omitted
+# READY and NOT-READY while retaining retired NO-ACTION, which made every READY
+# thread unreachable from the Loyal Opposition queue and every NOT-READY thread
+# unreachable from the Prime queue. A hand-correction then restored the correct
+# VALUES while leaving them a second definition, so an identity check against
+# the vocabulary objects still failed and the sets could drift again.
+#
+# Binding the names to the canonical objects is what removes the drift class:
+# equality can be restored by hand, identity cannot be faked. The membership is
+# unchanged by this edit, so the behaviour delta at merge is zero.
 OWNER_VISIBLE_STATUSES: Final[frozenset[str]] = frozenset({STATUS_ADVISORY})
 TERMINAL_OR_CLOSED_STATUSES: Final[frozenset[str]] = frozenset({STATUS_VERIFIED, STATUS_DEFERRED, STATUS_WITHDRAWN})
 VERIFIED_CONTEXT_STATUSES: Final[frozenset[str]] = frozenset({STATUS_VERIFIED})
@@ -123,17 +141,24 @@ def _action_role_for_status(status: str) -> str | None:
 def _reason_for_actionable(status: str) -> tuple[str, str]:
     if status in {STATUS_NEW, STATUS_REVISED}:
         return "lo_review_required", "review"
-    if status == STATUS_NO_ACTION:
+    if status == STATUS_VERDICT_REJECTED:
         return "lo_no_action_review_required", "review_no_action"
     if status == STATUS_GO:
         return "prime_go_continuation", "implement_or_continue"
     if status == STATUS_NO_GO:
         return "prime_revision_required", "revise"
+    if status == "READY":
+        return "lo_verification_required", "verify"
+    if status == "NOT-READY":
+        return "prime_report_correction_required", "revise_report"
     return "unknown_status", "none"
 
 
 def _reason_for_non_actionable(status: str, expected_role: str | None) -> tuple[str, str]:
-    if status in {STATUS_NEW, STATUS_REVISED, STATUS_NO_ACTION} and expected_role == LOYAL_OPPOSITION_ROLE:
+    if (
+        status in {STATUS_NEW, STATUS_REVISED, STATUS_READY, STATUS_VERDICT_REJECTED}
+        and expected_role == LOYAL_OPPOSITION_ROLE
+    ):
         return "wrong_role_lo_review", "loyal_opposition_review"
     if status in {STATUS_GO, STATUS_NO_GO} and expected_role == PRIME_BUILDER_ROLE:
         return "wrong_role_prime_continuation", "prime_builder_continuation"

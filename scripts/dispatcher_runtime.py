@@ -6741,17 +6741,6 @@ def run_dispatch_cycle(
         _cleanup_stale_tmp_files(state_dir)
         retention_result = _apply_runtime_evidence_retention(project_root, state_dir)
 
-        # Slice 1 of gtkb-operating-mode-transaction-001: drain any pending
-        # mode-switch transactions BEFORE recipient resolution so a deferred
-        # role/topology change takes effect for the dispatch target selection
-        # below. Fail-soft per design: failures do not abort the trigger.
-        try:
-            from groundtruth_kb.mode_switch.pending import apply_pending as _apply_pending
-
-            _apply_pending(project_root)
-        except Exception:  # noqa: BLE001 - fail-soft per spec acceptance criterion #6
-            pass
-
         # Substrate check: if dispatcher_daemon is not the active substrate,
         # record substrate mismatch skip and exit inertly.
         if not _is_dispatcher_daemon_active_substrate(project_root):

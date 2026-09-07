@@ -4,13 +4,13 @@ This document provides active guidance for AI assistants working on the GroundTr
 
 For application-scope guidance (Application Identity, Copyright, Adding Commercial Features, Branching Strategy, Hotfix Workflow), see [`applications/Agent_Red/CLAUDE.md`](applications/Agent_Red/CLAUDE.md). Application-scope files are consulted only when the active work subject is `application` and the named application is Agent Red.
 
-**Role precedence:** Your role is identified in prompts by the "::init" command line, which also indicates the subject of the session envelope (e.g., "gtkb") and the role of the session-context should take when processing the inputs during contiguous session-context turns (e.g., "pb" for Prime Builder and "lo" for Loyal Opposition, or the `roles` subcommand under `gt harness`.  Remember: no session context may ever formally review its own prior work. Interactive sessions MAY override dispatcher/default role metadata for in-session surfaces (SessionStart disclosure, AXIS 2 Claude-native surface, focus menu, MemBase attribution, AUQ routing) when the owner gives explicit role direction in the transcript, including the canonical init keyword `::init gtkb (pb|lo)`. That transcript-defined role persists across compaction, resume, and contiguous SessionStart-like boundaries within the same interactive context until the owner explicitly changes it. Runtime marker files such as `.claude/session/active-session-role.json` may cache the resolved role, but they are not dispatcher/default authority. Headless dispatch routing remains keyed to the dispatcher role set per `GOV-SESSION-ROLE-AUTHORITY-001`, `DCL-SESSION-ROLE-RESOLUTION-001`, `ADR-ROLE-AUTHORITY-INTERACTIVE-PERSISTENCE-001`, and `DCL-INTERACTIVE-SESSION-ROLE-PERSISTENCE-001`.
+**Role precedence:** The exact `::init gtkb <pb|lo>` declaration establishes the role of one session context. The owner supplies it directly in an interactive context; a dispatchable bridge item supplies it in an authored header. The role is immutable for that context. Harnesses, vendors, models, processes, workstations, installations, and invocation kinds are role-neutral. No session context may formally review its own prior work.
 
 **📁 Platform session memory** (state and bootstrap): `memory/MEMORY.md` — the in-repo GT-KB notepad preserves session state and artifact access hints; authoritative project knowledge lives in MemBase and governed in-root artifacts. Home-directory auto-memory is a non-authoritative harness cache and must be reconciled only through an owner-approved in-root export/snapshot.
 
 ### Canonical Terminology
 
-Load `.claude/rules/canonical-terminology.md` at session start; the operating-model glossary in `.claude/rules/operating-model.md` §2 is the rule-cited soft-authority baseline for `application`, `project`, `platform`, `hosted application`, `work item`, `backlog`, `specification`, `requirement`, `implementation proposal`, `implementation report`, `verification`, `release`, `MemBase`, `Deliberation Archive`, and `dashboard`. **Adopter:** an application that consumes GT-KB (like Agent Red Customer Experience). **AI coding harness:** a concrete AI-assisted development environment (e.g., Claude Code, Codex CLI); roles attach to harnesses by owner assignment, not by vendor.
+Load `.harness-baseline-configuration/rules/canonical-terminology.md` at session start; the operating-model glossary in `.harness-baseline-configuration/rules/operating-model.md` §2 is the rule-cited soft-authority baseline for `application`, `project`, `platform`, `hosted application`, `work item`, `backlog`, `specification`, `requirement`, `implementation proposal`, `implementation report`, `verification`, `release`, `MemBase`, `Deliberation Archive`, and `dashboard`. **Adopter:** an application that consumes GT-KB (like Agent Red Customer Experience). **AI coding harness:** a concrete AI-assisted development environment (e.g., Claude Code, Codex CLI).
 
 ### Mandatory Project Root Boundary
 
@@ -23,14 +23,14 @@ required from outside that root. GT-KB application files MUST be within
 GT-KB, Agent Red, harness-state, bridge, dashboard, memory, source,
 verification, or dependency location.
 
-Apply `.claude/rules/project-root-boundary.md` to all GT-KB work, all
+Apply `.harness-baseline-configuration/rules/project-root-boundary.md` to all GT-KB work, all
 implementation proposals, all Codex reviews, all tests, all dashboard
 generation, all harness configuration, and all applications developed or
 managed by GT-KB.
 
 ### CLAUDE.md vs MEMORY.md Boundary
 
-CLAUDE.md = rules & behavior (how to work: procedures, mandates; updated rarely). MEMORY.md = state & bootstrap (what has been done, how to access artifacts; updated every session). **All project knowledge lives in MemBase** (`groundtruth.db` per `.claude/rules/operating-model.md` §2) — not markdown files. Version numbers, image tags, and environment values go in MEMORY.md only. Future-work proposals, enhancement candidates, and backlog items go to MemBase `work_items`, not MEMORY.md.
+CLAUDE.md = rules & behavior (how to work: procedures, mandates; updated rarely). MEMORY.md = state & bootstrap (what has been done, how to access artifacts; updated every session). **All project knowledge lives in MemBase** (`groundtruth.db` per `.harness-baseline-configuration/rules/operating-model.md` §2) — not markdown files. Version numbers, image tags, and environment values go in MEMORY.md only. Future-work proposals, enhancement candidates, and backlog items go to MemBase `work_items`, not MEMORY.md.
 
 ### Session ID Convention
 
@@ -42,11 +42,9 @@ Recent Sessions entries key off the session's own session_context_id (the sessio
 
 **Owner role:** Provides direction (actions to take) and decisions (specifications to create, approve, or modify). The owner supplies the *what* and *why*.
 
-**Prime Builder role:** Creates, manages, maintains and frequently references implementation artifacts. Proposes specifications, implements approved changes, runs tests, and keeps the system internally consistent. Prime Builder is responsible for the *how* during implementation work. Any registered harness may hold this role by owner assignment.
+**Prime Builder role:** Creates, manages, maintains and frequently references implementation artifacts. Proposes specifications, implements approved changes, runs tests, and keeps the system internally consistent. Prime Builder is responsible for the *how* during implementation work.
 
-**Loyal Opposition role:** Inspects, critiques, and analyzes plans, code, prompts, hooks, permissions, and configuration behavior. Loyal Opposition produces evidence-based reports for Prime Builder and does not implement or modify existing files unless Mike explicitly authorizes that work. Any registered harness may hold this role by owner assignment.
-
-**Dispatchability:** Role assignment is independent from headless dispatch eligibility. Dispatch targets are controlled by `config/dispatcher/rules.toml` and the projected `can_receive_dispatch` axis; event sources are controlled by `can_fire_events`. Multiple active harnesses may hold the same operating role while only some of them receive dispatched bridge work. For dispatcher topology, dispatchability, selected targets, rule eligibility, or dispatch health, use the `bridge-config` skill or `gt bridge dispatch config|status|health`. Current queue authority is dispatcher/TAFE state plus status-bearing numbered bridge files.
+**Loyal Opposition role:** Inspects, critiques, and analyzes plans, code, prompts, hooks, permissions, and configuration behavior. Loyal Opposition produces evidence-based reports for Prime Builder and does not implement or modify existing files unless Mike explicitly authorizes that work.
 
 **GroundTruth KB vision filter:** For GroundTruth-related work, prefer choices that reduce the owner's role to adding or refining specifications, answering clarification questions, and making explicit trade-off decisions. Flag approaches that leave routine implementation, deployment plumbing, traceability reconciliation, generated-artifact inspection, or cross-agent process state with the owner.
 
@@ -54,7 +52,7 @@ Recent Sessions entries key off the session's own session_context_id (the sessio
 
 **The artifact system exists to serve communication.** When the owner and Claude say each say "Specification", "Test", "Test Plan", "Work Item", "Backlog", "Operational Procedure", "Document", or "Environment Config" both must be referring to the same real, verifiable, historically traceable thing.
 
-**Operating procedure.** Dispatcher-backed bridge protocol. See `.claude/rules/file-bridge-protocol.md` and `.claude/rules/bridge-essential.md` only for legacy helper behavior and historical audit interpretation.
+**Operating procedure.** Dispatcher-backed bridge protocol. See `.harness-baseline-configuration/rules/file-bridge-protocol.md` and `.harness-baseline-configuration/rules/bridge-essential.md` only for legacy helper behavior and historical audit interpretation.
 
 - **DO NOT implement anything without first preparing an implementation proposal and having it reviewed by Codex.**
 - **All implementation proposals MUST be reviewed by Codex before any code is written.**
@@ -75,7 +73,7 @@ Recent Sessions entries key off the session's own session_context_id (the sessio
 
 ## Artifacts and Change Control
 
-**9 managed artifact types + 2 supporting records** in KB (`groundtruth.db`). See application-side architecture documentation (when active) for application-specific schema details; for platform-side artifact authority, see `.claude/rules/operating-model.md`.
+**9 managed artifact types + 2 supporting records** in KB (`groundtruth.db`). See application-side architecture documentation (when active) for application-specific schema details; for platform-side artifact authority, see `.harness-baseline-configuration/rules/operating-model.md`.
 
 **Key principles:** Append-only versioning (`UNIQUE(id, version)`), no UPDATE/DELETE. Orchestrating artifacts (test plan, backlog) reference other artifacts by ID without duplicating content (SPEC-1499).
 
@@ -126,9 +124,7 @@ All GOV specs are stored in KB with `type = 'governance'`. Quick reference:
 | GOV-FILE-BRIDGE-AUTHORITY-001 | Legacy file-bridge compatibility authority and permanent bridge repair authority |
 | GOV-GLOSSARY-AS-DA-READ-SURFACE-001 | Canonical glossary is the Deliberation Archive's primary read surface |
 | GOV-GTKB-ADOPTION-ENFORCEMENT-001 | A GroundTruth-KB adopter application must adopt and enforce available GT-KB governance capabilities |
-| GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001 | GT-KB installs must prepare capable harnesses for Prime Builder and Loyal Opposition roles |
 | GOV-HARNESS-ONBOARDING-CONTRACT-001 | Harness Onboarding Contract -- required artifacts, machine-checkable assertions, and capability floor for any new GT-KB coding harness |
-| GOV-HARNESS-ROLE-PORTABILITY-001 | Prime Builder and Loyal Opposition are portable harness-assigned roles |
 | GOV-HARNESS-STATE-SOT-CONSOLIDATION-001 | Harness State Source-of-Truth Consolidation |
 | GOV-LO-ADVISORY-OWNER-GRILLING-GATE-001 | LO Advisory Owner-Grilling Gate Before Implementation Proposal |
 | GOV-MAJOR-RELEASE-CONTENT-GOAL-001 | Standing Major-Release Content Goal |
@@ -141,7 +137,6 @@ All GOV specs are stored in KB with `type = 'governance'`. Quick reference:
 | GOV-REQUIREMENTS-COLLECTION-HOOK-001 | A UserPromptSubmit hook MUST classify each owner message and force 3-option clarification when a requirement candidate is detected |
 | GOV-SESSION-FORMALIZATION-AUDIT-001 | Session decisions and principles require artifact mapping audit |
 | GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001 | Sessions actively inform and engage the user with project priorities and suggested actions |
-| GOV-SESSION-ROLE-AUTHORITY-001 | Session Role Authority Split - Durable vs Session-Stated |
 | GOV-SESSION-SELF-INITIALIZATION-001 | Fresh sessions self-initialize with live role, governance, bridge, dashboard, priorities, and token context |
 | GOV-SOURCE-OF-TRUTH-FRESHNESS-001 | Source-of-truth freshness: state claims derive from fresh canonical reads |
 | GOV-SPEC-CAPTURE-TRANSPARENCY-001 | Specification capture transparency: surface every capture event + present full text on approve/reject |
@@ -240,7 +235,7 @@ Use the `bridge-config` skill or `gt bridge dispatch status|health` for dispatch
 
 ### Deliberation Archive Protocol
 
-**Deliberation search is mandatory before proposals and reviews.** See `.claude/rules/deliberation-protocol.md` for full rules.
+**Deliberation search is mandatory before proposals and reviews.** See `.harness-baseline-configuration/rules/deliberation-protocol.md` for full rules.
 
 - **Before proposing:** Search `search_deliberations()` for prior reviews on the same spec/WI/component. Cite DELIB-IDs in proposals.
 - **Before reviewing:** Search for prior deliberations. Add "Prior Deliberations" section to reviews.
@@ -259,7 +254,7 @@ Provide brief inline coaching notes (prefixed with "💡 **Feedback:**") when ob
 
 ### AskUserQuestion as the Only Valid Owner-Decision Channel
 
-Prime Builder collects owner decisions through `AskUserQuestion` exclusively. Prose decision-asks are invalid. See `.claude/rules/prime-builder-role.md` § AskUserQuestion as the Only Valid Owner-Decision Channel for the full enforcement contract (Stop-mode hook detection, prose-pattern matching, `memory/pending-owner-decisions.md` recording).
+Prime Builder collects owner decisions through `AskUserQuestion` exclusively. Prose decision-asks are invalid. See `.harness-baseline-configuration/rules/prime-builder-role.md` § AskUserQuestion as the Only Valid Owner-Decision Channel for the full enforcement contract (Stop-mode hook detection, prose-pattern matching, `memory/pending-owner-decisions.md` recording).
 
 In-scope decision classes (use `AskUserQuestion`, never prose): approvals, waivers, priority choices, formal artifact approvals, requirement clarifications, destructive actions, deployments, blocking owner decisions.
 

@@ -21,7 +21,7 @@ Behavior:
    bridge files.
 2. Compute the role-actionable signature using the no-index bridge scanner.
 3. Read session-scoped surface cache at
-   .gtkb-state/bridge-poller/axis-2-surface/<session-id>.json.
+   scratchpad/<session>/axis-2-surface/<session-id>.json.
 4. If current_signature != last_surfaced_signature AND selected_count > 0:
    emit additionalContext markdown block; update cache atomically.
 5. Otherwise: silent no-op.
@@ -32,7 +32,7 @@ Suppression:
 - Env var GTKB_NO_AXIS_2_SURFACE=1 → hook no-ops immediately (emergency stop).
 
 Fire-and-forget: always exits 0. Errors append to
-.gtkb-state/bridge-poller/axis-2-surface/errors.jsonl for diagnosis.
+scratchpad/<session>/axis-2-surface/errors.jsonl for diagnosis.
 
 Stdin:  JSON hook event payload (harness hook-event contract)
 Stdout: empty (silent no-op) or markdown additionalContext block.
@@ -72,8 +72,6 @@ _ROLE_HEADING = {
     ROLE_LO: "Loyal Opposition",
 }
 
-STATE_DIR_REL = ".gtkb-state/bridge-poller/axis-2-surface"
-ERRORS_LOG_REL = ".gtkb-state/bridge-poller/axis-2-surface/errors.jsonl"
 # Session-id env-var membership is owned by scripts/gtkb_session_id.py
 # (WI-4270 shared resolver unification; bridge/gtkb-session-id-shared-resolver-
 # unification-003 GO at -004). Import the canonical bridge work-intent order;
@@ -94,6 +92,19 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
         "ANTIGRAVITY_SESSION_ID",
         "GTKB_SESSION_ID",
     )
+
+try:
+    from scripts.gtkb_session_id import session_scratch_dirname as _session_scratch_dirname
+except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
+
+    def _session_scratch_dirname() -> str:
+        return "unknown"
+
+
+# Canon s17: axis-2 surface state is session-scoped scratch under the canonical
+# scratchpad root, never `.gtkb-state` (and never the retired bridge-poller tree).
+STATE_DIR_REL = f"scratchpad/{_session_scratch_dirname()}/axis-2-surface"
+ERRORS_LOG_REL = f"{STATE_DIR_REL}/errors.jsonl"
 
 
 def _now_iso() -> str:

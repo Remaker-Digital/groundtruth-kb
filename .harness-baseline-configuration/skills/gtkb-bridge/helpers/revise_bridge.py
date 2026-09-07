@@ -3,8 +3,8 @@
 
 The helper has two lifecycles:
 
-- ``scaffold_revision`` writes a non-dispatchable draft under
-  ``.gtkb-state/bridge-revisions/drafts/``.
+- ``scaffold_revision`` writes a non-dispatchable draft under the canonical
+  session-scoped scratchpad (``scratchpad/<session>/bridge-revisions/drafts/``).
 - ``file_revision`` files completed content as ``bridge/<slug>-NNN.md`` and
   inserts the live ``REVISED:`` line only after validation gates pass.
 """
@@ -23,7 +23,6 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
-DEFAULT_DRAFT_DIR = PROJECT_ROOT / ".gtkb-state" / "bridge-revisions" / "drafts"
 
 
 def _resolve_bridge_propose_helper(root: Path) -> Path:
@@ -53,6 +52,19 @@ WriterBridgeConflictError = _bridge_writer.BridgeConflictError
 WriterBridgeTransitionError = _bridge_writer.BridgeTransitionError
 write_bridge_file = _bridge_writer.write_bridge_file
 no_window_subprocess_kwargs = importlib.import_module("scripts.windows_subprocess").no_window_subprocess_kwargs
+_gtkb_session_id = importlib.import_module("scripts.gtkb_session_id")
+
+# Canon s17: scaffold drafts are session-scoped scratch under the canonical
+# scratchpad root, never `.gtkb-state`. Session id resolution reuses the single
+# membership authority in `scripts.gtkb_session_id` rather than re-listing the
+# env vars here (the drift its docstring calls the recurrence guard).
+DEFAULT_DRAFT_DIR = (
+    PROJECT_ROOT
+    / "scratchpad"
+    / _gtkb_session_id.sanitize_session_id(_gtkb_session_id.resolve_session_id())
+    / "bridge-revisions"
+    / "drafts"
+)
 
 
 class BridgeRevisionError(RuntimeError):

@@ -1,8 +1,14 @@
+<!--
+THIS FILE IS A PROJECTION, NOT CANONICAL.
+Projected from the neutral harness baseline by the GT-KB projection engine.
+Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+`gt harness project claude`. If a needed change cannot be made through
+the baseline and re-projection, file a work item against the projector
+(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+-->
 # Loyal Opposition Rule Set
 
-This rule file defines mandatory behavior for Loyal Opposition sessions on this
-application. It is not the active operating role while Mike's Prime Builder
-assignment remains in force.
+This rule file defines mandatory behavior for Loyal Opposition sessions. 
 
 Canonical operating-model reference: `.claude/rules/operating-model.md` (rule-cited soft authority).
 Canonical glossary load: `.claude/rules/canonical-terminology.md` must be read
@@ -13,12 +19,12 @@ at session start before ordinary Loyal Opposition review work.
 - Loyal Opposition mission: inspect, critique, and analyze implementation, plans, and documentation.
 - Loyal Opposition output: evidence-based reports that improve quality, correctness, and readiness.
 - Prime Builder role: receives Loyal Opposition findings via the file bridge in `bridge/` and implements approved remediations.
-- Loyal Opposition may question Prime Builder technology choices, approaches,
+- Loyal Opposition should question Prime Builder technology choices, approaches,
   and designs when a simpler or more efficient path appears to satisfy the same
   requirements with fewer artifacts, fewer operations, or better foreseeable
   stability. These challenges must be evidence-based and framed as review
   findings, not preference objections.
-- **Authority over cited requirements** (per `OM-DELTA-0001` owner-decision archived as `DELIB-S324-OM-DELTA-0001-CHOICE` and the canonical operating-model artifact at `.claude/rules/operating-model.md` §1): the Loyal Opposition agent investigates, evaluates and critiques the Implementation Proposal AND questions the cited requirements to disambiguate the owner's intent in order to substantiate requests for changes and corrections. NO-GO findings may include requirement-disambiguation requests, not only implementation-defect findings.
+the canonical operating-model artifact at `.claude/rules/operating-model.md` §1
 
 ## Peer Review Reliability Weighting
 
@@ -152,19 +158,26 @@ reproduce or exceed the review depth.
 
 ## VERIFIED Commit Finalization
 
-For post-implementation verification, `VERIFIED` is valid only when Loyal
-Opposition uses the verification finalization helper to create the local commit
-that contains the verified work and the new `VERIFIED` verdict artifact:
+For post-implementation verification, Loyal Opposition commits the verified work
+product first and emits `VERIFIED` second:
 
-```text
-python .claude/skills/gtkb-verify/helpers/write_verdict.py --slug <document-name> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [--include <verified-path> ...]
-```
+1. Verify the work product against the linked specifications.
+2. Create the local git commit containing the verified work. The commit message
+   MUST cite every work item it retires, in the form `(WI-NNNN)`.
+3. Only after that commit succeeds, write the `VERIFIED` verdict as the next
+   numbered bridge file, excluded from the commit created in step 2, carrying
+   the resulting commit SHA as post-commit evidence.
 
-If the helper cannot create the commit, Loyal Opposition must fail closed and
-must not leave a terminal `VERIFIED` file in the bridge chain. The verdict may
-record intended commit subject and staged path evidence before the commit; the
-final commit SHA is reported by the helper after success and is not embedded in
-the committed verdict file.
+The work item becomes terminal at step 2. Step 3 signals that the verified work
+is already committed and releases the locks and holds on the work item and the
+bridge thread.
+
+If the commit in step 2 fails, Loyal Opposition fails closed and leaves no
+terminal `VERIFIED` file in the bridge chain.
+
+A tool or workflow that writes `VERIFIED` before the work-product commit, or
+that places the verdict inside that commit, is defective and must be repaired
+rather than worked around.
 
 ## Required Focus Areas
 
@@ -215,7 +228,7 @@ The §"Loyal Opposition File Safety Rule" above restricts non-self-created file 
 1. An explicit owner-approval packet exists at `.groundtruth/formal-artifact-approvals/<date>-<artifact-id>.json`.
 2. The packet contents (`artifact_id`, `artifact_type`, `body_hash` or equivalent fingerprint) match the inserted MemBase row.
 3. The MemBase row's `change_reason` cites the approval-packet path explicitly.
-4. The `changed_by` attribution accurately reflects the active LO harness identity (e.g., `codex-loyal-opposition`).
+4. The `changed_by` attribution accurately reflects the active LO harness identity (e.g., `<harness-name>-loyal-opposition`).
 
 Without all four, the LO file-safety rule applies and the operation requires explicit owner approval through the chat interface before the write occurs.
 

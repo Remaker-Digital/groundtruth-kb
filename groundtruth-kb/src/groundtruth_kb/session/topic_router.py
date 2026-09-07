@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 import sys
 from dataclasses import dataclass
@@ -12,15 +11,19 @@ from typing import Any, Literal
 from groundtruth_kb.activity.ops import render_ops_activity_context
 from groundtruth_kb.activity.profiles import ActivityProfile, ActivityProfileError, load_activity_profiles
 from groundtruth_kb.session.envelope import (
+    TOPIC_TYPE_ALIASES,
     TOPIC_TYPES,
     EnvelopeError,
     close_current_topic,
     close_topic,
+    normalize_topic_type,
     open_topic,
     utc_now_iso,
 )
 
-_TOPIC_TYPE_PATTERN = "|".join(TOPIC_TYPES)
+# Aliases first: harmless under fullmatch, but correct if this is ever changed
+# to re.match, where "ops" would otherwise shadow "operations".
+_TOPIC_TYPE_PATTERN = "|".join((*TOPIC_TYPE_ALIASES, *TOPIC_TYPES))
 TOPIC_OPEN_RE = re.compile(rf"^::open (?P<topic>{_TOPIC_TYPE_PATTERN})$")
 # Single-active (SPEC-TOPIC-ENVELOPE-ROUTER-001 v3 / DCL-TOPIC-ENVELOPE-ROUTING-001
 # v3 clause 7): bare ``::close`` and the typed ``::close <type>`` are both accepted.
@@ -46,11 +49,11 @@ def parse_topic_command(prompt: str) -> TopicCommand | None:
     line = first_non_blank_line(prompt)
     open_match = TOPIC_OPEN_RE.fullmatch(line)
     if open_match:
-        return TopicCommand(action="open", topic_type=open_match.group("topic"), raw=line)
+        return TopicCommand(action="open", topic_type=normalize_topic_type(open_match.group("topic")), raw=line)
     close_match = TOPIC_CLOSE_RE.fullmatch(line)
     if close_match:
         # ``topic`` group is None for bare ``::close`` (close the current topic).
-        return TopicCommand(action="close", topic_type=close_match.group("topic"), raw=line)
+        return TopicCommand(action="close", topic_type=normalize_topic_type(close_match.group("topic")), raw=line)
     return None
 
 
@@ -79,10 +82,6 @@ def handle_topic_command(
         "project_root": str(project_root),
         "topic": topic,
     }
-    log_dir = project_root / ".gtkb-state" / "topic-envelope-router"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    with (log_dir / "events.jsonl").open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(result, sort_keys=True) + "\n")
     return result  # type: ignore[return-value]
 
 
@@ -247,15 +246,6 @@ def _project_root_from_result(result: dict[str, object]) -> Path | None:
         return None
 
 
-def _load_startup_module(project_root: Path):
-    root_text = str(project_root)
-    if root_text not in sys.path:
-        sys.path.insert(0, root_text)
-    from scripts import session_self_initialization as startup  # noqa: PLC0415
-
-    return startup
-
-
 def _activity_profile_for_operator_context(result: dict[str, object]) -> ActivityProfile | None:
     topic_type = result.get("topic_type")
     if result.get("action") != "open" or not isinstance(topic_type, str):
@@ -285,62 +275,42 @@ def _render_activity_stance_operator_context(profile: ActivityProfile) -> str:
     return "\n".join(lines)
 
 
+def _render_startup_briefing_live_query(profile: ActivityProfile) -> str:
+    """Express the startup briefing as a named live-query route, not an inline payload.
+
+    S6: the marker render path must not import or execute the startup service.
+    The operator receives a route to the briefing; the briefing is computed on
+    demand by the packet composer's live-query mechanism.
+    """
+    return "\n".join(
+        [
+            "### Session Startup Briefing",
+            "",
+            "- delivery: live_query_descriptor",
+            "- reason: computed on demand; not inlined on the marker render path",
+            f"- activity: {profile.name}",
+            "- route: `gt session envelope packet --kind activity`",
+        ]
+    )
+
+
 def _render_open_operator_context(result: dict[str, object]) -> str:
     if result.get("action") != "open":
         return ""
     profile = _activity_profile_for_operator_context(result)
-    if not _uses_startup_briefing(profile):
-        return _render_activity_stance_operator_context(profile)
-    project_root = _project_root_from_result(result)
-    if project_root is None:
+    if profile is None:
         return "\n".join(
             [
                 "## Open Activity Operator Context",
                 "",
                 "- status: unavailable",
-                "- reason: project root unavailable in topic-router result",
+                "- reason: activity disposition profile unavailable",
             ]
         )
-    try:
-        startup = _load_startup_module(project_root)
-        model = startup.build_startup_model(project_root, role_profile="prime-builder", fast_hook=True)
-        dashboard = startup.GRAFANA_DASHBOARD_URL
-        active_work_subject = startup.render_active_work_subject(
-            project_root,
-            snapshot=model.get("workstream_focus"),
-            overlay_status=model.get("session_overlay") or {},
-            include_counterpart=True,
-            include_overlay_note=False,
-            include_operational_instructions=False,
-        )
-        startup_briefing = startup._render_session_startup_briefing(model)
-        top_priorities = startup._render_top_priority_actions_section(model)
-    except Exception as exc:  # noqa: BLE001 - topic-open context must not block routing.
-        return "\n".join(
-            [
-                "## Open Activity Operator Context",
-                "",
-                "- status: unavailable",
-                f"- reason: {exc}",
-            ]
-        )
-    return "\n".join(
-        [
-            "## Open Activity Operator Context",
-            "",
-            f"- Dashboard: GroundTruth-KB Project Dashboard: {dashboard}",
-            "",
-            "### Active Work Subject",
-            "",
-            active_work_subject,
-            "",
-            "### Session Startup Briefing",
-            "",
-            startup_briefing,
-            "",
-            top_priorities,
-        ]
-    )
+    sections = [_render_activity_stance_operator_context(profile)]
+    if _uses_startup_briefing(profile):
+        sections.append(_render_startup_briefing_live_query(profile))
+    return "\n\n".join(sections)
 
 
 def _render_ops_context(result: dict[str, object]) -> str:

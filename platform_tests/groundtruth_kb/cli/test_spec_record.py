@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sqlite3
 import subprocess
@@ -57,10 +56,8 @@ def _record_args(config: Path, content: Path, *extra: str, spec_id: str = "GOV-T
         str(content),
         "--change-reason",
         "record owner-approved spec",
-        "--auq-id",
-        "S344-AUQ-SPEC-1",
-        "--auq-answer",
-        "Approved",
+        "--expected-version",
+        "0",
         *extra,
     ]
 
@@ -122,10 +119,7 @@ def _service_request(content: Path, **overrides: object) -> SpecRecordRequest:
         "status": "specified",
         "content_file": content,
         "change_reason": "record owner-approved spec",
-        "auq_id": "S344-AUQ-SPEC-1",
-        "auq_answer": "Approved",
-        "owner_presented": True,
-        "approved_by": None,
+        "expected_version": 0,
         "spec_type": None,
         "priority": None,
         "scope": None,
@@ -144,62 +138,63 @@ def _service_request(content: Path, **overrides: object) -> SpecRecordRequest:
     return SpecRecordRequest(**values)
 
 
-def test_record_requires_owner_presented_before_packet_or_db_write(tmp_path: Path) -> None:
-    root, config, content = _project(tmp_path)
-    result = CliRunner().invoke(main, _record_args(config, content))
-    assert result.exit_code != 0
-    assert "--owner-presented" in result.output
-    assert _spec_count(root / "groundtruth.db") == 0
-    assert _packet_files(root) == []
+def test_record_requires_expected_version_before_any_write(tmp_path: Path) -> None:
+    """Omitting the CAS assertion blocks the write instead of defaulting."""
 
-
-def test_record_requires_auq_evidence_before_packet_or_db_write(tmp_path: Path) -> None:
     root, config, content = _project(tmp_path)
-    args = _record_args(config, content, "--owner-presented")
-    args.remove("--auq-id")
-    args.remove("S344-AUQ-SPEC-1")
+    args = _record_args(config, content)
+    args.remove("--expected-version")
+    args.remove("0")
     result = CliRunner().invoke(main, args)
     assert result.exit_code != 0
-    assert "Missing option '--auq-id'" in result.output
+    assert "--expected-version" in result.output
     assert _spec_count(root / "groundtruth.db") == 0
     assert _packet_files(root) == []
 
 
-def test_dry_run_constructs_valid_packet_and_writes_nothing(tmp_path: Path) -> None:
+def test_record_rejects_nonzero_expected_version(tmp_path: Path) -> None:
+    """A nonzero expected version addresses an existing spec and belongs to update."""
+
     root, config, content = _project(tmp_path)
-    result = CliRunner().invoke(main, _record_args(config, content, "--owner-presented", "--dry-run", "--json"))
+    args = _record_args(config, content)
+    args[args.index("--expected-version") + 1] = "1"
+    result = CliRunner().invoke(main, args)
+    assert result.exit_code != 0
+    assert "--expected-version must be 0 for record" in result.output
+    assert _spec_count(root / "groundtruth.db") == 0
+    assert _packet_files(root) == []
+
+
+def test_dry_run_reports_intent_and_writes_nothing(tmp_path: Path) -> None:
+    """A dry run reports the intended operation and creates no row and no artifact."""
+
+    root, config, content = _project(tmp_path)
+    result = CliRunner().invoke(main, _record_args(config, content, "--dry-run", "--json"))
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    packet = payload["approval_packet"]
-    assert packet["artifact_type"] == "governance"
-    assert packet["artifact_id"] == "GOV-TEST-001"
-    assert packet["approved_by"] == "owner"
-    assert packet["full_content"] == content.read_text(encoding="utf-8")
-    assert (
-        packet["full_content_sha256"] == hashlib.sha256(content.read_text(encoding="utf-8").encode("utf-8")).hexdigest()
-    )
-    assert packet["postimage_fields"] == {
-        "title": "Test spec",
-        "status": "specified",
-        "priority": None,
-        "scope": None,
-        "section": None,
-        "handle": None,
-        "tags": None,
-        "assertions": None,
-        "constraints": None,
-        "affected_by": None,
-        "testability": None,
-        "source_paths": None,
-        "application_scope": None,
-    }
+
+    assert payload["created"] is False
     assert payload["dry_run"] is True
-    assert Path(payload["approval_packet_path"]).name.endswith("-gov-test-001.json")
+    assert payload["replayed"] is False
+    assert payload["expected_version"] == 0
+    assert payload["id"] == "GOV-TEST-001"
+    assert payload["row"] is None
+    assert payload["db_operation"] == {
+        "method": "insert_spec",
+        "id": "GOV-TEST-001",
+        "type": "governance",
+        "status": "specified",
+    }
+    # Persistence is intrinsic: no approval surface is emitted at all.
+    assert "approval_packet" not in payload
+    assert "approval_packet_path" not in payload
     assert _spec_count(root / "groundtruth.db") == 0
     assert _packet_files(root) == []
 
 
-def test_structured_record_packet_matches_writer_inputs_and_persisted_postimage(tmp_path: Path) -> None:
+def test_structured_record_postimage_matches_persisted_row(tmp_path: Path) -> None:
+    """The dry-run intent and the persisted row agree on the complete postimage."""
+
     root, config, content = _project(tmp_path)
     structured_args = (
         "--priority",
@@ -241,26 +236,21 @@ def test_structured_record_packet_matches_writer_inputs_and_persisted_postimage(
         "application_scope": "gtkb_platform",
     }
 
-    dry_result = CliRunner().invoke(
-        main,
-        _record_args(config, content, "--owner-presented", "--dry-run", "--json", *structured_args),
-    )
+    dry_result = CliRunner().invoke(main, _record_args(config, content, "--dry-run", "--json", *structured_args))
     assert dry_result.exit_code == 0, dry_result.output
-    dry_payload = json.loads(dry_result.output)
-    assert dry_payload["approval_packet"]["postimage_fields"] == expected
+    assert json.loads(dry_result.output)["row"] is None
+    assert _spec_count(root / "groundtruth.db") == 0
 
-    write_result = CliRunner().invoke(
-        main,
-        _record_args(config, content, "--owner-presented", "--json", *structured_args),
-    )
+    write_result = CliRunner().invoke(main, _record_args(config, content, "--json", *structured_args))
     assert write_result.exit_code == 0, write_result.output
     write_payload = json.loads(write_result.output)
-    assert write_payload["approval_packet"]["postimage_fields"] == expected
-    assert write_payload["approval_packet"]["postimage_sha256"] == dry_payload["approval_packet"]["postimage_sha256"]
+    assert write_payload["created"] is True
+    assert write_payload["replayed"] is False
 
     row = _spec_row(root / "groundtruth.db", "GOV-TEST-001")
     assert row is not None
     assert _semantic_postimage(row) == expected
+    assert _packet_files(root) == []
 
 
 def test_gap_state_spec_capture_dry_run_carries_context_and_writes_nothing(tmp_path: Path) -> None:
@@ -273,13 +263,12 @@ def test_gap_state_spec_capture_dry_run_carries_context_and_writes_nothing(tmp_p
     )
 
     result = record_spec(_service_config(root), request)
-    packet = result["approval_packet"]
 
     assert result["gap_state_capture"] is True
-    assert packet["capture_context"] == "gap_state"
-    assert packet["gap_state_bridge_id"] == "gtkb-gap-state-spec-capture"
-    assert packet["intended_db_operation"]["method"] == "insert_spec"
-    assert packet["intended_db_operation"]["id"] == "GOV-TEST-001"
+    assert result["dry_run"] is True
+    assert result["db_operation"]["method"] == "insert_spec"
+    assert result["db_operation"]["id"] == "GOV-TEST-001"
+    assert "approval_packet" not in result
     assert _spec_count(root / "groundtruth.db") == 0
     assert _packet_files(root) == []
 
@@ -304,7 +293,7 @@ def test_content_file_outside_project_root_is_rejected(tmp_path: Path) -> None:
     root, config, _content_file = _project(tmp_path)
     outside = tmp_path / "outside.md"
     outside.write_text("outside\n", encoding="utf-8")
-    result = CliRunner().invoke(main, _record_args(config, outside, "--owner-presented"))
+    result = CliRunner().invoke(main, _record_args(config, outside))
     assert result.exit_code != 0
     assert "inside project root" in result.output
     assert _spec_count(root / "groundtruth.db") == 0
@@ -335,62 +324,74 @@ def test_prefixes_resolve_to_expected_artifact_types_in_dry_run(tmp_path: Path) 
         selected_content = content_by_id.get(spec_id, content)
         result = CliRunner().invoke(
             main,
-            _record_args(config, selected_content, "--owner-presented", "--dry-run", "--json", *extra, spec_id=spec_id),
+            _record_args(config, selected_content, "--dry-run", "--json", *extra, spec_id=spec_id),
         )
         assert result.exit_code == 0, result.output
         payload = json.loads(result.output)
-        assert payload["approval_packet"]["artifact_type"] == expected_type
-        assert Path(payload["approval_packet_path"]).name.endswith(f"-{spec_id.lower()}.json")
+        assert payload["db_operation"]["type"] == expected_type
+        assert payload["db_operation"]["id"] == spec_id
 
 
-def test_approval_packet_path_uses_lowercase_filename_and_preserves_payload_id(tmp_path: Path) -> None:
+def test_record_creates_no_approvals_artifact_for_any_id_casing(tmp_path: Path) -> None:
+    """Recording a spec emits the row only; no approvals artifact is created."""
+
     root, _config, content = _project(tmp_path)
     config = _service_config(root)
     spec_id = "GOV-MIXED-CASE-001"
 
     dry_run = record_spec(config, _service_request(content, spec_id=spec_id, dry_run=True))
-    dry_run_path = Path(dry_run["approval_packet_path"])
-    assert dry_run_path.name.endswith("-gov-mixed-case-001.json")
-    assert dry_run["approval_packet"]["artifact_id"] == spec_id
+    assert dry_run["id"] == spec_id
+    assert "approval_packet_path" not in dry_run
     assert _packet_files(root) == []
 
     written = record_spec(config, _service_request(content, spec_id=spec_id, dry_run=False))
-    written_path = Path(written["approval_packet_path"])
-    packets = _packet_files(root)
-    assert packets == [written_path]
-    assert written_path == dry_run_path
-    assert written_path.name.endswith("-gov-mixed-case-001.json")
-    packet = json.loads(written_path.read_text(encoding="utf-8"))
-    assert packet["artifact_id"] == spec_id
+    assert written["created"] is True
+    assert written["row"]["id"] == spec_id
+    assert "approval_packet_path" not in written
+    assert _packet_files(root) == []
+    assert not (root / ".groundtruth" / "formal-artifact-approvals").exists()
 
 
 def test_explicit_type_mismatch_is_rejected(tmp_path: Path) -> None:
     _root, config, content = _project(tmp_path)
     result = CliRunner().invoke(
         main,
-        _record_args(config, content, "--owner-presented", "--type", "requirement"),
+        _record_args(config, content, "--type", "requirement"),
     )
     assert result.exit_code != 0
     assert "does not match" in result.output
 
 
-def test_existing_spec_id_is_rejected_instead_of_versioned(tmp_path: Path) -> None:
+def test_identical_record_replays_and_differing_record_collides(tmp_path: Path) -> None:
+    """Exact replay is read-only; a same-id record with different content collides."""
+
     root, config, content = _project(tmp_path)
     runner = CliRunner()
-    first = runner.invoke(main, _record_args(config, content, "--owner-presented"))
+
+    first = runner.invoke(main, _record_args(config, content, "--json"))
     assert first.exit_code == 0, first.output
-    second = runner.invoke(main, _record_args(config, content, "--owner-presented"))
-    assert second.exit_code != 0
-    assert "already exists" in second.output
+    assert json.loads(first.output)["created"] is True
+
+    replay = runner.invoke(main, _record_args(config, content, "--json"))
+    assert replay.exit_code == 0, replay.output
+    replay_payload = json.loads(replay.output)
+    assert replay_payload["replayed"] is True
+    assert replay_payload["created"] is False
     assert _spec_count(root / "groundtruth.db") == 1
-    assert len(_packet_files(root)) == 1
+
+    other = _content(root, "other.md", "Different content entirely.\n")
+    collision = runner.invoke(main, _record_args(config, other))
+    assert collision.exit_code != 0
+    assert "record_collision" in collision.output
+    assert _spec_count(root / "groundtruth.db") == 1
+    assert _packet_files(root) == []
 
 
 def test_protected_behavior_requires_assertions(tmp_path: Path) -> None:
     root, config, content = _project(tmp_path)
     result = CliRunner().invoke(
         main,
-        _record_args(config, content, "--owner-presented", spec_id="PB-TEST-001"),
+        _record_args(config, content, spec_id="PB-TEST-001"),
     )
     assert result.exit_code != 0
     assert "require a non-empty --assertions-json list" in result.output
@@ -401,20 +402,17 @@ def test_adr_requires_decision_structure(tmp_path: Path) -> None:
     root, config, content = _project(tmp_path)
     result = CliRunner().invoke(
         main,
-        _record_args(config, content, "--owner-presented", spec_id="ADR-TEST-001"),
+        _record_args(config, content, spec_id="ADR-TEST-001"),
     )
     assert result.exit_code != 0
     assert "ADR content missing" in result.output
     assert _spec_count(root / "groundtruth.db") == 0
 
 
-def test_successful_dcl_record_creates_packet_and_spec_row(tmp_path: Path) -> None:
+def test_successful_dcl_record_creates_spec_row_and_no_packet(tmp_path: Path) -> None:
     root, config, _content_file = _project(tmp_path)
     content = _content(root, "dcl.md", "## Constraint\nThe system must keep this invariant.\n")
-    result = CliRunner().invoke(
-        main,
-        _record_args(config, content, "--owner-presented", spec_id="DCL-TEST-001"),
-    )
+    result = CliRunner().invoke(main, _record_args(config, content, spec_id="DCL-TEST-001"))
     assert result.exit_code == 0, result.output
     assert result.output.strip() == "DCL-TEST-001"
     assert _spec_count(root / "groundtruth.db") == 1
@@ -422,26 +420,22 @@ def test_successful_dcl_record_creates_packet_and_spec_row(tmp_path: Path) -> No
     assert row is not None
     assert row["type"] == "design_constraint"
     assert row["description"] == content.read_text(encoding="utf-8")
-    packets = _packet_files(root)
-    assert len(packets) == 1
-    assert packets[0].name.endswith("-dcl-test-001.json")
-    packet = json.loads(packets[0].read_text(encoding="utf-8"))
-    assert packet["artifact_id"] == "DCL-TEST-001"
-    assert packet["artifact_type"] == "design_constraint"
+    assert _packet_files(root) == []
 
 
-def test_approved_by_overrides_default_identity(tmp_path: Path) -> None:
+def test_record_output_carries_no_approval_fields(tmp_path: Path) -> None:
+    """The recorded result exposes no approval identity, packet, or evidence field."""
+
     root, config, content = _project(tmp_path)
-    result = CliRunner().invoke(
-        main,
-        _record_args(config, content, "--owner-presented", "--approved-by", "Mike"),
-    )
+    result = CliRunner().invoke(main, _record_args(config, content, "--json"))
     assert result.exit_code == 0, result.output
-    packet = json.loads(_packet_files(root)[0].read_text(encoding="utf-8"))
-    assert packet["approved_by"] == "Mike"
+    payload = json.loads(result.output)
+    for forbidden in ("approval_packet", "approval_packet_path", "approved_by", "auq_id", "auq_answer"):
+        assert forbidden not in payload
+    assert _packet_files(root) == []
 
 
-def test_spec_record_is_not_hook_matched_but_cli_still_blocks_missing_evidence(tmp_path: Path) -> None:
+def test_spec_record_is_not_hook_matched_but_cli_still_blocks_missing_cas(tmp_path: Path) -> None:
     root, config, content = _project(tmp_path)
     payload = {
         "tool_name": "Bash",
@@ -457,6 +451,9 @@ def test_spec_record_is_not_hook_matched_but_cli_still_blocks_missing_evidence(t
     )
     assert json.loads(hook.stdout) == {}
 
-    result = CliRunner().invoke(main, _record_args(config, content))
+    args = _record_args(config, content)
+    args.remove("--expected-version")
+    args.remove("0")
+    result = CliRunner().invoke(main, args)
     assert result.exit_code != 0
     assert _spec_count(root / "groundtruth.db") == 0

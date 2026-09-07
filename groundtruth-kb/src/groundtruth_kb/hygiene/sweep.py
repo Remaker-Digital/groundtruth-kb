@@ -1,7 +1,7 @@
 """Deterministic repository hygiene sweep — pattern-set-driven drift discovery.
 
 Walks the repository against an owner-curated TOML pattern-set registry and
-emits findings to ``.gtkb-state/hygiene-sweep/<run-id>/`` as JSON + markdown.
+emits findings to ``scratchpad/<session>/hygiene-sweep/<run-id>/`` as JSON + markdown.
 
 Read-only against the repository. No MemBase mutation surfaces. No bridge,
 spec, work-item, or deliberation creation. Lifecycle decisions are the
@@ -16,6 +16,7 @@ Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All right
 from __future__ import annotations
 
 import fnmatch
+import importlib
 import json
 import re
 import sys
@@ -364,7 +365,11 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - thin CLI w
     except PatternSetError as exc:
         print(f"error: {exc}", file=sys.stderr)  # print-ok
         return 2
-    out_dir = args.output or args.root / ".gtkb-state" / "hygiene-sweep" / result.run_id
+    # Canon s17: report output defaults to the session-scoped scratchpad, never
+    # `.gtkb-state`. `--output` still overrides.
+    _sid = importlib.import_module("scripts.gtkb_session_id")
+    _session = _sid.sanitize_session_id(_sid.resolve_session_id())
+    out_dir = args.output or args.root / "scratchpad" / _session / "hygiene-sweep" / result.run_id
     out_dir.mkdir(parents=True, exist_ok=True)
     emit_json(result, out_dir / "findings.json")
     emit_markdown(result, out_dir / "summary.md")

@@ -1,3 +1,11 @@
+<!--
+THIS FILE IS A PROJECTION, NOT CANONICAL.
+Projected from the neutral harness baseline by the GT-KB projection engine.
+Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+`gt harness project claude`. If a needed change cannot be made through
+the baseline and re-projection, file a work item against the projector
+(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+-->
 # Auto-Finalization Sweep
 
 author_identity: prime-builder/claude
@@ -24,13 +32,13 @@ dispatch-treadmill-drain program).
 - WI-4871 untracked-VERIFIED durability guard
   (`doctor._check_untracked_terminal_verified_verdicts`) — the detector this
   sweep remediates.
-- `ADR-CODEX-HOOK-PARITY-FALLBACK-001` — the Codex `Stop`-hook surface; the
+- `ADR-CODEX-HOOK-PARITY-FALLBACK-001` — the counterpart-harness `Stop`-hook surface; the
   sweep is registered in both harness surfaces (cross-harness parity).
 
 ## The treadmill
 
 After the PHASE-Y go-live, the only dispatchable Loyal Opposition harness
-(Cursor-E) writes terminal `VERIFIED` verdicts through the live dispatcher
+writes terminal `VERIFIED` verdicts through the live dispatcher
 daemon, but its finalization commits are blocked by the inventory-drift gate,
 and no dispatchable hooked Prime Builder is available to finalize. Terminal
 `VERIFIED` verdicts therefore accumulate untracked and continuously re-fail the
@@ -40,7 +48,7 @@ The sweep automates that hand-finalization.
 ## Mechanism
 
 `scripts/auto_finalize_sweep.py` is registered as a `Stop` hook in BOTH
-`.claude/settings.json` and `.codex/hooks.json` (the same shared-script,
+every registered harness's hook-registration surface (the same shared-script,
 dual-registration parity model as `scripts/gtkb_dispatcher_daemon.py`).
 On turn-end it:
 
@@ -59,7 +67,7 @@ On turn-end it:
      audit-logged for manual handling (the sweep never guesses source staging or
      hunk-selection).
    - **Current finalization/checker floor** — the terminal verdict body must
-     pass `.claude/skills/gtkb-verify/helpers/write_verdict.py` `validate_verified_body()`
+     pass `scripts/skill-helpers/gtkb-verify/write_verdict.py` `validate_verified_body()`
      and the protected-commit authorization checker for the exact verdict path.
      A legacy file-only verdict that lacks `Recommended commit type`,
      `## Spec-to-Test Mapping`, `## Commands Executed`, or helper-generated
@@ -104,7 +112,7 @@ for a session (e.g., during bridge-infrastructure debugging).
   guard detects.
 - It is NOT a dispatcher: it spawns no workers and makes no review decisions; it
   only commits verdicts an independent Loyal Opposition already decided.
-- It is NOT a substitute for fixing the Cursor-E inventory-drift commit blocker
+- It is NOT a substitute for fixing the dispatchable Loyal Opposition harness's inventory-drift commit blocker
   (a follow-on slice of the treadmill-drain program); it drains the symptom so
   the WI-4871 guard stays green while that root fix is pursued.
 

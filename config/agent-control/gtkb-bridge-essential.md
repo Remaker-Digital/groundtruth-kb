@@ -242,7 +242,7 @@ Do NOT, without explicit owner approval:
 - Recreate aggregate queue artifacts as live bridge state or treat them as authoritative
 - Delete bridge files (any version)
 - Skip the GO/NO-GO discipline for any code change beyond the explicit
-  exemptions in `.claude/rules/codex-review-gate.md`
+  exemptions in `.harness-baseline-configuration/rules/counterpart-review-gate.md`
 - Re-enable the retired OS poller tasks, freshness hook, foreground
   watchdog, or the retired smart-poller scheduled task / VBS daemon /
   runner as the active automation path

@@ -2,7 +2,7 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project openrouter`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
@@ -990,7 +990,7 @@ as the prompt's first line plus the ``GTKB_BRIDGE_POLLER_RUN_ID`` and
 **Definition:** The retired bridge-poller class (Windows scheduled tasks
 `AgentRedFileBridgeIndexScan-*`, `AgentRedBridgeLivenessAlert`,
 `AgentRedPollerLivenessWatcher`; the foreground watchdog; the
-`.api-harness/hooks/poller-freshness.py` hook; the in-session `CronCreate`
+`.harness-baseline-configuration/hooks/poller-freshness.py` hook; the in-session `CronCreate`
 poller). All members of this class were halted 2026-04-25 per owner
 directive because each fixed-interval tick spent an expensive resource â€”
 waking a harness into a full investigation â€” unconditionally, with no cheap
@@ -1277,10 +1277,10 @@ Term, definition, not-to-be-confused-with, source, implementation pointer. -->
 **Definition:** The fourth GT-KB coding harness (identity `D`), adopted in
 Phase 1 of `PROJECT-GTKB-OLLAMA-INTEGRATION`. The upstream Ollama platform
 CLI/server (`http://localhost:11434`) is local-capable, but the GT-KB harness
-currently routes all skills to cloud model ids via `.api-harness/routing.toml`
+currently routes all skills to cloud model ids via `routing.toml` (in api-harness)
 (current route: `kimi-k2-7-code-cloud` â€” cloud-backed, not local inference).
 Integrated through `scripts/ollama_harness.py` (a framework-free Python
-tool-calling shim) and `.api-harness/routing.toml` (static routing).
+tool-calling shim) and `routing.toml` (in api-harness) (static routing).
 
 **Canonical alias:** ollama harness.
 
@@ -1288,7 +1288,7 @@ tool-calling shim) and `.api-harness/routing.toml` (static routing).
 
 ### routing.toml
 
-**Definition:** The static TOML routing config at `.api-harness/routing.toml`. Maps
+**Definition:** The static TOML routing config at `routing.toml` (in api-harness). Maps
 harness skills to model ids within the Ollama harness's routing configuration.
 The current default route (`kimi-k2-7-code-cloud`) is cloud-backed via cloud
 API, not a locally-served Ollama model; the upstream Ollama platform CLI/server
@@ -1302,7 +1302,7 @@ at least one `[models.<key>]` table, a `[routing]` table with `default_model`).
 
 **Definition:** The GT-KB pattern binding skill/task contexts to specific models
 within a single harness's model pool. In Phase 1 this is expressed via
-`.api-harness/routing.toml` (`[routing].default_model`, with optional
+`routing.toml` (in api-harness) (`[routing].default_model`, with optional
 `[routing.skills]` overrides reserved for Phase 2+).
 
 *Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#task-to-model-routing).*

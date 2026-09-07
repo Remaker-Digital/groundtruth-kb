@@ -165,7 +165,7 @@ Codex review checks for the section's presence and substantive content. Loyal Op
 
 Bridge implementation proposals MUST include a substantive ## Prior Deliberations section. The section anchors the proposal in the prior-decision history and is one of the named placement targets for the DA read-surface correction (the bridge-template surface).
 
-The bridge-propose helper at .claude/skills/bridge-propose/helpers/write_bridge.py pre-populates this section by default via pre_populate_prior_deliberations: glossary-source seeding from .claude/rules/canonical-terminology.md plus optional semantic search. Authors review and prune the pre-populated entries.
+The bridge-propose helper at .claude/skills/bridge-propose/helpers/write_bridge.py pre-populates this section by default via pre_populate_prior_deliberations: glossary-source seeding from .harness-baseline-configuration/rules/canonical-terminology.md plus optional semantic search. Authors review and prune the pre-populated entries.
 
 Loyal Opposition MUST issue NO-GO when reviewing a NEW or REVISED proposal that meets ALL of these conditions:
 

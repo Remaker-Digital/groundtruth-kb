@@ -202,25 +202,12 @@ def auto_project_metadata(db: KnowledgeDB, wi_id: str) -> dict[str, str]:
 
     project_id = str(project.get("id")) if project else str(work_item.get("project_name") or "")
     project_name = str(project.get("name")) if project else str(work_item.get("project_name") or "")
-    authorization: dict[str, Any] | None = None
-    if project:
-        active_authorizations = db.list_project_authorizations(project["id"], status="active")
-        for candidate_authorization in active_authorizations:
-            included = _parsed_list(candidate_authorization, "included_work_item_ids")
-            excluded = _parsed_list(candidate_authorization, "excluded_work_item_ids")
-            if wi_id in excluded:
-                continue
-            if not included or wi_id in included:
-                authorization = candidate_authorization
-                break
-        if authorization is None and active_authorizations:
-            authorization = active_authorizations[0]
-
+    # WI-7657: no authorization is selected or emitted here. This function
+    # used to pick an active authorization row covering the work item and hand
+    # its id and name to the proposal scaffold, which is how a
+    # "Project Authorization:" header reached filed artifacts. No such header
+    # belongs on a filed artifact, and no such record exists to select.
     return {
-        "project_authorization_id": str(authorization.get("id"))
-        if authorization
-        else "<fill active project authorization>",
-        "project_authorization_name": str(authorization.get("authorization_name")) if authorization else "",
         "project_id": project_id or "<fill project id>",
         "project_name": project_name,
         "work_item_id": wi_id,

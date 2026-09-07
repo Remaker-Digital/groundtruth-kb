@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project codex`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """Bridge thread loader: read full version chain for a given slug.
 
 Resolves all ``bridge/<slug>-NNN.md`` files for a given thread slug, sorts by
@@ -10,7 +16,7 @@ don't have to issue N separate Read calls and reconstruct ordering manually.
 
 CLI usage:
 
-  python .claude/skills/bridge/helpers/show_thread_bridge.py <slug> [--format json|markdown]
+  python .harness-baseline-configuration/skills/bridge/helpers/show_thread_bridge.py <slug> [--format json|markdown]
                                                                     [--preview-lines N]
 
 Public API:
@@ -66,11 +72,38 @@ def _list_version_files(slug: str, bridge_dir: Path) -> list[tuple[int, Path]]:
     return results
 
 
+_ENVELOPE_HEAD_PREFIXES = ("::init", "::open")
+
+
+def _artifact_head_lines(lines):
+    """Yield lines with any leading ``::init`` / ``::open`` envelope removed.
+
+    The canonical bridge artifact head is ``::init gtkb <pb|lo>`` / ``::open
+    <activity>`` / ``<status token>``; the legacy order put the status token
+    first. Skipping leading envelope markers makes both orders resolve to the
+    same status token.
+    """
+    index = 0
+    while index < len(lines) and lines[index].strip().startswith(_ENVELOPE_HEAD_PREFIXES):
+        index += 1
+    return lines[index:]
+
+
+def _artifact_head_status(text):
+    """Return the first non-blank, non-envelope line of ``text``, stripped."""
+    for line in _artifact_head_lines(text.splitlines()):
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
+
+
 def _content_preview(path: Path, max_lines: int) -> tuple[str, str]:
     """Return (first_line, preview_text) for the given file."""
     text = path.read_text(encoding="utf-8")
     lines = text.splitlines()
-    first_line = lines[0] if lines else ""
+    head = _artifact_head_lines(lines)
+    first_line = head[0] if head else ""
     preview_lines = lines[:max_lines]
     return first_line, "\n".join(preview_lines)
 
@@ -80,7 +113,7 @@ def _status_from_bridge_file(path: Path) -> str | None:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
-    for line in text.splitlines():
+    for line in _artifact_head_lines(text.splitlines()):
         stripped = line.strip()
         if not stripped:
             continue

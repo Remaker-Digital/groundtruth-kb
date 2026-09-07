@@ -24,8 +24,8 @@ required_payloads = [
 allowed_surfaces = [
     "CLAUDE.md",
     "AGENTS.md",
-    ".claude/rules/canonical-terminology.md",
-    ".claude/rules/file-bridge-protocol.md",
+    ".harness-baseline-configuration/rules/canonical-terminology.md",
+    ".harness-baseline-configuration/rules/file-bridge-protocol.md",
     "config/agent-control/SESSION-STARTUP-INDEX.md",
     "config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md",
     "config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md",
@@ -101,14 +101,14 @@ readiness_check = "Both Prime Builder and Loyal Opposition build_startup_model(f
 
 [migration.wi4949.activity_map]
 build = [
-    ".claude/rules/codex-review-operating-contract.md",
-    ".claude/rules/codex-loyal-opposition-runbook.md",
+    ".harness-baseline-configuration/rules/review-operating-contract.md",
+    ".harness-baseline-configuration/rules/loyal-opposition-runbook.md",
 ]
 test = [
-    ".claude/rules/codex-review-operating-contract.md",
-    ".claude/rules/codex-loyal-opposition-runbook.md",
-    ".claude/rules/codex-review-checklists.md",
-    ".claude/rules/template-code-review.md",
+    ".harness-baseline-configuration/rules/review-operating-contract.md",
+    ".harness-baseline-configuration/rules/loyal-opposition-runbook.md",
+    ".harness-baseline-configuration/rules/loyal-opposition-review-checklists.md",
+    ".harness-baseline-configuration/rules/template-code-review.md",
 ]
-project = [".claude/rules/codex-standing-priorities.md", ".claude/rules/groundtruth-kb-vision.md"]
-deliberation = [".claude/rules/codex-way-of-working.md"]
+project = [".harness-baseline-configuration/rules/standing-priorities.md", ".harness-baseline-configuration/rules/groundtruth-kb-vision.md"]
+deliberation = [".harness-baseline-configuration/rules/way-of-working.md"]

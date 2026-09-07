@@ -1,3 +1,11 @@
+<!--
+THIS FILE IS A PROJECTION, NOT CANONICAL.
+Projected from the neutral harness baseline by the GT-KB projection engine.
+Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+`gt harness project claude`. If a needed change cannot be made through
+the baseline and re-projection, file a work item against the projector
+(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+-->
 # SoT Read Discipline
 
 This rule auto-loads via the `.claude/rules/` convention. It is the narrative authority for the SoT (source-of-truth) read-discipline enforcement layer landed in Slice 2A of `gtkb-platform-sot-consolidation-umbrella`.
@@ -10,25 +18,23 @@ This rule cites and is governed by:
 - `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` v2 — the cross-cutting governance principle this rule operationalizes (clauses a–d of the Read-Discipline Extension).
 - `DCL-SOT-REGISTRY-RECORD-SCHEMA-001` v2 — the `forbidden_substitutes` registry column the runtime hook consumes.
 - `GOV-PLATFORM-SOT-REGISTRY-001` — the platform SoT artifact registry.
-- `ADR-CODEX-HOOK-PARITY-FALLBACK-001` v2 — the empirical foundation for the Codex hook surface (Bash/apply_patch, not Read/Grep/Glob).
+- `ADR-CODEX-HOOK-PARITY-FALLBACK-001` v2 — the empirical foundation for the shell-command hook surface (governance record; retains its historical identifier).
 
 ## Runtime Behavior — Two-Surface Contract
 
-The canonical hook at `.claude/hooks/sot-read-discipline.py` intercepts read intents at the PreToolUse boundary and blocks reads against any registered `forbidden_substitutes` path with canonical-path guidance. Because Claude Code and Codex CLI emit different PreToolUse tool-event sets, the contract is harness-specific:
+The canonical hook at `.claude/hooks/sot-read-discipline.py` intercepts read intents at the pre-tool-use boundary and blocks reads against any registered `forbidden_substitutes` path with canonical-path guidance. Because different harnesses emit different pre-tool-use tool-event sets, the contract has two surface classes; each harness's projection registers the surface matching its native event model (registration rendered from `hooks/manifest.toml`, intent `read_access` plus `shell_exec`).
 
-### Claude side
+### Native-tool surface
 
-PreToolUse fires on `tool_name ∈ {Read, Grep, Glob}`. The canonical hook is registered in `.claude/settings.json` with matcher `"Read|Grep|Glob"`. It extracts the target path from:
+For harnesses whose pre-tool-use events report read tools directly (`Read`, `Grep`, `Glob` or equivalents), the hook extracts the target path from the tool input:
 
-- `tool_input.file_path` for `Read`
-- `tool_input.path` for `Grep`
-- `tool_input.pattern` for `Glob` (treats the pattern's base directory as the target)
+- the file path field for direct reads
+- the search path field for content searches
+- the pattern's base directory for glob matching
 
-### Codex side
+### Shell-command surface
 
-PreToolUse fires on `tool_name ∈ {Bash, apply_patch}`. The canonical hook does NOT register `Read/Grep/Glob` on the Codex side — that would be a non-intercepting (false-green) registration. Instead, a thin Codex adapter at `.codex/gtkb-hooks/sot-read-discipline-bash-adapter.py` is registered in `.codex/hooks.json` with matcher `"Bash"`. The adapter pipes the PreToolUse payload via subprocess into the canonical hook with `GTKB_HARNESS_NAME=codex` env override.
-
-The canonical hook's Codex branch parses the `tool_input.command` string for the following read/search verbs (initial set):
+For harnesses whose pre-tool-use events report shell commands rather than read tools, a thin per-harness adapter (a projector output; see the harness-adapter record `DOC-SOT-READ-DISCIPLINE-HARNESS-ADAPTERS-001` in MemBase) pipes the payload into the canonical hook with the harness name in the environment. The hook's shell branch parses the command string for the following read/search verbs (initial set):
 
 | Verb / form | Alias(es) | Path extraction |
 |-------------|-----------|-----------------|
@@ -64,7 +70,7 @@ The discipline arose from two strands of evidence:
 - `DELIB-20260673` — parallel-session fragmentation evidence: multiple AI sessions independently consulted different aliases of the same SoT, including a retired role mirror and another legacy alias, producing divergent state claims that the operator had to reconcile by hand.
 - `DELIB-20260670` — manual-triage survey identifying 8 forbidden-substitute candidates AND the always-loaded / shell-readable falsifying class of substitutes: paths that get loaded automatically at session start (where caching would be invisible) AND paths that are shell-readable via Bash/PowerShell verbs (where agent-side self-discipline fails because the read happens before any GT-KB-aware logic runs).
 
-The two-surface harness-specific contract directly addresses the falsifying class: by intercepting at PreToolUse and parsing both Claude tool-events AND Codex Bash command verbs, the discipline catches the read at the earliest point any harness can be intercepted. The mechanical floor (the `forbidden_substitutes` registry column) ensures the discipline is owner-controlled and not relying on agent memory.
+The two-surface contract directly addresses the falsifying class: by intercepting at the pre-tool-use boundary on both the native-tool surface and the shell-command surface, the discipline catches the read at the earliest point any harness can be intercepted. The mechanical floor (the `forbidden_substitutes` registry column) ensures the discipline is owner-controlled and not relying on agent memory.
 
 ## Relationship to Other Rules
 

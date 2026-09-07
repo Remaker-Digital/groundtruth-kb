@@ -50,6 +50,10 @@ GOOSE_REQUIRED_BLOCKING_HOOK_SCRIPTS = frozenset(
         "document_author_provenance_gate.py",
     }
 )
+CURSOR_HOOKS_JSON = Path(".cursor") / "hooks.json"
+CURSOR_ADAPTER_TOKEN = "cursor_hook_adapter.py"
+CURSOR_PYTHON_TOKEN = "python.exe"
+CURSOR_REQUIRED_BLOCKING_HOOK_SCRIPTS = GOOSE_REQUIRED_BLOCKING_HOOK_SCRIPTS
 
 
 def _load_sibling_script_module(module_name: str) -> Any:
@@ -76,6 +80,7 @@ load_harness_projection = _load_sibling_script_module("harness_projection_reader
 codex_adapter_generator = _load_sibling_script_module("generate_codex_skill_adapters")
 antigravity_adapter_generator = _load_sibling_script_module("generate_antigravity_skill_adapters")
 api_adapter_generator = _load_sibling_script_module("generate_api_skill_adapters")
+cursor_adapter_generator = _load_sibling_script_module("generate_cursor_skill_adapters")
 
 _FALLBACK_KNOWN_HARNESSES = ("claude", "codex")
 
@@ -129,6 +134,20 @@ WAIVER_REQUIRED_FIELDS = (
 OPERATING_ROLES = ("prime-builder", "loyal-opposition")
 
 
+def _load_declared_harnesses_from_profiles(project_root: Path) -> tuple[str, ...]:
+    """Return harness keys declared in scripts/harness_projection/profiles.toml."""
+    profiles_path = project_root / "scripts" / "harness_projection" / "profiles.toml"
+    try:
+        data = tomllib.loads(profiles_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, tomllib.TOMLDecodeError):
+        return ()
+    harnesses = data.get("harnesses")
+    if not isinstance(harnesses, dict):
+        return ()
+    names = [str(name) for name in harnesses if str(name).strip()]
+    return tuple(sorted(names))
+
+
 def _load_known_harnesses_from_projection(project_root: Path | None = None) -> tuple[str, ...]:
     """Derive KNOWN_HARNESSES from registry projection per REQ-HARNESS-REGISTRY-001 FR5.
 
@@ -136,17 +155,19 @@ def _load_known_harnesses_from_projection(project_root: Path | None = None) -> t
     the active reader-migration invariant; direct reads of harness-identities.json
     are forbidden under the planted-detector fixture in
     platform_tests/scripts/test_harness_registry_reader_migration.py.
+    Union declared projector profile names so Cursor remains selectable when
+    harness-state is purged or incomplete.
     """
     if project_root is None:
         project_root = PROJECT_ROOT
     projection = load_harness_projection(project_root)
-    names = tuple(
-        sorted(
-            str(record.get("harness_name"))
-            for record in projection.get("harnesses", [])
-            if isinstance(record, dict) and record.get("harness_name")
-        )
-    )
+    projection_names = {
+        str(record.get("harness_name"))
+        for record in projection.get("harnesses", [])
+        if isinstance(record, dict) and record.get("harness_name")
+    }
+    profile_names = set(_load_declared_harnesses_from_profiles(project_root))
+    names = tuple(sorted(projection_names | profile_names))
     return names if names else _FALLBACK_KNOWN_HARNESSES
 
 
@@ -178,6 +199,7 @@ ADAPTER_GENERATOR_BY_MARKER = {
     "GTKB-CODEX-SKILL-ADAPTER": "scripts/generate_codex_skill_adapters.py",
     "GTKB-ANTIGRAVITY-SKILL-ADAPTER": "scripts/generate_antigravity_skill_adapters.py",
     "GTKB-API-SKILL-ADAPTER": "scripts/generate_api_skill_adapters.py",
+    "GTKB-CURSOR-SKILL-ADAPTER": "scripts/generate_cursor_skill_adapters.py",
 }
 # Projection-engine harnesses resolve their generator from the registry
 # declaration instead of this static map, so a Phase-D cutover does not
@@ -400,6 +422,9 @@ def _render_expected_adapter(
         frontmatter = api_adapter_generator.validate_skill_frontmatter(canonical_text, adapter_source)
         adapter = api_adapter_generator.ApiSkillAdapter(description=frontmatter["description"], **common)
         return api_adapter_generator.render_adapter(adapter, generated_at=generated_at)
+    if expected_marker == "GTKB-CURSOR-SKILL-ADAPTER":
+        adapter = cursor_adapter_generator.CursorSkillAdapter(**common)
+        return cursor_adapter_generator.render_adapter(source_text, adapter, generated_at=generated_at)
     return None
 
 
@@ -752,10 +777,7 @@ def _status_for_goose_hook_registration(
             configured_status="native",
             evidence=registration["path"],
             state="PASS",
-            note=(
-                "Goose hook capability evidenced by plugin hooks.json registration, "
-                "not skill-adapter presence."
-            ),
+            note=("Goose hook capability evidenced by plugin hooks.json registration, not skill-adapter presence."),
         )
     if script in GOOSE_REQUIRED_BLOCKING_HOOK_SCRIPTS:
         return _base_result(
@@ -813,6 +835,172 @@ def _goose_required_blocking_gate_results(
     return results
 
 
+def _python_basenames_in_command(command: str) -> set[str]:
+    names: set[str] = set()
+    for token in command.replace('"', " ").split():
+        token_name = Path(token).name
+        if token_name.endswith(".py"):
+            names.add(token_name)
+    return names
+
+
+def load_cursor_hook_registration(project_root: Path) -> dict[str, Any]:
+    """Parse Cursor projected hooks.json. Skill adapters are not evidence."""
+    relative = CURSOR_HOOKS_JSON.as_posix()
+    empty: dict[str, Any] = {
+        "path": relative,
+        "exists": False,
+        "scripts": set(),
+        "commands": [],
+        "pretooluse_wrapped_fail_closed_scripts": set(),
+        "has_pretooluse": False,
+        "fail_closed_events": set(),
+    }
+    path = project_root / CURSOR_HOOKS_JSON
+    if not path.is_file():
+        return empty
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {**empty, "exists": True}
+    hooks = payload.get("hooks") if isinstance(payload, dict) else None
+    commands: list[str] = []
+    wrapped_scripts: set[str] = set()
+    fail_closed_events: set[str] = set()
+    has_pretooluse = False
+    all_scripts: set[str] = set()
+    if isinstance(hooks, dict):
+        for event, entries in hooks.items():
+            if not isinstance(entries, list):
+                continue
+            if event == "preToolUse" and entries:
+                has_pretooluse = True
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                command = entry.get("command")
+                if not isinstance(command, str):
+                    continue
+                commands.append(command)
+                scripts = _python_basenames_in_command(command)
+                all_scripts.update(scripts)
+                if entry.get("failClosed") is True:
+                    fail_closed_events.add(str(event))
+                if (
+                    event == "preToolUse"
+                    and entry.get("failClosed") is True
+                    and CURSOR_ADAPTER_TOKEN in command
+                    and CURSOR_PYTHON_TOKEN in command
+                ):
+                    wrapped_scripts.update(name for name in scripts if name != CURSOR_ADAPTER_TOKEN)
+    return {
+        "path": relative,
+        "exists": True,
+        "scripts": all_scripts,
+        "commands": commands,
+        "pretooluse_wrapped_fail_closed_scripts": wrapped_scripts,
+        "has_pretooluse": has_pretooluse,
+        "fail_closed_events": fail_closed_events,
+    }
+
+
+def _status_for_cursor_hook_registration(
+    project_root: Path,
+    capability: dict[str, Any],
+) -> CapabilityResult | None:
+    """Evidence Cursor hooks from .cursor/hooks.json, never from skill adapters."""
+    registration = load_cursor_hook_registration(project_root)
+    script = _capability_hook_script_name(capability)
+    if not script:
+        return None
+    if registration["exists"] and script in registration["pretooluse_wrapped_fail_closed_scripts"]:
+        return _base_result(
+            capability,
+            "cursor",
+            configured_status="native",
+            evidence=registration["path"],
+            state="PASS",
+            note=(
+                "Cursor hook capability evidenced by projected hooks.json registration "
+                "with adapter wrap, python.exe, and failClosed on preToolUse."
+            ),
+        )
+    if script in CURSOR_REQUIRED_BLOCKING_HOOK_SCRIPTS:
+        return _base_result(
+            capability,
+            "cursor",
+            configured_status="missing-registration",
+            evidence=registration["path"],
+            state="MISSING",
+            note=(
+                f"Required Cursor blocking gate {script} is not registered on preToolUse "
+                "with cursor_hook_adapter.py, python.exe, and failClosed. Skill adapter "
+                "manifests do not prove hook registration or invocation."
+            ),
+        )
+    if registration["exists"] and script in registration["scripts"]:
+        matching = [
+            command
+            for command in registration["commands"]
+            if script in _python_basenames_in_command(command) and CURSOR_ADAPTER_TOKEN in command
+        ]
+        if matching:
+            return _base_result(
+                capability,
+                "cursor",
+                configured_status="native",
+                evidence=registration["path"],
+                state="PASS",
+                note=(
+                    "Cursor hook capability evidenced by projected hooks.json adapter wrap "
+                    "(event other than fail-closed preToolUse)."
+                ),
+            )
+    return None
+
+
+def _cursor_required_blocking_gate_results(
+    project_root: Path,
+    selected_harnesses: list[str],
+) -> list[CapabilityResult]:
+    if "cursor" not in selected_harnesses:
+        return []
+    registration = load_cursor_hook_registration(project_root)
+    if not registration["exists"]:
+        return []
+    results: list[CapabilityResult] = []
+    wrapped = registration["pretooluse_wrapped_fail_closed_scripts"]
+    for script in sorted(CURSOR_REQUIRED_BLOCKING_HOOK_SCRIPTS):
+        stem = script[:-3] if script.endswith(".py") else script
+        present = script in wrapped
+        capability = {
+            "id": f"cursor.required-gate.{stem}",
+            "canonical_name": stem,
+            "parity_class": "required",
+            "required_for_roles": ["prime-builder", "loyal-opposition"],
+        }
+        results.append(
+            _base_result(
+                capability,
+                "cursor",
+                configured_status="native" if present else "missing-registration",
+                evidence=registration["path"],
+                state="PASS" if present else "MISSING",
+                note=(
+                    "Cursor required blocking gate evidenced by projected hooks.json "
+                    "preToolUse registration with adapter wrap, python.exe, and failClosed."
+                    if present
+                    else (
+                        f"Required Cursor blocking gate {script} is not registered on "
+                        "preToolUse with cursor_hook_adapter.py, python.exe, and failClosed. "
+                        "Skill adapter manifests do not prove hook registration or invocation."
+                    )
+                ),
+            )
+        )
+    return results
+
+
 def _status_for_surface(
     project_root: Path,
     capability: dict[str, Any],
@@ -823,6 +1011,10 @@ def _status_for_surface(
         goose_result = _status_for_goose_hook_registration(project_root, capability)
         if goose_result is not None:
             return goose_result
+    if harness == "cursor" and capability.get("kind") == "hook":
+        cursor_result = _status_for_cursor_hook_registration(project_root, capability)
+        if cursor_result is not None:
+            return cursor_result
     harness_config = capability.get(harness)
     if not isinstance(harness_config, dict):
         if manifest_adapters and harness in manifest_adapters:
@@ -911,14 +1103,18 @@ def _status_for_surface(
         # construction (WI-6267 M1).
         projection_engine = _projection_engine_by_harness(project_root).get(harness)
         projection_harness = harness if projection_engine else None
+        named_marker = f"GTKB-{harness.upper()}-SKILL-ADAPTER"
         if projection_engine:
-            expected_marker = f"GTKB-{harness.upper()}-SKILL-ADAPTER"
+            expected_marker = named_marker
             source_expected_marker = expected_marker
+        elif named_marker in ADAPTER_GENERATOR_BY_MARKER:
+            expected_marker = named_marker
+            source_expected_marker = "GTKB-CODEX-SKILL-ADAPTER"
         elif manifest_adapters and harness in manifest_adapters:
             expected_marker = "GTKB-API-SKILL-ADAPTER"
             source_expected_marker = "GTKB-API-SKILL-ADAPTER"
         else:
-            expected_marker = f"GTKB-{harness.upper()}-SKILL-ADAPTER"
+            expected_marker = named_marker
             source_expected_marker = "GTKB-CODEX-SKILL-ADAPTER"
         source_hash = _canonical_hash(source_path.read_text(encoding="utf-8"), source_expected_marker)
         declared_source_hash = str(harness_config.get("source_sha256") or "").strip()
@@ -1628,6 +1824,8 @@ def check_harness_parity(
             result = _status_for_surface(project_root, capability, selected_harness, harness_manifest_adapters)
             results.append(_apply_waiver(result, waivers.get((result.capability_id, selected_harness))))
     for gate_result in _goose_required_blocking_gate_results(project_root, active_harnesses):
+        results.append(_apply_waiver(gate_result, waivers.get((gate_result.capability_id, gate_result.harness))))
+    for gate_result in _cursor_required_blocking_gate_results(project_root, active_harnesses):
         results.append(_apply_waiver(gate_result, waivers.get((gate_result.capability_id, gate_result.harness))))
     for floor_harness in registered_floor_harnesses:
         results.extend(_evaluate_capability_floor(floor_harness, registry))

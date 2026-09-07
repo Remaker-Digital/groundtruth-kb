@@ -2,14 +2,14 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project antigravity`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
 # Bridge Is Essential - Top-Priority Mandate
 
-This rule auto-loads via `.claude/rules/` convention and is TRACKED in git
-(negated from the `.claude/` blanket ignore). Do not remove it.
+This rule auto-loads via `.agent/rules/` convention and is TRACKED in git
+(negated from the `.agent/` blanket ignore). Do not remove it.
 
 ## The Mandate
 
@@ -66,7 +66,7 @@ is no automated dispatch axis, and none may be created.
 
 ### Prompt-time surfacing (the only automation surface)
 
-`.claude/hooks/bridge-axis-2-surface.py`, registered via
+`.agent/hooks/bridge-axis-2-surface.py`, registered via
 `hooks/manifest.toml`, surfaces newly-actionable bridge work into the next
 prompt as additional context when an interactive session is active. It is
 pull-based: it informs a session that is already running. **It dispatches
@@ -115,7 +115,7 @@ Do NOT, without explicit owner approval:
 - Recreate aggregate queue artifacts as live bridge state or treat them as authoritative
 - Delete bridge files (any version)
 - Skip the GO/NO-GO discipline for any code change beyond the explicit
-  exemptions in `.claude/rules/counterpart-review-gate.md`
+  exemptions in `.agent/rules/counterpart-review-gate.md`
 - Re-enable the retired OS poller tasks, freshness hook, foreground
   watchdog, or the retired smart-poller scheduled task / VBS daemon /
   runner as the active automation path
@@ -130,9 +130,9 @@ Do NOT, without explicit owner approval:
 - **S292**: Session-start briefs for 7+ sessions silently omitted the in-session
   `CronCreate` poller instantiation. Failure was invisible because no alarm
   fired when instantiation was skipped. Lesson: procedural mandates documented
-  in `memory/*.md` are not enforceable; hooks and `.claude` hook
+  in `memory/*.md` are not enforceable; hooks and `.agent` hook
   registration are.
-- **S294**: Discovered `.claude/` was blanket-ignored in `.gitignore`, so the
+- **S294**: Discovered `.agent/` was blanket-ignored in `.gitignore`, so the
   bridge visibility infrastructure lived outside git. Worktrees could not see
   it. Fresh clones could not see it. Lesson: if it is essential, it must be
   tracked. The `!`-negation patterns added then remain in force for the rule

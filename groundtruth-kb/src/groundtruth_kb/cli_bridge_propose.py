@@ -359,6 +359,15 @@ def bridge_propose(
 @click.option("--add-spec", "add_specs", multiple=True, help="Repeatable spec id to add to generated links.")
 @click.option("--scope", "scope_lines", multiple=True, help="Repeatable proposed-scope bullet.")
 @click.option("--acceptance", "acceptance_criteria", multiple=True, help="Repeatable acceptance-criteria bullet.")
+@click.option(
+    "--simplification",
+    multiple=True,
+    help=(
+        "Repeatable Simplification Accounting bullet stating what gets smaller: "
+        "net artifacts, lines, state locations, concepts. An explicit "
+        '"nothing gets smaller" is a complete answer.'
+    ),
+)
 @click.option("--verification", multiple=True, help="Repeatable SPEC_ID=verification text row.")
 @click.option(
     "--cross-harness-disposition",
@@ -387,6 +396,7 @@ def bridge_file_implementation_proposal(
     add_specs: tuple[str, ...],
     scope_lines: tuple[str, ...],
     acceptance_criteria: tuple[str, ...],
+    simplification: tuple[str, ...],
     verification: tuple[str, ...],
     cross_harness_dispositions: tuple[str, ...],
     summary: str | None,
@@ -407,6 +417,7 @@ def bridge_file_implementation_proposal(
         add_specs=add_specs,
         scope_lines=scope_lines,
         acceptance_criteria=acceptance_criteria,
+        simplification=simplification,
         verification=verification,
         cross_harness_dispositions=cross_harness_dispositions,
         summary=summary,

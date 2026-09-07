@@ -10,6 +10,7 @@ Licensed under AGPL-3.0-or-later.
 from __future__ import annotations
 
 import os
+import re
 import tomllib  # stdlib since Python 3.11 (project requires >=3.11)
 import warnings
 from dataclasses import dataclass, field
@@ -50,6 +51,21 @@ class BackupConfig:
     sync_paths: tuple[Path, ...] = ()
 
 
+@dataclass(frozen=True)
+class PostgreSQLConfig:
+    """Secret-free PostgreSQL client settings.
+
+    Host, database, user, TLS, and password settings belong to host-managed
+    libpq service and password files.  GT-KB stores only the service name and
+    bounded client timeouts.
+    """
+
+    service: str = "gtkb"
+    connect_timeout_seconds: int = 10
+    lock_timeout_ms: int = 5000
+    statement_timeout_ms: int = 30000
+
+
 @dataclass
 class GTConfig:
     """Configuration for a GroundTruth KB project."""
@@ -65,6 +81,7 @@ class GTConfig:
     governance_gates: list[str] = field(default_factory=list)
     gate_config: dict[str, dict[str, Any]] = field(default_factory=dict)
     backup: BackupConfig = field(default_factory=BackupConfig)
+    postgresql: PostgreSQLConfig = field(default_factory=PostgreSQLConfig)
 
     @classmethod
     def load(cls, config_path: Path | None = None, **overrides: object) -> GTConfig:
@@ -90,8 +107,20 @@ class GTConfig:
         else:
             anchor = Path.cwd().resolve()
 
-        # Merge: file < env < overrides
-        merged = {**file_values, **env_values, **{k: v for k, v in overrides.items() if v is not None}}
+        explicit_values = {k: v for k, v in overrides.items() if v is not None}
+
+        # Merge ordinary settings at the top level. PostgreSQL settings merge
+        # per field so one environment override cannot erase TOML values for
+        # the other timeouts.
+        file_postgresql = file_values.pop("postgresql", {})
+        env_postgresql = env_values.pop("postgresql", {})
+        explicit_postgresql = explicit_values.pop("postgresql", {})
+        merged = {**file_values, **env_values, **explicit_values}
+        merged["postgresql"] = _coerce_postgresql_config(
+            file_postgresql,
+            env_postgresql,
+            explicit_postgresql,
+        )
 
         # Convert path strings to Path objects, anchored to config file directory
         for key in ("db_path", "project_root", "chroma_path"):
@@ -159,6 +188,8 @@ def _load_toml(config_path: Path | None) -> dict[str, Any]:
         raise FileNotFoundError(
             f"GroundTruth config file not found: {config_path}. Check the --config path or create the file."
         )
+    elif not config_path.is_file():
+        raise GTConfigError(f"GroundTruth config path is not a regular file: {config_path}")
 
     # Phase 4B.1, Finding 3: wrap TOML decode errors so the user sees the
     # offending file name instead of a raw parser traceback.
@@ -173,6 +204,8 @@ def _load_toml(config_path: Path | None) -> dict[str, Any]:
         ) from exc
     except tomllib.TOMLDecodeError as exc:
         raise GTConfigError(f"Invalid TOML in {config_path}: {exc}. Check your groundtruth.toml syntax.") from exc
+    except OSError as exc:
+        raise GTConfigError(f"Cannot read config file {config_path}: {exc}") from exc
 
     # Phase 4B.2, Finding 5: warn when [groundtruth] section is absent so
     # typos like [groundtuh] are caught early. stacklevel=3 surfaces the
@@ -190,27 +223,39 @@ def _load_toml(config_path: Path | None) -> dict[str, Any]:
             stacklevel=3,
         )
 
-    section = data.get("groundtruth", {})
+    def table_section(name: str) -> dict[str, object]:
+        value = data.get(name, {})
+        if not isinstance(value, dict):
+            raise GTConfigError(f"[{name}] must be a TOML table")
+        return value
+
+    section = table_section("groundtruth")
     result = dict(section)
 
     # Gates section is separate
-    gates_section = data.get("gates", {})
+    gates_section = table_section("gates")
     if "plugins" in gates_section:
         result["governance_gates"] = gates_section["plugins"]
 
     # Gate-specific config: [gates.config.GateClassName]
     gate_config_section = gates_section.get("config", {})
+    if not isinstance(gate_config_section, dict):
+        raise GTConfigError("[gates.config] must be a TOML table")
     if gate_config_section:
         result["gate_config"] = dict(gate_config_section)
 
     # Search section: [search]
-    search_section = data.get("search", {})
+    search_section = table_section("search")
     if "chroma_path" in search_section:
         result["chroma_path"] = search_section["chroma_path"]
 
-    backup_section = data.get("backup", {})
+    backup_section = table_section("backup")
     if backup_section:
         result["backup"] = dict(backup_section)
+
+    if "postgresql" in data:
+        postgresql_section = table_section("postgresql")
+        result["postgresql"] = dict(postgresql_section)
 
     return result
 
@@ -233,6 +278,74 @@ def _coerce_backup_config(value: object, *, anchor: Path) -> BackupConfig:
     return BackupConfig(**{k: v for k, v in raw.items() if k in BackupConfig.__dataclass_fields__})
 
 
+_POSTGRESQL_FIELDS = frozenset(PostgreSQLConfig.__dataclass_fields__)
+_POSTGRESQL_TIMEOUT_FIELDS = (
+    "connect_timeout_seconds",
+    "lock_timeout_ms",
+    "statement_timeout_ms",
+)
+_POSTGRESQL_TIMEOUT_MAX = 2_147_483_647
+_POSTGRESQL_SERVICE_RE = re.compile(r"[A-Za-z0-9_.-]+\Z")
+
+
+def _postgresql_mapping(value: object, *, source: str) -> dict[str, object]:
+    if value is None:
+        return {}
+    if isinstance(value, PostgreSQLConfig):
+        return {
+            "service": value.service,
+            "connect_timeout_seconds": value.connect_timeout_seconds,
+            "lock_timeout_ms": value.lock_timeout_ms,
+            "statement_timeout_ms": value.statement_timeout_ms,
+        }
+    if not isinstance(value, dict):
+        raise GTConfigError(f"{source} PostgreSQL configuration must be a mapping")
+    unknown = sorted(str(key) for key in value if key not in _POSTGRESQL_FIELDS)
+    if unknown:
+        raise GTConfigError(f"{source} PostgreSQL configuration contains forbidden or unknown keys: {unknown}")
+    return dict(value)
+
+
+def _coerce_postgresql_config(*layers: object) -> PostgreSQLConfig:
+    merged: dict[str, object] = {}
+    labels = ("TOML", "environment", "override")
+    for label, layer in zip(labels, layers, strict=True):
+        merged.update(_postgresql_mapping(layer, source=label))
+
+    service = merged.get("service", "gtkb")
+    if not isinstance(service, str) or not service or not _POSTGRESQL_SERVICE_RE.fullmatch(service):
+        raise GTConfigError(
+            "PostgreSQL service must be a non-empty libpq service name containing only "
+            "letters, digits, '.', '_', or '-'"
+        )
+
+    values: dict[str, int] = {}
+    defaults = PostgreSQLConfig()
+    for field_name in _POSTGRESQL_TIMEOUT_FIELDS:
+        raw = merged.get(field_name, getattr(defaults, field_name))
+        if isinstance(raw, bool):
+            raise GTConfigError(f"PostgreSQL {field_name} must be a positive integer")
+        if isinstance(raw, str):
+            if not raw.isascii() or not raw.isdecimal():
+                raise GTConfigError(f"PostgreSQL {field_name} must be a positive integer")
+            significant = raw.lstrip("0") or "0"
+            if len(significant) > 10:
+                raise GTConfigError(
+                    f"PostgreSQL {field_name} must be a positive integer no greater than {_POSTGRESQL_TIMEOUT_MAX}"
+                )
+            try:
+                raw = int(significant, 10)
+            except ValueError as exc:
+                raise GTConfigError(f"PostgreSQL {field_name} must be a positive integer") from exc
+        if not isinstance(raw, int) or raw <= 0 or raw > _POSTGRESQL_TIMEOUT_MAX:
+            raise GTConfigError(
+                f"PostgreSQL {field_name} must be a positive integer no greater than {_POSTGRESQL_TIMEOUT_MAX}"
+            )
+        values[field_name] = raw
+
+    return PostgreSQLConfig(service=service, **values)
+
+
 def _anchor_path(value: object, *, anchor: Path) -> Path:
     if isinstance(value, Path):
         path = value
@@ -250,7 +363,7 @@ def _find_config() -> Path | None:
     current = Path.cwd().resolve()
     for _ in range(10):  # limit depth
         candidate = current / "groundtruth.toml"
-        if candidate.exists():
+        if candidate.is_file():
             return candidate
         parent = current.parent
         if parent == current:
@@ -271,9 +384,26 @@ def _load_env() -> dict[str, Any]:
         "GT_LEGAL_FOOTER": "legal_footer",
         "GT_GOVERNANCE_GATES": "governance_gates",
     }
-    result = {}
+    result: dict[str, Any] = {}
     for env_key, config_key in mapping.items():
         val = os.environ.get(env_key)
         if val is not None:
             result[config_key] = val
+
+    postgresql_mapping = {
+        "GT_POSTGRES_SERVICE": "service",
+        "GT_POSTGRES_CONNECT_TIMEOUT_SECONDS": "connect_timeout_seconds",
+        "GT_POSTGRES_LOCK_TIMEOUT_MS": "lock_timeout_ms",
+        "GT_POSTGRES_STATEMENT_TIMEOUT_MS": "statement_timeout_ms",
+    }
+    unknown_postgresql = sorted(
+        key for key in os.environ if key.startswith("GT_POSTGRES_") and key not in postgresql_mapping
+    )
+    if unknown_postgresql:
+        raise GTConfigError(f"Unknown PostgreSQL environment settings: {unknown_postgresql}")
+    postgresql = {
+        config_key: os.environ[env_key] for env_key, config_key in postgresql_mapping.items() if env_key in os.environ
+    }
+    if postgresql:
+        result["postgresql"] = postgresql
     return result

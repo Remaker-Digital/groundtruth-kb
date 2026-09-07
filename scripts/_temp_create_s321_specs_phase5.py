@@ -3,7 +3,7 @@
 
 Per owner directive 2026-04-29 (S321):
   "(b) the dispatch prompt ALWAYS defers to the durable record by saying
-  'Read your durable role from .claude/rules/operating-role.md'"
+  'Read your durable role from .harness-baseline-configuration/rules/operating-role.md'"
 
 Selected option (b) over (a) (runner reads record + crafts prompt) because
 deference to the spawned harness's own SessionStart-hook-loaded role
@@ -32,12 +32,12 @@ NEW_SPEC = {
     "description": (
         "Per owner directive 2026-04-29 (S321): '(b) the dispatch prompt "
         'ALWAYS defers to the durable record by saying "Read your durable '
-        "role from .claude/rules/operating-role.md\".'\n\n"
+        "role from .harness-baseline-configuration/rules/operating-role.md\".'\n\n"
         "RATIONALE: spawned harnesses (claude -p, codex exec) currently "
         "receive role assignment via the dispatch prompt's hard-coded "
         "text ('You are Prime Builder' / 'You are Codex Loyal Opposition'). "
         "This bypasses the durable role record at "
-        "`.claude/rules/operating-role.md` and `harness-state/{harness}/"
+        "`.harness-baseline-configuration/rules/operating-role.md` and `harness-state/{harness}/"
         "operating-role.md`. The bypass works correctly in default operation "
         "(recipient->role mapping matches durable record) but creates a real "
         "divergence when the owner toggles the durable record (e.g., for a "
@@ -50,7 +50,7 @@ NEW_SPEC = {
         "prompt text MUST NOT hard-code the role assignment.\n\n"
         "EXAMPLE NEW PROMPT TEXT:\n"
         "  'Read your durable role record at "
-        "`.claude/rules/operating-role.md` (or `harness-state/{harness}/"
+        "`.harness-baseline-configuration/rules/operating-role.md` (or `harness-state/{harness}/"
         "operating-role.md` if present, which takes precedence) before "
         "acting. Process the bridge entries selected below according to "
         "your declared role.'\n\n"
@@ -67,7 +67,7 @@ NEW_SPEC = {
             "kind": "behavioral",
             "description": (
                 "_dispatch_prompt(recipient, items, max_items) output text "
-                "MUST contain '.claude/rules/operating-role.md' OR equivalent "
+                "MUST contain '.harness-baseline-configuration/rules/operating-role.md' OR equivalent "
                 "durable-record reference. Output MUST NOT contain literal "
                 "'You are Prime Builder' or 'You are Codex Loyal Opposition' "
                 "as standalone role assertions."
@@ -82,7 +82,7 @@ NEW_SPEC = {
 
 OWNER_QUOTE = (
     "(b) the dispatch prompt ALWAYS defers to the durable record by "
-    'saying "Read your durable role from .claude/rules/operating-role.md"'
+    'saying "Read your durable role from .harness-baseline-configuration/rules/operating-role.md"'
 )
 
 

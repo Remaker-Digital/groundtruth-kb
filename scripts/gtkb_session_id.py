@@ -193,6 +193,20 @@ def resolve_session_id(
     return ""
 
 
+def session_scratch_dirname(explicit: str | None = None) -> str:
+    """Return the session-scoped scratch subdirectory name for canon s17.
+
+    Canon s17 fixes the scratch root at ``<project root>/scratchpad`` and scopes
+    each session to its own subdirectory. This is the single derivation of that
+    subdirectory name, so callers never re-list the session-id env vars to build
+    a scratch path -- the recurrence this module exists to prevent.
+
+    Falls back to ``"unknown"`` (via :func:`sanitize_session_id`) when no session
+    id is resolvable, so a scratch path is always constructible.
+    """
+    return sanitize_session_id(resolve_session_id(explicit))
+
+
 __all__ = [
     "BRIDGE_WORK_INTENT_ORDER",
     "MARKER_CONTINUITY_ORDER",
@@ -206,4 +220,5 @@ __all__ = [
     "resolve_session_id",
     "sanitize_session_id",
     "session_marker_dir",
+    "session_scratch_dirname",
 ]

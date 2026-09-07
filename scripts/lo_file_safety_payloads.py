@@ -277,13 +277,32 @@ def normalize_cursor(payload: dict[str, Any]) -> NormalizedPayload:
     """Normalize a Cursor PreToolUse payload."""
     tool_name = str(payload.get("tool_name") or payload.get("toolName") or payload.get("tool") or "")
     tool_input = payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else {}
+    if not tool_input:
+        raw_input = payload.get("toolInput")
+        tool_input = raw_input if isinstance(raw_input, dict) else {}
+    file_path = str(tool_input.get("file_path") or tool_input.get("path") or payload.get("path") or "")
 
-    if tool_name in ("Write", "Edit", "MultiEdit"):
-        file_path = str(tool_input.get("file_path") or "")
+    if tool_name == "Write":
         return NormalizedPayload(
             harness=Harness.CURSOR,
             tool_name=tool_name,
-            mutation_class=MutationClass.WRITE if tool_name == "Write" else MutationClass.EDIT,
+            mutation_class=MutationClass.WRITE,
+            target_paths=[file_path] if file_path else [],
+            raw_payload=payload,
+        )
+    if tool_name in ("StrReplace", "Edit", "MultiEdit"):
+        return NormalizedPayload(
+            harness=Harness.CURSOR,
+            tool_name=tool_name,
+            mutation_class=MutationClass.EDIT,
+            target_paths=[file_path] if file_path else [],
+            raw_payload=payload,
+        )
+    if tool_name == "Delete":
+        return NormalizedPayload(
+            harness=Harness.CURSOR,
+            tool_name=tool_name,
+            mutation_class=MutationClass.DELETE,
             target_paths=[file_path] if file_path else [],
             raw_payload=payload,
         )
@@ -303,10 +322,13 @@ def normalize_cursor(payload: dict[str, Any]) -> NormalizedPayload:
             raw_payload=payload,
         )
 
+    glob_dir = str(tool_input.get("target_directory") or "")
+    read_path = file_path or glob_dir
     return NormalizedPayload(
         harness=Harness.CURSOR,
         tool_name=tool_name,
         mutation_class=MutationClass.READ_ONLY,
+        target_paths=[read_path] if read_path else [],
         raw_payload=payload,
     )
 

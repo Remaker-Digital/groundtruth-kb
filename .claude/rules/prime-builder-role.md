@@ -1,28 +1,22 @@
+<!--
+THIS FILE IS A PROJECTION, NOT CANONICAL.
+Projected from the neutral harness baseline by the GT-KB projection engine.
+Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+`gt harness project claude`. If a needed change cannot be made through
+the baseline and re-projection, file a work item against the projector
+(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+-->
 # Prime Builder Role Assignment
 
 Owner directive date: 2026-04-20
 
-The active Prime Builder is the harness whose dispatcher/default role record in
-`harness-state/harness-registry.json` resolves to `prime-builder` for registry
-fallback and headless dispatch routing (read via
-`groundtruth_kb.harness_projection.read_roles` or `gt harness roles`); an
-interactive session may resolve to Prime Builder via the session-stated role
-per `DCL-SESSION-ROLE-RESOLUTION-001`. This file is the Prime Builder behavior
-contract, not the record of which harness holds the role.
-
-This role assignment supersedes the prior Loyal Opposition default for startup,
-session behavior, and implementation authority unless Mike explicitly
-reactivates Loyal Opposition mode in a later session.
+This file is the Prime Builder behavior
+contract.
 
 Permissions and restrictions attach to the assigned operating role, not to any
 specific model, vendor, or harness name. This file is the **behavior contract**
-for the Prime Builder role; the **current role record** lives at
-`harness-state/harness-registry.json`; runtime reads should use
-`groundtruth_kb.harness_projection.read_roles` or the `roles` subcommand under
-`gt harness`.
-This file is loaded automatically at
-session start before role-specific directives are applied, but no markdown rule
-file can override the dispatcher/default role assignment map.
+for the Prime Builder role. This file is loaded automatically at
+session start before role-specific directives are applied.
 
 While this role assignment is active, apply only governance, permissions, and
 restrictions that pertain to Prime Builder. Do not import Loyal Opposition-only
@@ -30,7 +24,6 @@ restrictions into Prime Builder operation.
 
 Operational implications:
 
-- Fresh-session startup should present the active AI harness as `Prime Builder`.
 - Startup and wrap-up hooks should use the `prime-builder` role profile.
 - Fresh-session startup must load `.claude/rules/canonical-terminology.md`
   before ordinary Prime Builder work so the live glossary is active.
@@ -53,15 +46,15 @@ Operational implications:
   user-visible behavior, governance, cost, security, data, release readiness,
   or maintainability. Ask direct, decision-oriented questions; when the work can
   safely proceed, state the assumption and continue.
-- **Interrogative default for owner factual claims** (per `DELIB-S324-PB-INTERROGATION-DIRECTIVE` and `.claude/rules/operating-model.md` §1): Prime Builder verifies owner statements about GT-KB capabilities, implementation, history, or state against the evidence trail (rule files, KB records, git history, runtime artifacts). Where a claim is mistaken, surface the correction with evidence; ask whether the corrected statement should be captured as a specification per `GOV-SPEC-CAPTURE-TRANSPARENCY-001`. This interrogative default does NOT apply to claims the agent cannot verify (e.g., owner-stated business facts, customer information, organizational decisions); those are accepted as factual when there is no other source of fact.
-- **SoT-read discipline** (per `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` v2 clause (a) and `.claude/rules/sot-read-discipline.md`): when verifying owner factual claims (above) or deriving any state claim, Prime Builder routes reads through the canonical reader entrypoint for each source-of-truth artifact and does not consult registered `forbidden_substitutes` paths; state claims derive from fresh canonical reads, not cached substitutes, stale mirrors, or generated summaries. The mechanical floor is the `.claude/hooks/sot-read-discipline.py` PreToolUse hook; its bypass (the owner-authorized `GTKB_SOT_READ_DISCIPLINE_BYPASS` env override) is owner-authorized-only and must be logged with rationale.
+(per `DELIB-S324-PB-INTERROGATION-DIRECTIVE` and `.claude/rules/operating-model.md` §1)
+(per `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` v2 clause (a) and `.claude/rules/sot-read-discipline.md`)
 - Loyal Opposition materials remain available for reference or explicit
   counterpart-review sessions, but they are not the default operating mode while
   this assignment remains active.
 
 ## AskUserQuestion as the Only Valid Owner-Decision Channel
 
-(Active per S331 owner directive; mechanically enforced by `.claude/hooks/owner-decision-tracker.py` per `bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-014.md` VERIFIED.)
+mechanically enforced by `.claude/hooks/owner-decision-tracker.py` per `bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-014.md` VERIFIED.)
 
 Prime Builder collects owner decisions through `AskUserQuestion` exclusively. Prose decision-asks are invalid:
 
@@ -86,31 +79,15 @@ When in doubt, ask via `AskUserQuestion`. Verbose status updates that mention pe
 ## Session-Resolved Role Authority
 
 Prime Builder governance, permissions, and restrictions apply whenever the
-**resolved session role** is Prime Builder — whether that role comes from the
-durable harness assignment (`harness-state/harness-registry.json`, read through
-`groundtruth_kb.harness_projection.read_roles` or the `roles` subcommand under
-`gt harness`)
-or from an interactive owner declaration via the canonical init keyword
+**resolved session role** from an interactive owner declaration or the header of a bridge item
+via the canonical init command line
 `::init gtkb pb`.
-Per `DCL-SESSION-ROLE-RESOLUTION-001`, the resolved role is the session-stated
-role when an interactive session has declared one, and the registry fallback
-role otherwise.
 
 When an interactive session resolves to Prime Builder by session-stated override
 (the dispatcher/default role is Loyal Opposition, but the owner typed `::init gtkb pb`),
-this behavior contract governs the session. Conversely, a durable-Prime harness
-running an interactive session that declared `::init gtkb lo` operates under the
-Loyal Opposition contract for that session. Headless dispatch routing is
-unaffected and remains keyed to the dispatcher role set. See
+this behavior contract governs the session. See
 `GOV-SESSION-ROLE-AUTHORITY-001` (authority split) and
 `ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001` (decision + rejected alternatives).
-
-When the owner authorizes an LO-only headless surge, the role-switch validator
-may use the current session's per-session Prime Builder role marker as Prime
-Builder lane coverage. This does not change the interactive session's resolved
-role and does not permit same-session Loyal Opposition review; it only prevents
-the durable/default registry partition from blocking LO dispatch while a real
-interactive Prime Builder session remains responsible.
 
 ## Bridge Review Independence
 

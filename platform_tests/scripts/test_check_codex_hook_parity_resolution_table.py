@@ -514,24 +514,24 @@ def test_codex_out_dir_appears_in_claude_dispatcher(tmp_path: Path) -> None:
 # ----------------------------------------------------------------------------
 # Assertion 9: cache-writer parity (core single source).
 # ----------------------------------------------------------------------------
-def test_cache_writer_iterates_role_set_instead_of_mode_map(tmp_path: Path) -> None:
+def test_cache_writer_reintroduction_is_caught(tmp_path: Path) -> None:
+    """Inverted by WI-7318: a reintroduced cache writer must fail parity.
+
+    This previously planted a defective loop shape and asserted the tool caught
+    it. The startup-disclosure cache is gone, so the defect worth catching is
+    the writer coming back at all.
+    """
     project_root = _stage_relevant_files(tmp_path)
     _mutate_replace(
         project_root / _CORE,
-        "for mode in sorted(_MODE_TO_ROLE_PROFILE):",
-        "for role in sorted(_resolve_own_role_set()):",
+        "def _render_role_startup_report(",
+        "def _write_role_scoped_startup_relay_caches(additional_context):\n    return None\n\n\n"
+        "def _render_role_startup_report(",
     )
     errors = parity._resolution_table_parity_errors(project_root)
     assert any(
-        _CORE_LABEL in e and "_write_role_scoped_startup_relay_caches" in e and "must iterate" in e for e in errors
-    ), f"expected cache-writer loop error in {errors!r}"
-    assert any(
-        _CORE_LABEL in e
-        and "_write_role_scoped_startup_relay_caches" in e
-        and "must NOT reference" in e
-        and "_resolve_own_role_set" in e
-        for e in errors
-    ), f"expected forbidden-reference error in {errors!r}"
+        _CORE_LABEL in e and "_write_role_scoped_startup_relay_caches" in e and "must NOT define" in e for e in errors
+    ), f"expected cache-writer reintroduction error in {errors!r}"
 
 
 # ----------------------------------------------------------------------------

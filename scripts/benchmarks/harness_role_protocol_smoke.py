@@ -76,7 +76,7 @@ def _role_adoption(root: Path) -> tuple[bool, list[str]]:
 
 
 def _bridge_protocol(root: Path) -> tuple[bool, list[str]]:
-    text = _read_text(root, ".claude/rules/file-bridge-protocol.md")
+    text = _read_text(root, ".harness-baseline-configuration/rules/file-bridge-protocol.md")
     return _pass_if_no_missing(
         text,
         (
@@ -109,8 +109,8 @@ def _implementation_start(root: Path) -> tuple[bool, list[str]]:
 
 
 def _protected_mutation_boundary(root: Path) -> tuple[bool, list[str]]:
-    root_boundary = _read_text(root, ".claude/rules/project-root-boundary.md")
-    review_gate = _read_text(root, ".claude/rules/codex-review-gate.md")
+    root_boundary = _read_text(root, ".harness-baseline-configuration/rules/project-root-boundary.md")
+    review_gate = _read_text(root, ".harness-baseline-configuration/rules/counterpart-review-gate.md")
     combined = root_boundary + "\n" + review_gate
     return _pass_if_no_missing(
         combined,
@@ -129,8 +129,8 @@ def _role_authority_citation(root: Path) -> tuple[bool, list[str]]:
         _read_text(root, path)
         for path in (
             "AGENTS.md",
-            ".claude/rules/prime-builder-role.md",
-            ".claude/rules/operating-role.md",
+            ".harness-baseline-configuration/rules/prime-builder-role.md",
+            ".harness-baseline-configuration/rules/operating-role.md",
         )
     )
     return _pass_if_no_missing(
@@ -169,7 +169,7 @@ PROBES: tuple[Probe, ...] = (
     Probe(
         id="bridge_protocol_compliance",
         title="Bridge protocol compliance anchors",
-        paths=(".claude/rules/file-bridge-protocol.md",),
+        paths=(".harness-baseline-configuration/rules/file-bridge-protocol.md",),
         check=_bridge_protocol,
     ),
     Probe(
@@ -181,13 +181,20 @@ PROBES: tuple[Probe, ...] = (
     Probe(
         id="protected_mutation_boundary",
         title="Protected mutation boundary anchors",
-        paths=(".claude/rules/project-root-boundary.md", ".claude/rules/codex-review-gate.md"),
+        paths=(
+            ".harness-baseline-configuration/rules/project-root-boundary.md",
+            ".harness-baseline-configuration/rules/counterpart-review-gate.md",
+        ),
         check=_protected_mutation_boundary,
     ),
     Probe(
         id="role_authority_citation",
         title="Role authority citation anchors",
-        paths=("AGENTS.md", ".claude/rules/prime-builder-role.md", ".claude/rules/operating-role.md"),
+        paths=(
+            "AGENTS.md",
+            ".harness-baseline-configuration/rules/prime-builder-role.md",
+            ".harness-baseline-configuration/rules/operating-role.md",
+        ),
         check=_role_authority_citation,
     ),
     Probe(

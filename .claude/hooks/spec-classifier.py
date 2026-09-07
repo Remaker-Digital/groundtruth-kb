@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Claude Code UserPromptSubmit hook — Specification Classifier (regex gate).
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+"""UserPromptSubmit hook — Specification Classifier (regex gate).
 
 Enforces: GOV-REQUIREMENTS-COLLECTION-HOOK-001 v2; DCL-REQUIREMENTS-COLLECTION-HOOK-CONTRACT-001 v2.
 See bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04 for approved scope.
@@ -84,7 +90,7 @@ def main() -> None:
     try:
         data = json.loads(sys.stdin.read())
         # Accept both legacy "user_prompt" and current "prompt" field names
-        # per Claude Code UserPromptSubmit hook contract evolution.
+        # per the harness UserPromptSubmit hook contract evolution.
         prompt = data.get("prompt") or data.get("user_prompt") or ""
         if detect_specification_language(prompt):
             json.dump({"systemMessage": REMINDER}, sys.stdout)

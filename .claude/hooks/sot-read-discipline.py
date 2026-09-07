@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """SoT Read-Discipline canonical hook.
 
 Authority: DCL-SOT-READ-HOOK-CONTRACT-001 v1; GOV-SOURCE-OF-TRUTH-FRESHNESS-001 v2
@@ -7,9 +13,9 @@ Authority: DCL-SOT-READ-HOOK-CONTRACT-001 v1; GOV-SOURCE-OF-TRUTH-FRESHNESS-001 
 
 Two-surface harness-specific contract:
 
-- Claude branch: tool_name in {Read, Grep, Glob}; extract target from tool_input;
+- Native-tool branch: tool_name in {Read, Grep, Glob}; extract target from tool_input;
   consult registry; block on match.
-- Codex branch: tool_name == Bash; parse tool_input.command for known read/search
+- Shell-command branch: tool_name == Bash; parse tool_input.command for known read/search
   verbs (Get-Content, Select-String, Get-ChildItem incl. -Recurse, aliases gc/gci/cat,
   rg, grep); extract path; consult registry; block on match.
 
@@ -39,10 +45,19 @@ from groundtruth_kb.project.registry_control_plane import load_registry_snapshot
 
 BYPASS_ENV_VAR = "GTKB_SOT_READ_DISCIPLINE_BYPASS"
 
-CLAUDE_READ_TOOLS = {"Read", "Grep", "Glob"}
-CODEX_BASH_TOOL = "Bash"
+NATIVE_READ_TOOLS = {"Read", "Grep", "Glob"}
 
-# Per-verb extractor table for the Codex Bash branch.
+# WI-7289: the shell surface is not one tool name. The projector renders
+# shell_exec to "Bash|PowerShell" for Claude and "Shell|Bash" for Cursor, and
+# Goose registers every PreToolUse hook without a matcher at all, so a payload
+# can arrive under any of these names. Matching only "Bash" left the specified
+# shell surface of DCL-SOT-READ-HOOK-CONTRACT-001 unenforced on the harnesses
+# that do not use that name, even once the intent is declared.
+SHELL_COMMAND_TOOLS = frozenset({"Bash", "PowerShell", "Shell", "shell", "bash", "powershell"})
+# Retained for callers and tests that referenced the single-name constant.
+SHELL_COMMAND_TOOL = "Bash"
+
+# Per-verb extractor table for the shell-command branch.
 # Returns the path argument(s) extracted from a token list, or [] if no match.
 
 _PATH_FLAGS = {"-Path", "-LiteralPath", "--path"}
@@ -160,7 +175,7 @@ def _normalize_substitute(sub: str) -> str:
 
     Uses the same convention as _normalize_relative: replace backslashes with
     forward slashes, strip surrounding whitespace, and remove a leading "./"
-    prefix (but NOT a leading "." that begins a dotfile name like ".claude").
+    prefix (but NOT a leading "." that begins a dotfile name like ".groundtruth").
     """
     cleaned = sub.strip().replace("\\", "/")
     if cleaned.startswith("./"):
@@ -213,7 +228,7 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     tool_name = payload.get("tool_name") or payload.get("tool") or ""
 
     targets: list[str] = []
-    if tool_name in CLAUDE_READ_TOOLS:
+    if tool_name in NATIVE_READ_TOOLS:
         if tool_name == "Read":
             raw = tool_input.get("file_path") or ""
             if isinstance(raw, str) and raw:
@@ -229,7 +244,7 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
                 base = re.split(r"[*?\[]", raw, maxsplit=1)[0]
                 if base:
                     targets.append(base)
-    elif tool_name == CODEX_BASH_TOOL:
+    elif tool_name in SHELL_COMMAND_TOOLS:
         command = tool_input.get("command") or ""
         if isinstance(command, str) and command:
             targets.extend(_extract_paths_from_bash(command))

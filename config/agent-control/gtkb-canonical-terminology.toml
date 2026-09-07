@@ -26,7 +26,7 @@ version = "1.0.0"
 [config.profiles.local-only]
 # Solo-Prime scaffold; intentionally no AGENTS.md (per test_scaffold_project.py:63-77).
 required_files = ["CLAUDE.md", "MEMORY.md"]
-optional_files = [".claude/rules/deliberation-protocol.md"]
+optional_files = [".harness-baseline-configuration/rules/deliberation-protocol.md"]
 required_startup_terms = ["MemBase", "Deliberation Archive", "MEMORY.md"]
 missing_severity = "ERROR"
 required_primer_terms = [
@@ -39,7 +39,7 @@ required_primer_terms = [
 primer_missing_severity = "ERROR"
 
 [config.profiles.dual-agent]
-required_files = ["CLAUDE.md", "AGENTS.md", "MEMORY.md", ".claude/rules/deliberation-protocol.md"]
+required_files = ["CLAUDE.md", "AGENTS.md", "MEMORY.md", ".harness-baseline-configuration/rules/deliberation-protocol.md"]
 required_startup_terms = ["MemBase", "Deliberation Archive", "MEMORY.md", "Prime Builder", "Loyal Opposition"]
 missing_severity = "ERROR"
 required_primer_terms = [
@@ -54,7 +54,7 @@ primer_missing_severity = "ERROR"
 [config.profiles.dual-agent-webapp]
 # Extends dual-agent; no webapp-specific additional terminology files.
 extends = "dual-agent"
-required_files = ["CLAUDE.md", "AGENTS.md", "MEMORY.md", ".claude/rules/deliberation-protocol.md"]
+required_files = ["CLAUDE.md", "AGENTS.md", "MEMORY.md", ".harness-baseline-configuration/rules/deliberation-protocol.md"]
 required_startup_terms = ["MemBase", "Deliberation Archive", "MEMORY.md", "Prime Builder", "Loyal Opposition"]
 missing_severity = "ERROR"
 required_primer_terms = [
@@ -73,7 +73,7 @@ primer_missing_severity = "ERROR"
 # Harness-driven MEMORY.md lives outside the project repo; don't require MEMORY.md content check.
 extends = "dual-agent"
 memory_md_location = "harness"
-required_files = ["CLAUDE.md", "AGENTS.md", ".claude/rules/deliberation-protocol.md"]
+required_files = ["CLAUDE.md", "AGENTS.md", ".harness-baseline-configuration/rules/deliberation-protocol.md"]
 required_startup_terms = ["MemBase", "Deliberation Archive", "MEMORY.md", "Prime Builder", "Loyal Opposition"]
 missing_severity = "ERROR"
 required_primer_terms = [
@@ -96,4 +96,4 @@ ignore_paths = [
     "CHANGELOG.md",
 ]
 # Primer file path used by required_primer_terms evaluation (Slice 1, S327).
-primer_path = ".claude/rules/canonical-terminology.md"
+primer_path = ".harness-baseline-configuration/rules/canonical-terminology.md"

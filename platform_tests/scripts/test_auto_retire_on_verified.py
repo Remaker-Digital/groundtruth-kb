@@ -159,7 +159,15 @@ def test_auto_retire_skips_zero_member_project(tmp_path: Path) -> None:
         db.close()
 
 
-def test_auto_retire_skips_open_project_authorization_go_thread(tmp_path: Path) -> None:
+def test_auto_retire_proceeds_despite_an_open_authorization_shaped_thread(tmp_path: Path) -> None:
+    """WI-7729: the sweep side of the same removal.
+
+    The fixture is unchanged and is what makes this non-vacuous: it writes a thread
+    at status ``NEW`` -- a retirement-blocking status -- carrying both a
+    ``Project Authorization:`` line and a ``Project:`` line, which is precisely the
+    shape the removed conjunct matched. A reintroduced conjunct would trip on it and
+    fail this test.
+    """
     db = _seed_project(tmp_path, {"WI-1": "verified"})
     try:
         _seed_authorization(db, ["WI-1"])
@@ -167,11 +175,11 @@ def test_auto_retire_skips_open_project_authorization_go_thread(tmp_path: Path) 
         _write_open_project_authorization_thread(tmp_path)
         service = ProjectLifecycleService(db)
 
-        assert service.auto_retire_completed_projects(project_root=tmp_path) == []
+        assert service.auto_retire_completed_projects(project_root=tmp_path) != []
         status = service.member_completion_status("PROJECT-X", project_root=tmp_path)
-        assert status["open_project_authorization_bridge_threads"] == ["gtkb-auto-retire-open-pauth-fixture"]
-        assert "open_project_authorization_bridge_threads" in status["exclusion_reasons"]
-        assert db.get_project("PROJECT-X")["status"] == "active"
+        assert "open_project_authorization_bridge_threads" not in status
+        assert "open_project_authorization_bridge_threads" not in status["exclusion_reasons"]
+        assert db.get_project("PROJECT-X")["status"] == "retired"
     finally:
         db.close()
 
@@ -186,6 +194,31 @@ def test_auto_retire_skips_plan_incomplete_guard(tmp_path: Path) -> None:
         status = service.member_completion_status("PROJECT-X")
         assert status["completion_guarded"] is True
         assert "plan_incomplete_guard" in status["exclusion_reasons"]
+        assert db.get_project("PROJECT-X")["status"] == "active"
+    finally:
+        db.close()
+
+
+def test_auto_retire_skips_unsatisfied_closure_dependency(tmp_path: Path) -> None:
+    db = _seed_project(tmp_path, {"WI-1": "verified"})
+    try:
+        db.insert_project("Prerequisite", "test", "seed", id="PROJECT-PREREQUISITE", status="active")
+        service = ProjectLifecycleService(db)
+        service.add_project_dependency(
+            "PROJECT-X",
+            "PROJECT-PREREQUISITE",
+            required_prerequisite_state="retired",
+            affected_gate="closure",
+            rationale="PROJECT-X closes only after its prerequisite retires.",
+            provenance="TEST-12616",
+            changed_by="test",
+            change_reason="seed unsatisfied closure dependency",
+        )
+
+        assert service.auto_retire_completed_projects(project_root=tmp_path) == []
+        status = service.member_completion_status("PROJECT-X", project_root=tmp_path)
+        assert status["completion_ready"] is False
+        assert "unsatisfied_project_dependencies" in status["exclusion_reasons"]
         assert db.get_project("PROJECT-X")["status"] == "active"
     finally:
         db.close()

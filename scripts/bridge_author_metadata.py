@@ -15,13 +15,28 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+_PACKAGE_SRC = Path(__file__).resolve().parent.parent / "groundtruth-kb" / "src"
+if str(_PACKAGE_SRC) not in sys.path:
+    sys.path.insert(0, str(_PACKAGE_SRC))
+
+from groundtruth_kb.bridge.versioned_files import parse_bridge_header_block  # noqa: E402
+
 try:
     from gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
 except ModuleNotFoundError:  # pragma: no cover
     from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
 
 BRIDGE_AUTHOR_METADATA_STATUSES: frozenset[str] = frozenset(
-    {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED", "NO-ACTION"}
+    {
+        "NEW",
+        "REVISED",
+        "GO",
+        "NO-GO",
+        "VERDICT-REJECTED",
+        "VERIFIED",
+        "ADVISORY",
+        "DEFERRED",
+    }
 )
 REQUIRED_AUTHOR_METADATA_FIELDS: tuple[str, ...] = (
     "author_identity",
@@ -152,6 +167,19 @@ SYNTHETIC_SESSION_CONTEXT_IDS: frozenset[str] = frozenset(
     }
 )
 SYNTHETIC_SESSION_CONTEXT_RE = re.compile(r"^(?:openrouter|ollama)-harness-[a-z]$", re.IGNORECASE)
+UNRESOLVABLE_SESSION_CONTEXT_ID_PREFIXES: frozenset[str] = frozenset(
+    {
+        "absent",
+        "missing",
+        "none",
+        "nosession",
+        "notset",
+        "null",
+        "unavailable",
+        "unknown",
+        "unset",
+    }
+)
 DISPATCH_RUN_ID_RE = re.compile(
     r"^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z)-"
     r"(?P<role>acting-prime-builder|loyal-opposition|prime-builder)-"
@@ -190,8 +218,33 @@ def first_nonblank_line(content: str) -> str:
 
 
 def bridge_artifact_status(content: str) -> str | None:
-    first_line = first_nonblank_line(content).lstrip("\ufeff")
-    return first_line if first_line in BRIDGE_AUTHOR_METADATA_STATUSES else None
+    status = parse_bridge_header_block(content.lstrip("\ufeff")).status
+    return status if status in BRIDGE_AUTHOR_METADATA_STATUSES else None
+
+
+def _author_metadata_insert_index(content: str) -> int:
+    """Return the insertion point after the bounded bridge header block."""
+
+    lines = content.splitlines(keepends=True)
+    if bridge_artifact_status(content) not in BRIDGE_AUTHOR_METADATA_STATUSES:
+        return 0
+
+    last_header_index = -1
+    nonblank_seen = 0
+    for index, line in enumerate(lines):
+        stripped = line.strip().lstrip("\ufeff")
+        if not stripped:
+            continue
+        nonblank_seen += 1
+        if nonblank_seen > 3:
+            break
+        parsed_line = parse_bridge_header_block(stripped)
+        is_status = parsed_line.status in BRIDGE_AUTHOR_METADATA_STATUSES and parsed_line.status_line_exact
+        if stripped.startswith(("::init", "::open")) or is_status:
+            last_header_index = index
+            continue
+        break
+    return last_header_index + 1
 
 
 def metadata_value_is_valid(value: object) -> bool:
@@ -202,12 +255,17 @@ def metadata_value_is_valid(value: object) -> bool:
 
 
 def is_synthetic_session_context_id(value: object) -> bool:
-    """Return true for static bridge session placeholders, not real session ids."""
-    if not metadata_value_is_valid(value):
-        return False
-    text = str(value).strip().strip("`")
+    """Return true when a bridge session value cannot identify one context."""
+    text = str(value or "").strip().strip("`")
     lowered = text.lower()
-    return lowered in SYNTHETIC_SESSION_CONTEXT_IDS or SYNTHETIC_SESSION_CONTEXT_RE.fullmatch(text) is not None
+    leading_segment = lowered.split("-", 1)[0]
+    return (
+        lowered in PLACEHOLDER_VALUES
+        or lowered in SYNTHETIC_SESSION_CONTEXT_IDS
+        or SYNTHETIC_SESSION_CONTEXT_RE.fullmatch(text) is not None
+        or any(character.isspace() for character in text)
+        or leading_segment in UNRESOLVABLE_SESSION_CONTEXT_ID_PREFIXES
+    )
 
 
 def _field_value(data: Mapping[str, Any], field: str) -> str | None:
@@ -398,6 +456,52 @@ def _declared_harness_name(author_identity: str) -> str:
     return value.lower()
 
 
+def _author_context_failure_reason(
+    project_root: Path,
+    *,
+    session_context_id: str,
+    harness_name: str,
+) -> str:
+    """Name the precondition that actually failed, and why (WI-7526).
+
+    The former message named "an invoking session id and acting harness identity"
+    regardless of which half was missing. When harness identity was the missing
+    half because the registry projection is absent, that message pointed the
+    operator at session identity -- the half that was fine -- and away from the
+    cause. Nothing upstream surfaced it either: the identity readers are
+    fail-soft by design and return an empty document rather than reporting the
+    absence, so the first signal an operator saw was this error naming the wrong
+    thing.
+    """
+    missing = []
+    if not session_context_id:
+        missing.append("invoking session id")
+    if not harness_name:
+        missing.append("acting harness identity")
+    reason = (
+        "exact bridge author context requires both an invoking session id and acting harness "
+        f"identity; missing: {', '.join(missing)}"
+    )
+    if not harness_name:
+        try:
+            from scripts.harness_projection_reader import harness_registry_path
+
+            registry = harness_registry_path(project_root)
+            absent = not registry.is_file()
+        except Exception:  # pragma: no cover - diagnostics must never mask the real error
+            registry, absent = None, False
+        if absent:
+            reason += (
+                f". Cause: the harness registry projection at {registry} is absent and the identity "
+                "readers are fail-soft, so they returned an empty document instead of reporting it. "
+                "Per ADR-ELIMINATE-DURABLE-ROLE-ASSIGNMENT-001 and "
+                "DCL-NO-DURABLE-ROLE-IN-REGISTRY-001 that projection is no longer identity or role "
+                "authority, so restoring the file is NOT the fix. To proceed now, set "
+                "GTKB_AUTHOR_HARNESS_ID for this invocation or pass an explicit author harness id"
+            )
+    return reason
+
+
 def _resolve_harness_identity_fields(
     project_root: Path,
     *,
@@ -551,7 +655,11 @@ def load_author_metadata(
     harness_name = str(harness_identity.get("harness_name") or "").strip()
     if not session_context_id or not harness_name:
         raise BridgeAuthorMetadataError(
-            "exact bridge author context requires both an invoking session id and acting harness identity"
+            _author_context_failure_reason(
+                root,
+                session_context_id=session_context_id,
+                harness_name=harness_name,
+            )
         )
     authority_fields = _resolve_attested_authority_fields(
         root,
@@ -681,13 +789,9 @@ def ensure_author_metadata(
     if not lines:
         return "".join(metadata_lines)
 
-    insert_idx = 0
-    for idx, line in enumerate(lines):
-        if line.strip():
-            insert_idx = idx + 1
-            if not line.endswith(("\n", "\r")):
-                lines[idx] = line + "\n"
-            break
+    insert_idx = _author_metadata_insert_index(content)
+    if insert_idx > 0 and not lines[insert_idx - 1].endswith(("\n", "\r")):
+        lines[insert_idx - 1] += "\n"
     if insert_idx >= len(lines) or lines[insert_idx].strip():
         metadata_lines.append("\n")
     lines[insert_idx:insert_idx] = metadata_lines

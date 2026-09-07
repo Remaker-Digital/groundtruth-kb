@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Claude Code UserPromptSubmit hook — Glossary expansion (Phase 3 of GTKB-DA-READ-SURFACE-CORRECTION).
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+"""UserPromptSubmit hook — Glossary expansion (Phase 3 of GTKB-DA-READ-SURFACE-CORRECTION).
 
 Implements ``DCL-CONCEPT-ON-CONTACT-001`` Stage A: detects glossary-term
 overlap with the owner prompt and emits matched glossary entries as a
@@ -16,7 +22,7 @@ Specs: GOV-GLOSSARY-AS-DA-READ-SURFACE-001, ADR-DA-READ-SURFACE-PLACEMENT-001, D
 
 Stdin:  JSON {"prompt": "...", "session_id": "...", ...}
 Stdout: JSON {"systemMessage": "..."} when matches; {} when none/skip.
-Exit:   Always 0 (Claude Code hook contract; never blocks).
+Exit:   Always 0 (harness hook contract; never blocks).
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -38,8 +44,7 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()).resolve()
-GLOSSARY_PATH = PROJECT_DIR / ".claude" / "rules" / "canonical-terminology.md"
-AUDIT_LOG_DIR = PROJECT_DIR / ".gtkb-state" / "glossary-expansion" / "invocations"
+GLOSSARY_PATH = PROJECT_DIR / ".claude/rules" / "canonical-terminology.md"
 
 MAX_GLOSSARY_MATCHES = 5
 MAX_SEMANTIC_CANDIDATES = 3
@@ -331,16 +336,6 @@ def _truncate_to_budget(parts: list[str], budget: int) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def _write_audit_log(record: dict[str, Any]) -> None:
-    try:
-        AUDIT_LOG_DIR.mkdir(parents=True, exist_ok=True)
-        ts = record.get("timestamp", datetime.now(UTC).isoformat()).replace(":", "-")
-        path = AUDIT_LOG_DIR / f"{ts}.json"
-        path.write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    except OSError:
-        pass
-
-
 # ---------------------------------------------------------------------------
 # Hook entry point
 # ---------------------------------------------------------------------------
@@ -400,7 +395,6 @@ def _process(prompt: str) -> dict[str, Any]:
         # Glossary unavailable; fail closed.
         audit["skipped"] = True
         audit["skip_reason"] = "glossary_unavailable"
-        _write_audit_log(audit)
         return {}
 
     # Glossary match (capped).
@@ -460,7 +454,6 @@ def _process(prompt: str) -> dict[str, Any]:
 
     # If nothing to inject, emit empty.
     if not matched_headings and not semantic_rows:
-        _write_audit_log(audit)
         return {}
 
     # Format injection.
@@ -497,12 +490,10 @@ def _process(prompt: str) -> dict[str, Any]:
         fitted += _truncate_to_budget(semantic_parts, remaining)
 
     if not fitted:
-        _write_audit_log(audit)
         return {}
 
     body = _WRAPPER_PREFIX + "\n\n".join(fitted) + _WRAPPER_SUFFIX
     audit["injection_size_bytes"] = len(body.encode("utf-8"))
-    _write_audit_log(audit)
     return {"systemMessage": body}
 
 

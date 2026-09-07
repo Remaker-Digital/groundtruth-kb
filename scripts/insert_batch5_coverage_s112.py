@@ -18,6 +18,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools", "knowledge-db"))
 
+from datetime import UTC
+
 from db import KnowledgeDB  # noqa: E402
 
 db = KnowledgeDB()
@@ -339,7 +341,7 @@ MAPPINGS: list[tuple[str, str, str, str, str, str]] = [
         "291",
         "tests/e2e/test_navigation.py",
         "TestSystemStateIndicator",
-        "test_activation_status_in_navbar",
+        "test_authorization_in_navbar",
         "high",
         "Inactive system state indicator in nav bar",
     ),
@@ -413,9 +415,9 @@ MAPPINGS: list[tuple[str, str, str, str, str, str]] = [
 
 
 def main() -> None:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     inserted = 0
     skipped = 0
 

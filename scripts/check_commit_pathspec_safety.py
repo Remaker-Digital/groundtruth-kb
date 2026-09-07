@@ -13,7 +13,7 @@ This is Slice A of WI-4464 mitigation (a): the *tested detection mechanism*.
 It classifies the staged index and flags the contamination signature — a
 staged set that mixes bridge-queue files with non-bridge ``other`` files,
 which is also a standing protocol violation per
-``.claude/rules/bridge-essential.md`` ("Scoped commits only").
+``.harness-baseline-configuration/rules/bridge-essential.md`` ("Scoped commits only").
 
 Slice A performs NO commit-path / hook / config wiring. It is a self-contained,
 independently runnable + unit-tested mechanism. Advisory mode (the default)
@@ -210,7 +210,7 @@ def _format_warning(result: dict) -> str:
             "  Commit with an explicit pathspec instead, e.g.:",
             '    git commit -- <your-intended-files> -m "..."',
             "  See: memory/recovery-2026-06-11-fab20-commit-collision.md",
-            '  Protocol: .claude/rules/bridge-essential.md ("Scoped commits only").',
+            '  Protocol: .harness-baseline-configuration/rules/bridge-essential.md ("Scoped commits only").',
         ]
     )
     return "\n".join(lines)

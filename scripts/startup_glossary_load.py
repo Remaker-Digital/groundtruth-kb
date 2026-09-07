@@ -7,7 +7,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-GLOSSARY_RELATIVE_PATH = ".claude/rules/canonical-terminology.md"
+GLOSSARY_RELATIVE_PATH = ".harness-baseline-configuration/rules/canonical-terminology.md"
 GLOSSARY_CONFIG_RELATIVE_PATH = ".claude/rules/canonical-terminology.toml"
 CORE_PROFILE_KEY = "dual-agent"
 

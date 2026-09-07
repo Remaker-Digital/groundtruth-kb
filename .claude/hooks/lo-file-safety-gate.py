@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """PreToolUse hook: Loyal Opposition file-safety gate.
 
 Blocks Loyal Opposition writes outside the approved additive/reporting surfaces
@@ -508,7 +514,7 @@ def _change_decision(change: Change, root: Path, config: dict[str, Any], tool_in
     )
 
 
-def _simple_changes_from_claude_payload(payload: dict[str, Any], root: Path) -> tuple[list[Change], dict[str, Any]]:
+def _simple_changes_from_edit_tool_payload(payload: dict[str, Any], root: Path) -> tuple[list[Change], dict[str, Any]]:
     tool_name = _tool_name(payload)
     tool_input = _tool_input(payload)
     file_path = tool_input.get("file_path")
@@ -800,7 +806,7 @@ def _patch_changes(payload: dict[str, Any], root: Path) -> tuple[list[Change], d
 def _changed_paths(payload: dict[str, Any], root: Path) -> tuple[list[Change], dict[str, Any]]:
     tool_name = _tool_name(payload)
     if tool_name in {"Write", "Edit", "MultiEdit"}:
-        return _simple_changes_from_claude_payload(payload, root)
+        return _simple_changes_from_edit_tool_payload(payload, root)
     if tool_name == "Bash":
         return _bash_targets(payload, root), _tool_input(payload)
     if tool_name in {"apply_patch", "functions.apply_patch"} or "*** Begin Patch" in json.dumps(payload):

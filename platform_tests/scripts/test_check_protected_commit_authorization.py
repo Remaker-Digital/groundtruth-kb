@@ -251,6 +251,24 @@ author_model_configuration: test
 """
 
 
+def _copy_minimal_bridge_package(root: Path) -> list[str]:
+    """Install only the package surface needed by isolated bridge fixtures."""
+
+    rel_paths = [
+        "groundtruth-kb/src/groundtruth_kb/__init__.py",
+        "groundtruth-kb/src/groundtruth_kb/bridge/__init__.py",
+        "groundtruth-kb/src/groundtruth_kb/bridge/versioned_files.py",
+    ]
+    for rel_path in rel_paths[:2]:
+        target = root / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("", encoding="utf-8")
+    versioned_files = root / rel_paths[2]
+    versioned_files.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(REPO_ROOT / rel_paths[2], versioned_files)
+    return rel_paths
+
+
 def _write_transaction_chain(
     root: Path,
     module,
@@ -361,7 +379,7 @@ Responds to: {report}
     packet.pop("packet_hash")
     packet["schema_version"] = 3
     packet["implementation_start"] = {
-        "schema_version": 2,
+        "schema_version": 3,
         "bridge_id": bridge_id,
         "finalized_at": "2026-07-19T00:00:00Z",
         "session_id": "pb-start-session",
@@ -371,23 +389,7 @@ Responds to: {report}
             "thread_slug": bridge_id,
             "session_id": "pb-start-session",
             "claim_kind": "go_implementation",
-            "acting_role": "prime-builder",
-            "session_envelope_id": "SENV-pb-start-session",
-            "acting_role_attestation": "role-attestation:SENV-pb-start-session:1:0123456789abcdef",
             "project_id": "PROJECT-TEST",
-        },
-        "role_attestation": {
-            "schema_version": 1,
-            "invoking_context": "pb-start-session",
-            "session_envelope_id": "SENV-pb-start-session",
-            "subject": "gtkb",
-            "init_command_digest": "test-init-command-digest",
-            "binding_created_at": "2026-07-19T00:00:00Z",
-            "role": "prime-builder",
-            "source_event": "exact_init",
-            "issuer": "test/exact-init",
-            "attested_at": "2026-07-19T00:00:00Z",
-            "evidence_reference": "role-attestation:SENV-pb-start-session:1:0123456789abcdef",
         },
         "project_authorization_decision": {"allowed": True},
     }
@@ -1326,6 +1328,8 @@ def test_prospective_audit_tree_is_index_complete_and_ignores_live_gate_tamper(
     candidate_path.parent.mkdir()
     candidate_path.write_text(
         f"""ADVISORY
+::init gtkb pb
+::open build
 {_author("loyal-opposition", "019f0000-0000-7000-8000-000000000001")}
 bridge_kind: governance_advisory
 Document: {bridge_id}
@@ -1558,7 +1562,6 @@ def test_transaction_manifest_rejects_casefold_collision(tmp_path: Path) -> None
         ("missing_start_session", "implementation-start lacks a session id"),
         ("missing_claim", "lacks a work-intent claim"),
         ("claim_kind", "claim kind is not go_implementation"),
-        ("claim_role", "claim acting role is not prime-builder"),
         ("claim_session", "claim session differs from start session"),
         ("wrong_bridge", "names another bridge"),
         ("not_finalized", "packet is not finalized"),
@@ -1573,12 +1576,6 @@ def test_transaction_manifest_rejects_casefold_collision(tmp_path: Path) -> None
         ("proposal_drift", "resolver-approved proposal"),
         ("go_drift", "resolver-approved GO"),
         ("prestart_hash", "pre-start packet hash mismatch"),
-        ("session_drift", "attested context differs from start session"),
-        ("attestation_schema", "role-attestation schema is unsupported"),
-        ("attestation_role", "attested role is not prime-builder"),
-        ("attestation_source", "role authority is not exact-init"),
-        ("claim_envelope", "claim envelope differs from role attestation"),
-        ("claim_attestation", "claim reference differs from role attestation"),
         ("claim_project", "claim project differs from packet PAUTH"),
         ("out_of_scope", "target scope differs"),
         ("pauth_denied", "protected-mutation PAUTH validation failed"),
@@ -1645,7 +1642,7 @@ def test_transaction_local_candidate_fails_closed_on_provenance_and_packet_error
                 packet.pop("implementation_start")
                 packet["packet_hash"] = module.packet_hash(packet)
             elif failure == "start_schema":
-                packet["implementation_start"]["schema_version"] = 1
+                packet["implementation_start"]["schema_version"] = 4
                 packet["packet_hash"] = module.packet_hash(packet)
             elif failure == "missing_start_session":
                 packet["implementation_start"].pop("session_id")
@@ -1655,9 +1652,6 @@ def test_transaction_local_candidate_fails_closed_on_provenance_and_packet_error
                 packet["packet_hash"] = module.packet_hash(packet)
             elif failure == "claim_kind":
                 packet["implementation_start"]["work_intent_claim"]["claim_kind"] = "draft_review"
-                packet["packet_hash"] = module.packet_hash(packet)
-            elif failure == "claim_role":
-                packet["implementation_start"]["work_intent_claim"]["acting_role"] = "loyal-opposition"
                 packet["packet_hash"] = module.packet_hash(packet)
             elif failure == "claim_session":
                 packet["implementation_start"]["work_intent_claim"]["session_id"] = "other-session"
@@ -1689,26 +1683,6 @@ def test_transaction_local_candidate_fails_closed_on_provenance_and_packet_error
             elif failure == "prestart_hash":
                 packet["implementation_start"]["pre_start_packet_hash"] = "sha256:wrong"
                 packet["packet_hash"] = module.packet_hash(packet)
-            elif failure == "session_drift":
-                packet["implementation_start"]["role_attestation"]["invoking_context"] = "other-session"
-                packet["packet_hash"] = module.packet_hash(packet)
-            elif failure == "attestation_schema":
-                packet["implementation_start"]["role_attestation"]["schema_version"] = 2
-                packet["packet_hash"] = module.packet_hash(packet)
-            elif failure == "attestation_role":
-                packet["implementation_start"]["role_attestation"]["role"] = "loyal-opposition"
-                packet["packet_hash"] = module.packet_hash(packet)
-            elif failure == "attestation_source":
-                packet["implementation_start"]["role_attestation"]["source_event"] = "owner_role_change"
-                packet["packet_hash"] = module.packet_hash(packet)
-            elif failure == "claim_envelope":
-                packet["implementation_start"]["work_intent_claim"]["session_envelope_id"] = "SENV-other"
-                packet["packet_hash"] = module.packet_hash(packet)
-            elif failure == "claim_attestation":
-                packet["implementation_start"]["work_intent_claim"]["acting_role_attestation"] = (
-                    "role-attestation:SENV-other:1:fedcba9876543210"
-                )
-                packet["packet_hash"] = module.packet_hash(packet)
             elif failure == "claim_project":
                 packet["implementation_start"]["work_intent_claim"]["project_id"] = "PROJECT-OTHER"
                 packet["packet_hash"] = module.packet_hash(packet)
@@ -1729,6 +1703,43 @@ def test_transaction_local_candidate_fails_closed_on_provenance_and_packet_error
         finding.get("path") == verdict and any(expected in error for error in finding.get("evidence_errors", []))
         for finding in result["findings"]
     )
+
+
+@pytest.mark.parametrize("start_schema", [1, 2, 3])
+def test_transaction_local_candidate_accepts_computed_provenance_schema_without_packet_role_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    start_schema: int,
+) -> None:
+    module = _load_module()
+    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    _stage_transaction(tmp_path, selected_paths, report, verdict)
+    packet_path = tmp_path / ".gtkb-state" / "implementation-authorizations" / "by-bridge" / "gtkb-wi5629-fixture.json"
+    packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    start = packet["implementation_start"]
+    start["schema_version"] = start_schema
+    # Deliberately contradictory values prove that packet/session-object role
+    # material is not consulted by the protected-commit consumer.
+    start["role_attestation"] = {
+        "role": "loyal-opposition",
+        "session_envelope_id": "SENV-wrong",
+        "source_event": "owner_role_change",
+    }
+    start["worker_role_provenance"] = {"role": "loyal-opposition"}
+    start["work_intent_claim"]["acting_role"] = "loyal-opposition"
+    start["work_intent_claim"]["session_envelope_id"] = "SENV-other"
+    start["work_intent_claim"]["acting_role_attestation"] = "role-attestation:wrong"
+    packet["packet_hash"] = module.packet_hash(packet)
+    packet_path.write_text(json.dumps(packet), encoding="utf-8")
+
+    monkeypatch.setattr(module, "list_named_packets", lambda root: [])
+    monkeypatch.setattr(module, "run_bridge_compliance_audit", lambda **kwargs: {"decision": "pass"})
+    monkeypatch.setattr(module, "validate_verdict_evidence_anchors", lambda content, project_root: [])
+
+    result = module.evaluate(tmp_path)
+
+    assert result["status"] == "pass"
+    assert all(item["evidence"] == "transaction_local_verified_manifest" for item in result["cleared"])
 
 
 def test_explicit_paths_mode_never_grants_transaction_local_authority(
@@ -3562,6 +3573,7 @@ def test_report_verdict_hash_passes_before_and_after_candidate_materialization(
         target = root / rel_path
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO_ROOT / rel_path, target)
+    package_paths = _copy_minimal_bridge_package(root)
 
     (root / "groundtruth.toml").write_text('[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8")
     (root / ".gitignore").write_text("groundtruth.db\n.gtkb-state/\n", encoding="utf-8")
@@ -3623,6 +3635,7 @@ applies_when_doc_matches = ["gtkb-schema-v2-index-fixture"]
     subprocess.run(["git", "init", "-q"], cwd=root, check=True)
     committed_paths = [
         *authority_paths,
+        *package_paths,
         "groundtruth.toml",
         ".gitignore",
         config.relative_to(root).as_posix(),
@@ -5072,7 +5085,6 @@ def _wi6183_transaction_fixture(root: Path, module) -> tuple[str, str]:
         "scripts/bridge_work_intent_registry.py",
         "scripts/gtkb_session_id.py",
         "scripts/bridge_author_metadata.py",
-        "groundtruth-kb/src/groundtruth_kb/__init__.py",
         "config/governance/project-authorization-operation-taxonomy.toml",
     ]
     authority_paths.extend(
@@ -5083,6 +5095,7 @@ def _wi6183_transaction_fixture(root: Path, module) -> tuple[str, str]:
         target = root / rel_path
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO_ROOT / rel_path, target)
+    package_paths = _copy_minimal_bridge_package(root)
     (root / "groundtruth.toml").write_text('[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8")
     (root / ".gitignore").write_text("groundtruth.db\n.gtkb-state/\n", encoding="utf-8")
     applicability_config = root / "config" / "governance" / "spec-applicability.toml"
@@ -5131,6 +5144,7 @@ Responds to: {proposal_rel}
     subprocess.run(["git", "init", "-q"], cwd=root, check=True)
     committed_paths = [
         *authority_paths,
+        *package_paths,
         "groundtruth.toml",
         ".gitignore",
         applicability_config.relative_to(root).as_posix(),

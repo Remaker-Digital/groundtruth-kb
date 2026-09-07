@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """
 PostToolUse hook: spec/intake event surfacer.
 
@@ -21,7 +27,7 @@ proposal.
 
 Hook type: PostToolUse
 
-Stdin: JSON hook event payload per https://code.claude.com/docs/en/hooks
+Stdin: JSON hook event payload per the harness hook contract
 Stdout: JSON ``additionalContext`` block when new spec events are detected,
         else empty ``{}``.
 Exit:   Always 0 (graceful degradation; never blocks the agent).
@@ -152,7 +158,7 @@ def _resolve_session_started_at(cwd: Path) -> tuple[str, bool]:
     per slice A REVISED-2 §1.3).
 
     Fallback (file missing or malformed): ``datetime.now(UTC) -
-    FALLBACK_LOOKBACK``. NOT current_time per Codex F2 fix from
+    FALLBACK_LOOKBACK``. NOT current_time per Loyal Opposition F2 fix from
     NO-GO ``-002``.
     """
     session_start_path = cwd / SESSION_START_REL_PATH

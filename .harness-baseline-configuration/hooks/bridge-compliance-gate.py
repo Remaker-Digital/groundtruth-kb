@@ -55,7 +55,22 @@ try:
         is_synthetic_session_context_id,
     )
 except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
-    BRIDGE_AUTHOR_METADATA_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"})
+    BRIDGE_AUTHOR_METADATA_STATUSES = frozenset(
+        {
+            "NEW",
+            "REVISED",
+            "GO",
+            "NO-GO",
+            "VERIFIED",
+            "ADVISORY",
+            "WITHDRAWN",
+            "READY",
+            "NOT-READY",
+            "VERDICT-REJECTED",
+            "SUPERSEDED",
+            "BLOCKED",
+        }
+    )
     REQUIRED_AUTHOR_METADATA_FIELDS = (
         "author_identity",
         "author_harness_id",
@@ -139,30 +154,12 @@ BRIDGE_STATUS_TOKENS = (
     "GO",
     "NO-GO",
     "VERIFIED",
-    # WI-7045: canon section 6 names VERDICT-REJECTED the Prime rejection token and
-    # retires NO-ACTION. gtkb_bridge_writer._write_bridge_file_exclusive already
-    # requires VERDICT-REJECTED for new governed output while this audit rejected it,
-    # so no token was writable and the Prime verdict-rejection route was inoperable.
-    # Additive on purpose: NO-ACTION stays because this tuple also builds
-    # BRIDGE_FILE_STATUS_RE, which resolves the status of files already on disk.
-    # Retiring NO-ACTION/DEFERRED needs a read/write vocabulary split and is tracked
-    # separately. Authority: DELIB-20260825203701 (emergency-bootstrap event).
     "VERDICT-REJECTED",
-    # WI-7675: the same gap WI-7045 repaired for VERDICT-REJECTED, for the two
-    # report-phase tokens. Canon section 6 makes READY the implementation report
-    # and NOT-READY its rejection, but neither was writable here, so a GO'd work
-    # item had no lawful head for its report: READY was refused, and NEW or
-    # REVISED produced a GO->NEW / GO->REVISED pair that the lifecycle resolver
-    # rejects. NOT-READY precedes READY because this tuple also builds
-    # BRIDGE_FILE_STATUS_RE, and alternation is first-match, so the longer token
-    # must be offered first for the prefix never to truncate.
     "NOT-READY",
     "READY",
-    "NO-ACTION",
     "WITHDRAWN",
     "ADVISORY",
-    "DEFERRED",
-    "ACCEPTED",
+    "SUPERSEDED",
     "BLOCKED",
 )
 BRIDGE_VERSIONED_FILE_RE = re.compile(r"^(.+)-(\d{3,})\.md$")
@@ -285,31 +282,6 @@ CANDIDATE_EVIDENCE_HASH_LINE_RE = re.compile(
 # (Loyal Opposition GO at -004): conditional check that fires only when proposal/report content
 # indicates owner-approval scope. Verdict files (GO/NO-GO/VERIFIED first line) are
 # excluded — they are evidence narratives, not approval claims.
-OWNER_DECISIONS_HEADING_RE = re.compile(
-    r"^#{1,6}\s*Owner Decisions(?:\s*/\s*Input)?\s*$",
-    re.IGNORECASE | re.MULTILINE,
-)
-DEFERRED_REASON_RE = re.compile(r"\bdeferr(?:al|ed)\s+reason\b|\breason\s*:", re.IGNORECASE)
-DEFERRED_CLEAR_CONDITION_RE = re.compile(
-    r"\bclear\s+condition\b|\bresume\s+condition\b|\bunblock(?:ing)?\s+condition\b",
-    re.IGNORECASE,
-)
-OWNER_EVIDENCE_RE = re.compile(
-    r"\b(?:DELIB-[A-Z0-9_.-]+|AUQ|AskUserQuestion|owner\s+(?:decision|directive|input|approval))\b",
-    re.IGNORECASE,
-)
-OWNER_APPROVAL_MARKER_RES = (
-    # Marker 1: cites Sub-slice B's VERIFIED rule (the AUQ-only rule)
-    re.compile(
-        r"gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-006\.md",
-        re.IGNORECASE,
-    ),
-    # Marker 2: AUQ + decision-context phrase within ~200 chars
-    re.compile(
-        r"\b(?:AUQ|AskUserQuestion)\b[^.]{0,200}\b(?:answer|approval|decision|directive|authorize|authorization)\b",
-        re.IGNORECASE,
-    ),
-)
 
 # Cross-Harness Disposition gate (Slice 4 of PROJECT-GTKB-CROSS-HARNESS-PARITY;
 # DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001 assertion PARITY-DISPOSITION-GATE;
@@ -876,7 +848,7 @@ def _first_line_is_recognized_status(first_line: str) -> bool:
 
     Mirrors the gate's existing first-line recognition union (the ADVISORY,
     GO/NO-GO/VERIFIED, and PENDING_PREFLIGHT_STATUSES {NEW, REVISED} checks in
-    ``_deny_reason_for_content``) plus the non-actionable ``DEFERRED`` and
+    ``_deny_reason_for_content``) plus the non-actionable ``BLOCKED``, ``SUPERSEDED`` and
     terminal ``WITHDRAWN`` statuses used throughout bridge state. Errs toward acceptance (``.startswith`` for
     verdicts) so the body-status-token rule never false-blocks a line the rest
     of the gate would recognize.
@@ -2520,16 +2492,6 @@ def _deny_reason_for_content(
                 "sections ## Source, ## Claim, ## Owner Decision Needed, "
                 "## Recommended Prime Action, and ## Classification Slot."
             )
-        if first_line == "DEFERRED" and (
-            not _has_deferred_owner_evidence(content)
-            or not DEFERRED_REASON_RE.search(content)
-            or not DEFERRED_CLEAR_CONDITION_RE.search(content)
-        ):
-            return (
-                "[Governance] DEFERRED bridge files are owner-only parked status records. "
-                "They must include concrete Owner Decisions / Input evidence plus a deferral "
-                "reason and clear/resume condition."
-            )
         if first_line in {"GO", "VERIFIED"} and not _has_clean_applicability_preflight(content):
             return (
                 "[Governance] GO and VERIFIED bridge verdicts must include a clean "
@@ -2553,14 +2515,6 @@ def _deny_reason_for_content(
                 "(Hard-block per DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001 + "
                 "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)"
             )
-        if first_line == "VERIFIED" and not _has_commit_finalization_evidence(content):
-            return (
-                "[Governance] VERIFIED bridge verdicts must include a Commit Finalization Evidence "
-                "section carrying the committed path set as `-` bullets, plus ONE of: "
-                "(a) 'Work-product commit: <sha>' -- the canonical form, where the commit precedes "
-                "the verdict; or (b) 'Same-transaction path set' -- the legacy atomic-helper form. "
-                "(Hard-block per the Mandatory VERIFIED Commit-Finalization Gate.)"
-            )
         if first_line in {"NO-GO", "VERIFIED"}:
             anchor_reason = _verdict_evidence_anchor_deny_reason(content, cwd_path)
             if anchor_reason:
@@ -2575,19 +2529,6 @@ def _deny_reason_for_content(
                 "[Governance] Implementation proposals must include concrete Specification Links "
                 "before bridge submission. "
                 "(Hard-block per DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)"
-            )
-        if (
-            first_line not in {"ADVISORY", "DEFERRED"}
-            and not first_line.startswith(("GO", "NO-GO", "VERIFIED"))
-            and _proposal_claims_owner_approval(content)
-            and not _has_concrete_owner_decisions_section(content)
-        ):
-            return (
-                "[Governance] Bridge proposals/reports that claim owner-approval scope must "
-                "include a non-empty Owner Decisions / Input section enumerating the "
-                "AskUserQuestion answers that authorize the work. "
-                "(Hard-block per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK; "
-                "see bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-003.md.)"
             )
         if (
             first_line in PENDING_PREFLIGHT_STATUSES

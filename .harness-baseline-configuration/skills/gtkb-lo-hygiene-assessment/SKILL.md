@@ -180,6 +180,5 @@ Each of those is a separate bridge proposal with its own owner approval where ap
 - Source advisory: `DELIB-1473` (Loyal Opposition Advisory: LO Hygiene Assessment Skill).
 - Disposition thread: `bridge/gtkb-lo-hygiene-assessment-skill-advisory-disposition-002.md` (GO at `-002`; VERIFIED at `-004`).
 - Build thread: `bridge/gtkb-lo-hygiene-assessment-skill-build-005.md` (GO; this skill source).
-- Owner authorization: `DELIB-S350-BATCH4-FOUR-PROJECT-AUTHORIZATIONS` via `PAUTH-PROJECT-GTKB-LO-ADVISORY-INTAKE-LO-ADVISORY-INTAKE-PARALLEL-BATCH` (covers WI-3303).
 
 Copyright 2026 Remaker Digital, a DBA of VanDusen and Palmeter, LLC. All rights reserved.

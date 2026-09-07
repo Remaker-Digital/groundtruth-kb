@@ -682,7 +682,7 @@ MAPPINGS: list[tuple[str, str, str, str, str]] = [
         "SPEC-1106",
         f"{FILE_PREFIX}test_tenant_config_api.py",
         "TestGetActivationStatus",
-        "test_activation_status",
+        "test_authorization",
         "high",
     ),
     (

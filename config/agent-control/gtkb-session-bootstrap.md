@@ -34,7 +34,7 @@ this workspace and reads `AGENTS.md`:
 - Prime Builder / Loyal Opposition coordination uses the file bridge in
   `bridge/`.
 - Both Prime Builder and Loyal Opposition startup procedures load
-  `.claude/rules/canonical-terminology.md` so the live glossary is available
+  `.harness-baseline-configuration/rules/canonical-terminology.md` so the live glossary is available
   before ordinary role work. **Antigravity Startup Optimization**: The Antigravity harness (ID C) is exempt from loading the full rules/logs payload at startup (exempt from Phase B steps 9-18a) to minimize startup resource consumption. It loads only the essential project metadata and baseline rules (`CLAUDE.md`, `AGENTS.md`, `canonical-terminology.md`, `file-bridge-protocol.md`, `MEMORY.md`), skipping non-essential runbooks and non-local background startup checks.
 - Both Prime Builder and Loyal Opposition startup disclosures surface the
   strategic self-improvement directive: noticed fix-worthy issues and useful
@@ -121,7 +121,7 @@ Optional local environment overrides remain available:
 6. In Prime Builder mode, identify latest `GO` or `NO-GO` entries and include
    them in "Continue Last Session" scope.
 7. In Loyal Opposition mode, process latest `NEW` or `REVISED` entries from
-   oldest to newest using `.claude/rules/file-bridge-protocol.md`.
+   oldest to newest using `.harness-baseline-configuration/rules/file-bridge-protocol.md`.
 8. In Prime Builder mode, do not process latest `NEW`, `REVISED`, or
    `VERIFIED` entries as actionable queue work. Prime Builder bridge handling is
    limited to latest `GO` or `NO-GO` entries.
@@ -139,9 +139,9 @@ Optional local environment overrides remain available:
    - `AGENTS.md`
    - `harness-state/harness-identities.json`
    - `harness-state/harness-registry.json`
-   - `.claude/rules/operating-role.md` guidance
-   - `.claude/rules/canonical-terminology.md` (core primer subset only)
-   - `.claude/rules/file-bridge-protocol.md`
+   - `.harness-baseline-configuration/rules/operating-role.md` guidance
+   - `.harness-baseline-configuration/rules/canonical-terminology.md` (core primer subset only)
+   - `.harness-baseline-configuration/rules/file-bridge-protocol.md`
    - `config/agent-control/SESSION-STARTUP-INDEX.md` + role overlay
 11. **Do not** load activity-only Codex surfaces at base startup. Open the matching
     activity envelope first (`::open build|test|project|deliberation|spec|ops`) and
@@ -153,9 +153,9 @@ Optional local environment overrides remain available:
     - `::open project` → `codex-standing-priorities.md`, `groundtruth-kb-vision.md`
     - `::open deliberation` → `codex-way-of-working.md`
 12. For substantial LO review work inside an opened activity envelope, use:
-   - `.claude/rules/codex-review-checklists.md`
-   - `.claude/rules/template-code-review.md`
-   - `.claude/rules/template-decision-memo.md`
+   - `.harness-baseline-configuration/rules/loyal-opposition-review-checklists.md`
+   - `.harness-baseline-configuration/rules/template-code-review.md`
+   - `.harness-baseline-configuration/rules/template-decision-memo.md`
 13. In Loyal Opposition mode, include the standard project-state startup
     report after bridge verification:
     - direct `git status --short --branch`
@@ -193,8 +193,8 @@ recorded for that harness ID in `harness-state/harness-registry.json`, read
 through `groundtruth_kb.harness_projection.read_roles` or the `roles`
 subcommand under `gt harness`.
 Load AGENTS.md, the harness identity map, the role assignment map,
-.claude/rules/canonical-terminology.md (core primer subset),
-.claude/rules/file-bridge-protocol.md,
+.harness-baseline-configuration/rules/canonical-terminology.md (core primer subset),
+.harness-baseline-configuration/rules/file-bridge-protocol.md,
 config/agent-control/SESSION-STARTUP-INDEX.md, and the active role overlay.
 Defer activity-only Codex surfaces (standing priorities, review contract,
 loyal-opposition runbook, way-of-working, checklists) until `::open <activity>`

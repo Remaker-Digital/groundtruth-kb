@@ -36,7 +36,21 @@ DEFAULT_COMMANDS_PER_RUN = 3
 DEFAULT_TIMEOUT_SECONDS = 180
 REQUESTED_PERMISSIONS_PROFILE = ":workspace"
 EXPECTED_EFFECTIVE_PROFILE = "workspace-write"
-VERIFICATION_RELATIVE_PATH = Path(".gtkb-state") / "bridge-poller" / "codex-no-window-verification.json"
+
+
+def _session_scratch_dirname() -> str:
+    """Session-scoped scratch subdirectory name per canon s17."""
+    try:
+        from scripts.gtkb_session_id import session_scratch_dirname
+    except ImportError:  # pragma: no cover - direct script execution path
+        from gtkb_session_id import session_scratch_dirname
+
+    return session_scratch_dirname()
+
+
+# Canon s17: probe artifacts are session-scoped scratch under the canonical
+# scratchpad root, never `.gtkb-state` (and never the retired bridge-poller tree).
+VERIFICATION_RELATIVE_PATH = Path("scratchpad") / _session_scratch_dirname() / "codex-no-window-verification.json"
 RUN_WITH_STATUS_CONFIG_ENV_VAR = "GTKB_RUN_WITH_STATUS_CONFIG_B64"
 _EFFECTIVE_PROFILE_RE = re.compile(r"(?im)^\s*sandbox:\s*([^\s\[]+)")
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
@@ -211,7 +225,7 @@ def _run_with_dispatch_wrapper(
     desktop_name: str | None,
     timeout_seconds: int,
 ) -> subprocess.CompletedProcess[str]:
-    proof_dir = project_root / ".gtkb-state" / "bridge-poller" / "codex-no-window-smoke"
+    proof_dir = project_root / "scratchpad" / _session_scratch_dirname() / "codex-no-window-smoke"
     proof_dir.mkdir(parents=True, exist_ok=True)
     stem = f"{_now().strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}"
     stdout_path = proof_dir / f"{stem}.stdout.log"
@@ -293,7 +307,7 @@ def run_probe(
         if commands_per_run != 3:
             raise ValueError("commands_per_run must be 3 for the sentinel lifecycle")
         markers = _markers(run_index, commands_per_run, nonce)
-        sentinel_dir = project_root / ".gtkb-state" / "bridge-poller" / "codex-no-window-smoke"
+        sentinel_dir = project_root / "scratchpad" / _session_scratch_dirname() / "codex-no-window-smoke"
         sentinel_dir.mkdir(parents=True, exist_ok=True)
         sentinel_path = sentinel_dir / f"wi5310-{run_index}-{uuid.uuid4().hex}.sentinel"
         sentinel_value = f"GTKB-WI5310-SENTINEL-{run_index}-{nonce}"

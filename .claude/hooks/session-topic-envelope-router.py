@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
-"""Claude UserPromptSubmit adapter for ::open / ::close topic-envelope routing.
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+"""UserPromptSubmit adapter for ::open / ::close topic-envelope routing.
 
 Slice 5 (first conformance case) of PROJECT-GTKB-CROSS-HARNESS-PARITY. This is the
-Claude-native counterpart to the Codex
-``.codex/gtkb-hooks/session_wrapup_trigger_dispatch.py`` topic-command branch:
 both adapters call the identical shared, harness-agnostic platform module
 ``groundtruth_kb.session.topic_router`` (``parse_topic_command`` /
 ``handle_topic_command`` / ``render_topic_context``), differing only in
 ``HARNESS_NAME``, harness-id resolution, and diagnostic output paths (Q1
 behavioral — not identity — equivalence per ADR-CROSS-HARNESS-PARITY-001).
 
-Scope: the ``::open`` / ``::close`` topic-envelope routing only. The Codex hook's
-wrap-trigger-phrase branch is deliberately NOT ported — Claude already runs
+Scope: the ``::open`` / ``::close`` topic-envelope routing only. A wrap-trigger
+branch is deliberately NOT included — the Stop hook already runs
 session wrap-up via its Stop hook (``session_self_initialization --emit-wrapup``),
 so a UserPromptSubmit wrap-trigger would double-fire.
 
@@ -43,7 +47,6 @@ def _discover_project_root() -> Path:
 
 
 PROJECT_ROOT = _discover_project_root()
-OUT_DIR = PROJECT_ROOT / ".gtkb-state" / "session-topic-router" / HARNESS_NAME
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -125,7 +128,7 @@ def _lifecycle_guard_path() -> Path:
 def _startup_input_gate_active() -> bool:
     """True while the SessionStart init-keyword relay owns the next prompt.
 
-    Mirrors the Codex adapter so the topic router never races the startup
+    Mirrors the counterpart harness adapters so the topic router never races the startup
     disclosure relay.
     """
     try:
@@ -148,11 +151,16 @@ def main() -> int:
     raw_input = _read_stdin()
     prompt = _extract_prompt(raw_input)
 
-    if _startup_input_gate_active():
+    command = parse_topic_command(prompt)
+
+    # An explicit topic command is declarative and idempotent (Canon activity
+    # rules); the startup relay may suppress an ORDINARY prompt but must never
+    # silently discard an explicit ::open/::close. Discarding it produced three
+    # failed registrations with no error and no record.
+    if command is None and _startup_input_gate_active():
         _emit_no_context()
         return 0
 
-    command = parse_topic_command(prompt)
     if command is None:
         try:
             selection = route_prompt_resources(
@@ -177,14 +185,6 @@ def main() -> int:
             harness_name=HARNESS_NAME,
             harness_id=_persistent_harness_id(),
         )
-        try:
-            OUT_DIR.mkdir(parents=True, exist_ok=True)
-            (OUT_DIR / "last-topic-envelope-command.json").write_text(
-                json.dumps(result, indent=2, sort_keys=True),
-                encoding="utf-8",
-            )
-        except OSError:
-            pass
         print(_dump_payload(_hook_payload(render_topic_context(result))))
     except EnvelopeError as exc:
         context = (

@@ -54,9 +54,25 @@ def _seed_project(tmp_path: Path) -> tuple[Path, Path]:
     return root, config
 
 
+def _with_default_harness(args: tuple[str, ...]) -> list[str]:
+    """State the intended harness explicitly.
+
+    WI-7119: ``--harness-name`` no longer defaults to "codex"; it resolves from
+    whichever harness-native session variable the host set, and fails closed when
+    that is absent or ambiguous. These tests seed a codex identity and intend
+    codex, so they now say so rather than depending on a default that silently
+    addressed the wrong harness on every non-codex host.
+    """
+    argv = list(args)
+    if "--harness-name" not in argv:
+        argv = ["--harness-name", "codex", *argv]
+    return argv
+
+
 def _invoke_open(config: Path, *args: str):
     return CliRunner().invoke(
-        main, ["--config", str(config), "session", "envelope", "open", *args, "--json"]
+        main,
+        ["--config", str(config), "session", "envelope", "open", *_with_default_harness(args), "--json"],
     )
 
 
@@ -71,7 +87,7 @@ def _invoke_attest(config: Path, session_id: str, *args: str):
             "attest-author-metadata",
             "--session-id",
             session_id,
-            *args,
+            *_with_default_harness(args),
             "--json",
         ],
     )
@@ -263,10 +279,7 @@ def test_cli_same_host_refresh_returns_exact_envelope_without_rewrite(
     envelope = json.loads(refreshed.output)
     assert envelope["session_id"] == "codex-thread-123"
     assert envelope["role"] == "prime-builder"
-    assert (
-        envelope["worker_role_provenance"]["role_resolution_source"]
-        == "transcript_init_keyword"
-    )
+    assert envelope["worker_role_provenance"]["role_resolution_source"] == "transcript_init_keyword"
     assert exact_path.read_bytes() == before
     assert not current_path.exists()
     assert not projection_path.exists()
@@ -311,9 +324,7 @@ def test_cli_rejects_invalid_codex_host_thread_before_write(
 
 
 @pytest.mark.parametrize("keyword", ["::init gtkb", "::init application"])
-def test_cli_role_free_keyword_preserves_durable_fallback(
-    tmp_path: Path, keyword: str
-) -> None:
+def test_cli_role_free_keyword_preserves_durable_fallback(tmp_path: Path, keyword: str) -> None:
     _, config = _seed_project(tmp_path)
 
     result = _invoke_open(config, "--init-keyword", keyword)
@@ -356,15 +367,12 @@ def test_cli_successor_does_not_overwrite_closed_predecessor(tmp_path: Path) -> 
     predecessor = worker_session_envelope_path(root, "codex", "desktop-thread")
     predecessor.parent.mkdir(parents=True)
     predecessor.write_text(
-        json.dumps({"session_id": "desktop-thread", "status": "closed"}, indent=2)
-        + "\n",
+        json.dumps({"session_id": "desktop-thread", "status": "closed"}, indent=2) + "\n",
         encoding="utf-8",
     )
     before = predecessor.read_bytes()
 
-    result = _invoke_open(
-        config, "--init-keyword", "::init gtkb pb", "--role", "prime-builder"
-    )
+    result = _invoke_open(config, "--init-keyword", "::init gtkb pb", "--role", "prime-builder")
 
     assert result.exit_code == 0, result.output
     envelope = json.loads(result.output)
@@ -378,9 +386,7 @@ def test_cli_attests_exact_open_codex_session_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root, config = _seed_project(tmp_path)
-    opened = _invoke_open(
-        config, "--init-keyword", "::init gtkb lo", "--role", "loyal-opposition"
-    )
+    opened = _invoke_open(config, "--init-keyword", "::init gtkb lo", "--role", "loyal-opposition")
     assert opened.exit_code == 0, opened.output
     session_id = json.loads(opened.output)["session_id"]
     monkeypatch.setenv("GTKB_SESSION_ID", session_id)
@@ -400,24 +406,16 @@ def test_cli_attests_exact_open_codex_session_metadata(
     payload = json.loads(result.output)
     assert payload["model_id"] == "gpt-5.6-sol"
     assert payload["model_version"] == "gpt-5.6-sol"
-    assert (
-        payload["model_configuration"] == "reasoning_effort=xhigh; thread_source=user"
-    )
+    assert payload["model_configuration"] == "reasoning_effort=xhigh; thread_source=user"
     assert payload["model_metadata_source"] == "x-codex-turn-metadata"
-    authoritative = json.loads(
-        worker_session_envelope_path(root, "codex", session_id).read_text(
-            encoding="utf-8"
-        )
-    )
+    authoritative = json.loads(worker_session_envelope_path(root, "codex", session_id).read_text(encoding="utf-8"))
     assert not (root / "harness-state" / "codex" / "session-envelope.json").exists()
     assert not (root / ".claude" / "session" / "envelope.json").exists()
     assert authoritative["model_id"] == "gpt-5.6-sol"
     assert authoritative["model_metadata_source"] == "x-codex-turn-metadata"
 
 
-def test_cli_attests_exact_open_cursor_session_metadata(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_cli_attests_exact_open_cursor_session_metadata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root, config = _seed_project(tmp_path)
     conversation_id = "12a16794-f84d-457f-81b4-8e803034e4d5"
     monkeypatch.setenv("CURSOR_CONVERSATION_ID", conversation_id)
@@ -457,14 +455,9 @@ def test_cli_attests_exact_open_cursor_session_metadata(
     assert payload["model_id"] == "gpt-5.6-terra"
     assert payload["model_metadata_source"] == "cursor-conversation-metadata"
     authoritative = json.loads(
-        worker_session_envelope_path(root, "cursor", conversation_id).read_text(
-            encoding="utf-8"
-        )
+        worker_session_envelope_path(root, "cursor", conversation_id).read_text(encoding="utf-8")
     )
-    assert (
-        authoritative["model_configuration"]
-        == "reasoning_effort=xhigh; thread_source=cursor-agent-runtime"
-    )
+    assert authoritative["model_configuration"] == "reasoning_effort=xhigh; thread_source=cursor-agent-runtime"
     assert authoritative["model_metadata_source"] == "cursor-conversation-metadata"
 
 
@@ -483,9 +476,7 @@ def test_cli_attestation_rejects_placeholder_or_multiline_metadata_before_write(
     value: str,
 ) -> None:
     root, config = _seed_project(tmp_path)
-    opened = _invoke_open(
-        config, "--init-keyword", "::init gtkb lo", "--role", "loyal-opposition"
-    )
+    opened = _invoke_open(config, "--init-keyword", "::init gtkb lo", "--role", "loyal-opposition")
     session_id = json.loads(opened.output)["session_id"]
     path = worker_session_envelope_path(root, "codex", session_id)
     before = path.read_bytes()
@@ -516,9 +507,7 @@ def test_cli_attestation_rejects_noncurrent_session_without_replacing_projection
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root, config = _seed_project(tmp_path)
-    opened = _invoke_open(
-        config, "--init-keyword", "::init gtkb lo", "--role", "loyal-opposition"
-    )
+    opened = _invoke_open(config, "--init-keyword", "::init gtkb lo", "--role", "loyal-opposition")
     current = json.loads(opened.output)
     stale = dict(current)
     stale["session_id"] = "stale-session"
@@ -553,13 +542,9 @@ def test_cli_attestation_rebinds_valid_dispatch_envelope_to_exact_codex_thread(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root, config = _seed_project(tmp_path)
-    opened = _invoke_open(
-        config, "--init-keyword", "::init gtkb lo", "--role", "loyal-opposition"
-    )
+    opened = _invoke_open(config, "--init-keyword", "::init gtkb lo", "--role", "loyal-opposition")
     dispatch_envelope = json.loads(opened.output)
-    dispatch_path = worker_session_envelope_path(
-        root, "codex", dispatch_envelope["session_id"]
-    )
+    dispatch_path = worker_session_envelope_path(root, "codex", dispatch_envelope["session_id"])
     before_dispatch = dispatch_path.read_bytes()
     monkeypatch.setenv("CODEX_THREAD_ID", "codex-thread-123")
 
@@ -575,11 +560,7 @@ def test_cli_attestation_rebinds_valid_dispatch_envelope_to_exact_codex_thread(
     )
 
     assert result.exit_code == 0, result.output
-    exact = json.loads(
-        worker_session_envelope_path(root, "codex", "codex-thread-123").read_text(
-            encoding="utf-8"
-        )
-    )
+    exact = json.loads(worker_session_envelope_path(root, "codex", "codex-thread-123").read_text(encoding="utf-8"))
     assert not (root / "harness-state" / "codex" / "session-envelope.json").exists()
     assert exact["session_id"] == "codex-thread-123"
     assert exact["worker_role_provenance"]["session_id"] == "codex-thread-123"
@@ -592,9 +573,7 @@ def test_cli_attestation_promotes_existing_exact_open_codex_thread(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root, config = _seed_project(tmp_path)
-    opened = _invoke_open(
-        config, "--init-keyword", "::init gtkb lo", "--role", "loyal-opposition"
-    )
+    opened = _invoke_open(config, "--init-keyword", "::init gtkb lo", "--role", "loyal-opposition")
     current = json.loads(opened.output)
     exact = dict(current)
     exact["session_id"] = "codex-thread-123"
@@ -627,11 +606,7 @@ def test_cli_attestation_promotes_existing_exact_open_codex_thread(
 
 def test_cli_uses_package_parser_without_local_grammar_copy() -> None:
     source = (
-        Path(__file__).resolve().parents[2]
-        / "groundtruth-kb"
-        / "src"
-        / "groundtruth_kb"
-        / "cli_session_handoff.py"
+        Path(__file__).resolve().parents[2] / "groundtruth-kb" / "src" / "groundtruth_kb" / "cli_session_handoff.py"
     ).read_text(encoding="utf-8")
     assert "parse_canonical_init_keyword" in source
     assert "re.compile" not in source

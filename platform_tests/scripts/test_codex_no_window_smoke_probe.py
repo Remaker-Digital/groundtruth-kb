@@ -57,7 +57,13 @@ def test_run_probe_writes_schema_v3_workspace_sentinel_evidence(tmp_path: Path) 
     assert payload["sentinel_lifecycle_ok"] is True
 
     path = module.write_payload(tmp_path, payload)
-    assert path == tmp_path / ".gtkb-state" / "bridge-poller" / "codex-no-window-verification.json"
+    # Canon s17: probe evidence is session-scoped scratch, never `.gtkb-state`
+    # (and never the retired bridge-poller tree). Resolved via the same single
+    # authority the probe uses, so test and implementation cannot drift apart.
+    from scripts.gtkb_session_id import session_scratch_dirname
+
+    assert path == tmp_path / "scratchpad" / session_scratch_dirname() / "codex-no-window-verification.json"
+    assert ".gtkb-state" not in path.parts
     assert path.is_file()
 
 

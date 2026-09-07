@@ -16,6 +16,11 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from scripts.gtkb_session_id import session_scratch_dirname
+except ImportError:  # pragma: no cover - direct script execution path
+    from gtkb_session_id import session_scratch_dirname
+
+try:
     from bridge_author_metadata import (
         REQUIRED_AUTHOR_METADATA_FIELDS,
         author_metadata_gaps_for_content,
@@ -280,7 +285,8 @@ def render_markdown_report(report: AuditReport) -> str:
 
 
 def write_grandfather_report(project_root: Path, report: AuditReport) -> Path:
-    out_dir = project_root / ".gtkb-state" / "bridge-metadata-grandfather-audit"
+    # Canon s17: audit output is session-scoped scratch, never `.gtkb-state`.
+    out_dir = project_root / "scratchpad" / session_scratch_dirname() / "bridge-metadata-grandfather-audit"
     out_dir.mkdir(parents=True, exist_ok=True)
     date_stamp = report.generated_at[:10]
     out_path = out_dir / f"grandfather-audit-{date_stamp}.json"
@@ -291,7 +297,8 @@ def write_grandfather_report(project_root: Path, report: AuditReport) -> Path:
 
 
 def write_audit_reports(project_root: Path, report: AuditReport, out_dir: Path | None = None) -> tuple[Path, Path]:
-    report_dir = out_dir or project_root / ".gtkb-state" / "bridge-metadata-audit"
+    # Canon s17: `out_dir` still overrides; the default is session-scoped scratch.
+    report_dir = out_dir or project_root / "scratchpad" / session_scratch_dirname() / "bridge-metadata-audit"
     report_dir.mkdir(parents=True, exist_ok=True)
     safe_stamp = report.generated_at.replace(":", "").replace("-", "").replace("T", "-").rstrip("Z")
     json_path = report_dir / f"bridge-metadata-audit-{safe_stamp}.json"
@@ -310,12 +317,12 @@ def run_cli(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--write-state-report",
         action="store_true",
-        help="Write JSON and markdown reports under .gtkb-state/bridge-metadata-audit/.",
+        help="Write JSON and markdown reports under scratchpad/<session>/bridge-metadata-audit/.",
     )
     parser.add_argument(
         "--grandfather-report",
         action="store_true",
-        help="Write append-only grandfather audit JSON under .gtkb-state/.",
+        help="Write append-only grandfather audit JSON under scratchpad/<session>/.",
     )
     args = parser.parse_args(argv)
 

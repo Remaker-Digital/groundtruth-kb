@@ -51,8 +51,6 @@ from groundtruth_kb.bridge.detector import (
 )
 from groundtruth_kb.bridge.handshake import run_handshake
 from groundtruth_kb.bridge.notify import (
-    ACTIONABLE_STATUSES_FOR_CODEX,
-    ACTIONABLE_STATUSES_FOR_PRIME,
     NOTIFY_SCHEMA_VERSION,
     NOTIFY_SUBDIR,
     ActionablePending,
@@ -155,8 +153,6 @@ __all__ = [
     "list_all_registrations",
     "register_harness",
     # notify (smart-poller P3)
-    "ACTIONABLE_STATUSES_FOR_CODEX",
-    "ACTIONABLE_STATUSES_FOR_PRIME",
     "NOTIFY_SCHEMA_VERSION",
     "NOTIFY_SUBDIR",
     "ActionablePending",

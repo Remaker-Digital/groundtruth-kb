@@ -29,7 +29,6 @@ Exit:   always 0 (fire-and-forget; the hook must never crash the agent).
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 from datetime import UTC, datetime
@@ -44,22 +43,9 @@ PROJECT_ROOT = Path(
     or Path(__file__).resolve().parents[2]
 ).resolve()
 
-ERRORS_LOG_REL = ".gtkb-state/project-completion-surface/errors.jsonl"
-
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
-
-def _log_error(payload: dict[str, Any]) -> None:
-    """Append a diagnostic record. Best-effort; silent on failure."""
-    try:
-        log_path = PROJECT_ROOT / ERRORS_LOG_REL
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        with log_path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps({**payload, "ts": _now_iso()}) + "\n")
-    except Exception:
-        pass
 
 
 def _auto_complete_ready_authorizations() -> list[dict[str, Any]]:
@@ -75,8 +61,7 @@ def _auto_complete_ready_authorizations() -> list[dict[str, Any]]:
             sys.path.insert(0, str(gt_src))
         from groundtruth_kb.db import KnowledgeDB
         from groundtruth_kb.project.lifecycle import ProjectLifecycleService
-    except Exception as exc:
-        _log_error({"event": "service_unavailable", "error": str(exc)})
+    except Exception:
         return []
 
     db = None
@@ -84,8 +69,7 @@ def _auto_complete_ready_authorizations() -> list[dict[str, Any]]:
         db = KnowledgeDB(PROJECT_ROOT / "groundtruth.db")
         service = ProjectLifecycleService(db)
         return service.auto_complete_ready_authorizations(project_root=PROJECT_ROOT)
-    except Exception as exc:
-        _log_error({"event": "auto_complete_failed", "error": str(exc)})
+    except Exception:
         return []
     finally:
         if db is not None:
@@ -140,8 +124,7 @@ def main() -> int:
         pass
     try:
         output = _user_prompt_handler()
-    except Exception as exc:
-        _log_error({"event": "handler_crashed", "error": str(exc)})
+    except Exception:
         output = ""
     if output:
         sys.stdout.write(output)

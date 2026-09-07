@@ -14,6 +14,7 @@
 - Location: `E:\GT-KB`; key files: `CLAUDE.md`, this index.
 - Role: resolved from `harness-state/harness-registry.json` (`gt harness roles`).
 - Bridge: `gt bridge dispatch status` + status-bearing `bridge/*-NNN.md`.
+- `bridge/` is gitignored ephemeral runtime state (WI-6530); bridge files are not git-tracked, so per-thread history comes from the numbered chain on disk, not `git log`.
 - Backlog: `gt backlog list`. Recent-session detail: git history + `bridge/`.
 
 ## Quick Reference
@@ -23,6 +24,7 @@
 - **CI / CD:** `npx playwright test`
 - **Live web UI:** `localhost:8090`
 - **CLI prefix:** `gt` / `python -m groundtruth_kb`
+- **JSON-array CLI args** (`--related-bridge-threads`, `--depends-on-work-items`): invoke via `python -m groundtruth_kb.cli`; the `gt` shim mangles them intermittently (WI-6176 / WI-7616).
 - **Registry:** `config/registry/sot-artifacts.toml` (`gt registry validate` / `gt registry sync`)
 
 ## Protected Files (DO NOT MODIFY)

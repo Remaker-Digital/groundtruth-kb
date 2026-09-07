@@ -2,13 +2,13 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project antigravity`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
 # Counterpart Review Gate — Mandatory Pre-Implementation Review
 
-This rule auto-loads via `.claude/rules/` convention and is TRACKED in git.
+This rule auto-loads via `.agent/rules/` convention and is TRACKED in git.
 
 ## The Rule
 
@@ -118,7 +118,14 @@ If Loyal Opposition is reviewing an implementation proposal:
 5. Include the generated `Applicability Preflight` section AND the
    `Clause Applicability` section (with `Blocking Gaps` subsection if non-empty)
    in any `GO` verdict.
-6. Issue `NO-GO` if any required applicable specification is missing, if the
+6. Weigh a simpler alternative to the proposed design and record it in any `GO`
+   verdict under a `## Simpler Alternative Considered` heading, naming the
+   simpler design actually weighed and why the approved design was preferred.
+   This is mandatory, not discretionary. "No simpler alternative exists" is
+   permitted only when the reviewer states what was considered and why it does
+   not apply. See
+   `.harness-baseline-configuration/rules/review-operating-contract.md`.
+7. Issue `NO-GO` if any required applicable specification is missing, if the
    test mapping is missing or incomplete, or if the clause preflight reports
    a blocking gap without an explicit owner-waiver line for the offending clause.
 
@@ -160,7 +167,7 @@ errors. The bridge protocol exists to prevent exactly this class of silent drift
 
 ## Owner Decisions / Input Section Requirement
 
-(Active per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK; mechanically enforced by `.claude/hooks/bridge-compliance-gate.py`.)
+(Active per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK; mechanically enforced by `.agent/hooks/bridge-compliance-gate.py`.)
 
 Bridge proposals/reports that claim dependence on owner approval — citing the AUQ-only rule (`bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-006.md`), referencing AskUserQuestion answers, or otherwise indicating owner-decision scope — MUST include a non-empty `## Owner Decisions / Input` section enumerating the relevant AskUserQuestion evidence.
 
@@ -173,7 +180,7 @@ Loyal Opposition review checks for the section's presence and substantive conten
 
 Bridge implementation proposals MUST include a substantive ## Prior Deliberations section. The section anchors the proposal in the prior-decision history and is one of the named placement targets for the DA read-surface correction (the bridge-template surface).
 
-The bridge-propose helper at scripts/skill-helpers/bridge-propose/write_bridge.py pre-populates this section by default via pre_populate_prior_deliberations: glossary-source seeding from .claude/rules/canonical-terminology.md plus optional semantic search. Authors review and prune the pre-populated entries.
+The bridge-propose helper at scripts/skill-helpers/bridge-propose/write_bridge.py pre-populates this section by default via pre_populate_prior_deliberations: glossary-source seeding from .agent/rules/canonical-terminology.md plus optional semantic search. Authors review and prune the pre-populated entries.
 
 Loyal Opposition MUST issue NO-GO when reviewing a NEW or REVISED proposal that meets ALL of these conditions:
 

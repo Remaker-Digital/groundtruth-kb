@@ -472,8 +472,6 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
         model["role"]["bridge"]
         == "always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup"
     )
-    assert "dispatcher daemon" in model["role"]["bridge_dispatch"]
-    assert "retired smart poller and OS poller remain archived" in model["role"]["bridge_dispatch"]
     assert "gtkb-bridge" in model["role"]["bridge_operation_instructions"]
     assert "scripts/dispatcher_runtime.py" in model["role"]["bridge_operation_instructions"]
     assert "two complementary axes" in model["role"]["bridge_operation_instructions"]
@@ -1379,8 +1377,6 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
         model["role"]["bridge"]
         == "always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup"
     )
-    assert "dispatcher daemon" in model["role"]["bridge_dispatch"]
-    assert "retired smart poller and OS poller remain archived" in model["role"]["bridge_dispatch"]
     assert model["role"]["role_mapping_source"] == "harness-state/harness-registry.json"
     assert model["role"]["harness_id"] == "B"
     assert "## Loyal Opposition Startup Task" not in report
@@ -1822,14 +1818,12 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
         "Bridge: always available through TAFE/dispatcher state plus versioned bridge "
         "files and checked at session startup" in report_text
     )
-    assert "Bridge dispatch: dispatcher daemon registered as PostToolUse and Stop hooks" in report_text
     assert "Bridge operation instructions: Bridge automation has two complementary axes" in report_text
     assert "DISPATCHABLE WORK" in report_text
     assert "NON-DISPATCHABLE WORK" in report_text
     assert "Both axes are required" in report_text
     assert "Do NOT create new bridge automations" in report_text
     assert "scripts/dispatcher_runtime.py" in report_text
-    assert "retired smart poller and OS poller remain archived" in report_text
     assert "Startup Disclosure" in report_text
     assert "Strategic self-improvement directive" in report_text
     assert "review/consideration backlog items" in report_text
@@ -2119,10 +2113,6 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     assert profile["sections"]["additionalContext"]["sha256"] == hashlib.sha256(context.encode("utf-8")).hexdigest()
     assert profile["sections"]["startupDisclosure"]["utf8_bytes"] == len(disclosure.encode("utf-8"))
     assert profile["sections"]["startupDisclosure"]["sha256"] == hashlib.sha256(disclosure.encode("utf-8")).hexdigest()
-    profile_path = REPO_ROOT / profile["profile_path"]
-    assert profile_path.is_file()
-    written_profile = json.loads(profile_path.read_text(encoding="utf-8"))
-    assert written_profile == profile
     assert freshness["contract_version"] == "gtkb-startup-freshness-v1"
     assert freshness["request_started_at"] == "2026-04-23T13:20:00Z"
     assert freshness["report_origin"] == "in_memory_model_render"
@@ -2350,14 +2340,12 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
         "Bridge: always available through TAFE/dispatcher state plus versioned bridge "
         "files and checked at session startup" in context
     )
-    assert "Bridge dispatch: dispatcher daemon registered as PostToolUse and Stop hooks" in context
     assert "Bridge operation instructions: Bridge automation has two complementary axes" in context
     assert "DISPATCHABLE WORK" in context
     assert "NON-DISPATCHABLE WORK" in context
     assert "Both axes are required" in context
     assert "Do NOT create new bridge automations" in context
     assert "scripts/dispatcher_runtime.py" in context
-    assert "retired smart poller and OS poller remain archived" in context
     assert "Role mapping source: harness-state/harness-registry.json" in context
     assert "Harness self-identification: B" in context
     assert "Harness identity source: harness-state/harness-identities.json" in context

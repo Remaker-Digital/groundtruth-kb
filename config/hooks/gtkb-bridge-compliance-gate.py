@@ -108,6 +108,7 @@ BRIDGE_STATUS_TOKENS = (
     "DEFERRED",
     "ACCEPTED",
     "BLOCKED",
+    "SUPERSEDED",
 )
 BRIDGE_VERSIONED_FILE_RE = re.compile(r"^(.+)-(\d{3,})\.md$")
 LO_VERDICT_BRIDGE_FILE_RE = re.compile(r"^.+\.lo-verdict\.md$", re.IGNORECASE)
@@ -1976,53 +1977,6 @@ def _verdict_self_review_deny(file_path: str, content: str, cwd_path: Path) -> s
     )
 
 
-def _no_action_prior_verdict_deny(file_path: str, content: str) -> str | None:
-    """Block a NO-ACTION bridge write when the thread has no prior LO GO/NO-GO verdict.
-
-    Enforces DCL-NO-ACTION-STATUS-SEMANTICS-001: a NO-ACTION entry is a Prime
-    Builder rejection of a prior Loyal Opposition GO or NO-GO verdict, so it is
-    well-formed only when a prior GO/NO-GO exists in the same numbered bridge
-    thread. Advisory threads have no prior verdict, so writing NO-ACTION to close
-    an advisory is always ill-formed. Fires only on a Write whose first non-blank
-    line is exactly NO-ACTION; reads the thread's lower-numbered sibling versions
-    from the bridge directory and allows the write only when one carries GO or
-    NO-GO. Existing on-disk NO-ACTION files are not re-written, so the guard has
-    no retroactive effect (append-only bridge chain).
-    """
-    if not _is_bridge_markdown_file(file_path):
-        return None
-    if _first_nonblank_line(content) != "NO-ACTION":
-        return None
-    name_match = BRIDGE_VERSIONED_FILE_RE.match(Path(file_path).name)
-    if name_match is None:
-        return None
-    bridge_id = name_match.group(1)
-    this_version = int(name_match.group(2))
-    bridge_dir = Path(file_path).resolve().parent
-    try:
-        siblings = list(bridge_dir.glob(f"{bridge_id}-*.md"))
-    except OSError:
-        siblings = []
-    for sibling in siblings:
-        sib_match = BRIDGE_VERSIONED_FILE_RE.match(sibling.name)
-        if sib_match is None or sib_match.group(1) != bridge_id:
-            continue
-        if int(sib_match.group(2)) >= this_version:
-            continue
-        if _status_from_versioned_bridge_file(sibling) in {"GO", "NO-GO"}:
-            return None
-    return (
-        "[Governance] NO-ACTION bridge write blocked: a NO-ACTION entry is a Prime Builder "
-        "rejection of a prior Loyal Opposition GO or NO-GO verdict, so it is well-formed only when "
-        f"thread '{bridge_id}' already contains a GO or NO-GO verdict for Prime to reject; none was "
-        "found. Do NOT use NO-ACTION to close an ADVISORY thread or record a Prime 'no further "
-        "action' close -- keep the thread ADVISORY with a recorded disposition note, or move it to "
-        "a terminal WITHDRAWN status with cited rationale. (Hard-block per "
-        "DCL-NO-ACTION-STATUS-SEMANTICS-001; see .claude/rules/file-bridge-protocol.md section "
-        "'NO-ACTION Status'.)"
-    )
-
-
 def _bridge_envelope_head_deny_reason(content: str) -> str | None:
     try:
         validate_bridge_envelope_head(content, require_dispatchable=True)
@@ -2147,8 +2101,8 @@ def _deny_reason_for_content(
             if anchor_reason:
                 return anchor_reason
         if (
-            first_line not in {"ADVISORY", "DEFERRED"}
-            and not first_line.startswith(("GO", "NO-GO", "VERIFIED"))
+            first_line not in {"ADVISORY", "SUPERSEDED", "WITHDRAWN", "BLOCKED"}
+            and not first_line.startswith(("GO", "NO-GO", "VERIFIED", "NOT-READY", "VERDICT-REJECTED"))
             and not _has_concrete_spec_links(content)
             and not _specification_links_heading_misdetected(content)
         ):

@@ -8,7 +8,7 @@ Deliberations, spec-derived verification heading) BEFORE Codex review rather
 than in a revise loop. The composer counterpart to the gtkb-bridge-propose
 *writer* skill: this helper never writes to ``bridge/`` or MemBase — it reads
 MemBase read-only and writes only a draft under
-``.gtkb-state/propose-drafts/``. The author fills the ``TODO:`` placeholders,
+``scratchpad/<session>/propose-drafts/``. The author fills the ``TODO:`` placeholders,
 runs the printed self-review checklist, then hands the body to
 ``gtkb-bridge-propose`` for the credential-scanned write and bridge-state
 publication.
@@ -26,6 +26,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import re
 import sqlite3
@@ -33,8 +34,11 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DRAFTS_DIR = PROJECT_ROOT / ".gtkb-state" / "propose-drafts"
 GROUNDTRUTH_DB = PROJECT_ROOT / "groundtruth.db"
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+_gtkb_session_id = importlib.import_module("scripts.gtkb_session_id")
 
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 DEFAULT_BRIDGE_KIND = "prime_proposal"
@@ -268,9 +272,15 @@ this helper).
 
 
 def write_draft(slug: str, content: str, project_root: Path | None = None) -> Path:
-    """Write the scaffold to ``.gtkb-state/propose-drafts/<slug>-001.md`` and return it."""
+    """Write the scaffold under the session-scoped scratchpad and return it.
+
+    Canon s17: drafts are session-scoped scratch under
+    ``scratchpad/<session>/propose-drafts/``, never ``.gtkb-state``. The session
+    id comes from the single membership authority in ``scripts.gtkb_session_id``.
+    """
     root = project_root or PROJECT_ROOT
-    drafts = root / ".gtkb-state" / "propose-drafts"
+    session = _gtkb_session_id.sanitize_session_id(_gtkb_session_id.resolve_session_id())
+    drafts = root / "scratchpad" / session / "propose-drafts"
     drafts.mkdir(parents=True, exist_ok=True)
     target = drafts / f"{slug}-001.md"
     target.write_text(content, encoding="utf-8", newline="\n")

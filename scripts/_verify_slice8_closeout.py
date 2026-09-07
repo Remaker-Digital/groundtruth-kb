@@ -106,7 +106,7 @@ def check_b5_wheel_smoke() -> tuple[str, str]:
      2. Confirms wheel + sdist artifacts for EXPECTED_VERSION exist.
      3. Creates an **in-root** scratch venv at
         `E:/GT-KB/.tmp/slice8-install-smoke/<run-id>/venv` (per
-        Codex `-010` F1 + `.claude/rules/project-root-boundary.md`: all
+        Codex `-010` F1 + `.harness-baseline-configuration/rules/project-root-boundary.md`: all
         active GT-KB verification paths must be within `E:\\GT-KB`).
      4. `pip install` the built wheel into the venv.
      5. Runs `gt --version` from the venv; asserts `0.7.0rc1`.
@@ -144,7 +144,7 @@ def check_b5_wheel_smoke() -> tuple[str, str]:
     wheel_path = wheels[0]
 
     # Steps 3-7: install + version + init smoke in an in-root scratch dir.
-    # Per Codex `-010` F1 + .claude/rules/project-root-boundary.md, all
+    # Per Codex `-010` F1 + .harness-baseline-configuration/rules/project-root-boundary.md, all
     # verification paths must live within E:\GT-KB. The .tmp/ tree is gitignored
     # via *.tmp pattern (line 162 of .gitignore).
     scratch_parent = REPO_ROOT / ".tmp" / "slice8-install-smoke"

@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from copy import deepcopy
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,8 +21,11 @@ SESSION_PACKET_KIND = "session-envelope"
 ACTIVITY_PACKET_KIND = "activity-packet"
 SESSION_ENVELOPE_TOKEN_CAP = 900
 ACTIVITY_PACKET_TOKEN_CAP = 500
+# Retained only so existing callers that still pass ``ttl_seconds`` keep working.
+# It no longer selects any caching behaviour: WI-7318 removed the packet cache
+# because a cached startup disclosure contradicts the real-time generation
+# mandate, and its cache directory lived under a forbidden state path.
 DEFAULT_CACHE_TTL_SECONDS = 300
-DEFAULT_CACHE_RELATIVE_PATH = Path(".gtkb-state/session-envelope/packet-cache")
 
 _PACKET_KIND_ALIASES = {
     "session": SESSION_PACKET_KIND,
@@ -54,7 +57,17 @@ def compose_packet(
     generated_at: datetime | None = None,
     budget_cap_tokens: int | None = None,
 ) -> dict[str, Any]:
-    """Compose a budgeted packet, using a TTL/source-hash-valid cache when possible."""
+    """Compose a budgeted packet from live sources on every invocation.
+
+    WI-7318: this service previously served packets from a TTL-and-source-hash
+    validated cache under a forbidden state directory. Startup disclosures must
+    be generated in real time, so the cache is gone and every call composes.
+    ``ttl_seconds``, ``cache_dir`` and ``refresh`` are accepted and ignored so
+    existing callers keep working; removing them from the CLI surface is
+    follow-on work outside this change's authorized target paths.
+    """
+
+    del cache_dir, refresh  # accepted for caller compatibility; no longer used
 
     root = project_root.resolve()
     kind = _normalize_packet_kind(packet_kind)
@@ -71,61 +84,17 @@ def compose_packet(
         raise PacketError("role is required")
 
     now = _utc(generated_at)
-    expires_at = now + timedelta(seconds=ttl_seconds)
-    cache_root = (cache_dir or root / DEFAULT_CACHE_RELATIVE_PATH).resolve()
     sources, source_hashes = _collect_sources(root, include_startup=kind == SESSION_PACKET_KIND)
-    request = {
-        "schema_version": 1,
-        "packet_kind": kind,
-        "activity": activity,
-        "role": role.strip(),
-        "ttl_seconds": ttl_seconds,
-        "source_hashes": source_hashes,
-        "budget_cap_tokens": budget_cap_tokens,
-    }
-    cache_key = _sha256_json(request)[:32]
-    cache_path = cache_root / f"{cache_key}.json"
-
-    if not refresh:
-        cached = _read_valid_cache(cache_path, request=request, source_hashes=source_hashes, now=now)
-        if cached is not None:
-            packet = deepcopy(cached)
-            packet.setdefault("cache", {})
-            packet["cache"].update(
-                {
-                    "hit": True,
-                    "status": "hit",
-                    "cache_path": _display_path(cache_path, root),
-                }
-            )
-            return _with_estimated_tokens(packet)
-
-    packet = _build_packet(
+    return _build_packet(
         root=root,
         kind=kind,
         activity=activity,
         role=role.strip(),
-        ttl_seconds=ttl_seconds,
         generated_at=now,
-        expires_at=expires_at,
-        cache_key=cache_key,
-        cache_path=cache_path,
         source_pointers=sources,
         source_hashes=source_hashes,
         budget_cap_tokens=budget_cap_tokens,
     )
-    _write_cache(
-        cache_path,
-        {
-            "schema_version": 1,
-            "request": request,
-            "source_hashes": source_hashes,
-            "created_at": _iso(now),
-            "expires_at": _iso(expires_at),
-            "packet": packet,
-        },
-    )
-    return packet
 
 
 def estimated_token_count(payload: dict[str, Any]) -> int:
@@ -141,11 +110,7 @@ def _build_packet(
     kind: str,
     activity: str | None,
     role: str,
-    ttl_seconds: int,
     generated_at: datetime,
-    expires_at: datetime,
-    cache_key: str,
-    cache_path: Path,
     source_pointers: list[dict[str, Any]],
     source_hashes: dict[str, str],
     budget_cap_tokens: int | None,
@@ -163,23 +128,14 @@ def _build_packet(
         "status": "ready",
         "activity": activity,
         "generated_at": _iso(generated_at),
-        "ttl": {
-            "seconds": ttl_seconds,
-            "expires_at": _iso(expires_at),
-            "frame": "stable_frame_fetch_cache",
-            "cache_is_authority": False,
+        "composition": {
+            "policy": "real_time_per_invocation",
+            "cached": False,
         },
         "budget": {
             "cap_estimated_tokens": cap,
             "estimated_tokens": 0,
             "estimator": "ceil(canonical_json_bytes/4)",
-        },
-        "cache": {
-            "hit": False,
-            "status": "miss",
-            "cache_key": cache_key,
-            "cache_path": _display_path(cache_path, root),
-            "expires_at": _iso(expires_at),
         },
         "source_pointers": source_pointers,
         "source_hashes": source_hashes,
@@ -240,8 +196,7 @@ def _pointer_only_packet(packet: dict[str, Any], *, cap: int) -> dict[str, Any]:
             "packet_kind",
             "activity",
             "generated_at",
-            "ttl",
-            "cache",
+            "composition",
             "source_pointers",
             "source_hashes",
             "live_query_descriptors",
@@ -361,33 +316,6 @@ def _load_profiles_for_root(root: Path) -> dict[str, Any]:
     )
 
 
-def _read_valid_cache(
-    cache_path: Path,
-    *,
-    request: dict[str, Any],
-    source_hashes: dict[str, str],
-    now: datetime,
-) -> dict[str, Any] | None:
-    try:
-        entry = json.loads(cache_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    if not isinstance(entry, dict):
-        return None
-    if entry.get("request") != request or entry.get("source_hashes") != source_hashes:
-        return None
-    expires_at = _parse_iso(entry.get("expires_at"))
-    if expires_at is None or expires_at <= now:
-        return None
-    packet = entry.get("packet")
-    return packet if isinstance(packet, dict) else None
-
-
-def _write_cache(cache_path: Path, entry: dict[str, Any]) -> None:
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    cache_path.write_bytes(_canonical_json(entry) + b"\n")
-
-
 def _normalize_packet_kind(packet_kind: str) -> str:
     kind = _PACKET_KIND_ALIASES.get(packet_kind)
     if kind is None:
@@ -407,10 +335,6 @@ def _with_estimated_tokens(packet: dict[str, Any]) -> dict[str, Any]:
 
 def _canonical_json(payload: dict[str, Any]) -> bytes:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
-
-
-def _sha256_json(payload: dict[str, Any]) -> str:
-    return hashlib.sha256(_canonical_json(payload)).hexdigest()
 
 
 def _sha256_file(path: Path) -> str:
@@ -437,12 +361,3 @@ def _utc(value: datetime | None) -> datetime:
 
 def _iso(value: datetime) -> str:
     return value.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def _parse_iso(value: object) -> datetime | None:
-    if not isinstance(value, str):
-        return None
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
-    except ValueError:
-        return None

@@ -70,6 +70,57 @@ record follows `GOV-FILE-BRIDGE-AUTHORITY-001`. Neither clause displaces
 `GOV-ARTIFACT-APPROVAL-001` — approval evidence is still required before a
 captured item becomes implemented work.
 
+## Simplicity Principle
+
+Read the specification literally. Implement the nouns and verbs it contains. A marker is not a record; a trigger is not an object.
+
+Justification: complexity drift follows a structural cost asymmetry — an addition needs a proposal, a removal needs a proposal plus owner approval — so elaboration accumulates unless a named, always-loaded principle makes excess citable in review.
+
+Operational mandate: when two designs satisfy the specification, the one with fewer artifacts, fewer state locations, and fewer concepts wins by default. The more elaborate design must justify its excess against the specification text. The burden of proof falls on the addition, never on the removal. When an agent notices that an implementation exceeds its specification, it must:
+
+1. Surface the excess explicitly.
+2. File it as a backlog item in the MemBase `work_items` table (e.g., via
+   `gt backlog add`) with the excess named against the specification text.
+3. Not silently absorb the elaboration (which would make the cost invisible
+   to governance).
+
+This principle extends `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`, `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`, and `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`. Capture routes to the MemBase backlog per `GOV-STANDING-BACKLOG-001`. It does NOT supersede `GOV-ARTIFACT-APPROVAL-001` — formal artifact approval evidence is still required; the principle does not authorize deleting protected behavior without owner approval.
+
+## Event-Oriented Naming Principle
+
+Name hook-triggered and event-shaped concepts for when they fire, not for what
+they are. `init-trigger`, `on-init`, and `open-hook` are event names. A name that
+answers "what kind of thing is it?" invites a record; a name that answers "when
+does it fire?" does not.
+
+Justification: naming choices drive structure. A noun implies a thing, a thing
+implies a record, a record implies a store, a lifecycle, and eventually an
+archive. The canonical glossary already defines `::init` and `::open` as markers
+caught by a hook; the vocabulary that grew around them did not contradict those
+definitions, it exploited the noun. An entity noun therefore attracts persistence
+machinery the specification never asked for, and each increment is individually
+defensible.
+
+Operational mandate: when naming a concept that is triggered by a hook or fires
+on an event, prefer a verb or event form. When an agent encounters an entity noun
+standing for a triggered concept, it must:
+
+1. Surface the naming mismatch explicitly.
+2. File it as a backlog item in the MemBase `work_items` table (e.g., via
+   `gt backlog add`), naming the triggered concept and the persistence
+   machinery the noun has attracted.
+3. Not silently extend the noun with further fields, records, or lifecycle
+   state.
+
+This principle extends the Simplicity Principle above and
+`GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`. Capture routes to the MemBase backlog per
+`GOV-STANDING-BACKLOG-001`. It does NOT supersede `GOV-ARTIFACT-APPROVAL-001` —
+renaming an existing protected surface still requires formal artifact approval
+evidence; the principle governs new names and flags existing mismatches for
+governed correction. Whether a name is event-shaped is a judgment, not a
+mechanical test; the accompanying assertion checks only that this rule is present
+and that the named anti-pattern vocabulary does not reappear in this surface.
+
 ## Clean-Before-You-Leave Principle
 
 When implementation work is complete, all temp, ephemeral, or session-only

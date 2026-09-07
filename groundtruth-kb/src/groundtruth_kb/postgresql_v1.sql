@@ -1,0 +1,369 @@
+CREATE TABLE {schema}.specifications (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    title TEXT NOT NULL,
+    description TEXT,
+    priority TEXT,
+    scope TEXT,
+    section TEXT,
+    handle TEXT,
+    tags JSONB,
+    status TEXT NOT NULL,
+    assertions JSONB,
+    implementation_verified_at TIMESTAMPTZ,
+    retired_at TIMESTAMPTZ,
+    parent TEXT,
+    application_scope JSONB,
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL,
+    FOREIGN KEY (parent) REFERENCES {schema}.specifications(id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE {schema}.specification_deliberation_sources (
+    spec_id TEXT NOT NULL,
+    deliberation_id TEXT NOT NULL,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    source_role TEXT,
+    added_at TIMESTAMPTZ NOT NULL,
+    added_by TEXT NOT NULL,
+    PRIMARY KEY (spec_id, deliberation_id),
+    FOREIGN KEY (spec_id) REFERENCES {schema}.specifications(id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE {schema}.test_procedures (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    title TEXT NOT NULL,
+    type TEXT,
+    content TEXT,
+    assertion_count INTEGER,
+    last_execution_status TEXT,
+    last_executed_at TIMESTAMPTZ,
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL
+);
+
+CREATE TABLE {schema}.operational_procedures (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    title TEXT NOT NULL,
+    type TEXT,
+    variables JSONB,
+    steps JSONB,
+    known_failure_modes JSONB,
+    last_verified_at TIMESTAMPTZ,
+    last_corrected_at TIMESTAMPTZ,
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL
+);
+
+CREATE TABLE {schema}.environment_config (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    environment TEXT NOT NULL,
+    category TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    sensitive BOOLEAN NOT NULL DEFAULT FALSE,
+    notes TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE (environment, category, key)
+);
+
+CREATE TABLE {schema}.documents (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    content TEXT,
+    tags JSONB,
+    status TEXT NOT NULL,
+    source_path TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL
+);
+
+CREATE TABLE {schema}.tests (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    title TEXT NOT NULL,
+    spec_id TEXT NOT NULL,
+    test_type TEXT NOT NULL,
+    test_file TEXT,
+    test_class TEXT,
+    test_function TEXT,
+    description TEXT,
+    expected_outcome TEXT NOT NULL,
+    last_result TEXT,
+    last_executed_at TIMESTAMPTZ,
+    application_scope JSONB,
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL,
+    FOREIGN KEY (spec_id) REFERENCES {schema}.specifications(id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE {schema}.test_plans (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    title TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL,
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL
+);
+
+CREATE TABLE {schema}.test_plan_phases (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    plan_id TEXT NOT NULL,
+    phase_order INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    gate_criteria TEXT NOT NULL,
+    test_ids JSONB,
+    last_result TEXT,
+    last_executed_at TIMESTAMPTZ,
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL,
+    FOREIGN KEY (plan_id) REFERENCES {schema}.test_plans(id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE {schema}.work_items (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    title TEXT NOT NULL,
+    description TEXT,
+    origin TEXT NOT NULL,
+    component TEXT NOT NULL,
+    source_spec_id TEXT,
+    source_test_id TEXT,
+    failure_description TEXT,
+    resolution_status TEXT NOT NULL,
+    priority TEXT,
+    stage TEXT NOT NULL DEFAULT 'created',
+    implementation_order INTEGER,
+    status_detail TEXT,
+    source_owner_directive TEXT,
+    source_deliberation_query TEXT,
+    related_deliberation_ids JSONB,
+    related_spec_ids_at_creation JSONB,
+    related_bridge_threads JSONB,
+    depends_on_work_items JSONB,
+    blocks_work_items JSONB,
+    acceptance_summary TEXT,
+    regression_visibility TEXT,
+    completion_evidence TEXT,
+    supersedes JSONB,
+    superseded_by JSONB,
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL,
+    FOREIGN KEY (source_spec_id) REFERENCES {schema}.specifications(id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (source_test_id) REFERENCES {schema}.tests(id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE {schema}.projects (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    authorization_status TEXT NOT NULL CHECK (authorization_status IN ('authorized', 'not authorized')),
+    rank INTEGER,
+    parent_project_id TEXT,
+    purpose TEXT,
+    target_outcome TEXT,
+    scope_note TEXT,
+    start_date DATE,
+    target_date DATE,
+    completed_at TIMESTAMPTZ,
+    notes TEXT,
+    source_project_name TEXT,
+    source_subproject_name TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL,
+    FOREIGN KEY (parent_project_id) REFERENCES {schema}.projects(id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE {schema}.project_work_item_memberships (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    project_id TEXT NOT NULL,
+    work_item_id TEXT NOT NULL,
+    membership_order INTEGER,
+    status TEXT NOT NULL DEFAULT 'active',
+    source TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE (project_id, work_item_id),
+    FOREIGN KEY (project_id) REFERENCES {schema}.projects(id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (work_item_id) REFERENCES {schema}.work_items(id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE {schema}.project_dependencies (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    dependent_project_id TEXT NOT NULL,
+    prerequisite_project_id TEXT NOT NULL,
+    dependency_kind TEXT NOT NULL DEFAULT 'requires_project_state',
+    required_prerequisite_state TEXT NOT NULL DEFAULT 'retired',
+    affected_gate TEXT NOT NULL CHECK (affected_gate <> 'authorization'),
+    provenance TEXT NOT NULL,
+    registry_version INTEGER NOT NULL DEFAULT 1,
+    rationale TEXT,
+    blocking_status TEXT NOT NULL DEFAULT 'open',
+    related_work_item_id TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL,
+    FOREIGN KEY (dependent_project_id) REFERENCES {schema}.projects(id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (prerequisite_project_id) REFERENCES {schema}.projects(id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (related_work_item_id) REFERENCES {schema}.work_items(id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE {schema}.project_artifact_links (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    project_id TEXT NOT NULL,
+    artifact_type TEXT NOT NULL,
+    artifact_ref TEXT NOT NULL,
+    relationship TEXT NOT NULL DEFAULT 'related',
+    status TEXT NOT NULL DEFAULT 'active',
+    notes TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL,
+    FOREIGN KEY (project_id) REFERENCES {schema}.projects(id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE {schema}.testable_elements (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    subsystem TEXT NOT NULL,
+    page_or_module TEXT NOT NULL,
+    name TEXT NOT NULL,
+    element_type TEXT NOT NULL,
+    expected_behavior TEXT NOT NULL,
+    spec_id TEXT,
+    applicable_dimensions JSONB NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL,
+    FOREIGN KEY (spec_id) REFERENCES {schema}.specifications(id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE {schema}.deliberations (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    spec_id TEXT,
+    work_item_id TEXT,
+    source_type TEXT NOT NULL,
+    source_ref TEXT,
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    content TEXT NOT NULL,
+    content_hash TEXT,
+    participants JSONB,
+    outcome TEXT,
+    session_id TEXT,
+    sensitivity TEXT DEFAULT 'normal',
+    redaction_state TEXT DEFAULT 'clean',
+    redaction_notes TEXT,
+    origin_project TEXT,
+    origin_repo TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL,
+    FOREIGN KEY (spec_id) REFERENCES {schema}.specifications(id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (work_item_id) REFERENCES {schema}.work_items(id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE {schema}.deliberation_specs (
+    deliberation_id TEXT NOT NULL,
+    spec_id TEXT NOT NULL,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    role TEXT DEFAULT 'related',
+    PRIMARY KEY (deliberation_id, spec_id),
+    FOREIGN KEY (deliberation_id) REFERENCES {schema}.deliberations(id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (spec_id) REFERENCES {schema}.specifications(id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE {schema}.deliberation_work_items (
+    deliberation_id TEXT NOT NULL,
+    work_item_id TEXT NOT NULL,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    role TEXT DEFAULT 'related',
+    PRIMARY KEY (deliberation_id, work_item_id),
+    FOREIGN KEY (deliberation_id) REFERENCES {schema}.deliberations(id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (work_item_id) REFERENCES {schema}.work_items(id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE {schema}.canonical_terms (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    canonical_term TEXT NOT NULL,
+    definition TEXT NOT NULL,
+    authority_level TEXT NOT NULL CHECK (authority_level IN ('platform_core', 'adopter_extension', 'project_local')),
+    scope TEXT NOT NULL,
+    accepted_synonyms JSONB,
+    discouraged_synonyms JSONB,
+    linked_artifacts JSONB,
+    linked_services JSONB,
+    usage_examples JSONB,
+    forbidden_uses JSONB,
+    lifecycle_status TEXT NOT NULL CHECK (lifecycle_status IN ('candidate', 'active', 'deprecated', 'retired')),
+    source_authority TEXT NOT NULL,
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL
+);
+
+CREATE TABLE {schema}.harnesses (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    harness_name TEXT NOT NULL,
+    harness_type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'registered',
+    invocation_surfaces JSONB,
+    capabilities_ref TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_reason TEXT NOT NULL
+);
+
+CREATE TABLE {schema}.record_history (
+    history_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    record_type TEXT NOT NULL,
+    record_id JSONB NOT NULL,
+    prior_version INTEGER CHECK (prior_version IS NULL OR prior_version >= 1),
+    new_version INTEGER NOT NULL CHECK (new_version >= 1),
+    prior_state JSONB,
+    new_state JSONB NOT NULL,
+    actor TEXT NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL DEFAULT transaction_timestamp(),
+    reason TEXT NOT NULL
+);
+
+ALTER TABLE {schema}.specification_deliberation_sources
+    ADD CONSTRAINT specification_deliberation_sources_deliberation_fk
+    FOREIGN KEY (deliberation_id) REFERENCES {schema}.deliberations(id) DEFERRABLE INITIALLY DEFERRED;
+
+CREATE INDEX specifications_status_idx ON {schema}.specifications(status);
+CREATE INDEX tests_spec_id_idx ON {schema}.tests(spec_id);
+CREATE INDEX work_items_resolution_idx ON {schema}.work_items(resolution_status);
+CREATE INDEX projects_status_idx ON {schema}.projects(status, authorization_status);
+CREATE INDEX project_memberships_work_item_idx ON {schema}.project_work_item_memberships(work_item_id);
+CREATE INDEX project_dependencies_prerequisite_idx ON {schema}.project_dependencies(prerequisite_project_id, status);
+CREATE INDEX record_history_record_idx ON {schema}.record_history(record_type, new_version);

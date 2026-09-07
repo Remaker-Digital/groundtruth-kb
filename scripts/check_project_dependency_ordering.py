@@ -121,7 +121,14 @@ def _assertion(status: bool, evidence: dict[str, Any]) -> dict[str, Any]:
 
 def evaluate() -> dict[str, Any]:
     started = time.perf_counter()
-    state_root = PROJECT_ROOT / ".gtkb-state" / "project-dependency-ordering-evaluator"
+    # Canon s17: evaluator scratch is session-scoped under the canonical
+    # scratchpad root, never `.gtkb-state`.
+    try:
+        from scripts.gtkb_session_id import session_scratch_dirname
+    except ImportError:  # pragma: no cover - direct script execution path
+        from gtkb_session_id import session_scratch_dirname
+
+    state_root = PROJECT_ROOT / "scratchpad" / session_scratch_dirname() / "project-dependency-ordering-evaluator"
     state_root.mkdir(parents=True, exist_ok=True)
     assertions: dict[str, dict[str, Any]] = {}
 

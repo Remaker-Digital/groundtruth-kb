@@ -150,7 +150,12 @@ def _seed_keep_open_authorization(db: KnowledgeDB, project_root: Path, *, projec
 
 @pytest.fixture(autouse=True)
 def _mock_changed_by(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cli_backlog_update, "_resolve_changed_by", lambda: "test/prime-builder")
+    # WI-7729 incidental repair, disclosed in the report: the stub took no arguments
+    # while the real `_resolve_changed_by(project_root)` has taken one at HEAD since
+    # before this change, so every test using this fixture raised TypeError. The
+    # signature is accepted positionally or by keyword to keep the stub insensitive
+    # to the caller's style.
+    monkeypatch.setattr(cli_backlog_update, "_resolve_changed_by", lambda *_args, **_kwargs: "test/prime-builder")
 
 
 def test_resolve_last_terminal_member_retires_ready_project(tmp_path: Path) -> None:
@@ -169,7 +174,19 @@ def test_resolve_last_terminal_member_retires_ready_project(tmp_path: Path) -> N
         db.close()
 
 
-def test_resolve_does_not_retire_with_open_project_authorization_go_thread(tmp_path: Path) -> None:
+def test_resolve_retires_despite_an_open_authorization_shaped_thread(tmp_path: Path) -> None:
+    """WI-7729: the authorization-thread conjunct is removed, so it no longer blocks.
+
+    The fixture is deliberately unchanged, and that is what makes this assertion
+    non-vacuous: ``_write_open_project_authorization_thread`` writes a thread whose
+    status is ``NEW`` -- a retirement-blocking status -- carrying BOTH a
+    ``Project Authorization:`` line and a ``Project:`` line. That is exactly the
+    shape that made the removed conjunct fire. If the conjunct were still present,
+    or were reintroduced, this fixture would trip it and this test would fail.
+
+    The conjunct's subject no longer exists: it resolved an authorization id against
+    a retired relation. Removing it is a deletion, not a loosening of a live gate.
+    """
     db = _seed_project(tmp_path, {"WI-1": "verified", "WI-2": "open"})
     try:
         _seed_authorization(db)
@@ -178,11 +195,11 @@ def test_resolve_does_not_retire_with_open_project_authorization_go_thread(tmp_p
 
         result = update_backlog_item(_config(tmp_path), _resolve_request("WI-2"))
 
-        assert result["auto_retired_projects"] == []
-        assert db.get_project("PROJECT-X")["status"] == "active"
+        assert result["auto_retired_projects"] != []
+        assert db.get_project("PROJECT-X")["status"] == "retired"
         status = ProjectLifecycleService(db).member_completion_status("PROJECT-X", project_root=tmp_path)
-        assert status["open_project_authorization_bridge_threads"] == ["gtkb-auto-retire-resolve-open-pauth-fixture"]
-        assert "open_project_authorization_bridge_threads" in status["exclusion_reasons"]
+        assert "open_project_authorization_bridge_threads" not in status
+        assert "open_project_authorization_bridge_threads" not in status["exclusion_reasons"]
     finally:
         db.close()
 

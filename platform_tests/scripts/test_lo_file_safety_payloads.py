@@ -141,6 +141,27 @@ def test_cursor_write():
     payload = {"tool_name": "Write", "tool_input": {"file_path": "test.py"}}
     n = normalize_cursor(payload)
     assert n.mutation_class == MutationClass.WRITE
+    assert n.target_paths == ["test.py"]
+
+
+def test_cursor_strreplace_is_edit():
+    payload = {"tool_name": "StrReplace", "tool_input": {"file_path": "test.py"}}
+    n = normalize_cursor(payload)
+    assert n.mutation_class == MutationClass.EDIT
+
+
+def test_cursor_delete_accepts_path():
+    payload = {"toolName": "Delete", "toolInput": {"path": "gone.py"}}
+    n = normalize_cursor(payload)
+    assert n.mutation_class == MutationClass.DELETE
+    assert n.target_paths == ["gone.py"]
+
+
+def test_cursor_payload_level_path():
+    payload = {"tool_name": "Write", "path": "root.py"}
+    n = normalize_cursor(payload)
+    assert n.mutation_class == MutationClass.WRITE
+    assert n.target_paths == ["root.py"]
 
 
 def test_cursor_bash():

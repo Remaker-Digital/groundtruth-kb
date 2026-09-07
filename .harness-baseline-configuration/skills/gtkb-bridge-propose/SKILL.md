@@ -23,13 +23,14 @@ dispatcher/TAFE state without creating or requiring aggregate queue artifacts.
 
 **Project-linkage metadata (per ``DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001``)**:
 the proposal body for an implementation-targeting NEW/REVISED proposal MUST
-include three machine-readable header lines near the top::
+include two machine-readable header lines near the top::
 
-    Project Authorization: PAUTH-<authorization-id>
     Project: <PROJECT-ID>
     Work Item: <WI-NNNN | GTKB-* | WORKLIST-*>
 
-``bridge-compliance-gate.py`` hard-blocks the Write when any line is absent.
+``bridge-compliance-gate.py`` hard-blocks the Write when either line is absent.
+If a deployed gate still requires a separate authorization header or identifier,
+it is stale and must be corrected rather than satisfied.
 Non-implementation proposals self-declare exemption with a ``bridge_kind:``
 header in ``{spec_intake, governance_review, loyal_opposition_advisory}``;
 verdict files (GO/NO-GO/VERIFIED/WITHDRAWN) are exempt by status.

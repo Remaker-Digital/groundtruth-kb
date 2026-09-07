@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """Helper for filing bridge post-implementation reports.
 
 The helper has three modes:
 
 - ``plan_report`` inspects a latest-GO bridge thread without mutation.
-- ``scaffold_report`` writes a non-dispatchable draft under
-  ``.gtkb-state/bridge-impl-reports/drafts/``.
+- ``scaffold_report`` writes a non-dispatchable draft under the canonical
+  session-scoped scratchpad (``scratchpad/<session>/bridge-impl-reports/drafts/``).
 - ``file_report`` writes ``bridge/<slug>-NNN.md`` after credential and
   concurrency gates.
 """
@@ -25,17 +31,19 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
-DEFAULT_DRAFT_DIR = PROJECT_ROOT / ".gtkb-state" / "bridge-impl-reports" / "drafts"
 
 
 def _resolve_bridge_propose_helper(root: Path) -> Path:
-    """Prefer the canonical gtkb- prefixed helper, falling back to the pre-rename
-    name for backward compatibility (WI-5651 skill-rename path canonicalization)."""
-    for name in ("gtkb-bridge-propose", "bridge-propose"):
-        candidate = root / ".claude" / "skills" / name / "helpers" / "write_bridge.py"
-        if candidate.is_file():
-            return candidate
-    return root / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py"
+    """Resolve write_bridge helper from sibling skill directory or baseline."""
+    sibling = Path(__file__).resolve().parents[2] / "gtkb-bridge-propose" / "helpers" / "write_bridge.py"
+    if sibling.is_file():
+        return sibling
+    baseline_cand = (
+        root / ".harness-baseline-configuration" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py"
+    )
+    if baseline_cand.is_file():
+        return baseline_cand
+    return sibling
 
 
 BRIDGE_PROPOSE_HELPER = _resolve_bridge_propose_helper(PROJECT_ROOT)
@@ -51,6 +59,19 @@ WriterBridgeConflictError = _bridge_writer.BridgeConflictError
 WriterBridgeTransitionError = _bridge_writer.BridgeTransitionError
 write_bridge_file = _bridge_writer.write_bridge_file
 no_window_subprocess_kwargs = importlib.import_module("scripts.windows_subprocess").no_window_subprocess_kwargs
+_gtkb_session_id = importlib.import_module("scripts.gtkb_session_id")
+
+# Canon s17: scaffold drafts are session-scoped scratch under the canonical
+# scratchpad root, never `.gtkb-state`. Session id resolution reuses the single
+# membership authority in `scripts.gtkb_session_id` rather than re-listing the
+# env vars here (the drift its docstring calls the recurrence guard).
+DEFAULT_DRAFT_DIR = (
+    PROJECT_ROOT
+    / "scratchpad"
+    / _gtkb_session_id.sanitize_session_id(_gtkb_session_id.resolve_session_id())
+    / "bridge-impl-reports"
+    / "drafts"
+)
 
 
 class BridgeImplReportError(RuntimeError):
@@ -411,7 +432,14 @@ def _recommend_commit_type(files_changed: tuple[str, ...]) -> tuple[str, str]:
     capability_like = [
         path
         for path in normalized
-        if path.startswith((".claude/skills/", ".codex/skills/", "scripts/", "groundtruth-kb/src/"))
+        if path.startswith(
+            (
+                ".harness-baseline-configuration/skills/",
+                ".harness-baseline-configuration/skills/",
+                "scripts/",
+                "groundtruth-kb/src/",
+            )
+        )
     ]
     if len(test_like) == len(normalized):
         return ("test:", "All changed paths are test paths.")

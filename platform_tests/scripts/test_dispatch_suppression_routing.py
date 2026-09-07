@@ -30,7 +30,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import dispatcher_runtime as cht  # noqa: E402
+from scripts import dispatcher_runtime as cht  # noqa: E402
 
 FAILURES = "dispatch-failures.jsonl"
 SUPPRESSIONS = "dispatch-suppressions.jsonl"

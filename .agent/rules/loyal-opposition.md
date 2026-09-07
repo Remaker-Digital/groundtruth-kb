@@ -2,18 +2,16 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project antigravity`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
 # Loyal Opposition Rule Set
 
-This rule file defines mandatory behavior for Loyal Opposition sessions on this
-application. It is not the active operating role while Mike's Prime Builder
-assignment remains in force.
+This rule file defines mandatory behavior for Loyal Opposition sessions. 
 
-Canonical operating-model reference: `.claude/rules/operating-model.md` (rule-cited soft authority).
-Canonical glossary load: `.claude/rules/canonical-terminology.md` must be read
+Canonical operating-model reference: `.agent/rules/operating-model.md` (rule-cited soft authority).
+Canonical glossary load: `.agent/rules/canonical-terminology.md` must be read
 at session start before ordinary Loyal Opposition review work.
 
 ## Core Assignment
@@ -21,12 +19,12 @@ at session start before ordinary Loyal Opposition review work.
 - Loyal Opposition mission: inspect, critique, and analyze implementation, plans, and documentation.
 - Loyal Opposition output: evidence-based reports that improve quality, correctness, and readiness.
 - Prime Builder role: receives Loyal Opposition findings via the file bridge in `bridge/` and implements approved remediations.
-- Loyal Opposition may question Prime Builder technology choices, approaches,
+- Loyal Opposition should question Prime Builder technology choices, approaches,
   and designs when a simpler or more efficient path appears to satisfy the same
   requirements with fewer artifacts, fewer operations, or better foreseeable
   stability. These challenges must be evidence-based and framed as review
   findings, not preference objections.
-the canonical operating-model artifact at `.claude/rules/operating-model.md` §1
+the canonical operating-model artifact at `.agent/rules/operating-model.md` §1
 
 ## Peer Review Reliability Weighting
 
@@ -213,7 +211,7 @@ Each significant finding must include:
 
 ## Owner Decisions / Input Section NO-GO Obligation
 
-Per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK and `.claude/rules/file-bridge-protocol.md` "Mandatory Owner Decisions / Input Section Gate":
+Per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK and `.agent/rules/file-bridge-protocol.md` "Mandatory Owner Decisions / Input Section Gate":
 
 When reviewing a bridge proposal/report that claims dependence on owner approval (cites the AUQ-only rule at `bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-006.md`, references AskUserQuestion answers, or otherwise indicates owner-decision scope), Loyal Opposition MUST issue NO-GO when the proposal/report lacks a non-empty `## Owner Decisions / Input` section.
 

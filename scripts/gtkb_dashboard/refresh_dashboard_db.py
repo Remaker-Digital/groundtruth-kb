@@ -2252,10 +2252,68 @@ def _reconciled_health_cards(
         "blockers",
         "Visible release blockers from release readiness and live release-health findings.",
     )
+    complexity_card = _complexity_health_card()
+    if complexity_card is not None:
+        cards.append(complexity_card)
     cards.sort(
         key=lambda card: (_status_rank(str(card.get("status") or "")), str(card.get("label") or "")), reverse=True
     )
     return cards
+
+
+def _complexity_health_card() -> dict[str, Any] | None:
+    """Surface the WI-6746 complexity counts as a health card.
+
+    Uses the existing ``health_cards`` table rather than adding schema, so the
+    dashboard row costs no new column and no new table.
+
+    Fail-soft by design, and note the asymmetry against the gate hooks: this is a
+    *display* surface, so a benchmark that cannot run should omit its card rather
+    than break the dashboard refresh. That is the opposite of the correct default
+    for an enforcement gate, where an unrunnable check must deny.
+
+    Status is deliberately ``info``. These counts have no threshold yet -- a
+    number is not a problem until someone decides what "too many" means -- and
+    inventing one here would manufacture a false signal. The card exists so the
+    quantity is visible and its trend is noticeable between refreshes.
+    """
+    try:
+        from datetime import UTC, datetime
+
+        from scripts.benchmarks.complexity_metrics import run as _complexity_run
+
+        now = datetime.now(UTC).isoformat()
+        results = _complexity_run(now, now, PROJECT_ROOT)
+        by_id = {r.benchmark_id.rsplit(".", 1)[-1]: int(r.value) for r in results}
+    except Exception:
+        # Benchmark unavailable or failed: omit the card, never break the refresh.
+        #
+        # This swallow is narrow by intent and was itself a defect once: an
+        # earlier revision called a non-existent helper, and this handler
+        # silently turned the resulting NameError into "no card", producing a
+        # surface that could never render and reported nothing. The test
+        # asserting the card renders against the live tree exists specifically
+        # so a swallowed programming error cannot pass as a benign absence.
+        return None
+    if not by_id:
+        return None
+    return {
+        "label": "Platform Complexity",
+        "value": f"{by_id.get('state_locations', 0)} state, {by_id.get('governance_rule_files', 0)} rules",
+        "status": "info",
+        "tooltip": (
+            "State locations {state}, derived artifacts {derived}, governance rule files {rules}, "
+            "gate code lines {loc}, registered SoT artifacts {reg}, governed records {rec}. "
+            "Counts only; no threshold is asserted. Rising values indicate accretion (WI-6746)."
+        ).format(
+            state=by_id.get("state_locations", 0),
+            derived=by_id.get("derived_artifacts", 0),
+            rules=by_id.get("governance_rule_files", 0),
+            loc=by_id.get("gate_code_lines", 0),
+            reg=by_id.get("registered_sot_artifacts", 0),
+            rec=by_id.get("governed_records", 0),
+        ),
+    }
 
 
 def _current_metric_rows(

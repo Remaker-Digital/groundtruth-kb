@@ -13,6 +13,7 @@ from click.testing import CliRunner
 from groundtruth_kb.bridge import proposal_filing
 from groundtruth_kb.cli import main
 from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.session.attestation import bind_exact_init
 
 # Eagerly disable ChromaDB in unit test runtime to avoid hangs during semantic search queries
 groundtruth_kb.db.HAS_CHROMADB = False
@@ -30,6 +31,35 @@ ALLOWED_MUTATION_CLASSES = [
     "source",
     "test",
 ]
+
+
+#: Session identifiers this module authors as, mapped to their binding role
+#: (WI-6095). See the sibling fixture in ``test_gtkb_bridge_writer.py``.
+_AUTHORED_SESSIONS = {
+    "wi5420-test-session": "pb",
+    "wi5458-test-session": "pb",
+    "test-12341": "pb",
+}
+
+
+@pytest.fixture(autouse=True)
+def _bind_authored_sessions(tmp_path: Path) -> None:
+    """Give every session this module authors as a real exact-init binding.
+
+    Same defect and same repair as the writer module: these tests wrote as bare
+    placeholder identifiers that no session-init binding backed, and the filing
+    path now resolves author provenance through that binding per
+    ``DCL-INIT-BOUND-SESSION-IDENTITY-001``.
+
+    This runs before ``_seed_db``; both create the database if absent, so the
+    ordering is harmless.
+    """
+    for session_id, role in _AUTHORED_SESSIONS.items():
+        bind_exact_init(
+            tmp_path / "groundtruth.db",
+            native_context_id=session_id,
+            init_command=f"::init gtkb {role}",
+        )
 
 
 @pytest.fixture(autouse=True)

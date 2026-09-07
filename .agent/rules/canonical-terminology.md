@@ -2,7 +2,7 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project antigravity`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
@@ -169,7 +169,7 @@ Adopter projects also define their own application-instance term (e.g., the
 project_name itself); GT-KB's own checkout adds the instance term in its
 self-install. Multi-source attribution per the Loyal Opposition review
 `gtkb-gov-term-primer-startup-2026-05-02-002.md` F3: each entry cites its
-authoritative source. Sources include `.claude/rules/operating-model.md` §2
+authoritative source. Sources include `.agent/rules/operating-model.md` §2
 (canonical for most terms), `AGENTS.md`, role rules, and
 `DELIB-GTKB-IDP-TERMINOLOGY`.
 
@@ -290,7 +290,7 @@ Harvested information updates canonical source-of-truth artifacts.
 application that uses GT-KB as its governance/lifecycle infrastructure,
 e.g., by running `gt project init` to scaffold its repository or by
 linking to GT-KB-managed artifacts. Adopter projects receive scaffolded
-templates (CLAUDE.md, MEMORY.md, `.claude/rules/canonical-terminology.md`,
+templates (CLAUDE.md, MEMORY.md, `.agent/rules/canonical-terminology.md`,
 etc.) under their own root.
 
 **Not to be confused with:** the GT-KB platform itself; tenants of an
@@ -422,13 +422,13 @@ through the file bridge for pre-implementation review. Filed as
 `bridge/<topic>-NNN.md` with `NEW` or `REVISED` status. Must include
 `Specification Links`, `Prior Deliberations`, test plan, acceptance
 criteria, and risk/rollback per
-`.claude/rules/file-bridge-protocol.md`.
+`.agent/rules/file-bridge-protocol.md`.
 
 **Not to be confused with:** specification (a different artifact type);
 implementation report (post-implementation; below).
 
 **Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "implementation proposal";
-`.claude/rules/file-bridge-protocol.md`.
+`.agent/rules/file-bridge-protocol.md`.
 
 ### implementation report
 
@@ -437,14 +437,14 @@ through the file bridge for post-implementation verification. Filed as
 the next bridge version after implementation completes; must carry
 forward Spec Links + provide spec-to-test mapping + verification
 evidence + acceptance-criteria check per
-`.claude/rules/file-bridge-protocol.md` Mandatory Specification-Derived
+`.agent/rules/file-bridge-protocol.md` Mandatory Specification-Derived
 Verification Gate.
 
 **Not to be confused with:** implementation proposal (pre-implementation);
 test (an independent artifact).
 
 **Source:** `.harness-baseline-configuration/rules/operating-model.md` Â§2 "implementation report";
-`.claude/rules/file-bridge-protocol.md`.
+`.agent/rules/file-bridge-protocol.md`.
 
 ### verification
 
@@ -490,7 +490,7 @@ canonical dispatcher or bridge-state authority. Implementation never proceeds wi
 Bare `bridge`, `bridge work`, `bridge-related`, or `harness` topic
 language does not by itself select the bridge queue.
 
-**Source:** bridge-state surfaces; `.claude/rules/file-bridge-protocol.md`
+**Source:** bridge-state surfaces; `.agent/rules/file-bridge-protocol.md`
 for legacy helper behavior; `AGENTS.md` (cross-harness rule surface).
 
 ### bridge queue
@@ -575,7 +575,7 @@ reach-patterns rather than fighting agent defaults.
 ### glossary as DA read surface
 
 **Definition:** The architectural role assigned to
-`.claude/rules/canonical-terminology.md` by
+`.agent/rules/canonical-terminology.md` by
 `GOV-GLOSSARY-AS-DA-READ-SURFACE-001`: the glossary is the agent-side primary
 read path for prior-decision consultation; the Deliberation Archive is the
 substrate the glossary cites. Direct DA semantic search is the long-tail /
@@ -623,9 +623,9 @@ Harness-specific contract: each registered harness's native read/search tool eve
 
 **Not to be confused with:** the SoT artifact registry (the data; this is the read-time enforcement) or `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` (the governance principle this enforces).
 
-narrative authority `.claude/rules/sot-read-discipline.md`;
+narrative authority `.agent/rules/sot-read-discipline.md`;
 
-**Implementation pointer:** `.claude/hooks/sot-read-discipline.py` (canonical hook) plus per-harness command-verb adapters registered in each harness's hook surface; doctor `_check_sot_read_discipline`; owner-authorized bypass `GTKB_SOT_READ_DISCIPLINE_BYPASS`.
+**Implementation pointer:** `.agent/hooks/sot-read-discipline.py` (canonical hook) plus per-harness command-verb adapters registered in each harness's hook surface; doctor `_check_sot_read_discipline`; owner-authorized bypass `GTKB_SOT_READ_DISCIPLINE_BYPASS`.
 
 ### forbidden substitute
 
@@ -637,7 +637,7 @@ narrative authority `.claude/rules/sot-read-discipline.md`;
 
 **Source:** `DCL-SOT-REGISTRY-RECORD-SCHEMA-001` v2 (`forbidden_substitutes` metadata); `DCL-SOT-READ-HOOK-CONTRACT-001` v1; `DELIB-20260673`.
 
-**Implementation pointer:** `config/registry/sot-artifacts.toml` (`forbidden_substitutes` entries); enforced by `.claude/hooks/sot-read-discipline.py`.
+**Implementation pointer:** `config/registry/sot-artifacts.toml` (`forbidden_substitutes` entries); enforced by `.agent/hooks/sot-read-discipline.py`.
 
 ### handoff prompt
 
@@ -761,7 +761,7 @@ evidence and is not explicitly owner-waived.
 ### bridge compliance gate
 
 **Definition:** A `PreToolUse` Write hook
-(`.claude/hooks/bridge-compliance-gate.py`) that fails the Write of bridge
+(`.agent/hooks/bridge-compliance-gate.py`) that fails the Write of bridge
 proposals/reports lacking required protocol elements. Currently enforces the
 `Owner Decisions / Input` section requirement when the proposal/report
 depends on owner approval.
@@ -776,8 +776,8 @@ content against the canonical credential catalog
 containing credential-shaped spans. The hook applies to direct Write/Edit
 tool calls; helper scripts that bypass the Write tool require their own scan
 implementation. Two registered safety-gate hooks implement this surface:
-`.claude/hooks/credential-scan.py` (general-purpose, all Write/Edit targets)
-and `.claude/hooks/scanner-safe-writer.py` (bridge-scoped, Write-only for
+`.agent/hooks/credential-scan.py` (general-purpose, all Write/Edit targets)
+and `.agent/hooks/scanner-safe-writer.py` (bridge-scoped, Write-only for
 `bridge/*.md` files). Both are registered in each registered harness's tracked
 PreToolUse hook-registration surface.
 
@@ -786,7 +786,7 @@ PreToolUse hook-registration surface.
 ### owner-decision tracker
 
 **Definition:** A `Stop`-mode hook
-(`.claude/hooks/owner-decision-tracker.py`) that detects prose decision-ask
+(`.agent/hooks/owner-decision-tracker.py`) that detects prose decision-ask
 patterns in agent output and refuses turn-end when no `AskUserQuestion` tool
 call occurred in the same turn. Records detected questions in
 `memory/pending-owner-decisions.md`.
@@ -820,8 +820,8 @@ owner decisions).
 ### operating model
 
 **Definition:** The canonical operating-model artifact for GT-KB at
-`.claude/rules/operating-model.md`. Carries rule-cited soft authority:
-cited by `.claude/rules/loyal-opposition.md` and `AGENTS.md` as the
+`.agent/rules/operating-model.md`. Carries rule-cited soft authority:
+cited by `.agent/rules/loyal-opposition.md` and `AGENTS.md` as the
 operating-model reference; its terminology and framing are the alignment
 baseline for future remediation work. No hook or test mechanically enforces
 compliance with this artifact's text.
@@ -870,7 +870,7 @@ role (authority).
 area of a session: `gtkb_infrastructure` (the default; owner direction
 interpreted as GroundTruth-KB platform work) or `application` (owner
 direction interpreted as work on a named adopter/demo application). The
-work subject is recorded in `.claude/session/work-subject.json` and is set
+work subject is recorded in `.agent/session/work-subject.json` and is set
 by owner commands at session start.
 
 **Canonical alias:** active work subject.
@@ -887,7 +887,7 @@ workstream-focus menu shape, MemBase `changed_by` attribution, and AUQ-keyed
 routing â€” for the rest of the contiguous interactive context. It persists
 across compaction, resume, and contiguous SessionStart-like boundaries until
 the owner explicitly changes it. Runtime marker files such as
-`.claude/session/active-session-role.json` and per-session `role-*.json` files
+`.agent/session/active-session-role.json` and per-session `role-*.json` files
 are cache/state only and carry no dispatcher/default role authority; the legacy
 single-file marker may be invalidated at SessionStart, but the transcript-defined
 interactive role persists through the per-session marker/envelope authority.
@@ -936,7 +936,7 @@ health and topology surfaces, they describe removed mechanisms and carry no
 current authority.
 
 **Source:** owner directive, 2026-08-16 (legacy dispatcher disabled and being
-purged); `.claude/rules/bridge-essential.md` § Operational Mode.
+purged); `.agent/rules/bridge-essential.md` § Operational Mode.
 
 ### role set
 
@@ -990,7 +990,7 @@ as the prompt's first line plus the ``GTKB_BRIDGE_POLLER_RUN_ID`` and
 **Definition:** The retired bridge-poller class (Windows scheduled tasks
 `AgentRedFileBridgeIndexScan-*`, `AgentRedBridgeLivenessAlert`,
 `AgentRedPollerLivenessWatcher`; the foreground watchdog; the
-`.claude/hooks/poller-freshness.py` hook; the in-session `CronCreate`
+`.harness-baseline-configuration/hooks/poller-freshness.py` hook; the in-session `CronCreate`
 poller). All members of this class were halted 2026-04-25 per owner
 directive because each fixed-interval tick spent an expensive resource â€”
 waking a harness into a full investigation â€” unconditionally, with no cheap
@@ -1010,7 +1010,7 @@ vocabulary `{gtkb, application}` is **mandatory**; role vocabulary `{pb, lo}` is
 **optional** (pb = Prime Builder, lo = Loyal Opposition). Six valid forms. No synonyms;
 strict parse. When the role token is present it may establish the session-stated role;
 when absent the durable harness role from `harness-state/harness-registry.json` applies
-without writing `.claude/session/active-session-role.json`.
+without writing `.agent/session/active-session-role.json`.
 
 **Source:** `SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001` v3; `DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001`; `DCL-SESSION-ROLE-RESOLUTION-001`.
 
@@ -1076,7 +1076,7 @@ work-subject boundaries, or project authorization requirements.
 `DELIB-20260621-EXPLICIT-HINT-CONTEXT-LOAD-REFRAME`; WI-4482;
 `bridge/gtkb-wi4482-explicit-hint-context-management-umbrella-001.md`.
 
-**Implementation pointer:** `.claude/hooks/*` init/ wrap/ topic-router surfaces;
+**Implementation pointer:** `.agent/hooks/*` init/ wrap/ topic-router surfaces;
 `groundtruth_kb.session.topic_router`; `config/agent-control/activity-disposition-profiles.toml`.
 
 ### formal-artifact-approval packet
@@ -1103,7 +1103,7 @@ hash.
 protected narrative-authority file with matching
 formal-artifact-approval-packet evidence. Includes MemBase rows for GOV /
 ADR / DCL / PB / SPEC / REQ types, Deliberation Archive records, and the
-protected narrative artifacts at `.claude/rules/*.md`, `AGENTS.md`,
+protected narrative artifacts at `.agent/rules/*.md`, `AGENTS.md`,
 `CLAUDE.md`, `CLAUDE-REFERENCE.md`, `CLAUDE-ARCHITECTURE.md`,
 `applications/<name>/CLAUDE.md`,
 `applications/<name>/CLAUDE-REFERENCE.md`, and
@@ -1277,10 +1277,10 @@ Term, definition, not-to-be-confused-with, source, implementation pointer. -->
 **Definition:** The fourth GT-KB coding harness (identity `D`), adopted in
 Phase 1 of `PROJECT-GTKB-OLLAMA-INTEGRATION`. The upstream Ollama platform
 CLI/server (`http://localhost:11434`) is local-capable, but the GT-KB harness
-currently routes all skills to cloud model ids via `.api-harness/routing.toml`
+currently routes all skills to cloud model ids via `routing.toml` (in api-harness)
 (current route: `kimi-k2-7-code-cloud` â€” cloud-backed, not local inference).
 Integrated through `scripts/ollama_harness.py` (a framework-free Python
-tool-calling shim) and `.api-harness/routing.toml` (static routing).
+tool-calling shim) and `routing.toml` (in api-harness) (static routing).
 
 **Canonical alias:** ollama harness.
 
@@ -1288,7 +1288,7 @@ tool-calling shim) and `.api-harness/routing.toml` (static routing).
 
 ### routing.toml
 
-**Definition:** The static TOML routing config at `.api-harness/routing.toml`. Maps
+**Definition:** The static TOML routing config at `routing.toml` (in api-harness). Maps
 harness skills to model ids within the Ollama harness's routing configuration.
 The current default route (`kimi-k2-7-code-cloud`) is cloud-backed via cloud
 API, not a locally-served Ollama model; the upstream Ollama platform CLI/server
@@ -1302,7 +1302,7 @@ at least one `[models.<key>]` table, a `[routing]` table with `default_model`).
 
 **Definition:** The GT-KB pattern binding skill/task contexts to specific models
 within a single harness's model pool. In Phase 1 this is expressed via
-`.api-harness/routing.toml` (`[routing].default_model`, with optional
+`routing.toml` (in api-harness) (`[routing].default_model`, with optional
 `[routing.skills]` overrides reserved for Phase 2+).
 
 *Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#task-to-model-routing).*
@@ -1313,7 +1313,7 @@ The `gt project doctor` command verifies that this file and the startup-
 visible surfaces (CLAUDE.md, AGENTS.md, MEMORY.md) contain the canonical
 terms required for the project's profile. Missing canonical terms are
 ERROR-level; minor drift is WARN-level. See
-`.claude/rules/canonical-terminology.toml` for the required-terms matrix.
+`.agent/rules/canonical-terminology.toml` for the required-terms matrix.
 
 ---
 

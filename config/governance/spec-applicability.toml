@@ -10,8 +10,8 @@ severity = "blocking"
 rationale = "Application/root placement work must honor the GT-KB root and applications/ boundary."
 applies_when_paths_match = [
   "applications/**",
-  ".claude/rules/project-root-boundary.md",
-  ".claude/rules/file-bridge-protocol.md",
+  ".harness-baseline-configuration/rules/project-root-boundary.md",
+  ".harness-baseline-configuration/rules/file-bridge-protocol.md",
   "src/groundtruth_kb/project/**",
   "groundtruth-kb/src/groundtruth_kb/project/**",
 ]
@@ -31,8 +31,8 @@ clause_count = 16
 applies_when_doc_matches = ["*"]
 applies_when_paths_match = [
   "bridge/**",
-  ".claude/rules/file-bridge-protocol.md",
-  ".claude/rules/codex-review-gate.md",
+  ".harness-baseline-configuration/rules/file-bridge-protocol.md",
+  ".harness-baseline-configuration/rules/counterpart-review-gate.md",
 ]
 
 [[rules]]

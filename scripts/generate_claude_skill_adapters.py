@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Project the .claude skill tree from the .agents harness baseline.
+"""Project the .claude skill tree from the harness baseline.
 
-Owner directive 2026-08-13: ``.agents`` is the harness baseline and every
-individual harness configuration directory is a projection of it.
+Owner directive 2026-08-13: the harness baseline is authoritative and every
+individual harness configuration directory is a projection of it. The baseline
+tree is ``.harness-baseline-configuration``; the earlier ``.agents`` tree it
+replaced was retired by WI-6228 after the transition landed inverted (the old
+tree was emptied before the repoint), leaving this generator the last consumer
+still bound to it.
 
 ``.claude`` is the case that makes the directive real. Before this generator it
 was simultaneously the baseline *and* Claude Code's live configuration - one
-directory serving two roles - so repointing the capability registry at
-``.agents`` without also generating ``.claude`` would leave ``.claude``
+directory serving two roles - so repointing the capability registry at the
+baseline without also generating ``.claude`` would leave ``.claude``
 hand-edited and unenforced. The baseline would fork on the first edit, exactly
 the way ``.cursor`` drifted 73 files behind canonical while nothing reported it.
 
@@ -39,7 +43,21 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-BASELINE_SKILLS = Path(".agents") / "skills"
+# WI-6228 Change A — the harness baseline is the curated
+# `.harness-baseline-configuration` tree, not the retired `.agents` tree.
+#
+# This is the last remaining source-root binding to the retired baseline. The
+# other four generators resolve their sources through
+# `config/agent-control/gtkb-harness-capability-registry.toml`, whose
+# `canonical_source` / `adapter_source` entries were already migrated; only this
+# generator directory-scans a hardcoded path, which is why it was the only one
+# left reading an emptied tree.
+#
+# The empty-baseline guard below (see `generate`) is deliberately RETAINED. It is
+# what prevented the inverted transition — tree emptied before the repoint landed
+# — from erasing `.claude/skills`, since this generator prunes anything absent
+# from the baseline via `unlink(missing_ok=True)`.
+BASELINE_SKILLS = Path(".harness-baseline-configuration") / "skills"
 CLAUDE_SKILLS = Path(".claude") / "skills"
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
@@ -106,8 +124,11 @@ def generate(project_root: Path, *, check: bool = False) -> tuple[list[str], lis
         # Helper routes are a per-harness runtime fact. Claude Code executes its own
         # helper copies, so baseline helper references are rewritten to .claude.
         # References are documentation and stay on the baseline.
+        # WI-6228 Change C — rewrite from the current baseline prefix. A stale
+        # prefix here fails silently: the pattern simply stops matching and the
+        # projected body keeps a baseline path that does not resolve for Claude.
         payload = re.sub(
-            rb"\.agents(/skills/[A-Za-z0-9._-]+/helpers/)",
+            re.escape(b".harness-baseline-configuration") + rb"(/skills/[A-Za-z0-9._-]+/helpers/)",
             rb".claude\1",
             payload,
         )

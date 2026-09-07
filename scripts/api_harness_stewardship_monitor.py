@@ -11,7 +11,7 @@ no auto-remediation, no auto-dispatch/auto-kill, and no paid external
 pricing-API / credential / live-network calls. The readiness probe is an
 injected seam defaulting to ``mock_readiness_probe`` so tests and report-only
 runs make NO live network call. The module writes only under
-``.gtkb-state/api-harness-stewardship/``.
+``scratchpad/<session>/api-harness-stewardship/``.
 
 Bridge: gtkb-api-harness-stewardship-monitor (GO at -002).
 Governing specs: GOV-HARNESS-ONBOARDING-CONTRACT-001, GOV-STANDING-BACKLOG-001,
@@ -35,7 +35,11 @@ except ModuleNotFoundError:  # pragma: no cover - tomllib is stdlib on 3.11+
 # harness_id -> provider name (the two API harnesses this monitor stewards).
 MONITORED_HARNESSES: dict[str, str] = {"D": "ollama", "F": "openrouter"}
 
-_STATE_SUBPATH: tuple[str, ...] = (".gtkb-state", "api-harness-stewardship")
+# Canon s17: report output is session-scoped scratch under the canonical
+# scratchpad root, never `.gtkb-state`. The session component is resolved at
+# call time by `_state_dir` from the single session-id membership authority.
+_STATE_SUBPATH: tuple[str, ...] = ("scratchpad",)
+_STATE_LEAF: str = "api-harness-stewardship"
 
 # dispatch-state ``last_result`` values that indicate a degraded/stuck recipient.
 _FAILURE_RESULTS: frozenset[str] = frozenset(
@@ -74,7 +78,12 @@ def mock_readiness_probe(harness_id: str) -> dict[str, Any]:
 
 
 def _state_dir(project_root: Path) -> Path:
-    return project_root.joinpath(*_STATE_SUBPATH)
+    try:
+        from scripts.gtkb_session_id import session_scratch_dirname
+    except ImportError:  # pragma: no cover - direct script execution path
+        from gtkb_session_id import session_scratch_dirname
+
+    return project_root.joinpath(*_STATE_SUBPATH, session_scratch_dirname(), _STATE_LEAF)
 
 
 def _read_json(path: Path) -> Any:
@@ -434,7 +443,7 @@ def emit_report(
     *,
     material_changes: list[dict[str, Any]],
 ) -> dict[str, Path]:
-    """Write the JSON + markdown report under .gtkb-state/api-harness-stewardship/<run_id>/."""
+    """Write the JSON + markdown report under scratchpad/<session>/api-harness-stewardship/<run_id>/."""
     out_dir = _state_dir(project_root) / report["run_id"]
     out_dir.mkdir(parents=True, exist_ok=True)
     full = dict(report, material_changes=material_changes)

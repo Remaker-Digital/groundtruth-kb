@@ -2,13 +2,13 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project antigravity`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
 # SoT Read Discipline
 
-This rule auto-loads via the `.claude/rules/` convention. It is the narrative authority for the SoT (source-of-truth) read-discipline enforcement layer landed in Slice 2A of `gtkb-platform-sot-consolidation-umbrella`.
+This rule auto-loads via the `.agent/rules/` convention. It is the narrative authority for the SoT (source-of-truth) read-discipline enforcement layer landed in Slice 2A of `gtkb-platform-sot-consolidation-umbrella`.
 
 ## Authority
 
@@ -22,7 +22,7 @@ This rule cites and is governed by:
 
 ## Runtime Behavior — Two-Surface Contract
 
-The canonical hook at `.claude/hooks/sot-read-discipline.py` intercepts read intents at the pre-tool-use boundary and blocks reads against any registered `forbidden_substitutes` path with canonical-path guidance. Because different harnesses emit different pre-tool-use tool-event sets, the contract has two surface classes; each harness's projection registers the surface matching its native event model (registration rendered from `hooks/manifest.toml`, intent `read_access` plus `shell_exec`).
+The canonical hook at `.agent/hooks/sot-read-discipline.py` intercepts read intents at the pre-tool-use boundary and blocks reads against any registered `forbidden_substitutes` path with canonical-path guidance. Because different harnesses emit different pre-tool-use tool-event sets, the contract has two surface classes; each harness's projection registers the surface matching its native event model (registration rendered from `hooks/manifest.toml`, intent `read_access` plus `shell_exec`).
 
 ### Native-tool surface
 
@@ -74,10 +74,10 @@ The two-surface contract directly addresses the falsifying class: by interceptin
 
 ## Relationship to Other Rules
 
-- `.claude/rules/file-bridge-protocol.md` — bridge protocol authority; this rule operationalizes one aspect of the broader source-of-truth discipline that protocol depends on.
-- `.claude/rules/operating-model.md` — operating model framing; SoT read discipline is part of the platform's lifecycle-independence and audit-trail contract.
-- `.claude/rules/loyal-opposition.md` — LO review obligations; reviewers should flag PRs that introduce reads of registered forbidden substitutes without bypass justification.
-- `.claude/rules/prime-builder-role.md` — Prime Builder discipline; Prime SHOULD route reads through canonical readers per clause (a) of `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` v2.
+- `.agent/rules/file-bridge-protocol.md` — bridge protocol authority; this rule operationalizes one aspect of the broader source-of-truth discipline that protocol depends on.
+- `.agent/rules/operating-model.md` — operating model framing; SoT read discipline is part of the platform's lifecycle-independence and audit-trail contract.
+- `.agent/rules/loyal-opposition.md` — LO review obligations; reviewers should flag PRs that introduce reads of registered forbidden substitutes without bypass justification.
+- `.agent/rules/prime-builder-role.md` — Prime Builder discipline; Prime SHOULD route reads through canonical readers per clause (a) of `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` v2.
 
 ## Doctor Check
 

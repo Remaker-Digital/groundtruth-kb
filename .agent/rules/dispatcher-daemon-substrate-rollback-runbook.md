@@ -2,7 +2,7 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project antigravity`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
@@ -21,7 +21,7 @@ its dispatchability toggles, or any other automated dispatch substrate.
 Bridge dispatch is **manual owner assignment**. Dispatcher Next is the single
 future dispatcher and is not yet activated.
 
-Authority: `.claude/rules/bridge-essential.md` § Operational Mode.
+Authority: `.agent/rules/bridge-essential.md` § Operational Mode.
 
 This stub remains only so the path does not 404 for consumers that still
 reference it. It should be removed once those references are purged; removal is

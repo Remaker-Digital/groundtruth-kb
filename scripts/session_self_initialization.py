@@ -158,22 +158,8 @@ DEFAULT_RELEASE_BRANCH = "main"
 STARTUP_SERVICE_CONTRACT_VERSION = "gtkb-startup-service-v2"
 STARTUP_FRESHNESS_CONTRACT_VERSION = "gtkb-startup-freshness-v1"
 STARTUP_PAYLOAD_PROFILE_CONTRACT_VERSION = "gtkb-startup-payload-profile-v1"
-STARTUP_PAYLOAD_PROFILE_DIR = Path(".gtkb-state") / "startup-payload-profiles"
 OPERATING_ROLE_RELATIVE_PATH = ROLE_ASSIGNMENTS_RELATIVE_PATH
-HARNESS_LIFECYCLE_GUARDS = {
-    "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
-    "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
-    "antigravity": GTKB_HARNESS_STATE_ROOT / "antigravity" / "session-lifecycle-guard.json",
-    "cursor": GTKB_HARNESS_STATE_ROOT / "cursor" / "session-lifecycle-guard.json",
-    "ollama": GTKB_HARNESS_STATE_ROOT / "ollama" / "session-lifecycle-guard.json",
-    "openrouter": GTKB_HARNESS_STATE_ROOT / "openrouter" / "session-lifecycle-guard.json",
-}
-BRIDGE_DISPATCH_ROLE_TEXT = (
-    "dispatcher daemon registered as PostToolUse and Stop hooks "
-    "(.claude/settings.json, .codex/hooks.json, .cursor/hooks.json); fires on tool-use and Stop "
-    "rather than on a fixed interval; manual TAFE/dispatcher bridge scans "
-    "available as fallback; retired smart poller and OS poller remain archived"
-)
+
 BRIDGE_OPERATION_INSTRUCTIONS_TEXT = (
     "Bridge automation has two complementary axes. "
     "AXIS 1 (DISPATCHABLE WORK): the dispatcher daemon "
@@ -219,7 +205,6 @@ ROLE_PROFILES: dict[str, dict[str, str]] = {
         "assumed_role": "Prime Builder",
         "role_assignment": "active AI harness assigned by owner through the single role assignment map",
         "bridge": "always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup",
-        "bridge_dispatch": BRIDGE_DISPATCH_ROLE_TEXT,
         "bridge_operation_instructions": BRIDGE_OPERATION_INSTRUCTIONS_TEXT,
         "role_mapping_source": "harness-state/harness-registry.json",
     },
@@ -232,7 +217,6 @@ ROLE_PROFILES: dict[str, dict[str, str]] = {
             "was finalized. Compatibility/provenance label, NOT a new role-switch target."
         ),
         "bridge": "always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup",
-        "bridge_dispatch": BRIDGE_DISPATCH_ROLE_TEXT,
         "bridge_operation_instructions": BRIDGE_OPERATION_INSTRUCTIONS_TEXT,
         "role_mapping_source": ".harness-baseline-configuration/rules/acting-prime-builder.md",
     },
@@ -240,7 +224,6 @@ ROLE_PROFILES: dict[str, dict[str, str]] = {
         "assumed_role": "Loyal Opposition",
         "role_assignment": "active AI harness assigned by owner through the single role assignment map",
         "bridge": "always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup",
-        "bridge_dispatch": BRIDGE_DISPATCH_ROLE_TEXT,
         "bridge_operation_instructions": BRIDGE_OPERATION_INSTRUCTIONS_TEXT,
         "role_mapping_source": "harness-state/harness-registry.json",
     },
@@ -980,9 +963,9 @@ def _bind_session_role_attestation(
     init_command: str,
     harness_name: str,
 ) -> str | None:
-    """Create the immutable init binding carrying this context's role.
+    """Create the immutable init binding and its initial role attestation.
 
-    Called beside the role-marker writes so the bound fact and the marker
+    Called beside the role-marker writes so the attested fact and the marker
     cache are established together. The markers are a cache; this is the
     authority (``DCL-INIT-BOUND-SESSION-IDENTITY-001``).
 
@@ -993,10 +976,10 @@ def _bind_session_role_attestation(
     Callers without the literal command pass an empty string and no binding is
     created.
 
-    Fail-soft: startup must never break on binding. An already-bound
-    native context is the normal re-entry case, not an error.
+    Fail-soft: startup must never break on attestation. An already-bound
+    invoking context is the normal re-entry case, not an error.
 
-    Returns the binding evidence reference on a fresh binding, else ``None``.
+    Returns the attestation evidence reference on a fresh binding, else ``None``.
     """
 
     if not session_id or not init_command:
@@ -1015,27 +998,13 @@ def _bind_session_role_attestation(
             native_context_id=session_id,
             init_command=init_command,
         )
-    except RoleAttestationError as exc:
+    except RoleAttestationError:
         # session_already_initialized is expected on re-entry; the binding is
         # immutable by design, so a second init is a no-op rather than a fault.
-        if exc.code != "session_already_initialized":
-            _emit_attestation_bind_note(project_root, session_id, exc.code)
         return None
-    except Exception:  # noqa: BLE001 - startup must not fail on binding
+    except Exception:  # noqa: BLE001 - startup must not fail on attestation
         return None
     return binding.evidence_reference
-
-
-def _emit_attestation_bind_note(project_root: Path, session_id: str, code: str) -> None:
-    """Record an unexpected binding failure without breaking startup."""
-
-    try:
-        log_dir = project_root / ".gtkb-state" / "session-attestation"
-        log_dir.mkdir(parents=True, exist_ok=True)
-        with (log_dir / "bind-failures.jsonl").open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps({"session_id": session_id, "code": code}) + "\n")
-    except Exception:  # noqa: BLE001 - logging must never break startup
-        pass
 
 
 def _normalize_path(value: str) -> str:
@@ -5438,7 +5407,6 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             f"- Interactive role source: {role.get('interactive_role_source', 'unidentified')}",
             f"- Role assignment: {role['role_assignment']}",
             f"- Bridge: {role['bridge']}",
-            f"- Bridge dispatch: {role['bridge_dispatch']}",
             f"- Bridge operation instructions: {role['bridge_operation_instructions']}",
             f"- Role mapping source: {role['role_mapping_source']}",
             f"- Harness self-identification: {role.get('harness_id', 'unidentified')}",
@@ -7221,15 +7189,12 @@ def _startup_freshness_metadata(
 def _startup_service_context(result: dict[str, Any]) -> str:
     model = result["model"]
     project_root = Path(result["project_root"])
-    profile_path = _startup_payload_profile_path(result)
-    profile_rel = _display_path(project_root, profile_path)
     report_path = _display_path(project_root, Path(result["report_path"]))
     wrapup_path = _display_path(project_root, Path(result["wrapup_path"]))
     data_path = _display_path(project_root, Path(result["data_path"]))
     dashboard_path = _display_path(project_root, Path(result["dashboard_path"]))
     role = model.get("role") or {}
     tokens = (model.get("metrics") or {}).get("tokens") or {}
-    relay_cache_lines = _startup_relay_cache_lines(project_root, _harness_name_for_payload(result))
     startup_instruction_context = [
         "",
         "## Session Startup Instructions",
@@ -7313,12 +7278,7 @@ def _startup_service_context(result: dict[str, Any]) -> str:
             f"- Dashboard JSON: `{dashboard_path}`",
             f"- Startup report path: `{report_path}`",
             f"- Wrap-up report path: `{wrapup_path}`",
-            f"- Payload profile path: `{profile_rel}`",
             f"- Token measurement status: {tokens.get('measurement_status', 'unknown')}; reducing startup token consumption now uses compact `additionalContext` plus demand-loaded expansion paths.",
-            "",
-            "### Startup Disclosure Cache Paths",
-            "",
-            *relay_cache_lines,
             *startup_instruction_context,
             *loyal_opposition_context,
         ]
@@ -7427,28 +7387,6 @@ def _harness_name_for_payload(result: dict[str, Any]) -> str:
     return _resolved_harness_name(None) or "claude"
 
 
-def _startup_payload_profile_path(result: dict[str, Any]) -> Path:
-    project_root = Path(result["project_root"])
-    harness = re.sub(r"[^a-z0-9_-]+", "-", _harness_name_for_payload(result).lower()).strip("-") or "unknown"
-    return project_root / STARTUP_PAYLOAD_PROFILE_DIR / f"last-{harness}.json"
-
-
-def _startup_relay_cache_lines(project_root: Path, harness_name: str) -> list[str]:
-    if harness_name == "codex":
-        out_dir = project_root / ".codex" / "gtkb-hooks"
-    elif harness_name == "claude":
-        out_dir = project_root / ".claude" / "hooks"
-    elif harness_name == "cursor":
-        out_dir = project_root / ".cursor" / "gtkb-hooks"
-    else:
-        out_dir = project_root / "harness-state" / harness_name
-    return [
-        f"- Default cache: `{_display_path(project_root, out_dir / 'last-user-visible-startup.md')}`",
-        f"- Prime Builder cache: `{_display_path(project_root, out_dir / 'last-user-visible-startup-pb.md')}`",
-        f"- Loyal Opposition cache: `{_display_path(project_root, out_dir / 'last-user-visible-startup-lo.md')}`",
-    ]
-
-
 def _compact_top_priority_lines(model: dict[str, Any]) -> list[str]:
     actions = model.get("top_priority_actions") or []
     if not actions:
@@ -7480,8 +7418,6 @@ def _startup_payload_profile(
     additional_context: str,
     startup_disclosure: str,
 ) -> dict[str, Any]:
-    project_root = Path(result["project_root"])
-    profile_path = _startup_payload_profile_path(result)
     model = result["model"]
     role = model.get("role") or {}
     return {
@@ -7491,24 +7427,11 @@ def _startup_payload_profile(
         "harness_name": _harness_name_for_payload(result),
         "harness_id": role.get("harness_id"),
         "role_profile": model.get("role_profile"),
-        "profile_path": _display_path(project_root, profile_path),
         "sections": {
             "additionalContext": _text_payload_metrics(additional_context),
             "startupDisclosure": _text_payload_metrics(startup_disclosure),
         },
     }
-
-
-def _write_startup_payload_profile(result: dict[str, Any], profile: dict[str, Any]) -> None:
-    path = _startup_payload_profile_path(result)
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        _atomic_write_text(
-            path,
-            json.dumps(profile, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
-        )
-    except OSError:
-        pass
 
 
 def _emit_startup_service_payload(
@@ -7541,9 +7464,6 @@ def _emit_startup_service_payload(
         additional_context=additional_context,
         startup_disclosure=startup_disclosure,
     )
-    # Fail-soft profile write (writer swallows OSError); on-disk profile is the
-    # generated runtime evidence, the in-payload profile is the authoritative copy.
-    _write_startup_payload_profile(result, payload_profile)
     payload = {
         "hookSpecificOutput": {
             "hookEventName": "SessionStart",
@@ -7600,9 +7520,6 @@ def _default_lifecycle_guard_path(project_root: Path, *, harness_name: str | Non
     override = os.environ.get("GTKB_LIFECYCLE_GUARD_PATH")
     if override:
         return _normalized_path(Path(override))
-    resolved_harness_name = _resolved_harness_name(harness_name)
-    if resolved_harness_name and resolved_harness_name in HARNESS_LIFECYCLE_GUARDS:
-        return _normalized_path(HARNESS_LIFECYCLE_GUARDS[resolved_harness_name])
     return project_root / LIFECYCLE_GUARD_RELATIVE_PATH
 
 
@@ -7866,16 +7783,6 @@ def main(argv: list[str] | None = None) -> int:
             f"e.g., 'E:\\\\GT-KB' (escaped backslash) or 'E:/GT-KB' (forward slashes)."
         )
     project_root = args.project_root.resolve()
-    # Slice 1 of gtkb-operating-mode-transaction-001: drain any pending
-    # mode-switch transactions BEFORE topology derivation so a deferred
-    # role/topology change takes effect for this session's reported state.
-    # Fail-soft per design: failures do not abort startup.
-    try:
-        from groundtruth_kb.mode_switch.pending import apply_pending as _apply_pending
-
-        _apply_pending(project_root)
-    except Exception:  # noqa: BLE001 - fail-soft per spec acceptance criterion #6
-        pass
     if args.user_preferences_path is not None:
         # Per bridge/harness-state-preferences-path-cli-2026-04-28-002.md Codex
         # GO Candidate B: bridge the CLI arg into the existing

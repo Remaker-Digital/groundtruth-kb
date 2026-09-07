@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """
-Claude Code PreToolUse hook — Destructive Operation Gate.
+PreToolUse hook — Destructive Operation Gate.
 
 Intercepts Bash tool calls before execution and blocks commands that match
 destructive patterns (file deletion, git history rewriting, force pushes,
@@ -70,7 +76,7 @@ _GIT_DESTRUCTIVE = [
     re.compile(r"\bgit\s+branch\s+-[dD]\b", re.IGNORECASE),
 ]
 
-# Hook bypass — prevents Claude from skipping pre-commit guardrails
+# Hook bypass — prevents the active harness from skipping pre-commit guardrails
 _HOOK_BYPASS = [
     re.compile(r"\bgit\s+commit\b.*--no-verify", re.IGNORECASE),
     re.compile(r"\bgit\s+commit\b.*-n\b", re.IGNORECASE),  # -n is short for --no-verify

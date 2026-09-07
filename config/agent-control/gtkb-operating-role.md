@@ -130,7 +130,7 @@ scalar reads during the transition window.
 
 The legacy **compatibility/provenance value** `acting-prime-builder` is
 accepted on READ (per `GOV-ACTING-PRIME-BUILDER-001` +
-`.claude/rules/acting-prime-builder.md` section Compatibility/Provenance
+`.harness-baseline-configuration/rules/acting-prime-builder.md` section Compatibility/Provenance
 Classification) but rejected on SET; only `prime-builder` and
 `loyal-opposition` are valid SET targets via `scripts/harness_roles.py`.
 

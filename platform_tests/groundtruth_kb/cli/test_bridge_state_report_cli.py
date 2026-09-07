@@ -222,7 +222,7 @@ def test_bridge_state_report_json_omits_dispatcher_and_uses_registry_model_confi
     assert {row["status"]: row["count"] for row in payload["bridge"]["status_mix"]} == {
         "GO": 1,
         "NEW": 1,
-        "NO-ACTION": 1,
+        "VERDICT-REJECTED": 1,
         "REVISED": 1,
         "VERIFIED": 1,
     }

@@ -144,17 +144,25 @@ _BEHAVIOR_TABLE_HEADER_ROW_RE = re.compile(r"env-var\s+keyword\s+mode-in-role-se
 _HEADER_ROW_RE = re.compile(r"^env-var\s+keyword\s+mode-in-role-set\s+Decision\s+Effect$")
 _SEPARATOR_ROW_RE = re.compile(r"^=+(?:\s+=+)+$")
 
-# Cache-writer parity guards (assertion 9; addresses Slice 8 NO-GO -002 F2).
-# Per ``ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001`` Decision 2 and Slice 1
-# VERIFIED, ``_write_role_scoped_startup_relay_caches`` must iterate
-# ``_MODE_TO_ROLE_PROFILE`` and skip ``primary_mode`` so both ``-pb.md`` and
-# ``-lo.md`` caches are generated unconditionally regardless of the
-# harness's durable role set.  ``_resolve_own_role_set`` references in the
-# function body are the pre-Slice-1 defective shape that conditioned cache
-# writes on the durable role set (per scoping-003 line 71).
-_CACHE_WRITER_LOOP_LITERAL = "for mode in sorted(_MODE_TO_ROLE_PROFILE):"
-_CACHE_WRITER_SKIP_LITERAL = "if mode == primary_mode:"
-_CACHE_WRITER_FORBIDDEN_LITERAL = "_resolve_own_role_set"
+# Cache-writer ABSENCE guards (assertion 9; WI-7318).
+#
+# This clause was inverted. It previously required
+# ``_write_role_scoped_startup_relay_caches`` to exist and to iterate
+# ``_MODE_TO_ROLE_PROFILE``, so that both ``-pb.md`` and ``-lo.md`` relay
+# caches were written unconditionally. WI-7318 removed the startup-disclosure
+# relay cache entirely: caching a startup disclosure contradicts the real-time
+# generation mandate, and the artifacts were written from ``scripts/`` into
+# generated projection trees, which no non-projector may write.
+#
+# The parity contract is preserved rather than deleted, pointed the other way:
+# a reintroduced cache writer now fails here exactly as a missing one did
+# before, so the cross-harness drift signal survives the removal.
+_CACHE_WRITER_FORBIDDEN_SYMBOLS = (
+    "_write_role_scoped_startup_relay_caches",
+    "_write_startup_relay_cache",
+    "_startup_relay_cache_names",
+)
+_CACHE_ARTIFACT_FORBIDDEN_LITERAL = "last-user-visible" + "-startup"
 
 # Canonical resolution-table dict content (Slice D single-source relocation).
 # Under single-sourcing the old "two dispatchers must be ast-equivalent" check
@@ -1017,33 +1025,21 @@ def _resolution_table_parity_errors(project_root: Path) -> list[str]:
             f"Codex SessionStart dispatcher must not contain `{_CLAUDE_OUT_DIR_LITERAL}` (intentional-difference guard)"
         )
 
-    # ----- Assertion 9: cache-writer parity (core single source) ----------
-    # The core's ``_write_role_scoped_startup_relay_caches`` must iterate
-    # ``_MODE_TO_ROLE_PROFILE`` and skip ``primary_mode`` and must NOT reference
-    # ``_resolve_own_role_set`` (the pre-Slice-1 defective shape).
-    if "def _write_role_scoped_startup_relay_caches(" not in core_text:
-        errors.append(f"{core_label} must define `_write_role_scoped_startup_relay_caches()` (Slice 1 cache-writer)")
-    else:
-        body_text = _function_body_text(core_text, "_write_role_scoped_startup_relay_caches")
-        if _CACHE_WRITER_LOOP_LITERAL not in body_text:
+    # ----- Assertion 9: cache-writer absence (core single source) ---------
+    # WI-7318 removed the startup-disclosure relay cache. The core must not
+    # reintroduce a writer, and must not name the cache artifact family.
+    for symbol in _CACHE_WRITER_FORBIDDEN_SYMBOLS:
+        if f"def {symbol}(" in core_text:
             errors.append(
-                f"{core_label} `_write_role_scoped_startup_relay_caches()` must iterate "
-                f"`{_CACHE_WRITER_LOOP_LITERAL}` "
-                "(Slice 1 cache-writer fix; writes both -pb.md and -lo.md unconditionally per "
-                "ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 Decision 2)"
+                f"{core_label} must NOT define `{symbol}()`: the startup-disclosure relay cache was "
+                "removed by WI-7318 because caching a startup disclosure contradicts the real-time "
+                "generation mandate and wrote into generated projection trees"
             )
-        if _CACHE_WRITER_SKIP_LITERAL not in body_text:
-            errors.append(
-                f"{core_label} `_write_role_scoped_startup_relay_caches()` must skip the primary "
-                f"mode via `{_CACHE_WRITER_SKIP_LITERAL}` (Slice 1 cache-writer fix)"
-            )
-        if _CACHE_WRITER_FORBIDDEN_LITERAL in body_text:
-            errors.append(
-                f"{core_label} `_write_role_scoped_startup_relay_caches()` must NOT reference "
-                f"`{_CACHE_WRITER_FORBIDDEN_LITERAL}` "
-                "(pre-Slice-1 defective shape that conditioned cache writes on the durable "
-                "role set; regression per scoping-003 line 71)"
-            )
+    if _CACHE_ARTIFACT_FORBIDDEN_LITERAL in core_text:
+        errors.append(
+            f"{core_label} must NOT reference `{_CACHE_ARTIFACT_FORBIDDEN_LITERAL}`: that cache "
+            "artifact family was removed by WI-7318; the disclosure is rendered per invocation"
+        )
 
     # ----- Assertion 10: wrapper delegation (Slice D) ---------------------
     # Each thin wrapper must import the shared core and rebind its functions,

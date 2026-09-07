@@ -1,118 +1,128 @@
 {
-  "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "_comment": "Project-level harness settings. This file is TRACKED in git (negated by .gitignore) so every worktree and fresh clone inherits the project-level hook configuration. Workstation-specific permissions live in settings.local.json which remains untracked. Note 2026-04-25: the OS Claude/Codex bridge pollers were halted by owner directive (token-cost regression); the poller-freshness UserPromptSubmit hook was removed in the same change. Bridge scans are now manual via owner 'Bridge' prompts.",
+  "_comment": "PROJECTION, NOT CANONICAL - rendered from the baseline hooks/manifest.toml by the GT-KB projection engine; edit the baseline and re-project.",
   "hooks": {
     "PreToolUse": [
       {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy|Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-before-code.py\""
-          },
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-before-code.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy|Bash|PowerShell",
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/kb-not-markdown.py\""
-          },
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/kb-not-markdown.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy|Bash|PowerShell",
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/destructive-gate.py\""
-          },
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/destructive-gate.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy|Bash|PowerShell",
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/credential-scan.py\""
-          },
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/credential-scan.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy|Bash|PowerShell",
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/scanner-safe-writer.py\""
-          },
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/scanner-safe-writer.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy|Bash|PowerShell",
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/formal-artifact-approval-gate.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/document_author_provenance_gate.py\"",
             "timeout": 5
           }
         ]
       },
       {
-        "matcher": "Write",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy|Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/document_author_provenance_gate.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/lo-file-safety-gate.py\"",
             "timeout": 5
           }
         ]
       },
       {
-        "matcher": "Write|Edit|MultiEdit|Bash|PowerShell|Delete|Move|Copy",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy|Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/workstream-focus.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/directive-enforcement-adapter.py\"",
             "timeout": 5
           }
         ]
       },
       {
-        "matcher": "Write|Edit|MultiEdit|Bash",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy|Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/lo-file-safety-gate.py\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/implementation-start-gate.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/bridge-compliance-gate.py\"",
             "timeout": 5
           }
         ]
       },
       {
-        "matcher": "Write|Edit|MultiEdit|Bash|PowerShell|Delete|Move|Copy",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy|Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/directive-enforcement-claude-adapter.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/bridge-proposal-wi-id-collision-gate.py\"",
             "timeout": 5
           }
         ]
       },
       {
-        "matcher": "Write|Edit",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy|Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/bridge-compliance-gate.py\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/bridge-proposal-wi-id-collision-gate.py\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/narrative-artifact-approval-gate.py\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/code-quality-baseline-proposal-check.py\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/scripts/dispatch_blackbox_gate.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/code-quality-baseline-proposal-check.py\"",
             "timeout": 5
           }
         ]
       },
       {
-        "matcher": "Read|Grep|Glob",
+        "matcher": "Read|Grep|Glob|Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/sot-read-discipline.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/sot-read-discipline.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/scripts/dispatch_blackbox_gate.py\"",
             "timeout": 5
           }
         ]
@@ -123,17 +133,25 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-governance.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-governance.py\"",
             "timeout": 60
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/assertion-check.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/assertion-check.py\"",
             "timeout": 60
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start_dispatch.py\" --startup-service \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --harness-name claude",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start_dispatch.py\"",
             "timeout": 60
           }
         ]
@@ -144,20 +162,32 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/delib-search-tracker.py\""
-          },
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/delib-search-tracker.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-capture.py\""
-          },
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-capture.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-event-surfacer.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-event-surfacer.py\"",
             "timeout": 5
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/scripts/registry_observation_hook.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/scripts/registry_observation_hook.py\"",
             "timeout": 10
           }
         ]
@@ -168,27 +198,43 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --emit-wrapup --fast-hook --harness-name claude",
-            "timeout": 60
-          },
-          {
-            "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-tracker.py\" --mode stop",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-tracker.py\" --mode stop",
             "timeout": 5
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/advisory-router-scan.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/advisory-router-scan.py\"",
             "timeout": 10
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/scripts/advisory_grilling_gate_lint.py\" --stop-hook",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --emit-wrapup --fast-hook --harness-name claude",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/scripts/advisory_grilling_gate_lint.py\" --stop-hook",
             "timeout": 10
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/scripts/auto_finalize_sweep.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/scripts/auto_finalize_sweep.py\"",
             "timeout": 15
           }
         ]
@@ -199,49 +245,85 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/workstream-focus.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-init-binding.py\"",
             "timeout": 5
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/delib-search-gate.py\""
-          },
-          {
-            "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/intake-classifier.py\""
-          },
-          {
-            "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/gov09-capture.py\""
-          },
-          {
-            "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-tracker.py\" --mode user-prompt-submit",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/workstream-focus.py\"",
             "timeout": 5
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/bridge-axis-2-surface.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/delib-search-gate.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/intake-classifier.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/gov09-capture.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/bridge-axis-2-surface.py\"",
             "timeout": 5
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-classifier.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-classifier.py\"",
             "timeout": 5
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/glossary-expansion.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/glossary-expansion.py\"",
             "timeout": 5
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/project-completion-surface.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/project-completion-surface.py\"",
             "timeout": 5
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-topic-envelope-router.py\"",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-topic-envelope-router.py\"",
             "timeout": 5
           }
         ]

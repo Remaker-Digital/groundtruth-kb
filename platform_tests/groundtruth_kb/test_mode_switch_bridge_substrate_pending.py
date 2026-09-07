@@ -83,7 +83,7 @@ def test_apply_pending_drains_bridge_substrate_entries(project_root: Path) -> No
     assert state_data["substrate"] == "dispatcher_daemon"
 
 
-def test_apply_pending_preserves_legacy_role_pending_entries(project_root: Path) -> None:
+def test_apply_pending_refuses_legacy_role_pending_entries(project_root: Path) -> None:
     # Write legacy pending JSON file directly to pending dir
     pending_dir = project_root / ".gtkb-state" / "mode-switches" / "pending"
     pending_dir.mkdir(parents=True, exist_ok=True)
@@ -99,16 +99,20 @@ def test_apply_pending_preserves_legacy_role_pending_entries(project_root: Path)
     }
     legacy_file.write_text(json.dumps(legacy_payload, indent=2) + "\n", encoding="utf-8")
 
-    # Verify legacy file is parsed with axis="role"
+    # Legacy files still parse, and still carry axis="role".
     pending = list_pending(project_root)
     assert len(pending) == 1
     assert pending[0].axis == "role"
     assert pending[0].role == "prime-builder"
 
-    # Make sure apply runs role switch
+    # WI-7823: the role axis was removed from this queue. A session role resolves
+    # only from the immutable init binding, so a legacy role entry must be refused
+    # rather than applied, and must stay in pending/ for owner inspection.
     results = apply_pending(project_root)
     assert len(results) == 1
-    assert results[0].applied is True
+    assert results[0].applied is False
+    assert results[0].error is not None
+    assert legacy_file.exists()
 
 
 def test_apply_pending_records_failed_entries_with_error(project_root: Path) -> None:

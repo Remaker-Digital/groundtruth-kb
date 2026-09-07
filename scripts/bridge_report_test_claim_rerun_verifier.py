@@ -479,7 +479,14 @@ def run_pytest_claim(project_root: Path, claim: ExtractedClaim, timeout_seconds:
             observed_counts={},
         )
 
-    state_dir = project_root / ".gtkb-state" / "test-claim-rerun"
+    # Canon s17: rerun scratch is session-scoped under the canonical scratchpad
+    # root, never `.gtkb-state`.
+    try:
+        from scripts.gtkb_session_id import session_scratch_dirname
+    except ImportError:  # pragma: no cover - direct script execution path
+        from gtkb_session_id import session_scratch_dirname
+
+    state_dir = project_root / "scratchpad" / session_scratch_dirname() / "test-claim-rerun"
     state_dir.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     with tempfile.TemporaryDirectory(prefix="pytest-", dir=state_dir) as temp_dir:

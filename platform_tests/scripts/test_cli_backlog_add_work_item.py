@@ -966,3 +966,62 @@ def test_exact_repair_rolls_back_work_item_when_phase_write_fails(
 
     assert result.exit_code != 0
     assert _snapshot(db_path) == before
+
+
+def test_documented_backlog_paths_refuse_or_create_links_and_repair_unique_history(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """TEST-12540: no public creation path silently leaves an unlinked WI."""
+    root, config = _project(tmp_path)
+    db_path = root / "groundtruth.db"
+    _seed(db_path)
+    monkeypatch.setattr(
+        "groundtruth_kb.cli_backlog_add._resolve_changed_by",
+        lambda _project_root: "prime-builder/codex",
+    )
+
+    unsafe_add = CliRunner().invoke(
+        main,
+        [
+            "--config",
+            str(config),
+            "backlog",
+            "add",
+            "--title",
+            "Unlinked candidate",
+            "--origin",
+            "defect",
+            "--component",
+            "backlog",
+            "--change-reason",
+            "TEST-12540 documented-command boundary",
+        ],
+    )
+    work_items_after_add = _counts(db_path)[0]
+
+    _seed_exact_pair(
+        db_path,
+        provenance="Historical TEST-11462 uniquely corroborates WI-5325 without creator-generated prose.",
+    )
+    repair = CliRunner().invoke(main, _repair_argv(config, "--json"))
+    db = KnowledgeDB(db_path=db_path)
+    repaired = db.get_work_item("WI-5325")
+    db.close()
+
+    relationship_complete = (
+        repaired is not None and repaired["source_test_id"] == "TEST-11462" and "TEST-11462" in _phase_test_ids(db_path)
+    )
+    assert (
+        unsafe_add.exit_code != 0
+        and "gt backlog add-work-item" in unsafe_add.output
+        and work_items_after_add == 0
+        and repair.exit_code == 0
+        and relationship_complete
+    ), (
+        f"unsafe_add_exit={unsafe_add.exit_code}; "
+        f"work_items_after_add={work_items_after_add}; "
+        f"repair_exit={repair.exit_code}; "
+        f"repair_output={repair.output!r}; "
+        f"relationship_complete={relationship_complete}"
+    )

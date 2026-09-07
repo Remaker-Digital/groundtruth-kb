@@ -7,7 +7,14 @@ metadata:
   category: operations and hygiene
   activity-envelope: build, ops
 ---
-
+<!--
+THIS FILE IS A PROJECTION, NOT CANONICAL.
+Projected from the neutral harness baseline by the GT-KB projection engine.
+Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+`gt harness project claude`. If a needed change cannot be made through
+the baseline and re-projection, file a work item against the projector
+(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+-->
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
@@ -48,12 +55,12 @@ There are no other modes in v1.
 
 Read the smallest relevant set:
 
-- `.claude/rules/canonical-terminology.md`
-- `.claude/rules/operating-model.md`
-- `.claude/skills/structural-hygiene-review/SKILL.md`
-- `.claude/skills/check-deliberations/SKILL.md`
-- `.claude/skills/kb-session-wrap-scan/SKILL.md`
-- `.claude/skills/harness-parity-review/SKILL.md`
+- `.harness-baseline-configuration/rules/canonical-terminology.md`
+- `.harness-baseline-configuration/rules/operating-model.md`
+- `.harness-baseline-configuration/skills/gtkb-structural-hygiene-review/SKILL.md`
+- `.harness-baseline-configuration/skills/gtkb-check-deliberations/SKILL.md`
+- `.harness-baseline-configuration/skills/gtkb-session-wrap-scan/SKILL.md`
+- `.harness-baseline-configuration/skills/gtkb-harness-parity-review/SKILL.md`
 - `config/agent-control/harness-capability-registry.toml`
 - `config/agent-control/system-interface-map.toml`
 - Bridge dispatcher status/health CLI and TAFE-backed bridge-state surfaces
@@ -70,7 +77,7 @@ Read the smallest relevant set:
 | 2. Branch cleanup | identify stale branches / worktree noise; require dry-run evidence before any cleanup | perform branch cleanup only with safe scope, never `git push --force` to main/master |
 | 3. Bridge double-version | audit `bridge/` parser behavior, aggregate-queue assumptions, and version ambiguity before any fix | repair only if verified defect exists; never edit a filed bridge file in place |
 | 4. `REPOSITORY-STRUCTURE.md` | identify current structure / source-of-truth gaps | draft or update documentation |
-| 5. Terminology drift | map drift against `.claude/rules/canonical-terminology.md` | update docs / schema / API / tests as needed |
+| 5. Terminology drift | map drift against `.harness-baseline-configuration/rules/canonical-terminology.md` | update docs / schema / API / tests as needed |
 | 6. Duplicate specs | identify candidate duplicate specifications and authority conflicts | merge / retire only through the governed spec process (formal-artifact approval) |
 | 7. Gitignore + scripts triage | identify noisy / generated / unowned artifacts and stale scripts | mechanical cleanup with verification; never script deletion without bridge-tracked approval |
 | 8. Naming consistency | identify invasive rename clusters and risk boundaries | execute in narrow slices after other phases stabilize |
@@ -82,7 +89,7 @@ Read the smallest relevant set:
 2. Read the smallest relevant input set for the chosen mode.
 3. For each in-scope hygiene phase, run the relevant existing skill / scanner as a read-only orchestration step. Examples:
    - Phase 1: `python scripts/check_deliberation_archive_health.py` or the equivalent skill.
-   - Phase 4-5: orchestrate `structural-hygiene-review` and `check-deliberations` outputs.
+   - Phase 4-5: orchestrate `gtkb-structural-hygiene-review` and `gtkb-check-deliberations` outputs.
    - Phase 9: `python scripts/check_harness_parity.py --all --markdown` for adapter / parity residuals.
 4. Synthesize findings into the standard report format (next section).
 5. File the report as an Advisory Proposal bridge entry (ADVISORY status) or a
@@ -147,7 +154,7 @@ If the assessment finds a defect that requires mutation, the report MUST list it
 ## Report Destination
 
 `independent-progress-assessments/` is retired (contents deleted by owner
-directive); reports do NOT go there. Per `.claude/rules/loyal-opposition.md`
+directive); reports do NOT go there. Per `.harness-baseline-configuration/rules/loyal-opposition.md`
 storage convention, file the report as an Advisory Proposal bridge entry
 (ADVISORY status; see `gtkb-bridge-advisory-status-001`, VERIFIED) or a
 Deliberation Archive record (`gt deliberations record`), per content.
@@ -156,10 +163,10 @@ Deliberation Archive record (`gt deliberations record`), per content.
 
 This skill **orchestrates** rather than replaces:
 
-- `structural-hygiene-review` - structural drift, naming, artifact authority, glossary alignment.
-- `check-deliberations` - Deliberation Archive population, linkage, conflict, redaction, duplicates.
-- `kb-session-wrap-scan` - W1 (transcript snapshot) + W2 (cross-artifact consistency) scanners.
-- `harness-parity-review` - cross-harness skill / adapter parity drift.
+- `gtkb-structural-hygiene-review` - structural drift, naming, artifact authority, glossary alignment.
+- `gtkb-check-deliberations` - Deliberation Archive population, linkage, conflict, redaction, duplicates.
+- `gtkb-session-wrap-scan` - W1 (transcript snapshot) + W2 (cross-artifact consistency) scanners.
+- `gtkb-harness-parity-review` - cross-harness skill / adapter parity drift.
 - `arch-audit` - architecture compliance audit when a phase touches ADR / DCL.
 
 The orchestration value is in synthesizing those outputs into a single Prime-facing action plan with consistent classification (`prime-action` / `peer-prime-candidate` / `lo-verification`) and a phase-indexed ordering recommendation.
@@ -181,6 +188,14 @@ Each of those is a separate bridge proposal with its own owner approval where ap
 - Source advisory: `DELIB-1473` (Loyal Opposition Advisory: LO Hygiene Assessment Skill).
 - Disposition thread: `bridge/gtkb-lo-hygiene-assessment-skill-advisory-disposition-002.md` (GO at `-002`; VERIFIED at `-004`).
 - Build thread: `bridge/gtkb-lo-hygiene-assessment-skill-build-005.md` (GO; this skill source).
-- Owner authorization: `DELIB-S350-BATCH4-FOUR-PROJECT-AUTHORIZATIONS` via `PAUTH-PROJECT-GTKB-LO-ADVISORY-INTAKE-LO-ADVISORY-INTAKE-PARALLEL-BATCH` (covers WI-3303).
 
 Copyright 2026 Remaker Digital, a DBA of VanDusen and Palmeter, LLC. All rights reserved.
+
+<!--
+GTKB-CLAUDE-SKILL-ADAPTER-BEGIN
+Generated by: scripts/harness_projection/project_harness.py
+Generated at: content-addressed a75e306a29be
+Canonical source: .harness-baseline-configuration/skills/gtkb-lo-hygiene-assessment/SKILL.md
+Canonical source sha256: a75e306a29be75df8d65df4532fa328cc97f7a9c68f505ffca9a14b58fcc234b
+GTKB-CLAUDE-SKILL-ADAPTER-END
+-->

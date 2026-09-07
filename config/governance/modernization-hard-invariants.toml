@@ -1,0 +1,180 @@
+# Modernization Hard-Invariant Registry (WI-5158 Gate 1.25 slice)
+# WI-5152 — canonical 28-outer-assertion map (23 MUST_APPLY, 4 DEFERRED_TO, 1 conditional)
+
+schema_version = 1
+registry_id = "modernization-hard-invariants-wi5158-gate-1.25"
+work_item = "WI-5152"
+slice = "WI-5158 Gate 1.25"
+
+[[entries]]
+id = "GIT-ADR-A1"
+carrier = "ADR-GOVERNED-TWO-TIER-GIT-LIFECYCLE-001"
+applicability = "MUST_APPLY"
+description = "Two-tier governed Git lifecycle ADR assertion A1"
+
+[[entries]]
+id = "GIT-ADR-A2"
+carrier = "ADR-GOVERNED-TWO-TIER-GIT-LIFECYCLE-001"
+applicability = "MUST_APPLY"
+description = "Two-tier governed Git lifecycle ADR assertion A2"
+
+[[entries]]
+id = "GIT-ADR-A3"
+carrier = "ADR-GOVERNED-TWO-TIER-GIT-LIFECYCLE-001"
+applicability = "MUST_APPLY"
+description = "Two-tier governed Git lifecycle ADR assertion A3"
+
+[[entries]]
+id = "GIT-ADR-A4"
+carrier = "ADR-GOVERNED-TWO-TIER-GIT-LIFECYCLE-001"
+applicability = "MUST_APPLY"
+description = "Two-tier governed Git lifecycle ADR assertion A4"
+
+[[entries]]
+id = "GIT-ADR-A5"
+carrier = "ADR-GOVERNED-TWO-TIER-GIT-LIFECYCLE-001"
+applicability = "DEFERRED_TO"
+deferred_to = "WI-5159"
+description = "Two-tier governed Git lifecycle ADR assertion A5 deferred to WI-5159"
+
+[[entries]]
+id = "GIT-ADR-A6"
+carrier = "ADR-GOVERNED-TWO-TIER-GIT-LIFECYCLE-001"
+applicability = "MUST_APPLY"
+description = "Two-tier governed Git lifecycle ADR assertion A6"
+
+[[entries]]
+id = "GIT-ADR-A7"
+carrier = "ADR-GOVERNED-TWO-TIER-GIT-LIFECYCLE-001"
+applicability = "MUST_APPLY"
+description = "Two-tier governed Git lifecycle ADR assertion A7"
+
+[[entries]]
+id = "GIT-REQ-A1"
+carrier = "REQ-GTKB-GOVERNED-GIT-LIFECYCLE-001"
+applicability = "MUST_APPLY"
+description = "Governed Git lifecycle requirement assertion A1"
+
+[[entries]]
+id = "GIT-REQ-A2"
+carrier = "REQ-GTKB-GOVERNED-GIT-LIFECYCLE-001"
+applicability = "MUST_APPLY"
+description = "Governed Git lifecycle requirement assertion A2"
+
+[[entries]]
+id = "GIT-REQ-A3"
+carrier = "REQ-GTKB-GOVERNED-GIT-LIFECYCLE-001"
+applicability = "MUST_APPLY"
+description = "Governed Git lifecycle requirement assertion A3"
+
+[[entries]]
+id = "GIT-REQ-A4"
+carrier = "REQ-GTKB-GOVERNED-GIT-LIFECYCLE-001"
+applicability = "MUST_APPLY"
+description = "Governed Git lifecycle requirement assertion A4"
+
+[[entries]]
+id = "GIT-REQ-A5"
+carrier = "REQ-GTKB-GOVERNED-GIT-LIFECYCLE-001"
+applicability = "DEFERRED_TO"
+deferred_to = "WI-5159"
+description = "Governed Git lifecycle requirement assertion A5 deferred to WI-5159"
+
+[[entries]]
+id = "GIT-REQ-A6"
+carrier = "REQ-GTKB-GOVERNED-GIT-LIFECYCLE-001"
+applicability = "MUST_APPLY"
+description = "Governed Git lifecycle requirement assertion A6"
+
+[[entries]]
+id = "GIT-REQ-A7"
+carrier = "REQ-GTKB-GOVERNED-GIT-LIFECYCLE-001"
+applicability = "DEFERRED_TO"
+deferred_to = "WI-5160"
+description = "Governed Git lifecycle requirement assertion A7 deferred to WI-5160"
+
+[[entries]]
+id = "GIT-REQ-A8"
+carrier = "REQ-GTKB-GOVERNED-GIT-LIFECYCLE-001"
+applicability = "MUST_APPLY"
+description = "Governed Git lifecycle requirement assertion A8"
+
+[[entries]]
+id = "BRANCH-BIND-A1"
+carrier = "DCL-GIT-BRANCH-BINDING-PROMOTION-001"
+applicability = "MUST_APPLY"
+description = "Git branch-binding promotion assertion A1"
+
+[[entries]]
+id = "BRANCH-BIND-A2"
+carrier = "DCL-GIT-BRANCH-BINDING-PROMOTION-001"
+applicability = "MUST_APPLY"
+description = "Git branch-binding promotion assertion A2"
+
+[[entries]]
+id = "BRANCH-BIND-A3"
+carrier = "DCL-GIT-BRANCH-BINDING-PROMOTION-001"
+applicability = "MUST_APPLY"
+description = "Git branch-binding promotion assertion A3"
+
+[[entries]]
+id = "BRANCH-BIND-A4"
+carrier = "DCL-GIT-BRANCH-BINDING-PROMOTION-001"
+applicability = "MUST_APPLY"
+description = "Git branch-binding promotion assertion A4"
+
+[[entries]]
+id = "BRANCH-BIND-A5"
+carrier = "DCL-GIT-BRANCH-BINDING-PROMOTION-001"
+applicability = "MUST_APPLY"
+description = "Git branch-binding promotion assertion A5"
+
+[[entries]]
+id = "BRANCH-BIND-A6"
+carrier = "DCL-GIT-BRANCH-BINDING-PROMOTION-001"
+applicability = "DEFERRED_TO"
+deferred_to = "WI-5159"
+description = "Git branch-binding promotion assertion A6 deferred to WI-5159"
+
+[[entries]]
+id = "BRANCH-BIND-A7"
+carrier = "DCL-GIT-BRANCH-BINDING-PROMOTION-001"
+applicability = "MUST_APPLY"
+description = "Git branch-binding promotion assertion A7"
+
+[[entries]]
+id = "BRANCH-BIND-A8"
+carrier = "DCL-GIT-BRANCH-BINDING-PROMOTION-001"
+applicability = "MUST_APPLY"
+description = "Git branch-binding promotion assertion A8"
+
+[[entries]]
+id = "BRANCH-BIND-A9"
+carrier = "DCL-GIT-BRANCH-BINDING-PROMOTION-001"
+applicability = "MUST_APPLY"
+description = "Git branch-binding promotion assertion A9"
+
+[[entries]]
+id = "A1"
+carrier = "GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001"
+applicability = "MUST_APPLY"
+description = "Non-impairment assertion A1 (proposal)"
+
+[[entries]]
+id = "A2"
+carrier = "GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001"
+applicability = "MUST_APPLY"
+description = "Non-impairment assertion A2 (activation)"
+
+[[entries]]
+id = "A3"
+carrier = "GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001"
+applicability = "MUST_APPLY"
+description = "Non-impairment assertion A3 (verification/closure)"
+
+[[entries]]
+id = "A4"
+carrier = "GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001"
+applicability = "CONDITIONAL"
+conditional_note = "NOT_APPLICABLE only after deterministic proof that no active worker-loading route changes; otherwise MUST_APPLY or UNASSESSED"
+description = "Non-impairment assertion A4 (conditional)"

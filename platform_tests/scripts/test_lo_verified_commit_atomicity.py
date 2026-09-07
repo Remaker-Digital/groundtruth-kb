@@ -1268,3 +1268,257 @@ def test_verified_finalization_rejects_latest_implemented_status(verify_helper, 
             project_root=repo,
             pre_populate=False,
         )
+
+
+# ---------------------------------------------------------------------------
+# WI-6203 — residual crash-order and idempotency proofs.
+#
+# These exercise the finalize/rollback publication contract directly (unit
+# level), complementing the publish_lo_verdict integration tests above. They
+# encode the three properties the WI-6203 proposal owns:
+#   1. no VERIFIED file persists before the work-product commit succeeds;
+#   2. no rollback of a completed commit if post-commit signal emission fails;
+#   3. best-effort idempotent signal after an already-terminal commit.
+# The single-terminal-commit model is assumed; no two-commit helper is used.
+# ---------------------------------------------------------------------------
+
+
+def _pending_verified(target_path: str = "bridge/sample-004.md"):
+    return provider_writer._PendingBridgePublication(
+        capability="lo_verified",
+        capability_hash="sha256:" + "a" * 64,
+        target_path=target_path,
+        session_id="22222222-2222-4222-8222-222222222222",
+        content_digest="sha256:" + "b" * 64,
+        document_name="sample",
+        version=4,
+        status="VERIFIED",
+    )
+
+
+def _init_wi6203_repo(tmp_path: Path) -> Path:
+    """A real git repository with a real base commit."""
+    repo = tmp_path / "repo"
+    (repo / "bridge").mkdir(parents=True)
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "wi6203@example.invalid")
+    _git(repo, "config", "user.name", "WI-6203 Test")
+    _write_project_marker(repo)
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "base")
+    return repo
+
+
+def _run_fresh_process(repo: Path, script: str, target: Path, log: Path):
+    """Execute `script` in a FRESH interpreter.
+
+    Process restart is the point: module-level state such as
+    ``_PENDING_BRIDGE_PUBLICATIONS`` starts empty, so recovery must come from
+    the durable sidecar rather than from in-process memory.
+    """
+    driver = repo / "_wi6203_driver.py"
+    driver.write_text(script, encoding="utf-8")
+    return subprocess.run(
+        [sys.executable, str(driver), str(REPO_ROOT), str(repo), str(target), str(log)],
+        cwd=str(repo),
+        text=True,
+        capture_output=True,
+        **no_window_subprocess_kwargs(),
+    )
+
+
+_ROLLBACK_DRIVER = """
+import json, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from scripts import gtkb_bridge_writer as w
+
+repo, target, log = Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4])
+pending_was_empty = w._PENDING_BRIDGE_PUBLICATIONS == {}
+released = []
+w._registry_publication_enabled = lambda *a, **k: False
+w._release_claim = lambda *a, **k: released.append("release")
+raised = ""
+try:
+    w.rollback_pending_bridge_publication(
+        target, repo, reason="process death before work-product commit"
+    )
+except Exception as exc:
+    raised = str(exc)
+log.write_text(
+    json.dumps({"pending_was_empty": pending_was_empty, "released": released, "raised": raised}),
+    encoding="utf-8",
+)
+"""
+
+
+_SIGNAL_FAILURE_DRIVER = """
+import json, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from scripts import gtkb_bridge_writer as w
+
+repo, target, log = Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4])
+SESSION = "22222222-2222-4222-8222-222222222222"
+
+def _boom(*a, **k):
+    raise RuntimeError("signal emission down")
+
+w._registry_publication_enabled = lambda *a, **k: False
+w._publication_author_session = lambda _c: (SESSION, {})
+w._claim_holder = lambda *a, **k: {"session_id": SESSION}
+w._release_claim = _boom
+raised = ""
+try:
+    w.finalize_pending_bridge_publication(target, repo)
+except Exception as exc:
+    raised = str(exc)
+log.write_text(json.dumps({"raised": raised}), encoding="utf-8")
+"""
+
+
+_FINALIZE_DRIVER = """
+import json, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from scripts import gtkb_bridge_writer as w
+
+repo, target, log = Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4])
+SESSION = "22222222-2222-4222-8222-222222222222"
+state = repo / "claim_state.json"
+if not state.exists():
+    state.write_text(json.dumps({"held": True}), encoding="utf-8")
+
+pending_was_empty = w._PENDING_BRIDGE_PUBLICATIONS == {}
+counter = {"released": 0}
+
+def _holder(*a, **k):
+    return {"session_id": SESSION} if json.loads(state.read_text(encoding="utf-8"))["held"] else None
+
+def _release(*a, **k):
+    counter["released"] += 1
+    state.write_text(json.dumps({"held": False}), encoding="utf-8")
+
+w._registry_publication_enabled = lambda *a, **k: False
+w._publication_author_session = lambda _c: (SESSION, {})
+w._claim_holder = _holder
+w._release_claim = _release
+raised = ""
+try:
+    w.finalize_pending_bridge_publication(target, repo)
+except Exception as exc:
+    raised = str(exc)
+log.write_text(
+    json.dumps({"pending_was_empty": pending_was_empty, "released": counter["released"], "raised": raised}),
+    encoding="utf-8",
+)
+"""
+
+
+def test_wi6203_uncommitted_verified_leaves_no_durable_terminal_after_process_death(
+    tmp_path: Path,
+) -> None:
+    """Property 1 (fault injection + restart): a VERIFIED written before the
+    work-product commit must leave no durable terminal, and recovery must run
+    from the durable sidecar in a process that never held the in-memory entry.
+    """
+    import json
+
+    repo = _init_wi6203_repo(tmp_path)
+    target = repo / "bridge" / "sample-004.md"
+    target.write_text("VERIFIED\n\n# sample verified verdict\n", encoding="utf-8")
+    provider_writer._write_pending_publication_sidecar(_pending_verified(), target=target, project_root=repo)
+    assert provider_writer._pending_publication_sidecar_path(target, repo).is_file()
+
+    commits_before = _git(repo, "log", "--oneline").stdout.strip().splitlines()
+
+    log = repo / "events.json"
+    result = _run_fresh_process(repo, _ROLLBACK_DRIVER, target, log)
+    assert result.returncode == 0, result.stderr
+
+    events = json.loads(log.read_text(encoding="utf-8"))
+    # The recovering process genuinely did not inherit in-memory state.
+    assert events["pending_was_empty"] is True
+    assert events["raised"] == ""
+    # No false terminal survives the pre-commit crash.
+    assert not target.exists()
+    # The claim is retained, not released, so the work item is not lost.
+    assert events["released"] == []
+    # And no work-product commit was fabricated by the recovery path.
+    assert _git(repo, "log", "--oneline").stdout.strip().splitlines() == commits_before
+
+
+def test_wi6203_signal_failure_after_real_work_product_commit_does_not_revert_it(
+    tmp_path: Path,
+) -> None:
+    """Property 2 (real commit + post-commit fault): once the work-product
+    commit exists, a failure in the post-commit signal must not remove or
+    revert it. The verdict is written after that commit and is not part of it
+    (canon section 7 ordering).
+    """
+    import json
+
+    repo = _init_wi6203_repo(tmp_path)
+    work = repo / "work_product.txt"
+    work.write_text("implemented bytes\n", encoding="utf-8")
+    _git(repo, "add", "work_product.txt")
+    _git(repo, "commit", "-qm", "feat: work product (WI-6203)")
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    committed = _git(repo, "show", "--name-only", "--format=", "HEAD").stdout
+
+    # Verdict is authored AFTER the work-product commit, excluded from it.
+    target = repo / "bridge" / "sample-004.md"
+    target.write_text("VERIFIED\n\n# post-commit verdict\n", encoding="utf-8")
+    provider_writer._write_pending_publication_sidecar(_pending_verified(), target=target, project_root=repo)
+
+    log = repo / "events.json"
+    result = _run_fresh_process(repo, _SIGNAL_FAILURE_DRIVER, target, log)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(log.read_text(encoding="utf-8"))["raised"] == "signal emission down"
+
+    # The committed work product survives the post-commit signal failure.
+    assert _git(repo, "rev-parse", "HEAD").stdout.strip() == head
+    assert "work_product.txt" in committed
+    # The verdict was never inside the work-product commit.
+    assert "bridge/sample-004.md" not in committed
+    # No compensating removal of an already-committed attempt.
+    assert target.exists()
+    assert work.read_text(encoding="utf-8") == "implemented bytes\n"
+
+
+def test_wi6203_finalize_is_idempotent_across_a_real_process_restart(
+    tmp_path: Path,
+) -> None:
+    """Property 3 (restart idempotency): finalizing again in a brand-new
+    process, after the claim is already released, is a no-op. It must not
+    raise and must not release a second time.
+    """
+    import json
+
+    repo = _init_wi6203_repo(tmp_path)
+    target = repo / "bridge" / "sample-004.md"
+    target.write_text("VERIFIED\n\n# terminal verdict\n", encoding="utf-8")
+    provider_writer._write_pending_publication_sidecar(_pending_verified(), target=target, project_root=repo)
+
+    first_log = repo / "first.json"
+    second_log = repo / "second.json"
+
+    first = _run_fresh_process(repo, _FINALIZE_DRIVER, target, first_log)
+    assert first.returncode == 0, first.stderr
+    second = _run_fresh_process(repo, _FINALIZE_DRIVER, target, second_log)
+    assert second.returncode == 0, second.stderr
+
+    a = json.loads(first_log.read_text(encoding="utf-8"))
+    b = json.loads(second_log.read_text(encoding="utf-8"))
+
+    # Both runs were genuinely fresh processes, not a same-process repeat.
+    assert a["pending_was_empty"] is True
+    assert b["pending_was_empty"] is True
+    # Released exactly once across the restart boundary.
+    assert a["released"] == 1
+    assert b["released"] == 0
+    # The repeat neither raises nor double-releases.
+    assert a["raised"] == ""
+    assert b["raised"] == ""
+    # The terminal artifact is retained.
+    assert target.exists()

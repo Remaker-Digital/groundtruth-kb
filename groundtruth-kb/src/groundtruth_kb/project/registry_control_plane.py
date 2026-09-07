@@ -2718,11 +2718,15 @@ def transition_apply(
         )
 
     desired: list[SoTArtifact] = []
+    dest_data = json.loads(request_row["destination"]) if request_row["destination"] else {}
     for record in snapshot.records:
         if record.id in removal_ids:
             continue
         if record.id in coverage_changes:
-            desired.append(replace(record, coverage_mode=coverage_changes[record.id]))
+            kwargs = {"coverage_mode": coverage_changes[record.id]}
+            if record.id == request_row["entry_id"] and "storage_path" in dest_data:
+                kwargs["storage_path"] = dest_data["storage_path"]
+            desired.append(replace(record, **kwargs))
         else:
             desired.append(record)
 

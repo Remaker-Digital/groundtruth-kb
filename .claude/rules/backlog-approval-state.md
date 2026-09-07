@@ -1,3 +1,11 @@
+<!--
+THIS FILE IS A PROJECTION, NOT CANONICAL.
+Projected from the neutral harness baseline by the GT-KB projection engine.
+Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+`gt harness project claude`. If a needed change cannot be made through
+the baseline and re-projection, file a work item against the projector
+(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+-->
 # Backlog Approval State Retirement Rule
 
 ## Purpose
@@ -10,14 +18,13 @@ or a text-edit bypass.
 
 Implementation authority is project-level:
 
-1. An active project authorization (`PAUTH-*`) defines the owner-approved scope.
+1. The work item's single parent project has `activation-status: authorized`.
 2. A live bridge `GO` approves the specific implementation proposal.
-3. A matching implementation-start authorization packet and work-intent claim
-   open the Prime Builder write path.
+3. A matching live work-intent claim opens the Prime Builder write path.
 
 Individual work items do not have an approval state. A work item may be
-tracked, prioritized, reviewed, linked to a project, or included in a project
-authorization without becoming an independent approval authority.
+tracked, prioritized, reviewed, or linked to its parent project without becoming
+an independent approval authority. It inherits authorization from that project.
 
 ## Legacy Data
 
@@ -32,5 +39,5 @@ surfaces that treat a work-item approval state as live authority.
 ## Enforcement
 
 Any live gate that accepts or rejects implementation based on `approval_state`
-is obsolete and must be replaced by the project-level authorization,
-bridge-`GO`, and implementation-start packet chain.
+is obsolete and must be replaced by the parent project's `activation-status`,
+bridge `GO`, and live work-intent claim.

@@ -2,7 +2,7 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project antigravity`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
@@ -10,7 +10,7 @@ the baseline and re-projection, file a work item against the projector
 
 This rule is the durable procedure for handling Loyal Opposition (LO) peer-solution advisories — investigations of external systems, frameworks, libraries, or processes that may inform GT-KB's design. It formalizes the classification vocabulary, the owner-dialogue workflow, and the Prime-side response template that the parent Slice-0 thread `bridge/gtkb-peer-solution-advisory-loop-conversion-003.md` (Loyal Opposition GO at `-004`) authorized.
 
-This rule is auto-loaded via `.claude/rules/` convention.
+This rule is auto-loaded via `.agent/rules/` convention.
 
 ## Purpose
 
@@ -40,7 +40,7 @@ Required follow-on: a NEW bridge proposal documenting WHICH parts adopt and WHIC
 
 Prime rejects the peer solution because it does not address the GT-KB problem, conflicts with established GT-KB governance, or its tradeoffs are unacceptable. Use when adoption or adaptation would weaken GT-KB rather than strengthen it.
 
-(per `.claude/rules/deliberation-protocol.md`)
+(per `.agent/rules/deliberation-protocol.md`)
 
 ### `defer`
 
@@ -59,7 +59,7 @@ Required follow-on: a Deliberation Archive record citing the peer-system URL or 
 The loop runs as follows:
 
 1. **LO files peer-solution advisory.** LO investigates a peer system on owner request (or proactively when LO encounters one in the course of normal review work). LO files the advisory as an LO Advisory Proposal bridge entry when it may create future Prime Builder work, or as a Deliberation Archive record when it is a process/review finding with no derived-work implication.
-2. **Prime reads the advisory** as part of the standard Loyal-Opposition-insight review path defined in `.claude/rules/way-of-working.md`.
+2. **Prime reads the advisory** as part of the standard Loyal-Opposition-insight review path defined in `.agent/rules/way-of-working.md`.
 3. **Prime classifies the advisory** using the five-state vocabulary above. The classification IS a Prime decision recorded in the response.
 4. **Prime drafts the response artifact** appropriate to the classification:
    - `adopt` / `adapt` -> NEW bridge proposal.
@@ -80,7 +80,7 @@ section in the advisory body. The gate section enumerates:
 2. What Prime Builder must grill the owner about before drafting any
    implementation proposal derived from this advisory.
 3. What owner decisions must be durable, recorded via `AskUserQuestion`
-   per `.claude/rules/prime-builder-role.md` § "AskUserQuestion as the
+   per `.agent/rules/prime-builder-role.md` § "AskUserQuestion as the
    Only Valid Owner-Decision Channel", before an implementation
    proposal can exist.
 
@@ -88,7 +88,7 @@ Prime Builder must conduct a structured owner clarification/grilling
 pass — using the `/grill-me-for-clarification` skill or an equivalent
 AUQ-recorded structured interview — and the resulting AUQ evidence
 MUST land in the resulting bridge proposal's mandatory `## Owner
-Decisions / Input` section (per `.claude/rules/file-bridge-protocol.md`
+Decisions / Input` section (per `.agent/rules/file-bridge-protocol.md`
 § "Mandatory Owner Decisions / Input Section Gate") before the proposal
 is filed as `NEW`.
 
@@ -141,7 +141,7 @@ Prime responses (the classification + the follow-on artifact) are bridge-tracked
 
 ## Approval-Gate
 
-protected paths (e.g., `.claude/rules/*.md`, `AGENTS.md`, the root harness instruction file)
+protected paths (e.g., `.agent/rules/*.md`, `AGENTS.md`, the root harness instruction file)
 
 This separation preserves the layered approval model: owner approves the strategic decision (adopt vs adapt) at the bridge-review level; owner approves the specific protected-file content at the per-artifact packet level. A peer solution's adoption can be approved without committing the owner to every detail of its protected-file implementation.
 

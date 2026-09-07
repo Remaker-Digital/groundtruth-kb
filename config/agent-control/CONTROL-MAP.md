@@ -5,16 +5,16 @@ Purpose: tracked map of the major control surfaces that shape agent behavior in 
 ## Startup Directives
 
 - `AGENTS.md`
-- `.claude/rules/codex-way-of-working.md`
-- `.claude/rules/codex-review-operating-contract.md`
-- `.claude/rules/codex-loyal-opposition-runbook.md`
-- `.claude/rules/codex-knowledge-base-index.md`
+- `.harness-baseline-configuration/rules/way-of-working.md`
+- `.harness-baseline-configuration/rules/review-operating-contract.md`
+- `.harness-baseline-configuration/rules/loyal-opposition-runbook.md`
+- `.harness-baseline-configuration/rules/loyal-opposition-knowledge-base-index.md`
 
 ## Review Memory
 
-- `.claude/rules/codex-decision-ledger.md`
-- `.claude/rules/codex-dead-ends-and-false-positives.md`
-- `.claude/rules/codex-review-checklists.md`
+- `.harness-baseline-configuration/rules/decision-ledger.md`
+- `.harness-baseline-configuration/rules/dead-ends-and-false-positives.md`
+- `.harness-baseline-configuration/rules/loyal-opposition-review-checklists.md`
 
 ## Local Runtime Controls
 
@@ -31,8 +31,8 @@ Review skill intent currently lives in local `.claude/skills/` as:
 
 ## Output Contracts
 
-- `.claude/rules/template-code-review.md`
-- `.claude/rules/template-decision-memo.md`
+- `.harness-baseline-configuration/rules/template-code-review.md`
+- `.harness-baseline-configuration/rules/template-decision-memo.md`
 - Advisory Proposal bridge entries / Deliberation Archive records
   (`independent-progress-assessments/` is retired; do not write there)
 

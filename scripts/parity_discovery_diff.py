@@ -40,26 +40,18 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# Guarded imports — direct script execution may not have repo root on sys.path.
-# Pattern mirrored from scripts/check_harness_parity.py:21-24.
-try:
-    from scripts.check_harness_parity import (
-        build_surface_map,
-        load_parity_waivers,
-        load_registry,
-        resolve_applicability,
-        validate_parity_waiver,
-    )
-    from scripts.harness_projection_reader import load_harness_projection
-except ModuleNotFoundError:  # pragma: no cover - import fallback
-    from check_harness_parity import (  # type: ignore[no-redef]
-        build_surface_map,
-        load_parity_waivers,
-        load_registry,
-        resolve_applicability,
-        validate_parity_waiver,
-    )
-    from harness_projection_reader import load_harness_projection  # type: ignore[no-redef]
+# Package-qualified imports only (WI-6583). The former bare-name fallback loaded
+# these modules a second time under their unqualified names, so each ``scripts/x.py``
+# resolved to two distinct module objects and tripped the dual-identity guard in
+# ``scripts/verify_antigravity_dispatch.py``.
+from scripts.check_harness_parity import (  # noqa: E402
+    build_surface_map,
+    load_parity_waivers,
+    load_registry,
+    resolve_applicability,
+    validate_parity_waiver,
+)
+from scripts.harness_projection_reader import load_harness_projection  # noqa: E402
 
 # Harnesses that declare a hook-config file, and the file each declares. A
 # harness participates in the hook-surface diff iff it is active AND its config

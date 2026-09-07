@@ -1,146 +1,186 @@
 {
   "version": 1,
+  "_comment": "PROJECTION, NOT CANONICAL - rendered from the baseline hooks/manifest.toml by the GT-KB projection engine; edit the baseline and re-project.",
   "hooks": {
-    "sessionStart": [
+    "preToolUse": [
       {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\.cursor\\gtkb-hooks\\session_start_dispatch.py",
-        "timeout": 180
-      }
-    ],
-    "beforeSubmitPrompt": [
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_cmd_no_window.py E:\\GT-KB\\.cursor\\gtkb-hooks\\workstream-focus.cmd",
-        "timeout": 5
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/spec-before-code.py",
+        "timeout": 30,
+        "matcher": "Write|StrReplace|Edit|MultiEdit|Delete|Shell|Bash",
+        "failClosed": true
       },
       {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\.codex\\gtkb-hooks\\session_wrapup_trigger_dispatch.py",
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/kb-not-markdown.py",
+        "timeout": 30,
+        "matcher": "Write|StrReplace|Edit|MultiEdit|Delete|Shell|Bash",
+        "failClosed": true
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/destructive-gate.py",
+        "timeout": 30,
+        "matcher": "Write|StrReplace|Edit|MultiEdit|Delete|Shell|Bash",
+        "failClosed": true
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/credential-scan.py",
+        "timeout": 30,
+        "matcher": "Write|StrReplace|Edit|MultiEdit|Delete|Shell|Bash",
+        "failClosed": true
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/scanner-safe-writer.py",
+        "timeout": 30,
+        "matcher": "Write|StrReplace|Edit|MultiEdit|Delete|Shell|Bash",
+        "failClosed": true
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/document_author_provenance_gate.py",
+        "timeout": 30,
+        "matcher": "Write|StrReplace|Edit|MultiEdit|Delete|Shell|Bash",
+        "failClosed": true
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/lo-file-safety-gate.py",
+        "timeout": 30,
+        "matcher": "Write|StrReplace|Edit|MultiEdit|Delete|Shell|Bash",
+        "failClosed": true
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/directive-enforcement-adapter.py",
+        "timeout": 30,
+        "matcher": "Write|StrReplace|Edit|MultiEdit|Delete|Shell|Bash",
+        "failClosed": true
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/bridge-compliance-gate.py",
+        "timeout": 30,
+        "matcher": "Write|StrReplace|Edit|MultiEdit|Delete|Shell|Bash",
+        "failClosed": true
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/bridge-proposal-wi-id-collision-gate.py",
+        "timeout": 30,
+        "matcher": "Write|StrReplace|Edit|MultiEdit|Delete|Shell|Bash",
+        "failClosed": true
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/code-quality-baseline-proposal-check.py",
+        "timeout": 30,
+        "matcher": "Write|StrReplace|Edit|MultiEdit|Delete|Shell|Bash",
+        "failClosed": true
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/sot-read-discipline.py",
+        "timeout": 30,
+        "matcher": "Read|Grep|Glob|Shell|Bash",
+        "failClosed": true
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py scripts/dispatch_blackbox_gate.py",
+        "timeout": 30,
+        "matcher": "Write|StrReplace|Edit|MultiEdit|Delete|Shell|Bash",
+        "failClosed": true
+      }
+    ],
+    "sessionStart": [
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/session-start-governance.py",
         "timeout": 60
       },
       {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\.claude\\hooks\\spec-classifier.py",
-        "timeout": 5
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/assertion-check.py",
+        "timeout": 60
       },
       {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\.codex\\gtkb-hooks\\glossary-expansion.py",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\.codex\\gtkb-hooks\\project-completion-surface.py",
-        "timeout": 5
-      }
-    ],
-    "beforeShellExecution": [
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\destructive-gate.py",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\credential-scan.py",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_cmd_no_window.py E:\\GT-KB\\.cursor\\gtkb-hooks\\workstream-focus.cmd",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\formal-artifact-approval-gate.py",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\bridge-compliance-gate.py",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\code-quality-baseline-proposal-check.py",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\bridge-proposal-wi-id-collision-gate.py",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\implementation-start-gate.py",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\directive-enforcement-claude-adapter.py",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\lo-file-safety-gate.py",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\sot-read-discipline.py",
-        "timeout": 5
-      }
-    ],
-    "preToolUse": [
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\destructive-gate.py",
-        "matcher": "Shell",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\credential-scan.py",
-        "matcher": "Shell",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\bridge-compliance-gate.py",
-        "matcher": "Write",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\scripts\\dispatch_blackbox_gate.py",
-        "matcher": "Write",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\bridge-proposal-wi-id-collision-gate.py",
-        "matcher": "Write",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\narrative-artifact-approval-gate.py",
-        "matcher": "Write",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\code-quality-baseline-proposal-check.py",
-        "matcher": "Write",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\document_author_provenance_gate.py",
-        "matcher": "Write",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\lo-file-safety-gate.py",
-        "matcher": "Write",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\implementation-start-gate.py",
-        "matcher": "Write",
-        "timeout": 5
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/session_start_dispatch.py",
+        "timeout": 60
       }
     ],
     "postToolUse": [
       {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\.claude\\hooks\\spec-event-surfacer.py",
-        "timeout": 5
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/delib-search-tracker.py",
+        "timeout": 30
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/owner-decision-capture.py",
+        "timeout": 30
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/spec-event-surfacer.py",
+        "timeout": 30
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py scripts/registry_observation_hook.py",
+        "timeout": 30
       }
     ],
     "stop": [
       {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\.claude\\hooks\\advisory-router-scan.py",
-        "timeout": 10
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/owner-decision-tracker.py --mode stop",
+        "timeout": 30,
+        "failClosed": true
       },
       {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\advisory_grilling_gate_lint.py --stop-hook",
-        "timeout": 10
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/advisory-router-scan.py",
+        "timeout": 30,
+        "failClosed": true
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py scripts/session_self_initialization.py --emit-wrapup --fast-hook --harness-name cursor",
+        "timeout": 60,
+        "failClosed": true
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py scripts/advisory_grilling_gate_lint.py --stop-hook",
+        "timeout": 30,
+        "failClosed": true
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py scripts/auto_finalize_sweep.py",
+        "timeout": 30,
+        "failClosed": true
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/session-init-binding.py",
+        "timeout": 30
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/workstream-focus.py",
+        "timeout": 30
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/delib-search-gate.py",
+        "timeout": 30
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/intake-classifier.py",
+        "timeout": 30
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/gov09-capture.py",
+        "timeout": 30
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/bridge-axis-2-surface.py",
+        "timeout": 30
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/spec-classifier.py",
+        "timeout": 30
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/glossary-expansion.py",
+        "timeout": 30
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/project-completion-surface.py",
+        "timeout": 30
+      },
+      {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/session-topic-envelope-router.py",
+        "timeout": 30
       }
     ]
   }

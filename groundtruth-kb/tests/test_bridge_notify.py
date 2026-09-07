@@ -19,6 +19,8 @@ Bridge imports are lazy per tests/test_bridge_import_hygiene rule.
 from __future__ import annotations
 
 import json
+import sqlite3
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -36,8 +38,6 @@ def _notify() -> SimpleNamespace:
         disposition_for_status,
     )
     from groundtruth_kb.bridge.notify import (
-        ACTIONABLE_STATUSES_FOR_CODEX,
-        ACTIONABLE_STATUSES_FOR_PRIME,
         NOTIFY_SCHEMA_VERSION,
         ActionablePending,
         NotificationArtifact,
@@ -49,8 +49,6 @@ def _notify() -> SimpleNamespace:
     from groundtruth_kb.bridge.routing import BridgeAgent
 
     return SimpleNamespace(
-        ACTIONABLE_STATUSES_FOR_CODEX=ACTIONABLE_STATUSES_FOR_CODEX,
-        ACTIONABLE_STATUSES_FOR_PRIME=ACTIONABLE_STATUSES_FOR_PRIME,
         BridgeDisposition=BridgeDisposition,
         LOYAL_OPPOSITION_ACTIONABLE_STATUSES=LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
         LOYAL_OPPOSITION_ROLE=LOYAL_OPPOSITION_ROLE,
@@ -86,6 +84,49 @@ def _make_index_with_top_file(tmp_path: Path, doc_name: str, top_status: str, to
     return text, project_root
 
 
+def _write_work_item_thread(root: Path, doc_name: str, status: str, work_item_id: str) -> str:
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(exist_ok=True)
+    top_path = bridge_dir / f"{doc_name}-002.md"
+    top_path.write_text(
+        f"{status}\n::init gtkb pb\n::open build\n\nWork Item: {work_item_id}\n",
+        encoding="utf-8",
+    )
+    proposal_path = bridge_dir / f"{doc_name}-001.md"
+    proposal_path.write_text(
+        f"NEW\n::init gtkb lo\n::open build\n\nWork Item: {work_item_id}\n",
+        encoding="utf-8",
+    )
+    return f"Document: {doc_name}\n{status}: bridge/{top_path.name}\nNEW: bridge/{proposal_path.name}\n"
+
+
+def _write_current_work_item(
+    root: Path,
+    work_item_id: str,
+    *,
+    stage: str,
+    resolution_status: str,
+    status_detail: str,
+) -> None:
+    with sqlite3.connect(root / "groundtruth.db") as connection:
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS current_work_items "
+            "(id TEXT PRIMARY KEY, stage TEXT, resolution_status TEXT, status_detail TEXT)"
+        )
+        connection.execute(
+            "INSERT INTO current_work_items (id, stage, resolution_status, status_detail) VALUES (?, ?, ?, ?)",
+            (work_item_id, stage, resolution_status, status_detail),
+        )
+
+
+def _init_git_repo(root: Path, *messages: str) -> None:
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "config", "user.name", "GT-KB Test"], check=True)
+    subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.invalid"], check=True)
+    for message in messages:
+        subprocess.run(["git", "-C", str(root), "commit", "--allow-empty", "-q", "-m", message], check=True)
+
+
 # --- Tests for compute_actionable_pending ----------------------------------
 
 
@@ -98,18 +139,26 @@ def test_shared_disposition_matrix_routes_statuses_by_role() -> None:
     assert n.disposition_for_status("NO-GO", n.PRIME_BUILDER_ROLE).next_action == "revise"
 
 
-def test_shared_disposition_matrix_advisory_is_manual_prime_only() -> None:
+def test_shared_disposition_matrix_advisory_is_role_neutral_owner_visible() -> None:
+    """ADVISORY is owner-visible informational input, never assigned to a role.
+
+    Canon section 6: ADVISORY is authored by either role at any time and is not
+    dispatchable. It is therefore non-actionable for BOTH roles, with an
+    identical behavioural disposition for each -- an ADVISORY is never "Prime
+    work" or "Loyal Opposition work".
+    """
     n = _notify()
 
     prime = n.disposition_for_status("ADVISORY", n.PRIME_BUILDER_ROLE)
     loyal_opposition = n.disposition_for_status("ADVISORY", n.LOYAL_OPPOSITION_ROLE)
 
-    assert prime.actionable is True
-    assert prime.dispatchable is False
-    assert prime.owner_visible is True
-    assert prime.reason_code == "prime_advisory_disposition"
-    assert loyal_opposition.actionable is False
-    assert loyal_opposition.reason_code == "wrong_role_prime_advisory"
+    for disposition in (prime, loyal_opposition):
+        assert disposition.actionable is False
+        assert disposition.dispatchable is False
+        assert disposition.owner_visible is True
+        assert disposition.terminal is False
+        assert disposition.reason_code == "advisory_owner_visible"
+        assert disposition.next_action == "none"
 
 
 def test_shared_disposition_matrix_wrong_role_reason_codes() -> None:
@@ -122,29 +171,29 @@ def test_shared_disposition_matrix_wrong_role_reason_codes() -> None:
 def test_notify_actionable_status_sets_follow_shared_disposition_matrix() -> None:
     n = _notify()
 
-    assert n.ACTIONABLE_STATUSES_FOR_PRIME == n.PRIME_ACTIONABLE_STATUSES
-    assert n.ACTIONABLE_STATUSES_FOR_CODEX == n.LOYAL_OPPOSITION_ACTIONABLE_STATUSES
+    assert frozenset({"GO", "NO-GO", "NOT-READY"}) == n.PRIME_ACTIONABLE_STATUSES
+    assert frozenset({"NEW", "REVISED", "READY", "VERDICT-REJECTED"}) == n.LOYAL_OPPOSITION_ACTIONABLE_STATUSES
 
 
 def test_compute_pending_routes_new_revised_to_codex(tmp_path: Path) -> None:
     n = _notify()
     text, root = _make_index_with_top_file(tmp_path, "foo", "REVISED")
     parsed = n.parse_index(text)
-    prime, codex = n.compute_actionable_pending(parsed, project_root=root)
+    prime, loyal_opposition = n.compute_actionable_pending(parsed, project_root=root)
     assert len(prime) == 0
-    assert len(codex) == 1
-    assert codex[0].top_status == "REVISED"
-    assert codex[0].document_name == "foo"
+    assert len(loyal_opposition) == 1
+    assert loyal_opposition[0].top_status == "REVISED"
+    assert loyal_opposition[0].document_name == "foo"
 
 
 def test_compute_pending_routes_go_no_go_to_prime(tmp_path: Path) -> None:
     n = _notify()
     text, root = _make_index_with_top_file(tmp_path, "foo", "GO")
     parsed = n.parse_index(text)
-    prime, codex = n.compute_actionable_pending(parsed, project_root=root)
+    prime, loyal_opposition = n.compute_actionable_pending(parsed, project_root=root)
     assert len(prime) == 1
     assert prime[0].top_status == "GO"
-    assert len(codex) == 0
+    assert len(loyal_opposition) == 0
 
 
 def test_compute_pending_excludes_verified_for_both_recipients(tmp_path: Path) -> None:
@@ -152,9 +201,9 @@ def test_compute_pending_excludes_verified_for_both_recipients(tmp_path: Path) -
     n = _notify()
     text, root = _make_index_with_top_file(tmp_path, "foo", "VERIFIED")
     parsed = n.parse_index(text)
-    prime, codex = n.compute_actionable_pending(parsed, project_root=root)
+    prime, loyal_opposition = n.compute_actionable_pending(parsed, project_root=root)
     assert len(prime) == 0
-    assert len(codex) == 0
+    assert len(loyal_opposition) == 0
 
 
 def test_compute_pending_excludes_withdrawn_for_both_recipients(tmp_path: Path) -> None:
@@ -164,9 +213,9 @@ def test_compute_pending_excludes_withdrawn_for_both_recipients(tmp_path: Path) 
     n = _notify()
     text, root = _make_index_with_top_file(tmp_path, "foo", "WITHDRAWN")
     parsed = n.parse_index(text)
-    prime, codex = n.compute_actionable_pending(parsed, project_root=root)
+    prime, loyal_opposition = n.compute_actionable_pending(parsed, project_root=root)
     assert len(prime) == 0, f"WITHDRAWN must not be actionable for Prime; got {prime}"
-    assert len(codex) == 0, f"WITHDRAWN must not be actionable for Codex; got {codex}"
+    assert len(loyal_opposition) == 0, f"WITHDRAWN must not be actionable for Loyal Opposition; got {loyal_opposition}"
 
 
 def test_deferred_top_status_not_actionable_for_either_role(tmp_path: Path) -> None:
@@ -174,9 +223,9 @@ def test_deferred_top_status_not_actionable_for_either_role(tmp_path: Path) -> N
     n = _notify()
     text, root = _make_index_with_top_file(tmp_path, "foo", "DEFERRED")
     parsed = n.parse_index(text)
-    prime, codex = n.compute_actionable_pending(parsed, project_root=root)
+    prime, loyal_opposition = n.compute_actionable_pending(parsed, project_root=root)
     assert len(prime) == 0, f"DEFERRED must not be actionable for Prime; got {prime}"
-    assert len(codex) == 0, f"DEFERRED must not be actionable for Codex; got {codex}"
+    assert len(loyal_opposition) == 0, f"DEFERRED must not be actionable for Loyal Opposition; got {loyal_opposition}"
 
 
 def test_compute_pending_excludes_documents_with_missing_top_file(
@@ -189,9 +238,9 @@ def test_compute_pending_excludes_documents_with_missing_top_file(
     # NOTE: we do NOT create foo-002.md
     text = "Document: foo\nGO: bridge/foo-002.md\nNEW: bridge/foo-001.md\n"
     parsed = n.parse_index(text)
-    prime, codex = n.compute_actionable_pending(parsed, project_root=project_root)
+    prime, loyal_opposition = n.compute_actionable_pending(parsed, project_root=project_root)
     assert len(prime) == 0
-    assert len(codex) == 0
+    assert len(loyal_opposition) == 0
 
 
 def test_compute_pending_is_deterministic_across_repeated_calls(tmp_path: Path) -> None:
@@ -216,8 +265,8 @@ def test_compute_pending_does_not_consult_checkpoint(tmp_path: Path) -> None:
         '{"schema_version": 1, "captured_at": "2020", "documents": []}',
         encoding="utf-8",
     )
-    prime, codex = n.compute_actionable_pending(parsed, project_root=root)
-    assert len(codex) == 1
+    prime, loyal_opposition = n.compute_actionable_pending(parsed, project_root=root)
+    assert len(loyal_opposition) == 1
 
 
 def test_compute_pending_preserves_index_order(tmp_path: Path) -> None:
@@ -236,6 +285,93 @@ def test_compute_pending_preserves_index_order(tmp_path: Path) -> None:
     parsed = n.parse_index(text)
     prime, _ = n.compute_actionable_pending(parsed, project_root=tmp_path)
     assert [item.document_name for item in prime] == ["gamma", "alpha", "beta"]
+
+
+def test_actionability_annotation_never_suppresses_visible_thread(tmp_path: Path) -> None:
+    """TEST-12165: lifecycle fields annotate but cannot hide a GO thread."""
+
+    n = _notify()
+    _init_git_repo(tmp_path, "chore: baseline")
+    index_text = _write_work_item_thread(tmp_path, "resolved-carrier", "GO", "WI-9001")
+    _write_current_work_item(
+        tmp_path,
+        "WI-9001",
+        stage="resolved",
+        resolution_status="resolved",
+        status_detail="Do not implement; historical triage hold.",
+    )
+
+    prime, loyal_opposition = n.compute_actionable_pending(n.parse_index(index_text), project_root=tmp_path)
+
+    assert loyal_opposition == []
+    assert len(prime) == 1
+    assert prime[0].work_item_id == "WI-9001"
+    assert prime[0].work_item_stage == "resolved"
+    assert prime[0].work_item_resolution_status == "resolved"
+    assert prime[0].work_item_status_detail == "Do not implement; historical triage hold."
+    assert prime[0].git_terminality == "ambiguous"
+    assert prime[0].terminality_diagnostic == "work_item_terminal_without_checked_in_commit"
+
+
+def test_confirmed_git_terminality_suppresses_thread(tmp_path: Path) -> None:
+    """TEST-12165: one exact checked-in terminal commit is suppressive."""
+
+    n = _notify()
+    _init_git_repo(tmp_path, "fix(bridge): terminal work product (WI-9002)")
+    index_text = _write_work_item_thread(tmp_path, "checked-in-carrier", "GO", "WI-9002")
+    _write_current_work_item(
+        tmp_path,
+        "WI-9002",
+        stage="backlogged",
+        resolution_status="open",
+        status_detail="Stale row must not override Git terminality.",
+    )
+
+    prime, loyal_opposition = n.compute_actionable_pending(n.parse_index(index_text), project_root=tmp_path)
+
+    assert prime == []
+    assert loyal_opposition == []
+
+
+def test_ambiguous_terminality_fails_visible(tmp_path: Path) -> None:
+    """TEST-12165: non-singleton commit evidence is diagnostic, not suppressive."""
+
+    n = _notify()
+    _init_git_repo(
+        tmp_path,
+        "fix(bridge): first historical commit (WI-9003)",
+        "fix(bridge): second historical commit (WI-9003)",
+    )
+    index_text = _write_work_item_thread(tmp_path, "ambiguous-carrier", "NO-GO", "WI-9003")
+
+    prime, _ = n.compute_actionable_pending(n.parse_index(index_text), project_root=tmp_path)
+
+    assert len(prime) == 1
+    assert prime[0].git_terminality == "ambiguous"
+    assert prime[0].terminality_diagnostic == "multiple_or_non_singleton_commit_metadata;work_item_database_missing"
+
+
+def test_prime_actionable_view_emitted_alongside_lo(tmp_path: Path) -> None:
+    """TEST-12165: state report exposes distinct fresh Prime and LO views."""
+
+    from groundtruth_kb.bridge.state_report import _bridge_section
+
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "prime-thread-001.md").write_text(
+        "GO\n::init gtkb pb\n::open build\n\nWork Item: WI-9004\n",
+        encoding="utf-8",
+    )
+    (bridge_dir / "lo-thread-001.md").write_text(
+        "NEW\n::init gtkb lo\n::open build\n\nWork Item: WI-9005\n",
+        encoding="utf-8",
+    )
+
+    bridge = _bridge_section(tmp_path)
+
+    assert [row["slug"] for row in bridge["prime_actionable"]] == ["prime-thread"]
+    assert [row["slug"] for row in bridge["lo_actionable"]] == ["lo-thread"]
+    assert bridge["prime_actionable"][0]["git_terminality"] == "ambiguous"
 
 
 # --- WI-3442: scoping-terminal-with-successor classifier fix ----------------
@@ -261,14 +397,14 @@ def test_scoping_terminal_with_successor_is_excluded(tmp_path: Path) -> None:
         "NEW: bridge/gtkb-example-001.md\n"
     )
     parsed = n.parse_index(text)
-    prime, codex = n.compute_actionable_pending(parsed, project_root=tmp_path)
+    prime, loyal_opposition = n.compute_actionable_pending(parsed, project_root=tmp_path)
     prime_names = {item.document_name for item in prime}
-    codex_names = {item.document_name for item in codex}
+    loyal_opposition_names = {item.document_name for item in loyal_opposition}
     assert "gtkb-example-scoping" not in prime_names, (
         f"scoping-terminal must be suppressed from Prime when successor exists; got {prime_names}"
     )
-    assert "gtkb-example-scoping" not in codex_names, (
-        f"scoping-terminal must be suppressed from Codex when successor exists; got {codex_names}"
+    assert "gtkb-example-scoping" not in loyal_opposition_names, (
+        f"scoping-terminal must be suppressed from Loyal Opposition when successor exists; got {loyal_opposition_names}"
     )
 
 
@@ -279,12 +415,12 @@ def test_scoping_terminal_without_successor_is_included(tmp_path: Path) -> None:
     n = _notify()
     text, root = _make_index_with_top_file(tmp_path, "gtkb-example-scoping", "GO")
     parsed = n.parse_index(text)
-    prime, codex = n.compute_actionable_pending(parsed, project_root=root)
+    prime, loyal_opposition = n.compute_actionable_pending(parsed, project_root=root)
     prime_names = {item.document_name for item in prime}
     assert "gtkb-example-scoping" in prime_names, (
         f"scoping thread without successor must remain Prime-actionable; got {prime_names}"
     )
-    assert len(codex) == 0
+    assert len(loyal_opposition) == 0
 
 
 def test_go_thread_with_verified_implementation_sibling_suppressed(tmp_path: Path) -> None:
@@ -307,7 +443,7 @@ def test_go_thread_with_verified_implementation_sibling_suppressed(tmp_path: Pat
         "NEW: bridge/gtkb-example-implementation-005.md\n"
     )
     parsed = n.parse_index(text)
-    prime, _codex = n.compute_actionable_pending(parsed, project_root=tmp_path)
+    prime, _loyal_opposition = n.compute_actionable_pending(parsed, project_root=tmp_path)
     prime_names = {item.document_name for item in prime}
     assert "gtkb-example" not in prime_names, (
         f"GO proposal must be suppressed when its -implementation sibling is VERIFIED; got {prime_names}"
@@ -331,7 +467,7 @@ def test_go_thread_with_unverified_implementation_sibling_still_actionable(tmp_p
         "NEW: bridge/gtkb-example-implementation-001.md\n"
     )
     parsed = n.parse_index(text)
-    prime, _codex = n.compute_actionable_pending(parsed, project_root=tmp_path)
+    prime, _loyal_opposition = n.compute_actionable_pending(parsed, project_root=tmp_path)
     prime_names = {item.document_name for item in prime}
     assert "gtkb-example" in prime_names, (
         f"GO proposal must remain actionable when -implementation sibling is not VERIFIED; got {prime_names}"
@@ -344,7 +480,7 @@ def test_go_thread_without_sibling_unaffected(tmp_path: Path) -> None:
     n = _notify()
     text, root = _make_index_with_top_file(tmp_path, "gtkb-example", "GO")
     parsed = n.parse_index(text)
-    prime, _codex = n.compute_actionable_pending(parsed, project_root=root)
+    prime, _loyal_opposition = n.compute_actionable_pending(parsed, project_root=root)
     prime_names = {item.document_name for item in prime}
     assert "gtkb-example" in prime_names, (
         f"GO thread without an -implementation sibling must remain actionable; got {prime_names}"
@@ -504,22 +640,22 @@ def test_revised_remains_in_codex_notification_across_unchanged_scans(
 
     state_dir = tmp_path / "state"
     # Scan 1
-    _, codex_1 = n.compute_actionable_pending(parsed, project_root=root)
-    n.update_notification(state_dir, n.BridgeAgent.CODEX, codex_1)
+    _, loyal_opposition_1 = n.compute_actionable_pending(parsed, project_root=root)
+    n.update_notification(state_dir, n.BridgeAgent.CODEX, loyal_opposition_1)
     artifact_1 = n.read_notification(state_dir, n.BridgeAgent.CODEX)
     assert artifact_1 is not None
     assert artifact_1.pending_actions[0].top_status == "REVISED"
 
     # Scan 2 (unchanged INDEX)
-    _, codex_2 = n.compute_actionable_pending(parsed, project_root=root)
-    n.update_notification(state_dir, n.BridgeAgent.CODEX, codex_2)
+    _, loyal_opposition_2 = n.compute_actionable_pending(parsed, project_root=root)
+    n.update_notification(state_dir, n.BridgeAgent.CODEX, loyal_opposition_2)
     artifact_2 = n.read_notification(state_dir, n.BridgeAgent.CODEX)
     assert artifact_2 is not None
     assert artifact_2.pending_actions[0].top_status == "REVISED"
 
     # Scan 3 (unchanged INDEX)
-    _, codex_3 = n.compute_actionable_pending(parsed, project_root=root)
-    n.update_notification(state_dir, n.BridgeAgent.CODEX, codex_3)
+    _, loyal_opposition_3 = n.compute_actionable_pending(parsed, project_root=root)
+    n.update_notification(state_dir, n.BridgeAgent.CODEX, loyal_opposition_3)
     artifact_3 = n.read_notification(state_dir, n.BridgeAgent.CODEX)
     assert artifact_3 is not None
     assert artifact_3.pending_actions[0].top_status == "REVISED"
@@ -553,9 +689,9 @@ def test_revised_to_go_transition_moves_notification_codex_to_prime(
     # Scan 1: top is REVISED
     text_1, root = _make_index_with_top_file(tmp_path, "foo", "REVISED", top_version=2)
     parsed_1 = n.parse_index(text_1)
-    prime_1, codex_1 = n.compute_actionable_pending(parsed_1, project_root=root)
+    prime_1, loyal_opposition_1 = n.compute_actionable_pending(parsed_1, project_root=root)
     n.update_notification(state_dir, n.BridgeAgent.PRIME, prime_1)
-    n.update_notification(state_dir, n.BridgeAgent.CODEX, codex_1)
+    n.update_notification(state_dir, n.BridgeAgent.CODEX, loyal_opposition_1)
     assert n.read_notification(state_dir, n.BridgeAgent.CODEX) is not None
     assert n.read_notification(state_dir, n.BridgeAgent.PRIME) is None
 
@@ -563,9 +699,9 @@ def test_revised_to_go_transition_moves_notification_codex_to_prime(
     (root / "bridge" / "foo-003.md").write_text("# stub\n", encoding="utf-8")
     text_2 = "Document: foo\nGO: bridge/foo-003.md\nREVISED: bridge/foo-002.md\nNEW: bridge/foo-001.md\n"
     parsed_2 = n.parse_index(text_2)
-    prime_2, codex_2 = n.compute_actionable_pending(parsed_2, project_root=root)
+    prime_2, loyal_opposition_2 = n.compute_actionable_pending(parsed_2, project_root=root)
     n.update_notification(state_dir, n.BridgeAgent.PRIME, prime_2)
-    n.update_notification(state_dir, n.BridgeAgent.CODEX, codex_2)
+    n.update_notification(state_dir, n.BridgeAgent.CODEX, loyal_opposition_2)
     assert n.read_notification(state_dir, n.BridgeAgent.CODEX) is None
     artifact_prime = n.read_notification(state_dir, n.BridgeAgent.PRIME)
     assert artifact_prime is not None
@@ -580,17 +716,17 @@ def test_new_or_revised_to_verified_clears_codex_notification(tmp_path: Path) ->
     # Scan 1: top is REVISED
     text_1, root = _make_index_with_top_file(tmp_path, "foo", "REVISED", top_version=2)
     parsed_1 = n.parse_index(text_1)
-    prime_1, codex_1 = n.compute_actionable_pending(parsed_1, project_root=root)
-    n.update_notification(state_dir, n.BridgeAgent.CODEX, codex_1)
+    prime_1, loyal_opposition_1 = n.compute_actionable_pending(parsed_1, project_root=root)
+    n.update_notification(state_dir, n.BridgeAgent.CODEX, loyal_opposition_1)
     assert n.read_notification(state_dir, n.BridgeAgent.CODEX) is not None
 
     # Scan 2: top transitions to VERIFIED
     (root / "bridge" / "foo-004.md").write_text("# stub\n", encoding="utf-8")
     text_2 = "Document: foo\nVERIFIED: bridge/foo-004.md\nREVISED: bridge/foo-002.md\nNEW: bridge/foo-001.md\n"
     parsed_2 = n.parse_index(text_2)
-    prime_2, codex_2 = n.compute_actionable_pending(parsed_2, project_root=root)
+    prime_2, loyal_opposition_2 = n.compute_actionable_pending(parsed_2, project_root=root)
     n.update_notification(state_dir, n.BridgeAgent.PRIME, prime_2)
-    n.update_notification(state_dir, n.BridgeAgent.CODEX, codex_2)
+    n.update_notification(state_dir, n.BridgeAgent.CODEX, loyal_opposition_2)
     # VERIFIED → no notification for either:
     assert n.read_notification(state_dir, n.BridgeAgent.CODEX) is None
     assert n.read_notification(state_dir, n.BridgeAgent.PRIME) is None
@@ -618,8 +754,8 @@ def test_verified_top_status_does_not_appear_in_codex_notification(
     text, root = _make_index_with_top_file(tmp_path, "foo", "VERIFIED")
     parsed = n.parse_index(text)
     state_dir = tmp_path / "state"
-    _, codex = n.compute_actionable_pending(parsed, project_root=root)
-    n.update_notification(state_dir, n.BridgeAgent.CODEX, codex)
+    _, loyal_opposition = n.compute_actionable_pending(parsed, project_root=root)
+    n.update_notification(state_dir, n.BridgeAgent.CODEX, loyal_opposition)
     assert n.read_notification(state_dir, n.BridgeAgent.CODEX) is None
 
 
@@ -658,8 +794,8 @@ def test_only_new_revised_appear_in_codex_notification(tmp_path: Path) -> None:
         "Document: e\nVERIFIED: bridge/e-002.md\nNEW: bridge/e-001.md\n"
     )
     parsed = n.parse_index(text)
-    _, codex = n.compute_actionable_pending(parsed, project_root=tmp_path)
-    statuses = {item.top_status for item in codex}
+    _, loyal_opposition = n.compute_actionable_pending(parsed, project_root=tmp_path)
+    statuses = {item.top_status for item in loyal_opposition}
     assert statuses == {"NEW", "REVISED"}
 
 
@@ -1045,11 +1181,11 @@ def test_compute_pending_codex_NEW_scoping_proposal_is_dispatchable(tmp_path: Pa
         tmp_path, "foo", "NEW", "scoping_proposal", "NEW", operative_version=4, top_version=4
     )
     parsed = n.parse_index(text)
-    prime, codex = n.compute_actionable_pending(parsed, project_root=root)
-    assert len(codex) == 1
-    assert codex[0].dispatchable is True
-    assert codex[0].classification == "terminal"
-    assert codex[0].top_status == "NEW"
+    prime, loyal_opposition = n.compute_actionable_pending(parsed, project_root=root)
+    assert len(loyal_opposition) == 1
+    assert loyal_opposition[0].dispatchable is True
+    assert loyal_opposition[0].classification == "terminal"
+    assert loyal_opposition[0].top_status == "NEW"
 
 
 def test_compute_pending_codex_NEW_candidate_spec_intake_is_dispatchable(tmp_path: Path) -> None:
@@ -1058,9 +1194,9 @@ def test_compute_pending_codex_NEW_candidate_spec_intake_is_dispatchable(tmp_pat
         tmp_path, "foo", "NEW", "candidate_spec_intake", "NEW", operative_version=4, top_version=4
     )
     parsed = n.parse_index(text)
-    _, codex = n.compute_actionable_pending(parsed, project_root=root)
-    assert codex[0].dispatchable is True
-    assert codex[0].classification == "terminal"
+    _, loyal_opposition = n.compute_actionable_pending(parsed, project_root=root)
+    assert loyal_opposition[0].dispatchable is True
+    assert loyal_opposition[0].classification == "terminal"
 
 
 def test_compute_pending_codex_REVISED_terminal_kind_is_dispatchable(tmp_path: Path) -> None:
@@ -1069,8 +1205,8 @@ def test_compute_pending_codex_REVISED_terminal_kind_is_dispatchable(tmp_path: P
         tmp_path, "foo", "REVISED", "scoping_proposal", "REVISED", operative_version=3, top_version=3
     )
     parsed = n.parse_index(text)
-    _, codex = n.compute_actionable_pending(parsed, project_root=root)
-    assert codex[0].dispatchable is True
+    _, loyal_opposition = n.compute_actionable_pending(parsed, project_root=root)
+    assert loyal_opposition[0].dispatchable is True
 
 
 def test_compute_pending_prime_NO_GO_terminal_kind_is_dispatchable(tmp_path: Path) -> None:
@@ -1093,8 +1229,8 @@ def test_compute_pending_prime_NO_GO_owner_hold_is_visible_but_not_dispatchable(
         encoding="utf-8",
     )
     parsed = n.parse_index(text)
-    prime, codex = n.compute_actionable_pending(parsed, project_root=root)
-    assert codex == []
+    prime, loyal_opposition = n.compute_actionable_pending(parsed, project_root=root)
+    assert loyal_opposition == []
     assert len(prime) == 1
     assert prime[0].dispatchable is False
     assert prime[0].classification == "owner_hold"
@@ -1117,8 +1253,8 @@ def test_compute_pending_prime_NO_GO_headless_ineligible_is_visible_but_not_disp
         encoding="utf-8",
     )
     parsed = n.parse_index(text)
-    prime, codex = n.compute_actionable_pending(parsed, project_root=root)
-    assert codex == []
+    prime, loyal_opposition = n.compute_actionable_pending(parsed, project_root=root)
+    assert loyal_opposition == []
     assert len(prime) == 1
     assert prime[0].dispatchable is False
     assert prime[0].classification == "headless_ineligible"
@@ -1305,16 +1441,15 @@ def test_kind_aware_routing_enabled_when_env_var_one(monkeypatch) -> None:
     assert k._kind_aware_routing_enabled() is True
 
 
-def test_compute_pending_prime_ADVISORY_is_actionable_but_not_dispatchable(tmp_path: Path) -> None:
-    """ADVISORY status entries appear in actionable_for_prime so manual scans /
-    interactive surfaces can present them for owner-deliberation/UAQ disposition,
-    but ``dispatchable`` MUST be False so they never spawn a headless Prime
-    session. Per gtkb-advisory-prime-actionability-surfacing-002 (Codex GO
-    2026-06-14) Conditions 1 + 3: the dispatchability invariant in
-    ``_derive_dispatchable`` already forces False for any status other than
-    NEW/REVISED/NO-GO and conditionally GO. We intentionally do NOT assert any
-    specific ``classification`` token (per Codex Condition 2: do not conflate
-    ADVISORY with the VERIFIED-terminal label).
+def test_compute_pending_advisory_is_in_neither_role_queue(tmp_path: Path) -> None:
+    """ADVISORY entries appear in NEITHER actionable list.
+
+    Canon section 6: ADVISORY is owner-visible informational input, never
+    assigned or dispatched to a role. It is absent from both
+    ``PRIME_ACTIONABLE_STATUSES`` and ``LOYAL_OPPOSITION_ACTIONABLE_STATUSES``,
+    so ``compute_actionable_pending`` returns it in neither queue. Owner-facing
+    surfaces present advisories from their own owner-visible path, not from a
+    role queue.
     """
     n = _notify()
     # ADVISORY entries have no NEW/REVISED operative version in this thread shape;
@@ -1324,8 +1459,6 @@ def test_compute_pending_prime_ADVISORY_is_actionable_but_not_dispatchable(tmp_p
     (bridge_dir / "foo-001.md").write_text("ADVISORY\nbridge_kind: loyal_opposition_advisory\n", encoding="utf-8")
     text = "Document: foo\nADVISORY: bridge/foo-001.md\n"
     parsed = n.parse_index(text)
-    prime, codex = n.compute_actionable_pending(parsed, project_root=tmp_path)
-    assert len(prime) == 1
-    assert prime[0].top_status == "ADVISORY"
-    assert prime[0].dispatchable is False
-    assert codex == []
+    prime, loyal_opposition = n.compute_actionable_pending(parsed, project_root=tmp_path)
+    assert prime == []
+    assert loyal_opposition == []

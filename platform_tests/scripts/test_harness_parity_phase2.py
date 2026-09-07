@@ -424,6 +424,54 @@ def test_non_active_registry_rows_are_excluded_but_remain_visible(tmp_path: Path
     assert "unexpected" in markdown
 
 
+def test_missing_registry_fail_soft_without_membase(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_fixture(tmp_path)
+    (tmp_path / "harness-state" / "harness-registry.json").unlink()
+    report = module.evaluate(tmp_path)
+    assert report["summary"]["evaluated_harness_count"] == 0
+    assert report["summary"]["registry_harness_count"] == 0
+
+
+def test_cursor_hook_projection_uses_hooks_json_not_gtkb_hooks(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_fixture(tmp_path)
+    registry_path = tmp_path / "harness-state" / "harness-registry.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry["harnesses"].append(
+        {
+            "id": "E",
+            "harness_name": "cursor",
+            "harness_type": "cursor",
+            "status": "active",
+            "role": ["loyal-opposition"],
+            "can_receive_dispatch": False,
+            "can_fire_events": False,
+            "invocation_surfaces": {
+                "headless": {"argv": ["python.exe", "scripts/cursor_harness.py", "--prompt", "{{PROMPT}}"]}
+            },
+        }
+    )
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    (tmp_path / ".cursor").mkdir()
+    (tmp_path / ".cursor" / "hooks.json").write_text('{"version":1,"hooks":{}}\n', encoding="utf-8")
+    (tmp_path / ".cursor" / "skills" / "gtkb-bridge" / "helpers").mkdir(parents=True)
+    (tmp_path / ".cursor" / "skills" / "gtkb-verify" / "helpers").mkdir(parents=True)
+    (tmp_path / "scripts" / "cursor_harness.py").write_text("CREATE_NO_WINDOW\n", encoding="utf-8")
+    (tmp_path / "scripts" / "cursor_hook_adapter.py").write_text("CREATE_NO_WINDOW\n", encoding="utf-8")
+
+    report = module.evaluate(tmp_path)
+    cells = {cell["dimension"]: cell for cell in report["cells"] if cell["harness"] == "cursor"}
+    assert cells["hook_projection"]["status"] == "supported"
+    assert ".cursor/hooks.json" in cells["hook_projection"]["evidence"]
+    assert ".cursor/gtkb-hooks" not in cells["hook_projection"]["evidence"]
+    assert cells["provider_settings"]["status"] == "supported"
+    assert "not provider-shim scoped" in cells["provider_settings"]["details"]
+    assert cells["no_window_launch"]["status"] == "supported"
+    assert "scripts/cursor_hook_adapter.py" in cells["no_window_launch"]["evidence"]
+    assert cells["bridge_write_path"]["status"] == "supported"
+
+
 def test_wi4926_provider_readiness_contract_is_documented_and_registered() -> None:
     docs = (REPO_ROOT / "docs" / "harness-parity-phase-2.md").read_text(encoding="utf-8")
     matrix = (REPO_ROOT / "docs" / "harness-parity-phase-2-matrix.md").read_text(encoding="utf-8")

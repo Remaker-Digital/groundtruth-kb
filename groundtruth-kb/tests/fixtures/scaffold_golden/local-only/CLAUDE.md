@@ -12,27 +12,35 @@ This project follows ADR-0001: Three-Tier Memory Architecture (MemBase = canonic
 
 ## Canonical Terminology (ADR-0001 core vocabulary)
 
-| Term | Short definition |
-|------|-----------------|
-| **MemBase** | Canonical, authoritative store of specs and governed knowledge (`groundtruth.db`). |
-| **Deliberation Archive (DA)** | Design-reasoning tier — decisions, reviews, rejected alternatives. |
-| **MEMORY.md** | Operational notepad at repo root. Can coordinate work; cannot make anything true. |
-| **GroundTruth KB / GT-KB** | The product: MemBase + CLI + templates + doctor + bridge. |
-| **Prime Builder** | Implementing agent. Proposes, implements, tests. |
-| **Loyal Opposition** | Reviewing agent. Inspects, critiques, issues GO / NO-GO / VERIFIED. |
 
-Full glossary: `.claude/rules/canonical-terminology.md` (scaffolded). Record in MemBase.
+| Term                          | Short definition                                                                   |
+| ----------------------------- | ---------------------------------------------------------------------------------- |
+| **MemBase**                   | Canonical, authoritative store of specs and governed knowledge (`groundtruth.db`). |
+| **Deliberation Archive (DA)** | Design-reasoning tier — decisions, reviews, rejected alternatives.                 |
+| **MEMORY.md**                 | Operational notepad at repo root. Can coordinate work; cannot make anything true.  |
+| **GroundTruth KB / GT-KB**    | The product: MemBase + CLI + templates + doctor + bridge.                          |
+| **Prime Builder**             | Implementing agent. Proposes, implements, tests.                                   |
+| **Loyal Opposition**          | Reviewing agent. Inspects, critiques, issues GO / NO-GO / VERIFIED.                |
+
+
+Full glossary: `.cursor/rules/canonical-terminology.md` (scaffolded). Record in MemBase.
 
 ---
 
+
+
 ## Project Identity
 
-| Attribute | Value |
-|-----------|-------|
-| **Project Name** | _test_golden_local_only |
-| **Type** | Local Only project |
-| **Status** | See MEMORY.md for current status |
-| **Owner** | GoldenFixtureOwner |
+
+| Attribute        | Value                            |
+| ---------------- | -------------------------------- |
+| **Project Name** | _test_golden_local_only          |
+| **Type**         | Local Only project               |
+| **Status**       | See MEMORY.md for current status |
+| **Owner**        | GoldenFixtureOwner               |
+
+
+
 
 ### Copyright Notice
 
@@ -43,6 +51,8 @@ Copyright 2026 GoldenFixtureOwner. All rights reserved.
 ```
 
 ---
+
+
 
 ## Roles
 
@@ -70,6 +80,8 @@ directives, and role exceptions.
 
 ---
 
+
+
 ## Workflow: Specification → Work Item → Test → Implementation
 
 1. Owner requests change → record as specification(s) in MemBase (canonical knowledge and specifications)
@@ -80,15 +92,20 @@ directives, and role exceptions.
 6. Execute tests → PASS or FAIL
 7. FAIL → create new work item (verify spec → verify test → fix implementation)
 
+
+
 ### Spec-First Rule
 
 When the owner describes what the system **must do**, **should do**, or states numbered criteria:
+
 1. Record or verify specifications in MemBase
 2. Create work items for any gaps
 3. Present the backlog for prioritization
 4. Only proceed to implementation after approval
 
 ---
+
+
 
 ## MemBase (Canonical Knowledge and Specifications)
 
@@ -99,14 +116,17 @@ to check current status. Use `gt assert` to verify specifications against the co
 
 ---
 
+
+
 ## Working with This Project
+
+
 
 ### Starting a New Session
 
 After bridge obligations are clear, produce the mandatory **ORIENT block** once per session
 before other substantive work. Format, live-source rules, structured `UNKNOWN:<category>`
-tags, and `/baseline-audit` triggers are defined in
-`.claude/rules/session-start-orientation.md`.
+tags, and `/baseline-audit` triggers are defined in `.cursor/rules/session-start-orientation.md`.
 
 Send startup keywords and task content as separate messages:
 
@@ -124,13 +144,18 @@ Key files: CLAUDE.md, MEMORY.md, BRIDGE-INVENTORY.md (if used)
 Next: [describe task].
 ```
 
+
+
 ### Session Wrap-Up
 
 Before ending a session:
+
 1. Produce a well-formed **ORIENT block** in the final owner-visible turn (see `.claude/rules/session-start-orientation.md`)
 2. Update MEMORY.md with what was done and what's next
 3. Run `gt assert` to confirm no regressions
 4. Commit with session ID in the message
+
+
 
 ### Protected Behaviors
 

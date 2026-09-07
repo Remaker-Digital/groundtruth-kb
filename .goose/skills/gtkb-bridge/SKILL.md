@@ -1,6 +1,6 @@
 ---
 name: gtkb-bridge
-description: Operate the bridge protocol — file proposals, route actionable bridge work, write governance-compliant verdicts, file post-implementation reports, navigate lifecycle states. Use when proposing implementation work that needs Loyal Opposition review, when responding to a NEW/REVISED/NO-ACTION entry as the reviewing harness, or when checking bridge thread state. The companion skills `gtkb-bridge-propose`, `gtkb-proposal-review`, and `gtkb-send-review` cover specific subactions; use this skill when working across the protocol or when an action's fit isn't obvious.
+description: Operate the bridge protocol — file proposals, route actionable bridge work, write governance-compliant verdicts, file post-implementation reports, navigate lifecycle states. Use when proposing implementation work that needs Loyal Opposition review, when responding to a NEW/REVISED/VERDICT-REJECTED entry as the reviewing harness, or when checking bridge thread state. The companion skills `gtkb-bridge-propose`, `gtkb-proposal-review`, and `gtkb-send-review` cover specific subactions; use this skill when working across the protocol or when an action's fit isn't obvious.
 ---
 <!--
 THIS FILE IS A PROJECTION, NOT CANONICAL.
@@ -10,20 +10,9 @@ Do not edit here: change the baseline (.harness-baseline-configuration) and re-p
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
-
 # /gtkb-bridge
 
 This skill is the canonical entry point for bridge protocol operations. The bridge is GroundTruth-KB's coordination mechanism between Prime Builder and Loyal Opposition: implementation proposals, reviews, and verifications flow through dispatcher-backed bridge state plus versioned markdown audit files under `bridge/`.
-
-## Current Authority Note
-
-After the 2026-06-15 TAFE/dispatcher cutover, bridge files under `bridge/` form
-the durable audit chain and dispatcher/TAFE state is the live queue surface. For
-dispatcher configuration and health, use the `bridge-config` skill and
-`gt bridge dispatch config|status|health`. Aggregate queue artifacts are not
-part of current operation.
-
-This skill body presents **identical content** to every registered harness via the baseline projection pipeline. Operations described here behave the same way regardless of which harness invokes the skill.
 
 ## Bridge protocol summary
 
@@ -42,11 +31,15 @@ Lifecycle states (per `config/agent-control/gtkb-file-bridge-protocol.md`):
 
 | State | Set by | Means |
 |---|---|---|
-| `NEW` | Prime | Fresh proposal awaiting review |
-| `REVISED` | Prime | Updated proposal after a NO-GO |
+| `NEW` | Prime Builder | Fresh proposal awaiting review |
+| `REVISED` | Prime Builder | Updated proposal after a NO-GO |
 | `GO` | Loyal Opposition | Proposal approved for implementation |
 | `NO-GO` | Loyal Opposition | Proposal requires changes before approval |
-| `NO-ACTION` | Prime | Rejects a non-compliant Loyal Opposition verdict and requires `review_no_action` |
+| `READY` | Prime Builder | Implementation ready for verification |
+| `NOT-READY` | Loyal Opposition | Implementation not yet ready for verification |
+| `WITHDRAWN` | Prime Builder | Proposal requires changes before approval |
+| `SUPERSEDED` | Loyal Opposition | Work item has been superseded by a later item and will not be implemented |
+| `VERDICT-REJECTED` | Prime Builder  | Rejects a non-compliant Loyal Opposition verdict |
 | `VERIFIED` | Loyal Opposition | Post-implementation verification passed |
 | (terminal) | — | A thread is "terminal" when its latest entry is VERIFIED with no further work pending |
 
@@ -64,7 +57,6 @@ A complete thread cycle: `NEW` → (`NO-GO` → `REVISED`)* → `GO` → (implem
    - **Project-linkage metadata (per `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`)**: every implementation-targeting NEW/REVISED proposal MUST include three machine-readable header lines near the top of the file:
 
      ```text
-     Project Authorization: PAUTH-<authorization-id>
      Project: <PROJECT-ID>
      Work Item: <WI-NNNN | GTKB-* | WORKLIST-*>
      ```
@@ -75,7 +67,7 @@ A complete thread cycle: `NEW` → (`NO-GO` → `REVISED`)* → `GO` → (implem
 4. Run pre-filing preflights:
    - `python scripts/bridge_applicability_preflight.py --bridge-id <topic-slug>` — must report `preflight_passed: true`, no missing required/advisory specs.
    - `python scripts/adr_dcl_clause_preflight.py --bridge-id <topic-slug>` — must exit 0, no blocking gaps.
-(`gtkb-bridge-propose` skill — see `.goose/skills/gtkb-bridge-propose/SKILL.md`) or its CLI successor.
+5. Delegate the file write to the governed helper-mediated path (`gtkb-bridge-propose` skill — see `.harness-baseline-configuration/skills/gtkb-bridge-propose/SKILL.md`) or its CLI successor. The helper performs credential scanning per `CREDENTIAL_PATTERNS + BASH_EXTRAS`, writes `bridge/<topic-slug>-<version>.md`, and publishes dispatcher/TAFE state.
 
 **Credential safety**: never bypass the helper for governance-content writes. Use `mode="abort"` on credential hits unless redaction is genuinely safe; `mode="redact"` replaces spans with `[REDACTED:<label>]` markers.
 
@@ -83,15 +75,15 @@ A complete thread cycle: `NEW` → (`NO-GO` → `REVISED`)* → `GO` → (implem
 
 **Purpose**: identify actionable bridge items for the current harness's role.
 
-**Helper**: `scripts/skill-helpers/gtkb-bridge/scan_bridge.py`
+**Helper**: `.harness-baseline-configuration/skills/gtkb-bridge/helpers/scan_bridge.py`
 
 **Canonical invocation** (deterministic, replaces manual grep+Read+regex):
 
 ```powershell
-python scripts/skill-helpers/gtkb-bridge/scan_bridge.py --role <prime-builder|loyal-opposition> --compact [--format json|markdown]
+python .harness-baseline-configuration/skills/gtkb-bridge/helpers/scan_bridge.py --role <prime-builder|loyal-opposition> --compact [--format json|markdown]
 ```
 
-Current scans must use dispatcher/TAFE state and the status-bearing versioned
+Current scans must use the status-bearing versioned
 files under `bridge/`; use `bridge-config` for dispatcher topology and health
 claims. Any helper that still requires aggregate queue state is defective and
 must not be used for live queue authority.
@@ -102,18 +94,17 @@ review or audit explicitly needs archival detail.
 
 **Action** (manual or via helper):
 
-1. Read dispatcher/TAFE bridge state and the versioned bridge file chain.
+1. Read bridge state and the versioned bridge file chain.
 2. Filter for actionable status given the current role:
-   - **Loyal Opposition** acts on `NEW`, `REVISED`, and `NO-ACTION` (proposals/reports awaiting a governance-compliant verdict or a verdict correction).
-   - **Prime Builder** acts only on `NO-GO` (revise) and `GO` (implement). `VERIFIED` is terminal closure for both roles, not queue work.
-3. For each actionable thread, read **the full version chain** (all prior entries) before responding. The protocol requires reading the whole thread, not just the latest version. The `Show-thread` helper below mechanizes that load.
-4. Optional: cross-check with `.gtkb-state/bridge-poller/dispatch-state.json` (or successor under `.gtkb-state/dispatcher-daemon/`) to deduplicate against already-dispatched signatures.
+   - **Loyal Opposition** acts on `NEW`, `REVISED`, `READY`, `VERDICT-REJECTED` (proposals/reports awaiting a governance-compliant verdict or a verdict correction), and `WITHDRAWN` (proposals/reports that have been withdrawn).
+   - **Prime Builder** acts on `NO-GO` (revise),`GO` (implement), `NOT-READY` (repair implementation), and `SUPERSEDED` (proposals/reports that have been superseded by a later work item).
+3. For each actionable thread, read **the full version chain** (all prior entries) before responding. The protocol requires reading the whole thread, not just the latest version. The `Show-thread` helper below mechanizes that load. `VERIFIED` is terminal closure for both roles, not queue work.
 
 ### Revise
 
 **Purpose**: help Prime Builder respond to a latest `NO-GO` without filing incomplete skeletons as actionable bridge state.
 
-**Helper**: `scripts/skill-helpers/gtkb-bridge/revise_bridge.py`
+**Helper**: `.harness-baseline-configuration/skills/gtkb-bridge/helpers/revise_bridge.py`
 
 **Action**:
 
@@ -140,7 +131,7 @@ The helper creates drafts; it does not author the substantive correction. Prime 
    exits 0 and must not be treated as a blocking gate; the registered clause
    preflight remains authoritative.
 5. Run a deliberation search: `db.search_deliberations(...)` per `config/agent-control/gtkb-deliberation-protocol.md`. Add a `Prior Deliberations` section to the verdict citing relevant DELIB-IDs.
-run `python scripts/skill-helpers/gtkb-verify/write_verdict.py --slug <topic-slug> --body-file <draft-body-file>` to seed
+6. Before writing the verdict, run `python .harness-baseline-configuration/skills/gtkb-verify/helpers/write_verdict.py --slug <topic-slug> --body-file <draft-body-file>` to seed `## Prior Deliberations`, then review and prune the helper-suggested candidates. If you opt out, keep an explicit `_No prior deliberations: <reason>._` line.
 7. For implementation reviews: confirm the proposal links all relevant specifications and the proposed tests derive from those specifications. **Issue NO-GO if any relevant specification is missing or test mapping is incomplete**, per `config/agent-control/gtkb-review-gate.md`.
 8. For verification reviews (post-impl reports): confirm the implementation report carries forward the linked specifications, includes spec-to-test mapping, executes the tests, and reports observed results. **Issue NO-GO instead of VERIFIED for any untested linked specification** unless owner waiver is documented.
 9. Write the verdict file `bridge/<topic-slug>-<next-version>.md` with the verdict on line 1 (`GO`, `NO-GO`, or `VERIFIED`); include the applicability preflight and clause applicability sections; cite findings with severity (P0-P4), evidence source, impact, and recommended action per `config/agent-control/gtkb-loyal-opposition.md` and `config/agent-control/gtkb-report-depth-prime-builder-context.md`.
@@ -152,38 +143,36 @@ run `python scripts/skill-helpers/gtkb-verify/write_verdict.py --slug <topic-slu
 
 **Purpose**: file a post-implementation report after a GO is implemented.
 
-**Helper**: `scripts/skill-helpers/gtkb-bridge/impl_report_bridge.py`
+**Helper**: `.harness-baseline-configuration/skills/gtkb-bridge/helpers/impl_report_bridge.py`
 
 **Action**:
 
 1. Implement the work per the GO d proposal scope. Run the spec-derived tests; capture the exact commands and observed results.
 2. Use the helper's `plan` mode or no-index CLI successor to require latest `GO`, load the approved proposal and GO verdict, compute the next version, carry forward linked specifications, capture dirty files via `git diff --name-only HEAD --`, and show the proposed `NEW` report metadata without mutation:
    ```powershell
-python scripts/skill-helpers/gtkb-bridge/impl_report_bridge.py plan <topic-slug> --compact
+   python .harness-baseline-configuration/skills/gtkb-bridge/helpers/impl_report_bridge.py plan <topic-slug> --compact
    ```
    Use compact plan output for routine implementation-start orientation. Omit
    `--compact` only when you need the full changed-file and version-chain
    payload for report drafting.
-3. Use `scaffold` mode when you need a non-dispatchable draft under `.gtkb-state/bridge-impl-reports/drafts/`; complete the implementation claim, command evidence, observed results, spec-to-test mapping, acceptance status, and risk/rollback before live filing.
-4. Use `file` mode only when the report content is ready for Loyal Opposition verification. The helper refuses non-`GO` latest status, exact-document mismatches, existing target files, and credential-shaped content. It writes `bridge/<topic-slug>-<next-version>.md` through the governed no-index bridge path:
+3. Use `file` mode only when the report content is ready for Loyal Opposition verification. The helper refuses non-`GO` latest status, exact-document mismatches, existing target files, and credential-shaped content. It writes `bridge/<topic-slug>-<next-version>.md` through the governed no-index bridge path:
    ```powershell
-python scripts/skill-helpers/gtkb-bridge/impl_report_bridge.py file <topic-slug> --content-file <completed-report.md>
+   python .harness-baseline-configuration/skills/gtkb-bridge/helpers/impl_report_bridge.py file <topic-slug> --content-file <completed-report.md>
    ```
-5. The helper does not bypass Loyal Opposition verification. After filing, the thread is Loyal Opposition-actionable; wait for VERIFIED or NO-GO response.
+4. The helper does not bypass Loyal Opposition verification. After filing, the thread is Loyal Opposition-actionable; wait for VERIFIED or NO-GO response.
 
 ### Protected-file Writes
 
 **Purpose**: write protected narrative-artifact files with an immediate Layer-C universal-floor evidence verdict.
 
-**Helper**: `scripts/skill-helpers/gtkb-bridge/protected_write.py`
+**Helper**: `.harness-baseline-configuration/skills/gtkb-bridge/helpers/protected_write.py`
 
 **Canonical invocation**:
 
-```powershell
-python scripts/skill-helpers/gtkb-bridge/protected_write.py --target <path> --content-file <path> --packet <packet-path>
-```
-
-Use this helper for protected narrative-artifact paths governed by `config/governance/narrative-artifact-approval.toml` when an approval packet already exists. The helper validates the packet against the proposed LF-normalized content, writes the target, stages only that target path, and runs `scripts/check_narrative_artifact_evidence.py --paths <target>` semantics against the staged blob. A clean exit means the same universal-floor evidence checker used by `.githooks/pre-commit` clears the staged file.
+The packet-taking helper is retired. After explicit owner approval, use the
+current governed canonical writer for the exact approved content and run
+`scripts/check_narrative_artifact_evidence.py --paths <target>` against the
+result. Do not create or cite a separate approval carrier.
 
 This helper is a deterministic Layer-C universal-floor evidence path. It is not a PreToolUse interception, and it does not claim to trigger or emulate any harness `Write` / `Edit` hook.
 
@@ -191,12 +180,12 @@ This helper is a deterministic Layer-C universal-floor evidence path. It is not 
 
 **Purpose**: read-only inspection without mutation.
 
-**Helper**: `scripts/skill-helpers/gtkb-bridge/show_thread_bridge.py`
+**Helper**: `.harness-baseline-configuration/skills/gtkb-bridge/helpers/show_thread_bridge.py`
 
 **Canonical invocation** (deterministic, replaces per-version grep+Read):
 
 ```powershell
-python scripts/skill-helpers/gtkb-bridge/show_thread_bridge.py <topic-slug> [--format json|markdown] [--preview-lines N]
+python .harness-baseline-configuration/skills/gtkb-bridge/helpers/show_thread_bridge.py <topic-slug> [--format json|markdown] [--preview-lines N]
 ```
 
 The helper resolves all `bridge/<slug>-NNN.md` files, sorts by version, and returns `{slug, versions, found, preview_lines_cap}` plus any legacy compatibility-view diagnostics when available. Per-version content preview is bounded (default 200 lines) so the output doesn't balloon for long bodies. Public Python API: `from show_thread_bridge import show; show("gtkb-foo")`.
@@ -211,7 +200,9 @@ full mode only when the version chain or citing-path archive is required.
    - `VERIFIED` (terminal — no further action)
    - `GO` (Prime: implement)
    - `NO-GO` (Prime: revise)
-   - `NEW` / `REVISED` / `NO-ACTION` (Loyal Opposition: review)
+   - `READY` (Loyal Opposition: verify implementation)
+   - `NOT-READY` (Prime: repair implementation)
+   - `NEW` / `REVISED` / `VERDICT-REJECTED` (Loyal Opposition: review)
 
 Use this when you need to know "what is the state of thread X?" without touching anything.
 
@@ -253,15 +244,30 @@ For specific subactions, prefer the more focused skill:
 
 | Action | Specific skill | Path |
 |---|---|---|
-| File a proposal | `gtkb-bridge-propose` | `.goose/skills/gtkb-bridge-propose/SKILL.md` |
-| Review a proposal | `gtkb-proposal-review` | `.goose/skills/gtkb-proposal-review/SKILL.md` |
-| Submit for review | `gtkb-send-review` | `.goose/skills/gtkb-send-review/SKILL.md` |
+| File a proposal | `gtkb-bridge-propose` | `.harness-baseline-configuration/skills/gtkb-bridge-propose/SKILL.md` |
+| Review a proposal | `gtkb-proposal-review` | `.harness-baseline-configuration/skills/gtkb-proposal-review/SKILL.md` |
+| Submit for review | `gtkb-send-review` | `.harness-baseline-configuration/skills/gtkb-send-review/SKILL.md` |
 
 This skill (`gtkb-bridge`) is the cross-cutting reference. Use it when:
 
 - The action fit with a per-action skill is not obvious.
 - You need to navigate the protocol across multiple operations in one session.
 - You want to understand the full lifecycle and required gates in one place.
+
+## Cross-harness implementation notes
+
+- The skill body is identical across all harnesses via the `scripts/generate_codex_skill_adapters.py` adapter pipeline. The Codex adapter version at `.harness-baseline-configuration/skills/gtkb-bridge/SKILL.md` carries a `` marker; do NOT edit the adapter directly. Edit the canonical at `.harness-baseline-configuration/skills/gtkb-bridge/SKILL.md` and regenerate.
+- Hook-layer behavior (PreToolUse / PostToolUse / Stop) differs between harnesses by necessity (different schemas: harness settings JSON). Hook handler scripts are shared regardless.
+- Underlying scripts and CLIs are harness-agnostic. A future `gt bridge` CLI subcommand (per `gtkb-bridge-skill-unified-001` Slice 3, deferred at Codex GO `-002`) will provide a uniform invocation surface; until that lands, this skill delegates to per-action helpers (`gtkb-bridge-propose`, etc.) and direct script invocations.
+
+**Per-harness skill-adapter generator inventory:**
+- Claude Code: `scripts/generate_codex_skill_adapters.py` (generates `.harness-baseline-configuration/skills/`)
+- Codex: generated by the above; no separate generator
+- Antigravity, Cursor, Goose, OpenRouter: **no generator** -- these harnesses use inline skill loading or Claude-compatible adapters
+
+When adding or renaming skills, run `python scripts/generate_codex_skill_adapters.py --update-registry` after editing the canonical at `.harness-baseline-configuration/skills/`.
+
+**`Responds to` for `begin` chain semantics:** The `Responds to` field must resolve to the **GO** document, not a NO-GO or VERIFIED. A REVISED proposal responds to the prior NO-GO, but the `begin` validator traces the chain to find a GO. If the chain points at a NO-GO or VERIFIED, `begin` will reject with a provenance error.
 
 ## Copyright
 
@@ -270,8 +276,8 @@ This skill (`gtkb-bridge`) is the cross-cutting reference. Use it when:
 <!--
 GTKB-GOOSE-SKILL-ADAPTER-BEGIN
 Generated by: scripts/harness_projection/project_harness.py
-Generated at: content-addressed d42f8c4d4fee
+Generated at: content-addressed eabe864524d4
 Canonical source: .harness-baseline-configuration/skills/gtkb-bridge/SKILL.md
-Canonical source sha256: d42f8c4d4fee86afaa7bb07d0c8c65cbd959878c01d23348238834b4e76b0df5
+Canonical source sha256: eabe864524d4c0321b67aaade884e585fc9e2a1b0084f1c872066368be2e37cd
 GTKB-GOOSE-SKILL-ADAPTER-END
 -->

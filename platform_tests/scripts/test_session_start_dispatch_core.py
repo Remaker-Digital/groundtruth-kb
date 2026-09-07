@@ -227,31 +227,6 @@ def test_packet_receipt_marks_weak_hook_fallback_as_non_parity(monkeypatch) -> N
     assert "pointer_only=true" in rendered
 
 
-def test_role_scoped_relay_cache_deadline_preserves_primary_and_skips_alternate(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # Deadline guard.
-    module = _load_module()
-    disclosure = (
-        "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\n- Role being assumed: Prime Builder\n"
-    )
-    monkeypatch.setattr(module, "OUT_DIR", tmp_path)
-    monkeypatch.setattr(module, "_persistent_harness_id", lambda: "TEST-ID")
-    monkeypatch.setattr(module, "_resolve_own_role_set", lambda *args, **kwargs: frozenset({"pb"}))
-    monkeypatch.setattr(module, "_monotonic_seconds", lambda: 20.0)
-    monkeypatch.setattr(
-        module,
-        "_render_role_startup_report",
-        lambda _role_profile: pytest.fail("alternate role cache render should be skipped after deadline"),
-    )
-
-    module._write_role_scoped_startup_relay_caches(disclosure, deadline_monotonic=20.0)
-
-    assert (tmp_path / "last-user-visible-startup-pb.md").is_file()
-    assert not (tmp_path / "last-user-visible-startup-lo.md").exists()
-
-
 def test_session_start_context_id_accepts_only_canonical_uuid() -> None:
     module = _load_module()
     session_id = "12a16794-f84d-457f-81b4-8e803034e4d5"
@@ -281,13 +256,8 @@ def _run_normal_startup(module, monkeypatch, tmp_path, payload: dict[str, object
         lambda: (module.StartupDecision.NORMAL_STARTUP, "normal"),
     )
     monkeypatch.setattr(module, "_valid_session_start_payload", lambda *_args: True)
-    monkeypatch.setattr(module, "_write_startup_relay_cache", lambda *_args, **_kwargs: None)
-
-    def _fake_role_scoped_relay_cache(*args, **kwargs):
-        captured["role_cache_args"] = args
-        captured["role_cache_kwargs"] = kwargs
-
-    monkeypatch.setattr(module, "_write_role_scoped_startup_relay_caches", _fake_role_scoped_relay_cache)
+    # WI-7318: the SessionStart path no longer writes a startup-disclosure relay
+    # cache, so there are no cache writers left to stub here.
 
     def _fake_run(command, **kwargs):
         captured["command"] = command
@@ -318,18 +288,6 @@ def test_main_passes_valid_session_context_as_startup_guard_id(monkeypatch, tmp_
 
     assert captured["env"]["GTKB_STARTUP_GUARD_ID"] == session_id
     assert captured["command"][-2:] == ["--session-start-source", "startup"]
-
-
-def test_main_bounds_role_scoped_relay_cache_sync_work(monkeypatch, tmp_path) -> None:
-    module = _load_module()
-    monkeypatch.setattr(module, "_monotonic_seconds", lambda: 10.0)
-
-    captured = _run_normal_startup(module, monkeypatch, tmp_path, {"source": "startup"})
-
-    assert captured["role_cache_args"] == ("startup",)
-    assert captured["role_cache_kwargs"] == {
-        "deadline_monotonic": 10.0 + module.ROLE_SCOPED_STARTUP_RELAY_CACHE_SYNC_BUDGET_SECONDS
-    }
 
 
 @pytest.mark.parametrize("session_id", [None, "not-a-session", 42])

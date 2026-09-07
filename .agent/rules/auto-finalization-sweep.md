@@ -2,7 +2,7 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project antigravity`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
@@ -15,7 +15,7 @@ author_model: claude-opus-4-8
 author_model_version: claude-opus-4-8
 author_model_configuration: Claude Code interactive; resolved role prime-builder via ::init gtkb pb
 
-This rule auto-loads via the `.claude/rules/` convention. It is the narrative
+This rule auto-loads via the `.agent/rules/` convention. It is the narrative
 authority for the auto-finalization sweep landed by WI-4889 (Slice 1 of the
 dispatch-treadmill-drain program).
 

@@ -125,22 +125,25 @@ _RELAY_DISPATCHERS = {
 
 
 def test_startup_relay_cache_write_is_parity_across_dispatchers() -> None:
-    """T6 -- ADR-CODEX-HOOK-PARITY-FALLBACK-001: both SessionStart dispatchers
-    write the harness-scoped startup-disclosure relay cache.
+    """T6 -- ADR-CODEX-HOOK-PARITY-FALLBACK-001: neither SessionStart dispatcher
+    writes a startup-disclosure relay cache.
 
-    The bounded-pointer relay is sound only if BOTH harness dispatchers populate
-    the harness-scoped cache; a one-harness implementation would break the relay
-    for the other harness.
+    Inverted by WI-7318. This previously required BOTH dispatchers to populate a
+    harness-scoped cache, because the relay handed the agent a pointer to a file
+    it then read. The relay now renders the disclosure for its own turn, so a
+    cache writer in either dispatcher is the drift this assertion catches. The
+    parity property is unchanged in kind -- the two dispatchers must still agree
+    -- only the value they must agree on is inverted.
     """
-    # Verify the core implementation contains the cache writing logic
     core_path = REPO_ROOT / "scripts" / "session_start_dispatch_core.py"
     core_text = core_path.read_text(encoding="utf-8")
-    assert "def _write_startup_relay_cache(" in core_text, (
-        "Core dispatcher logic is missing the _write_startup_relay_cache helper"
+    for symbol in ("_write_startup_relay_cache", "_write_role_scoped_startup_relay_caches"):
+        assert f"def {symbol}(" not in core_text, (
+            f"Core dispatcher reintroduced {symbol}(); the startup-disclosure cache was removed by WI-7318"
+        )
+    assert "last-user-visible" + "-startup" not in core_text, (
+        "Core dispatcher names the removed startup-disclosure cache artifact family"
     )
-    assert "_write_startup_relay_cache(" in core_text, "Core dispatcher logic must call _write_startup_relay_cache"
-    assert "last-user-visible-startup.md" in core_text
-    assert "last-user-visible-startup.meta.json" in core_text
 
     # Verify each wrapper delegates/imports the core dispatcher
     for harness, path in _RELAY_DISPATCHERS.items():

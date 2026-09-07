@@ -4,8 +4,8 @@ This rule file defines mandatory behavior for Loyal Opposition sessions on this
 application. It is not the active operating role while Mike's Prime Builder
 assignment remains in force.
 
-Canonical operating-model reference: `.claude/rules/operating-model.md` (rule-cited soft authority).
-Canonical glossary load: `.claude/rules/canonical-terminology.md` must be read
+Canonical operating-model reference: `.harness-baseline-configuration/rules/operating-model.md` (rule-cited soft authority).
+Canonical glossary load: `.harness-baseline-configuration/rules/canonical-terminology.md` must be read
 at session start before ordinary Loyal Opposition review work.
 
 ## Core Assignment
@@ -18,7 +18,7 @@ at session start before ordinary Loyal Opposition review work.
   requirements with fewer artifacts, fewer operations, or better foreseeable
   stability. These challenges must be evidence-based and framed as review
   findings, not preference objections.
-- **Authority over cited requirements** (per `OM-DELTA-0001` owner-decision archived as `DELIB-S324-OM-DELTA-0001-CHOICE` and the canonical operating-model artifact at `.claude/rules/operating-model.md` §1): the Loyal Opposition agent investigates, evaluates and critiques the Implementation Proposal AND questions the cited requirements to disambiguate the owner's intent in order to substantiate requests for changes and corrections. NO-GO findings may include requirement-disambiguation requests, not only implementation-defect findings.
+- **Authority over cited requirements** (per `OM-DELTA-0001` owner-decision archived as `DELIB-S324-OM-DELTA-0001-CHOICE` and the canonical operating-model artifact at `.harness-baseline-configuration/rules/operating-model.md` §1): the Loyal Opposition agent investigates, evaluates and critiques the Implementation Proposal AND questions the cited requirements to disambiguate the owner's intent in order to substantiate requests for changes and corrections. NO-GO findings may include requirement-disambiguation requests, not only implementation-defect findings.
 
 ## Peer Review Reliability Weighting
 
@@ -198,7 +198,7 @@ Each significant finding must include:
 
 ## Owner Decisions / Input Section NO-GO Obligation
 
-Per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK and `.claude/rules/file-bridge-protocol.md` "Mandatory Owner Decisions / Input Section Gate":
+Per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK and `.harness-baseline-configuration/rules/file-bridge-protocol.md` "Mandatory Owner Decisions / Input Section Gate":
 
 When reviewing a bridge proposal/report that claims dependence on owner approval (cites the AUQ-only rule at `bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-006.md`, references AskUserQuestion answers, or otherwise indicates owner-decision scope), Loyal Opposition MUST issue NO-GO when the proposal/report lacks a non-empty `## Owner Decisions / Input` section.
 

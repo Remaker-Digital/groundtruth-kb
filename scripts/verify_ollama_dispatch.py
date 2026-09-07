@@ -32,7 +32,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from windows_subprocess import no_window_subprocess_kwargs
+from scripts.windows_subprocess import no_window_subprocess_kwargs
 
 # Allow running from repo root or scripts/
 _SCRIPT_DIR = Path(__file__).resolve().parent
@@ -40,8 +40,8 @@ _PROJECT_ROOT = _SCRIPT_DIR.parent if (_SCRIPT_DIR.parent / "groundtruth.toml").
 
 sys.path.insert(0, str(_PROJECT_ROOT / "scripts"))
 
-from harness_projection_reader import load_harness_projection  # noqa: E402
-from ollama_harness import (  # noqa: E402
+from scripts.harness_projection_reader import load_harness_projection  # noqa: E402
+from scripts.ollama_harness import (  # noqa: E402
     DEFAULT_ENDPOINT,
     DEFAULT_TIMEOUT_SECONDS,
     ModelMetadata,
@@ -536,7 +536,7 @@ def _check_bridge_filing_via_dispatch(
         # files are required even with a no-op runner. The stubs need only
         # satisfy the is_file() probe; the runner replaces their execution
         # with a deterministic allow.
-        from ollama_harness import BRIDGE_WRITE_GUARDS
+        from scripts.ollama_harness import BRIDGE_WRITE_GUARDS
 
         for guard_relative in BRIDGE_WRITE_GUARDS:
             stub = fixture_root / guard_relative
@@ -546,7 +546,7 @@ def _check_bridge_filing_via_dispatch(
         # Use a no-op guard runner that always passes (fixture workspace
         # has stub guard files only)
         def _noop_guard(script: Path, payload: dict[str, Any], env: Any, timeout: float) -> Any:
-            from ollama_harness import GuardExecutionResult
+            from scripts.ollama_harness import GuardExecutionResult
 
             return GuardExecutionResult(returncode=0, stdout='{"decision":"allow"}')
 
@@ -596,7 +596,7 @@ def _check_guard_destructive_bash(project_root: Path, model_route: ModelRoute, e
     metadata = ModelMetadata(model_route.model_id, model_route.model_version, endpoint, model_route.key)
 
     def _blocking_guard(script: Path, payload: dict[str, Any], env: Any, timeout: float) -> Any:
-        from ollama_harness import GuardExecutionResult
+        from scripts.ollama_harness import GuardExecutionResult
 
         # Simulate a guard that blocks destructive commands
         cmd = json.dumps(payload)
@@ -627,7 +627,7 @@ def _check_guard_formal_artifact(project_root: Path, model_route: ModelRoute, en
     metadata = ModelMetadata(model_route.model_id, model_route.model_version, endpoint, model_route.key)
 
     def _blocking_guard(script: Path, payload: dict[str, Any], env: Any, timeout: float) -> Any:
-        from ollama_harness import GuardExecutionResult
+        from scripts.ollama_harness import GuardExecutionResult
 
         path_str = json.dumps(payload)
         if "formal-artifact-approval" in path_str or ".groundtruth/" in path_str:
@@ -690,7 +690,7 @@ def _check_guard_bridge_bash_denial(project_root: Path, model_route: ModelRoute,
     command_called = False
 
     def _allowing_guard(script: Path, payload: dict[str, Any], env: Any, timeout: float) -> Any:
-        from ollama_harness import GuardExecutionResult
+        from scripts.ollama_harness import GuardExecutionResult
 
         records.append(str(script))
         return GuardExecutionResult(returncode=0, stdout='{"decision":"allow"}')

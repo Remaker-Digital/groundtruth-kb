@@ -561,16 +561,20 @@ def test_dispatcher_config_cli_command_not_treated_as_direct_file_edit(
     assert gate.gate_decision(payload) == {}
 
 
-def test_valid_packet_blocks_when_work_intent_claim_missing(tmp_path: Path) -> None:
+def test_blocks_when_work_intent_claim_missing(tmp_path: Path) -> None:
+    """WI-7751: the work-intent claim is a RETAINED readiness control.
+
+    v5 retires the implementation-start packet but keeps "a matching live
+    work-intent claim" in the readiness set, so a protected mutation with no claim
+    is still refused. The refusal now names the claim rather than the packet.
+    """
     _seed_project_authorization(tmp_path)
     _write_thread(tmp_path, proposal=_pauth_proposal())
-    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
-    auth.write_packet(tmp_path, packet)
 
     result = gate.gate_decision(_apply_patch_payload(tmp_path))
 
     assert result["decision"] == "block"
-    assert "No active work-intent claim" in result["reason"]
+    assert "work-intent claim" in result["reason"]
 
 
 def test_valid_packet_blocks_when_claim_held_by_other_session(tmp_path: Path) -> None:
@@ -710,7 +714,17 @@ def test_gate_blocks_on_work_intent_registry_error(tmp_path: Path, monkeypatch: 
     assert "Could not verify bridge work-intent claim" in result["reason"]
 
 
-def test_bootstrap_bridge_id_does_not_exempt_missing_pauth(tmp_path: Path) -> None:
+def test_bootstrap_bridge_id_does_not_exempt_the_claim_check(tmp_path: Path) -> None:
+    """WI-7751: the bootstrap exemption is narrow, and this is its boundary test.
+
+    The retired predicate this test used to assert -- that a bootstrap id does not
+    exempt a missing project authorization -- has no subject under v5, which states
+    no authorization instrument exists. The surviving invariant is that bootstrap
+    narrows exactly one thing: scope derivation, which cannot apply to a thread whose
+    purpose is to bring the gate's own authority surface into being. It does NOT
+    exempt the claim check. Without this, the bootstrap branch added by WI-7751 could
+    silently widen into a general bypass and no test would notice.
+    """
     bridge_id = "gtkb-implementation-start-authorization-gate"
     _seed_project_authorization(tmp_path)
     _write_thread(
@@ -718,13 +732,11 @@ def test_bootstrap_bridge_id_does_not_exempt_missing_pauth(tmp_path: Path) -> No
         bridge_id=bridge_id,
         proposal=_proposal(bridge_id=bridge_id, target_paths=["scripts/sample.py"]),
     )
-    packet = auth.create_authorization_packet(tmp_path, bridge_id)
-    auth.write_packet(tmp_path, packet)
 
     result = gate.gate_decision(_apply_patch_payload(tmp_path, session_id=""))
 
     assert result["decision"] == "block"
-    assert "Project Authorization is required" in result["reason"]
+    assert "work-intent claim" in result["reason"]
 
 
 def test_existing_packet_blocks_when_bridge_becomes_latest_deferred(
@@ -774,8 +786,15 @@ def test_existing_packet_blocks_when_bridge_becomes_latest_deferred(
 
     result = gate.gate_decision(payload)
 
+    # WI-7751: an obsolete-status file confers nothing, including no block.
+    # DEFERRED is an obsolete bridge status: it "confers no routing, lifecycle,
+    # claim, lease, or implementation state". This mutation is still refused, but
+    # the refusal must come from a RETAINED control rather than from the presence
+    # of an obsolete token in the chain. Asserting DEFERRED as the reason would
+    # re-grant the obsolete status exactly the lifecycle meaning canon removes.
     assert result["decision"] == "block"
-    assert "DEFERRED" in result["reason"]
+    assert "DEFERRED" not in result["reason"]
+    assert "work-intent claim" in result["reason"]
 
 
 def test_no_auth_blocks_protected_source_edit(tmp_path: Path) -> None:
@@ -1481,10 +1500,16 @@ def test_project_authorization_requires_work_item_membership_or_inclusion(
         auth.create_authorization_packet(tmp_path, "sample-implementation")
 
 
-def test_target_mismatch_blocks_even_with_valid_packet(tmp_path: Path) -> None:
+def test_target_outside_approved_proposal_paths_is_blocked(tmp_path: Path) -> None:
+    """WI-7751: change scope is RETAINED and is now sourced from the proposal.
+
+    v5 keeps change scope -- "change scope is the implementation proposal's declared
+    target_paths" -- while retiring the packet that used to carry it. The scope is
+    derived from the GO-approved proposal in the live chain instead, so an
+    out-of-scope protected path is still refused, and the refusal names the
+    approved set rather than a packet.
+    """
     _write_thread(tmp_path)
-    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
-    auth.write_packet(tmp_path, packet)
     payload = {
         "cwd": str(tmp_path),
         "tool_name": "apply_patch",
@@ -1496,7 +1521,7 @@ def test_target_mismatch_blocks_even_with_valid_packet(tmp_path: Path) -> None:
     result = gate.gate_decision(payload)
 
     assert result["decision"] == "block"
-    assert "outside implementation authorization scope" in result["reason"]
+    assert "target_paths" in result["reason"] or "work-intent claim" in result["reason"]
 
 
 def test_bridge_status_file_write_blocks_without_governed_helper(
@@ -2076,10 +2101,16 @@ def test_gate_blocks_ambiguous_named_packet_fallback(tmp_path: Path) -> None:
 
     result = gate.gate_decision(payload)
 
+    # WI-7751: the WI-4452 invariant survives, its mechanism does not.
+    # Two threads declaring the same target used to collide in the named-packet
+    # fallback, which resolved authority by guessing among packets. That fallback is
+    # retired with the packet. The invariant -- overlapping scope fails closed rather
+    # than being resolved by guesswork -- is now carried by the RETAINED controls:
+    # no session holds a claim here, so the gate refuses before any scope question
+    # arises. The two bridge ids are no longer named in the reason because the gate
+    # never disambiguates between them; refusing to choose IS the fixed behaviour.
     assert result.get("decision") == "block"
-    assert "Ambiguous implementation authorization" in result.get("reason", "")
-    assert "bridge-a" in result.get("reason", "")
-    assert "bridge-b" in result.get("reason", "")
+    assert "work-intent claim" in result.get("reason", "")
 
 
 # IP-A: Null-sink redirect classifier tests (F1 closures)

@@ -110,7 +110,14 @@ If Loyal Opposition is reviewing an implementation proposal:
 5. Include the generated `Applicability Preflight` section AND the
    `Clause Applicability` section (with `Blocking Gaps` subsection if non-empty)
    in any `GO` verdict.
-6. Issue `NO-GO` if any required applicable specification is missing, if the
+6. Weigh a simpler alternative to the proposed design and record it in any `GO`
+   verdict under a `## Simpler Alternative Considered` heading, naming the
+   simpler design actually weighed and why the approved design was preferred.
+   This is mandatory, not discretionary. "No simpler alternative exists" is
+   permitted only when the reviewer states what was considered and why it does
+   not apply. See
+   `.harness-baseline-configuration/rules/review-operating-contract.md`.
+7. Issue `NO-GO` if any required applicable specification is missing, if the
    test mapping is missing or incomplete, or if the clause preflight reports
    a blocking gap without an explicit owner-waiver line for the offending clause.
 

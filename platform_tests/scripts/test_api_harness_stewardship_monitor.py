@@ -3,7 +3,7 @@
 Covers the GO-required evidence (bridge/gtkb-api-harness-stewardship-monitor-002):
 all six read surfaces (incl. dispatch JSONL rotation), stuck-work risk scoring
 with cited evidence, material-change detection, end-to-end run emitting only
-under .gtkb-state/api-harness-stewardship/, and an AST/structural proof that the
+under scratchpad/<session>/api-harness-stewardship/, and an AST/structural proof that the
 module is report-only (no network imports, no mutating MemBase/dispatch calls).
 """
 
@@ -257,7 +257,11 @@ def test_run_emits_reports_only_under_state_subdir(project_root: Path):
     )
 
     assert report["report_only"] is True
-    state_root = project_root / ".gtkb-state" / "api-harness-stewardship"
+    # Canon s17: reports go to the session-scoped scratchpad, never `.gtkb-state`.
+    from scripts.gtkb_session_id import session_scratch_dirname
+
+    session_dir = session_scratch_dirname()
+    state_root = project_root / "scratchpad" / session_dir / "api-harness-stewardship"
     assert (state_root / "20260618T220000Z" / "report.json").is_file()
     assert (state_root / "20260618T220000Z" / "report.md").is_file()
 
@@ -266,7 +270,7 @@ def test_run_emits_reports_only_under_state_subdir(project_root: Path):
     new_files = after - before
     assert new_files, "run() should have written report artifacts"
     for rel in new_files:
-        assert rel.parts[:2] == (".gtkb-state", "api-harness-stewardship"), rel
+        assert rel.parts[:3] == ("scratchpad", session_dir, "api-harness-stewardship"), rel
 
     # Read surfaces are untouched (read-only proof).
     dispatch_after = (project_root / ".gtkb-state" / "bridge-poller" / "dispatch-state.json").read_bytes()

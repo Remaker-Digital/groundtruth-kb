@@ -29,7 +29,14 @@ PYTHON_BIN="${PYTHON:-python}"
 # not fail open when PYTHON_BIN lacks ruff while the project venv has it.
 "$PYTHON_BIN" scripts/check_ruff_format.py --staged || exit $?
 
-"$PYTHON_BIN" scripts/check_protected_commit_authorization.py --staged || exit $?
+# The protected-commit authorization gate is retired from this hook (owner
+# direction, 2026-09-07, canon v8.92). Its predicates no longer exist: project
+# authorization is a field on the project row and gates dispatch, not commits
+# (section 3); GO packets lived under the forbidden .gtkb-state (section 17);
+# and bridge material is never committed, so it cannot serve as commit
+# evidence (section 6). Commit authority is Loyal Opposition after VERIFIED
+# (section 7) or the owner directly (section 9). Deleting the script and its
+# remaining consumers is governed Phase 2 work.
 
 # Only proceed if PowerShell is available
 PWSH=""

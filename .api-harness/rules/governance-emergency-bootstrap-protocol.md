@@ -2,7 +2,7 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project openrouter`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
@@ -67,7 +67,7 @@ is NOT sanctioned.
 ## (b) After-Action Audit-Trail Entry (Required)
 
 After the emergency-bootstrap commit lands, the actor MUST file an after-action
-bridge entry with status `WITHDRAWN` that records:
+bridge entry with status `ADVISORY` that records:
 
 - the commit SHA of the emergency-bootstrap repair;
 - the deadlock rationale (which condition in (a) was met and why the normal path
@@ -77,7 +77,7 @@ bridge entry with status `WITHDRAWN` that records:
   correct.
 
 Precedent: `bridge/gtkb-commit-untracked-governance-hooks-002.md` (the WI-4449
-closure) is the canonical example of this after-action entry. The `WITHDRAWN`
+closure) is the canonical example of this after-action entry. The `ADVISORY`
 status marks the entry as an audit record rather than an actionable proposal in
 the queue, while preserving it permanently in the append-only bridge audit
 trail.
@@ -88,7 +88,7 @@ If owner approval for the emergency-bootstrap action was not already on record a
 the time of the action, the actor MUST capture it retroactively as a
 Deliberation Archive owner-decision record (`source_type=owner_conversation`,
 `outcome=owner_decision`) per `GOV-ARTIFACT-APPROVAL-001`. The deliberation cites
-the commit SHA and the after-action `WITHDRAWN` bridge entry, closing the
+the commit SHA and the after-action `ADVISORY` bridge entry, closing the
 formal-approval invariant even though the action itself preceded approval.
 
 ## What This Protocol Does NOT Permit
@@ -96,7 +96,7 @@ formal-approval invariant even though the action itself preceded approval.
 - It does not permit bypassing the bridge for ordinary feature work, defect
   fixes, or refactors that are unrelated to restoring a broken foundational
   subsystem.
-- It does not permit skipping the after-action `WITHDRAWN` entry or the
+- It does not permit skipping the after-action `ADVISORY` entry or the
   retroactive owner-approval capture.
 - It does not weaken the credential-scan or root-boundary invariants; those
   remain in force during an emergency-bootstrap action.

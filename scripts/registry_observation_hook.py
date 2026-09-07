@@ -129,13 +129,6 @@ def _record_audit_gap(payload: dict[str, Any], *, code: str, detail: str) -> dic
         or None,
         "observed_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
-    try:
-        target = PROJECT_ROOT / ".gtkb-state" / "sot-registry" / "audit-gaps.jsonl"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        with target.open("a", encoding="utf-8", newline="\n") as handle:
-            handle.write(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n")
-    except OSError:
-        pass
     return row
 
 

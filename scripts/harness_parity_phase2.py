@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import tomllib
 from collections import Counter
 from dataclasses import asdict, dataclass
@@ -32,7 +33,7 @@ NO_WINDOW_EVIDENCE_PATHS_BY_HARNESS = {
         ".codex/hooks.json",
         ".codex/gtkb-hooks/run_cmd_no_window.py",
     ),
-    "cursor": ("scripts/cursor_harness.py",),
+    "cursor": ("scripts/cursor_harness.py", "scripts/cursor_hook_adapter.py"),
     "ollama": ("scripts/ollama_harness.py",),
     "openrouter": ("scripts/openrouter_harness.py", "scripts/dispatcher_runtime.py"),
     "alibaba-cloud-studio": ("scripts/alibaba_cloud_studio_harness.py", "scripts/dispatcher_runtime.py"),
@@ -183,11 +184,17 @@ DIMENSIONS = (
 
 
 def _load_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError):
+        return {}
 
 
 def _load_toml(path: Path) -> dict[str, Any]:
-    return tomllib.loads(path.read_text(encoding="utf-8"))
+    try:
+        return tomllib.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError):
+        return {}
 
 
 def _rel(root: Path, path: Path) -> str:
@@ -430,7 +437,7 @@ def _hook_projection_status(root: Path, harness: dict[str, Any]) -> tuple[str, l
     surfaces = {
         "claude": [".claude/settings.json", ".claude/hooks"],
         "codex": [".codex/hooks.json", ".codex/gtkb-hooks"],
-        "cursor": [".cursor/rules", ".cursor/gtkb-hooks"],
+        "cursor": [".cursor/hooks.json"],
         "antigravity": [".agent"],
         "ollama": ["scripts/ollama_harness.py"],
         "openrouter": ["scripts/openrouter_harness.py"],
@@ -447,7 +454,7 @@ def _bridge_write_path_status(root: Path, harness: dict[str, Any]) -> tuple[str,
     surfaces = {
         "claude": [".claude/skills/gtkb-bridge/helpers", ".claude/skills/gtkb-verify/helpers"],
         "codex": [".codex/skills/gtkb-bridge/helpers", ".codex/skills/gtkb-verify/helpers"],
-        "cursor": [".cursor/skills/gtkb-bridge/helpers"],
+        "cursor": [".cursor/skills/gtkb-bridge/helpers", ".cursor/skills/gtkb-verify/helpers"],
         "antigravity": [".agent/skills/gtkb-bridge"],
         "ollama": ["scripts/ollama_harness.py", ".api-harness/skills/gtkb-bridge"],
         "openrouter": ["scripts/openrouter_harness.py", ".api-harness/skills/gtkb-bridge"],
@@ -476,7 +483,7 @@ def _readiness_probe_status(root: Path, harness: dict[str, Any]) -> tuple[str, l
 def _provider_settings_status(harness: dict[str, Any], cap_registry: dict[str, Any]) -> tuple[str, list[str], str]:
     name = str(harness.get("harness_name") or "")
     floor = _harness_config(cap_registry, name)
-    provider_backed = name in {"ollama", "openrouter", "alibaba-cloud-studio", "cursor"}
+    provider_backed = name in {"ollama", "openrouter", "alibaba-cloud-studio"}
     if not provider_backed:
         return "supported", ["harness-state/harness-registry.json"], "Harness is not provider-shim scoped."
     fields = ("routing_schema_version", "skill_adapter_manifest", "skill_adapter_generation_supported")
@@ -532,6 +539,33 @@ def _no_window_status(root: Path, harness: dict[str, Any]) -> tuple[str, list[st
     return "needs_adapter", evidence, "Provider/adapter invocation lacks explicit no-window evidence."
 
 
+def _load_harnesses_from_membase(root: Path) -> list[dict[str, Any]]:
+    db_path = root / "groundtruth.db"
+    if not db_path.is_file():
+        return []
+    src = root / "groundtruth-kb" / "src"
+    if str(src) not in sys.path:
+        sys.path.insert(0, str(src))
+    try:
+        from groundtruth_kb.db import KnowledgeDB
+
+        rows = KnowledgeDB(db_path).list_harnesses()
+    except Exception:
+        return []
+    records: list[dict[str, Any]] = []
+    for row in rows:
+        record = dict(row)
+        for field in ("role", "invocation_surfaces"):
+            value = record.get(field)
+            if isinstance(value, str) and value.strip():
+                try:
+                    record[field] = json.loads(value)
+                except json.JSONDecodeError:
+                    pass
+        records.append(record)
+    return records
+
+
 def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> dict[str, Any]:
     root = project_root.resolve()
     harness_doc = _load_json(root / HARNESS_REGISTRY_PATH)
@@ -542,6 +576,8 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
 
     cells: list[Cell] = [*waiver_validation]
     registry_harnesses = [h for h in harness_doc.get("harnesses", []) if isinstance(h, dict)]
+    if not registry_harnesses:
+        registry_harnesses = _load_harnesses_from_membase(root)
     harnesses = [h for h in registry_harnesses if h.get("status") == "active"]
     excluded_harnesses = [h for h in registry_harnesses if h.get("status") != "active"]
     for harness in harnesses:

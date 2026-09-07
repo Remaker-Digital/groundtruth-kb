@@ -2,7 +2,7 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project openrouter`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
@@ -23,7 +23,7 @@ Purpose: preserve failed approaches, avoidable errors, and false positives so fu
 - issue:
   A prior audit incorrectly treated `memory/MEMORY.md` as missing from the workspace.
 - why it happened:
-  The check stopped at repo-local paths and did not verify Claude's auto-memory resolution path under the user-local `.api-harness/projects/.../memory/` directory.
+  The check stopped at repo-local paths and did not verify Claude's auto-memory resolution path under the user-local `.claude/projects/.../memory/` directory.
 - prevention rule:
   For any claim about Claude-resolved memory or session artifacts, verify both:
   1. repo-local path

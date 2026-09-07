@@ -259,7 +259,7 @@ D4_STEPS = [
         "step": 5,
         "action": (
             "Implementation happens only through a bridge with explicit Codex "
-            "GO, per ``.claude/rules/codex-review-gate.md``. No Claude-Design-"
+            "GO, per ``.harness-baseline-configuration/rules/counterpart-review-gate.md``. No Claude-Design-"
             "derived code lands without D5 invariant coverage demonstrated."
         ),
         "verify": "Bridge VERIFIED; D5 assertion run passes after implementation.",
@@ -288,7 +288,7 @@ D6_STEPS = [
             "protocol.md``): (a) handoff-packet-format compliance vs D1; "
             "(b) intake-triage classification vs D2; (c) D5 invariant coverage; "
             "(d) required-evidence completeness per "
-            "``.claude/rules/report-depth-prime-builder-context.md``."
+            "``.harness-baseline-configuration/rules/report-depth-prime-builder-context.md``."
         ),
         "verify": "Bridge review file saved; verdict GO or NO-GO; findings addressed.",
     },

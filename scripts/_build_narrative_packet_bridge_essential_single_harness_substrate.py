@@ -1,10 +1,10 @@
 """Build the narrative-artifact-approval packet for IP-7 of
 bridge/gtkb-single-harness-bridge-dispatcher-slice-2-005.md (Codex GO at -006):
-``.claude/rules/bridge-essential.md`` amendment adding the single-harness
+``.harness-baseline-configuration/rules/bridge-essential.md`` amendment adding the single-harness
 bridge dispatcher as a recognized second live substrate.
 
 This script:
-1. Reads the current `.claude/rules/bridge-essential.md`.
+1. Reads the current `.harness-baseline-configuration/rules/bridge-essential.md`.
 2. Inserts the new "Dual-Substrate Coexistence" subsection between the
    existing "Bridge Dispatch Enablement Contract" section and the
    "Two-Axis Bridge Automation Model" section.
@@ -19,7 +19,7 @@ import hashlib
 import json
 from pathlib import Path
 
-TARGET = Path(".claude/rules/bridge-essential.md")
+TARGET = Path(".harness-baseline-configuration/rules/bridge-essential.md")
 PACKET_PATH = Path(
     ".groundtruth/formal-artifact-approvals/2026-05-12-claude-rules-bridge-essential-md-single-harness-dispatcher-substrate.json"
 )
@@ -98,7 +98,7 @@ def main() -> None:
         "artifact_type": "narrative_artifact",
         "artifact_id": "claude-rules-bridge-essential-md-single-harness-dispatcher-substrate",
         "action": "insert-section",
-        "target_path": ".claude/rules/bridge-essential.md",
+        "target_path": ".harness-baseline-configuration/rules/bridge-essential.md",
         "source_ref": "bridge:gtkb-single-harness-bridge-dispatcher-slice-2-005:IP-7",
         "full_content": new_content,
         "full_content_sha256": hashlib.sha256(new_content.encode("utf-8")).hexdigest(),
@@ -110,7 +110,7 @@ def main() -> None:
         "explicit_change_request": (
             "Implement IP-7 of bridge/gtkb-single-harness-bridge-dispatcher-slice-2-005.md "
             "(Codex GO at -006): insert a new 'Dual-Substrate Coexistence' subsection into "
-            ".claude/rules/bridge-essential.md, immediately before the '## Two-Axis Bridge "
+            ".harness-baseline-configuration/rules/bridge-essential.md, immediately before the '## Two-Axis Bridge "
             "Automation Model' section. The amendment identifies the single-harness bridge "
             "dispatcher (Slice 2) as the second live dispatch substrate alongside the "
             "dispatcher daemon, documents their mutual exclusivity at "

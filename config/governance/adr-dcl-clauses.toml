@@ -103,7 +103,7 @@ description = "VERIFIED reports must include a spec-to-test mapping with execute
 applies_when_path = ["bridge/**"]
 applies_when_doc_name = []
 applies_when_content = [
-    "(?i)\\b(?:VERIFIED|implementation report|post[- ]impl(?:ementation)?)\\b",
+    "(?ims)(?:\\A\\s*VERIFIED\\b|^bridge_kind:\\s*implementation_report\\b)",
 ]
 evidence_required = "Implementation report includes a `Specification-Derived Verification` (or equivalent spec-to-test) section AND command evidence (pytest/python -m pytest/etc.) AND observed results."
 evidence_pattern = "(?i)(?:specification[- ]derived\\s+verification|spec[- ]to[- ]test|python -m pytest|pytest|ruff|test_.+\\.py)"

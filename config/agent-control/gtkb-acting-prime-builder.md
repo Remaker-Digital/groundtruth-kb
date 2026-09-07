@@ -45,7 +45,7 @@ is the reference adopter application for GT-KB at
 for GT-KB review when explicitly named. Unqualified GT-KB tooling references
 must not resolve silently to Agent Red's lifecycle-independent repository or CI
 surfaces. There are no exceptions to the root-containment rule.
-Apply `.claude/rules/project-root-boundary.md` before accepting, proposing,
+Apply `.harness-baseline-configuration/rules/project-root-boundary.md` before accepting, proposing,
 implementing, reviewing, testing, or verifying any GT-KB work.
 
 Any AI model harness may assume either role if it supports the operational

@@ -1,8 +1,16 @@
+<!--
+THIS FILE IS A PROJECTION, NOT CANONICAL.
+Projected from the neutral harness baseline by the GT-KB projection engine.
+Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+`gt harness project claude`. If a needed change cannot be made through
+the baseline and re-projection, file a work item against the projector
+(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+-->
 # GroundTruth-KB Operating Model
 
 **Status:** Canonical (rule-cited soft authority). Active.
 
-**Authority model:** This file is the canonical operating-model artifact for GT-KB. It carries **rule-cited soft authority only**: it is cited by `.claude/rules/loyal-opposition.md` and `AGENTS.md` as the operating-model reference, and its terminology and framing are the alignment baseline for future remediation work. **No hook or test mechanically enforces compliance with this artifact's text.** Hook-enforced compliance (e.g., scanners that gate writes on operating-model violations) is intentionally deferred per the Slice 0 evidence-based recommendation against Slice 5 (recurring hygiene automation) at this stage.
+it is cited by `.claude/rules/loyal-opposition.md` and `AGENTS.md` as the operating-model reference
 
 **Source:** Owner verbatim text captured at `bridge/gtkb-operating-model-slice-0-inventory-2026-04-30-001.md` §10. Five substantive clarifying decisions per S324 AskUserQuestion answers archived as `DELIB-S324-OM-DELTA-{0001,0003,0004,0007,0032}-CHOICE` (`source_type='owner_conversation'`, `outcome='owner_decision'`, `session_id='S324'`). The Slice 0 inventory was a retired local report; canonical authority now rests on the owner decisions and bridge thread. Slice 1 bridge thread at `bridge/gtkb-operating-model-slice-1-canonical-artifact-2026-04-30-*.md`.
 
@@ -93,7 +101,7 @@ The terms below have canonical meanings in GT-KB. Allowed synonyms appear in par
 This artifact describes the operating model the platform is designed to embody. Some described capabilities are fully implemented; others are intended-but-incomplete. This section maps current capability state. Per `OM-DELTA-0030` discipline: claims about platform capabilities must distinguish implemented surfaces from intended surfaces.
 
 **Fully implemented (as of 2026-04-30):**
-- Bridge protocol (NEW / REVISED / GO / NO-GO / VERIFIED plus ADVISORY / DEFERRED / WITHDRAWN non-actionable states with dispatcher/TAFE state and numbered bridge files).
+- Bridge protocol (NEW / REVISED / GO / NO-GO / VERIFIED plus ADVISORY / DEFERRED / WITHDRAWN non-actionable states with bridge state and numbered bridge files).
 - MemBase (`groundtruth.db`) with append-only/versioned governed records.
 - Deliberation Archive (table + ChromaDB semantic index).
 - Smart-poller with kind-aware routing and single-instance lock (per `gtkb-bridge-poller-001` umbrella).
@@ -101,7 +109,6 @@ This artifact describes the operating model the platform is designed to embody. 
 - Bridge-compliance-gate hook hard-blocking non-compliant proposals/VERIFIED reports.
 - MemBase-only standing backlog (canonical `work_items` table surfaced via `gt backlog list`); the transitional markdown view was retired at migration conclusion (per `GOV-STANDING-BACKLOG-001`, `DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION`, and owner clarification, 2026-05-06).
 - CLI surfaces for `gt deliberations`, project initialization, doctor health checks.
-- Ollama harness (identity D, suspended with `loyal-opposition` role) per `ADR-OLLAMA-HARNESS-ADOPTION-001`; Phase-1 surfaces: a framework-free Python shim (`scripts/ollama_harness.py`) exposing the canonical full-parity tool set dispatched through a fail-closed local guard adapter (`DCL-OLLAMA-TOOL-PARITY-GATE-001`); static `.api-harness/routing.toml` routing; current default model is `kimi-k2-7-code-cloud` (cloud-backed via cloud API, not local Ollama inference; the Qwen 2.5 Coder 14B original Phase-1 model has been superseded by cloud routing); author-metadata env-var injection (`DCL-OLLAMA-AUTHOR-METADATA-INJECTION-001`); the harness-onboarding capability floor (`GOV-HARNESS-ONBOARDING-CONTRACT-001`); and doctor `_check_ollama_harness`. Bridge dispatch routing active; harness currently suspended.
 
 **Intended-but-partial (as of 2026-04-30):**
 - Dashboard surfaces (per `GTKB-DASHBOARD-002` slice progress; some surfaces are integrated, others are parked).
@@ -109,8 +116,7 @@ This artifact describes the operating model the platform is designed to embody. 
 - Third-party-service status surface in dashboard (intended; not yet implemented as a unified view).
 - Comprehensive release manifest + two-stage release validation (per `GOV-RELEASE-PLATFORM-INVENTORY-TWO-STAGE-001` and `GOV-RELEASE-MANIFEST-README-001` candidate specs awaiting follow-on impl bridges).
 - Recurring hygiene automation (Slice 5 of `GTKB-OPERATING-MODEL-ALIGNMENT-REMEDIATION` deferred per Slice 0 evidence).
-- Cross-harness enforcement of bridge protocol (per `DCL-CROSS-HARNESS-ENFORCEMENT-001` — Claude Code Write/Edit covered; other paths tracked as gap or blocked).
-- Ollama harness Phase 2+ (per `PROJECT-GTKB-OLLAMA-INTEGRATION`) — multi-model routing, `.api-harness/skills/` adapter generation, dispatch-substrate wiring, and harness-D role promotion. Not implemented in Phase 1.
+- Cross-harness enforcement of bridge protocol (per `DCL-CROSS-HARNESS-ENFORCEMENT-001` — the hook-enforced Write/Edit surface is covered; other harness paths tracked as gap or blocked).
 
 When a future capability changes implementation state, this section is updated as part of the relevant implementation thread's post-impl report.
 

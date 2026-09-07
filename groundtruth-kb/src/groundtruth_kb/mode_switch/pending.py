@@ -1,20 +1,27 @@
-"""Pending-transaction queue for next-session-effective mode switches.
+"""Pending-transaction queue for next-session-effective bridge-substrate switches.
 
-Per ``SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001`` acceptance criterion #6:
-"The implementation explicitly supports next-session effectiveness;
-immediate mid-session state replacement is optional unless separately
-specified."
+Per ``SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001`` v2, which supports next-session
+effectiveness for the NON-ROLE axes of that requirement only.
+
+THE ROLE AXIS WAS REMOVED (WI-7823). A session role resolves only from the
+immutable init binding established for that session context, per
+``DCL-SESSION-ROLE-RESOLUTION-001``. Nothing may create, persist, defer, or apply
+at session initialization a result that resolves a session role, so this module
+has no ``defer_role_switch`` writer and ``apply_pending`` refuses any entry whose
+axis is not ``bridge_substrate``. ``apply_role_switch`` remains available in
+``mode_switch.transaction`` for immediate harness-registry configuration; it is
+simply unreachable from this queue.
 
 Pending files live at ``.gtkb-state/mode-switches/pending/<timestamp>-<uuid>.json``.
 On apply, successful entries move to ``.gtkb-state/mode-switches/applied/``;
 failed entries remain in ``pending/`` with the error logged so the owner
-can inspect.
+can inspect. The forbidden-root placement of that queue is carried separately by
+WI-7172 and is out of scope here.
 
-The shared ``apply_pending(project_root)`` entry point is invoked from
-    multiple SessionStart-adjacent call sites BEFORE durable role resolution
-    (startup initialization and dispatcher-daemon status/control paths) so that
-    a deferred transaction takes effect for the next session it can observe.
-    Each call site wraps the invocation fail-soft.
+``apply_pending(project_root)`` is an owner-invoked entry point, reached through
+``gt mode apply-pending``. It is deliberately NOT called from any session-startup
+path: automatic application at startup is what allowed one session to install
+state for the next, which is the defect WI-7823 removed.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen and Palmeter, LLC. All rights
 reserved.
@@ -32,7 +39,6 @@ from pathlib import Path
 from groundtruth_kb.mode_switch.transaction import (
     TransactionResult,
     TransactionValidationError,
-    apply_role_switch,
 )
 
 PENDING_SUBDIR = "pending"
@@ -74,40 +80,6 @@ class ApplyResult:
     error: str | None = None
     applied_path: Path | None = None
     transaction_result: TransactionResult | None = None
-
-
-def defer_role_switch(
-    project_root: Path,
-    harness_id_or_name: str,
-    role: str,
-    *,
-    change_reason: str,
-    scheduled_at: datetime | None = None,
-) -> Path:
-    """Write a pending mode-switch transaction to the queue.
-
-    Returns the path to the new pending JSON file. The pending directory is
-    runtime-created.
-    """
-    directory = _pending_dir(project_root)
-    directory.mkdir(parents=True, exist_ok=True)
-    when = scheduled_at if scheduled_at is not None else datetime.now(UTC)
-    record_id = uuid.uuid4().hex[:8]
-    filename = f"{_timestamp()}-{record_id}.json"
-    target = directory / filename
-    payload = {
-        "schema_version": 1,
-        "record_id": record_id,
-        "harness_id_or_name": harness_id_or_name,
-        "role": role,
-        "change_reason": change_reason,
-        "scheduled_at": when.isoformat().replace("+00:00", "Z"),
-    }
-    target.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    return target
 
 
 def list_pending(project_root: Path) -> list[PendingTransaction]:
@@ -176,16 +148,12 @@ def apply_pending(project_root: Path) -> list[ApplyResult]:
                 )
                 tx_result = None
             else:
-                if not entry.role:
-                    raise TransactionValidationError(
-                        "Missing 'role' in role pending transaction",
-                        axis="role",
-                    )
-                tx_result = apply_role_switch(
-                    project_root,
-                    entry.harness_id_or_name,
-                    entry.role,
-                    change_reason=entry.change_reason,
+                raise TransactionValidationError(
+                    f"Unsupported pending axis {entry.axis!r}. Role deferral was removed "
+                    "under WI-7823: a session role resolves only from the immutable init "
+                    "binding per DCL-SESSION-ROLE-RESOLUTION-001, so no pending entry may "
+                    "resolve one. Only the 'bridge_substrate' axis is applied here.",
+                    axis=entry.axis,
                 )
         except TransactionValidationError as exc:
             # Write a failed record to .gtkb-state/mode-switches/failed/

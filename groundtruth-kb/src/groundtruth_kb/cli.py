@@ -18,6 +18,7 @@ import os
 import re
 import subprocess
 import sys
+import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -78,7 +79,7 @@ from groundtruth_kb.coherence import (
 from groundtruth_kb.coherence import (
     run_all as run_coherence_checks,
 )
-from groundtruth_kb.config import GTConfig
+from groundtruth_kb.config import GTConfig, GTConfigError
 from groundtruth_kb.db import DeliberationSearchDegradedError, KnowledgeDB
 from groundtruth_kb.db_snapshot import SnapshotError, create_snapshot
 from groundtruth_kb.gates import GateRegistry
@@ -95,7 +96,6 @@ from groundtruth_kb.project.core_spec_intake import next_missing_slot, next_ques
 from groundtruth_kb.project.lifecycle import (
     PROJECT_DEPENDENCY_KIND_REGISTRY,
     PROJECTS_CHANGED_BY,
-    ProjectAuthorizationSpecLinkageError,
     ProjectLifecycleError,
     ProjectLifecycleService,
 )
@@ -3341,7 +3341,12 @@ def hygiene_sweep(
     except PatternSetError as exc:
         click.echo(f"error: {exc}", err=True)
         raise SystemExit(2) from exc
-    out_dir = Path(output) if output else root_path / ".gtkb-state" / "hygiene-sweep" / result.run_id
+    # Canon s17: report output defaults to the session-scoped scratchpad, never
+    # `.gtkb-state`. `--output` still overrides. Session id comes from the single
+    # membership authority in `scripts.gtkb_session_id`.
+    _sid = importlib.import_module("scripts.gtkb_session_id")
+    _session = _sid.sanitize_session_id(_sid.resolve_session_id())
+    out_dir = Path(output) if output else root_path / "scratchpad" / _session / "hygiene-sweep" / result.run_id
     out_dir.mkdir(parents=True, exist_ok=True)
     if fmt in ("json", "both"):
         emit_json(result, out_dir / "findings.json")
@@ -3400,7 +3405,10 @@ def hygiene_supersession_scan(
     """
     root_path = Path(root).resolve()
     result = run_supersession_scan(root_path, preserve_audit_history=not include_audit_history)
-    out_dir = Path(output) if output else root_path / ".gtkb-state" / "hygiene-supersession" / result.run_id
+    # Canon s17: see the hygiene-sweep command above; `--output` still overrides.
+    _sid = importlib.import_module("scripts.gtkb_session_id")
+    _session = _sid.sanitize_session_id(_sid.resolve_session_id())
+    out_dir = Path(output) if output else root_path / "scratchpad" / _session / "hygiene-supersession" / result.run_id
     out_dir.mkdir(parents=True, exist_ok=True)
     if fmt in ("json", "both"):
         emit_supersession_json(result, out_dir / "findings.json")
@@ -6127,7 +6135,6 @@ def projects_show(ctx: click.Context, project_id: str, json_output: bool) -> Non
     work_items = payload["work_items"]
     dependencies = payload["dependencies"]
     artifact_links = payload["artifact_links"]
-    authorizations = payload["authorizations"]
     if json_output:
         click.echo(json.dumps(payload, indent=2, sort_keys=True))
         return
@@ -6150,10 +6157,10 @@ def projects_show(ctx: click.Context, project_id: str, json_output: bool) -> Non
         click.echo("Artifact links:")
         for link in artifact_links:
             click.echo(f"  - {link['artifact_type']}:{link['artifact_ref']} ({link['relationship']})")
-    if authorizations:
-        click.echo("Authorizations:")
-        for authorization in authorizations:
-            click.echo(f"  - {authorization['id']}: {authorization['status']} - {authorization['authorization_name']}")
+    # WI-7657: the Authorizations block is gone with the authorization
+    # instrument. Authorization is a field on the project row, so it is shown
+    # with the project rather than as a list of separate records.
+    click.echo(f"Authorization: {project.get('authorization') or 'unknown'}")
 
 
 @projects_cmd.command("create")
@@ -6236,6 +6243,12 @@ def projects_create(
 @click.option("--notes", default=None, help="New project notes.")
 @click.option("--source-project-name", default=None, help="Compatibility source project name.")
 @click.option("--source-subproject-name", default=None, help="Compatibility source sub-project name.")
+@click.option(
+    "--activation-status",
+    type=click.Choice(["authorized", "not authorized"]),
+    default=None,
+    help="Set project authorization. This is the governed path for authorizing a project.",
+)
 @click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
 @click.option("--change-reason", required=True, help="History reason for the new project version.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
@@ -6256,6 +6269,7 @@ def projects_update(
     notes: str | None,
     source_project_name: str | None,
     source_subproject_name: str | None,
+    authorization: str | None,
     changed_by: str,
     change_reason: str,
     json_output: bool,
@@ -6277,6 +6291,7 @@ def projects_update(
             "notes": notes,
             "source_project_name": source_project_name,
             "source_subproject_name": source_subproject_name,
+            "authorization": authorization,
         }.items()
         if value is not None
     }
@@ -6880,254 +6895,6 @@ def projects_link_bridge(
     click.echo(f"Linked bridge thread {link['artifact_ref']} to {link['project_id']}.")
 
 
-@projects_cmd.command("authorize")
-@click.argument("project_id")
-@click.option("--id", "authorization_id", default=None, help="Explicit authorization id.")
-@click.option("--owner-decision", required=True, help="Owner-decision deliberation id.")
-@click.option("--name", required=True, help="Authorization name.")
-@click.option("--scope", "scope_summary", required=True, help="Bounded authorization scope summary.")
-@click.option("--allowed-mutation", "allowed_mutation_classes", multiple=True, help="Allowed mutation class.")
-@click.option("--forbid", "forbidden_operations", multiple=True, help="Forbidden operation.")
-@click.option("--include-work-item", "included_work_item_ids", multiple=True, help="Explicitly included work item.")
-@click.option("--exclude-work-item", "excluded_work_item_ids", multiple=True, help="Explicitly excluded work item.")
-@click.option("--include-spec", "included_spec_ids", multiple=True, help="Explicitly included spec.")
-@click.option("--exclude-spec", "excluded_spec_ids", multiple=True, help="Explicitly excluded spec.")
-@click.option("--expires-at", default=None, help="Optional ISO-8601 expiration timestamp.")
-@click.option(
-    "--plan-incomplete",
-    is_flag=True,
-    help="Record a keep-open completion guard so this authorization can complete without retiring the project.",
-)
-@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
-@click.option("--change-reason", required=True, help="History reason for the authorization version.")
-@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
-@click.pass_context
-def projects_authorize(
-    ctx: click.Context,
-    project_id: str,
-    authorization_id: str | None,
-    owner_decision: str,
-    name: str,
-    scope_summary: str,
-    allowed_mutation_classes: tuple[str, ...],
-    forbidden_operations: tuple[str, ...],
-    included_work_item_ids: tuple[str, ...],
-    excluded_work_item_ids: tuple[str, ...],
-    included_spec_ids: tuple[str, ...],
-    excluded_spec_ids: tuple[str, ...],
-    expires_at: str | None,
-    plan_incomplete: bool,
-    changed_by: str,
-    change_reason: str,
-    json_output: bool,
-) -> None:
-    """Authorize a bounded project for implementation work."""
-    db, service = _project_service(ctx)
-    try:
-        authorization = service.authorize_project(
-            project_id,
-            authorization_id=authorization_id,
-            owner_decision=owner_decision,
-            name=name,
-            scope=scope_summary,
-            allowed_mutation_classes=list(allowed_mutation_classes) or None,
-            forbidden_operations=list(forbidden_operations) or None,
-            included_work_item_ids=list(included_work_item_ids) or None,
-            excluded_work_item_ids=list(excluded_work_item_ids) or None,
-            included_spec_ids=list(included_spec_ids) or None,
-            excluded_spec_ids=list(excluded_spec_ids) or None,
-            expires_at=expires_at,
-            plan_incomplete=plan_incomplete,
-            changed_by=changed_by,
-            change_reason=change_reason,
-        )
-    except ProjectAuthorizationSpecLinkageError as exc:
-        # WI-3312: spec-linkage rejection is an owner-correctable usage error.
-        raise click.UsageError(str(exc)) from exc
-    except ProjectLifecycleError as exc:
-        raise click.ClickException(str(exc)) from exc
-    finally:
-        db.close()
-
-    if json_output:
-        click.echo(json.dumps(authorization, indent=2, sort_keys=True))
-        return
-    suffix = " Plan-incomplete keep-open guard recorded." if plan_incomplete else ""
-    click.echo(f"Authorized project {authorization['project_id']} with {authorization['id']}.{suffix}")
-
-
-@projects_cmd.command("authorizations")
-@click.argument("project_id")
-@click.option("--all", "include_terminal", is_flag=True, help="Include revoked/terminal authorizations.")
-@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
-@click.option(
-    "--covers-path",
-    default=None,
-    help="Filter to authorizations covering this target path.",
-)
-@click.pass_context
-def projects_authorizations(
-    ctx: click.Context,
-    project_id: str,
-    include_terminal: bool,
-    json_output: bool,
-    covers_path: str | None,
-) -> None:
-    """List project-scoped implementation authorizations."""
-    db, service = _project_service(ctx)
-    try:
-        authorizations = service.list_project_authorizations(project_id, include_terminal=include_terminal)
-    except ProjectLifecycleError as exc:
-        raise click.ClickException(str(exc)) from exc
-    finally:
-        db.close()
-
-    if covers_path is not None:
-        from groundtruth_kb.governance.project_authorization_operation_time import classify_target
-
-        path_class = classify_target(covers_path).mutation_class
-        filtered: list[dict[str, Any]] = []
-        for auth in authorizations:
-            allowed = auth.get("allowed_mutation_classes_parsed") or []
-            if path_class in allowed:
-                filtered.append(auth)
-        authorizations = filtered
-        if not authorizations:
-            click.echo(f"No active project authorization covers path: {covers_path}")
-            return
-
-    if json_output:
-        click.echo(json.dumps(authorizations, indent=2, sort_keys=True))
-        return
-    if not authorizations:
-        click.echo("No project authorizations found.")
-        return
-    for authorization in authorizations:
-        click.echo(
-            f"{authorization['id']}\t{authorization['project_id']}\t"
-            f"{authorization['status']}\t{authorization['authorization_name']}"
-        )
-
-
-@projects_cmd.command("show-authorization")
-@click.argument("authorization_id")
-@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
-@click.pass_context
-def projects_show_authorization(ctx: click.Context, authorization_id: str, json_output: bool) -> None:
-    """Show one current project authorization by ID."""
-    config = _resolve_config(ctx)
-    db = _open_db(config)
-    try:
-        authorization = db.get_project_authorization(authorization_id)
-    finally:
-        db.close()
-    if authorization is None:
-        click.echo(f"Project authorization {authorization_id} not found.")
-        raise SystemExit(1)
-    if json_output:
-        click.echo(json.dumps(authorization, indent=2, sort_keys=True))
-        return
-    click.echo(
-        f"{authorization['id']}\t{authorization['project_id']}\t"
-        f"{authorization['status']}\t{authorization['authorization_name']}"
-    )
-    click.echo(f"  scope: {authorization.get('scope_summary') or ''}")
-    click.echo(f"  owner decision: {authorization.get('owner_decision_deliberation_id') or ''}")
-
-
-@projects_cmd.command("revoke-authorization")
-@click.argument("authorization_id")
-@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
-@click.option("--change-reason", required=True, help="History reason for revocation.")
-@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
-@click.pass_context
-def projects_revoke_authorization(
-    ctx: click.Context,
-    authorization_id: str,
-    changed_by: str,
-    change_reason: str,
-    json_output: bool,
-) -> None:
-    """Revoke a project-scoped implementation authorization."""
-    db, service = _project_service(ctx)
-    try:
-        authorization = service.revoke_project_authorization(
-            authorization_id,
-            changed_by=changed_by,
-            change_reason=change_reason,
-        )
-    except ProjectLifecycleError as exc:
-        raise click.ClickException(str(exc)) from exc
-    finally:
-        db.close()
-
-    if json_output:
-        click.echo(json.dumps(authorization, indent=2, sort_keys=True))
-        return
-    click.echo(f"Revoked project authorization {authorization['id']}.")
-
-
-@projects_cmd.command("complete-authorization")
-@click.argument("authorization_id")
-@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
-@click.option("--change-reason", required=True, help="History reason for completion.")
-@click.option(
-    "--keep-project-open",
-    is_flag=True,
-    help="Complete the authorization without retiring the project when it is the sole active authorization.",
-)
-@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
-@click.pass_context
-def projects_complete_authorization(
-    ctx: click.Context,
-    authorization_id: str,
-    changed_by: str,
-    change_reason: str,
-    keep_project_open: bool,
-    json_output: bool,
-) -> None:
-    """Complete a project-scoped implementation authorization.
-
-    ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v5: project completion
-    and retirement are automatic once every membership-linked work item is
-    VERIFIED unless the caller explicitly elects ``--keep-project-open``. This
-    subcommand is the explicit-invocation surface; it does not gate on an owner
-    decision. The owner-directed ``retire`` subcommand is the separate path for
-    retirements outside the automatic VERIFIED gate.
-    """
-    config = _resolve_config(ctx)
-    db, service = _project_service(ctx)
-    try:
-        result = service.complete_project_authorization(
-            authorization_id,
-            project_root=config.project_root,
-            changed_by=changed_by,
-            change_reason=change_reason,
-            retire_project=not keep_project_open,
-        )
-    except ProjectLifecycleError as exc:
-        raise click.ClickException(str(exc)) from exc
-    finally:
-        db.close()
-
-    if json_output:
-        click.echo(json.dumps(result, indent=2, sort_keys=True))
-        return
-    authorization = result["authorization"]
-    retired = " Project retired." if result["project_retired"] else ""
-    click.echo(f"Completed project authorization {authorization['id']}.{retired}")
-
-
-# ---------------------------------------------------------------------------
-# gt secrets
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# gt canonical-terms (Phase 1 backing-registry CLI)
-# ---------------------------------------------------------------------------
-
-
 @main.group(name="canonical-terms")
 def canonical_terms_cmd() -> None:
     """Canonical Terminology System backing-registry commands.
@@ -7614,7 +7381,6 @@ _IMPORTABLE_TABLES = frozenset(
         "project_work_item_memberships",
         "project_dependencies",
         "project_artifact_links",
-        "project_authorizations",
         "backlog_snapshots",
         "testable_elements",
         "quality_scores",
@@ -7830,6 +7596,132 @@ def db_snapshot_cmd(
 # ---------------------------------------------------------------------------
 # gt config
 # ---------------------------------------------------------------------------
+
+
+@db_cmd.group("postgres")
+def db_postgres_cmd() -> None:
+    """Native PostgreSQL shadow-kernel operations."""
+
+
+def _emit_postgres_json(payload: dict[str, Any]) -> None:
+    click.echo(json.dumps(payload, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")))
+
+
+def _run_postgres_operation(ctx: click.Context, operation: Any) -> None:
+    from groundtruth_kb.postgres_kernel import PostgresKernel, PostgresKernelError
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            cfg = _resolve_config(ctx)
+        result = operation(PostgresKernel(cfg.postgresql), cfg)
+    except GTConfigError as exc:
+        _emit_postgres_json({"error": {"code": "invalid_postgresql_config", "message": str(exc)}})
+        ctx.exit(1)
+    except PostgresKernelError as exc:
+        _emit_postgres_json(exc.to_json_dict())
+        ctx.exit(1)
+    _emit_postgres_json(result)
+
+
+@db_postgres_cmd.command("init")
+@click.pass_context
+def db_postgres_init_cmd(ctx: click.Context) -> None:
+    """Initialize an empty, service-selected PostgreSQL schema."""
+    _run_postgres_operation(ctx, lambda kernel, _cfg: kernel.initialize())
+
+
+@db_postgres_cmd.command("status")
+@click.pass_context
+def db_postgres_status_cmd(ctx: click.Context) -> None:
+    """Read PostgreSQL kernel status without creating or repairing objects."""
+    _run_postgres_operation(ctx, lambda kernel, _cfg: kernel.status())
+
+
+@db_postgres_cmd.command("export-current")
+@click.option(
+    "--sqlite-snapshot",
+    type=click.STRING,
+    metavar="PATH",
+)
+@click.option(
+    "--transform-plan",
+    type=click.STRING,
+    metavar="PATH",
+)
+@click.option("--output", type=click.STRING, metavar="PATH")
+@click.option("--preflight-only", is_flag=True)
+@click.pass_context
+def db_postgres_export_current_cmd(
+    ctx: click.Context,
+    sqlite_snapshot: str | None,
+    transform_plan: str | None,
+    output: str | None,
+    preflight_only: bool,
+) -> None:
+    """Export reviewed current state from one immutable SQLite snapshot."""
+    valid_preflight = preflight_only and sqlite_snapshot is not None and transform_plan is None and output is None
+    valid_export = (
+        not preflight_only and sqlite_snapshot is not None and transform_plan is not None and output is not None
+    )
+    if not valid_preflight and not valid_export:
+        _emit_postgres_json(
+            {
+                "error": {
+                    "code": "invalid_export_mode",
+                    "message": (
+                        "export-current requires --sqlite-snapshot with either --preflight-only "
+                        "alone or both --transform-plan and --output"
+                    ),
+                }
+            }
+        )
+        ctx.exit(1)
+
+    if valid_preflight:
+        assert sqlite_snapshot is not None
+        _run_postgres_operation(
+            ctx,
+            lambda kernel, cfg: kernel.preflight_export_current(
+                sqlite_snapshot=Path(sqlite_snapshot),
+                live_sqlite_source=cfg.db_path,
+            ),
+        )
+        return
+
+    assert sqlite_snapshot is not None
+    assert transform_plan is not None
+    assert output is not None
+    _run_postgres_operation(
+        ctx,
+        lambda kernel, cfg: kernel.export_current(
+            sqlite_snapshot=Path(sqlite_snapshot),
+            transform_plan=Path(transform_plan),
+            output=Path(output),
+            live_sqlite_source=cfg.db_path,
+        ),
+    )
+
+
+@db_postgres_cmd.command("import-current")
+@click.option("--input", "input_path", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
+@click.option("--actor", required=True)
+@click.option("--reason", required=True)
+@click.pass_context
+def db_postgres_import_current_cmd(ctx: click.Context, input_path: Path, actor: str, reason: str) -> None:
+    """Import one complete canonical current-state manifest."""
+    _run_postgres_operation(
+        ctx,
+        lambda kernel, _cfg: kernel.import_current(input_path=input_path, actor=actor, reason=reason),
+    )
+
+
+@db_postgres_cmd.command("readback-current")
+@click.option("--output", type=click.Path(dir_okay=False, path_type=Path), required=True)
+@click.pass_context
+def db_postgres_readback_current_cmd(ctx: click.Context, output: Path) -> None:
+    """Publish a canonical current-state readback manifest."""
+    _run_postgres_operation(ctx, lambda kernel, _cfg: kernel.readback_current(output=output))
 
 
 @main.command()
@@ -8909,10 +8801,12 @@ def spec_list_cmd(
     help="In-root file whose contents become the spec description",
 )
 @click.option("--change-reason", required=True, help="Reason to store with the spec version")
-@click.option("--auq-id", required=True, help="AskUserQuestion / AUQ evidence identifier")
-@click.option("--auq-answer", required=True, help="Owner answer text or concise answer summary")
-@click.option("--owner-presented", is_flag=True, default=False, help="Assert native-format content was shown to owner")
-@click.option("--approved-by", default=None, help="Manual approval identity (default: owner)")
+@click.option(
+    "--expected-version",
+    type=int,
+    required=True,
+    help="Exact expected current version; 0 asserts the specification does not yet exist",
+)
 @click.option("--type", "spec_type", type=click.Choice(SPEC_RECORD_TYPES), default=None, help="Explicit spec type")
 @click.option("--priority", default=None)
 @click.option("--scope", default=None)
@@ -8944,10 +8838,7 @@ def spec_record_cmd(
     status: str,
     content_file: Path,
     change_reason: str,
-    auq_id: str,
-    auq_answer: str,
-    owner_presented: bool,
-    approved_by: str | None,
+    expected_version: int,
     spec_type: str | None,
     priority: str | None,
     scope: str | None,
@@ -8972,10 +8863,7 @@ def spec_record_cmd(
         status=status,
         content_file=content_file,
         change_reason=change_reason,
-        auq_id=auq_id,
-        auq_answer=auq_answer,
-        owner_presented=owner_presented,
-        approved_by=approved_by,
+        expected_version=expected_version,
         spec_type=spec_type,
         priority=priority,
         scope=scope,
@@ -9015,10 +8903,12 @@ def spec_record_cmd(
     help="In-root file whose contents become the new spec description",
 )
 @click.option("--change-reason", required=True, help="Reason to store with the new spec version")
-@click.option("--auq-id", required=True, help="AskUserQuestion / AUQ evidence identifier")
-@click.option("--auq-answer", required=True, help="Owner answer text or concise answer summary")
-@click.option("--owner-presented", is_flag=True, default=False, help="Assert native-format content was shown to owner")
-@click.option("--approved-by", default=None, help="Manual approval identity (default: owner)")
+@click.option(
+    "--expected-version",
+    type=int,
+    required=True,
+    help="Exact expected current version; a stale value leaves zero effect",
+)
 @click.option("--title", default=None, help="Updated title (carried forward when omitted)")
 @click.option("--status", default=None, help="Updated lifecycle status (carried forward when omitted)")
 @click.option("--priority", default=None)
@@ -9049,10 +8939,7 @@ def spec_update_cmd(
     spec_id: str,
     content_file: Path,
     change_reason: str,
-    auq_id: str,
-    auq_answer: str,
-    owner_presented: bool,
-    approved_by: str | None,
+    expected_version: int,
     title: str | None,
     status: str | None,
     priority: str | None,
@@ -9076,10 +8963,7 @@ def spec_update_cmd(
         spec_id=spec_id,
         content_file=content_file,
         change_reason=change_reason,
-        auq_id=auq_id,
-        auq_answer=auq_answer,
-        owner_presented=owner_presented,
-        approved_by=approved_by,
+        expected_version=expected_version,
         title=title,
         status=status,
         priority=priority,
@@ -10502,19 +10386,18 @@ def mode_group() -> None:
     help="Role to assign",
 )
 @click.option("--reason", "reason", default="manual role-switch via gt mode set-role")
-@click.option(
-    "--defer-to-next-session",
-    "defer",
-    is_flag=True,
-    help="Queue for SessionStart application instead of mid-session apply",
-)
 @click.pass_context
-def mode_set_role(ctx: click.Context, harness: str, role: str, reason: str, defer: bool) -> None:
-    """Apply (or defer) a role-switch transaction."""
+def mode_set_role(ctx: click.Context, harness: str, role: str, reason: str) -> None:
+    """Apply a harness-registry role-switch transaction immediately.
+
+    Deferral was removed under WI-7823. A session role resolves only from the
+    immutable init binding per DCL-SESSION-ROLE-RESOLUTION-001, so no role change
+    may be queued for a later session to inherit. This command writes the durable
+    harness-registry routing label and takes effect at once.
+    """
     import json as _json
     from pathlib import Path
 
-    from groundtruth_kb.mode_switch.pending import defer_role_switch
     from groundtruth_kb.mode_switch.transaction import (
         TransactionValidationError,
         apply_role_switch,
@@ -10522,10 +10405,6 @@ def mode_set_role(ctx: click.Context, harness: str, role: str, reason: str, defe
 
     config = _resolve_config(ctx)
     root = Path(config.project_root)
-    if defer:
-        path = defer_role_switch(root, harness, role, change_reason=reason)
-        click.echo(_json.dumps({"deferred": True, "pending_path": str(path)}, indent=2))
-        return
     try:
         result = apply_role_switch(root, harness, role, change_reason=reason)
     except TransactionValidationError as exc:

@@ -230,20 +230,23 @@ def _declared_model_fields(content: str) -> dict[str, str]:
 def _harness_id_for(harness_name: str, project_root: Path) -> str:
     """Resolve the durable harness ID for a harness name, or empty string.
 
-    Read from the persistent identity map rather than derived from the name,
-    because the name-to-ID mapping is owner-assigned and not computable.
+    WI-7016: read through the harness projection, which resolves from the
+    database registry. The legacy harness-identities.json is retired and now
+    carries no records, so reading it returned "" for every harness.
     """
 
     if not harness_name:
         return ""
     try:
-        from scripts.harness_identity import load_harness_identities
+        from groundtruth_kb.harness_projection import read_roles
 
-        record = load_harness_identities(project_root).get("harnesses", {}).get(harness_name)
+        for record in read_roles(project_root).get("harnesses", []) or []:
+            if isinstance(record, dict) and record.get("harness_name") == harness_name:
+                identifier = record.get("id")
+                return str(identifier) if isinstance(identifier, str) else ""
     except Exception:
         return ""
-    identifier = record.get("id") if isinstance(record, dict) else None
-    return str(identifier) if isinstance(identifier, str) else ""
+    return ""
 
 
 def _metadata_from_attestation(session_id: str, project_root: Path, content: str) -> dict[str, str] | None:
@@ -354,16 +357,6 @@ def _metadata_from_envelope(session_id: str, project_root: Path, content: str = 
         "author_model_version": "unknown",
         "author_model_configuration": "verdict-filing-service",
     }
-
-
-def _require_loyal_opposition_author(content: str) -> None:
-    """Fail closed unless the filed artifact carries Loyal Opposition provenance."""
-    lowered = content.lower()
-    if "::init gtkb lo" not in lowered and "loyal-opposition" not in lowered:
-        raise VerdictFilingError(
-            "verdict/advisory author provenance must resolve to loyal-opposition; "
-            "the content must carry the canonical `::init gtkb lo` envelope line"
-        )
 
 
 def _candidate_evidence_hash(candidate_path: str, content: str, project_root: Path) -> str:
@@ -507,7 +500,6 @@ def publish_verdict(
         )
 
     # ADVISORY: governed append-only writer with governance_advisory kind.
-    _require_loyal_opposition_author(content)
     advisory_content = content.rstrip() + "\n"
     advisory_content = advisory_content.replace("bridge_kind: lo_verdict", "bridge_kind: governance_advisory", 1)
     claim_registry = _load_claim_registry(root)

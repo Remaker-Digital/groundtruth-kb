@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """
-Claude Code Stop / UserPromptSubmit hook -- Owner-decision tracker.
+Stop / UserPromptSubmit hook -- Owner-decision tracker.
 
 Mechanically surfaces pending owner decisions across session boundaries by
 maintaining a durable list at memory/pending-owner-decisions.md.
@@ -16,7 +22,7 @@ Two modes:
   UserPromptSubmit's nudge).
 
   BOUNDED EXCEPTION (per gtkb-decision-tracker-block-prose-ask-2026-04-29-003
-  REVISED-1 §F3 Parent Bridge Contract Revision; Codex GO at -004): when the
+  REVISED-1 §F3 Parent Bridge Contract Revision; Loyal Opposition GO at -004): when the
   just-completed turn contains at least one prose-decision-ask AND zero
   AskUserQuestion tool_use entries, Stop mode emits a single
   `{"decision": "block", "reason": "..."}` JSON to stdout. This is a control-
@@ -38,13 +44,13 @@ Two modes:
 - UserPromptSubmit: reads the durable file; if the user's prompt does NOT
   reference a pending decision (by DECISION-NNNN ID, decision keywords,
   or a recognized owner shortcut), emits a nudge to stdout (which the
-  Claude Code hook contract injects into the model's context as
+  harness hook contract injects into the model's context as
   additionalContext). Recognized owner shortcuts mutate the durable file
   in-place: `defer all`, `defer DECISION-NNNN`,
   `resolve DECISION-NNNN: <answer>`, `clear pending`.
 
 Stdin: JSON hook event payload per
-       https://code.claude.com/docs/en/hooks
+       the harness hook-contract documentation
 Stdout: empty (typical Stop), block-decision JSON (Stop hard-condition),
         or markdown text (UserPromptSubmit mode)
 Exit:   Always 0 (graceful degradation; never crashes the agent). Note
@@ -56,7 +62,7 @@ Authority:
 - bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md REVISED
 - bridge/gtkb-gov-owner-decision-surfacing-slice1-004.md GO (parent F3 rule)
 - bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-003.md REVISED-1
-  (F3 bounded exception; Codex GO at -004)
+  (F3 bounded exception; Loyal Opposition GO at -004)
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -86,7 +92,6 @@ DECISION_ID_PREFIX = "DECISION-"
 # threshold without editing hook code.
 HISTORY_AGE_DAYS = 30
 OWNER_DECISION_ARCHIVE_DIR_REL = Path("memory") / "archive"
-OWNER_DECISION_RETENTION_FAILURE_LOG_REL = Path(".gtkb-state") / "owner-decision-retention" / "failures.jsonl"
 RUNTIME_RETENTION_CONFIG_REL = Path("config") / "governance" / "runtime-evidence-retention.toml"
 
 # question_hash uses sha256 of question + sorted option labels, truncated
@@ -94,7 +99,7 @@ RUNTIME_RETENTION_CONFIG_REL = Path("config") / "governance" / "runtime-evidence
 # for the durable-file scale; full sha256 would bloat the file unnecessarily.
 QUESTION_HASH_LENGTH = 16
 
-# Project root resolution: prefer CLAUDE_PROJECT_DIR env var (Claude Code
+# Project root resolution: prefer the CLAUDE_PROJECT_DIR env var (the harness
 # sets this for hooks); fall back to walking up from this file's location.
 PROJECT_ROOT = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2]).resolve()
 PACKAGE_SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
@@ -104,7 +109,6 @@ for package_src in (PACKAGE_SRC, HOOK_REPO_SRC):
         sys.path.insert(0, str(package_src))
 
 PENDING_FILE_REL = "memory/pending-owner-decisions.md"
-DISPATCH_RUNS_REL = Path(".gtkb-state") / "bridge-poller" / "dispatch-runs"
 WORKER_RUN_ID_ENV_VAR = "GTKB_BRIDGE_POLLER_RUN_ID"
 PROJECT_ROOT_ENV_VAR = "GTKB_PROJECT_ROOT"
 
@@ -193,7 +197,7 @@ PROSE_FALSE_POSITIVE_GUARDS: tuple[re.Pattern[str], ...] = (
     ),
 )
 
-# Per Sub-slice A revision -007 §F1 (Codex -002 finding): guards are applied
+# Per Sub-slice A revision -007 §F1 (Loyal Opposition -002 finding): guards are applied
 # against a local window around each match, not the full assistant event.
 # This prevents systematic false negatives when one event mentions bridge
 # state alongside an unrelated genuine prose decision-ask.
@@ -280,12 +284,12 @@ def _is_inside_structural_context(text: str, match_start: int) -> bool:
     return bool(line_full.startswith("    "))
 
 
-# Block emission feature flag (Codex -004 GO condition 3).
+# Block emission feature flag (Loyal Opposition -004 GO condition 3).
 # Default '1' (enabled); '=0' suppresses block JSON only — detection,
 # durable-file appends, and graceful degradation are preserved.
 BLOCK_EMISSION_ENV_VAR = "GTKB_BLOCK_ON_PROSE_DECISION_ASK"
 
-# Per Codex -004 GO condition 4 + Q5 answer: cap displayed prose-pattern
+# Per Loyal Opposition -004 GO condition 4 + Q5 answer: cap displayed prose-pattern
 # matches in the block reason text at 3 entries; if more matches were detected,
 # include "(N additional matches)" suffix.
 BLOCK_REASON_DISPLAYED_MATCHES_CAP = 3
@@ -299,7 +303,7 @@ BLOCK_REASON_EXCERPT_MAX_LEN = 80
 def _block_emission_enabled() -> bool:
     """Return True when block JSON emission is enabled (env var unset or != '0').
 
-    Per Codex -004 GO condition 3: this flag suppresses ONLY the block JSON
+    Per Loyal Opposition -004 GO condition 3: this flag suppresses ONLY the block JSON
     emission; prose detection, durable-file appends, and graceful degradation
     on malformed input are NOT suppressed.
     """
@@ -310,7 +314,7 @@ def _build_block_decision(matches: list[tuple[str, str]]) -> dict[str, str]:
     """Construct the Stop-mode block-decision JSON.
 
     Per gtkb-decision-tracker-block-prose-ask-2026-04-29-003 REVISED-1 §1.4
-    (output schema) + Codex -004 Q5 cap-at-3:
+    (output schema) + Loyal Opposition -004 Q5 cap-at-3:
 
     - Lists the first ``BLOCK_REASON_DISPLAYED_MATCHES_CAP`` matches with
       pattern_id and a truncated excerpt.
@@ -365,7 +369,17 @@ def _dispatch_artifact_path(run_id: str) -> Path:
     project_root_value = os.environ.get(PROJECT_ROOT_ENV_VAR, "").strip()
     project_root = Path(project_root_value).resolve() if project_root_value else PROJECT_ROOT
     safe_run_id = re.sub(r"[^A-Za-z0-9_.-]", "_", run_id)
-    return project_root / DISPATCH_RUNS_REL / f"{safe_run_id}.owner-decision-requested.json"
+    # Canon s17: the worker artifact is session-scoped scratch under the canonical
+    # scratchpad root, never `.gtkb-state` (and never the retired bridge-poller tree).
+    try:
+        from scripts.gtkb_session_id import session_scratch_dirname
+    except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
+
+        def session_scratch_dirname() -> str:
+            return "unknown"
+
+    dispatch_runs = Path("scratchpad") / session_scratch_dirname() / "dispatch-runs"
+    return project_root / dispatch_runs / f"{safe_run_id}.owner-decision-requested.json"
 
 
 def _write_worker_owner_decision_request(
@@ -477,9 +491,6 @@ def _quote_yaml(value: str) -> str:
     return f'"{s}"'
 
 
-_AUTO_ARCHIVE_FAILURE_LOG_REL = Path(".gtkb-state/owner-decision-auto-archive/failures.jsonl")
-
-
 def _auto_archive_if_enabled(entry: DecisionEntry, session_hint: str = "") -> None:
     """Slice 4: opt-in auto-archive of resolved AUQ to the Deliberation Archive.
 
@@ -487,9 +498,7 @@ def _auto_archive_if_enabled(entry: DecisionEntry, session_hint: str = "") -> No
     deterministic per ``SPEC-AUQ-NO-LLM-CLASSIFIER-001``. All filesystem and
     DB writes are anchored to ``PROJECT_ROOT`` (resolved from
     ``CLAUDE_PROJECT_DIR`` at hook startup), never ``Path.cwd()``. Failures
-    are caught and appended to ``<PROJECT_ROOT>/.gtkb-state/owner-decision-
-    auto-archive/failures.jsonl``; the tracker's notepad-tier write remains
-    load-bearing.
+    are swallowed; the tracker's notepad-tier write remains load-bearing.
     """
     if os.environ.get("GTKB_AUQ_AUTO_ARCHIVE", "0") != "1":
         return
@@ -512,20 +521,8 @@ def _auto_archive_if_enabled(entry: DecisionEntry, session_hint: str = "") -> No
         ok, _reason = should_auto_archive(candidate)
         if ok:
             archive_decision(candidate, project_root=PROJECT_ROOT)
-    except Exception as exc:  # noqa: BLE001 - hook must never raise
-        try:
-            failure_log = PROJECT_ROOT / _AUTO_ARCHIVE_FAILURE_LOG_REL
-            failure_log.parent.mkdir(parents=True, exist_ok=True)
-            record = {
-                "timestamp": datetime.now(UTC).isoformat(),
-                "decision_id": entry.id,
-                "error_type": type(exc).__name__,
-                "error_message": str(exc)[:500],
-            }
-            with failure_log.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(record) + "\n")
-        except OSError:
-            pass
+    except Exception:  # noqa: BLE001 - hook must never raise
+        pass
 
 
 def _owner_decision_retention_age_days() -> int:
@@ -569,23 +566,6 @@ def _move_old_resolved_to_history(
     return mutated
 
 
-def _record_retention_archive_failure(entry: DecisionEntry, exc: Exception) -> None:
-    """Record DA-harvest failure without losing or rotating the ledger entry."""
-    try:
-        failure_log = PROJECT_ROOT / OWNER_DECISION_RETENTION_FAILURE_LOG_REL
-        failure_log.parent.mkdir(parents=True, exist_ok=True)
-        record = {
-            "timestamp": datetime.now(UTC).isoformat(),
-            "decision_id": entry.id,
-            "error_type": type(exc).__name__,
-            "error_message": str(exc)[:500],
-        }
-        with failure_log.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record, sort_keys=True) + "\n")
-    except OSError:
-        pass
-
-
 def _archive_decision_for_retention(entry: DecisionEntry) -> bool:
     """Harvest one resolved decision to the DA before sidecar rotation.
 
@@ -609,8 +589,7 @@ def _archive_decision_for_retention(entry: DecisionEntry) -> bool:
         )
         archive_decision(decision, project_root=PROJECT_ROOT)
         return True
-    except Exception as exc:  # noqa: BLE001 - hook must never raise
-        _record_retention_archive_failure(entry, exc)
+    except Exception:  # noqa: BLE001 - hook must never raise
         return False
 
 
@@ -991,7 +970,7 @@ def _read_transcript_tail(path: Path, max_events: int = 500) -> list[dict[str, A
     file order (oldest first within the tail). Truncated/corrupt lines
     are skipped silently with a stderr log.
 
-    The 500-event tail is sized for typical Claude Code sessions (a
+    The 500-event tail is sized for typical harness sessions (a
     long single turn is rarely above 100 events; 500 covers multi-turn
     context with margin while staying well under the file size at
     which line-by-line read becomes slow).
@@ -1332,7 +1311,7 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
            eligible).
         2. The same turn contained ZERO AskUserQuestion tool_use entries
            (askuserquestion_count is per just-completed turn, not session-
-           cumulative — per Codex -004 Q1 answer).
+           cumulative — per Loyal Opposition -004 Q1 answer).
         3. The env var ``GTKB_BLOCK_ON_PROSE_DECISION_ASK`` is not '0'.
         4. The hook is not running inside an auto-dispatched bridge worker
            (``GTKB_BRIDGE_POLLER_RUN_ID`` is unset). Workers cannot open
@@ -1390,7 +1369,7 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
     mutated = cross_session_mutated
 
     # Scan A -- AskUserQuestion pairs. Track per-turn count for block-emission
-    # decision (per Codex -004 Q1: per just-completed turn, not session-cumulative).
+    # decision (per Loyal Opposition -004 Q1: per just-completed turn, not session-cumulative).
     # Also accumulate question/option pairs for same-turn correlation with
     # prose matches per DCL-OWNER-DECISION-TRACKER-SAME-TURN-AUQ-RESOLUTION-001.
     askuserquestion_count = 0
@@ -1603,7 +1582,7 @@ def _parse_iso_timestamp(value: str) -> datetime | None:
 def _session_hint() -> str:
     """Best-effort session ID (S<N>) for asked_in_session field.
 
-    Read from CLAUDE_SESSION_ID env var if set; otherwise empty. The
+    Read from the CLAUDE_SESSION_ID env var if set; otherwise empty. The
     field is informational; no logic depends on it being populated.
     """
     return os.environ.get("CLAUDE_SESSION_ID", "")
@@ -1734,7 +1713,7 @@ def _prompt_references_pending(prompt: str, pending: list[DecisionEntry]) -> boo
 def _format_nudge(pending: list[DecisionEntry], freshness_marker: str | None = None) -> str:
     """Render the UserPromptSubmit nudge.
 
-    Markdown-formatted; the Claude Code hook contract injects this as
+    Markdown-formatted; the harness hook contract injects this as
     additionalContext, so it is visible to the model on each user turn.
     Limited to top-3 by recency to avoid context bloat; full list is in
     the durable file.

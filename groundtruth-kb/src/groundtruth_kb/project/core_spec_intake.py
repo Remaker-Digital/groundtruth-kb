@@ -135,7 +135,7 @@ def mark_slot_complete(
         return db.insert_spec(
             id=spec_id,
             title=title,
-            status="specified",
+            status="active",
             changed_by="core-spec-intake",
             change_reason=f"Mark core spec intake slot {slot_def.name} complete",
             description=description,
@@ -159,7 +159,7 @@ def mark_slot_complete(
         section="Core Spec Intake",
         handle=f"core-spec-intake:{project_id}:{slot_def.name}",
         tags=tags,
-        status="specified",
+        status="active",
         type="requirement",
         authority="stated",
         testability="observable",

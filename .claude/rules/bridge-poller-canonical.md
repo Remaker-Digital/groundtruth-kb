@@ -1,3 +1,11 @@
+<!--
+THIS FILE IS A PROJECTION, NOT CANONICAL.
+Projected from the neutral harness baseline by the GT-KB projection engine.
+Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+`gt harness project claude`. If a needed change cannot be made through
+the baseline and re-projection, file a work item against the projector
+(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+-->
 # DEPRECATED — Bridge Smart Poller Canonical (Retired Slice 4, 2026-05-09)
 
 > ⚠️ **DEPRECATED** — This template documented the canonical smart-poller
@@ -11,13 +19,13 @@ The canonical bridge dispatch automation is now the **cross-harness
 event-driven trigger** at `scripts/gtkb_dispatcher_daemon.py`,
 registered in:
 
-- `.claude/settings.json` — `PostToolUse` and `Stop` hook arrays.
-- `.codex/hooks.json` — Codex-side parity (forward-compatible per
+- `settings.json` (or projected harness config) — `PostToolUse` and `Stop` hook arrays.
+- harness hooks configuration — Codex-side parity (forward-compatible per
   `ADR-CODEX-HOOK-PARITY-FALLBACK-001`).
 
 The replacement contract is described in:
 
-- `.claude/rules/bridge-essential.md` (active operating mode).
+- `.harness-baseline-configuration/rules/bridge-essential.md` (active operating mode).
 - `templates/rules/prime-bridge-collaboration-protocol.md` § Bridge Dispatch
   Automation (per Slice 4 D5k).
 - `groundtruth-kb/docs/tutorials/dual-agent-setup.md` (tutorial; Slice 4 D5d).

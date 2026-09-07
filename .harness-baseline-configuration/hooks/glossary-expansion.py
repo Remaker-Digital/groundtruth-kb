@@ -39,7 +39,6 @@ from typing import Any
 
 PROJECT_DIR = Path(os.environ.get("{{HARNESS_PROJECT_DIR_VAR}}") or os.getcwd()).resolve()
 GLOSSARY_PATH = PROJECT_DIR / "{{HARNESS_RULES_DIR}}" / "canonical-terminology.md"
-AUDIT_LOG_DIR = PROJECT_DIR / ".gtkb-state" / "glossary-expansion" / "invocations"
 
 MAX_GLOSSARY_MATCHES = 5
 MAX_SEMANTIC_CANDIDATES = 3
@@ -331,16 +330,6 @@ def _truncate_to_budget(parts: list[str], budget: int) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def _write_audit_log(record: dict[str, Any]) -> None:
-    try:
-        AUDIT_LOG_DIR.mkdir(parents=True, exist_ok=True)
-        ts = record.get("timestamp", datetime.now(UTC).isoformat()).replace(":", "-")
-        path = AUDIT_LOG_DIR / f"{ts}.json"
-        path.write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    except OSError:
-        pass
-
-
 # ---------------------------------------------------------------------------
 # Hook entry point
 # ---------------------------------------------------------------------------
@@ -400,7 +389,6 @@ def _process(prompt: str) -> dict[str, Any]:
         # Glossary unavailable; fail closed.
         audit["skipped"] = True
         audit["skip_reason"] = "glossary_unavailable"
-        _write_audit_log(audit)
         return {}
 
     # Glossary match (capped).
@@ -460,7 +448,6 @@ def _process(prompt: str) -> dict[str, Any]:
 
     # If nothing to inject, emit empty.
     if not matched_headings and not semantic_rows:
-        _write_audit_log(audit)
         return {}
 
     # Format injection.
@@ -497,12 +484,10 @@ def _process(prompt: str) -> dict[str, Any]:
         fitted += _truncate_to_budget(semantic_parts, remaining)
 
     if not fitted:
-        _write_audit_log(audit)
         return {}
 
     body = _WRAPPER_PREFIX + "\n\n".join(fitted) + _WRAPPER_SUFFIX
     audit["injection_size_bytes"] = len(body.encode("utf-8"))
-    _write_audit_log(audit)
     return {"systemMessage": body}
 
 

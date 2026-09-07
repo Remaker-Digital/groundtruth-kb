@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project codex`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """Helper for filing completed bridge REVISED versions.
 
 The helper has two lifecycles:
 
-- ``scaffold_revision`` writes a non-dispatchable draft under
-  ``.gtkb-state/bridge-revisions/drafts/``.
+- ``scaffold_revision`` writes a non-dispatchable draft under the canonical
+  session-scoped scratchpad (``scratchpad/<session>/bridge-revisions/drafts/``).
 - ``file_revision`` files completed content as ``bridge/<slug>-NNN.md`` and
   inserts the live ``REVISED:`` line only after validation gates pass.
 """
@@ -23,17 +29,19 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
-DEFAULT_DRAFT_DIR = PROJECT_ROOT / ".gtkb-state" / "bridge-revisions" / "drafts"
 
 
 def _resolve_bridge_propose_helper(root: Path) -> Path:
-    """Prefer the canonical gtkb- prefixed helper, falling back to the pre-rename
-    name for backward compatibility (WI-5651 skill-rename path canonicalization)."""
-    for name in ("gtkb-bridge-propose", "bridge-propose"):
-        candidate = root / ".claude" / "skills" / name / "helpers" / "write_bridge.py"
-        if candidate.is_file():
-            return candidate
-    return root / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py"
+    """Resolve write_bridge helper from sibling skill directory or baseline."""
+    sibling = Path(__file__).resolve().parents[2] / "gtkb-bridge-propose" / "helpers" / "write_bridge.py"
+    if sibling.is_file():
+        return sibling
+    baseline_cand = (
+        root / ".harness-baseline-configuration" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py"
+    )
+    if baseline_cand.is_file():
+        return baseline_cand
+    return sibling
 
 
 BRIDGE_PROPOSE_HELPER = _resolve_bridge_propose_helper(PROJECT_ROOT)
@@ -50,6 +58,19 @@ WriterBridgeConflictError = _bridge_writer.BridgeConflictError
 WriterBridgeTransitionError = _bridge_writer.BridgeTransitionError
 write_bridge_file = _bridge_writer.write_bridge_file
 no_window_subprocess_kwargs = importlib.import_module("scripts.windows_subprocess").no_window_subprocess_kwargs
+_gtkb_session_id = importlib.import_module("scripts.gtkb_session_id")
+
+# Canon s17: scaffold drafts are session-scoped scratch under the canonical
+# scratchpad root, never `.gtkb-state`. Session id resolution reuses the single
+# membership authority in `scripts.gtkb_session_id` rather than re-listing the
+# env vars here (the drift its docstring calls the recurrence guard).
+DEFAULT_DRAFT_DIR = (
+    PROJECT_ROOT
+    / "scratchpad"
+    / _gtkb_session_id.sanitize_session_id(_gtkb_session_id.resolve_session_id())
+    / "bridge-revisions"
+    / "drafts"
+)
 
 
 class BridgeRevisionError(RuntimeError):
@@ -282,8 +303,34 @@ def _placeholder_hits(content: str) -> list[str]:
     return hits
 
 
+_ENVELOPE_HEAD_PREFIXES = ("::init", "::open")
+
+
+def _artifact_head_lines(lines):
+    """Yield lines with any leading ``::init`` / ``::open`` envelope removed.
+
+    The canonical bridge artifact head is ``::init gtkb <pb|lo>`` / ``::open
+    <activity>`` / ``<status token>``; the legacy order put the status token
+    first. Skipping leading envelope markers makes both orders resolve to the
+    same status token.
+    """
+    index = 0
+    while index < len(lines) and lines[index].strip().startswith(_ENVELOPE_HEAD_PREFIXES):
+        index += 1
+    return lines[index:]
+
+
+def _artifact_head_status(text):
+    """Return the first non-blank, non-envelope line of ``text``, stripped."""
+    for line in _artifact_head_lines(text.splitlines()):
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
+
+
 def _assert_completed_revision(content: str) -> None:
-    if content.lstrip().splitlines()[0].strip() != "REVISED":
+    if _artifact_head_status(content) != "REVISED":
         raise BridgeRevisionPlaceholderError("Completed revision content must start with REVISED")
     hits = _placeholder_hits(content)
     if hits:

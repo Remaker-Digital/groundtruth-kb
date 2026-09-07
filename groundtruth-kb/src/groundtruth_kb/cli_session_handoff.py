@@ -157,9 +157,8 @@ def _reconcile_with_session_binding(project_root: Path, envelope: dict) -> dict:
 
     reconciled = dict(envelope)
     reconciled["session_init_binding"] = {
-        "envelope_id": binding.envelope_id,
+        "session_context_id": binding.session_context_id,
         "subject": binding.subject,
-        "init_command_digest": binding.command_digest,
         "created_at": binding.created_at,
         "source": "session_init_bindings (database, authoritative for governed writes)",
     }

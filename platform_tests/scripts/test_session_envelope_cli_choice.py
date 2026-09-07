@@ -54,6 +54,10 @@ def test_both_topic_choices_sourced_from_topic_types() -> None:
     assert open_choices == close_choices == tuple(TOPIC_TYPES)
 
 
+# WI-7119: --harness-name no longer defaults to a fixed harness; it resolves
+# from the acting harness's session variable and fails closed when absent.
+# These tests exercise the topic_type parse surface, not harness resolution,
+# so they state a harness explicitly to keep that surface the subject.
 def test_cli_topic_open_ops_accepted(tmp_path, monkeypatch) -> None:
     # DCL-TOPIC-ENVELOPE-ROUTING-001 v3: ``ops`` is a valid open type at the CLI
     # parse surface (it raised click.BadParameter pre-fix). Runtime is stubbed
@@ -62,11 +66,15 @@ def test_cli_topic_open_ops_accepted(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "_resolve_config", lambda ctx: types.SimpleNamespace(project_root=str(tmp_path)))
     monkeypatch.setattr("groundtruth_kb.session.envelope.open_topic", lambda *a, **k: {"type": "ops"})
     runner = CliRunner()
-    accepted = runner.invoke(cli.session_group, ["topic", "open", "ops"])
+    accepted = runner.invoke(
+        cli.session_group, ["topic", "open", "--harness-name", "codex", "--harness-id", "A", "ops"]
+    )
     assert accepted.exit_code == 0, accepted.output
     # Negative control: an unknown type is still rejected as a usage error, and
     # the rejection lists ``ops`` among the valid choices.
-    rejected = runner.invoke(cli.session_group, ["topic", "open", "definitely-not-a-type"])
+    rejected = runner.invoke(
+        cli.session_group, ["topic", "open", "--harness-name", "codex", "--harness-id", "A", "definitely-not-a-type"]
+    )
     assert rejected.exit_code == 2
     assert "ops" in rejected.output
 
@@ -76,7 +84,9 @@ def test_cli_topic_close_ops_accepted(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "_resolve_config", lambda ctx: types.SimpleNamespace(project_root=str(tmp_path)))
     monkeypatch.setattr("groundtruth_kb.session.envelope.close_topic", lambda *a, **k: {"type": "ops"})
     runner = CliRunner()
-    accepted = runner.invoke(cli.session_group, ["topic", "close", "ops"])
+    accepted = runner.invoke(
+        cli.session_group, ["topic", "close", "--harness-name", "codex", "--harness-id", "A", "ops"]
+    )
     assert accepted.exit_code == 0, accepted.output
 
 

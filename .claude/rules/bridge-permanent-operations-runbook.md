@@ -1,3 +1,11 @@
+<!--
+THIS FILE IS A PROJECTION, NOT CANONICAL.
+Projected from the neutral harness baseline by the GT-KB projection engine.
+Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+`gt harness project claude`. If a needed change cannot be made through
+the baseline and re-projection, file a work item against the projector
+(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+-->
 # DEPRECATED — Bridge Permanent Operations Runbook (Retired 2026-06-11, FAB-05 / HYG-018)
 
 > ⚠️ **DEPRECATED / RETIRED.** This runbook formerly mandated 3-minute OS bridge
@@ -13,7 +21,7 @@ The OS-poller stack (Windows scheduled tasks `AgentRedFileBridgeIndexScan-*`,
 watchers) polled blindly on a fixed interval regardless of bridge activity and
 was halted by owner directive on 2026-04-25. Bridge dispatch is now daemon-driven
 via the dispatcher daemon (`scripts/gtkb_dispatcher_daemon.py`) on the headless
-dispatcher supervisor path; manual dispatcher/TAFE bridge-state scans remain
+dispatcher supervisor path; manual bridge-state scans remain
 the fallback. See
 [`bridge-essential.md`](bridge-essential.md) for the canonical operating mode and
 the two-axis bridge-automation model.

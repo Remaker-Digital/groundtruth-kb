@@ -68,10 +68,10 @@ The two-surface harness-specific contract directly addresses the falsifying clas
 
 ## Relationship to Other Rules
 
-- `.claude/rules/file-bridge-protocol.md` — bridge protocol authority; this rule operationalizes one aspect of the broader source-of-truth discipline that protocol depends on.
-- `.claude/rules/operating-model.md` — operating model framing; SoT read discipline is part of the platform's lifecycle-independence and audit-trail contract.
-- `.claude/rules/loyal-opposition.md` — LO review obligations; reviewers should flag PRs that introduce reads of registered forbidden substitutes without bypass justification.
-- `.claude/rules/prime-builder-role.md` — Prime Builder discipline; Prime SHOULD route reads through canonical readers per clause (a) of `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` v2.
+- `.harness-baseline-configuration/rules/file-bridge-protocol.md` — bridge protocol authority; this rule operationalizes one aspect of the broader source-of-truth discipline that protocol depends on.
+- `.harness-baseline-configuration/rules/operating-model.md` — operating model framing; SoT read discipline is part of the platform's lifecycle-independence and audit-trail contract.
+- `.harness-baseline-configuration/rules/loyal-opposition.md` — LO review obligations; reviewers should flag PRs that introduce reads of registered forbidden substitutes without bypass justification.
+- `.harness-baseline-configuration/rules/prime-builder-role.md` — Prime Builder discipline; Prime SHOULD route reads through canonical readers per clause (a) of `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` v2.
 
 ## Doctor Check
 

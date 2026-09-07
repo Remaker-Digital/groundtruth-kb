@@ -117,8 +117,10 @@ def render_adapter(source_text: str, adapter: SkillAdapter, *, generated_at: str
     # helper copies, so baseline helper references are rewritten to that route.
     # Before the baseline moved to .agents this happened implicitly, because the
     # baseline was .claude. References are documentation and stay on the baseline.
+    # WI-6228 Change C — rewrite from the current baseline prefix
+    # (`.harness-baseline-configuration`), not the retired `.agents` tree.
     body = re.sub(
-        r"\.agents(/skills/[A-Za-z0-9._-]+/helpers/)",
+        re.escape(".harness-baseline-configuration") + r"(/skills/[A-Za-z0-9._-]+/helpers/)",
         r".claude\1",
         body,
     )

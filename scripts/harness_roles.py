@@ -8,7 +8,7 @@ in-process form is ``frozenset[str]``. Legacy scalar values are accepted on
 READ and upgraded to list form on first WRITE.
 
 Authority: ADR-SINGLE-HARNESS-OPERATING-MODE-001 (Path 2 atomic migration);
-``.claude/rules/operating-role.md`` § Role Set Schema (Active Authority).
+``.harness-baseline-configuration/rules/operating-role.md`` § Role Set Schema (Active Authority).
 """
 
 from __future__ import annotations
@@ -21,40 +21,22 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-try:
-    from scripts.harness_identity import (
-        DEFAULT_HARNESS_IDS as _DEFAULT_HARNESS_IDS,
-    )
-    from scripts.harness_identity import (
-        normalize_harness_id,
-        normalize_harness_name,
-    )
-    from scripts.harness_identity import (
-        resolved_harness_id as _resolved_persistent_harness_id,
-    )
-except ImportError:  # pragma: no cover - direct script execution path
-    from harness_identity import (  # type: ignore[no-redef]
-        DEFAULT_HARNESS_IDS as _DEFAULT_HARNESS_IDS,
-    )
-    from harness_identity import (
-        normalize_harness_id,
-        normalize_harness_name,
-    )
-    from harness_identity import (
-        resolved_harness_id as _resolved_persistent_harness_id,
-    )
-
-try:
-    from scripts.harness_projection_reader import load_harness_projection
-except ImportError:  # pragma: no cover - direct script execution path
-    from harness_projection_reader import (  # type: ignore[no-redef]
-        load_harness_projection,
-    )
+from scripts.harness_identity import (
+    DEFAULT_HARNESS_IDS as _DEFAULT_HARNESS_IDS,
+)
+from scripts.harness_identity import (
+    normalize_harness_id,
+    normalize_harness_name,
+)
+from scripts.harness_identity import (
+    resolved_harness_id as _resolved_persistent_harness_id,
+)
+from scripts.harness_projection_reader import load_harness_projection
 
 ROLE_PRIME_BUILDER = "prime-builder"
 ROLE_LOYAL_OPPOSITION = "loyal-opposition"
 # Compatibility/provenance value (per
-# .claude/rules/acting-prime-builder.md § Compatibility/Provenance
+# .harness-baseline-configuration/rules/acting-prime-builder.md § Compatibility/Provenance
 # Classification). Accepted on READ; rejected on SET.
 ROLE_ACTING_PRIME_BUILDER = "acting-prime-builder"
 
@@ -756,10 +738,9 @@ def _project_completion_ready(db: Any, project_id: str) -> tuple[bool, list[str]
     if str(project.get("status") or "").strip().lower() in PROJECT_TERMINAL_STATUSES:
         return False, ["project_already_terminal"]
 
-    active_authorizations = db.list_project_authorizations(project_id, status="active")
-    if active_authorizations:
-        reasons.append("active_project_authorizations_remain")
-
+    # WI-7657: a lingering active authorization is no longer a completion
+    # blocker, because no authorization record exists to linger. Completion
+    # readiness is now decided solely by the project's linked work items below.
     linked_work_items = db.list_project_work_items(project_id)
     if not linked_work_items:
         reasons.append("no_linked_project_work_items")
@@ -860,7 +841,6 @@ def evaluate_ollama_phase2_closure(
 
     db = KnowledgeDB(db_path=db_path)
     project = db.get_project(OLLAMA_PHASE2_PROJECT_ID)
-    authorization = db.get_project_authorization(OLLAMA_PHASE2_AUTHORIZATION_ID)
     work_items = {item_id: db.get_work_item(item_id) for item_id in OLLAMA_PHASE2_CLOSURE_WORK_ITEMS}
     missing_work_items = [item_id for item_id, row in work_items.items() if row is None]
     work_items_requiring_update = [
@@ -868,8 +848,6 @@ def evaluate_ollama_phase2_closure(
     ]
     if project is None:
         blocking_reasons.append("phase2_project_missing")
-    if authorization is None:
-        blocking_reasons.append("phase2_authorization_missing")
     if missing_work_items:
         blocking_reasons.append("phase2_work_items_missing")
 
@@ -884,7 +862,6 @@ def evaluate_ollama_phase2_closure(
         "prerequisites": prerequisites,
         "ollama_promoted": promoted,
         "project": project,
-        "authorization": authorization,
         "work_items": work_items,
         "missing_work_items": missing_work_items,
         "work_items_requiring_update": work_items_requiring_update,
@@ -951,16 +928,8 @@ def apply_ollama_phase2_closure(
         )
         result["resolved_work_items"].append(item_id)
 
-    authorization = db.get_project_authorization(OLLAMA_PHASE2_AUTHORIZATION_ID)
-    if authorization is not None and authorization.get("status") == "active":
-        db.update_project_authorization(
-            OLLAMA_PHASE2_AUTHORIZATION_ID,
-            changed_by,
-            change_reason,
-            status="completed",
-        )
-        result["authorization_completed"] = True
-
+    # WI-7657: there is no authorization record to complete. Closure is
+    # recorded by the resolved work items and the project completion below.
     result["project_completed"] = _complete_ollama_phase2_project_if_ready(
         db,
         root,

@@ -1,3 +1,11 @@
+<!--
+THIS FILE IS A PROJECTION, NOT CANONICAL.
+Projected from the neutral harness baseline by the GT-KB projection engine.
+Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+`gt harness project claude`. If a needed change cannot be made through
+the baseline and re-projection, file a work item against the projector
+(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+-->
 # GT-KB Project Root Boundary
 
 This rule is mandatory for all GT-KB work and for every application developed,
@@ -11,7 +19,7 @@ managed, scaffolded, upgraded, or governed by GT-KB.
 - GT-KB demo/application files MUST be within `E:\GT-KB\applications\`.
 - **EXCEPTION:** `groundtruth-kb/examples/` (adopter fixtures) are exempt from the `applications/` mandate.
 - Agent Red is the reference adopter application for GT-KB. Its application files
-  live at `E:\GT-KB\applications\Agent_Red\` per `CLAUDE.md` section
+  live at `E:\GT-KB\applications\Agent_Red\` per the root harness instruction file section
   Mandatory Project Root Boundary, governed by the isolation contract at
   `applications/Agent_Red/.gtkb-app-isolation.json`. The hosted form deploys
   from a lifecycle-independent repository at
@@ -47,8 +55,8 @@ managed, scaffolded, upgraded, or governed by GT-KB.
 
 ## Harness-Local Scratchpad Non-Authority Boundary
 
-Harness-local scratchpads are non-authoritative. This includes Antigravity planning/brain files,
-Codex automation memory, Claude Code auto-memory, and the
+Harness-local scratchpads are non-authoritative. This includes per-harness planning/brain files,
+automation memory, harness auto-memory, and the
 `MEMORY.md` hierarchy, including `memory/MEMORY.md`, scaffolded root
 `MEMORY.md`, and harness-created mirrors or cache files.
 
@@ -121,7 +129,7 @@ MemBase is always `E:\GT-KB\groundtruth.db`.
 ## External Harness Executable Resolution Exception
 
 GT-KB cross-harness operations may resolve and invoke external AI coding harness
-executables (e.g., codex, claude, gemini) that are installed outside E:\GT-KB by
+executables (registry-enumerated harness CLIs) that are installed outside E:\GT-KB by
 their own toolchains (npm-global, user-install, system package managers) when ALL
 of the following hold:
 
@@ -129,7 +137,7 @@ of the following hold:
    (harness-state/harness-registry.json) via an invocation_surfaces.*.argv entry.
    Only registry-enumerated harness command names are eligible.
 2. Resolution uses one of: (a) ambient PATH resolution provided by the launching
-   context (the mechanism by which codex/claude are already dispatched), or (b) a
+   context (the mechanism by which registered harnesses are already dispatched), or (b) a
    location configured in the in-root platform env source-of-truth (.env.local)
    per GOV-ENV-LOCAL-AUTHORITY-001, which is the SoT for hard path prefixes and
    CLI configuration choices. No out-of-root absolute path is stored as a literal

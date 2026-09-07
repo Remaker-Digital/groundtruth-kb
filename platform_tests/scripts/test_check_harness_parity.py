@@ -1177,6 +1177,18 @@ def test_known_harnesses_fallback_on_missing_projection(monkeypatch, tmp_path: P
     assert result == ("claude", "codex")
 
 
+def test_known_harnesses_include_declared_cursor_without_harness_state(monkeypatch, tmp_path: Path) -> None:
+    """Declared projector profiles keep Cursor selectable when harness-state is absent."""
+    module = _load_module()
+    (tmp_path / "harness-state").mkdir()
+    profiles = tmp_path / "scripts" / "harness_projection" / "profiles.toml"
+    profiles.parent.mkdir(parents=True)
+    profiles.write_text('[harnesses.cursor]\nname = "cursor"\n', encoding="utf-8")
+    monkeypatch.setattr(module, "PROJECT_ROOT", tmp_path)
+    result = module._load_known_harnesses_from_projection()
+    assert "cursor" in result
+
+
 def test_capability_floor_for_registered_no_role_harness(monkeypatch, tmp_path: Path) -> None:
     """Registered/no-active-role harness with full floor â†’ 6 PASS CapabilityResults."""
     module = _load_module()
@@ -1400,7 +1412,6 @@ reason = "fixture"
     assert any(result.harness == "goose" and result.capability_id == "test.lifecycle" for result in historical.results)
 
 
-
 def _write_goose_plugin_hooks(project_root: Path, scripts: list[str], *, projection: bool = True) -> None:
     path = project_root / ".goose" / "plugins" / "gtkb" / "hooks" / "hooks.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1518,4 +1529,104 @@ skill_adapter_manifest = ".goose/skills/MANIFEST.json"
     ]
     assert present
     assert any(result.capability_id == "goose.required-gate.destructive-gate" for result in missing_gates)
+    assert report.overall_status == "FAIL"
+
+
+def _write_cursor_hooks(
+    project_root: Path,
+    scripts: list[str],
+    *,
+    wrap: bool = True,
+    fail_closed: bool = True,
+) -> None:
+    path = project_root / ".cursor" / "hooks.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    entries = []
+    for name in scripts:
+        if wrap:
+            command = f'"groundtruth-kb/.venv/Scripts/python.exe" scripts/cursor_hook_adapter.py .cursor/hooks/{name}'
+        else:
+            command = f"python .cursor/hooks/{name}"
+        entry: dict[str, object] = {"command": command, "matcher": "Write|StrReplace"}
+        if fail_closed:
+            entry["failClosed"] = True
+        entries.append(entry)
+    path.write_text(json.dumps({"version": 1, "hooks": {"preToolUse": entries}}), encoding="utf-8")
+
+
+def _write_cursor_harness_manifest(project_root: Path) -> None:
+    (project_root / "harness-state").mkdir(parents=True, exist_ok=True)
+    (project_root / "harness-state" / "harness-registry.json").write_text(
+        json.dumps({"harnesses": [{"harness_name": "cursor", "status": "active", "role": ["loyal-opposition"]}]}),
+        encoding="utf-8",
+    )
+
+
+def test_cursor_hooks_json_evidences_hook_capability(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_cursor_harness_manifest(tmp_path)
+    _write_cursor_hooks(tmp_path, ["sot-read-discipline.py"])
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "hook.sot-read-discipline"
+kind = "hook"
+canonical_name = "sot-read-discipline"
+canonical_source = "config/hooks/gtkb-sot-read-discipline.py"
+required_for_roles = ["loyal-opposition"]
+parity_class = "required"
+
+[harnesses.cursor]
+skill_adapter_manifest = ".cursor/skills/MANIFEST.json"
+""",
+    )
+
+    report = module.check_harness_parity(tmp_path, harness="cursor", role="loyal-opposition")
+
+    target = [result for result in report.results if result.capability_id == "hook.sot-read-discipline"]
+    assert len(target) == 1
+    assert target[0].state == "PASS"
+    assert target[0].evidence.endswith("hooks.json")
+    assert "adapter wrap" in target[0].note
+
+
+def test_cursor_required_gate_census_fails_when_hooks_omit_named_gate(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_cursor_harness_manifest(tmp_path)
+    _write_cursor_hooks(tmp_path, ["sot-read-discipline.py"])
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "skill.x"
+kind = "skill"
+canonical_name = "x"
+canonical_source = ".claude/skills/x/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/x/SKILL.md"
+status = "native"
+
+[harnesses.cursor]
+skill_adapter_manifest = ".cursor/skills/MANIFEST.json"
+""",
+    )
+    _write_skill(tmp_path, "x")
+
+    report = module.check_harness_parity(tmp_path, harness="cursor", role="loyal-opposition", include_all=True)
+    missing_gates = [
+        result
+        for result in report.results
+        if result.capability_id.startswith("cursor.required-gate.") and result.state == "MISSING"
+    ]
+    present = [
+        result
+        for result in report.results
+        if result.capability_id == "cursor.required-gate.sot-read-discipline" and result.state == "PASS"
+    ]
+    assert present
+    assert any(result.capability_id == "cursor.required-gate.destructive-gate" for result in missing_gates)
     assert report.overall_status == "FAIL"

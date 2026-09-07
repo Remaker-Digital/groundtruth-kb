@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """
-Claude Code PreToolUse hook -- Narrative-artifact approval gate.
+PreToolUse hook -- Narrative-artifact approval gate.
 
 Blocks Write/Edit on narrative-artifact paths (rule files, AGENTS.md,
-CLAUDE*.md) unless the call references a valid
+harness instruction files) unless the call references a valid
 approval packet that proves owner-visible packet display per DELIB-0835.
 
 Slice A of GTKB-NARRATIVE-ARTIFACT-APPROVAL-EXTENSION-001.
 Bridge:    bridge/gtkb-narrative-artifact-approval-extension-001-004.md (GO)
 Specs:     GOV-ARTIFACT-APPROVAL-001 (extended), DCL-ARTIFACT-APPROVAL-HOOK-001 (extended)
 
-Harness scope: Claude only (PreToolUse on Write|Edit). Codex template parity at
-groundtruth-kb/templates/hooks/narrative-artifact-approval-gate.py is
-forward-compatible-only per ADR-CODEX-HOOK-PARITY-FALLBACK-001; it is NOT a
 live Windows interception boundary. Slice C's pre-commit hook is the
 universal enforcement floor.
 
 Stdin:  JSON {"tool_name": "Write|Edit", "tool_input": {"file_path": "...", ...}, ...}
 Stdout: JSON {"decision": "block", "reason": "..."} or {} (allow)
-Exit:   Always 0 (Claude Code hook contract: hook always returns 0; decision is in stdout)
+Exit:   Always 0 (harness hook contract: hook always returns 0; decision is in stdout)
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -62,6 +65,18 @@ REQUIRED_PACKET_FIELDS = {
 VALID_APPROVAL_MODES = {"approve", "acknowledge", "edit-and-approve", "auto"}
 
 NARRATIVE_ARTIFACT_TYPE = "narrative_artifact"
+
+
+def _normalize_lf(text: str) -> str:
+    """Normalize CRLF and bare CR line endings to LF.
+
+    Owner-approved packets are stored LF-normalized. A Windows Write/Edit tool
+    may carry the same content with CRLF line endings, which would otherwise
+    fail the byte-exact hash/equality checks. Applying this helper before
+    hashing and comparison makes autodiscovery match the packet without
+    mutating the proposed content.
+    """
+    return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def _project_root() -> Path:
@@ -211,8 +226,10 @@ def _validate_packet(
 
     # When the tool call carries the proposed write content, ensure the packet
     # describes the same content. Edit operations may not include full content
-    # in tool_input; we only enforce when content is present.
-    if new_content is not None and new_content != full_content:
+    # in tool_input; we only enforce when content is present. The comparison is
+    # LF-normalized so a Windows Write carrying CRLF bytes still matches the
+    # LF-normalized owner-approved packet (WI-6012).
+    if new_content is not None and _normalize_lf(new_content) != _normalize_lf(full_content):
         return (
             "approval packet full_content does not match the proposed Write/Edit content "
             "(packet must be regenerated when the content changes)"
@@ -277,7 +294,7 @@ def _autodiscover_packet(root: Path, rel_path: str, new_content: str | None) -> 
     approvals_dir = root / ".groundtruth" / "formal-artifact-approvals"
     if not approvals_dir.is_dir():
         return None
-    target_hash = hashlib.sha256(new_content.encode("utf-8")).hexdigest()
+    target_hash = hashlib.sha256(_normalize_lf(new_content).encode("utf-8")).hexdigest()
     matches: list[tuple[float, str]] = []
     for packet_file in approvals_dir.glob("*.json"):
         try:
@@ -313,6 +330,27 @@ def _block_reason(rel_path: str, detail: str) -> str:
     )
 
 
+def _shell_candidates(payload: dict, root: Path, *, require_content: bool = True) -> list[dict]:
+    """Native-shaped payloads to judge for one incoming payload (WI-7289).
+
+    A native payload expands to itself, so native handling is unchanged. A shell
+    payload expands to one synthetic Write per recognized write target; an
+    unrecognized command expands to nothing and is therefore allowed.
+    """
+    hooks_dir = str(Path(__file__).resolve().parent)
+    if hooks_dir not in sys.path:
+        sys.path.insert(0, hooks_dir)
+    try:
+        from _shell_payload import expand_shell_payload
+    except ImportError:
+        return [payload]
+    try:
+        return expand_shell_payload(payload, root, require_content=require_content)
+    except Exception:
+        # Extraction must never harden into a new failure mode for the gate.
+        return [payload]
+
+
 def main() -> None:
     if "--self-test" in sys.argv:
         _emit_pass()
@@ -324,31 +362,37 @@ def main() -> None:
         _emit_pass()
         return
 
+    # WI-7289: this gate is registered on the shell surface now, so a shell
+    # command that writes a protected narrative artifact must be judged by the
+    # same code as the native write it is equivalent to.
+    for candidate in _shell_candidates(payload, _project_root()):
+        if _decide(candidate):
+            return
+    _emit_pass()
+
+
+def _decide(payload: dict) -> bool:
+    """Judge one native-shaped payload. True when a verdict was emitted."""
     tool_name = payload.get("tool_name", "")
     if tool_name not in WRITE_TOOLS:
-        _emit_pass()
-        return
+        return False
 
     tool_input = payload.get("tool_input", {}) or {}
     file_path = tool_input.get("file_path", "")
     if not isinstance(file_path, str) or not file_path:
-        _emit_pass()
-        return
+        return False
 
     root = _project_root()
     rel_path = _normalise_relative(file_path, root)
     if rel_path is None:
-        _emit_pass()
-        return
+        return False
 
     config = _load_config(root)
     if config is None:
-        _emit_pass()
-        return
+        return False
 
     if not _is_protected(rel_path, config):
-        _emit_pass()
-        return
+        return False
 
     if tool_name == "Write":
         new_content = tool_input.get("content")
@@ -364,19 +408,19 @@ def main() -> None:
         packet_ref = _autodiscover_packet(root, rel_path, new_content)
     if not packet_ref:
         _emit_block(_block_reason(rel_path, "No approval-packet reference was found."))
-        return
+        return True
 
     packet, parse_error = _load_packet(packet_ref, root)
     if parse_error or packet is None:
         _emit_block(_block_reason(rel_path, parse_error or "approval packet did not load"))
-        return
+        return True
 
     error = _validate_packet(packet, rel_path, new_content)
     if error:
         _emit_block(_block_reason(rel_path, error))
-        return
+        return True
 
-    _emit_pass()
+    return False
 
 
 if __name__ == "__main__":

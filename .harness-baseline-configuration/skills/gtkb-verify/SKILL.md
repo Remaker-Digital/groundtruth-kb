@@ -147,6 +147,14 @@ zero-padded version number for the thread. Structure:
 - `## Clause Applicability` — the verbatim output from
   `scripts/adr_dcl_clause_preflight.py`, including a `## Blocking Gaps`
   subsection when the clause preflight exited 5.
+- `## Simpler Alternative Considered` — include this section only when
+  authoring a `GO` verdict, where it is mandatory. Name the simpler design
+  actually weighed against the approved design and why the approved design was
+  preferred. "No simpler alternative exists" is permitted only when you state
+  what was considered and why it does not apply; a bare denial is not a
+  considered alternative. Not applicable to `NO-GO` (already a rejection) or
+  `VERIFIED` (post-commit evidence, not an approval decision). See
+  `.harness-baseline-configuration/rules/review-operating-contract.md`.
 - `## Prior Deliberations` — `DELIB-*` citations from the deliberation search,
   or an explicit `_No prior deliberations: <reason>._` line for a novel topic.
 - `## Specifications Carried Forward` — the list of linked specifications,

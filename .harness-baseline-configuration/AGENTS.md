@@ -65,7 +65,7 @@ restrictions that pertain to Prime Builder. When the resolved session role is
 Loyal Opposition, apply only governance, permissions, and restrictions that
 pertain to Loyal Opposition. Once resolved, the role is immutable for the lifetime of the session context.
 
-Interactive sessions MAY override the dispatcher/default role metadata for in-session surfaces — SessionStart disclosure, the workstream-focus menu, MemBase `changed_by` attribution, AUQ routing, and the Claude-native AXIS 2 surface — when the owner gives explicit role direction in the transcript, including the canonical init keyword `::init gtkb (pb|lo)`. The transcript-defined role persists across compaction, resume, and contiguous SessionStart-like boundaries within the same interactive context until the owner explicitly changes it. This does not change the dispatcher/default assignment map — runtime marker files such as `.claude/session/active-session-role.json` are cache/state only, not dispatcher/default role records — and headless dispatch routing remains keyed to the dispatcher role set per `GOV-SESSION-ROLE-AUTHORITY-001`, `DCL-SESSION-ROLE-RESOLUTION-001`, `ADR-ROLE-AUTHORITY-INTERACTIVE-PERSISTENCE-001`, and `DCL-INTERACTIVE-SESSION-ROLE-PERSISTENCE-001`.
+Interactive sessions MAY override the dispatcher/default role metadata for in-session surfaces — SessionStart disclosure, the workstream-focus menu, MemBase `changed_by` attribution, AUQ routing, and the Claude-native AXIS 2 surface — when the owner gives explicit role direction in the transcript, including the canonical init keyword `::init gtkb (pb|lo)`. The transcript-defined role persists across compaction, resume, and contiguous SessionStart-like boundaries within the same interactive context until the owner explicitly changes it. This does not change the dispatcher/default assignment map — runtime marker files such as `{{HARNESS_CONFIG_DIR}}/session/active-session-role.json` are cache/state only, not dispatcher/default role records — and headless dispatch routing remains keyed to the dispatcher role set per `GOV-SESSION-ROLE-AUTHORITY-001`, `DCL-SESSION-ROLE-RESOLUTION-001`, `ADR-ROLE-AUTHORITY-INTERACTIVE-PERSISTENCE-001`, and `DCL-INTERACTIVE-SESSION-ROLE-PERSISTENCE-001`.
 
 ## Prime Builder File Authority
 
@@ -89,7 +89,7 @@ verified.
 ### Protected Targets and Paths
 The following workspace locations are strictly protected and require a bridge GO verdict before any mutation:
 *   **Platform Source & Tests:** `groundtruth-kb/src/`, `groundtruth-kb/tests/`, `platform_tests/`, `tests/`, `scripts/`
-*   **CI/CD & Configuration:** `.github/workflows/`, `.claude/hooks/`, `.claude/rules/`, `.codex/gtkb-hooks/`, `config/`
+*   **CI/CD & Configuration:** `.github/workflows/`, `{{HARNESS_HOOKS_DIR}}/`, `{{HARNESS_RULES_DIR}}/`, `config/`
 *   **Cloud & Deployment Configs:** `Dockerfile`, `Dockerfile.test`, `Dockerfile.ui`, `.dockerignore`, `docker-compose.yml`, `shopify.app.toml`
 *   **Environment & Credentials:** `env.local`, `.env`, `env.staging`
 
@@ -267,10 +267,8 @@ The first owner message in a fresh session is routed through the init-keyword co
   fully utilized.
 - New files should be created under:
   - `bridge/` for governed bridge artifacts.
-  - `.claude/rules/`
+  - `{{HARNESS_RULES_DIR}}/`
   - project root only when startup/loading requires it (for example, this file).
-
-# GT-KB Agent Canon — Compact Operating Guidance
 
 # GT-KB Agent Canon — Compact Operating Guidance
 

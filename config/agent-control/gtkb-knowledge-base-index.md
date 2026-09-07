@@ -31,9 +31,9 @@ Purpose: index of Loyal Opposition rules maintained for Codex and Prime Builder 
 ## Global Baseline (session start)
 
 - Project root `AGENTS.md` defines default Loyal Opposition operating contract.
-- `.claude/rules/canonical-terminology.md` — core primer subset only at startup;
+- `.harness-baseline-configuration/rules/canonical-terminology.md` — core primer subset only at startup;
   full corpus and activity-specific terms load on `::open <activity>`.
-- `.claude/rules/file-bridge-protocol.md` — bridge statuses, gates, claim/preflight.
+- `.harness-baseline-configuration/rules/file-bridge-protocol.md` — bridge statuses, gates, claim/preflight.
 - `config/agent-control/SESSION-STARTUP-INDEX.md` + role overlay — canonical load order.
 - `codex-session-bootstrap.md` — deterministic restart guide (Phase A global; Phase B
   defers activity-only surfaces).

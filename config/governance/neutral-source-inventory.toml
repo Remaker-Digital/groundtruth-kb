@@ -24,7 +24,7 @@ groundtruth_kb_src = "groundtruth-kb/src/groundtruth_kb"
 configuration = { description = "Canonical neutral configuration source; edited in place" }
 source = { description = "Python source and automation scripts" }
 test = { description = "Test artifacts (unit/integration/e2e/assertion)" }
-governance_evidence = { description = "Approval packets and governed evidence" }
+governance_evidence = { description = "Governed canonical evidence" }
 documentation = { description = "Markdown and prose guidance" }
 metadata = { description = "Machine-readable metadata/registry rows" }
 junk = { description = "Caches, scratch, and disposable content; never authority" }
@@ -46,10 +46,10 @@ junk = "delete-only"
 
 [routes.mutate]
 configuration = "allowed (baseline source)"
-source = "allowed under PAUTH"
-test = "allowed under PAUTH"
-governance_evidence = "governed packet write only"
-documentation = "allowed under PAUTH"
+source = "allowed within claimed GO scope"
+test = "allowed within claimed GO scope"
+governance_evidence = "governed canonical write only"
+documentation = "allowed within claimed GO scope"
 metadata = "governed record write only"
 junk = "delete-only; never authority"
 
@@ -86,3 +86,111 @@ paths = [
 # or governance configuration that resolves outside the host root fails
 # closed (WI-6040 acceptance 5).
 check_literal_machine_paths = true
+
+# --------------------------------------------------------------------------
+# Declared-reference registry (WI-6390).
+#
+# Certification mode (`--certify`) enumerates every reference to a generated
+# harness target across the walk roots above and classifies each occurrence as
+# DECLARED or UNDECLARED against this registry. Any undeclared occurrence fails
+# closed (GOV-HARNESS-NEUTRAL-BASELINE-001).
+#
+# Two occurrence classes are distinguished by the matched form:
+#   harness_path     - the token is followed by "/" (a path into a generated
+#                      tree, e.g. ".claude/hooks/foo.py")
+#   projection_token - the bare directory name with no separator (e.g. ".codex"
+#                      used as a value or identifier)
+#
+# A declaration is legitimate only when the neutral source genuinely requires
+# the target name to do its job. Declaring a reference is NOT remediation; it
+# records that the reference is correct and why. Every entry must carry a
+# non-empty `reason`, and an entry without one fails the registry closed.
+# --------------------------------------------------------------------------
+[declared_references]
+# Reference vocabulary. Defaults to `projection_prefixes.paths` when omitted;
+# stated explicitly here so the certification vocabulary is auditable on its own.
+# Filenames that mark a file as projector OUTPUT. Reported by location, not by
+# reference: a manifest legitimately names every target it produces, so its
+# references are declarable, but its presence inside the neutral source is not.
+generated_output_names = [
+  ".projection-manifest.json",
+  "hooks.json",
+  "routing.toml",
+]
+tokens = [
+  ".claude",
+  ".codex",
+  ".goose",
+  ".cursor",
+  ".agent",
+  ".api-harness",
+]
+
+# Each declaration matches a walk-root-relative POSIX path, exactly or by glob.
+# `classes` restricts the declaration to specific occurrence classes; when
+# omitted, both classes are declared for that path.
+
+[[declared_references.declarations]]
+path = ".harness-baseline-configuration/.projection-manifest.json"
+reason = "The projection manifest enumerates the generated targets it produces; naming every target is the manifest's function, not contamination."
+
+[[declared_references.declarations]]
+path = "config/registry/sot-artifacts.toml"
+reason = "The source-of-truth registry records forbidden-substitute paths, which are by construction paths inside generated trees; the registry cannot forbid a path without naming it."
+
+[[declared_references.declarations]]
+path = "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/registry/sot-artifacts.toml"
+reason = "Packaged copy of the source-of-truth registry above; identical function and identical justification."
+
+[[declared_references.declarations]]
+path = "scripts/harness_projection/profiles.toml"
+reason = "The projector profile table maps neutral source to each harness target; the target names are the projector's required input."
+
+[[declared_references.declarations]]
+path = "scripts/harness_parity_phase2.py"
+reason = "Cross-harness parity tooling names the harnesses under comparison; a parity check cannot compare targets it may not name."
+
+[[declared_references.declarations]]
+path = "scripts/check_codex_hook_parity.py"
+reason = "Hook-parity tooling names the harnesses under comparison; same justification as the parity phase-2 surface."
+
+# --- Declared families, seeded from the measured population on 2026-09-03. ---
+# A RATCHET: entries may be removed as sanitation lands and must not be added
+# without an owner-approved bridge revision. Before seeding, certification
+# reported 2,983 occurrences across 240 files against 6 declarations, which
+# fails closed on the whole platform and cannot be adopted. These declarations
+# cover the surfaces whose FUNCTION is to name targets. The neutral baseline is
+# deliberately NOT declared: references there are the contamination the gate
+# exists to find.
+
+[[declared_references.declarations]]
+path = "scripts/harness_projection/*"
+reason = "The projection engine and its profile table must name every target they render; a projector that may not name its outputs cannot produce them."
+
+[[declared_references.declarations]]
+path = "groundtruth-kb/src/groundtruth_kb/**"
+reason = "Platform source reads and validates projections - doctor checks, parity checks, and projection readers all resolve target paths - so naming targets is required behaviour, not source contamination."
+
+[[declared_references.declarations]]
+path = "config/registry/**"
+reason = "Registry configuration enumerates projection paths as registered data, including forbidden substitutes that cannot be forbidden without being named."
+
+[[declared_references.declarations]]
+path = "config/governance/**"
+reason = "Governance configuration declares the projection prefixes and disposable prefixes themselves; this file is an instance of that."
+
+[[declared_references.declarations]]
+path = "scripts/*.py"
+reason = "Platform automation resolves per-harness surfaces for inventory, parity, startup and hygiene work; the target name is an input to those operations."
+
+[[declared_references.declarations]]
+path = "config/agent-control/**"
+reason = "RATCHETED EXCEPTION, NOT AN ENDORSEMENT. config/agent-control is forbidden drift and must not remain an authority, compatibility baseline, or runtime dependency; its purge is tracked as WI-6962. It is declared only so the certification is adoptable before that purge lands, and it is the largest single contributor at 776 occurrences. Removing this declaration is the expected outcome of WI-6962, not a regression."
+
+[[declared_references.declarations]]
+path = "config/hooks/**"
+reason = "RATCHETED EXCEPTION. Transitional hook configuration slated for relocation into the neutral baseline; declared so certification is adoptable before that relocation."
+
+[[declared_references.declarations]]
+path = "config/file-reference-migration/**"
+reason = "RATCHETED EXCEPTION. Migration bookkeeping that records old and new reference paths by construction; it cannot record a path migration without naming both paths."

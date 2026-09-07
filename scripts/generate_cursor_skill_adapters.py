@@ -46,7 +46,6 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 from _wrap_io import _atomic_write_bytes  # noqa: E402
 
-
 ADAPTER_BLOCK_RE = re.compile(
     r"<!--\s*GTKB-[A-Za-z0-9_-]+-SKILL-ADAPTER.*?GTKB-[A-Za-z0-9_-]+-SKILL-ADAPTER\s*-->\s*",
     re.DOTALL,
@@ -107,6 +106,38 @@ def _load_registry(project_root: Path) -> dict[str, Any]:
         raise CursorSkillAdapterError(f"Cannot load harness capability registry {path}: {exc}") from exc
 
 
+def _append_adapter(
+    *,
+    project_root: Path,
+    renderer: Any,
+    adapters: list[CursorSkillAdapter],
+    seen: set[str],
+    capability_id: str,
+    canonical_name: str,
+    source: str,
+    surface: str,
+) -> None:
+    if surface in seen:
+        raise CursorSkillAdapterError(f"Duplicate Cursor adapter surface: {surface}")
+    seen.add(surface)
+    source_path = project_root / source
+    try:
+        source_text = source_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise CursorSkillAdapterError(f"Cannot read canonical skill {source}: {exc}") from exc
+    stripped = _strip_all_adapter_blocks(renderer._strip_generated_block(source_text)).lstrip("\ufeff").rstrip() + "\n"
+    renderer.validate_skill_frontmatter(stripped, source)
+    adapters.append(
+        CursorSkillAdapter(
+            capability_id=capability_id,
+            canonical_name=canonical_name or Path(source).parent.name,
+            source_relative_path=source,
+            adapter_relative_path=surface,
+            source_sha256=_sha256(stripped.encode("utf-8")),
+        )
+    )
+
+
 def build_adapters(project_root: Path) -> list[CursorSkillAdapter]:
     renderer = _codex_generator()
     raw_capabilities = _load_registry(project_root).get("capabilities")
@@ -114,11 +145,17 @@ def build_adapters(project_root: Path) -> list[CursorSkillAdapter]:
         raise CursorSkillAdapterError("Harness capability registry has no capabilities array")
     adapters: list[CursorSkillAdapter] = []
     seen: set[str] = set()
+    unsupported_names: set[str] = set()
     for capability in raw_capabilities:
         if not isinstance(capability, dict) or capability.get("kind") != "skill":
             continue
         cursor = capability.get("cursor")
-        if not isinstance(cursor, dict) or cursor.get("status") == "unsupported":
+        if isinstance(cursor, dict) and cursor.get("status") == "unsupported":
+            name = str(capability.get("canonical_name") or "").strip()
+            if name:
+                unsupported_names.add(name)
+            continue
+        if not isinstance(cursor, dict):
             continue
         raw_surface = str(cursor.get("surface") or "")
         if not raw_surface.replace("\\", "/").startswith(".cursor/skills/"):
@@ -129,27 +166,45 @@ def build_adapters(project_root: Path) -> list[CursorSkillAdapter]:
             prefix=(BASELINE_SKILLS_PREFIX, ".claude/skills/"),
             suffix="/SKILL.md",
         )
-        if surface in seen:
-            raise CursorSkillAdapterError(f"Duplicate Cursor adapter surface: {surface}")
-        seen.add(surface)
-        source_path = project_root / source
-        try:
-            source_text = source_path.read_text(encoding="utf-8")
-        except (OSError, UnicodeError) as exc:
-            raise CursorSkillAdapterError(f"Cannot read canonical skill {source}: {exc}") from exc
-        stripped = (
-            _strip_all_adapter_blocks(renderer._strip_generated_block(source_text)).lstrip("\ufeff").rstrip() + "\n"
+        _append_adapter(
+            project_root=project_root,
+            renderer=renderer,
+            adapters=adapters,
+            seen=seen,
+            capability_id=str(capability.get("id") or ""),
+            canonical_name=str(capability.get("canonical_name") or Path(source).parent.name),
+            source=source,
+            surface=surface,
         )
-        renderer.validate_skill_frontmatter(stripped, source)
-        adapters.append(
-            CursorSkillAdapter(
-                capability_id=str(capability.get("id") or ""),
-                canonical_name=str(capability.get("canonical_name") or Path(source).parent.name),
-                source_relative_path=source,
-                adapter_relative_path=surface,
-                source_sha256=_sha256(stripped.encode("utf-8")),
+    baseline_root = project_root / ".harness-baseline-configuration/skills"
+    if baseline_root.is_dir():
+        for skill_dir in sorted(baseline_root.iterdir()):
+            if not skill_dir.is_dir():
+                continue
+            skill_md = skill_dir / "SKILL.md"
+            if not skill_md.is_file():
+                continue
+            name = skill_dir.name
+            if name in unsupported_names:
+                continue
+            surface = f".cursor/skills/{name}/SKILL.md"
+            if surface in seen:
+                continue
+            source = _safe_relative(
+                f"{BASELINE_SKILLS_PREFIX}{name}/SKILL.md",
+                prefix=BASELINE_SKILLS_PREFIX,
+                suffix="/SKILL.md",
             )
-        )
+            _append_adapter(
+                project_root=project_root,
+                renderer=renderer,
+                adapters=adapters,
+                seen=seen,
+                capability_id=f"skill.{name}",
+                canonical_name=name,
+                source=source,
+                surface=_safe_relative(surface, prefix=".cursor/skills/", suffix="/SKILL.md"),
+            )
     return sorted(adapters, key=lambda item: item.adapter_relative_path.casefold())
 
 
@@ -170,7 +225,6 @@ def render_adapter(source_text: str, adapter: CursorSkillAdapter, *, generated_a
         "Generated by: scripts/generate_codex_skill_adapters.py",
         "Generated by: scripts/generate_cursor_skill_adapters.py",
     )
-    rendered = rendered.replace(f"Generated at: {generated_at}\n", "")
     # Neutralize foreign harness directory references:
     rendered = re.sub(
         r"\.(?:codex|claude|agents|agent|goose|api-harness)(/(?:skills|hooks|rules)/)", r".cursor\1", rendered

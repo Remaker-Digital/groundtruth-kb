@@ -2,7 +2,7 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project antigravity`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
@@ -12,7 +12,7 @@ This rule file defines mandatory behavior for both Prime Builder and Loyal
 Opposition when interacting with the Deliberation Archive (SPEC-2098).
 
 The active AI harness loads this file via AGENTS.md startup checklist item 15a
-or via `.claude/rules/` auto-load.
+or via `.agent/rules/` auto-load.
 
 ## Canonical Terminology Anchored Here
 
@@ -23,7 +23,7 @@ the GT-KB checkout, repo-root in scaffolded adopter projects per the
 harness-memory vs dual-agent profile distinction) / **Deliberation Archive**
 (this file's subject — design-reasoning record). Canonical-term references
 to MemBase, MEMORY.md, and Deliberation Archive must use these exact forms;
-see `.claude/rules/canonical-terminology.md` for the full glossary. Doctor's
+see `.agent/rules/canonical-terminology.md` for the full glossary. Doctor's
 canonical-terminology check enforces these strings in this rule file as part
 of the dual-agent / harness-memory `required_files` contract.
 

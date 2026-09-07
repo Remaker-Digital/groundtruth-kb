@@ -17,7 +17,25 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_REGISTRY_RELATIVE_PATH = Path("config/governance/protected-artifact-inventory-drift.toml")
 DEFAULT_INVENTORY_RELATIVE_PATH = Path(".groundtruth/inventory/dev-environment-inventory.json")
 DEFAULT_VOLATILE_PATHS = ("generated_at",)
-PASSING_OUTCOMES = {"clean", "accepted_baseline_update", "local_only_notice", "review_evidence_present"}
+PASSING_OUTCOMES = {
+    "clean",
+    "accepted_baseline_update",
+    "local_only_notice",
+    "review_evidence_present",
+    "test_evidence_present",
+    "staged_review_notice",
+}
+# Routes whose registry ``required_evidence`` names tests. A staged test module
+# satisfies them mechanically, which is what the registry says the evidence is.
+# fnmatch's ``*`` spans directory separators, so the patterns cover nested test
+# packages. (Owner direction, 2026-09-07, canon v8.92 sections 6 and 7.)
+TEST_EVIDENCE_ROUTES = frozenset({"compatibility_tests", "release_blocker"})
+COMPATIBILITY_TEST_PATTERNS = ("platform_tests/*test_*.py", "groundtruth-kb/tests/*test_*.py")
+# Routes whose ``required_evidence`` is a review artifact. Review is recorded in
+# the bridge, which is ephemeral and never committed (canon section 6), so at
+# pre-commit time these routes warn; the whole-tree release gate (staged=False)
+# still blocks on them.
+STAGED_REVIEW_ROUTES = frozenset({"governance_review", "docs_review"})
 BRIDGE_REVIEW_EVIDENCE_PATTERNS = ("bridge/*-[0-9][0-9][0-9].md",)
 
 # Inventoried surfaces that drive the public dev-environment inventory. This is a
@@ -213,6 +231,13 @@ def has_bridge_review_evidence(changed_paths: list[str]) -> bool:
     )
 
 
+def has_test_evidence(changed_paths: list[str]) -> bool:
+    """Return True when the changed set stages at least one test module."""
+    return any(
+        any(fnmatch.fnmatchcase(path, pattern) for pattern in COMPATIBILITY_TEST_PATTERNS) for path in changed_paths
+    )
+
+
 def staged_paths_touch_inventoried_surface(changed_paths: list[str]) -> bool:
     """Return True when any changed path is an inventoried surface (WI-4862).
 
@@ -250,6 +275,7 @@ def evaluate_drift(
     normalized_changed_paths = [_assert_relative_inside_project(path) for path in paths]
     protected_changes = classify_changed_paths(registry, normalized_changed_paths)
     review_evidence_present = has_bridge_review_evidence(normalized_changed_paths)
+    test_evidence_present = has_test_evidence(normalized_changed_paths)
     baseline_rel = DEFAULT_INVENTORY_RELATIVE_PATH.as_posix()
     baseline_changed = baseline_rel in set(normalized_changed_paths)
     blocking: list[dict[str, Any]] = []
@@ -280,6 +306,8 @@ def evaluate_drift(
     accepted_baseline_update = False
     local_only_notice = False
     review_evidence_accepted = False
+    test_evidence_accepted = False
+    staged_review_notice = False
     for change in protected_changes:
         route = str(change.get("route") or "")
         if route == "local_only_notice":
@@ -292,6 +320,17 @@ def evaluate_drift(
         if allow_review_evidence and review_evidence_present:
             review_evidence_accepted = True
             warnings.append(f"protected change has staged bridge review evidence: {change['path']}")
+            continue
+        if route in TEST_EVIDENCE_ROUTES and test_evidence_present:
+            test_evidence_accepted = True
+            warnings.append(f"protected change has staged test evidence: {change['path']}")
+            continue
+        if staged and route in STAGED_REVIEW_ROUTES:
+            staged_review_notice = True
+            warnings.append(
+                f"protected change routes to {route}; review is recorded in the bridge, "
+                f"not at commit time (release gate still blocks): {change['path']}"
+            )
             continue
         blocking.append(
             {
@@ -316,6 +355,12 @@ def evaluate_drift(
     elif review_evidence_accepted:
         status = "pass"
         outcome = "review_evidence_present"
+    elif test_evidence_accepted:
+        status = "pass"
+        outcome = "test_evidence_present"
+    elif staged_review_notice:
+        status = "pass"
+        outcome = "staged_review_notice"
     else:
         status = "pass"
         outcome = "clean"
@@ -329,6 +374,7 @@ def evaluate_drift(
         "protected_changes": protected_changes,
         "baseline_changed": baseline_changed,
         "review_evidence_present": review_evidence_present,
+        "test_evidence_present": test_evidence_present,
         "allow_review_evidence": allow_review_evidence,
         "blocking": blocking,
         "warnings": warnings,

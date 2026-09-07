@@ -119,7 +119,7 @@ edits drift from owner intent without owner-visible review.
 [[excluded_by_design.items]]
 pattern = "MEMORY.md"
 rationale = """
-Per Codex GO -002 answer 2 (.claude/rules/canonical-terminology.md ADR-0001
+Per Codex GO -002 answer 2 (.harness-baseline-configuration/rules/canonical-terminology.md ADR-0001
 three-tier memory architecture), MEMORY.md is the operational notepad tier.
 It is high-churn session-state, not canonical authority. Gating every MEMORY.md
 write would create high friction without proportional governance value. A

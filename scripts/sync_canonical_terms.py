@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Synchronize MemBase canonical_terms from the markdown glossary.
 
-FAB-15 keeps ``.claude/rules/canonical-terminology.md`` as the glossary source
+FAB-15 keeps ``.harness-baseline-configuration/rules/canonical-terminology.md`` as the glossary source
 of truth while making the backing ``canonical_terms`` table deterministically
 regenerable and doctor-checkable.
 """

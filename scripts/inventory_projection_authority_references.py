@@ -8,7 +8,7 @@ as authority -- cannot be evaluated without a complete, reproducible inventory.
 This script builds that inventory. **It corrects nothing.**
 
 Read-only by construction: it opens files for reading, writes only a structured
-report under ``.gtkb-state/``, and never writes source, configuration, or any
+report under the session-scoped scratchpad, and never writes source, configuration, or any
 generated target.
 
 Search domain includes the neutral source `.harness-baseline-configuration/`
@@ -27,6 +27,11 @@ import json
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+try:
+    from scripts.gtkb_session_id import session_scratch_dirname
+except ImportError:  # pragma: no cover - direct script execution path
+    from gtkb_session_id import session_scratch_dirname
 
 # Generated harness-configuration roots. These directories are projections: their
 # content is produced from `.harness-baseline-configuration/` by the projector and
@@ -268,7 +273,7 @@ def main(argv: list[str] | None = None) -> int:
         "--out-dir",
         type=Path,
         default=None,
-        help="Runtime evidence directory (default: <project-root>/.gtkb-state/projection-authority-inventory).",
+        help="Runtime evidence directory (default: <project-root>/scratchpad/<session>/projection-authority-inventory).",
     )
     parser.add_argument("--json", action="store_true", help="Emit the report as JSON on stdout.")
     args = parser.parse_args(argv)
@@ -277,7 +282,11 @@ def main(argv: list[str] | None = None) -> int:
     references = scan(project_root)
     report = build_report(references)
 
-    out_dir = args.out_dir or (project_root / ".gtkb-state" / "projection-authority-inventory")
+    # Canon s17: inventory output is session-scoped scratch, never `.gtkb-state`.
+    # `--out-dir` still overrides.
+    out_dir = args.out_dir or (
+        project_root / "scratchpad" / session_scratch_dirname() / "projection-authority-inventory"
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "inventory.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (out_dir / "inventory.md").write_text(render_markdown(report), encoding="utf-8")

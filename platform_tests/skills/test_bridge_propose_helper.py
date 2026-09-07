@@ -656,3 +656,33 @@ def test_wi5767_helper_codex_parity():
     a = HELPER_PATH.read_bytes()
     b = CODEX_HELPER_PATH.read_bytes()
     assert a == b, "Codex helper copy must match the canonical Claude helper bytes"
+
+
+# --- WI-6538: the propose helper must not reorder an authored head ---
+
+
+def test_propose_helper_does_not_reorder_complete_authored_head() -> None:
+    """The helper head-normalization binding preserves a complete authored head.
+
+    The helper calls normalize_bridge_envelope_head before compose/write. With the
+    WI-6538 writer contract in force that call is a no-op for a complete head, so an
+    authored non-canonical order reaches disk unchanged. Asserted through the helper
+    own binding rather than the writer module, so the test fails if the helper is
+    ever repointed at a rewriting implementation.
+    """
+    import importlib.util
+    import sys
+    from pathlib import Path as _Path
+
+    newline = chr(10)
+    repo_root = _Path(__file__).resolve().parents[2]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    helper_path = repo_root / "scripts" / "skill-helpers" / "gtkb-bridge-propose" / "write_bridge.py"
+    spec = importlib.util.spec_from_file_location("wi6538_write_bridge", helper_path)
+    assert spec is not None and spec.loader is not None
+    helper = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(helper)
+
+    authored = newline.join(["::init gtkb lo", "::open build", "NEW", "", "Document: gtkb-x", "body", ""])
+    assert helper.normalize_bridge_envelope_head(authored) == authored

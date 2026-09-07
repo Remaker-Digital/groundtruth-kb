@@ -102,3 +102,47 @@ def test_valid_dispatchable_envelope_reaches_later_checks(gate, tmp_path: Path) 
 
     if reason is not None:
         assert "artifact-head envelope" not in reason
+
+
+# --- WI-6538: a COMPLETE authored head is order-independent at the writer ---
+#
+# Owner canon does not fix the order of the three required head lines, so a
+# complete-but-disordered head is not in error and the governed writer must not
+# rebuild it. These tests exercise the writer contract directly; the gate's own
+# line-position constraint is a separate surface and is deliberately not asserted
+# here (see file-bridge-protocol.md, "Complete authored heads are order-independent").
+
+NL = chr(10)
+
+
+def _writer():
+    import sys
+
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    from scripts.gtkb_bridge_writer import normalize_bridge_envelope_head
+
+    return normalize_bridge_envelope_head
+
+
+@pytest.mark.parametrize(
+    "head_lines",
+    [
+        ["::init gtkb lo", "::open build", "NEW"],
+        ["::open build", "::init gtkb lo", "NEW"],
+        ["::init gtkb lo", "NEW", "::open build"],
+        ["NEW", "::init gtkb lo", "::open build"],
+    ],
+)
+def test_complete_head_survives_writer_byte_identically(head_lines) -> None:
+    """A complete head is returned unmodified regardless of line order."""
+    content = NL.join([*head_lines, "", "Document: gtkb-envelope-head", "body", ""])
+    assert _writer()(content) == content
+
+
+def test_incomplete_head_is_still_normalized() -> None:
+    """Normalization still applies where the head is incomplete."""
+    content = NL.join(["NEW", "", "Document: gtkb-envelope-head", "body", ""])
+    normalized = _writer()(content)
+    assert normalized != content
+    assert normalized.splitlines()[:3] == ["NEW", "::init gtkb lo", "::open build"]

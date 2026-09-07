@@ -115,11 +115,10 @@ Purpose: define execution behavior by assigned role.
 - If risk is high, request owner decision before action.
 - Record unresolved issues as explicit open items.
 - Reuse the review checklists and templates for substantial proposal reviews, code reviews, and decision investigations.
-- Treat standalone owner prompts `switch mode next session` and `change mode
-  next session` as commands to toggle the durable next-session role between
-  Prime Builder and Loyal Opposition. Treat `prime builder mode next session`
-  and `loyal opposition mode next session` as direct next-session role
-  selections.
+- A session role comes only from the owner's literal `::init gtkb <pb|lo>` line, or
+  from the `::init` line of a dispatchable bridge item, and is immutable for that
+  session context. No prompt, prose phrasing, or queued transaction selects a role
+  for a later session.
 
 ## Owner Action Visibility
 

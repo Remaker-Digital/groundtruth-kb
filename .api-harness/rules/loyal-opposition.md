@@ -2,15 +2,13 @@
 THIS FILE IS A PROJECTION, NOT CANONICAL.
 Projected from the neutral harness baseline by the GT-KB projection engine.
 Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
-`gt harness project claude`. If a needed change cannot be made through
+`gt harness project openrouter`. If a needed change cannot be made through
 the baseline and re-projection, file a work item against the projector
 (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 -->
 # Loyal Opposition Rule Set
 
-This rule file defines mandatory behavior for Loyal Opposition sessions on this
-application. It is not the active operating role while Mike's Prime Builder
-assignment remains in force.
+This rule file defines mandatory behavior for Loyal Opposition sessions. 
 
 Canonical operating-model reference: `.api-harness/rules/operating-model.md` (rule-cited soft authority).
 Canonical glossary load: `.api-harness/rules/canonical-terminology.md` must be read
@@ -21,7 +19,7 @@ at session start before ordinary Loyal Opposition review work.
 - Loyal Opposition mission: inspect, critique, and analyze implementation, plans, and documentation.
 - Loyal Opposition output: evidence-based reports that improve quality, correctness, and readiness.
 - Prime Builder role: receives Loyal Opposition findings via the file bridge in `bridge/` and implements approved remediations.
-- Loyal Opposition may question Prime Builder technology choices, approaches,
+- Loyal Opposition should question Prime Builder technology choices, approaches,
   and designs when a simpler or more efficient path appears to satisfy the same
   requirements with fewer artifacts, fewer operations, or better foreseeable
   stability. These challenges must be evidence-based and framed as review

@@ -9,7 +9,6 @@
 # scripts/hygiene/hygiene_baseline.py::load_baseline().
 #
 # Bridge: bridge/gtkb-fab-20-hygiene-investigation-skill-004.md (GO)
-# Project Authorization: PAUTH-FAB20-20260610 (WI-4432)
 # Source: HYG-001..060 = independent-progress-assessments/GT-KB-ARCHITECTURE-HYGIENE-INVESTIGATION-2026-06-10.md (source retired 2026-07-17)
 #         HYG-061..068 = bridge/gtkb-fable-investigation-advisory-001.md (v2 verified-merge)
 #
@@ -401,7 +400,7 @@ fab_cluster = "FAB-06"
 
 [[findings]]
 id = "HYG-032"
-title = ".codex/config.toml grants approval_policy='never' + sandbox network access with no recoverable approval evidence, contradicting the recorded owner posture"
+title = ".codex/config.toml grants approval_policy='never' + sandbox network access without a recoverable owner-confirmation trace, contradicting the recorded owner posture"
 finding_class = "decision-needed"
 impact = "High"
 effort = "Low"
@@ -797,7 +796,7 @@ fab_cluster = "FAB-15"
 
 [[findings]]
 id = "HYG-065"
-title = "~1,004 open WIs vs only 162 covered by any active project authorization — the doctor's \"930 warn\" backlog-health output is one orphaned-WI WARN per uncovered open item"
+title = "~1,004 open WIs vs only 162 attached to an authorized parent project — the doctor's \"930 warn\" backlog-health output is one orphaned-WI WARN per uncovered open item"
 finding_class = "debt"
 impact = "Medium"
 effort = "Medium"

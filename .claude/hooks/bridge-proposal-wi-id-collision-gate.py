@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """Advisory PreToolUse hook for bridge proposal work-item ID collisions."""
 
 from __future__ import annotations
@@ -80,26 +86,54 @@ def _load_payload() -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _shell_candidates(payload: dict, root: Path) -> list[dict]:
+    """Native-shaped payloads to judge for one incoming payload (WI-7289).
+
+    A native payload expands to itself, so native handling is unchanged. A shell
+    payload expands to one synthetic Write per recognized write target; an
+    unrecognized command expands to nothing and is therefore allowed.
+    """
+    hooks_dir = str(Path(__file__).resolve().parent)
+    if hooks_dir not in sys.path:
+        sys.path.insert(0, hooks_dir)
+    try:
+        from _shell_payload import expand_shell_payload
+    except ImportError:
+        return [payload]
+    try:
+        return expand_shell_payload(payload, root)
+    except Exception:
+        # Extraction must never harden into a new failure mode for the gate.
+        return [payload]
+
+
 def main() -> int:
     payload = _load_payload()
+    root = Path(payload.get("cwd") or ".").resolve()
+    for candidate in _shell_candidates(payload, root):
+        rc = _check_one(candidate)
+        if rc is not None:
+            return rc
+    emit_pass()
+    return 0
+
+
+def _check_one(payload: dict) -> int | None:
+    """Judge one native-shaped payload; exit code, or None to keep looking."""
     tool_name = str(payload.get("tool_name") or "")
     if tool_name not in WRITE_TOOLS:
-        emit_pass()
-        return 0
+        return None
 
     tool_input = payload.get("tool_input") or {}
     if not isinstance(tool_input, dict):
-        emit_pass()
-        return 0
+        return None
     file_path = tool_input.get("file_path")
     if not isinstance(file_path, str) or not _is_bridge_proposal_file(file_path):
-        emit_pass()
-        return 0
+        return None
 
     content = _content_for_payload(tool_name, tool_input)
     if not content:
-        emit_pass()
-        return 0
+        return None
 
     try:
         result = check_content(content)
@@ -113,8 +147,7 @@ def main() -> int:
         )
         return 0
 
-    emit_pass()
-    return 0
+    return None
 
 
 if __name__ == "__main__":

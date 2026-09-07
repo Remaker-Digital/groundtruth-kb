@@ -1,18 +1,23 @@
-"""Claude Code SessionStart hook dispatcher (thin delegating wrapper).
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
+"""SessionStart hook dispatcher (thin delegating wrapper).
 
 Slice D of GTKB-STARTUP-REFRACTOR-001 (WI-4272;
-bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-004.md, Codex GO)
+bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-004.md, Loyal Opposition GO)
 extracted the shared SessionStart dispatch logic into
-``scripts/session_start_dispatch_core.py``. This wrapper sets the Claude-harness
+``scripts/session_start_dispatch_core.py``. This wrapper sets the active-harness
 configuration (``HARNESS_NAME``, ``OUT_DIR``) and rebinds the shared dispatch
 functions onto this module's namespace so module-level names resolve against
 this wrapper. The rebind preserves the SessionStart dispatcher tests'
 ``monkeypatch.setattr(module, ...)`` contract while the logic lives once in the
-shared core. Behavior is identical to the Codex wrapper except ``HARNESS_NAME``
+shared core. Behavior is identical across per-harness wrappers except ``HARNESS_NAME``
 and ``OUT_DIR``.
 
 The drift gate for the shared primitives lives in
-``scripts/check_codex_hook_parity.py::_resolution_table_parity_errors``, which
 asserts the primitives in the shared core plus per-wrapper delegation +
 intentional-difference guards.
 """
@@ -36,9 +41,9 @@ for _name, _value in vars(_core).items():
         continue
     globals()[_name] = _value
 
-# Claude-harness configuration (the only real per-harness difference).
+# Active-harness configuration (the only real per-harness difference).
 HARNESS_NAME = "claude"
-OUT_DIR = PROJECT_ROOT / ".claude" / "hooks"
+OUT_DIR = PROJECT_ROOT / ".claude/hooks"
 
 # Rebind every shared function onto THIS module's globals so module-level names
 # (HARNESS_NAME, OUT_DIR, and test-monkeypatched helpers) resolve against this

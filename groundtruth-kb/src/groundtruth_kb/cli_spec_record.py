@@ -5,13 +5,11 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
-from groundtruth_kb.governance.approval_packet import construct_approval_packet, validate_packet
 
 
 class SpecRecordError(Exception):
@@ -43,10 +41,7 @@ class SpecRecordRequest:
     status: str
     content_file: Path
     change_reason: str
-    auq_id: str
-    auq_answer: str
-    owner_presented: bool
-    approved_by: str | None
+    expected_version: int
     spec_type: str | None
     priority: str | None
     scope: str | None
@@ -79,11 +74,6 @@ def _changed_by() -> str:
         if value and value.strip():
             return value.strip()
     return "gt-cli"
-
-
-def _approval_packet_path(project_root: Path, artifact_id: str) -> Path:
-    date_prefix = datetime.now(UTC).strftime("%Y-%m-%d")
-    return project_root / ".groundtruth" / "formal-artifact-approvals" / f"{date_prefix}-{artifact_id.lower()}.json"
 
 
 def _parse_json_option(raw: str | None, option_name: str, expected_type: type) -> Any:
@@ -119,12 +109,11 @@ def _resolve_spec_type(spec_id: str, declared_type: str | None) -> str:
 
 
 def _validate_request_evidence(request: SpecRecordRequest) -> None:
-    if not request.owner_presented:
-        raise SpecRecordError("--owner-presented is required before recording a spec")
-    if not request.auq_id.strip():
-        raise SpecRecordError("--auq-id must be non-empty")
-    if not request.auq_answer.strip():
-        raise SpecRecordError("--auq-answer must be non-empty")
+    if request.expected_version != 0:
+        raise SpecRecordError(
+            "--expected-version must be 0 for record; a nonzero expected version addresses an "
+            "existing specification and belongs to `spec update`"
+        )
     if not request.change_reason.strip():
         raise SpecRecordError("--change-reason must be non-empty")
     if request.gap_state_capture:
@@ -165,38 +154,38 @@ def _validate_subtype(spec_id: str, spec_type: str, content: str, assertions: li
         raise SpecRecordError("DCL-* specs require an explicit constraint section")
 
 
-def _build_packet(
-    *,
-    request: SpecRecordRequest,
-    resolved_type: str,
-    full_content: str,
-    changed_by: str,
-    db_operation: dict[str, object],
-    postimage_fields: dict[str, Any],
-) -> dict[str, object]:
-    return construct_approval_packet(
-        artifact_type=resolved_type,
-        artifact_id=request.spec_id,
-        action="create",
-        source_ref=request.spec_id,
-        full_content=full_content,
-        approval_mode="approve",
-        presented_to_user=request.owner_presented,
-        transcript_captured=True,
-        explicit_change_request=f"AUQ {request.auq_id}: {request.auq_answer}",
-        approved_by=request.approved_by or "owner",
-        changed_by=changed_by,
-        change_reason=request.change_reason,
-        capture_context="gap_state" if request.gap_state_capture else None,
-        gap_state_bridge_id=request.gap_state_bridge_id if request.gap_state_capture else None,
-        gap_state_reason=request.gap_state_reason if request.gap_state_capture else None,
-        intended_db_operation=db_operation if request.gap_state_capture else None,
-        postimage_fields=postimage_fields,
-    )
+def _matches_postimage(row: dict[str, Any], full_content: str, postimage_fields: dict[str, Any]) -> bool:
+    """Return True when the stored row already equals the requested postimage exactly.
+
+    JSON-valued columns are compared against their parsed form when the reader
+    supplies one, so an identical request is recognized regardless of stored
+    serialization.
+    """
+
+    def _norm(value: Any) -> Any:
+        # Storage normalizes an empty JSON container to NULL, so an identical
+        # request round-trips to None. Comparing without this would report a
+        # false difference and turn an exact replay into a spurious collision.
+        if isinstance(value, (list, dict)) and not value:
+            return None
+        return value
+
+    if (row.get("description") or "") != full_content:
+        return False
+    for name, value in postimage_fields.items():
+        parsed_key = f"{name}_parsed"
+        stored = row[parsed_key] if parsed_key in row else row.get(name)
+        if _norm(stored) != _norm(value):
+            return False
+    return True
 
 
 def record_spec(config: GTConfig, request: SpecRecordRequest) -> dict[str, Any]:
-    """Validate evidence, write an approval packet, and insert a new spec."""
+    """Validate the request under exact expected-version CAS and insert a new spec.
+
+    Persistence is intrinsic: the canonical row is the record. No packet, receipt,
+    approval field, or approvals-directory artifact is constructed, written, or read.
+    """
 
     _validate_request_evidence(request)
 
@@ -222,8 +211,7 @@ def record_spec(config: GTConfig, request: SpecRecordRequest) -> dict[str, Any]:
     _validate_subtype(request.spec_id, resolved_type, full_content, assertions)
 
     db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
-    if db.get_spec(request.spec_id) is not None:
-        raise SpecRecordError(f"spec {request.spec_id} already exists; Slice 2 record is create-only")
+    existing = db.get_spec(request.spec_id)
 
     changed_by = _changed_by()
     db_operation: dict[str, object] = {
@@ -247,35 +235,37 @@ def record_spec(config: GTConfig, request: SpecRecordRequest) -> dict[str, Any]:
         "source_paths": source_paths,
         "application_scope": request.application_scope,
     }
-    packet = _build_packet(
-        request=request,
-        resolved_type=resolved_type,
-        full_content=full_content,
-        changed_by=changed_by,
-        db_operation=db_operation,
-        postimage_fields=postimage_fields,
-    )
-    validation = validate_packet(packet)
-    if not validation.is_valid:
-        raise SpecRecordError("; ".join(validation.errors))
+    if existing is not None:
+        # Exact replay is read-only: an identical request against an identical row
+        # appends nothing and reports itself as a replay. A same-id request whose
+        # content or postimage differs is a collision and leaves zero effect.
+        if _matches_postimage(existing, full_content, postimage_fields):
+            return {
+                "created": False,
+                "dry_run": request.dry_run,
+                "replayed": True,
+                "expected_version": request.expected_version,
+                "gap_state_capture": request.gap_state_capture,
+                "id": existing["id"],
+                "row": existing,
+                "db_operation": db_operation,
+            }
+        raise SpecRecordError(
+            f"record_collision: {request.spec_id} already exists at version "
+            f"{int(existing['version'])} with different content or postimage; no effect was applied"
+        )
 
-    packet_path = _approval_packet_path(project_root, request.spec_id)
     if request.dry_run:
         return {
             "created": False,
             "dry_run": True,
+            "replayed": False,
+            "expected_version": request.expected_version,
             "gap_state_capture": request.gap_state_capture,
             "id": request.spec_id,
             "row": None,
-            "approval_packet_path": str(packet_path),
-            "approval_packet": packet,
             "db_operation": db_operation,
         }
-
-    if packet_path.exists():
-        raise SpecRecordError(f"approval packet already exists: {packet_path}")
-    packet_path.parent.mkdir(parents=True, exist_ok=True)
-    packet_path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     row = db.insert_spec(
         id=request.spec_id,
@@ -291,10 +281,10 @@ def record_spec(config: GTConfig, request: SpecRecordRequest) -> dict[str, Any]:
     return {
         "created": True,
         "dry_run": False,
+        "replayed": False,
+        "expected_version": request.expected_version,
         "gap_state_capture": request.gap_state_capture,
         "id": row["id"],
         "row": row,
-        "approval_packet_path": str(packet_path),
-        "approval_packet": packet,
         "db_operation": db_operation,
     }

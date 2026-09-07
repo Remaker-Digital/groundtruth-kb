@@ -1808,6 +1808,46 @@ def _staged_or_worktree_text(root: Path, rel_path: str) -> str:
         raise GateError(f"could not read {rel_path}: {exc}") from exc
 
 
+def _disk_bridge_entries(root: Path, bridge_id: str) -> tuple[_IndexEntry, ...]:
+    """WI-6726 Surface B: the commit-gate counterpart of the b39db7a31 repair.
+
+    WI-6530 reclassified ``bridge/`` as ephemeral runtime state and git-ignored it,
+    but this gate still sourced bridge lifecycle evidence from the committed tree,
+    so the tree yields no entries, the snapshot has no ``bridge`` directory, and
+    every terminal VERIFIED thread is unreadable -- the commit-side half of the
+    deadlock ``b39db7a31`` fixed on the verdict-writing side. An IGNORED bridge file
+    present on disk satisfies chain integrity for the reason accepted there:
+    tracked-ness is not a meaningful signal for a path class governance declared
+    ephemeral.
+
+    Fails closed. A matching bridge file that is NOT ignored is a real gap, and any
+    such file collapses the fallback to an empty tuple so the caller keeps its
+    existing missing-evidence error. Content is hashed into the object store so the
+    unchanged ``_materialize_entries`` path, the ledger, and every snapshot
+    immutability guard continue to apply verbatim.
+    """
+    bridge_dir = root / "bridge"
+    if not bridge_dir.is_dir():
+        return ()
+    exact_re = re.compile(rf"^{re.escape(bridge_id)}-\d{{3}}\.md$")
+    entries: list[_IndexEntry] = []
+    for path in sorted(bridge_dir.iterdir()):
+        if not path.is_file() or not exact_re.fullmatch(path.name):
+            continue
+        rel_path = f"bridge/{path.name}"
+        ignored = _run_git(root, "check-ignore", "-q", "--", rel_path)
+        if ignored.returncode != 0:
+            return ()
+        hashed = _run_git(root, "hash-object", "-w", "--", rel_path, text=True)
+        if hashed.returncode != 0:
+            return ()
+        oid = (hashed.stdout or "").strip()
+        if not oid:
+            return ()
+        entries.append(_IndexEntry(mode="100644", oid=oid, rel_path=rel_path))
+    return tuple(entries)
+
+
 @contextmanager
 def _bridge_snapshot(
     root: Path,
@@ -1840,6 +1880,9 @@ def _bridge_snapshot(
         head_entries = tuple(
             entry for entry in _parse_tree_inventory(head_listing.stdout) if exact_re.fullmatch(entry.rel_path)
         )
+    if not head_entries:
+        # WI-6726 Surface B: fall back to ignored-but-present on-disk chain evidence.
+        head_entries = _disk_bridge_entries(root, bridge_id)
     with tempfile.TemporaryDirectory(prefix=".gtkb-lifecycle-", dir=scratch_root) as tmp:
         snapshot_root = Path(tmp)
         ledger = _materialize_entries(
@@ -2347,7 +2390,13 @@ def _approved_chain(snapshot_root: Path, resolution: Any) -> _ApprovedChain:
     if latest.status != "VERIFIED" or not latest.responds_to:
         raise GateError("latest lifecycle state is not a report-linked VERIFIED verdict")
     report = _version_by_path(resolution, latest.responds_to)
-    if report is None or report.status not in {"NEW", "REVISED"} or report.author_role != "prime-builder":
+    # WI-6726 Surface B follow-on: canon section 6 replaced the retired post-GO
+    # NEW with READY as the implementation-report status, so a compliant
+    # NEW -> GO -> READY -> VERIFIED chain was rejected here as "not linked to a
+    # Prime implementation report". NEW and REVISED are retained because canon
+    # section 6 keeps historical GO -> NEW chains readable via
+    # HISTORICAL_TRANSITIONS, and this gate reads committed history.
+    if report is None or report.status not in {"NEW", "REVISED", "READY"} or report.author_role != "prime-builder":
         raise GateError("VERIFIED verdict is not linked to a Prime implementation report")
     try:
         report_text = (snapshot_root / report.path).read_text(encoding="utf-8")

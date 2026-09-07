@@ -35,7 +35,6 @@ versions of an existing thread, verdict files, or advisory entries.
 - `slug` — kebab-case thread name (e.g. `gtkb-widget-refactor`).
 - `work_item` — the governing WI id (`WI-NNNN` / `GTKB-*`).
 - `project` — the `PROJECT-*` id grouping the work.
-- `pauth` — the active `PAUTH-*` authorization id covering the work item.
 - optional `slice` number, `bridge_kind` (default `prime_proposal`),
   and one or more `target_path` globs the implementation will touch.
 
@@ -45,14 +44,14 @@ versions of an existing thread, verdict files, or advisory entries.
 
    ```text
    python scripts/gtkb_propose_scaffold.py scaffold \
-       --slug <slug> --work-item <WI> --project <PROJECT-ID> --pauth <PAUTH-ID> \
+       --slug <slug> --work-item <WI> --project <PROJECT-ID> \
        [--slice <N>] [--bridge-kind <kind>] \
        [--target-path <glob> --target-path <glob> ...]
    ```
 
    The helper validates the slug (kebab-case and safe bridge-file name),
-   validates the work-item/project/authorization triple read-only against
-   MemBase, seeds `## Prior Deliberations` from a Deliberation Archive search,
+   validates the work-item/project relationship and the project's current
+   `activation-status` read-only against MemBase, seeds `## Prior Deliberations` from a Deliberation Archive search,
    pre-lists the always-applicable governing specs in `## Specification Links`,
    and writes the draft to `.gtkb-state/propose-drafts/<slug>-001.md`. It prints
    a self-review checklist.
@@ -76,9 +75,10 @@ versions of an existing thread, verdict files, or advisory entries.
 ## Boundaries
 
 - Read-only against MemBase; writes only the draft under `.gtkb-state/`.
-- Does not replace Loyal Opposition review, the implementation-start packet, or
-  the formal-artifact / narrative-artifact approval packets — it only reduces
-  the structural-revise-loop friction before review.
+- Does not replace Loyal Opposition review, a live work-intent claim, or explicit
+  owner approval where formal mutation requires it; it only reduces the
+  structural-revise-loop friction before review. Do not create a separate
+  approval or authorization carrier.
 - The scaffold is a starting point, not a substitute for substantive authoring:
   every `TODO:` must be replaced before filing.
 

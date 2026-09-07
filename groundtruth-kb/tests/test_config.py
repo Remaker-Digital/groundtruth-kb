@@ -23,13 +23,15 @@ Licensed under AGPL-3.0-or-later.
 
 from __future__ import annotations
 
+import dataclasses
+import re
 import tomllib
 from pathlib import Path
 
 import pytest
 
 import groundtruth_kb
-from groundtruth_kb.config import GTConfig, GTConfigError
+from groundtruth_kb.config import GTConfig, GTConfigError, PostgreSQLConfig
 
 
 def test_defaults():
@@ -354,3 +356,173 @@ def test_unknown_toml_key_warns(tmp_path):
     assert cfg.app_title == "Test"
     # Unknown key had no effect — brand_color remains the default
     assert cfg.brand_color == "#2563eb"
+
+
+# --- PostgreSQL client settings (WI-7707) ---------------------------------
+#
+# ``postgres_kernel.py`` carries exactly one first-party import,
+# ``from groundtruth_kb.config import PostgreSQLConfig``. Until that name existed here the entire
+# PostgreSQL surface — kernel, target DDL and all three test files — could not be imported,
+# collected or run.
+
+
+def test_postgresql_config_carries_the_kernel_contract():
+    """The four attributes the kernel reads exist and are defaulted.
+
+    Enumerated from the kernel rather than assumed: ``service``, ``connect_timeout_seconds``,
+    ``lock_timeout_ms`` and ``statement_timeout_ms`` are the only ``self.settings.*`` reads in
+    ``postgres_kernel.py``. Defaults matter because they are what makes the type constructible
+    without configuration, which is what restores importability.
+    """
+    settings = PostgreSQLConfig()
+    assert settings.service == "gtkb"
+    assert settings.connect_timeout_seconds == 10
+    assert settings.lock_timeout_ms == 5000
+    assert settings.statement_timeout_ms == 30000
+
+
+def test_postgresql_config_is_frozen_and_holds_no_secrets():
+    """Frozen, and carrying no credential-bearing field.
+
+    Host, database, user, TLS and password belong to host-managed libpq service and password files.
+    A field named for any of them appearing here would be a credential surface this type is
+    specifically designed not to have.
+    """
+    settings = PostgreSQLConfig()
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        settings.service = "other"  # type: ignore[misc]
+
+    forbidden = {"host", "password", "passwd", "user", "username", "dbname", "database", "sslmode", "tls"}
+    present = {f.name for f in dataclasses.fields(PostgreSQLConfig)}
+    assert not (present & forbidden), f"credential-bearing fields must not live here: {sorted(present & forbidden)}"
+
+
+def test_gtconfig_exposes_a_postgresql_section():
+    """``GTConfig`` carries the section, defaulted, without disturbing existing construction."""
+    cfg = GTConfig()
+    assert isinstance(cfg.postgresql, PostgreSQLConfig)
+    assert cfg.postgresql.service == "gtkb"
+
+
+# --- PostgreSQL configuration, ported from the WI-6252 cohort suite (WI-7739) ------------
+# The config port at WI-7742 landed the PostgreSQLConfig dataclass and named the merge-logic
+# rework a non-goal. These twelve tests were written against that rework and are ported with it,
+# unmodified. The three dataclass-contract tests above are kept: they assert a different property
+# and removing reviewed passing tests to match a file is not a port.
+
+
+def test_postgresql_defaults_are_secret_free():
+    """PostgreSQL uses a named libpq service and bounded, non-secret timeouts."""
+    cfg = GTConfig()
+
+    assert cfg.postgresql.service == "gtkb"
+    assert cfg.postgresql.connect_timeout_seconds == 10
+    assert cfg.postgresql.lock_timeout_ms == 5000
+    assert cfg.postgresql.statement_timeout_ms == 30000
+
+
+def test_postgresql_toml_and_environment_merge_per_field(tmp_path, monkeypatch):
+    toml_file = tmp_path / "groundtruth.toml"
+    toml_file.write_text(
+        "[groundtruth]\n[postgresql]\nservice='reviewed'\nlock_timeout_ms=7000\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("GT_POSTGRES_STATEMENT_TIMEOUT_MS", "45000")
+
+    cfg = GTConfig.load(config_path=toml_file)
+
+    assert cfg.postgresql.service == "reviewed"
+    assert cfg.postgresql.connect_timeout_seconds == 10
+    assert cfg.postgresql.lock_timeout_ms == 7000
+    assert cfg.postgresql.statement_timeout_ms == 45000
+
+
+@pytest.mark.parametrize("key", ["password", "dsn", "url", "host", "database", "user", "sslmode"])
+def test_postgresql_toml_rejects_secret_or_connection_keys(tmp_path, key):
+    toml_file = tmp_path / "groundtruth.toml"
+    toml_file.write_text(f"[groundtruth]\n[postgresql]\n{key}='forbidden'\n", encoding="utf-8")
+
+    with pytest.raises(GTConfigError, match="forbidden or unknown"):
+        GTConfig.load(config_path=toml_file)
+
+
+@pytest.mark.parametrize("value", ["", "postgres://host/db", "name with space", "x=y", "line\\nbreak"])
+def test_postgresql_rejects_non_service_values(value):
+    with pytest.raises(GTConfigError, match="libpq service name"):
+        GTConfig.load(postgresql={"service": value})
+
+
+@pytest.mark.parametrize("value", [0, -1, 2_147_483_648, True, "1.5", "ten"])
+def test_postgresql_rejects_invalid_timeouts(value):
+    with pytest.raises(GTConfigError, match="positive integer"):
+        GTConfig.load(postgresql={"connect_timeout_seconds": value})
+
+
+def test_postgresql_environment_values_are_typed(monkeypatch):
+    monkeypatch.setenv("GT_POSTGRES_SERVICE", "test-service")
+    monkeypatch.setenv("GT_POSTGRES_CONNECT_TIMEOUT_SECONDS", "12")
+    monkeypatch.setenv("GT_POSTGRES_LOCK_TIMEOUT_MS", "6000")
+    monkeypatch.setenv("GT_POSTGRES_STATEMENT_TIMEOUT_MS", "36000")
+
+    cfg = GTConfig.load()
+
+    assert cfg.postgresql.service == "test-service"
+    assert cfg.postgresql.connect_timeout_seconds == 12
+    assert cfg.postgresql.lock_timeout_ms == 6000
+    assert cfg.postgresql.statement_timeout_ms == 36000
+
+
+def test_postgresql_timeout_accepts_in_range_decimal_with_leading_zeroes():
+    cfg = GTConfig.load(postgresql={"connect_timeout_seconds": "00000000001"})
+
+    assert cfg.postgresql.connect_timeout_seconds == 1
+
+
+def test_postgresql_unknown_environment_key_fails_closed(monkeypatch):
+    monkeypatch.setenv("GT_POSTGRES_PASSWORD", "must-not-be-read")
+
+    with pytest.raises(GTConfigError, match="Unknown PostgreSQL environment settings"):
+        GTConfig.load()
+
+
+def test_postgresql_long_timeout_environment_value_fails_with_typed_error(monkeypatch):
+    monkeypatch.setenv("GT_POSTGRES_CONNECT_TIMEOUT_SECONDS", "9" * 5000)
+
+    with pytest.raises(GTConfigError, match="positive integer no greater than"):
+        GTConfig.load()
+
+
+def test_postgresql_non_table_toml_value_fails_closed(tmp_path):
+    toml_file = tmp_path / "groundtruth.toml"
+    toml_file.write_text('postgresql="not-a-table"\n[groundtruth]\n', encoding="utf-8")
+
+    with pytest.raises(GTConfigError, match="must be a TOML table"):
+        GTConfig.load(config_path=toml_file)
+
+
+@pytest.mark.parametrize(
+    "content,section",
+    [
+        ('groundtruth="not-a-table"\n', "groundtruth"),
+        ("gates=1\n[groundtruth]\n", "gates"),
+        ("search=[]\n[groundtruth]\n", "search"),
+        ('backup="not-a-table"\n[groundtruth]\n', "backup"),
+        ("[groundtruth]\n[gates]\nconfig=1\n", "gates.config"),
+    ],
+)
+def test_postgresql_config_rejects_every_consumed_non_table_section(tmp_path, content, section):
+    toml_file = tmp_path / "groundtruth.toml"
+    toml_file.write_text(content, encoding="utf-8")
+
+    with pytest.raises(GTConfigError, match=rf"\[{re.escape(section)}\] must be a TOML table"):
+        GTConfig.load(config_path=toml_file)
+
+
+def test_postgresql_config_preserves_programmatic_missing_groundtruth_warning(tmp_path):
+    toml_file = tmp_path / "groundtruth.toml"
+    toml_file.write_text("[groundtuh]\napp_title='typo'\n[postgresql]\nservice='reviewed'\n", encoding="utf-8")
+
+    with pytest.warns(UserWarning, match=r"no \[groundtruth\] section found"):
+        cfg = GTConfig.load(config_path=toml_file)
+
+    assert cfg.postgresql.service == "reviewed"

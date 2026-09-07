@@ -30,7 +30,12 @@ RESOURCE_DIRECTORY_NAMES = ("references", "helpers")
 RESOURCE_EXCLUDED_DIRECTORY_NAMES = frozenset({"__pycache__"})
 RESOURCE_EXCLUDED_PREFIXES = ("_temp_", "tmp_", "draft-", "draft_")
 RESOURCE_EXCLUDED_SUFFIXES = frozenset({".pyc", ".pyo"})
-SLASH_CANONICAL_HELPER_PATH_RE = re.compile(r"\.agents/skills/([^/\s`\"')]+)/helpers/")
+# WI-6228 Change C — the harness baseline is `.harness-baseline-configuration`,
+# not the retired `.agents` tree. This regex rewrites helper paths inside
+# PROJECTED CONTENT; a stale prefix here fails silently rather than loudly,
+# because a non-matching pattern simply leaves the body unrewritten.
+BASELINE_SKILLS_PREFIX = ".harness-baseline-configuration/skills/"
+SLASH_CANONICAL_HELPER_PATH_RE = re.compile(re.escape(BASELINE_SKILLS_PREFIX) + r"([^/\s`\"')]+)/helpers/")
 BACKSLASH_CANONICAL_HELPER_PATH_RE = re.compile(r"\.claude\\skills\\([^\\\s`\"')]+)\\helpers\\")
 
 

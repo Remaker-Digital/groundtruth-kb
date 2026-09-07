@@ -65,7 +65,7 @@ DEFAULT_PYTEST_TIMEOUT_S: Final[int] = 120
 SPEC_ID_RE: Final[re.Pattern[str]] = re.compile(r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ|DELIB)-[A-Z0-9][A-Z0-9_-]*\b")
 
 # Rule-file path pattern. Per Codex `-006` F1 NO-GO: linked rule files
-# (e.g. `.claude/rules/file-bridge-protocol.md`) must appear in the
+# (e.g. `.harness-baseline-configuration/rules/file-bridge-protocol.md`) must appear in the
 # mechanical matrix, not only in narrative prose. Path tokens lack a
 # leading word character so word-boundary anchoring is omitted.
 RULE_PATH_RE: Final[re.Pattern[str]] = re.compile(r"\.claude/rules/[a-z0-9_-]+\.md")
@@ -346,7 +346,7 @@ def _discover_derived_tests(spec_id: str) -> list[str]:
 
     For ID tokens (SPEC/GOV/etc.), the search is anchored with `\\b` to
     prevent substring matches on longer IDs. For file-path tokens (e.g.
-    ``.claude/rules/file-bridge-protocol.md``), word boundaries are omitted
+    ``.harness-baseline-configuration/rules/file-bridge-protocol.md``), word boundaries are omitted
     because the leading `.` and embedded `/` are non-word characters that
     would never sit at a word boundary.
     """

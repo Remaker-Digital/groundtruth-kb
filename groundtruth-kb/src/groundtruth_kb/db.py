@@ -52,7 +52,62 @@ DEFAULT_SQLITE_BUSY_TIMEOUT_MS = 30_000
 #: re-stamped those databases forward, laundering the omission. The comment here
 #: previously cited ``test_schema_version_matches_migration_count`` as a CI
 #: guard; no such test ever existed. The stamp is no longer trusted alone.
-SCHEMA_VERSION = 17
+SCHEMA_VERSION = 19
+
+_GOVERNED_OPERATIONAL_EVENTS_DDL = """
+-- WI-6992: the operational-event record, derived from the canon section 9
+-- evidence list rather than from the legacy ``operational_events`` table.
+--
+-- Three differences from the legacy shape, each forced by the owner ruling of
+-- 2026-08-31 that authorization is a value on the project record and never an
+-- object. The three ``project_authorization_*`` columns collapse to one
+-- authorization value, because section 9 asks for the project's authorization
+-- VALUE at the time, not an identifier or version. ``execution_membership_id``
+-- and ``execution_membership_version`` are dropped outright, because section 9
+-- states no requirement they satisfy and the model behind them is retired by
+-- DELIB-20260831060002 section 39. The remaining thirteen columns carry over.
+--
+-- The legacy ``operational_events`` table is retained untouched as
+-- pre-definition history. No operation of the governed service reads or writes
+-- it: a row lacking a declared authorization value cannot be verified against a
+-- record that requires one, and returning it through the same typed surface
+-- would imply a conformance it does not have.
+CREATE TABLE IF NOT EXISTS governed_operational_events (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    schema_version INTEGER NOT NULL CHECK (schema_version = 1),
+    event_type TEXT NOT NULL CHECK (event_type IN ('emergency_bootstrap', 'foundational_bootstrap')),
+    lifecycle_state TEXT NOT NULL CHECK (
+        lifecycle_state IN (
+            'open',
+            'effects_recorded_pending_independent_verification',
+            'independently_verified',
+            'committed_pending_publication',
+            'closed',
+            'publication_confirmed_closed'
+        )
+    ),
+    work_item_id TEXT NOT NULL,
+    work_item_version INTEGER NOT NULL,
+    project_id TEXT NOT NULL,
+    project_version INTEGER NOT NULL,
+    project_authorization_value TEXT NOT NULL CHECK (
+        project_authorization_value IN ('authorized', 'not authorized')
+    ),
+    body_json TEXT NOT NULL,
+    body_sha256 TEXT NOT NULL,
+    recorder_session_context_id TEXT NOT NULL,
+    recorded_at TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_governed_operational_events_id_version ON governed_operational_events(id, version);
+CREATE INDEX IF NOT EXISTS idx_governed_operational_events_work_item ON governed_operational_events(work_item_id, version);
+CREATE INDEX IF NOT EXISTS idx_governed_operational_events_project ON governed_operational_events(project_id, version);
+CREATE INDEX IF NOT EXISTS idx_governed_operational_events_state ON governed_operational_events(lifecycle_state);
+"""
+
 
 #: WI-7015: cheap structural canaries checked on the fast path alongside the
 #: ``PRAGMA user_version`` stamp. Each entry is a ``(table, column)`` pair that
@@ -61,9 +116,11 @@ SCHEMA_VERSION = 17
 #: reads, so the WI-6609 property holds: an up-to-date database still takes no
 #: write lock at connect time. Add an entry for any column a migration adds to a
 #: table that already ships rows.
-_SCHEMA_STRUCTURAL_SENTINELS: tuple[tuple[str, str], ...] = (
-    ("project_authorizations", "owner_decision_deliberation_id"),
-)
+#: WI-7657 emptied this tuple. Its sole entry named a column on
+#: ``project_authorizations``, a table this build no longer creates. A sentinel
+#: naming an absent relation would report every database stale on every open,
+#: which is the opposite of what a canary is for.
+_SCHEMA_STRUCTURAL_SENTINELS: tuple[tuple[str, str], ...] = ()
 #: WI-7063: DDL restoring a missing sentinel column, run BEFORE ``SCHEMA_SQL``
 #: rather than as an ordinary ``_migrate_schema`` entry. Ordering is the point:
 #: ``_upgrade_schema`` executes ``SCHEMA_SQL`` first and only then calls
@@ -75,11 +132,10 @@ _SCHEMA_STRUCTURAL_SENTINELS: tuple[tuple[str, str], ...] = (
 #: Added NULLABLE deliberately: SQLite cannot add a NOT NULL column without a
 #: default to a populated table, and converging with SCHEMA_SQL would need a
 #: full rebuild -- outside the approved minimal scope (DELIB-20260825231512).
-_SENTINEL_REPAIR_DDL: dict[tuple[str, str], str] = {
-    ("project_authorizations", "owner_decision_deliberation_id"): (
-        "ALTER TABLE project_authorizations ADD COLUMN owner_decision_deliberation_id TEXT"
-    ),
-}
+#: WI-7657 emptied this mapping. Its sole entry repaired a column on
+#: ``project_authorizations``; with the table no longer created, the repair has
+#: nothing to act on and would raise if it ran.
+_SENTINEL_REPAIR_DDL: dict[tuple[str, str], str] = {}
 #: Bounded retry for the one-time schema upgrade. The upgrade takes a write
 #: lock, so a concurrent upgrade can legitimately collide; the common path is
 #: read-only and never reaches this.
@@ -90,7 +146,7 @@ _VALID_APPLICATION_SCOPES = frozenset({"gtkb_platform", "agent_red_application"}
 #: record holding exactly one of these two values. It carries no expiry,
 #: mutation-class, forbidden-operation, or included/excluded id-list semantics:
 #: those belong to the authorization *object* model this field replaces.
-_VALID_ACTIVATION_STATUSES = frozenset({"authorized", "not authorized"})
+_VALID_AUTHORIZATION_VALUES = frozenset({"authorized", "not authorized"})
 #: The projects whose sole authorization evidence is revoked, and which the
 #: WI-7611 backfill therefore denies. Every other project backfills to
 #: ``authorized`` per the owner decision: "authorized everywhere, deny only the
@@ -571,7 +627,7 @@ CREATE TABLE IF NOT EXISTS projects (
     notes TEXT,
     source_project_name TEXT,
     source_subproject_name TEXT,
-    activation_status TEXT NOT NULL DEFAULT 'authorized',
+    authorization TEXT NOT NULL DEFAULT 'authorized',
     changed_by TEXT NOT NULL,
     changed_at TEXT NOT NULL,
     change_reason TEXT NOT NULL,
@@ -628,30 +684,6 @@ CREATE TABLE IF NOT EXISTS project_artifact_links (
     relationship TEXT NOT NULL DEFAULT 'related',
     status TEXT NOT NULL DEFAULT 'active',
     notes TEXT,
-    changed_by TEXT NOT NULL,
-    changed_at TEXT NOT NULL,
-    change_reason TEXT NOT NULL,
-    UNIQUE(id, version)
-);
-
-CREATE TABLE IF NOT EXISTS project_authorizations (
-    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
-    id TEXT NOT NULL,
-    version INTEGER NOT NULL,
-    project_id TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'active',
-    authorization_name TEXT NOT NULL,
-    owner_decision_deliberation_id TEXT NOT NULL,
-    scope_summary TEXT NOT NULL,
-    allowed_mutation_classes TEXT,
-    forbidden_operations TEXT,
-    included_work_item_ids TEXT,
-    excluded_work_item_ids TEXT,
-    included_spec_ids TEXT,
-    excluded_spec_ids TEXT,
-    expires_at TEXT,
-    supersedes TEXT,
-    superseded_by TEXT,
     changed_by TEXT NOT NULL,
     changed_at TEXT NOT NULL,
     change_reason TEXT NOT NULL,
@@ -1130,11 +1162,6 @@ CREATE INDEX IF NOT EXISTS idx_project_dependencies_to ON project_dependencies(t
 CREATE INDEX IF NOT EXISTS idx_project_artifact_links_id_version ON project_artifact_links(id, version);
 CREATE INDEX IF NOT EXISTS idx_project_artifact_links_project ON project_artifact_links(project_id);
 CREATE INDEX IF NOT EXISTS idx_project_artifact_links_artifact ON project_artifact_links(artifact_type, artifact_ref);
-CREATE INDEX IF NOT EXISTS idx_project_authorizations_id_version ON project_authorizations(id, version);
-CREATE INDEX IF NOT EXISTS idx_project_authorizations_project ON project_authorizations(project_id);
-CREATE INDEX IF NOT EXISTS idx_project_authorizations_status ON project_authorizations(status);
-CREATE INDEX IF NOT EXISTS idx_project_authorizations_owner_decision
-    ON project_authorizations(owner_decision_deliberation_id);
 CREATE INDEX IF NOT EXISTS idx_flow_definitions_id_version ON flow_definitions(id, version);
 CREATE INDEX IF NOT EXISTS idx_flow_definitions_flow_type ON flow_definitions(flow_type);
 CREATE INDEX IF NOT EXISTS idx_flow_instances_id_version ON flow_instances(id, version);
@@ -1268,11 +1295,6 @@ CREATE VIEW IF NOT EXISTS current_project_artifact_links AS
 SELECT l.* FROM project_artifact_links l
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM project_artifact_links GROUP BY id) m
 ON l.id = m.id AND l.version = m.max_v;
-
-CREATE VIEW IF NOT EXISTS current_project_authorizations AS
-SELECT a.* FROM project_authorizations a
-INNER JOIN (SELECT id, MAX(version) AS max_v FROM project_authorizations GROUP BY id) m
-ON a.id = m.id AND a.version = m.max_v;
 
 CREATE VIEW IF NOT EXISTS current_flow_definitions AS
 SELECT f.* FROM flow_definitions f
@@ -1575,6 +1597,58 @@ CREATE INDEX IF NOT EXISTS idx_work_intent_claims_slug ON work_intent_claims(thr
 CREATE INDEX IF NOT EXISTS idx_work_intent_claims_kind ON work_intent_claims(claim_kind);
 CREATE INDEX IF NOT EXISTS idx_work_intent_claims_role_project ON work_intent_claims(acting_role, project_id);
 CREATE INDEX IF NOT EXISTS idx_work_intent_claims_work_item ON work_intent_claims(work_item_id);
+
+-- WI-6992: the operational-event record, derived from the canon section 9
+-- evidence list rather than from the legacy ``operational_events`` table.
+--
+-- Three differences from the legacy shape, each forced by the owner ruling of
+-- 2026-08-31 that authorization is a value on the project record and never an
+-- object. The three ``project_authorization_*`` columns collapse to one
+-- authorization value, because section 9 asks for the project's authorization
+-- VALUE at the time, not an identifier or version. ``execution_membership_id``
+-- and ``execution_membership_version`` are dropped outright, because section 9
+-- states no requirement they satisfy and the model behind them is retired by
+-- DELIB-20260831060002 section 39. The remaining thirteen columns carry over.
+--
+-- The legacy ``operational_events`` table is retained untouched as
+-- pre-definition history. No operation of the governed service reads or writes
+-- it: a row lacking a declared authorization value cannot be verified against a
+-- record that requires one, and returning it through the same typed surface
+-- would imply a conformance it does not have.
+CREATE TABLE IF NOT EXISTS governed_operational_events (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    schema_version INTEGER NOT NULL CHECK (schema_version = 1),
+    event_type TEXT NOT NULL CHECK (event_type IN ('emergency_bootstrap', 'foundational_bootstrap')),
+    lifecycle_state TEXT NOT NULL CHECK (
+        lifecycle_state IN (
+            'open',
+            'effects_recorded_pending_independent_verification',
+            'independently_verified',
+            'committed_pending_publication',
+            'closed',
+            'publication_confirmed_closed'
+        )
+    ),
+    work_item_id TEXT NOT NULL,
+    work_item_version INTEGER NOT NULL,
+    project_id TEXT NOT NULL,
+    project_version INTEGER NOT NULL,
+    project_authorization_value TEXT NOT NULL CHECK (
+        project_authorization_value IN ('authorized', 'not authorized')
+    ),
+    body_json TEXT NOT NULL,
+    body_sha256 TEXT NOT NULL,
+    recorder_session_context_id TEXT NOT NULL,
+    recorded_at TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_governed_operational_events_id_version ON governed_operational_events(id, version);
+CREATE INDEX IF NOT EXISTS idx_governed_operational_events_work_item ON governed_operational_events(work_item_id, version);
+CREATE INDEX IF NOT EXISTS idx_governed_operational_events_project ON governed_operational_events(project_id, version);
+CREATE INDEX IF NOT EXISTS idx_governed_operational_events_state ON governed_operational_events(lifecycle_state);
 """
 
 
@@ -2610,7 +2684,7 @@ class KnowledgeDB:
         if added_telemetry_cols:
             _log.debug("Applied migration: TAFE stage attempt telemetry columns %s", added_telemetry_cols)
 
-        # Migration 14: WI-7611 project activation_status field.
+        # Migration 14: WI-7611 project authorization field.
         #
         # Owner decision DELIB-20260831060012: authorization is a single field on
         # the project record, holding exactly 'authorized' or 'not authorized',
@@ -2622,19 +2696,62 @@ class KnowledgeDB:
         # specification is corrected on a later carrier. Adding the field ahead of
         # that correction is safe precisely because no gate consults it, so it
         # cannot compete with the clause still in force.
+        # WI-7706 renamed this column from ``activation_status`` to ``authorization``.
+        # The guard therefore accepts EITHER name as "already applied": a database
+        # predating the rename carries ``activation_status`` and is renamed by
+        # Migration 16 below, so re-adding the field here would leave two columns.
         project_cols = {row[1] for row in conn.execute("PRAGMA table_info(projects)").fetchall()}
-        if "activation_status" not in project_cols:
-            conn.execute("ALTER TABLE projects ADD COLUMN activation_status TEXT NOT NULL DEFAULT 'authorized'")
+        if not ({"authorization", "activation_status"} & project_cols):
+            conn.execute("ALTER TABLE projects ADD COLUMN authorization TEXT NOT NULL DEFAULT 'authorized'")
             # Every row backfills to the DEFAULT above; only the enumerated
             # revoked-evidence projects are denied. Applied to every version row
             # rather than the latest alone, so no historical version carries a
             # value the current model cannot express.
             conn.executemany(
-                "UPDATE projects SET activation_status = 'not authorized' WHERE id = ?",
+                "UPDATE projects SET authorization = 'not authorized' WHERE id = ?",
                 [(project_id,) for project_id in _ACTIVATION_STATUS_DENIED_PROJECT_IDS],
             )
             conn.commit()
-            _log.debug("Applied migration: projects.activation_status")
+            _log.debug("Applied migration: projects.authorization")
+
+        # Migration 15: WI-6992 governed operational-event record.
+        #
+        # Creates the corrected record derived from the canon section 9 evidence
+        # list. Purely additive: the legacy ``operational_events`` table and its
+        # 28 rows are not read, written, migrated or dropped here. Scope item 6
+        # of WI-6992 forbids reinterpreting an authorization-object reference as
+        # an authorization value, and the legacy column carries only
+        # object-presence states, so no content-preserving map onto
+        # 'authorized' / 'not authorized' exists. Those rows are therefore
+        # retained as pre-definition history rather than migrated.
+        existing = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='governed_operational_events'"
+            ).fetchall()
+        }
+        if not existing:
+            conn.executescript(_GOVERNED_OPERATIONAL_EVENTS_DDL)
+            conn.commit()
+            _log.debug("Applied migration: governed_operational_events")
+
+        # Migration 16: WI-7706 rename projects.activation_status -> authorization.
+        #
+        # The field always held authorization values -- 'authorized' and
+        # 'not authorized' -- but carried a name describing activation. Canon
+        # section 1 holds the two concepts distinct: activation is the mechanical
+        # consequence of the project commit, authorization is the owner's prior
+        # approval to proceed. GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001 v5
+        # names this field as the authorization record, so the name is aligned to
+        # what it holds and to what the specification calls it.
+        #
+        # Rename, not add-and-copy: RENAME COLUMN preserves NOT NULL, the
+        # 'authorized' default and every stored value, rewriting no row.
+        project_cols = {row[1] for row in conn.execute("PRAGMA table_info(projects)").fetchall()}
+        if "activation_status" in project_cols and "authorization" not in project_cols:
+            conn.execute("ALTER TABLE projects RENAME COLUMN activation_status TO authorization")
+            conn.commit()
+            _log.debug("Applied migration: projects.activation_status -> projects.authorization")
 
     def _backfill_project_artifacts_from_work_items(self) -> None:
         """Backfill project rows from compatibility work-item project strings.
@@ -5706,14 +5823,6 @@ class KnowledgeDB:
         )
         return (row[0] or 0) + 1
 
-    def _next_project_authorization_version(self, authorization_id: str) -> int:
-        row = (
-            self._get_conn()
-            .execute("SELECT MAX(version) FROM project_authorizations WHERE id = ?", (authorization_id,))
-            .fetchone()
-        )
-        return (row[0] or 0) + 1
-
     def insert_project(
         self,
         name: str,
@@ -6242,43 +6351,6 @@ class KnowledgeDB:
         rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
 
-    def _validate_active_authorization_specs(self, included_spec_ids: list[str] | None) -> None:
-        """Raise ValueError if an active project authorization cites no approved
-        specification (GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001 / WI-3312).
-
-        A cited spec id satisfies the requirement when it resolves via
-        ``get_spec()`` to a current ``specifications``-table row whose lifecycle
-        ``status`` is in the approved set ``{specified, implemented, verified}``.
-        No ``type`` allowlist is applied: membership in the ``specifications``
-        table is itself the "is a specification" predicate -- the ``type``
-        column is heterogeneous descriptive metadata, not an authorization
-        discriminator.
-        """
-        approved_lifecycle = {"active", "specified", "implemented", "verified"}
-        if not included_spec_ids:
-            raise ValueError(
-                "Project authorization status='active' requires at least one "
-                "included_spec_id "
-                "(GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001)."
-            )
-        resolved = 0
-        invalid: list[str] = []
-        for spec_id in included_spec_ids:
-            row = self.get_spec(spec_id)
-            if row is None:
-                invalid.append(f"{spec_id}: not-found")
-            elif row.get("status") not in approved_lifecycle:
-                invalid.append(f"{spec_id}: status={row.get('status')}-not-approved")
-            else:
-                resolved += 1
-        if resolved == 0:
-            raise ValueError(
-                "Project authorization status='active' requires at least one "
-                "approved specification "
-                "(GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001). "
-                f"Cited spec IDs failed resolution: {'; '.join(invalid)}"
-            )
-
     def _validate_spec_amendment_approval_packet(
         self,
         *,
@@ -6345,175 +6417,6 @@ class KnowledgeDB:
         covers, reason = packet_covers_amendment(packet, project_id, authorization_id, added, removed)
         if not covers:
             raise ValueError(f"Cited approval packet does not cover the amendment ({clause}): {rel_path}: {reason}")
-
-    def insert_project_authorization(
-        self,
-        project_id: str,
-        authorization_name: str,
-        owner_decision_deliberation_id: str,
-        scope_summary: str,
-        changed_by: str,
-        change_reason: str,
-        *,
-        id: str | None = None,
-        status: str = "active",
-        allowed_mutation_classes: list[str] | None = None,
-        forbidden_operations: list[str] | None = None,
-        included_work_item_ids: list[str] | None = None,
-        excluded_work_item_ids: list[str] | None = None,
-        included_spec_ids: list[str] | None = None,
-        excluded_spec_ids: list[str] | None = None,
-        expires_at: str | None = None,
-        supersedes: list[str] | None = None,
-        superseded_by: list[str] | None = None,
-        commit: bool = True,
-    ) -> dict[str, Any] | None:
-        """Insert a new append-only project authorization version."""
-        from groundtruth_kb.project.authorization import reject_authorization_creation_c2_c4
-
-        if self.get_project(project_id) is None:
-            raise ValueError(f"Project {project_id} not found")
-        if self.get_deliberation(owner_decision_deliberation_id) is None:
-            raise ValueError(f"Owner decision deliberation {owner_decision_deliberation_id} not found")
-        if not authorization_name.strip():
-            raise ValueError("authorization_name is required")
-        if not scope_summary.strip():
-            raise ValueError("scope_summary is required")
-        if status == "active":
-            self._validate_active_authorization_specs(included_spec_ids)
-
-        authorization_id = id or _stable_project_link_id("PAUTH", project_id, authorization_name)
-        version = self._next_project_authorization_version(authorization_id)
-        reject_authorization_creation_c2_c4(
-            authorization_id=authorization_id,
-            scope_summary=scope_summary,
-            included_work_item_ids=included_work_item_ids,
-            excluded_work_item_ids=excluded_work_item_ids,
-            new_identity=version == 1,
-            status=status,
-        )
-        if str(status or "").strip().lower() == "active":
-            for existing in self.list_project_authorizations(project_id):
-                existing_id = str(existing.get("id") or "")
-                if existing_id and existing_id != authorization_id:
-                    raise ValueError(
-                        f"Project {project_id!r} already has current authorization "
-                        f"{existing_id!r}; a second current identity is prohibited "
-                        "(DCL-PROJECT-AUTHORIZATION-EVENT-TRANSACTION-001 C1)."
-                    )
-        if version > 1:
-            prior_authorization = self.get_project_authorization(authorization_id)
-            if prior_authorization is not None:
-                self._validate_spec_amendment_approval_packet(
-                    prior_included=prior_authorization.get("included_spec_ids_parsed"),
-                    prior_excluded=prior_authorization.get("excluded_spec_ids_parsed"),
-                    new_included=included_spec_ids,
-                    new_excluded=excluded_spec_ids,
-                    change_reason=change_reason,
-                    project_id=project_id,
-                    authorization_id=authorization_id,
-                )
-
-        def encode(values: list[str] | None) -> str | None:
-            if values is None:
-                return None
-            return json.dumps([str(value).strip() for value in values if str(value).strip()])
-
-        conn = self._get_conn()
-        conn.execute(
-            """INSERT INTO project_authorizations
-               (id, version, project_id, status, authorization_name, owner_decision_deliberation_id,
-                scope_summary, allowed_mutation_classes, forbidden_operations, included_work_item_ids,
-                excluded_work_item_ids, included_spec_ids, excluded_spec_ids, expires_at, supersedes,
-                superseded_by, changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                authorization_id,
-                version,
-                project_id,
-                status,
-                authorization_name,
-                owner_decision_deliberation_id,
-                scope_summary,
-                encode(allowed_mutation_classes),
-                encode(forbidden_operations),
-                encode(included_work_item_ids),
-                encode(excluded_work_item_ids),
-                encode(included_spec_ids),
-                encode(excluded_spec_ids),
-                expires_at,
-                encode(supersedes),
-                encode(superseded_by),
-                changed_by,
-                _now(),
-                change_reason,
-            ),
-        )
-        # WI-6453: an active insert of version N>1 must leave exactly one
-        # selectable-current stored row. Prior rows for this id are marked
-        # superseded in the same transaction; payload columns stay intact.
-        if version > 1 and str(status or "").strip().lower() == "active":
-            conn.execute(
-                """UPDATE project_authorizations
-                   SET status = 'superseded',
-                       superseded_by = ?
-                   WHERE id = ? AND version < ?""",
-                (json.dumps([authorization_id]), authorization_id, version),
-            )
-        if commit:
-            conn.commit()
-        return self.get_project_authorization(authorization_id)
-
-    def get_project_authorization(self, authorization_id: str) -> dict[str, Any] | None:
-        """Retrieve a project authorization record by ID.
-
-        Args:
-            authorization_id: The authorization identifier.
-
-        Returns:
-            The authorization dictionary, or None if not found.
-        """
-        row = (
-            self._get_conn()
-            .execute("SELECT * FROM current_project_authorizations WHERE id = ?", (authorization_id,))
-            .fetchone()
-        )
-        return _row_to_dict(row) if row else None
-
-    def list_project_authorizations(
-        self,
-        project_id: str | None = None,
-        *,
-        status: str | None = None,
-        include_terminal: bool = False,
-    ) -> list[dict[str, Any]]:
-        """List project authorizations matching filters.
-
-        Args:
-            project_id: Optional project identifier to filter by.
-            status: Optional lifecycle status to filter by.
-            include_terminal: If True, terminal/expired records are included.
-
-        Returns:
-            A list of project authorization dictionaries.
-        """
-        query = "SELECT * FROM current_project_authorizations WHERE 1=1"
-        params: list[Any] = []
-        if project_id:
-            query += " AND project_id = ?"
-            params.append(project_id)
-        if status:
-            query += " AND status = ?"
-            params.append(status)
-        elif not include_terminal:
-            query += " AND status = 'active'"
-        query += " ORDER BY project_id, authorization_name, id"
-        rows = self._get_conn().execute(query, params).fetchall()
-        return [_row_to_dict(r) for r in rows]
-
-    # ------------------------------------------------------------------
-    # Typed Artifact-Flow Engine: flow definitions
-    # ------------------------------------------------------------------
 
     def _next_flow_definition_version(self, definition_id: str) -> int:
         row = (
@@ -8228,99 +8131,6 @@ class KnowledgeDB:
         rows = self._get_conn().execute("SELECT * FROM current_harnesses ORDER BY id").fetchall()
         return [_row_to_dict(r) for r in rows]
 
-    def update_project_authorization(
-        self,
-        authorization_id: str,
-        changed_by: str,
-        change_reason: str,
-        **fields: Any,
-    ) -> dict[str, Any] | None:
-        """Update fields of an existing project authorization by inserting a new version.
-
-        Args:
-            authorization_id: The authorization identifier.
-            changed_by: Person or agent performing the change.
-            change_reason: Explanatory rationale for the change.
-            **fields: Keyword arguments of fields to update.
-
-        Returns:
-            The updated project authorization dictionary.
-        """
-        current = self.get_project_authorization(authorization_id)
-        if current is None:
-            raise ValueError(f"Project authorization {authorization_id} not found")
-        allowed_fields = {
-            "project_id",
-            "status",
-            "authorization_name",
-            "owner_decision_deliberation_id",
-            "scope_summary",
-            "allowed_mutation_classes",
-            "forbidden_operations",
-            "included_work_item_ids",
-            "excluded_work_item_ids",
-            "included_spec_ids",
-            "excluded_spec_ids",
-            "expires_at",
-            "supersedes",
-            "superseded_by",
-        }
-        unknown = sorted(set(fields) - allowed_fields)
-        if unknown:
-            raise ValueError(f"Unsupported project authorization fields: {', '.join(unknown)}")
-
-        def current_json(field: str) -> list[str] | None:
-            parsed = current.get(f"{field}_parsed")
-            if isinstance(parsed, list):
-                return [str(value) for value in parsed]
-            return None
-
-        values = {
-            "project_id": fields.get("project_id", current["project_id"]),
-            "status": fields.get("status", current["status"]),
-            "authorization_name": fields.get("authorization_name", current["authorization_name"]),
-            "owner_decision_deliberation_id": fields.get(
-                "owner_decision_deliberation_id", current["owner_decision_deliberation_id"]
-            ),
-            "scope_summary": fields.get("scope_summary", current["scope_summary"]),
-            "allowed_mutation_classes": fields.get(
-                "allowed_mutation_classes", current_json("allowed_mutation_classes")
-            ),
-            "forbidden_operations": fields.get("forbidden_operations", current_json("forbidden_operations")),
-            # WI-6617 C4: do not copy work-item include/exclude lists onto a new
-            # version. Coverage is current project membership.
-            "included_work_item_ids": fields.get("included_work_item_ids"),
-            "excluded_work_item_ids": fields.get("excluded_work_item_ids"),
-            "included_spec_ids": fields.get("included_spec_ids", current_json("included_spec_ids")),
-            "excluded_spec_ids": fields.get("excluded_spec_ids", current_json("excluded_spec_ids")),
-            "expires_at": fields.get("expires_at", current["expires_at"]),
-            "supersedes": fields.get("supersedes", current_json("supersedes")),
-            "superseded_by": fields.get("superseded_by", current_json("superseded_by")),
-        }
-        return self.insert_project_authorization(
-            values["project_id"],
-            values["authorization_name"],
-            values["owner_decision_deliberation_id"],
-            values["scope_summary"],
-            changed_by,
-            change_reason,
-            id=authorization_id,
-            status=values["status"],
-            allowed_mutation_classes=values["allowed_mutation_classes"],
-            forbidden_operations=values["forbidden_operations"],
-            included_work_item_ids=values["included_work_item_ids"],
-            excluded_work_item_ids=values["excluded_work_item_ids"],
-            included_spec_ids=values["included_spec_ids"],
-            excluded_spec_ids=values["excluded_spec_ids"],
-            expires_at=values["expires_at"],
-            supersedes=values["supersedes"],
-            superseded_by=values["superseded_by"],
-        )
-
-    # ------------------------------------------------------------------
-    # Backlog Snapshots
-    # ------------------------------------------------------------------
-
     def _next_backlog_version(self, snapshot_id: str) -> int:
         row = (
             self._get_conn()
@@ -8921,7 +8731,6 @@ class KnowledgeDB:
             "test_plan_phases": ("id", "test_plan_phases", "title"),
             "work_items": ("id", "work_items", "title"),
             "projects": ("id", "projects", "name"),
-            "project_authorizations": ("id", "project_authorizations", "authorization_name"),
             "backlog_snapshots": ("id", "backlog_snapshots", "title"),
         }
 
@@ -8984,7 +8793,6 @@ class KnowledgeDB:
             "project_work_item_memberships",
             "project_dependencies",
             "project_artifact_links",
-            "project_authorizations",
             "backlog_snapshots",
             "quality_scores",
             "testable_elements",
@@ -10307,7 +10115,6 @@ class KnowledgeDB:
         ).fetchone()[0]
         project_dependency_count = conn.execute("SELECT COUNT(*) FROM current_project_dependencies").fetchone()[0]
         project_artifact_link_count = conn.execute("SELECT COUNT(*) FROM current_project_artifact_links").fetchone()[0]
-        project_authorization_count = conn.execute("SELECT COUNT(*) FROM current_project_authorizations").fetchone()[0]
 
         backlog_count = conn.execute("SELECT COUNT(*) FROM current_backlog_snapshots").fetchone()[0]
 
@@ -10338,7 +10145,6 @@ class KnowledgeDB:
             "project_membership_count": project_membership_count,
             "project_dependency_count": project_dependency_count,
             "project_artifact_link_count": project_artifact_link_count,
-            "project_authorization_count": project_authorization_count,
             "backlog_snapshot_count": backlog_count,
             "testable_element_count": te_count,
             "deliberation_count": delib_count,

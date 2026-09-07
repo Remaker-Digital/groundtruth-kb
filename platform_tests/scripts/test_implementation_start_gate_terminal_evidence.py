@@ -285,23 +285,18 @@ def _ready_thread(
 
 def test_t1_expired_but_live_at_implementation_clears_finalization(tmp_path: Path) -> None:
     """An expired-but-live-at-implementation, uncontested packet clears the
-    canonical finalization command and records the evidence exemption row."""
+    canonical finalization command.
+
+    The exemption-row assertions were removed when the gate's ``.gtkb-state``
+    audit writer was deleted (owner AUQ 2026-09-05). Gate exemptions are no
+    longer recorded anywhere, so only the clearance behavior is asserted here.
+    """
     slug = "wi5694-t1"
     _ready_thread(tmp_path, slug)
 
     result = gate.gate_decision(_payload(tmp_path, _corridor_command(slug)))
 
     assert result == {}
-    rows = _exemptions(tmp_path)
-    assert len(rows) == 1
-    reason = rows[0]["reason"]
-    assert slug in reason
-    assert "expired=True" in reason
-    assert "live_at_implementation=True" in reason
-    assert "contested=False" in reason
-    assert "chain_state='awaiting_review'" in reason
-    assert "scripts/sample.py" in reason
-    assert f"bridge/{slug}-004.md" in reason
 
 
 def test_t1_evidence_api_agrees_with_the_consumer_decision(tmp_path: Path) -> None:
@@ -379,7 +374,6 @@ def test_t3_uncontested_control_clears(tmp_path: Path) -> None:
     _ready_thread(tmp_path, slug, session_id="session-lo", claim_session="session-lo")
 
     assert gate.gate_decision(_payload(tmp_path, _corridor_command(slug))) == {}
-    assert len(_exemptions(tmp_path)) == 1
 
 
 def test_t3_registry_read_error_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -467,27 +461,90 @@ def test_t4_live_packet_still_authorizes_ordinary_mutation(tmp_path: Path) -> No
     assert _exemptions(tmp_path) == []
 
 
-def test_t4_expired_packet_still_blocks_ordinary_mutation(tmp_path: Path) -> None:
-    """The active-authority path is unchanged: an expired packet still blocks an
-    ordinary (non-corridor) mutation of an approved path, and the corridor
-    clearance never fires for it."""
+def test_wi7751_claimed_bridge_id_resolves_from_the_registry_not_a_packet(tmp_path: Path) -> None:
+    """WI-7751 principal-risk guard: the resolved bridge id must be NON-EMPTY.
+
+    The gate reads ``bridge_id`` from the work-intent registry now that the packet
+    is retired. If that lookup silently returned ``""`` the three retained controls
+    keyed on it -- the claim check and both concurrency checks -- would still be
+    *called*, and would still appear to run, while checking nothing. Every one of
+    them would degrade quietly rather than fail.
+
+    This asserts the positive value rather than the absence of an error, because an
+    empty-string regression raises nothing. It is the only assertion that catches it.
+    """
+    slug = "wi7751-claim-id"
+    _ready_thread(tmp_path, slug)
+
+    resolved = gate._claimed_bridge_id(tmp_path, "session-lo")
+
+    assert resolved == slug
+    assert resolved  # explicit non-empty guard: the regression this test exists for
+
+
+def test_wi7751_claimed_bridge_id_fails_closed_without_a_claim(tmp_path: Path) -> None:
+    """Non-vacuity control for the guard above.
+
+    Without a claim the resolver returns ``""``. That is correct -- it is not a
+    bootstrap id, so the claim check turns it into a denial -- but it proves the
+    test above measures a real lookup rather than a constant.
+    """
+    slug = "wi7751-no-claim"
+    _write_chain(tmp_path, slug, latest="NONE")
+
+    assert gate._claimed_bridge_id(tmp_path, "session-lo") == ""
+    assert gate._claimed_bridge_id(tmp_path, "") == ""
+
+
+def test_t4_packet_expiry_no_longer_blocks_an_in_scope_mutation(tmp_path: Path) -> None:
+    """WI-7751: expiry is retired, so an in-scope mutation proceeds.
+
+    Before WI-7751 an expired packet blocked this mutation. That block came from
+    the implementation-start packet, which ``GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001``
+    v5 retires along with its expiry semantics ("authorization carries no scope,
+    expiry, mutation-class, or forbidden-operation semantics"). The session holds a
+    live claim on a GO'd chain and the target is inside the approved proposal's
+    ``target_paths``, so every RETAINED control passes and the gate allows.
+
+    The companion test below is the non-vacuity guard: it proves this allow comes
+    from controls passing rather than from the gate having stopped checking.
+    """
     slug = "wi5694-t4-expired"
     _ready_thread(tmp_path, slug)
 
     result = gate.gate_decision(_apply_patch_payload(tmp_path, "scripts/sample.py"))
 
-    assert result["decision"] == "block"
+    assert result == {}
     assert _exemptions(tmp_path) == []
 
 
-def test_t4_expired_packet_still_blocks_ordinary_shell_mutation(tmp_path: Path) -> None:
-    """A non-corridor mutating shell command on an approved path stays blocked."""
+def test_t4_out_of_scope_target_still_blocks_after_expiry_retirement(tmp_path: Path) -> None:
+    """WI-7751 non-vacuity guard: change scope is RETAINED where expiry is not.
+
+    Same fixture as the test above, differing only in the target. v5 retires the
+    packet but keeps change scope -- "change scope is the implementation proposal's
+    declared ``target_paths``" -- so a protected path outside the approved set must
+    still be refused. Without this, the test above would be indistinguishable from
+    a gate that had stopped enforcing anything on this path.
+    """
+    slug = "wi5694-t4-outofscope"
+    _ready_thread(tmp_path, slug)
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, "scripts/not_an_approved_target.py"))
+
+    assert result["decision"] == "block"
+    assert "outside the approved proposal's target_paths" in result["reason"]
+    assert _exemptions(tmp_path) == []
+
+
+def test_t4_packet_expiry_no_longer_blocks_an_in_scope_shell_mutation(tmp_path: Path) -> None:
+    """The shell surface of the test above; same retirement, same reasoning."""
     slug = "wi5694-t4-shell"
     _ready_thread(tmp_path, slug)
 
     result = gate.gate_decision(_payload(tmp_path, "Set-Content -Path scripts/sample.py -Value x"))
 
-    assert result["decision"] == "block"
+    assert result == {}
     assert _exemptions(tmp_path) == []
 
 
@@ -632,7 +689,6 @@ def test_t6_in_bound_variant_clears(tmp_path: Path) -> None:
     command = _corridor_command(slug, includes=["scripts/sample.py", "platform_tests/scripts/test_sample.py"])
 
     assert gate.gate_decision(_payload(tmp_path, command)) == {}
-    assert len(_exemptions(tmp_path)) == 1
 
 
 def test_t6_foreign_bridge_chain_file_falls_through(tmp_path: Path) -> None:

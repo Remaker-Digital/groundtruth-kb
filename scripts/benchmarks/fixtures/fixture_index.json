@@ -30,7 +30,7 @@
       "fixture_root": "scripts/benchmarks/fixtures/proposal-report-root-boundary-001",
       "source_artifact_refs": [
         "bridge/gtkb-harness-benchmark-fixture-corpus-003.md",
-        ".claude/rules/project-root-boundary.md"
+        ".harness-baseline-configuration/rules/project-root-boundary.md"
       ],
       "challenge_family": "proposal_report_correctness",
       "promotion_status": "unpromoted",
@@ -55,8 +55,8 @@
       "fixture_id": "direct-mutation-claim-accuracy-001",
       "fixture_root": "scripts/benchmarks/fixtures/direct-mutation-claim-accuracy-001",
       "source_artifact_refs": [
-        ".claude/rules/codex-review-gate.md",
-        ".claude/rules/file-bridge-protocol.md"
+        ".harness-baseline-configuration/rules/counterpart-review-gate.md",
+        ".harness-baseline-configuration/rules/file-bridge-protocol.md"
       ],
       "challenge_family": "direct_mutation_refusal",
       "promotion_status": "unpromoted",

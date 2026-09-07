@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# THIS FILE IS A PROJECTION, NOT CANONICAL.
+# Projected from the neutral harness baseline by the GT-KB projection engine.
+# Do not edit here: change the baseline (.harness-baseline-configuration) and re-project with
+# `gt harness project claude`. If a needed change cannot be made through
+# the baseline and re-projection, file a work item against the projector
+# (GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6).
 """UserPromptSubmit hook - Project VERIFIED-completion automatic-transition trigger.
 
 W1 of GTKB-GOVERNANCE-CORRECTION-S358 (WI-3365); originally IP-2 of WI-3316.
@@ -18,9 +24,6 @@ This hook is the prompt-time trigger plus owner-visible notification; the
 transition itself is performed by
 ``ProjectLifecycleService.complete_project_authorization()``.
 
-This file is kept byte-identical between ``.claude/hooks/`` and
-``.codex/gtkb-hooks/`` for Claude/Codex hook parity
-(``ADR-CODEX-HOOK-PARITY-FALLBACK-001``); ``parents[2]`` resolves the repo root
 from either location.
 
 Stdin:  JSON hook event payload (consumed, not inspected).
@@ -32,7 +35,6 @@ Exit:   always 0 (fire-and-forget; the hook must never crash the agent).
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 from datetime import UTC, datetime
@@ -42,27 +44,12 @@ from typing import Any
 ENV_DISABLE = "GTKB_NO_PROJECT_COMPLETION_SURFACE"
 
 PROJECT_ROOT = Path(
-    os.environ.get("CLAUDE_PROJECT_DIR")
-    or os.environ.get("GTKB_PROJECT_ROOT")
-    or Path(__file__).resolve().parents[2]
+    os.environ.get("CLAUDE_PROJECT_DIR") or os.environ.get("GTKB_PROJECT_ROOT") or Path(__file__).resolve().parents[2]
 ).resolve()
-
-ERRORS_LOG_REL = ".gtkb-state/project-completion-surface/errors.jsonl"
 
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
-
-def _log_error(payload: dict[str, Any]) -> None:
-    """Append a diagnostic record. Best-effort; silent on failure."""
-    try:
-        log_path = PROJECT_ROOT / ERRORS_LOG_REL
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        with log_path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps({**payload, "ts": _now_iso()}) + "\n")
-    except Exception:
-        pass
 
 
 def _auto_complete_ready_authorizations() -> list[dict[str, Any]]:
@@ -78,8 +65,7 @@ def _auto_complete_ready_authorizations() -> list[dict[str, Any]]:
             sys.path.insert(0, str(gt_src))
         from groundtruth_kb.db import KnowledgeDB
         from groundtruth_kb.project.lifecycle import ProjectLifecycleService
-    except Exception as exc:
-        _log_error({"event": "service_unavailable", "error": str(exc)})
+    except Exception:
         return []
 
     db = None
@@ -87,8 +73,7 @@ def _auto_complete_ready_authorizations() -> list[dict[str, Any]]:
         db = KnowledgeDB(PROJECT_ROOT / "groundtruth.db")
         service = ProjectLifecycleService(db)
         return service.auto_complete_ready_authorizations(project_root=PROJECT_ROOT)
-    except Exception as exc:
-        _log_error({"event": "auto_complete_failed", "error": str(exc)})
+    except Exception:
         return []
     finally:
         if db is not None:
@@ -143,8 +128,7 @@ def main() -> int:
         pass
     try:
         output = _user_prompt_handler()
-    except Exception as exc:
-        _log_error({"event": "handler_crashed", "error": str(exc)})
+    except Exception:
         output = ""
     if output:
         sys.stdout.write(output)

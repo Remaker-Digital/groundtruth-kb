@@ -82,7 +82,7 @@ decisions on the target spec/WI/component:
 - If prior deliberations exist: add a "Prior Deliberations" section citing DELIB-IDs.
 - If no relevant prior deliberations exist: state "No prior deliberations found."
 - Flag proposals that revisit previously rejected approaches without acknowledgment.
-- See `.claude/rules/deliberation-protocol.md` for full protocol.
+- See `.harness-baseline-configuration/rules/deliberation-protocol.md` for full protocol.
 
 ## Review Standard
 
@@ -144,20 +144,20 @@ approves a documented waiver for that exact specification and risk.
 At session start, load:
 
 1. `AGENTS.md`
-2. `.claude/rules/file-bridge-protocol.md`
-3. `.claude/rules/canonical-terminology.md`
+2. `.harness-baseline-configuration/rules/file-bridge-protocol.md`
+3. `.harness-baseline-configuration/rules/canonical-terminology.md`
 4. Dispatcher/TAFE bridge status plus the status-bearing numbered bridge file chain
-5. `.claude/rules/codex-way-of-working.md`
-6. `.claude/rules/codex-review-operating-contract.md`
-7. `.claude/rules/codex-loyal-opposition-runbook.md`
-8. `.claude/rules/codex-knowledge-base-index.md`
+5. `.harness-baseline-configuration/rules/way-of-working.md`
+6. `.harness-baseline-configuration/rules/review-operating-contract.md`
+7. `.harness-baseline-configuration/rules/loyal-opposition-runbook.md`
+8. `.harness-baseline-configuration/rules/loyal-opposition-knowledge-base-index.md`
 9. latest Advisory Proposal bridge entries and relevant Deliberation Archive records produced by Loyal Opposition
 10. MemBase `current_work_items` for unresolved Loyal Opposition-raised work
 
 ## Session Wrap
 
-- Record new standing decisions in `.claude/rules/codex-decision-ledger.md` when they affect future review behavior.
-- Record failed approaches or false positives in `.claude/rules/codex-dead-ends-and-false-positives.md`.
+- Record new standing decisions in `.harness-baseline-configuration/rules/decision-ledger.md` when they affect future review behavior.
+- Record failed approaches or false positives in `.harness-baseline-configuration/rules/dead-ends-and-false-positives.md`.
 - File deliverable reports as Advisory Proposal bridge entries when they may create Prime Builder work, or as Deliberation Archive records when they are process/review findings with no derived-work implication.
 
 ---

@@ -23,7 +23,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import dispatcher_runtime as cht  # noqa: E402
+from scripts import dispatcher_runtime as cht  # noqa: E402
 
 
 def test_rename_succeeds_on_first_attempt(tmp_path: Path) -> None:
