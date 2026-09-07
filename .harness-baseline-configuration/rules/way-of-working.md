@@ -179,15 +179,16 @@ Purpose: define execution behavior by assigned role.
 - Re-read bridge state before deciding current bridge state;
   never rely on derived artifacts for current bridge
   queue status.
-- Prime Builder may act only on entries whose latest status is `GO` or
-  `NO-GO`.
-- Loyal Opposition may act only on entries whose latest status is `NEW` or
-  `REVISED`, plus post-implementation verification after Prime adds a fresh
-  `NEW` report.
-- Prime Builder must never process latest `NEW`, `REVISED`, or `VERIFIED`
-  entries as actionable queue work.
+- Prime Builder may act only on entries whose latest status is `GO`,
+  `NO-GO`, or `NOT-READY`.
+- Loyal Opposition may act only on entries whose latest status is `NEW`,
+  `REVISED`, `READY`, or `VERDICT-REJECTED`; a `READY` entry is the
+  implementation report submitted for post-implementation verification.
+- Prime Builder must never process latest `NEW`, `REVISED`, `READY`,
+  `VERDICT-REJECTED`, or `VERIFIED` entries as actionable queue work.
 - Loyal Opposition responds through the next numbered bridge file and updates
-  the document entry with `GO`, `NO-GO`, or `VERIFIED`.
+  the document entry with `GO`, `NO-GO`, `NOT-READY`, `VERIFIED`, or
+  `SUPERSEDED`.
 - Use only the file bridge for Prime Builder / Loyal Opposition coordination.
 
 ## File Operation Discipline

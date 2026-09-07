@@ -131,8 +131,8 @@ If Loyal Opposition is verifying an implementation:
    as proposal review.
 6. Include the generated `Applicability Preflight` section AND the
    `Clause Applicability` section in any `VERIFIED` verdict.
-7. Issue `NO-GO` instead of `VERIFIED` for any untested linked specification or
-   blocking-gap clause unless an explicit owner waiver is documented.
+7. Issue `NOT-READY` instead of `VERIFIED` for any untested linked specification
+   or blocking-gap clause unless an explicit owner waiver is documented.
 8. Commit the verified work product first, with a message citing every work item
    it retires in the form `(WI-NNNN)`. Only after that commit succeeds, record
    `VERIFIED` as the next numbered bridge file, excluded from that commit and

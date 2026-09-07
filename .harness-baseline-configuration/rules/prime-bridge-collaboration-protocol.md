@@ -27,7 +27,7 @@ it for readers of this rule.
 | `READY` | Prime Builder | Implementation report, valid only after `GO` |
 | `VERDICT-REJECTED` | Prime Builder | Rejects a noncompliant verdict; routes a fresh correction |
 | `WITHDRAWN` | Prime Builder | Closes a proposal before `GO`; terminal |
-| `BLOCKED` | Prime Builder | Opens a thread that waits on a named blocker |
+| `BLOCKED` | Prime Builder | Typed refusal returned instead of `NEW` when the parent project is not authorized at filing time; opens a thread |
 | `GO` | Loyal Opposition | Proposal approved for implementation |
 | `NO-GO` | Loyal Opposition | Proposal rejected; a `REVISED` proposal is required |
 | `NOT-READY` | Loyal Opposition | Report rejected; a corrected `READY` report is required |
@@ -80,15 +80,16 @@ specification is linked and that proposed tests derive from those specifications
 For post-implementation verification, Loyal Opposition must carry forward the
 linked specifications, confirm specification-derived tests were created or
 identified, execute or inspect execution of those tests against the
-implementation, and issue `NO-GO` instead of `VERIFIED` for any untested linked
-specification unless an explicit owner waiver is documented.
+implementation, and issue `NOT-READY` instead of `VERIFIED` for any untested
+linked specification unless an explicit owner waiver is documented.
 
 ### Prime Builder Response
 
-Prime Builder processes latest `GO` and `NO-GO` entries.
+Prime Builder processes latest `GO`, `NO-GO`, and `NOT-READY` entries.
 
 - `GO`: proceed or close as directed by the verdict.
 - `NO-GO`: fix blockers and write a `REVISED` entry.
+- `NOT-READY`: correct the implementation report and file `READY` again.
 - `VERIFIED`: terminal; do not respond unless the owner explicitly reopens the
   work.
 

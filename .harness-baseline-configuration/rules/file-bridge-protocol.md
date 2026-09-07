@@ -475,10 +475,13 @@ begins a fresh `NEW` chain that cites it.
 
 ## BLOCKED Status
 
-`BLOCKED` is a **Prime Builder-authored** thread opener that names the blocker
-a proposal is waiting on. It is not dispatchable and carries no verdict. The
-thread continues only when Prime Builder files `NEW` (the blocker is cleared)
-or `WITHDRAWN`.
+`BLOCKED` is the **Prime Builder-authored** typed refusal a headless session
+returns instead of a `NEW` proposal when the work item's parent project reads
+`not authorized` at filing time. It begins a thread and may occupy no other
+position, requests no review, is not dispatchable, and carries the project id,
+the observed authorization value, and the time of the read. An interactive
+session asks the owner instead. The thread continues only when Prime Builder
+files `NEW` (the project is authorized) or `WITHDRAWN`.
 
 ## Prime Workflow
 

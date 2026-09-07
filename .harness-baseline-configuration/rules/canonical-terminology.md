@@ -679,8 +679,9 @@ and Loyal Opposition on a single topic. A bridge thread is identified by a
 kebab-case slug and consists of an ordered sequence of versioned files
 (`bridge/<slug>-001.md`, `-002.md`, â€¦) plus a single entry in
 the dispatcher-backed bridge state. The thread terminates at `VERIFIED`,
-`WITHDRAWN`, or `SUPERSEDED`. `BLOCKED` opens a thread that waits on a named
-blocker until Prime Builder files `NEW` or `WITHDRAWN`.
+`WITHDRAWN`, or `SUPERSEDED`. `BLOCKED` opens a thread with the typed refusal a
+headless session returns when the parent project is not authorized at filing
+time; it continues only when Prime Builder files `NEW` or `WITHDRAWN`.
 
 *Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#bridge-thread).*
 
@@ -717,8 +718,8 @@ own proposal before `GO`); an advisory disposition (which stays under
 
 **Definition:** A Loyal-Opposition-initiated bridge entry that delivers an advisory
 recommendation to Prime Builder, distinct from a Prime-initiated proposal.
-An LO advisory is filed at `bridge/<slug>-001.md` with status `NO-GO`
-(deliberate) and a `bridge_kind: loyal_opposition_advisory` header. It tasks
+An LO advisory is filed at `bridge/<slug>-001.md` with status `ADVISORY`
+and a `bridge_kind: loyal_opposition_advisory` header. It tasks
 Prime Builder with filing a normal implementation proposal that converts the
 advisory into scoped, testable GT-KB work.
 
