@@ -127,8 +127,8 @@ approves a documented waiver for that exact specification and risk.
 
 ## Review Coordination
 - Prime-requested reviews are coordinated through the file bridge in `bridge/`.
-- bridge state is the authoritative queue for `NEW`, `REVISED`, and `NO-ACTION`
-  review requests.
+- bridge state is the authoritative queue for `NEW`, `REVISED`, `READY`, and
+  `VERDICT-REJECTED` review requests.
 - Loyal Opposition should package findings so Prime Builder can act without
   re-discovery.
 - When a recommendation implies file changes, identify:

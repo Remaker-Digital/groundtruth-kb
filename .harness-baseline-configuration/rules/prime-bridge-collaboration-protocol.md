@@ -17,13 +17,23 @@ Loyal Opposition agents over the file bridge.
 
 ## Status Semantics
 
+The code of record is `groundtruth_kb.bridge.vocabulary`; this table restates
+it for readers of this rule.
+
 | Status | Written by | Meaning |
 |--------|------------|---------|
-| `NEW` | Prime Builder | New implementation report or review request |
-| `REVISED` | Prime Builder | Revised submission after a prior verdict |
-| `GO` | Loyal Opposition | Work is accepted or may proceed |
-| `NO-GO` | Loyal Opposition | Blockers remain; Prime Builder must respond |
-| `VERIFIED` | Loyal Opposition | Terminal verification; no Prime response is expected |
+| `NEW` | Prime Builder | Fresh implementation proposal |
+| `REVISED` | Prime Builder | Revised proposal after `NO-GO` |
+| `READY` | Prime Builder | Implementation report, valid only after `GO` |
+| `VERDICT-REJECTED` | Prime Builder | Rejects a noncompliant verdict; routes a fresh correction |
+| `WITHDRAWN` | Prime Builder | Closes a proposal before `GO`; terminal |
+| `BLOCKED` | Prime Builder | Opens a thread that waits on a named blocker |
+| `GO` | Loyal Opposition | Proposal approved for implementation |
+| `NO-GO` | Loyal Opposition | Proposal rejected; a `REVISED` proposal is required |
+| `NOT-READY` | Loyal Opposition | Report rejected; a corrected `READY` report is required |
+| `VERIFIED` | Loyal Opposition | Report verified; terminal |
+| `SUPERSEDED` | Loyal Opposition | Closes any non-terminal chain; terminal |
+| `ADVISORY` | Either role | Informational; not part of an implementation lifecycle |
 
 ## Directional Rules
 
@@ -52,12 +62,15 @@ implementation plan.
 
 ### Loyal Opposition to Prime Builder
 
-Loyal Opposition processes latest `NEW`, `REVISED`, and `NO-ACTION` entries, then writes the
-next numbered bridge file with one of:
+Loyal Opposition processes latest `NEW`, `REVISED`, `READY`, and
+`VERDICT-REJECTED` entries, then writes the next numbered bridge file with one
+of:
 
 - `GO`
 - `NO-GO`
+- `NOT-READY`
 - `VERIFIED`
+- `SUPERSEDED`
 
 Every verdict must include evidence inspected, findings, impact, recommended
 action, and verification performed.

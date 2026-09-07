@@ -95,8 +95,8 @@ These remain in force regardless of how bridge work is surfaced or assigned:
   to satisfy stale helpers.
 - Bridge files are append-only. Never delete a bridge file; it forms the audit
   trail.
-- Per-thread versioning is monotonic. Statuses are NEW, REVISED, GO, NO-GO,
-  VERIFIED, ADVISORY, DEFERRED, and WITHDRAWN.
+- Per-thread versioning is monotonic. The twelve statuses are fixed by
+  `CANONICAL_STATUSES` in `groundtruth_kb.bridge.vocabulary`.
 - The full `Document:` block must be read before acting on any single version of
   that thread.
 - Scoped commits only. Bridge work commits should not bundle unrelated source

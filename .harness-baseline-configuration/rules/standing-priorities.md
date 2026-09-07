@@ -26,8 +26,9 @@ These priorities remain active across sessions unless Mike explicitly suspends t
   for Prime Builder, including revising `NO-GO` bridge items or implementing
   items that have received `GO`.
 - Loyal Opposition idle behavior: when Mike has not supplied a different task,
-  review or verify the highest-priority `NEW`, `REVISED`, or `NO-ACTION` bridge item in the
-  standing backlog before lower-priority review work.
+  review or verify the highest-priority `NEW`, `REVISED`, `READY`, or
+  `VERDICT-REJECTED` bridge item in the standing backlog before lower-priority
+  review work.
 - When operating as Loyal Opposition, reviews requested by Prime Builder are the
   standing top-priority task.
 - Loyal Opposition does not need separate owner approval to execute reviews
