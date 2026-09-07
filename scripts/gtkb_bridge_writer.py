@@ -20,12 +20,22 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from groundtruth_kb.bridge.versioned_files import parse_bridge_header_block
+from groundtruth_kb.bridge.vocabulary import (
+    ACCEPTED_ON_READ,
+    CANONICAL_STATUSES,
+    LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
+    LOYAL_OPPOSITION_AUTHORED_STATUSES,
+    PRIME_ACTIONABLE_STATUSES,
+    PRIME_AUTHORED_STATUSES,
+    TRANSITIONS,
+)
+
 from scripts.bridge_author_metadata import (
     ensure_author_metadata,
     extract_author_metadata,
     is_synthetic_session_context_id,
 )
-from groundtruth_kb.bridge.versioned_files import parse_bridge_header_block
 from scripts.verdict_evidence_anchor_preflight import (
     validate_verdict_evidence_anchors,
     violation_summary,
@@ -62,33 +72,18 @@ def _bridge_file_committed_in_git(target: Path, project_root: Path) -> bool:
 _CLOSING_INSTRUCTION = "When you are finished working, close your session envelope by invoking ::wrap."
 
 
-VALID_STATUSES: frozenset[str] = frozenset(
-    {
-        "NEW",
-        "REVISED",
-        "READY",  # <-- add
-        "GO",
-        "NO-GO",
-        "NOT-READY",  # <-- add
-        "VERDICT-REJECTED",
-        "NO-ACTION",
-        "VERIFIED",
-        "ADVISORY",
-        "DEFERRED",
-        "WITHDRAWN",
-    }
-)
-PRIME_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "VERDICT-REJECTED", "NO-ACTION"})
-LOYAL_OPPOSITION_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "VERIFIED"})
+# Canon section 6: the status vocabulary has exactly one code of record,
+# groundtruth_kb.bridge.vocabulary. The writer derives every status set from it
+# instead of restating tokens. A token outside CANONICAL_STATUSES is not
+# writable here; the historical-inert tokens are accepted only when reading.
+VALID_STATUSES: frozenset[str] = CANONICAL_STATUSES
+PRIME_STATUSES: frozenset[str] = PRIME_AUTHORED_STATUSES
+LOYAL_OPPOSITION_STATUSES: frozenset[str] = LOYAL_OPPOSITION_AUTHORED_STATUSES
+# The envelope names the next responder, not the author of the artifact:
+# Loyal-Opposition-actionable statuses route to "lo", Prime-actionable to "pb".
 ENVELOPE_RESPONDER_BY_STATUS: Mapping[str, str] = {
-    # The envelope names the next responder, not the author of the artifact.
-    "NEW": "lo",
-    "REVISED": "lo",
-    "READY": "lo",
-    "VERDICT-REJECTED": "lo",
-    "GO": "pb",
-    "NO-GO": "pb",
-    "NOT-READY": "pb",
+    **{status: "lo" for status in sorted(LOYAL_OPPOSITION_ACTIONABLE_STATUSES)},
+    **{status: "pb" for status in sorted(PRIME_ACTIONABLE_STATUSES)},
 }
 ENVELOPE_ACTIVITY_VALUES: frozenset[str] = frozenset({"ops", "deliberation", "build", "test", "spec", "project"})
 ENVELOPE_ACTIVITY_ALIASES: dict[str, str] = {"operations": "ops", "specification": "spec"}
@@ -96,7 +91,9 @@ LO_ENVELOPE_BRIDGE_KINDS: frozenset[str] = frozenset({"lo_verdict", "loyal_oppos
 
 PRIME_ROLE_SLOT = "prime-builder"
 LOYAL_OPPOSITION_ROLE_SLOT = "loyal-opposition"
-PROVIDER_VERDICT_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "VERIFIED"})
+# A provider-backed worker is Loyal Opposition, so its verdict must be a
+# Loyal-Opposition-authored status; ADVISORY is informational, not a verdict.
+PROVIDER_VERDICT_STATUSES: frozenset[str] = LOYAL_OPPOSITION_AUTHORED_STATUSES - {"ADVISORY"}
 PROVIDER_VERDICT_STATUS_MISMATCH_CODE = "GTKB_PROVIDER_VERDICT_STATUS_MISMATCH"
 PROVIDER_RUNTIME_MODEL_FIELDS: tuple[str, ...] = (
     "author_model",
@@ -271,7 +268,7 @@ def _first_status(content: str) -> str:
 def _authored_header_token(content: str) -> str:
     """Return the exact authored status spelling from the bounded header."""
 
-    accepted = VALID_STATUSES | {"NO-ACTION"}
+    accepted = ACCEPTED_ON_READ
     for line in parse_bridge_header_block(content).raw_lines:
         value = line.strip().lstrip("\ufeff").upper()
         if value in accepted:
@@ -610,15 +607,18 @@ def _thread_state(project_root: Path, document_name: str) -> tuple[Path, int, st
 
 
 def _validate_provider_transition(*, latest_status: str, latest_content: str, verdict: str) -> None:
+    # Canon section 6: the successor relation is a function of the current
+    # status alone and lives in the vocabulary's TRANSITIONS table. A provider-
+    # backed worker is Loyal Opposition, so it may only author Loyal-Opposition
+    # statuses: report rejection is NOT-READY, and NO-GO never follows READY.
     bridge_kind_match = _BRIDGE_KIND_RE.search(latest_content)
     bridge_kind = bridge_kind_match.group("value").lower() if bridge_kind_match else ""
-    implementation_report = bridge_kind == "implementation_report"
-    if implementation_report:
-        allowed = {"NO-GO", "VERIFIED"}
-    elif latest_status in {"NEW", "REVISED", "VERDICT-REJECTED"}:
-        allowed = {"GO", "NO-GO"}
-    else:
-        allowed = set()
+    # A report filed as NEW or REVISED before READY existed is still a report:
+    # read it as READY for successor purposes so it can never receive GO.
+    effective_status = latest_status
+    if bridge_kind == "implementation_report" and latest_status in {"NEW", "REVISED"}:
+        effective_status = "READY"
+    allowed = TRANSITIONS.get(effective_status, frozenset()) & LOYAL_OPPOSITION_AUTHORED_STATUSES
     if verdict not in allowed:
         raise BridgeTransitionError(
             f"provider verdict {verdict} is invalid after {latest_status} (bridge_kind={bridge_kind or 'unknown'})"

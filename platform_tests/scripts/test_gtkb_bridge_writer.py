@@ -918,14 +918,6 @@ def test_write_bridge_file_accepts_pre_metadata_content_when_injection_skipped(
     assert "# GO Verdict" in written
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "WI-7525: the writer accepts DEFERRED and NO-ACTION, which canon section 6 "
-        "declares obsolete and requires new writes to reject. No source module is in "
-        "WI-6095 scope, so this records the divergence rather than repairing it."
-    ),
-)
 def test_writer_accepted_statuses_match_the_canonical_vocabulary() -> None:
     """The writer's accepted set must equal the canonical vocabulary (WI-6095).
 
@@ -941,18 +933,13 @@ def test_writer_accepted_statuses_match_the_canonical_vocabulary() -> None:
     source instead of carrying a copy of it, which is precisely how the old
     literal came to encode ``NO-ACTION`` long after canon retired it.
 
-    Measured at the time of writing, the writer is a strict superset of the
-    canonical set by exactly the two obsolete statuses::
-
-        CANONICAL_STATUSES      10
-        writer VALID_STATUSES   12
-        writer-only             DEFERRED, NO-ACTION
-        canonical-only          (none)
-
-    ``strict=True`` makes this self-retiring. When WI-7525 reconciles the sets
-    the test XPASSes, strict mode turns that into a failure, and whoever lands
-    the reconciliation is forced to remove this marker. An ordinary xfail would
-    have gone quietly green and stayed here forever.
+    When first written the writer was a strict superset of the canonical set by
+    exactly the two obsolete statuses (DEFERRED and NO-ACTION), and a strict
+    xfail marker recorded the divergence. On 2026-09-07 the writer started
+    deriving ``VALID_STATUSES`` from ``CANONICAL_STATUSES`` (owner-direct
+    enforcement reset, canon section 6), the sets became equal, the strict
+    marker turned the XPASS into a failure as designed, and it was removed.
+    This assertion is now a live regression check.
     """
     assert VALID_STATUSES == CANONICAL_STATUSES
 

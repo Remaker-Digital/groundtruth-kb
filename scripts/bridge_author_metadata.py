@@ -20,24 +20,17 @@ if str(_PACKAGE_SRC) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_SRC))
 
 from groundtruth_kb.bridge.versioned_files import parse_bridge_header_block  # noqa: E402
+from groundtruth_kb.bridge.vocabulary import CANONICAL_STATUSES  # noqa: E402
 
 try:
     from gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
 except ModuleNotFoundError:  # pragma: no cover
     from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
 
-BRIDGE_AUTHOR_METADATA_STATUSES: frozenset[str] = frozenset(
-    {
-        "NEW",
-        "REVISED",
-        "GO",
-        "NO-GO",
-        "VERDICT-REJECTED",
-        "VERIFIED",
-        "ADVISORY",
-        "DEFERRED",
-    }
-)
+# Canon section 6: every canonical bridge artifact is an audit record and carries
+# author/model metadata, so the set is the vocabulary's code of record, not a
+# copy of it. Historical-inert tokens are never written and so never need it.
+BRIDGE_AUTHOR_METADATA_STATUSES: frozenset[str] = CANONICAL_STATUSES
 REQUIRED_AUTHOR_METADATA_FIELDS: tuple[str, ...] = (
     "author_identity",
     "author_harness_id",
