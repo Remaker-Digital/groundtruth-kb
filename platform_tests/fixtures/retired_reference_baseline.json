@@ -1,0 +1,1673 @@
+{
+  "purpose": "Per-file counts of references to concepts retired by canon v8.92, asserted as a ratchet by test_retired_concept_references.py.",
+  "tokens": [
+    ".gtkb-state",
+    "DECISION-NNNN",
+    "DEFERRED",
+    "NO-ACTION",
+    "PAUTH",
+    "TAFE",
+    "config/agent-control",
+    "formal-artifact-approvals",
+    "harness-state/",
+    "project_authorizations"
+  ],
+  "files": {
+    ".harness-baseline-configuration/AGENTS.md": {
+      "NO-ACTION": 5,
+      "PAUTH": 3,
+      "TAFE": 6,
+      "config/agent-control": 6,
+      "harness-state/": 1
+    },
+    ".harness-baseline-configuration/gtkb-hooks/directive-enforcement-adapter.py": {
+      ".gtkb-state": 1
+    },
+    ".harness-baseline-configuration/gtkb-hooks/glossary-expansion.py": {
+      ".gtkb-state": 1
+    },
+    ".harness-baseline-configuration/gtkb-hooks/operating-role.md": {
+      "harness-state/": 2
+    },
+    ".harness-baseline-configuration/gtkb-hooks/project-completion-surface.py": {
+      ".gtkb-state": 1
+    },
+    ".harness-baseline-configuration/hooks/advisory-router-scan.py": {
+      ".gtkb-state": 2
+    },
+    ".harness-baseline-configuration/hooks/assertion-check.py": {
+      ".gtkb-state": 2
+    },
+    ".harness-baseline-configuration/hooks/bridge-axis-2-surface.py": {
+      ".gtkb-state": 1,
+      "TAFE": 1
+    },
+    ".harness-baseline-configuration/hooks/bridge-compliance-gate.py": {
+      ".gtkb-state": 5,
+      "DEFERRED": 1,
+      "NO-ACTION": 25,
+      "TAFE": 1,
+      "formal-artifact-approvals": 4
+    },
+    ".harness-baseline-configuration/hooks/directive-enforcement-adapter.py": {
+      ".gtkb-state": 1
+    },
+    ".harness-baseline-configuration/hooks/formal-artifact-approval-gate.py": {
+      ".gtkb-state": 1,
+      "formal-artifact-approvals": 1
+    },
+    ".harness-baseline-configuration/hooks/narrative-artifact-approval-gate.py": {
+      ".gtkb-state": 1,
+      "formal-artifact-approvals": 3
+    },
+    ".harness-baseline-configuration/hooks/owner-decision-tracker.py": {
+      ".gtkb-state": 1,
+      "DECISION-NNNN": 1
+    },
+    ".harness-baseline-configuration/hooks/scanner-safe-writer.py": {
+      ".gtkb-state": 1
+    },
+    ".harness-baseline-configuration/rules/auto-finalization-sweep.md": {
+      ".gtkb-state": 1
+    },
+    ".harness-baseline-configuration/rules/bridge-essential.md": {
+      "config/agent-control": 2
+    },
+    ".harness-baseline-configuration/rules/canonical-terminology.md": {
+      ".gtkb-state": 3,
+      "config/agent-control": 1,
+      "formal-artifact-approvals": 1,
+      "harness-state/": 6
+    },
+    ".harness-baseline-configuration/rules/counterpart-review-gate.md": {
+      "config/agent-control": 1
+    },
+    ".harness-baseline-configuration/rules/file-bridge-protocol.md": {
+      ".gtkb-state": 1,
+      "DEFERRED": 1,
+      "NO-ACTION": 1,
+      "config/agent-control": 1
+    },
+    ".harness-baseline-configuration/rules/loyal-opposition-knowledge-base-index.md": {
+      "config/agent-control": 2
+    },
+    ".harness-baseline-configuration/rules/loyal-opposition-runbook.md": {
+      "config/agent-control": 1
+    },
+    ".harness-baseline-configuration/rules/loyal-opposition.md": {
+      "config/agent-control": 1,
+      "formal-artifact-approvals": 1
+    },
+    ".harness-baseline-configuration/rules/prime-bridge-collaboration-protocol.md": {
+      ".gtkb-state": 1
+    },
+    ".harness-baseline-configuration/rules/project-root-boundary.md": {
+      "harness-state/": 1
+    },
+    ".harness-baseline-configuration/rules/review-operating-contract.md": {
+      "config/agent-control": 1
+    },
+    ".harness-baseline-configuration/rules/session-bootstrap.md": {
+      "config/agent-control": 7,
+      "harness-state/": 9
+    },
+    ".harness-baseline-configuration/rules/standing-priorities.md": {
+      "config/agent-control": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-advisory-disposition/SKILL.md": {
+      "NO-ACTION": 3,
+      "TAFE": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-advisory-proposal/SKILL.md": {
+      "TAFE": 2
+    },
+    ".harness-baseline-configuration/skills/gtkb-assertion-triage/SKILL.md": {
+      ".gtkb-state": 8
+    },
+    ".harness-baseline-configuration/skills/gtkb-bridge-config/SKILL.md": {
+      "TAFE": 1,
+      "harness-state/": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-bridge-propose/SKILL.md": {
+      ".gtkb-state": 2,
+      "TAFE": 12
+    },
+    ".harness-baseline-configuration/skills/gtkb-bridge-propose/helpers/write_bridge.py": {
+      ".gtkb-state": 1,
+      "DEFERRED": 1,
+      "NO-ACTION": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-bridge-reconciliation/SKILL.md": {
+      "DEFERRED": 2,
+      "TAFE": 4
+    },
+    ".harness-baseline-configuration/skills/gtkb-bridge/SKILL.md": {
+      ".gtkb-state": 1,
+      "NO-ACTION": 2,
+      "TAFE": 6,
+      "config/agent-control": 23
+    },
+    ".harness-baseline-configuration/skills/gtkb-bridge/helpers/impl_report_bridge.py": {
+      ".gtkb-state": 1,
+      "DEFERRED": 1,
+      "PAUTH": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-bridge/helpers/revise_bridge.py": {
+      ".gtkb-state": 1,
+      "DEFERRED": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-bridge/helpers/scan_bridge.py": {
+      "DEFERRED": 4,
+      "NO-ACTION": 4
+    },
+    ".harness-baseline-configuration/skills/gtkb-bridge/helpers/show_thread_bridge.py": {
+      "DEFERRED": 1,
+      "NO-ACTION": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-dispatcher-control/SKILL.md": {
+      "TAFE": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-formal-artifact-packet-helper/SKILL.md": {
+      "formal-artifact-approvals": 2
+    },
+    ".harness-baseline-configuration/skills/gtkb-harness-parity-review/SKILL.md": {
+      "config/agent-control": 2,
+      "harness-state/": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-hygiene-investigation/SKILL.md": {
+      "TAFE": 2,
+      "config/agent-control": 1,
+      "harness-state/": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-hygiene-sweep/SKILL.md": {
+      ".gtkb-state": 1,
+      "TAFE": 2,
+      "config/agent-control": 1,
+      "harness-state/": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-lo-hygiene-assessment/SKILL.md": {
+      "TAFE": 1,
+      "config/agent-control": 2,
+      "formal-artifact-approvals": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-propose/SKILL.md": {
+      ".gtkb-state": 3,
+      "TAFE": 4
+    },
+    ".harness-baseline-configuration/skills/gtkb-send-review/SKILL.md": {
+      "TAFE": 1,
+      "config/agent-control": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-session-wrap/SKILL.md": {
+      ".gtkb-state": 2,
+      "TAFE": 2
+    },
+    ".harness-baseline-configuration/skills/gtkb-session-wrap/references/audit-checklist.md": {
+      ".gtkb-state": 1,
+      "TAFE": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-session-wrap/references/handoff-template.md": {
+      ".gtkb-state": 1,
+      "TAFE": 2
+    },
+    ".harness-baseline-configuration/skills/gtkb-skill-governance-lifecycle/SKILL.md": {
+      "config/agent-control": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-skill-rollout/SKILL.md": {
+      "config/agent-control": 2
+    },
+    ".harness-baseline-configuration/skills/gtkb-structural-hygiene-review/SKILL.md": {
+      "config/agent-control": 1
+    },
+    ".harness-baseline-configuration/skills/gtkb-verify/SKILL.md": {
+      "NO-ACTION": 2,
+      "TAFE": 2
+    },
+    ".harness-baseline-configuration/skills/gtkb-verify/helpers/write_verdict.py": {
+      ".gtkb-state": 1,
+      "NO-ACTION": 1
+    },
+    "AGENTS.md": {
+      ".gtkb-state": 6,
+      "DEFERRED": 3,
+      "NO-ACTION": 4,
+      "PAUTH": 8,
+      "TAFE": 5,
+      "config/agent-control": 3,
+      "formal-artifact-approvals": 2,
+      "project_authorizations": 2
+    },
+    "CLAUDE.md": {
+      "NO-ACTION": 3,
+      "TAFE": 1,
+      "config/agent-control": 2,
+      "harness-state/": 1
+    },
+    "config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md": {
+      "NO-ACTION": 1,
+      "TAFE": 2,
+      "config/agent-control": 4
+    },
+    "config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md": {
+      "config/agent-control": 3
+    },
+    "config/agent-control/REVIEW-MODE-SETUP.md": {
+      "TAFE": 1
+    },
+    "config/agent-control/ROLE-CAPABILITY-MANIFEST.md": {
+      "config/agent-control": 2
+    },
+    "config/agent-control/SESSION-STARTUP-CONTROL-MAP.md": {
+      ".gtkb-state": 1,
+      "config/agent-control": 8,
+      "harness-state/": 1
+    },
+    "config/agent-control/SESSION-STARTUP-INDEX.md": {
+      "TAFE": 4,
+      "config/agent-control": 11
+    },
+    "config/agent-control/activity-disposition-profiles.toml": {
+      "PAUTH": 3,
+      "TAFE": 4
+    },
+    "config/agent-control/activity-envelope-sharding.toml": {
+      "config/agent-control": 3
+    },
+    "config/agent-control/command-surface.toml": {
+      "PAUTH": 1,
+      "config/agent-control": 2
+    },
+    "config/agent-control/declarative-agent-role-manifest.yaml": {
+      "config/agent-control": 3
+    },
+    "config/agent-control/goose-execution-floor.toml": {
+      ".gtkb-state": 1
+    },
+    "config/agent-control/gtkb-acting-prime-builder.md": {
+      "harness-state/": 2
+    },
+    "config/agent-control/gtkb-activity-disposition-profiles.toml": {
+      "PAUTH": 3,
+      "TAFE": 4
+    },
+    "config/agent-control/gtkb-activity-envelope-sharding.toml": {
+      "config/agent-control": 3
+    },
+    "config/agent-control/gtkb-auto-finalization-sweep.md": {
+      ".gtkb-state": 1
+    },
+    "config/agent-control/gtkb-backlog-approval-state.md": {
+      "PAUTH": 1
+    },
+    "config/agent-control/gtkb-bridge-essential.md": {
+      ".gtkb-state": 3,
+      "DEFERRED": 2,
+      "TAFE": 9,
+      "config/agent-control": 2,
+      "harness-state/": 1
+    },
+    "config/agent-control/gtkb-bridge-permanent-operations-runbook.md": {
+      "TAFE": 1
+    },
+    "config/agent-control/gtkb-canonical-terminology.md": {
+      ".gtkb-state": 6,
+      "DEFERRED": 5,
+      "NO-ACTION": 5,
+      "TAFE": 7,
+      "config/agent-control": 1,
+      "formal-artifact-approvals": 1,
+      "harness-state/": 3
+    },
+    "config/agent-control/gtkb-command-surface.toml": {
+      "PAUTH": 1,
+      "config/agent-control": 2
+    },
+    "config/agent-control/gtkb-decision-ledger.md": {
+      "TAFE": 3
+    },
+    "config/agent-control/gtkb-declarative-agent-role-manifest.yaml": {
+      "config/agent-control": 3
+    },
+    "config/agent-control/gtkb-dispatcher-daemon-substrate-rollback-runbook.md": {
+      "TAFE": 1
+    },
+    "config/agent-control/gtkb-file-bridge-protocol.md": {
+      ".gtkb-state": 1,
+      "DEFERRED": 18,
+      "NO-ACTION": 19,
+      "TAFE": 13,
+      "config/agent-control": 1
+    },
+    "config/agent-control/gtkb-harness-capability-registry.toml": {
+      "config/agent-control": 7
+    },
+    "config/agent-control/gtkb-knowledge-base-index.md": {
+      "config/agent-control": 2
+    },
+    "config/agent-control/gtkb-lo-startup-overlay.md": {
+      "NO-ACTION": 1,
+      "TAFE": 2,
+      "config/agent-control": 4
+    },
+    "config/agent-control/gtkb-loyal-opposition-runbook.md": {
+      "NO-ACTION": 1,
+      "TAFE": 2,
+      "config/agent-control": 1
+    },
+    "config/agent-control/gtkb-loyal-opposition.md": {
+      "config/agent-control": 1,
+      "formal-artifact-approvals": 1
+    },
+    "config/agent-control/gtkb-operating-model.md": {
+      "DEFERRED": 2,
+      "TAFE": 1
+    },
+    "config/agent-control/gtkb-operating-role.md": {
+      ".gtkb-state": 2,
+      "harness-state/": 11
+    },
+    "config/agent-control/gtkb-pb-startup-overlay.md": {
+      "TAFE": 3,
+      "config/agent-control": 4
+    },
+    "config/agent-control/gtkb-prime-bridge-collaboration-protocol.md": {
+      ".gtkb-state": 1,
+      "NO-ACTION": 1,
+      "TAFE": 3
+    },
+    "config/agent-control/gtkb-project-root-boundary.md": {
+      "harness-state/": 1
+    },
+    "config/agent-control/gtkb-review-gate.md": {
+      "TAFE": 1,
+      "config/agent-control": 1
+    },
+    "config/agent-control/gtkb-review-mode-setup.md": {
+      "TAFE": 1
+    },
+    "config/agent-control/gtkb-review-operating-contract.md": {
+      "NO-ACTION": 1,
+      "TAFE": 3,
+      "config/agent-control": 1
+    },
+    "config/agent-control/gtkb-role-capability-manifest.md": {
+      "config/agent-control": 2
+    },
+    "config/agent-control/gtkb-session-bootstrap.md": {
+      "TAFE": 7,
+      "config/agent-control": 7,
+      "harness-state/": 9
+    },
+    "config/agent-control/gtkb-session-startup-control-map.md": {
+      ".gtkb-state": 1,
+      "config/agent-control": 8,
+      "harness-state/": 1
+    },
+    "config/agent-control/gtkb-session-startup-index.md": {
+      "TAFE": 4,
+      "config/agent-control": 11,
+      "harness-state/": 1
+    },
+    "config/agent-control/gtkb-skill-scenarios.toml": {
+      "config/agent-control": 1
+    },
+    "config/agent-control/gtkb-standing-priorities.md": {
+      "NO-ACTION": 1,
+      "TAFE": 3,
+      "config/agent-control": 1
+    },
+    "config/agent-control/gtkb-system-interface-map.toml": {
+      ".gtkb-state": 5,
+      "DEFERRED": 5,
+      "NO-ACTION": 2,
+      "TAFE": 13,
+      "config/agent-control": 9,
+      "harness-state/": 6
+    },
+    "config/agent-control/gtkb-unified-policy-registry.toml": {
+      "config/agent-control": 9
+    },
+    "config/agent-control/gtkb-way-of-working.md": {
+      "TAFE": 5
+    },
+    "config/agent-control/harness-capability-registry.toml": {
+      "config/agent-control": 7
+    },
+    "config/agent-control/skill-scenarios.toml": {
+      "config/agent-control": 1
+    },
+    "config/agent-control/system-interface-map.toml": {
+      ".gtkb-state": 5,
+      "DEFERRED": 5,
+      "NO-ACTION": 2,
+      "TAFE": 13,
+      "config/agent-control": 9,
+      "harness-state/": 6
+    },
+    "config/agent-control/unified-policy-registry.toml": {
+      "config/agent-control": 9
+    },
+    "config/dispatcher/requirements-dispatcher-next-spike.txt": {
+      "PAUTH": 1
+    },
+    "config/dispatcher/rules.toml": {
+      "NO-ACTION": 1
+    },
+    "config/file-reference-migration/wi5640.toml": {
+      ".gtkb-state": 4,
+      "config/agent-control": 49,
+      "formal-artifact-approvals": 1,
+      "harness-state/": 4
+    },
+    "config/governance/adr-dcl-clauses.toml": {
+      "DEFERRED": 1,
+      "TAFE": 2
+    },
+    "config/governance/document-author-provenance.toml": {
+      ".gtkb-state": 1
+    },
+    "config/governance/gate-fp-corpus.toml": {
+      ".gtkb-state": 1
+    },
+    "config/governance/hygiene-baseline-registry.toml": {
+      "config/agent-control": 1
+    },
+    "config/governance/hygiene-sweep-patterns.toml": {
+      ".gtkb-state": 19
+    },
+    "config/governance/modernization-release-candidate.json": {
+      "PAUTH": 1
+    },
+    "config/governance/narrative-artifact-approval.toml": {
+      "PAUTH": 1,
+      "formal-artifact-approvals": 2
+    },
+    "config/governance/neutral-source-inventory.toml": {
+      ".gtkb-state": 1,
+      "config/agent-control": 2
+    },
+    "config/governance/protected-artifact-inventory-drift.toml": {
+      "harness-state/": 1
+    },
+    "config/governance/protected-commit-timers.toml": {
+      "DEFERRED": 1
+    },
+    "config/governance/staging-admission.toml": {
+      ".gtkb-state": 1
+    },
+    "config/governance/tafe-acknowledged-archived-bridges.toml": {
+      "TAFE": 2
+    },
+    "config/harness-parity/phase2-waivers.toml": {
+      "harness-state/": 8
+    },
+    "config/hooks/gtkb-advisory-router-scan.py": {
+      ".gtkb-state": 2
+    },
+    "config/hooks/gtkb-assertion-check.py": {
+      ".gtkb-state": 2
+    },
+    "config/hooks/gtkb-bridge-axis-2-surface.py": {
+      ".gtkb-state": 4,
+      "TAFE": 1
+    },
+    "config/hooks/gtkb-bridge-compliance-gate.py": {
+      ".gtkb-state": 4,
+      "DEFERRED": 7,
+      "NO-ACTION": 3,
+      "PAUTH": 3,
+      "TAFE": 1,
+      "formal-artifact-approvals": 4
+    },
+    "config/hooks/gtkb-directive-enforcement-claude-adapter.py": {
+      ".gtkb-state": 1
+    },
+    "config/hooks/gtkb-formal-artifact-approval-gate.py": {
+      ".gtkb-state": 2,
+      "formal-artifact-approvals": 1
+    },
+    "config/hooks/gtkb-glossary-expansion.py": {
+      ".gtkb-state": 1
+    },
+    "config/hooks/gtkb-narrative-artifact-approval-gate.py": {
+      ".gtkb-state": 2,
+      "formal-artifact-approvals": 3
+    },
+    "config/hooks/gtkb-owner-decision-tracker.py": {
+      ".gtkb-state": 4,
+      "DECISION-NNNN": 1
+    },
+    "config/hooks/gtkb-project-completion-surface.py": {
+      ".gtkb-state": 1
+    },
+    "config/hooks/gtkb-scanner-safe-writer.py": {
+      ".gtkb-state": 1
+    },
+    "config/hooks/gtkb-session-topic-envelope-router.py": {
+      ".gtkb-state": 1
+    },
+    "config/registry/context-manifests.toml": {
+      "config/agent-control": 7
+    },
+    "config/registry/sot-artifacts.toml": {
+      ".gtkb-state": 2,
+      "DEFERRED": 1,
+      "config/agent-control": 82,
+      "formal-artifact-approvals": 2,
+      "harness-state/": 4
+    },
+    "groundtruth-kb/src/groundtruth_kb/activity/ops.py": {
+      ".gtkb-state": 5
+    },
+    "groundtruth-kb/src/groundtruth_kb/activity/profiles.py": {
+      "TAFE": 1,
+      "config/agent-control": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/authority.py": {
+      "harness-state/": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/backlog/__init__.py": {
+      "PAUTH": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge/detector.py": {
+      "DEFERRED": 3,
+      "NO-ACTION": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge/disposition.py": {
+      "DEFERRED": 1,
+      "NO-ACTION": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge/notify.py": {
+      ".gtkb-state": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge/paths.py": {
+      ".gtkb-state": 3
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge/prior_deliberations.py": {
+      ".gtkb-state": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge/proposal_filing.py": {
+      ".gtkb-state": 1,
+      "PAUTH": 6,
+      "TAFE": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge/routing.py": {
+      "NO-ACTION": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge/state_report.py": {
+      "DEFERRED": 1,
+      "NO-ACTION": 1,
+      "TAFE": 2,
+      "harness-state/": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge/status_driver.py": {
+      ".gtkb-state": 1,
+      "DEFERRED": 2,
+      "NO-ACTION": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge/verdict_filing.py": {
+      "NO-ACTION": 6,
+      "harness-state/": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge/versioned_files.py": {
+      "NO-ACTION": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge/wait_commands.py": {
+      "DEFERRED": 3
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge_dispatch_config.py": {
+      ".gtkb-state": 2,
+      "NO-ACTION": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge_dispatch_report.py": {
+      ".gtkb-state": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge_dispatch_reset.py": {
+      ".gtkb-state": 6,
+      "PAUTH": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge_dispatch_transactions.py": {
+      ".gtkb-state": 1,
+      "NO-ACTION": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/bridge_dispatch_worker_context.py": {
+      ".gtkb-state": 1,
+      "NO-ACTION": 2,
+      "PAUTH": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/cli.py": {
+      ".gtkb-state": 7,
+      "TAFE": 18
+    },
+    "groundtruth-kb/src/groundtruth_kb/cli_approval_packet.py": {
+      "formal-artifact-approvals": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/cli_backlog_add_work_item.py": {
+      "PAUTH": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/cli_backlog_update.py": {
+      "PAUTH": 5
+    },
+    "groundtruth-kb/src/groundtruth_kb/cli_bridge_propose.py": {
+      ".gtkb-state": 2,
+      "PAUTH": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/cli_deliberations_record.py": {
+      "formal-artifact-approvals": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/cli_projects_reconcile.py": {
+      "PAUTH": 1,
+      "TAFE": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/cli_session_handoff.py": {
+      "harness-state/": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/cli_skills.py": {
+      "config/agent-control": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/context/freshness.py": {
+      "harness-state/": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/context/manifest.py": {
+      "config/agent-control": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/activity-disposition-profiles.toml": {
+      "TAFE": 4
+    },
+    "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/activity-envelope-sharding.toml": {
+      "config/agent-control": 3
+    },
+    "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/command-surface.toml": {
+      "PAUTH": 1,
+      "config/agent-control": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/system-interface-map.toml": {
+      ".gtkb-state": 5,
+      "DEFERRED": 5,
+      "NO-ACTION": 2,
+      "TAFE": 13,
+      "config/agent-control": 9,
+      "harness-state/": 6
+    },
+    "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/registry/sot-artifacts.toml": {
+      ".gtkb-state": 2,
+      "DEFERRED": 1,
+      "config/agent-control": 82,
+      "formal-artifact-approvals": 2,
+      "harness-state/": 4
+    },
+    "groundtruth-kb/src/groundtruth_kb/context/registries/v1/context-manifests.toml": {
+      "config/agent-control": 7
+    },
+    "groundtruth-kb/src/groundtruth_kb/context/resource_routing.py": {
+      "TAFE": 3
+    },
+    "groundtruth-kb/src/groundtruth_kb/db.py": {
+      "PAUTH": 1,
+      "TAFE": 43,
+      "formal-artifact-approvals": 1,
+      "project_authorizations": 4
+    },
+    "groundtruth-kb/src/groundtruth_kb/dispatch_tuning_advisory.py": {
+      "PAUTH": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/dispatcher/lane_scoring.py": {
+      "harness-state/": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/dispatcher/scheduler.py": {
+      ".gtkb-state": 2,
+      "DEFERRED": 1,
+      "NO-ACTION": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/dispatcher_complex.py": {
+      ".gtkb-state": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/dispatcher_disable_guard.py": {
+      ".gtkb-state": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/git_lifecycle/maintenance.py": {
+      ".gtkb-state": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/git_lifecycle/service.py": {
+      ".gtkb-state": 4
+    },
+    "groundtruth-kb/src/groundtruth_kb/git_lifecycle/state.py": {
+      ".gtkb-state": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/governance/approval_packet.py": {
+      "formal-artifact-approvals": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/governance/context.py": {
+      "DEFERRED": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/governance/project_authorization_operation_time.py": {
+      ".gtkb-state": 1,
+      "PAUTH": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/harness_projection.py": {
+      "config/agent-control": 1,
+      "harness-state/": 4
+    },
+    "groundtruth-kb/src/groundtruth_kb/hygiene/__init__.py": {
+      ".gtkb-state": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/hygiene/auto_resolve.py": {
+      ".gtkb-state": 1,
+      "DEFERRED": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/hygiene/reclaim.py": {
+      ".gtkb-state": 3,
+      "PAUTH": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/hygiene/supersession.py": {
+      ".gtkb-state": 2,
+      "formal-artifact-approvals": 1,
+      "harness-state/": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/hygiene/sweep.py": {
+      ".gtkb-state": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/membase_effective_use_audit.py": {
+      "DEFERRED": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/mode_switch/audit.py": {
+      ".gtkb-state": 3
+    },
+    "groundtruth-kb/src/groundtruth_kb/mode_switch/bridge_substrate.py": {
+      ".gtkb-state": 2,
+      "harness-state/": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/mode_switch/invariants.py": {
+      "harness-state/": 3
+    },
+    "groundtruth-kb/src/groundtruth_kb/mode_switch/pending.py": {
+      ".gtkb-state": 9
+    },
+    "groundtruth-kb/src/groundtruth_kb/mode_switch/transaction.py": {
+      "harness-state/": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/mode_switch/validation.py": {
+      ".gtkb-state": 1,
+      "DEFERRED": 1,
+      "harness-state/": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/modernization/workflow.py": {
+      ".gtkb-state": 2,
+      "PAUTH": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/operating_state.py": {
+      ".gtkb-state": 1,
+      "config/agent-control": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/owner_decision/resolution_signals.py": {
+      "DEFERRED": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/postgres_kernel.py": {
+      "project_authorizations": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/project/artifact_membership_reconciliation.py": {
+      ".gtkb-state": 2,
+      "formal-artifact-approvals": 7,
+      "harness-state/": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/project/authorization.py": {
+      "PAUTH": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/project/checks/gt_cli_availability.py": {
+      "PAUTH": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/project/checks/state_location_registry.py": {
+      ".gtkb-state": 4,
+      "formal-artifact-approvals": 1,
+      "harness-state/": 3
+    },
+    "groundtruth-kb/src/groundtruth_kb/project/doctor.py": {
+      ".gtkb-state": 2,
+      "DEFERRED": 1,
+      "NO-ACTION": 6,
+      "PAUTH": 1,
+      "TAFE": 18,
+      "config/agent-control": 1,
+      "formal-artifact-approvals": 1,
+      "harness-state/": 15
+    },
+    "groundtruth-kb/src/groundtruth_kb/project/lifecycle.py": {
+      "formal-artifact-approvals": 1,
+      "project_authorizations": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/project/preflight.py": {
+      "DEFERRED": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/project/registry_control_plane.py": {
+      ".gtkb-state": 5,
+      "PAUTH": 4
+    },
+    "groundtruth-kb/src/groundtruth_kb/project/scaffold.py": {
+      ".gtkb-state": 1,
+      "NO-ACTION": 2,
+      "TAFE": 1,
+      "formal-artifact-approvals": 3,
+      "harness-state/": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/project/sot_audit.py": {
+      ".gtkb-state": 2,
+      "harness-state/": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/reporting/harvest_coverage.py": {
+      "DEFERRED": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/session/envelope.py": {
+      "PAUTH": 1,
+      "TAFE": 3
+    },
+    "groundtruth-kb/src/groundtruth_kb/session/handoff.py": {
+      "DEFERRED": 1,
+      "NO-ACTION": 4,
+      "TAFE": 1,
+      "harness-state/": 3
+    },
+    "groundtruth-kb/src/groundtruth_kb/session/packet.py": {
+      "config/agent-control": 3
+    },
+    "groundtruth-kb/src/groundtruth_kb/shim_dispatch_telemetry.py": {
+      ".gtkb-state": 1
+    },
+    "groundtruth-kb/src/groundtruth_kb/tafe_dispatch_policy.py": {
+      "TAFE": 2
+    },
+    "groundtruth-kb/src/groundtruth_kb/tafe_dispatch_runtime.py": {
+      "TAFE": 9
+    },
+    "groundtruth-kb/src/groundtruth_kb/tafe_stuck_flow.py": {
+      "TAFE": 12
+    },
+    "groundtruth-kb/src/groundtruth_kb/typed_artifact_flow.py": {
+      "TAFE": 8
+    },
+    "groundtruth-kb/src/groundtruth_kb/watchdog/service_sot.py": {
+      ".gtkb-state": 2
+    },
+    "groundtruth-kb/templates/BRIDGE-INVENTORY.md": {
+      "TAFE": 3
+    },
+    "groundtruth-kb/templates/bridge-os-poller-setup-prompt.md": {
+      "TAFE": 1
+    },
+    "groundtruth-kb/templates/hooks/assertion-check.py": {
+      ".gtkb-state": 2
+    },
+    "groundtruth-kb/templates/hooks/bridge-compliance-gate.py": {
+      ".gtkb-state": 5,
+      "DEFERRED": 8,
+      "NO-ACTION": 27,
+      "TAFE": 1,
+      "formal-artifact-approvals": 4
+    },
+    "groundtruth-kb/templates/hooks/delib-search-gate.py": {
+      "DEFERRED": 1
+    },
+    "groundtruth-kb/templates/hooks/delib-search-tracker.py": {
+      "DEFERRED": 1
+    },
+    "groundtruth-kb/templates/hooks/narrative-artifact-approval-gate.py": {
+      ".gtkb-state": 1,
+      "formal-artifact-approvals": 3
+    },
+    "groundtruth-kb/templates/hooks/scanner-safe-writer.py": {
+      ".gtkb-state": 1
+    },
+    "groundtruth-kb/templates/hooks/session-start-governance.py": {
+      "DEFERRED": 1
+    },
+    "groundtruth-kb/templates/hooks/spec-before-code.py": {
+      "DEFERRED": 1
+    },
+    "groundtruth-kb/templates/project/AGENTS.md": {
+      "TAFE": 1
+    },
+    "groundtruth-kb/templates/project/README-quickstart.md": {
+      "TAFE": 1,
+      "formal-artifact-approvals": 1
+    },
+    "groundtruth-kb/templates/project/codex-bootstrap/CODEX-SESSION-BOOTSTRAP.md": {
+      "TAFE": 1
+    },
+    "groundtruth-kb/templates/rules/bridge-essential.md": {
+      ".gtkb-state": 3,
+      "DEFERRED": 2,
+      "TAFE": 9,
+      "config/agent-control": 2,
+      "harness-state/": 1
+    },
+    "groundtruth-kb/templates/rules/canonical-terminology.md": {
+      "DEFERRED": 1,
+      "TAFE": 2
+    },
+    "groundtruth-kb/templates/rules/file-bridge-protocol.md": {
+      ".gtkb-state": 1,
+      "DEFERRED": 11,
+      "NO-ACTION": 10,
+      "TAFE": 13,
+      "config/agent-control": 1
+    },
+    "groundtruth-kb/templates/rules/prime-bridge-collaboration-protocol.md": {
+      ".gtkb-state": 1,
+      "TAFE": 6
+    },
+    "groundtruth-kb/templates/rules/session-start-orientation.md": {
+      "TAFE": 1
+    },
+    "groundtruth-kb/templates/skills/bridge-propose/SKILL.md": {
+      ".gtkb-state": 2,
+      "PAUTH": 1,
+      "TAFE": 12
+    },
+    "groundtruth-kb/templates/skills/bridge-propose/helpers/write_bridge.py": {
+      ".gtkb-state": 1,
+      "DEFERRED": 1,
+      "NO-ACTION": 1,
+      "TAFE": 1
+    },
+    "groundtruth-kb/templates/skills/gtkb-baseline-audit/SKILL.md": {
+      "TAFE": 2
+    },
+    "groundtruth-kb/templates/skills/gtkb-bridge-propose/SKILL.md": {
+      ".gtkb-state": 2,
+      "PAUTH": 1,
+      "TAFE": 12
+    },
+    "groundtruth-kb/templates/skills/gtkb-bridge-propose/helpers/write_bridge.py": {
+      ".gtkb-state": 1,
+      "DEFERRED": 1,
+      "NO-ACTION": 1,
+      "TAFE": 1
+    },
+    "groundtruth-kb/templates/skills/gtkb-bridge/SKILL.md": {
+      ".gtkb-state": 4,
+      "NO-ACTION": 6,
+      "PAUTH": 1,
+      "TAFE": 10,
+      "config/agent-control": 1
+    },
+    "groundtruth-kb/templates/skills/gtkb-bridge/helpers/impl_report_bridge.py": {
+      ".gtkb-state": 2,
+      "DEFERRED": 1,
+      "PAUTH": 1
+    },
+    "groundtruth-kb/templates/skills/gtkb-bridge/helpers/revise_bridge.py": {
+      ".gtkb-state": 2,
+      "DEFERRED": 1
+    },
+    "groundtruth-kb/templates/skills/gtkb-bridge/helpers/scan_bridge.py": {
+      "DEFERRED": 3,
+      "NO-ACTION": 2
+    },
+    "groundtruth-kb/templates/skills/gtkb-bridge/helpers/show_thread_bridge.py": {
+      "DEFERRED": 1,
+      "NO-ACTION": 1
+    },
+    "scripts/_archive_delib_s327_backlog_directive.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_archive_delib_s328_isolation_017_slice4_decisions.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_archive_delib_s328_isolation_017_slice5_overlay_scope.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_build_adr_single_harness_operating_mode_packet.py": {
+      "formal-artifact-approvals": 1,
+      "harness-state/": 2
+    },
+    "scripts/_build_canonical_terminology_init_keyword_packet.py": {
+      ".gtkb-state": 1,
+      "formal-artifact-approvals": 2
+    },
+    "scripts/_build_dcl_init_keyword_consistent_assertion_packet.py": {
+      ".gtkb-state": 2,
+      "formal-artifact-approvals": 1,
+      "harness-state/": 4
+    },
+    "scripts/_build_dcl_single_harness_dispatcher_desktop_task_packet.py": {
+      ".gtkb-state": 4,
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_build_narrative_packet_bridge_essential_single_harness_substrate.py": {
+      ".gtkb-state": 1,
+      "formal-artifact-approvals": 2,
+      "harness-state/": 1
+    },
+    "scripts/_build_narrative_packet_operating_role_md.py": {
+      "formal-artifact-approvals": 1,
+      "harness-state/": 7
+    },
+    "scripts/_build_spec_canonical_init_keyword_packet.py": {
+      ".gtkb-state": 1,
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_dispatch_envelope_slice_a_010_verified.py": {
+      "NO-ACTION": 6,
+      "PAUTH": 2
+    },
+    "scripts/_dispatch_lo_verdicts_20260717_envelope_authority.py": {
+      "NO-ACTION": 4,
+      "PAUTH": 3,
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_dispatch_wi5211_002_verdict.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/_dispatch_wi5241_006_verdict.py": {
+      "DEFERRED": 12,
+      "PAUTH": 4
+    },
+    "scripts/_dispatch_wi5307_018_verdict.py": {
+      "NO-ACTION": 1,
+      "PAUTH": 3
+    },
+    "scripts/_dispatch_wi5341_002_verdict.py": {
+      "PAUTH": 5,
+      "TAFE": 1
+    },
+    "scripts/_dispatch_wi5343_002_verdict.py": {
+      ".gtkb-state": 3,
+      "PAUTH": 2,
+      "TAFE": 1
+    },
+    "scripts/_insert_adr_backlog_db_authority.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_insert_adr_single_harness_operating_mode.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_insert_dcl_backlog_db_schema.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_insert_dcl_init_keyword_consistent_assertion.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_insert_dcl_single_harness_dispatcher_desktop_task.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_insert_doc194.py": {
+      "DEFERRED": 1
+    },
+    "scripts/_insert_gov_standing_backlog_v2.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_insert_spec_canonical_init_keyword.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_insert_spec_single_harness_bridge_dispatcher.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_record_wi_s344_strategic_improvement.py": {
+      "formal-artifact-approvals": 2
+    },
+    "scripts/_temp_create_s321_specs_phase3.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_temp_create_s321_specs_phase4.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/_temp_create_s321_specs_phase5.py": {
+      "harness-state/": 2
+    },
+    "scripts/_verify_slice8_closeout.py": {
+      "DEFERRED": 5
+    },
+    "scripts/adr_dcl_clause_preflight.py": {
+      "TAFE": 1
+    },
+    "scripts/advisory_backlog_router.py": {
+      ".gtkb-state": 3,
+      "DEFERRED": 1
+    },
+    "scripts/advisory_grilling_gate_lint.py": {
+      ".gtkb-state": 2,
+      "DEFERRED": 1,
+      "NO-ACTION": 1
+    },
+    "scripts/api_harness_stewardship_monitor.py": {
+      ".gtkb-state": 2,
+      "PAUTH": 1
+    },
+    "scripts/assertion_categorize.py": {
+      ".gtkb-state": 4
+    },
+    "scripts/assertion_retirement_workflow.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/auto_finalize_sweep.py": {
+      ".gtkb-state": 2
+    },
+    "scripts/autonomous_dispatch_loop_health.py": {
+      "DEFERRED": 2,
+      "NO-ACTION": 2
+    },
+    "scripts/backfill_approval_state.py": {
+      "PAUTH": 1
+    },
+    "scripts/backfill_implements_links.py": {
+      "PAUTH": 2,
+      "project_authorizations": 1
+    },
+    "scripts/batch_archive_terminal_verdicts.py": {
+      ".gtkb-state": 1,
+      "DEFERRED": 1
+    },
+    "scripts/benchmarks/__init__.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/benchmarks/assertion_signal_noise.py": {
+      ".gtkb-state": 3
+    },
+    "scripts/benchmarks/cli.py": {
+      ".gtkb-state": 7
+    },
+    "scripts/benchmarks/common.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/benchmarks/complexity_metrics.py": {
+      ".gtkb-state": 2,
+      "harness-state/": 1
+    },
+    "scripts/benchmarks/effectiveness_observatory.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/benchmarks/fixtures/fixture_index.json": {
+      "PAUTH": 1
+    },
+    "scripts/benchmarks/harness_observed_scorecard.py": {
+      ".gtkb-state": 5
+    },
+    "scripts/benchmarks/harness_quality_manifest.py": {
+      "TAFE": 1
+    },
+    "scripts/benchmarks/harness_quality_telemetry.py": {
+      "TAFE": 2
+    },
+    "scripts/benchmarks/harness_role_protocol_smoke.py": {
+      "harness-state/": 3
+    },
+    "scripts/bridge_applicability_preflight.py": {
+      "DEFERRED": 1,
+      "NO-ACTION": 3,
+      "PAUTH": 7
+    },
+    "scripts/bridge_author_metadata.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/bridge_citation_freshness_preflight.py": {
+      "DEFERRED": 1,
+      "NO-ACTION": 2
+    },
+    "scripts/bridge_claim_cli.py": {
+      ".gtkb-state": 1,
+      "NO-ACTION": 2,
+      "PAUTH": 4
+    },
+    "scripts/bridge_dispatch_starvation_telemetry.py": {
+      ".gtkb-state": 1,
+      "PAUTH": 1
+    },
+    "scripts/bridge_lifecycle_resolver.py": {
+      "DEFERRED": 3
+    },
+    "scripts/bridge_metadata_audit.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/bridge_proposal_duplicate_thread_guard.py": {
+      "DEFERRED": 1,
+      "TAFE": 1
+    },
+    "scripts/bridge_report_test_claim_rerun_verifier.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/bridge_verified_backlog_reconciler.py": {
+      "DEFERRED": 1,
+      "NO-ACTION": 2
+    },
+    "scripts/bridge_work_intent_registry.py": {
+      ".gtkb-state": 1,
+      "NO-ACTION": 4,
+      "PAUTH": 2
+    },
+    "scripts/check_codex_hook_parity.py": {
+      ".gtkb-state": 1,
+      "harness-state/": 5
+    },
+    "scripts/check_commit_scope_bundling.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/check_file_bridge_authority.py": {
+      "NO-ACTION": 1,
+      "TAFE": 1
+    },
+    "scripts/check_git_branch_binding_promotion.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/check_harness_parity.py": {
+      "DEFERRED": 2,
+      "config/agent-control": 4,
+      "harness-state/": 1
+    },
+    "scripts/check_legacy_harness_language.py": {
+      ".gtkb-state": 1,
+      "PAUTH": 1
+    },
+    "scripts/check_modernization_git_lifecycle.py": {
+      ".gtkb-state": 9,
+      "PAUTH": 2,
+      "harness-state/": 2,
+      "project_authorizations": 4
+    },
+    "scripts/check_modernization_release_candidate.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/check_modernization_scope_semantics.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/check_narrative_artifact_evidence.py": {
+      ".gtkb-state": 1,
+      "formal-artifact-approvals": 3
+    },
+    "scripts/check_project_dependency_ordering.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/check_protected_commit_authorization.py": {
+      ".gtkb-state": 12,
+      "DEFERRED": 1,
+      "NO-ACTION": 1,
+      "PAUTH": 65
+    },
+    "scripts/check_skill_health.py": {
+      ".gtkb-state": 4,
+      "PAUTH": 2
+    },
+    "scripts/check_source_of_truth_freshness.py": {
+      "harness-state/": 1
+    },
+    "scripts/check_staged_artifact_admission.py": {
+      ".gtkb-state": 1,
+      "DEFERRED": 1,
+      "NO-ACTION": 1
+    },
+    "scripts/check_staged_path_scope.py": {
+      ".gtkb-state": 2
+    },
+    "scripts/check_superseded_sot_leakage.py": {
+      ".gtkb-state": 1,
+      "config/agent-control": 1
+    },
+    "scripts/check_whole_file_reformat.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/check_work_item_terminal_notification.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/check_work_item_terminal_resolver.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/check_workspace_boundary.py": {
+      "harness-state/": 1
+    },
+    "scripts/cloud_harness_base.py": {
+      ".gtkb-state": 1,
+      "DEFERRED": 1
+    },
+    "scripts/codex_no_window_smoke_probe.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/collect_dev_environment_inventory.py": {
+      ".gtkb-state": 1,
+      "harness-state/": 5
+    },
+    "scripts/collect_modernization_semantic_evidence.py": {
+      ".gtkb-state": 4
+    },
+    "scripts/command_surface_disposition.py": {
+      "PAUTH": 3,
+      "config/agent-control": 1
+    },
+    "scripts/command_surface_env.py": {
+      ".gtkb-state": 5,
+      "PAUTH": 1
+    },
+    "scripts/controlled_artifact_paths.py": {
+      ".gtkb-state": 8,
+      "harness-state/": 1
+    },
+    "scripts/cursor_harness.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/discover_orphan_wi_memberships.py": {
+      ".gtkb-state": 6
+    },
+    "scripts/dispatch_blackbox_boundary_scanner.py": {
+      ".gtkb-state": 1,
+      "PAUTH": 1,
+      "TAFE": 3
+    },
+    "scripts/dispatch_blackbox_gate.py": {
+      ".gtkb-state": 2,
+      "harness-state/": 1
+    },
+    "scripts/dispatcher_generation_admission.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/dispatcher_runtime.py": {
+      ".gtkb-state": 10,
+      "DEFERRED": 1,
+      "NO-ACTION": 6,
+      "TAFE": 3,
+      "harness-state/": 5
+    },
+    "scripts/document_author_metadata.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/draft_lint.py": {
+      "PAUTH": 1
+    },
+    "scripts/ensure_dispatcher_daemon.py": {
+      "TAFE": 1
+    },
+    "scripts/generate_claude_skill_adapters.py": {
+      "config/agent-control": 1
+    },
+    "scripts/generate_codex_backlog_cleanup_review_packet.py": {
+      "DEFERRED": 2
+    },
+    "scripts/generate_cursor_skill_adapters.py": {
+      "config/agent-control": 1
+    },
+    "scripts/generate_rule_compatibility_projections.py": {
+      "config/agent-control": 3
+    },
+    "scripts/gtkb_bridge_writer.py": {
+      ".gtkb-state": 1,
+      "NO-ACTION": 2
+    },
+    "scripts/gtkb_dashboard/generate_grafana_dashboard.py": {
+      "PAUTH": 1,
+      "TAFE": 13
+    },
+    "scripts/gtkb_dashboard/refresh_dashboard_db.py": {
+      "TAFE": 17
+    },
+    "scripts/gtkb_dispatcher_daemon.py": {
+      ".gtkb-state": 4,
+      "harness-state/": 1
+    },
+    "scripts/gtkb_file_reference_migration.py": {
+      ".gtkb-state": 2,
+      "PAUTH": 1,
+      "config/agent-control": 5
+    },
+    "scripts/gtkb_propose_scaffold.py": {
+      ".gtkb-state": 1,
+      "PAUTH": 2
+    },
+    "scripts/gtkb_service_sot_watchdog.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/harness_envelope_equivalence.py": {
+      "config/agent-control": 1,
+      "harness-state/": 2
+    },
+    "scripts/harness_identity.py": {
+      "harness-state/": 2
+    },
+    "scripts/harness_parity_phase2.py": {
+      "PAUTH": 1,
+      "config/agent-control": 2,
+      "formal-artifact-approvals": 1,
+      "harness-state/": 2
+    },
+    "scripts/harness_probe_glm52_r3.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/harness_projection/execute_neutralization.py": {
+      ".gtkb-state": 2
+    },
+    "scripts/harness_projection/profiles.toml": {
+      "config/agent-control": 1
+    },
+    "scripts/harness_projection_reader.py": {
+      "harness-state/": 2
+    },
+    "scripts/harness_roles.py": {
+      "PAUTH": 1,
+      "harness-state/": 3
+    },
+    "scripts/harness_skill_effectiveness.py": {
+      "PAUTH": 1,
+      "config/agent-control": 1
+    },
+    "scripts/hygiene/advisory_candidate_promote.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/hygiene/hygiene_baseline.py": {
+      "PAUTH": 1
+    },
+    "scripts/hygiene/hygiene_report.py": {
+      "PAUTH": 1
+    },
+    "scripts/hygiene/prefix_split_detector.py": {
+      "PAUTH": 2
+    },
+    "scripts/hygiene/router_corpus_dispose.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/hygiene/stray_detector.py": {
+      "PAUTH": 1
+    },
+    "scripts/implementation_authorization.py": {
+      ".gtkb-state": 7,
+      "DEFERRED": 5,
+      "NO-ACTION": 10,
+      "PAUTH": 14,
+      "formal-artifact-approvals": 1
+    },
+    "scripts/install_db_snapshot_task.ps1": {
+      ".gtkb-state": 2
+    },
+    "scripts/install_gt_path_shim.py": {
+      "PAUTH": 1
+    },
+    "scripts/inventory_lo_bridge_history_backfill.py": {
+      ".gtkb-state": 3
+    },
+    "scripts/inventory_projection_authority_references.py": {
+      ".gtkb-state": 2
+    },
+    "scripts/inventory_verified_untested_spec_hygiene_cluster.py": {
+      ".gtkb-state": 2,
+      "PAUTH": 2
+    },
+    "scripts/isolation_program_backstop.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/lo_batch_publish.py": {
+      "NO-ACTION": 1
+    },
+    "scripts/migrate_bridge_kind_taxonomy.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/migrate_work_item_priority_canonical.py": {
+      "PAUTH": 1
+    },
+    "scripts/neutral_source_inventory.py": {
+      ".gtkb-state": 2
+    },
+    "scripts/ollama_harness.py": {
+      "NO-ACTION": 2
+    },
+    "scripts/openrouter_harness.py": {
+      "NO-ACTION": 2
+    },
+    "scripts/ops/dispatch_monitor.py": {
+      ".gtkb-state": 2
+    },
+    "scripts/ops/dispatch_parity.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/ops/harness_storm_watchdog.ps1": {
+      ".gtkb-state": 2
+    },
+    "scripts/ops/storm_watchdog_reap.py": {
+      ".gtkb-state": 4
+    },
+    "scripts/orphan_citation_audit.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/orphan_test_rationalization.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/pauth_finalization_exposure_sweep.py": {
+      ".gtkb-state": 2,
+      "DEFERRED": 1,
+      "PAUTH": 3
+    },
+    "scripts/per_thread_finalization_repair.py": {
+      "DEFERRED": 2,
+      "NO-ACTION": 2
+    },
+    "scripts/post_action_receipt.py": {
+      ".gtkb-state": 3,
+      "formal-artifact-approvals": 1
+    },
+    "scripts/pre_verdict_executability_check.py": {
+      "NO-ACTION": 4,
+      "PAUTH": 5
+    },
+    "scripts/project_child_wi_checklist.py": {
+      "PAUTH": 2
+    },
+    "scripts/project_verified_completion_scanner.py": {
+      "project_authorizations": 1
+    },
+    "scripts/proposal_target_paths_coverage_preflight.py": {
+      ".gtkb-state": 1,
+      "config/agent-control": 1
+    },
+    "scripts/protected_mutation_guard.py": {
+      "DEFERRED": 1
+    },
+    "scripts/protocol_enforcement_health.py": {
+      ".gtkb-state": 3,
+      "DEFERRED": 1,
+      "NO-ACTION": 3
+    },
+    "scripts/record_core_spec_intake_governance.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/registry_observation_hook.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/release_candidate_gate.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/resolve_orphan_wi_memberships.py": {
+      ".gtkb-state": 2,
+      "PAUTH": 1
+    },
+    "scripts/resolve_project_resource.py": {
+      "config/agent-control": 1
+    },
+    "scripts/resolve_system_interface.py": {
+      "harness-state/": 1
+    },
+    "scripts/restore_fleet_membase_carriers.py": {
+      ".gtkb-state": 1,
+      "PAUTH": 8,
+      "project_authorizations": 2
+    },
+    "scripts/run_spec_derived_tests.py": {
+      "DEFERRED": 1,
+      "NO-ACTION": 3,
+      "formal-artifact-approvals": 1
+    },
+    "scripts/seed_harness_registry.py": {
+      "harness-state/": 2
+    },
+    "scripts/session_self_initialization.py": {
+      ".gtkb-state": 1,
+      "DEFERRED": 1,
+      "NO-ACTION": 8,
+      "TAFE": 10,
+      "config/agent-control": 2,
+      "harness-state/": 7
+    },
+    "scripts/session_start_dispatch_core.py": {
+      ".gtkb-state": 2,
+      "TAFE": 1,
+      "harness-state/": 5
+    },
+    "scripts/skill-helpers/gtkb-bridge-propose/write_bridge.py": {
+      ".gtkb-state": 1,
+      "DEFERRED": 1,
+      "NO-ACTION": 1
+    },
+    "scripts/skill-helpers/gtkb-bridge/impl_report_bridge.py": {
+      ".gtkb-state": 2,
+      "DEFERRED": 1,
+      "PAUTH": 1
+    },
+    "scripts/skill-helpers/gtkb-bridge/revise_bridge.py": {
+      ".gtkb-state": 2,
+      "DEFERRED": 1
+    },
+    "scripts/skill-helpers/gtkb-bridge/scan_bridge.py": {
+      "DEFERRED": 4,
+      "NO-ACTION": 4
+    },
+    "scripts/skill-helpers/gtkb-bridge/show_thread_bridge.py": {
+      "DEFERRED": 1,
+      "NO-ACTION": 1
+    },
+    "scripts/skill-helpers/gtkb-verify/write_verdict.py": {
+      ".gtkb-state": 1,
+      "NO-ACTION": 3
+    },
+    "scripts/skill_usage_router.py": {
+      "config/agent-control": 1
+    },
+    "scripts/sot_compactness_audit.py": {
+      "PAUTH": 4,
+      "TAFE": 1,
+      "project_authorizations": 1
+    },
+    "scripts/startup_payload_budget_report.py": {
+      ".gtkb-state": 4
+    },
+    "scripts/validate_formal_artifact_packet.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/verdict_evidence_anchor_preflight.py": {
+      "DEFERRED": 1,
+      "NO-ACTION": 1
+    },
+    "scripts/verify_antigravity_dispatch.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/verify_codex_dispatch.py": {
+      ".gtkb-state": 1
+    },
+    "scripts/verify_ollama_dispatch.py": {
+      "formal-artifact-approvals": 1
+    },
+    "scripts/verify_slice8_5_ci_green.py": {
+      "DEFERRED": 1
+    },
+    "scripts/worker_exit_reconciliation_sweep.py": {
+      ".gtkb-state": 3,
+      "PAUTH": 1
+    },
+    "scripts/workstream_focus.py": {
+      "TAFE": 3,
+      "config/agent-control": 1,
+      "harness-state/": 2
+    }
+  }
+}

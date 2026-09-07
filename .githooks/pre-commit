@@ -32,7 +32,7 @@ PYTHON_BIN="${PYTHON:-python}"
 # The protected-commit authorization gate is retired from this hook (owner
 # direction, 2026-09-07, canon v8.92). Its predicates no longer exist: project
 # authorization is a field on the project row and gates dispatch, not commits
-# (section 3); GO packets lived under the forbidden .gtkb-state (section 17);
+# (section 3); GO packets lived under a forbidden runtime-state tree (section 17);
 # and bridge material is never committed, so it cannot serve as commit
 # evidence (section 6). Commit authority is Loyal Opposition after VERIFIED
 # (section 7) or the owner directly (section 9). Deleting the script and its
