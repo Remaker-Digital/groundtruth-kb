@@ -462,3 +462,146 @@ def test_toolchain_public_probe_evidence_change_still_gates(tmp_path: Path) -> N
 
     assert result["material_inventory_drift"] is True
     assert result["diff_keys"] == ["toolchain"]
+
+
+def _write_registry_with_review_route(root: Path) -> Path:
+    """The default registry plus a governance_review entry for baseline rules."""
+    path = _write_registry(root)
+    path.write_text(
+        path.read_text(encoding="utf-8")
+        + "\n".join(
+            [
+                "",
+                "[[protected_artifacts]]",
+                'id = "rules"',
+                'patterns = [".harness-baseline-configuration/rules/**"]',
+                'severity = "governance_review"',
+                'route = "governance_review"',
+                "accept_with_inventory_baseline_update = false",
+                'required_evidence = ["bridge report"]',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def _write_registry_with_release_blocker_route(root: Path) -> Path:
+    """The default registry plus a release_blocker entry for a release script."""
+    path = _write_registry(root)
+    path.write_text(
+        path.read_text(encoding="utf-8")
+        + "\n".join(
+            [
+                "",
+                "[[protected_artifacts]]",
+                'id = "release"',
+                'patterns = ["scripts/release_pipeline.py"]',
+                'severity = "release_blocker"',
+                'route = "release_blocker"',
+                "accept_with_inventory_baseline_update = false",
+                'required_evidence = ["release gate test"]',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_compatibility_tests_route_accepts_a_test_in_the_change_set(tmp_path: Path) -> None:
+    """A change routed to compatibility_tests is accepted by the tests that travel
+    with it. Review is recorded in the bridge, which is never committed (canon
+    section 6), so committed bridge material cannot be the only accepted route."""
+    module = _load_module()
+    _write_registry(tmp_path)
+    current = _payload()
+    _write_inventory(tmp_path, current)
+
+    result = module.evaluate_drift(
+        tmp_path,
+        changed_paths=[".githooks/pre-commit", "platform_tests/hooks/test_precommit_retired_gates.py"],
+        current_inventory=current,
+        staged=True,
+    )
+
+    assert result["status"] == "pass"
+    assert result["outcome"] == "test_evidence_present"
+    assert result["test_evidence_present"] is True
+    assert result["blocking"] == []
+    assert any("staged test evidence" in warning for warning in result["warnings"])
+
+
+def test_compatibility_tests_route_still_blocks_without_a_test_in_the_change_set(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_registry(tmp_path)
+    current = _payload()
+    _write_inventory(tmp_path, current)
+
+    result = module.evaluate_drift(
+        tmp_path,
+        changed_paths=[".githooks/pre-commit", "scripts/check_ruff_format.py"],
+        current_inventory=current,
+        staged=True,
+    )
+
+    assert result["status"] == "fail"
+    assert result["test_evidence_present"] is False
+    assert result["blocking"][0]["route"] == "compatibility_tests"
+
+
+def test_release_blocker_route_accepts_a_package_test_in_the_change_set(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_registry_with_release_blocker_route(tmp_path)
+    current = _payload()
+    _write_inventory(tmp_path, current)
+
+    result = module.evaluate_drift(
+        tmp_path,
+        changed_paths=["scripts/release_pipeline.py", "groundtruth-kb/tests/test_release_pipeline.py"],
+        current_inventory=current,
+        staged=True,
+    )
+
+    assert result["status"] == "pass"
+    assert result["outcome"] == "test_evidence_present"
+    assert result["blocking"] == []
+
+
+def test_governance_review_route_warns_at_commit_time(tmp_path: Path) -> None:
+    """governance_review is recorded in the bridge, not at commit time, so the
+    staged (pre-commit) gate warns instead of demanding committed bridge files."""
+    module = _load_module()
+    _write_registry_with_review_route(tmp_path)
+    current = _payload()
+    _write_inventory(tmp_path, current)
+
+    result = module.evaluate_drift(
+        tmp_path,
+        changed_paths=[".harness-baseline-configuration/rules/file-bridge-protocol.md"],
+        current_inventory=current,
+        staged=True,
+    )
+
+    assert result["status"] == "pass"
+    assert result["outcome"] == "staged_review_notice"
+    assert result["blocking"] == []
+    assert any("review is recorded in the bridge" in warning for warning in result["warnings"])
+
+
+def test_governance_review_route_still_blocks_the_whole_tree_release_gate(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_registry_with_review_route(tmp_path)
+    current = _payload()
+    _write_inventory(tmp_path, current)
+
+    result = module.evaluate_drift(
+        tmp_path,
+        changed_paths=[".harness-baseline-configuration/rules/file-bridge-protocol.md"],
+        current_inventory=current,
+        staged=False,
+    )
+
+    assert result["status"] == "fail"
+    assert result["blocking"][0]["route"] == "governance_review"
