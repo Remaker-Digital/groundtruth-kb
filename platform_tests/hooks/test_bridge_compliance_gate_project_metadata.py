@@ -1,14 +1,17 @@
 """Tests for the bridge-compliance-gate project-linkage metadata clause (WI-3314).
 
-Covers 3 of the 4 clauses of DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001:
+Covers the clauses of DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001 that
+survive canon v8.92:
 - CLAUSE-PROJECT-METADATA-PRESENT: NEW/REVISED implementation proposals must
-  carry Project Authorization / Project / Work Item metadata lines.
+  carry Project / Work Item metadata lines.
 - CLAUSE-VERDICT-FILES-EXCLUDED: GO/NO-GO/VERIFIED/WITHDRAWN verdict files are
   not subject to the metadata check.
 - CLAUSE-NON-IMPLEMENTATION-EXEMPT: bridge_kind in {spec_intake,
   governance_review, loyal_opposition_advisory} exempts the proposal.
 
-CLAUSE-PROJECT-AUTH-LIVE-CHECK is deferred to WI-3315 and is NOT tested here.
+Canon section 3 makes authorization a field on the project row that gates
+dispatch, not filing, so no authorization line is required or read; the gate
+must not even suggest one in its refusal hint.
 
 New test surface (per bridge/gtkb-bridge-compliance-project-metadata-005.md
 REVISED-2, GO at -006). Does not regress
@@ -49,10 +52,8 @@ def gate(request):
 # fire), so the project-metadata clause is the only variable under test.
 _SPEC_LINKS_SECTION = "## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
 
-_META_AUTH = "Project Authorization: PAUTH-TEST-PROJECT-X\n"
 _META_PROJECT = "Project: PROJECT-TEST-X\n"
 _META_WI = "Work Item: WI-9999\n"
-_BOLD_META_AUTH = "**Project Authorization:** PAUTH-TEST-PROJECT-X\n"
 _BOLD_META_PROJECT = "**Project:** PROJECT-TEST-X\n"
 _BOLD_META_WI = "**Work Item:** WI-9999\n"
 
@@ -82,42 +83,34 @@ _METADATA_CLAUSE = "CLAUSE-PROJECT-METADATA-PRESENT"
 # --- CLAUSE-PROJECT-METADATA-PRESENT (blocked cases) ----------------------------
 
 
-def test_bridge_proposal_missing_project_authorization_line_blocked(gate) -> None:
-    content = _proposal("NEW", metadata=_META_PROJECT + _META_WI)
-    reason = _deny(gate, content)
-    assert reason is not None and _METADATA_CLAUSE in reason
-    assert "Project Authorization:" in reason
-
-
 def test_bridge_proposal_missing_project_line_blocked(gate) -> None:
-    content = _proposal("NEW", metadata=_META_AUTH + _META_WI)
+    content = _proposal("NEW", metadata=_META_WI)
     reason = _deny(gate, content)
     assert reason is not None and _METADATA_CLAUSE in reason
     assert "Project:" in reason
 
 
 def test_bridge_proposal_missing_work_item_line_blocked(gate) -> None:
-    content = _proposal("NEW", metadata=_META_AUTH + _META_PROJECT)
+    content = _proposal("NEW", metadata=_META_PROJECT)
     reason = _deny(gate, content)
     assert reason is not None and _METADATA_CLAUSE in reason
     assert "Work Item:" in reason
 
 
 def test_project_metadata_bold_variant_denied_with_copy_paste_examples(gate) -> None:
-    content = _proposal("NEW", metadata=_BOLD_META_AUTH + _BOLD_META_PROJECT + _BOLD_META_WI)
+    content = _proposal("NEW", metadata=_BOLD_META_PROJECT + _BOLD_META_WI)
     reason = _deny(gate, content)
     assert reason is not None and _METADATA_CLAUSE in reason
-    assert "`Project Authorization: PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING`" in reason
     assert "`Project: PROJECT-GTKB-RELIABILITY-FIXES`" in reason
     assert "`Work Item: WI-3496`" in reason
-    assert "`**Project Authorization:** ...`" in reason
     assert "`**Project:** ...`" in reason
     assert "`**Work Item:** ...`" in reason
     assert "not recognized as project-linkage metadata lines" in reason
+    assert "Authorization" not in reason, "the refusal hint must not teach a retired authorization line"
 
 
-def test_bridge_proposal_all_three_metadata_lines_passes(gate) -> None:
-    content = _proposal("NEW", metadata=_META_AUTH + _META_PROJECT + _META_WI)
+def test_bridge_proposal_both_metadata_lines_passes(gate) -> None:
+    content = _proposal("NEW", metadata=_META_PROJECT + _META_WI)
     reason = _deny(gate, content)
     assert reason is None or _METADATA_CLAUSE not in reason
 
@@ -129,7 +122,7 @@ def test_bridge_proposal_metadata_accepts_wi_gtkb_worklist_id_formats(gate) -> N
         "GTKB-SOME-THING-001",
         "WORKLIST-A-B-C",
     ):
-        metadata = _META_AUTH + _META_PROJECT + f"Work Item: {wi_value}\n"
+        metadata = _META_PROJECT + f"Work Item: {wi_value}\n"
         content = _proposal("NEW", metadata=metadata)
         reason = _deny(gate, content)
         assert reason is None or _METADATA_CLAUSE not in reason, f"Work Item id format {wi_value} should be accepted"
@@ -139,7 +132,7 @@ def test_bridge_proposal_metadata_accepts_wi_auto_id(gate) -> None:
     # WI-AUTO-<SPEC-ID> ids are minted by groundtruth_kb.intake (spec-intake
     # confirm). A NEW proposal whose Work Item line carries one must not trip
     # CLAUSE-PROJECT-METADATA-PRESENT. Regression guard for WI-3322.
-    metadata = _META_AUTH + _META_PROJECT + "Work Item: WI-AUTO-SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001\n"
+    metadata = _META_PROJECT + "Work Item: WI-AUTO-SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001\n"
     content = _proposal("NEW", metadata=metadata)
     reason = _deny(gate, content)
     assert reason is None or _METADATA_CLAUSE not in reason, (
