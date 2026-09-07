@@ -34,7 +34,15 @@ for _parent in Path(__file__).resolve().parents:
     if (_parent / "scripts" / "harness_roles.py").is_file():
         if str(_parent) not in sys.path:
             sys.path.insert(0, str(_parent))
+        _gt_src = _parent / "groundtruth-kb" / "src"
+        if _gt_src.is_dir() and str(_gt_src) not in sys.path:
+            sys.path.insert(0, str(_gt_src))
         break
+
+try:
+    from groundtruth_kb.bridge.vocabulary import LOYAL_OPPOSITION_AUTHORED_STATUSES as _LO_AUTHORED_STATUSES
+except Exception:  # pragma: no cover - fail-open fallback for partial installs
+    _LO_AUTHORED_STATUSES = frozenset({"GO", "NO-GO", "NOT-READY", "VERIFIED", "SUPERSEDED", "ADVISORY"})
 
 try:
     from scripts.harness_roles import is_loyal_opposition, is_prime_builder, load_role_assignments, resolved_harness_id
@@ -59,7 +67,10 @@ except Exception:  # pragma: no cover - fail-open fallback
 CONFIG_RELATIVE_PATH = Path("config") / "governance" / "lo-file-safety.toml"
 APPROVAL_ENV_VAR = "GTKB_LO_FILE_SAFETY_APPROVAL_PACKET"
 APPROVAL_PACKET_TYPE = "lo_file_safety_authorization"
-LO_STATUS_TOKENS = frozenset({"NO-GO", "GO", "VERIFIED", "ADVISORY"})
+# Canon section 4: the statuses Loyal Opposition may author come from the
+# vocabulary's code of record, so a lawful NOT-READY or SUPERSEDED write is
+# never refused here while an unlawful token still is.
+LO_STATUS_TOKENS = _LO_AUTHORED_STATUSES
 VERSIONED_BRIDGE_PATH_RE = re.compile(r"^bridge/.+-\d{3}\.md$")
 NULL_SINKS = {"nul", "null", "$null", "/dev/null", "2>nul", "2>$null", "2>/dev/null"}
 WRITEISH_COMMAND_RE = re.compile(

@@ -424,7 +424,9 @@ def test_publish_bridge_verdict_schema_and_skill_filtering():
     properties = schema["parameters"]["properties"]
     assert set(schema["parameters"]["required"]) == {"slug", "verdict", "content"}
     assert not {"path", "file_path", "version"} & properties.keys()
-    assert properties["verdict"]["enum"] == ["GO", "NO-GO", "VERIFIED"]
+    # Every Loyal-Opposition-authored verdict is publishable: NOT-READY is the
+    # only lawful rejection of an implementation report, SUPERSEDED closes a chain.
+    assert properties["verdict"]["enum"] == ["GO", "NO-GO", "NOT-READY", "SUPERSEDED", "VERIFIED"]
 
     allowed = ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
     for skill in ("bridge-review", "verification"):

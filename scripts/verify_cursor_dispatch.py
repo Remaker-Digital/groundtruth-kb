@@ -16,6 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts import cursor_harness  # noqa: E402
+from scripts.gtkb_bridge_writer import PROVIDER_VERDICT_STATUSES  # noqa: E402
 from scripts.harness_projection_reader import load_harness_projection  # noqa: E402
 
 HARNESS_ID = "E"
@@ -209,7 +210,7 @@ def evaluate_readiness(
         and publication_contract.get("execution_mode") == "ask"
         and publication_contract.get("output_format") == "text"
         and publication_contract.get("publisher") == "publish_lo_verdict"
-        and publication_contract.get("supported_verdicts") == ["GO", "NO-GO", "VERIFIED"]
+        and publication_contract.get("supported_verdicts") == sorted(PROVIDER_VERDICT_STATUSES)
     )
     add_check(
         "governed read-only LO publication",

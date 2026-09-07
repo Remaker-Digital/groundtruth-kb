@@ -143,6 +143,18 @@ SKIPPED_SCAN_DIR_NAMES = frozenset(
 )
 LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
 PUBLISH_BRIDGE_VERDICT_TOOL = "PublishBridgeVerdict"
+
+
+def _provider_verdict_enum() -> list[str]:
+    """Verdicts a provider-backed Loyal Opposition may publish: the writer's contract, from the vocabulary."""
+    try:
+        from groundtruth_kb.bridge.vocabulary import LOYAL_OPPOSITION_AUTHORED_STATUSES
+
+        return sorted(LOYAL_OPPOSITION_AUTHORED_STATUSES - {"ADVISORY"})
+    except Exception:  # pragma: no cover - partial installs keep the same contract by value
+        return ["GO", "NO-GO", "NOT-READY", "SUPERSEDED", "VERIFIED"]
+
+
 PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT = "provider_verdict_claim_peer_stand_down"
 CANONICAL_TOOLS = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash", PUBLISH_BRIDGE_VERDICT_TOOL})
 MUTATING_TOOLS = frozenset({"Write", "Edit", "Bash"})
@@ -776,13 +788,14 @@ def build_tool_schemas(allowed_tools: Iterable[str]) -> list[dict[str, Any]]:
         PUBLISH_BRIDGE_VERDICT_TOOL: _schema(
             PUBLISH_BRIDGE_VERDICT_TOOL,
             (
-                "Publish a governed Loyal Opposition GO, NO-GO, or VERIFIED verdict. "
+                "Publish a governed Loyal Opposition verdict: GO or NO-GO on a proposal, "
+                "NOT-READY or VERIFIED on an implementation report, SUPERSEDED to close a chain. "
                 "The runtime computes the next bridge path/version. VERIFIED also requires "
                 "include_paths and commit_message; hunk_patch_paths is optional."
             ),
             {
                 "slug": {"type": "string"},
-                "verdict": {"type": "string", "enum": ["GO", "NO-GO", "VERIFIED"]},
+                "verdict": {"type": "string", "enum": _provider_verdict_enum()},
                 "content": {"type": "string"},
                 "include_paths": {"type": "array", "items": {"type": "string"}},
                 "hunk_patch_paths": {"type": "array", "items": {"type": "string"}},

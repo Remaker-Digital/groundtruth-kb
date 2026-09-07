@@ -23,12 +23,12 @@ try:
     from scripts.bridge_author_metadata import load_author_metadata
     from scripts.bridge_work_intent_registry import acquire as acquire_work_intent
     from scripts.bridge_work_intent_registry import release as release_work_intent
-    from scripts.gtkb_bridge_writer import publish_lo_verdict
+    from scripts.gtkb_bridge_writer import PROVIDER_VERDICT_STATUSES, publish_lo_verdict
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
     from bridge_author_metadata import load_author_metadata
     from bridge_work_intent_registry import acquire as acquire_work_intent
     from bridge_work_intent_registry import release as release_work_intent
-    from gtkb_bridge_writer import publish_lo_verdict
+    from gtkb_bridge_writer import PROVIDER_VERDICT_STATUSES, publish_lo_verdict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_TIMEOUT_SECONDS = 600.0
@@ -75,12 +75,12 @@ _VERDICT_ENVELOPE_KEYS = frozenset(
         "commit_message",
     }
 )
-_VERDICT_STATUSES = frozenset({"GO", "NO-GO", "VERIFIED"})
+# The verdicts a provider-backed Loyal Opposition may publish are the writer's
+# contract, derived from the vocabulary; this harness does not restate them.
+_VERDICT_STATUSES = PROVIDER_VERDICT_STATUSES
 _SAFE_BRIDGE_SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _TIMEOUT_CAPTURE_SECRET_PATTERNS = (
-    re.compile(
-        r"(?i)\b(api[_-]?key|token|secret|password)\s*[:=]\s*([A-Za-z0-9._~+/=-]{8,})"
-    ),
+    re.compile(r"(?i)\b(api[_-]?key|token|secret|password)\s*[:=]\s*([A-Za-z0-9._~+/=-]{8,})"),
 )
 
 
@@ -113,9 +113,7 @@ def _cursor_supports_agent_subcommand(cursor_executable: str) -> bool:
         return False
     help_text = f"{completed.stdout or ''}\n{completed.stderr or ''}".lower()
     return (
-        completed.returncode == 0
-        and "--output-format" in help_text
-        and ("--print" in help_text or "-p" in help_text)
+        completed.returncode == 0 and "--output-format" in help_text and ("--print" in help_text or "-p" in help_text)
     )
 
 
@@ -169,9 +167,7 @@ def _windows_cursor_agent_direct_commands() -> tuple[list[str], ...]:
             modified_at = 0.0
         candidates.append((modified_at, version_dir.name, node, index))
     candidates.sort(reverse=True)
-    return tuple(
-        [str(node), str(index)] for _modified_at, _name, node, index in candidates
-    )
+    return tuple([str(node), str(index)] for _modified_at, _name, node, index in candidates)
 
 
 def _resolve_agent_command() -> list[str]:
@@ -276,11 +272,7 @@ def cursor_adaptation_metadata(project_root: Path = PROJECT_ROOT) -> dict[str, A
             "scripts/cursor_harness.py": _sha256_file(shim_path),
             "skill-route-aliases": "sha256:"
             + __import__("hashlib")
-            .sha256(
-                json.dumps(
-                    _SKILL_ROUTE_ALIASES, sort_keys=True, separators=(",", ":")
-                ).encode("utf-8")
-            )
+            .sha256(json.dumps(_SKILL_ROUTE_ALIASES, sort_keys=True, separators=(",", ":")).encode("utf-8"))
             .hexdigest(),
         },
         "raw_prompt_included": False,
@@ -329,9 +321,7 @@ def _requires_bridge_output(skill: str | None) -> bool:
     return skill in LOYAL_OPPOSITION_BRIDGE_SKILLS
 
 
-def _effective_execution_options(
-    *, skill: str | None, output_format: str, mode: str | None
-) -> tuple[str, str | None]:
+def _effective_execution_options(*, skill: str | None, output_format: str, mode: str | None) -> tuple[str, str | None]:
     if _requires_bridge_output(skill):
         return "text", "ask"
     return output_format, mode
@@ -365,9 +355,7 @@ def _artifact_head_status(text):
 
 def _normalized_envelope_paths(value: object, *, field: str) -> list[str]:
     if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
-        raise CursorHarnessError(
-            f"verdict envelope {field} must be a JSON array of strings"
-        )
+        raise CursorHarnessError(f"verdict envelope {field} must be a JSON array of strings")
     normalized: list[str] = []
     for raw in value:
         candidate = raw.strip().replace("\\", "/")
@@ -379,9 +367,7 @@ def _normalized_envelope_paths(value: object, *, field: str) -> list[str]:
             or any(part in {"", ".", ".."} for part in path.parts)
             or any(ord(char) < 32 for char in candidate)
         ):
-            raise CursorHarnessError(
-                f"verdict envelope {field} contains an unsafe project-relative path"
-            )
+            raise CursorHarnessError(f"verdict envelope {field} contains an unsafe project-relative path")
         normalized.append(path.as_posix())
     if len(set(normalized)) != len(normalized):
         raise CursorHarnessError(f"verdict envelope {field} contains duplicate paths")
@@ -396,67 +382,36 @@ def _parse_bridge_verdict_envelope(stdout: str) -> dict[str, object]:
     )
     match = pattern.fullmatch(stdout)
     if match is None:
-        raise CursorHarnessError(
-            "Cursor LO output must contain exactly one complete verdict envelope"
-        )
+        raise CursorHarnessError("Cursor LO output must contain exactly one complete verdict envelope")
     try:
         payload = json.loads(match.group("payload"))
     except json.JSONDecodeError as exc:
-        raise CursorHarnessError(
-            f"Cursor LO verdict envelope is not valid JSON: {exc.msg}"
-        ) from exc
+        raise CursorHarnessError(f"Cursor LO verdict envelope is not valid JSON: {exc.msg}") from exc
     if not isinstance(payload, dict) or set(payload) != _VERDICT_ENVELOPE_KEYS:
-        raise CursorHarnessError(
-            "Cursor LO verdict envelope fields do not match schema version 1"
-        )
+        raise CursorHarnessError("Cursor LO verdict envelope fields do not match schema version 1")
     if type(payload["schema_version"]) is not int or payload["schema_version"] != 1:
-        raise CursorHarnessError(
-            "Cursor LO verdict envelope schema_version must be integer 1"
-        )
+        raise CursorHarnessError("Cursor LO verdict envelope schema_version must be integer 1")
     document_name = payload["document_name"]
-    if (
-        not isinstance(document_name, str)
-        or _SAFE_BRIDGE_SLUG_RE.fullmatch(document_name) is None
-    ):
-        raise CursorHarnessError(
-            "Cursor LO verdict envelope document_name is not a canonical bridge slug"
-        )
+    if not isinstance(document_name, str) or _SAFE_BRIDGE_SLUG_RE.fullmatch(document_name) is None:
+        raise CursorHarnessError("Cursor LO verdict envelope document_name is not a canonical bridge slug")
     verdict = payload["verdict"]
     if not isinstance(verdict, str) or verdict not in _VERDICT_STATUSES:
-        raise CursorHarnessError(
-            "Cursor LO verdict envelope verdict must be GO, NO-GO, or VERIFIED"
-        )
+        raise CursorHarnessError("Cursor LO verdict envelope verdict must be GO, NO-GO, or VERIFIED")
     content = payload["content"]
     if not isinstance(content, str) or not content.strip():
-        raise CursorHarnessError(
-            "Cursor LO verdict envelope content must be non-empty text"
-        )
+        raise CursorHarnessError("Cursor LO verdict envelope content must be non-empty text")
     if _artifact_head_status(content) != verdict:
-        raise CursorHarnessError(
-            "Cursor LO verdict envelope content status does not match verdict"
-        )
-    include_paths = _normalized_envelope_paths(
-        payload["include_paths"], field="include_paths"
-    )
-    hunk_patch_paths = _normalized_envelope_paths(
-        payload["hunk_patch_paths"], field="hunk_patch_paths"
-    )
+        raise CursorHarnessError("Cursor LO verdict envelope content status does not match verdict")
+    include_paths = _normalized_envelope_paths(payload["include_paths"], field="include_paths")
+    hunk_patch_paths = _normalized_envelope_paths(payload["hunk_patch_paths"], field="hunk_patch_paths")
     commit_message = payload["commit_message"]
-    if not isinstance(commit_message, str) or any(
-        ord(char) < 32 and char not in "\t" for char in commit_message
-    ):
-        raise CursorHarnessError(
-            "Cursor LO verdict envelope commit_message must be plain text"
-        )
+    if not isinstance(commit_message, str) or any(ord(char) < 32 and char not in "\t" for char in commit_message):
+        raise CursorHarnessError("Cursor LO verdict envelope commit_message must be plain text")
     if verdict == "VERIFIED":
         if not include_paths or not commit_message.strip():
-            raise CursorHarnessError(
-                "VERIFIED verdict envelope requires include_paths and commit_message"
-            )
+            raise CursorHarnessError("VERIFIED verdict envelope requires include_paths and commit_message")
     elif include_paths or hunk_patch_paths or commit_message.strip():
-        raise CursorHarnessError(
-            "GO and NO-GO verdict envelopes cannot request Git finalization"
-        )
+        raise CursorHarnessError("GO and NO-GO verdict envelopes cannot request Git finalization")
     return {
         "document_name": document_name,
         "verdict": verdict,
@@ -475,23 +430,15 @@ def _publish_bridge_verdict_envelope(
     env: dict[str, str],
 ) -> dict[str, object]:
     if not session_id.strip():
-        raise CursorHarnessError(
-            "Cursor LO governed publication requires a dispatcher worker session id"
-        )
+        raise CursorHarnessError("Cursor LO governed publication requires a dispatcher worker session id")
     document_name = str(envelope["document_name"])
     try:
         author_metadata = load_author_metadata(project_root, env=env)
-        acquired = acquire_work_intent(
-            document_name, session_id, project_root=project_root
-        )
+        acquired = acquire_work_intent(document_name, session_id, project_root=project_root)
     except Exception as exc:  # noqa: BLE001 - normalize governed boundary failures
-        raise CursorHarnessError(
-            f"could not acquire governed verdict claim: {type(exc).__name__}: {exc}"
-        ) from exc
+        raise CursorHarnessError(f"could not acquire governed verdict claim: {type(exc).__name__}: {exc}") from exc
     if not acquired:
-        raise CursorHarnessError(
-            f"governed verdict claim for {document_name!r} is held by another session"
-        )
+        raise CursorHarnessError(f"governed verdict claim for {document_name!r} is held by another session")
     try:
         published = publish_lo_verdict(
             document_name,
@@ -510,17 +457,13 @@ def _publish_bridge_verdict_envelope(
             release_work_intent(document_name, session_id, project_root=project_root)
         except Exception:
             pass
-        raise CursorHarnessError(
-            f"governed verdict publication failed: {type(exc).__name__}: {exc}"
-        ) from exc
+        raise CursorHarnessError(f"governed verdict publication failed: {type(exc).__name__}: {exc}") from exc
     return published.to_dict()
 
 
 def _dispatcher_run_id(env: dict[str, str] | None = None) -> str:
     env = os.environ if env is None else env
-    return env.get("GTKB_BRIDGE_POLLER_RUN_ID", "") or env.get(
-        "GTKB_INHERITED_SESSION_ID", ""
-    )
+    return env.get("GTKB_BRIDGE_POLLER_RUN_ID", "") or env.get("GTKB_INHERITED_SESSION_ID", "")
 
 
 def _normalized_for_process_match(value: object) -> str:
@@ -591,9 +534,7 @@ def _cursor_agent_provenance_records(
     return records
 
 
-def _merge_cursor_agent_provenance(
-    project_root: Path, records: list[dict[str, Any]]
-) -> None:
+def _merge_cursor_agent_provenance(project_root: Path, records: list[dict[str, Any]]) -> None:
     if not records:
         return
     provenance_dir = project_root / _PROVENANCE_DIR
@@ -706,11 +647,7 @@ def _bounded_timeout_capture(value: object, *, label: str) -> str:
 
 
 def _timeout_stdout(exc: subprocess.TimeoutExpired) -> object:
-    return (
-        getattr(exc, "stdout", None)
-        if getattr(exc, "stdout", None) is not None
-        else getattr(exc, "output", None)
-    )
+    return getattr(exc, "stdout", None) if getattr(exc, "stdout", None) is not None else getattr(exc, "output", None)
 
 
 def _timeout_diagnostic(
@@ -735,12 +672,8 @@ def _timeout_diagnostic(
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Run the GT-KB Cursor Agent harness shim."
-    )
-    parser.add_argument(
-        "-p", "--prompt", required=True, help="Prompt to send to Cursor Agent."
-    )
+    parser = argparse.ArgumentParser(description="Run the GT-KB Cursor Agent harness shim.")
+    parser.add_argument("-p", "--prompt", required=True, help="Prompt to send to Cursor Agent.")
     parser.add_argument(
         "--skill",
         help="Optional skill route key (for example bridge-review or verification).",
@@ -829,9 +762,7 @@ def main(argv: list[str] | None = None) -> int:
                 started_at_epoch=cursor_agent_started_at,
             )
         stdout_text = _bounded_timeout_capture(_timeout_stdout(exc), label="stdout")
-        stderr_text = _bounded_timeout_capture(
-            getattr(exc, "stderr", None), label="stderr"
-        )
+        stderr_text = _bounded_timeout_capture(getattr(exc, "stderr", None), label="stderr")
         if stdout_text:
             sys.stdout.write(stdout_text)
             if not stdout_text.endswith("\n"):

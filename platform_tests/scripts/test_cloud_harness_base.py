@@ -2429,7 +2429,9 @@ def test_publish_bridge_verdict_schema_has_no_path_or_version_authority() -> Non
     assert "path" not in properties
     assert "file_path" not in properties
     assert "version" not in properties
-    assert properties["verdict"]["enum"] == ["GO", "NO-GO", "VERIFIED"]
+    # Every Loyal-Opposition-authored verdict is publishable: NOT-READY is the
+    # only lawful rejection of an implementation report, SUPERSEDED closes a chain.
+    assert properties["verdict"]["enum"] == ["GO", "NO-GO", "NOT-READY", "SUPERSEDED", "VERIFIED"]
 
 
 def test_provider_verdict_publisher_bootstraps_project_root_under_safe_path() -> None:
