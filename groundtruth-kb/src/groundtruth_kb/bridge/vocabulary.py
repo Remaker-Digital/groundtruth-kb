@@ -7,38 +7,38 @@ restated in nine places inside `scripts/bridge_lifecycle_resolver.py` alone --
 eight top-level definitions plus a hand-maintained regex -- and again across
 dozens of consumers. Consumers import from here; they do not re-declare.
 
-Authority is canon section 6 (`AGENTS.md`, "Status vocabulary -- exactly ten"
-and "Legal transition table -- complete").
-
-Nine-versus-ten: `DELIB-20260831060001` summarises the settled vocabulary as
-nine statuses and omits `NOT-READY`. That record states of itself that it
-"carries no authority. Authority lives only in GOV, SPEC, ADR, and DCL." Canon
-section 6 is titled "exactly ten", defines `NOT-READY` in full as the
-report-phase counterpart of `NO-GO`, and routes it in three further places.
-Ten is therefore correct and the deliberation summary is the incomplete record.
+Authority is canon section 6 ("Status vocabulary -- exactly twelve" and
+"Legal transition table -- complete"), frozen at v8.92 (2026-09-07). The
+Dispatcher authors no status; NO-GO has exactly one form; SUPERSEDED and
+BLOCKED are canonical, not historical.
 """
 
 from __future__ import annotations
 
 import re
 
-# Canon section 6, in canon's own order. Exactly ten.
+# Canon section 6, in canon's own order. Exactly twelve.
 CANONICAL_STATUSES: frozenset[str] = frozenset(
     {
         "NEW",
         "REVISED",
         "READY",
         "VERDICT-REJECTED",
+        "BLOCKED",
         "GO",
         "NO-GO",
         "NOT-READY",
+        "SUPERSEDED",
         "VERIFIED",
         "WITHDRAWN",
         "ADVISORY",
     }
 )
 
-# Only the canonical ten may be written. Canon section 6 "Obsolete statuses":
+# Canon section 6, "(thread start)": what may open a thread.
+THREAD_START_STATUSES: frozenset[str] = frozenset({"NEW", "BLOCKED", "ADVISORY"})
+
+# Only the canonical twelve may be written. Canon section 6 "Obsolete statuses":
 # "New writes reject both."
 PERMITTED_ON_WRITE: frozenset[str] = CANONICAL_STATUSES
 
@@ -54,7 +54,7 @@ PERMITTED_ON_WRITE: frozenset[str] = CANONICAL_STATUSES
 # a canonical status: providing one would be the crosswalk canon forbids. They
 # carry no entry in TRANSITIONS and no membership in any author set, so a chain
 # whose operative status is one of these is non-dispatchable by construction.
-HISTORICAL_INERT_STATUSES: frozenset[str] = frozenset({"NO-ACTION", "DEFERRED", "ACCEPTED", "BLOCKED"})
+HISTORICAL_INERT_STATUSES: frozenset[str] = frozenset({"NO-ACTION", "DEFERRED", "ACCEPTED"})
 
 # What a reader may recognize. Recognition is not authority.
 ACCEPTED_ON_READ: frozenset[str] = CANONICAL_STATUSES | HISTORICAL_INERT_STATUSES
@@ -64,25 +64,25 @@ ACCEPTED_ON_READ: frozenset[str] = CANONICAL_STATUSES | HISTORICAL_INERT_STATUSE
 # relation to be a pure function of the current status, so no entry here
 # consults thread history.
 #
-# NO-GO carries canon's two forms in one entry. Canon distinguishes them "by
-# author, not by the artifact adjudicated": the Loyal-Opposition form yields
-# REVISED | WITHDRAWN | VERDICT-REJECTED, and the Dispatcher finalization form
-# yields VERIFIED. The union keeps the relation history-free; the restriction of
-# VERIFIED to the Dispatcher form is an authorship check
-# (`is_dispatcher_finalization`), not a successor-set difference. Canon's
-# explicit rejection of `NO-GO -> READY` holds because READY is absent here.
+# NO-GO has exactly one form (Loyal Opposition, proposal phase). A failed
+# project commit is canonical finalization state, never a verdict, so nothing
+# here routes VERIFIED to NO-GO or NO-GO to VERIFIED. SUPERSEDED may follow any
+# non-terminal status; VERIFIED may only be followed by a fresh VERIFIED over
+# the exact final bytes (canon section 7).
 TRANSITIONS: dict[str, frozenset[str]] = {
-    "NEW": frozenset({"GO", "NO-GO", "WITHDRAWN"}),
-    "REVISED": frozenset({"GO", "NO-GO", "WITHDRAWN"}),
-    "NO-GO": frozenset({"REVISED", "WITHDRAWN", "VERDICT-REJECTED", "VERIFIED"}),
-    "GO": frozenset({"READY", "VERDICT-REJECTED"}),
-    "READY": frozenset({"VERIFIED", "NOT-READY"}),
-    "NOT-READY": frozenset({"READY", "VERDICT-REJECTED"}),
-    "VERDICT-REJECTED": frozenset({"GO", "NO-GO", "NOT-READY"}),
-    "VERIFIED": frozenset({"NO-GO"}),
+    "BLOCKED": frozenset({"NEW", "WITHDRAWN"}),
+    "NEW": frozenset({"GO", "NO-GO", "WITHDRAWN", "SUPERSEDED"}),
+    "REVISED": frozenset({"GO", "NO-GO", "WITHDRAWN", "SUPERSEDED"}),
+    "NO-GO": frozenset({"REVISED", "WITHDRAWN", "VERDICT-REJECTED", "SUPERSEDED"}),
+    "GO": frozenset({"READY", "VERDICT-REJECTED", "SUPERSEDED"}),
+    "READY": frozenset({"VERIFIED", "NOT-READY", "SUPERSEDED"}),
+    "NOT-READY": frozenset({"READY", "VERDICT-REJECTED", "SUPERSEDED"}),
+    "VERDICT-REJECTED": frozenset({"GO", "NO-GO", "NOT-READY", "SUPERSEDED"}),
+    "VERIFIED": frozenset({"VERIFIED"}),
     "ADVISORY": frozenset({"ADVISORY"}),
-    # Canon: "WITHDRAWN is terminal and has no successors."
+    # Canon: WITHDRAWN and SUPERSEDED are terminal and have no successors.
     "WITHDRAWN": frozenset(),
+    "SUPERSEDED": frozenset(),
 }
 
 # Read-time tolerance for pairs written under the superseded vocabulary.
@@ -135,17 +135,22 @@ RESOLVABLE_TRANSITIONS: dict[str, frozenset[str]] = {
 # Canon section 4 authorship. ADVISORY is "authored by either role at any time",
 # so it appears in both agent sets.
 PRIME_AUTHORED_STATUSES: frozenset[str] = frozenset(
-    {"NEW", "REVISED", "READY", "VERDICT-REJECTED", "WITHDRAWN", "ADVISORY"}
+    {"NEW", "REVISED", "READY", "VERDICT-REJECTED", "WITHDRAWN", "BLOCKED", "ADVISORY"}
 )
-LOYAL_OPPOSITION_AUTHORED_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "NOT-READY", "VERIFIED", "ADVISORY"})
+LOYAL_OPPOSITION_AUTHORED_STATUSES: frozenset[str] = frozenset(
+    {"GO", "NO-GO", "NOT-READY", "VERIFIED", "SUPERSEDED", "ADVISORY"}
+)
 # Canon section 7: the finalization-repair NO-GO is the only Dispatcher-authored
 # status, and it is addressed to Loyal Opposition rather than Prime Builder.
-DISPATCHER_AUTHORED_STATUSES: frozenset[str] = frozenset({"NO-GO"})
+# Canon sections 6 and 10: the Dispatcher never authors a proposal, verdict, or
+# bridge lifecycle item. Kept as an empty set so any remaining consumer reads the
+# canon rather than a stale token; delete once no consumer imports it.
+DISPATCHER_AUTHORED_STATUSES: frozenset[str] = frozenset()
 
 # Canon section 0.5 routing.
 PRIME_ACTIONABLE_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "NOT-READY"})
 LOYAL_OPPOSITION_ACTIONABLE_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "READY", "VERDICT-REJECTED"})
-NON_DISPATCHABLE_STATUSES: frozenset[str] = frozenset({"ADVISORY", "VERIFIED", "WITHDRAWN"})
+NON_DISPATCHABLE_STATUSES: frozenset[str] = frozenset({"ADVISORY", "VERIFIED", "WITHDRAWN", "SUPERSEDED", "BLOCKED"})
 
 
 def status_alternation(statuses: frozenset[str] | None = None) -> str:

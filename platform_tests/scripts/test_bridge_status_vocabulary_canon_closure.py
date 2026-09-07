@@ -60,9 +60,9 @@ def test_longer_tokens_win_over_their_prefixes() -> None:
         )
 
 
-# 3 - clause 1: the vocabulary is exactly canon's ten.
-def test_canonical_vocabulary_is_exactly_ten() -> None:
-    assert len(CANONICAL_STATUSES) == 10
+# 3 - clause 1: the vocabulary is exactly canon's twelve (v8.92).
+def test_canonical_vocabulary_is_exactly_twelve() -> None:
+    assert len(CANONICAL_STATUSES) == 12
     assert PERMITTED_ON_WRITE == CANONICAL_STATUSES
 
 
@@ -162,9 +162,13 @@ def test_transition_targets_are_all_canonical() -> None:
 # 10 - the authorship split canon section 4 states, including the shared token.
 def test_authorship_sets_match_canon() -> None:
     assert (
-        frozenset({"NEW", "REVISED", "READY", "VERDICT-REJECTED", "WITHDRAWN", "ADVISORY"}) == PRIME_AUTHORED_STATUSES
+        frozenset({"NEW", "REVISED", "READY", "VERDICT-REJECTED", "WITHDRAWN", "BLOCKED", "ADVISORY"})
+        == PRIME_AUTHORED_STATUSES
     )
-    assert frozenset({"GO", "NO-GO", "NOT-READY", "VERIFIED", "ADVISORY"}) == LOYAL_OPPOSITION_AUTHORED_STATUSES
+    assert (
+        frozenset({"GO", "NO-GO", "NOT-READY", "VERIFIED", "SUPERSEDED", "ADVISORY"})
+        == LOYAL_OPPOSITION_AUTHORED_STATUSES
+    )
     # ADVISORY is the only token canon gives to both roles.
     shared = PRIME_AUTHORED_STATUSES & LOYAL_OPPOSITION_AUTHORED_STATUSES
     assert shared == frozenset({"ADVISORY"})

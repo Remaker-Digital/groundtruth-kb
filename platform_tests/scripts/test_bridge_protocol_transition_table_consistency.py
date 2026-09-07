@@ -82,7 +82,9 @@ def test_baseline_table_matches_the_single_vocabulary() -> None:
     rendered = _parse_table(_section(_read(BASELINE_DOC), TABLE_HEADING))
     expected = {k: v for k, v in TRANSITIONS.items() if v}
     assert rendered == expected
-    assert "`WITHDRAWN` is terminal and has no successors" in _section(_read(BASELINE_DOC), TABLE_HEADING)
+    assert "`WITHDRAWN` and `SUPERSEDED` are terminal and have no successors" in _section(
+        _read(BASELINE_DOC), TABLE_HEADING
+    )
 
 
 def test_report_phase_and_proposal_phase_share_no_token() -> None:
@@ -95,8 +97,10 @@ def test_report_phase_and_proposal_phase_share_no_token() -> None:
     report_phase = {"READY", "NOT-READY"}
     assert not (proposal_phase & report_phase)
     assert "READY" not in TRANSITIONS["NO-GO"], "canon rejects NO-GO -> READY"
-    assert TRANSITIONS["GO"] == frozenset({"READY", "VERDICT-REJECTED"})
-    assert TRANSITIONS["READY"] == frozenset({"VERIFIED", "NOT-READY"})
+    # SUPERSEDED is a terminal closer lawful after any non-terminal status; it
+    # belongs to neither phase, so it is excluded from the phase-disjointness claim.
+    assert TRANSITIONS["GO"] == frozenset({"READY", "VERDICT-REJECTED", "SUPERSEDED"})
+    assert TRANSITIONS["READY"] == frozenset({"VERIFIED", "NOT-READY", "SUPERSEDED"})
 
 
 def test_no_go_row_never_allows_new_or_ready() -> None:
@@ -107,8 +111,8 @@ def test_no_go_row_never_allows_new_or_ready() -> None:
     assert "READY" not in rendered["NO-GO"]
 
 
-def test_vocabulary_is_exactly_canon_ten() -> None:
-    assert len(CANONICAL_STATUSES) == 10
+def test_vocabulary_is_exactly_canon_twelve() -> None:
+    assert len(CANONICAL_STATUSES) == 12
     assert (
         frozenset(
             {
@@ -116,9 +120,11 @@ def test_vocabulary_is_exactly_canon_ten() -> None:
                 "REVISED",
                 "READY",
                 "VERDICT-REJECTED",
+                "BLOCKED",
                 "GO",
                 "NO-GO",
                 "NOT-READY",
+                "SUPERSEDED",
                 "VERIFIED",
                 "WITHDRAWN",
                 "ADVISORY",
