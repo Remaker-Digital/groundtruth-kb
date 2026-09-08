@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -164,6 +165,103 @@ def context_group() -> None:
     """Load task-specific current knowledge through the authority service."""
 
 
+def _finalization_command(name: str) -> None:
+    def action(ctx: click.Context, project_id: str, json_output: bool, **body: Any) -> None:
+        _emit(_call(ctx, "POST", f"/v1/projects/{quote(project_id, safe='')}/{name}", body=body), json_output)
+
+    action = click.pass_context(action)
+    action = click.option("--json", "json_output", is_flag=True)(action)
+    if name == "confirm-commit":
+        action = click.option("--commit-id", required=True)(action)
+        action = click.option("--expected-parent", required=True)(action)
+    if name == "commit-failed":
+        action = click.option("--reason", type=click.Choice(["commit_not_confirmed"]), required=True)(action)
+        action = click.option("--evidence", required=True)(action)
+    action = click.option("--expected-version", type=click.IntRange(1), required=True)(action)
+    action = click.option("--native-context-id", required=True)(action)
+    action = click.argument("project_id")(action)
+    NATIVE_COMMANDS["projects"].command(
+        name, help="Prepare, confirm, or report failure of the complete project Git commit."
+    )(action)
+
+
+for _finalization_operation in ("prepare-commit", "confirm-commit", "commit-failed"):
+    _finalization_command(_finalization_operation)
+
+
+@NATIVE_COMMANDS["projects"].command("commit")
+@click.argument("project_id")
+@click.option("--native-context-id", required=True)
+@click.option("--expected-version", type=click.IntRange(1), required=True)
+@click.option("--message-file", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def commit_project(
+    ctx: click.Context,
+    project_id: str,
+    native_context_id: str,
+    expected_version: int,
+    message_file: Path,
+    json_output: bool,
+) -> None:
+    """Commit the complete verified project in this context's own checkout using normal hooks."""
+    endpoint = f"/v1/projects/{quote(project_id, safe='')}"
+    body = {"native_context_id": native_context_id, "expected_version": expected_version}
+    prepared = _call(ctx, "POST", endpoint + "/prepare-commit", body=body)
+    if prepared["status"] != "ready_to_commit":
+        _emit(prepared, json_output)
+        return
+    checkout = Path(prepared["checkout"]["path"])
+    message_file = message_file.resolve()
+    try:
+        message = message_file.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        raise click.ClickException("The commit message must be a readable UTF-8 file") from error
+    if any(citation not in message for citation in prepared["required_citations"]):
+        raise click.ClickException("The authored commit message must cite every project work item")
+
+    def git(*args: str) -> bytes:
+        result = subprocess.run(
+            ["git", "--literal-pathspecs", "-C", str(checkout), *args], capture_output=True, timeout=120
+        )
+        if result.returncode:
+            raise click.ClickException(result.stderr.decode("utf-8", errors="replace").strip() or "Git command failed")
+        return result.stdout
+
+    try:
+        artifacts = prepared["reviewed_artifacts"]
+        staged = {path.decode("utf-8") for path in git("diff", "--cached", "--name-only", "-z").split(b"\0") if path}
+        if staged - artifacts.keys():
+            raise click.ClickException(
+                "The context index contains unrelated staged work; preserve it before committing this project"
+            )
+        tracked = {path.decode("utf-8") for path in git("ls-files", "-z").split(b"\0") if path}
+        paths = sorted(path for path, blob in artifacts.items() if blob is not None or path in tracked)
+        git("add", "--", *paths)
+        git("commit", "--file", str(message_file))
+        commit_id = git("rev-parse", "HEAD").decode("ascii").strip()
+    except (click.ClickException, OSError, subprocess.TimeoutExpired) as error:
+        result = _call(
+            ctx,
+            "POST",
+            endpoint + "/commit-failed",
+            body={**body, "reason": "commit_not_confirmed", "evidence": str(error)},
+        )
+        _emit(result, json_output)
+        raise click.ClickException(f"Project commit did not complete: {error}") from error
+    # An uncertain acknowledgement is retried with this same commit through
+    # confirm-commit, never by making another commit or inventing a verdict.
+    _emit(
+        _call(
+            ctx,
+            "POST",
+            endpoint + "/confirm-commit",
+            body={**body, "commit_id": commit_id, "expected_parent": prepared["expected_parent"]},
+        ),
+        json_output,
+    )
+
+
 @context_group.command("work-item")
 @click.argument("work_item_id")
 @click.option("--json", "json_output", is_flag=True)
@@ -235,15 +333,6 @@ def show_session(ctx: click.Context, native_context_id: str, json_output: bool) 
     _emit(_call(ctx, "GET", "/v1/sessions/binding", query={"native_context_id": native_context_id}), json_output)
 
 
-@native_session_group.command("retire")
-@click.option("--native-context-id", required=True)
-@click.option("--json", "json_output", is_flag=True)
-@click.pass_context
-def retire_session(ctx: click.Context, native_context_id: str, json_output: bool) -> None:
-    """Retire a context after its artifact claim is delivered or released."""
-    _emit(_call(ctx, "POST", "/v1/sessions/retire", body={"native_context_id": native_context_id}), json_output)
-
-
 @click.group("bridge")
 def native_bridge_group() -> None:
     """Deliver disposable bridge messages through native fenced domain operations."""
@@ -299,8 +388,21 @@ def _fence_command(name: str) -> None:
         _emit(_call(ctx, "POST", f"/v1/bridge/{quote(document, safe='')}/{name}", body=body), json_output)
 
 
-for _operation in ("check", "release"):
+for _operation in ("check", "release", "worktree"):
     _fence_command(_operation)
+
+
+@native_bridge_group.command("publish-work")
+@click.argument("document")
+@click.option("--native-context-id", required=True)
+@click.option("--fence", type=click.IntRange(1), required=True)
+@click.option("--preimages-file", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def publish_work(ctx: click.Context, document: str, preimages_file: Path, json_output: bool, **body: Any) -> None:
+    """Publish only the claimed artifacts from this context's registered checkout."""
+    body["expected_artifacts"] = _fields(preimages_file)
+    _emit(_call(ctx, "POST", f"/v1/bridge/{quote(document, safe='')}/publish-work", body=body), json_output)
 
 
 @native_bridge_group.command("deliver")

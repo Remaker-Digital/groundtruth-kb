@@ -6,6 +6,7 @@ import json
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -28,7 +29,17 @@ def bridge(native, tmp_path):
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, capture_output=True)
     (tmp_path / "tests").mkdir()
     (tmp_path / "code.py").write_text("value = 1\n", encoding="utf-8")
+    (tmp_path / "second.py").write_text("second = 1\n", encoding="utf-8")
+    (tmp_path / "foreign_tracked.txt").write_text("Original unrelated content\n", encoding="utf-8")
+    (tmp_path / ".gitignore").write_text(".worktrees/\n", encoding="utf-8")
     (tmp_path / "tests/test_effect.py").write_text("def test_effect(): assert 1 == 1\n", encoding="utf-8")
+    for arguments in (
+        ["config", "user.name", "Qualification"],
+        ["config", "user.email", "qualification@example.invalid"],
+        ["add", "--", "code.py", "second.py", "tests/test_effect.py", ".gitignore", "foreign_tracked.txt"],
+        ["commit", "-qm", "Isolated qualification preimage"],
+    ):
+        subprocess.run(["git", "-C", str(tmp_path), *arguments], check=True, capture_output=True)
     row = {column: None for column in TABLE_SPECS["harnesses"].columns}
     row.update(
         id="HARNESS-1",
@@ -58,7 +69,8 @@ def bridge(native, tmp_path):
             )
             assert result.status_code == 200, result.text
             contexts[name] = result.json()
-        yield service, client, contexts, tmp_path
+        work_root = NativeBridgeService(service.kernel, tmp_path).work_root("PROJECT-1")
+        yield service, client, contexts, work_root
 
 
 def authored(context, document, version, status, **extra):
@@ -151,9 +163,16 @@ def test_binding_is_immutable_exact_and_retry_idempotent(bridge):
             )
         )
     assert bound[0] == bound[1]
-    retired = client.post("/v1/sessions/retire", json={"native_context_id": "pb1"})
-    assert retired.status_code == 200
-    assert client.get("/v1/sessions/binding", params={"native_context_id": "pb1"}).status_code == 422
+    # Ending a worker process does not delete its immutable role binding or
+    # allow that same native context to reinitialize as its own reviewer.
+    assert client.post("/v1/sessions/retire", json={"native_context_id": "pb1"}).status_code in {404, 405}
+    assert client.get("/v1/sessions/binding", params={"native_context_id": "pb1"}).json() == contexts["pb1"]
+    assert (
+        client.post(
+            "/v1/sessions/bind", json={"native_context_id": "pb1", "init_command": "::init gtkb lo"}
+        ).status_code
+        == 422
+    )
 
 
 def test_fresh_context_chain_preserves_bytes_consumes_claims_and_verifies(bridge):
@@ -163,7 +182,6 @@ def test_fresh_context_chain_preserves_bytes_consumes_claims_and_verifies(bridge
     assert retry.status_code == 200 and retry.json()["status"] == "already_delivered"
     queue = client.get("/v1/bridge/queue", params={"role": "lo"}).json()
     assert [row["id"] for row in queue["eligible"]] == ["chain"]
-    assert client.post("/v1/sessions/retire", json={"native_context_id": "pb1"}).status_code == 200
     reserved = claim(client, "chain", "lo1", 1, "GO").json()
     assert reserved["predecessor"]["content"] == new_request["content"]
     go = {
@@ -195,6 +213,47 @@ def test_fresh_context_chain_preserves_bytes_consumes_claims_and_verifies(bridge
             ).format(sql.Identifier(tx.schema))
         )
         assert tx.cursor.fetchone()["n"] == 0
+
+
+def test_scoped_publication_preserves_local_work_and_supports_a_fresh_successor(bridge):
+    service, client, contexts, root = bridge
+    deliver(client, contexts, "chain", "pb1", 1, "NEW")
+    deliver(client, contexts, "chain", "lo1", 2, "GO")
+    reserved = claim(client, "chain", "pb2", 2, "READY").json()
+    fence = {"native_context_id": "pb2", "fence": reserved["fence"]}
+    opened = client.post("/v1/bridge/chain/worktree", json=fence).json()
+    own = Path(opened["path"])
+    (own / "code.py").write_text("value = 2\n", encoding="utf-8")
+    (own / "foreign_tracked.txt").write_text("Private unrelated work\n", encoding="utf-8")
+    refused = client.post("/v1/bridge/chain/worktree", json=fence)
+    assert refused.json()["error"]["code"] == "checkout_has_local_work"
+    assert (own / "code.py").read_text() == "value = 2\n"
+    body = {**fence, "expected_artifacts": opened["artifact_preimages"]}
+    published = client.post("/v1/bridge/chain/publish-work", json=body)
+    assert published.status_code == 200, published.text
+    assert client.post("/v1/bridge/chain/publish-work", json=body).json() == published.json()
+    assert (root / "foreign_tracked.txt").read_text() == "Original unrelated content\n"
+    (root / "tests/test_effect.py").write_text("def test_effect(): assert 2 == 2\n", encoding="utf-8")
+    refused = client.post("/v1/bridge/chain/publish-work", json=body)
+    assert refused.json()["error"]["code"] == "artifact_preimage_changed"
+    (own / "code.py").write_text("Unpublished prior-context edit\n", encoding="utf-8")
+    with service.kernel.transaction() as tx:
+        tx.cursor.execute(
+            sql.SQL(
+                "UPDATE {}.work_intent_claims SET expires_at=clock_timestamp()-interval '1 second' WHERE attempt_id='chain'"
+            ).format(sql.Identifier(tx.schema))
+        )
+    assert client.post("/v1/bridge/chain/publish-work", json=body).json()["error"]["code"] == "stale_artifact_fence"
+    successor = claim(client, "chain", "pb3", 2, "READY").json()
+    loaded = client.post(
+        "/v1/bridge/chain/worktree", json={"native_context_id": "pb3", "fence": successor["fence"]}
+    ).json()
+    fresh = Path(loaded["path"])
+    assert fresh != own
+    assert (fresh / "code.py").read_text() == "value = 2\n"
+    assert (fresh / "tests/test_effect.py").read_text() == "def test_effect(): assert 2 == 2\n"
+    assert (fresh / "foreign_tracked.txt").read_text() == "Original unrelated content\n"
+    assert (own / "code.py").read_text() == "Unpublished prior-context edit\n"
 
 
 def test_claim_expiry_and_different_successor_contention_are_not_thread_ownership(bridge):
@@ -245,6 +304,8 @@ def test_header_and_role_errors_have_no_delivery_effect(bridge):
         original.replace("Version: 1", "Version: 1\r\nversion: 1"),
         original.replace("Version: 1", "Version: 1\r\nNEW"),
         original.replace("bridge_kind: implementation_proposal", "bridge_kind: prime_proposal"),
+        original.replace('["code.py"]', '["bridge/payload.md"]'),
+        original.replace('["code.py"]', '[".GIT/config"]'),
         original.replace("NEW\r\n", "NO-ACTION\r\n", 1),
         original.replace(
             "author_session_context_id: " + contexts["pb1"]["session_context_id"],

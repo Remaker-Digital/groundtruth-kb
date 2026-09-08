@@ -15,6 +15,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 from uuid import uuid4
 
 import psycopg
@@ -327,6 +328,14 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
     (tmp_path / "tests").mkdir()
     (tmp_path / "code.py").write_text("value = 1\n", encoding="utf-8")
     (tmp_path / "tests/test_effect.py").write_text("def test_effect(): assert 1 == 1\n", encoding="utf-8")
+    (tmp_path / ".gitignore").write_text(".worktrees/\n", encoding="utf-8")
+    for arguments in (
+        ["config", "user.name", "Qualification"],
+        ["config", "user.email", "qualification@example.invalid"],
+        ["add", "--", "code.py", "tests/test_effect.py", ".gitignore"],
+        ["commit", "-qm", "Isolated CLI preimage"],
+    ):
+        subprocess.run(["git", "-C", str(tmp_path), *arguments], check=True, capture_output=True)
     harness = {column: None for column in TABLE_SPECS["harnesses"].columns}
     harness.update(
         id="HARNESS-CLI",
@@ -497,8 +506,48 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
                         "bridge", "check", "cli-chain", "--native-context-id", context, "--fence", str(fence), "--json"
                     )
                     assert checked.returncode == 0, checked.stderr
-                    (tmp_path / "code.py").write_text("value = 2\n", encoding="utf-8")
+                    opened = cli(
+                        "bridge",
+                        "worktree",
+                        "cli-chain",
+                        "--native-context-id",
+                        context,
+                        "--fence",
+                        str(fence),
+                        "--json",
+                    )
+                    assert opened.returncode == 0, opened.stderr
+                    checkout = json.loads(opened.stdout)
+                    (Path(checkout["path"]) / "code.py").write_text("value = 2\n", encoding="utf-8")
+                    preimages = tmp_path / "preimages.json"
+                    preimages.write_text(json.dumps(checkout["artifact_preimages"]), encoding="utf-8")
+                    published = cli(
+                        "bridge",
+                        "publish-work",
+                        "cli-chain",
+                        "--native-context-id",
+                        context,
+                        "--fence",
+                        str(fence),
+                        "--preimages-file",
+                        str(preimages),
+                        "--json",
+                    )
+                    assert published.returncode == 0, published.stderr
+                    assert (tmp_path / "code.py").read_text() == "value = 1\n"
                 if status == "VERIFIED":
+                    opened = cli(
+                        "bridge",
+                        "worktree",
+                        "cli-chain",
+                        "--native-context-id",
+                        context,
+                        "--fence",
+                        str(fence),
+                        "--json",
+                    )
+                    assert opened.returncode == 0, opened.stderr
+                    assert (Path(json.loads(opened.stdout)["path"]) / "code.py").read_text() == "value = 2\n"
                     snapshot = cli("bridge", "artifacts", "cli-chain", "--json")
                     assert snapshot.returncode == 0, snapshot.stderr
                     metadata["verified_artifacts"] = json.dumps(json.loads(snapshot.stdout))
@@ -528,8 +577,30 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
                 assert delivered.returncode == 0, delivered.stderr
                 if status == "VERIFIED":
                     assert json.loads(delivered.stdout)["project_ready_for_commit"] is True
-                retired = cli("session", "retire", "--native-context-id", context, "--json")
-                assert retired.returncode == 0, retired.stderr
+            message = tmp_path / "project-commit.txt"
+            message.write_text("Complete the CLI qualification project (WI-1)\n", encoding="utf-8")
+            committed = cli(
+                "projects",
+                "commit",
+                "PROJECT-1",
+                "--native-context-id",
+                context,
+                "--expected-version",
+                "1",
+                "--message-file",
+                str(message),
+                "--json",
+            )
+            assert committed.returncode == 0, committed.stderr
+            result = json.loads(committed.stdout)
+            assert result["status"] == "confirmed"
+            actual_head = subprocess.run(
+                ["git", "-C", str(tmp_path), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+            ).stdout.strip()
+            assert actual_head == result["commit_id"]
+            assert (tmp_path / "code.py").read_text() == "value = 2\n"
+            terminal = cli("projects", "show", "PROJECT-1", "--json")
+            assert json.loads(terminal.stdout)["project"]["status"] == "verified"
             disabled = cli("db", "postgres", "status")
             assert disabled.returncode != 0 and "fallback is disabled" in disabled.stderr
         finally:

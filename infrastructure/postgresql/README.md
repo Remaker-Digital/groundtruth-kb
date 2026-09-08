@@ -94,9 +94,10 @@ receives no database credentials, connection string, or raw-table interface.
 This interface is currently for migration qualification. It provides typed
 specification, test, test-plan/phase, program/project, work-intake, membership,
 and current task-context operations. Native session binding and bridge claims,
-publication and independent review have behavioral qualification. Project
-finalization, complete domain coverage, worktree/effect integration and authority
-cutover remain required before ordinary agents are resumed. Attribution on
+publication and independent review have behavioral qualification. Isolated
+project work, session checkout publication and project finalization are covered
+by the additional suites described below. Complete domain coverage, production
+migration and authority cutover remain required before ordinary agents are resumed. Attribution on
 knowledge correction operations is not a session binding or a review assertion.
 
 For an explicitly initialized disposable database, an operator config selects
@@ -173,11 +174,11 @@ Call `bridge check` immediately before a protected implementation effect.
 returns actual Git-normalized file identities for independent review, not a
 verdict. VERIFIED requires the agent-authored reviewed map to match those bytes.
 The response reports whether all current project members are verified; that
-boolean does not claim a commit or project terminality. Project commit and
-failure recovery are still being implemented.
+boolean does not claim a commit or project terminality. Complete project
+finalization uses the separate ordinary project commands below.
 
-`bridge release` ends the named claim by current fence. `session retire` removes
-the binding only after its live artifact claim is delivered or released.
+`bridge release` ends the named claim by current fence. A worker context ends
+without a mutable session lifecycle or deletion of its immutable role binding.
 Later contexts use their own bindings and fresh claims. `bridge abandon` closes
 an unusable attempt from canonical evidence without inventing a withdrawal or
 inheriting its GO. Withdrawn, superseded and abandoned attempts purge their
@@ -192,3 +193,65 @@ actual Git bytes and payload purge. The separate CLI-process test in
 `test_native_authority_service.py` also completes NEW/GO/READY/VERIFIED using four
 fresh contexts with no PostgreSQL client environment settings. These tests use
 an explicit disposable PostgreSQL service and isolated Git roots.
+
+## Isolated work and project completion
+
+Uncommitted project work resides in a service-managed checkout under
+`.worktrees/projects/`, derived from the project identifier. The integration
+checkout retains the committed platform and unrelated existing user work.
+Each worker uses its own `.worktrees/<session-context-id>` checkout. The CLI
+loads project artifacts into that checkout without reading a predecessor's
+checkout or another harness's files:
+
+    gt bridge worktree <document-id> --native-context-id <actual-context-id> --fence <returned-fence> --json
+
+The response supplies the caller's path and the exact `artifact_preimages`
+map for its proposal and test paths. Preserve that map in the caller's ephemeral
+context/scratch while editing those files in the returned checkout. Publication
+accepts only the claimed implementation-report scope:
+
+    gt bridge publish-work <document-id> --native-context-id <actual-context-id> --fence <returned-fence> --preimages-file <preimages.json> --json
+
+Publication compares current project artifacts with the retrieved preimages,
+rechecks the current claim before effects, and transfers only that scope.
+An exact retry is harmless; it needs no durable permission or publication receipt.
+Unpublished local work is preserved. The agent then authors and delivers READY.
+A successor reviewer loads the resulting project artifacts into its own checkout
+and independently tests them before authoring VERIFIED.
+
+When all members are verified, the reviewing context commits the complete
+project through the ordinary CLI:
+
+    gt projects commit <project-id> --native-context-id <actual-context-id> --expected-version <project-version> --message-file <authored-message.txt> --json
+
+The command prepares the verified cohort in that context's own checkout,
+refuses unrelated staged paths, stages the exact project scope, and runs normal
+Git commit hooks. The authored message must cite every member as `(WI-NNNN)`.
+The service checks the candidate's actual parent, complete reviewed file map,
+changed paths and citations before fast-forwarding the integration branch.
+No additional merge commit is created. Normal Git fast-forward checks preserve
+unrelated work and refuse conflicting local edits; see the
+[Git merge contract](https://git-scm.com/docs/git-merge).
+The short filesystem operation is serialized in PostgreSQL; it does not
+reserve a project or work-item thread for an agent's lifetime.
+
+For explicit preparation, an agent-performed normal Git commit, or recovery:
+
+    gt projects prepare-commit <project-id> --native-context-id <actual-context-id> --expected-version <project-version> --json
+    gt projects confirm-commit <project-id> --native-context-id <actual-context-id> --expected-version <project-version> --commit-id <actual-sha> --expected-parent <prepared-sha> --json
+    gt projects commit-failed <project-id> --native-context-id <actual-context-id> --expected-version <project-version> --reason commit_not_confirmed --evidence <observed-failure> --json
+
+An uncertain confirmation is retried with the same actual commit, including
+from a fresh reviewing context if integration already occurred. A changed
+reviewed artifact or failed commit records a request for fresh verification;
+Dispatcher authors no verdict. Terminal project state records the actual Git
+commit, work items receive its identity, and disposable bridge payloads are
+purged. The commit's timestamp supplies project completion time.
+
+`platform_tests/groundtruth_kb/test_native_project_finalization.py` exercises
+multi-member completion, private candidate commits, preservation of unrelated
+staged/unstaged work, hook refusal and hook-altered bytes, partial or foreign
+commits, overlapping integration edits, fresh verification and confirmation
+after an uncertain acknowledgement. The ordinary CLI-process suite includes
+publication, successor review and project commit. These are disposable native
+qualification scenarios, not proof of the still-pending production cutover.

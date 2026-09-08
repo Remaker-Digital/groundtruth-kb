@@ -43,6 +43,12 @@ from groundtruth_kb.native_authority import (
     _write,
 )
 from groundtruth_kb.postgres_kernel import PostgresKernel, PostgresKernelError, PostgresTransaction, parse_json_bytes
+from groundtruth_kb.session.worktree import (
+    SessionWorktreeError,
+    materialize_context_worktree,
+    project_worktree,
+    publish_context_work,
+)
 
 ROLE_NAMES = {"pb": "prime-builder", "lo": "loyal-opposition"}
 ROLE_TOKENS = {value: key for key, value in ROLE_NAMES.items()}
@@ -75,6 +81,10 @@ class DeliverRequest(FenceRequest):
     mode: Literal["interactive", "headless"] = "interactive"
 
 
+class PublishWorkRequest(FenceRequest):
+    expected_artifacts: dict[str, str | None]
+
+
 class AbandonRequest(SessionRequest):
     expected_version: int = Field(ge=0)
     reason: Text
@@ -98,13 +108,19 @@ def _paths(value: Any, label: str) -> list[str]:
         parts = PurePosixPath(path)
         if (
             not path
+            or not parts.parts
             or any(ord(character) < 32 for character in path)
             or "\\" in path
             or ":" in path
             or parts.is_absolute()
             or ".." in parts.parts
             or path != parts.as_posix()
-            or any(part in {".git", ".gtkb-state", "harness-state", "scratchpad"} for part in parts.parts)
+            or any(
+                part.casefold() in {".git", ".gtkb-state", "harness-state", "scratchpad", ".worktrees"}
+                for part in parts.parts
+            )
+            or parts.parts[0].casefold() == "bridge"
+            or path.casefold().startswith(".groundtruth/formal-artifact-approvals/")
         ):
             _error("invalid_bridge_header", f"{label} contains an invalid or forbidden artifact path")
         normalized.append(path.casefold())
@@ -226,6 +242,12 @@ class NativeBridgeService:
         self.kernel = kernel
         self.project_root = project_root.resolve()
 
+    def work_root(self, project_id: str) -> Path:
+        try:
+            return project_worktree(self.project_root, project_id)
+        except SessionWorktreeError as error:
+            raise PostgresKernelError(error.code, str(error)) from error
+
     def bind(self, request: BindSession) -> dict[str, Any]:
         markers = {line for line in request.init_command.splitlines() if INIT.fullmatch(line)}
         if len(markers) != 1:
@@ -270,27 +292,6 @@ class NativeBridgeService:
         with self.kernel.transaction(read_only=True) as tx:
             return _public(self._binding(tx, native_context_id))
 
-    def retire_session(self, native_context_id: str) -> dict[str, Any]:
-        with self.kernel.transaction() as tx:
-            binding = self._binding(tx, native_context_id)
-            tx.cursor.execute(
-                sql.SQL(
-                    "SELECT 1 FROM {}.work_intent_claims WHERE claimant_session_context_id=%s AND expires_at>clock_timestamp()"
-                ).format(sql.Identifier(tx.schema)),
-                (binding["session_context_id"],),
-            )
-            if tx.cursor.fetchone():
-                _error(
-                    "live_artifact_claim", "Release or deliver the current artifact claim before retiring this context"
-                )
-            tx.cursor.execute(
-                sql.SQL("DELETE FROM {}.session_init_bindings WHERE native_context_id=%s").format(
-                    sql.Identifier(tx.schema)
-                ),
-                (native_context_id,),
-            )
-            return {"session_context_id": binding["session_context_id"], "status": "retired"}
-
     @staticmethod
     def _attempt(tx: PostgresTransaction, document: str, *, lock: bool = False) -> dict[str, Any] | None:
         tx.cursor.execute(
@@ -324,14 +325,14 @@ class NativeBridgeService:
             _error("wrong_author_role", "The immutable context role cannot author this status")
 
     @staticmethod
-    def _scope(tx: PostgresTransaction, attempt: dict[str, Any]) -> None:
-        work = _required(tx, "work_items", attempt["work_item_id"])
+    def _scope(tx: PostgresTransaction, attempt: dict[str, Any], *, lock: bool = False) -> None:
+        work = _required(tx, "work_items", attempt["work_item_id"], lock=lock)
         if attempt["work_item_version"] is not None and work["version"] != attempt["work_item_version"]:
             _error("scope_changed", "Current work scope changed; reconcile this attempt before further effects")
         if _current_parent(tx, work["id"])["project_id"] != attempt["project_id"]:
             _error("scope_changed", "The work item's project changed; reconcile the attempt")
         for key, version in attempt["spec_versions"].items():
-            current = _required(tx, "specifications", key)
+            current = _required(tx, "specifications", key, lock=lock)
             if current["version"] != version or current["status"] in {"retired", "superseded"}:
                 _error("scope_changed", "Applicable formal knowledge changed; reconcile the attempt", id=key)
 
@@ -383,6 +384,8 @@ class NativeBridgeService:
                 _error("invalid_transition", "The intended artifact cannot follow the current bridge status")
             if request.intended_status == "NEW" and project["authorization"] != "authorized":
                 _error("project_not_authorized", "The parent project is not authorized for a NEW proposal")
+            if project_id:
+                self.work_root(project_id)
             if request.intended_status == "VERIFIED" and attempt["head_status"] == "VERIFIED":
                 if not attempt["finalization_failure"]:
                     _error(
@@ -490,19 +493,87 @@ class NativeBridgeService:
             )
             return {"status": "released", "document": document, "fence": request.fence}
 
+    def lock_worktrees(self, tx: PostgresTransaction) -> None:
+        """Serialize short filesystem effects, never the lifetime of agent work."""
+        tx.cursor.execute(
+            "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+            ("gtkb-git:" + str(self.project_root.resolve()).casefold(),),
+        )
+
+    def open_worktree(self, document: str, request: FenceRequest) -> dict[str, Any]:
+        """Materialize current project work into only the receiving context's checkout."""
+        with self.kernel.transaction(serializable=False) as tx:
+            self.lock_worktrees(tx)
+            binding, attempt, _ = self._fenced(tx, document, request)
+            own_paths = set(attempt["proposal_paths"] + attempt["test_targets"])
+            paths = set(own_paths)
+            tx.cursor.execute(
+                sql.SQL(
+                    "SELECT proposal_paths,test_targets FROM {}.bridge_attempts WHERE project_id=%s AND disposition='active'"
+                ).format(sql.Identifier(tx.schema)),
+                (attempt["project_id"],),
+            )
+            for row in tx.cursor.fetchall():
+                paths.update(row["proposal_paths"] + row["test_targets"])
+            source = self.work_root(attempt["project_id"]) if attempt["project_id"] else self.project_root
+            head = subprocess.run(
+                ["git", "-C", str(source), "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+            ).stdout.strip()
+            try:
+                artifacts = self._snapshot(sorted(paths), root=source)
+                result = materialize_context_worktree(
+                    self.project_root,
+                    binding["session_context_id"],
+                    expected_head=head,
+                    artifacts=artifacts,
+                    snapshot=self._snapshot,
+                    artifact_source=source,
+                )
+                result["artifact_preimages"] = {path: artifacts[path] for path in sorted(own_paths)}
+                result["loaded_paths"] = sorted(paths)
+                return result
+            except SessionWorktreeError as error:
+                raise PostgresKernelError(error.code, str(error)) from error
+
+    def publish_work(self, document: str, request: PublishWorkRequest) -> dict[str, Any]:
+        """Apply only the caller's claimed implementation artifacts, before its report."""
+        with self.kernel.transaction(serializable=False) as tx:
+            self.lock_worktrees(tx)
+            binding, attempt, claim = self._fenced(tx, document, request)
+            if claim["intended_status"] != "READY":
+                _error(
+                    "implementation_claim_required", "Work publication requires the exact implementation-report claim"
+                )
+            self._scope(tx, attempt, lock=True)
+            try:
+                artifacts = publish_context_work(
+                    self.project_root,
+                    binding["session_context_id"],
+                    artifact_paths=sorted(set(attempt["proposal_paths"] + attempt["test_targets"])),
+                    expected_artifacts=request.expected_artifacts,
+                    snapshot=self._snapshot,
+                    artifact_destination=self.work_root(attempt["project_id"]),
+                    before_effect=lambda: self._fenced(tx, document, request),
+                )
+            except SessionWorktreeError as error:
+                raise PostgresKernelError(error.code, str(error)) from error
+            return {"status": "published", "document": document, "artifacts": artifacts}
+
     def artifacts(self, document: str) -> dict[str, Any]:
         with self.kernel.transaction(read_only=True) as tx:
             attempt = self._attempt(tx, document)
             if not attempt or attempt["disposition"] != "active":
                 _error("not_found", "No active attempt has artifacts to review")
-            return self._snapshot(sorted(set(attempt["proposal_paths"] + attempt["test_targets"])))
+            paths = sorted(set(attempt["proposal_paths"] + attempt["test_targets"]))
+            return self._snapshot(paths, root=self.work_root(attempt["project_id"])) if paths else {}
 
-    def _snapshot(self, paths: list[str]) -> dict[str, str | None]:
+    def _snapshot(self, paths: list[str], *, root: Path | None = None) -> dict[str, str | None]:
         """Hash the actual Git-normalized bytes, including explicit deletions."""
+        root = (root or self.project_root).resolve()
         result = {}
         for relative in paths:
-            path = self.project_root / relative
-            if not path.resolve().is_relative_to(self.project_root):
+            path = root / relative
+            if path.is_symlink() or not path.resolve().is_relative_to(root):
                 _error("artifact_outside_root", "A reviewed artifact escapes the configured project root")
             if not path.exists():
                 result[relative] = None
@@ -510,7 +581,7 @@ class NativeBridgeService:
             if not path.is_file():
                 _error("artifact_scope_not_concrete", "Review requires concrete file paths, not directories")
             command = subprocess.run(
-                ["git", "-C", str(self.project_root), "hash-object", f"--path={relative}", "--", str(path)],
+                ["git", "-C", str(root), "hash-object", f"--path={relative}", "--", str(path)],
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
@@ -665,7 +736,10 @@ class NativeBridgeService:
                     reviewed = parse_json_bytes(metadata.get("verified_artifacts", "").encode("utf-8"))
                 except PostgresKernelError:
                     _error("reviewed_artifacts_required", "VERIFIED must identify the exact reviewed Git blob map")
-                actual = self._snapshot(sorted(set(attempt["proposal_paths"] + attempt["test_targets"])))
+                actual = self._snapshot(
+                    sorted(set(attempt["proposal_paths"] + attempt["test_targets"])),
+                    root=self.work_root(attempt["project_id"]),
+                )
                 if not actual or reviewed != actual:
                     _error(
                         "reviewed_bytes_changed",

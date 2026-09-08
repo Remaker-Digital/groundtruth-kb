@@ -23,7 +23,7 @@ from groundtruth_kb.bridge.native import (
     DeliverRequest,
     FenceRequest,
     NativeBridgeService,
-    SessionRequest,
+    PublishWorkRequest,
 )
 from groundtruth_kb.native_authority import (
     AuthorityService,
@@ -37,6 +37,12 @@ from groundtruth_kb.native_authority import (
     WorkItemMutation,
 )
 from groundtruth_kb.postgres_kernel import PostgresKernelError, canonical_json_bytes, parse_json_bytes
+from groundtruth_kb.project.native_finalization import (
+    CommitConfirmation,
+    CommitFailure,
+    FinalizationRequest,
+    NativeProjectFinalization,
+)
 
 Domain = Literal["specifications", "tests", "projects", "work-items", "test-plans", "test-phases"]
 
@@ -73,6 +79,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     app = FastAPI(title="GT-KB authority", version="1", docs_url=None, redoc_url=None)
     app.router.route_class = CanonicalRoute
     bridge = NativeBridgeService(service.kernel, project_root or Path.cwd())
+    finalization = NativeProjectFinalization(bridge)
 
     @app.middleware("http")
     async def local_cli_boundary(request: Request, call_next):
@@ -125,10 +132,6 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     def session_binding(native_context_id: str) -> Response:
         return _result(bridge.session(native_context_id))
 
-    @app.post("/v1/sessions/retire")
-    def retire_session(request: SessionRequest) -> Response:
-        return _result(bridge.retire_session(request.native_context_id))
-
     @app.get("/v1/bridge/queue")
     def bridge_queue(role: Literal["pb", "lo"]) -> Response:
         return _result(bridge.queue(role))
@@ -160,6 +163,14 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     @app.post("/v1/bridge/{document}/abandon")
     def bridge_abandon(document: Identifier, request: AbandonRequest) -> Response:
         return _result(bridge.abandon(document, request))
+
+    @app.post("/v1/bridge/{document}/worktree")
+    def bridge_worktree(document: Identifier, request: FenceRequest) -> Response:
+        return _result(bridge.open_worktree(document, request))
+
+    @app.post("/v1/bridge/{document}/publish-work")
+    def bridge_publish_work(document: Identifier, request: PublishWorkRequest) -> Response:
+        return _result(bridge.publish_work(document, request))
 
     @app.get("/v1/{domain}")
     def list_records(
@@ -213,6 +224,18 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
             if value is not None
         }
         return _result(service.list_records(domain, filters=filters, after=after, limit=limit, search=search))
+
+    @app.post("/v1/projects/{project_id}/prepare-commit")
+    def prepare_commit(project_id: Identifier, request: FinalizationRequest) -> Response:
+        return _result(finalization.prepare(project_id, request))
+
+    @app.post("/v1/projects/{project_id}/confirm-commit")
+    def confirm_commit(project_id: Identifier, request: CommitConfirmation) -> Response:
+        return _result(finalization.confirm(project_id, request))
+
+    @app.post("/v1/projects/{project_id}/commit-failed")
+    def commit_failed(project_id: Identifier, request: CommitFailure) -> Response:
+        return _result(finalization.failure(project_id, request))
 
     @app.get("/v1/{domain}/{record_id}")
     def show(domain: Domain, record_id: Identifier) -> Response:
