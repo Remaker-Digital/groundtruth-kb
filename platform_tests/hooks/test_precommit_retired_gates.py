@@ -22,6 +22,7 @@ RETIRED_GATE = "check_protected_commit_authorization.py"
 LIVE_GATES = (
     "scan_secrets.py",
     "check_dev_environment_inventory_drift.py",
+    "check_narrative_artifact_evidence.py",
     "check_ruff_format.py",
 )
 
