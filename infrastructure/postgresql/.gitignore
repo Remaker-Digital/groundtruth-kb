@@ -1,0 +1,6 @@
+/runtime/
+/data/
+/credentials/
+/logs/
+/wal/
+/backups/
