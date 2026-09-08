@@ -10,14 +10,22 @@ CREATE TABLE {schema}.specifications (
     tags JSONB,
     status TEXT NOT NULL,
     assertions JSONB,
+    type TEXT,
+    authority TEXT,
+    provisional_until TEXT,
+    constraints JSONB,
+    affected_by JSONB,
+    testability TEXT,
+    source_paths JSONB,
     implementation_verified_at TIMESTAMPTZ,
     retired_at TIMESTAMPTZ,
     parent TEXT,
-    application_scope JSONB,
+    application_scope TEXT CHECK (application_scope IN ('gtkb_platform', 'agent_red_application')),
     changed_by TEXT NOT NULL,
     changed_at TIMESTAMPTZ NOT NULL,
     change_reason TEXT NOT NULL,
-    FOREIGN KEY (parent) REFERENCES {schema}.specifications(id) DEFERRABLE INITIALLY DEFERRED
+    FOREIGN KEY (parent) REFERENCES {schema}.specifications(id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (provisional_until) REFERENCES {schema}.specifications(id) DEFERRABLE INITIALLY DEFERRED
 );
 
 CREATE TABLE {schema}.specification_deliberation_sources (
@@ -40,9 +48,11 @@ CREATE TABLE {schema}.test_procedures (
     assertion_count INTEGER,
     last_execution_status TEXT,
     last_executed_at TIMESTAMPTZ,
+    last_executed_on DATE,
     changed_by TEXT NOT NULL,
     changed_at TIMESTAMPTZ NOT NULL,
-    change_reason TEXT NOT NULL
+    change_reason TEXT NOT NULL,
+    CHECK (last_executed_at IS NULL OR last_executed_on IS NULL)
 );
 
 CREATE TABLE {schema}.operational_procedures (
@@ -54,10 +64,14 @@ CREATE TABLE {schema}.operational_procedures (
     steps JSONB,
     known_failure_modes JSONB,
     last_verified_at TIMESTAMPTZ,
+    last_verified_on DATE,
     last_corrected_at TIMESTAMPTZ,
+    last_corrected_on DATE,
     changed_by TEXT NOT NULL,
     changed_at TIMESTAMPTZ NOT NULL,
-    change_reason TEXT NOT NULL
+    change_reason TEXT NOT NULL,
+    CHECK (last_verified_at IS NULL OR last_verified_on IS NULL),
+    CHECK (last_corrected_at IS NULL OR last_corrected_on IS NULL)
 );
 
 CREATE TABLE {schema}.environment_config (
@@ -102,11 +116,13 @@ CREATE TABLE {schema}.tests (
     expected_outcome TEXT NOT NULL,
     last_result TEXT,
     last_executed_at TIMESTAMPTZ,
-    application_scope JSONB,
+    last_executed_on DATE,
+    application_scope TEXT CHECK (application_scope IN ('gtkb_platform', 'agent_red_application')),
     changed_by TEXT NOT NULL,
     changed_at TIMESTAMPTZ NOT NULL,
     change_reason TEXT NOT NULL,
-    FOREIGN KEY (spec_id) REFERENCES {schema}.specifications(id) DEFERRABLE INITIALLY DEFERRED
+    FOREIGN KEY (spec_id) REFERENCES {schema}.specifications(id) DEFERRABLE INITIALLY DEFERRED,
+    CHECK (last_executed_at IS NULL OR last_executed_on IS NULL)
 );
 
 CREATE TABLE {schema}.test_plans (
@@ -131,10 +147,12 @@ CREATE TABLE {schema}.test_plan_phases (
     test_ids JSONB,
     last_result TEXT,
     last_executed_at TIMESTAMPTZ,
+    last_executed_on DATE,
     changed_by TEXT NOT NULL,
     changed_at TIMESTAMPTZ NOT NULL,
     change_reason TEXT NOT NULL,
-    FOREIGN KEY (plan_id) REFERENCES {schema}.test_plans(id) DEFERRABLE INITIALLY DEFERRED
+    FOREIGN KEY (plan_id) REFERENCES {schema}.test_plans(id) DEFERRABLE INITIALLY DEFERRED,
+    CHECK (last_executed_at IS NULL OR last_executed_on IS NULL)
 );
 
 CREATE TABLE {schema}.work_items (

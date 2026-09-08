@@ -140,7 +140,16 @@ _TIMESTAMP_COLUMNS = frozenset(
         "retired_at",
     }
 )
-_DATE_COLUMNS = frozenset({"start_date", "target_date"})
+_DATE_COLUMNS = frozenset({"start_date", "target_date", "last_executed_on", "last_verified_on", "last_corrected_on"})
+_DATE_PRECISION_FIELDS = {
+    "tests": (("last_executed_at", "last_executed_on"),),
+    "test_procedures": (("last_executed_at", "last_executed_on"),),
+    "test_plan_phases": (("last_executed_at", "last_executed_on"),),
+    "operational_procedures": (
+        ("last_verified_at", "last_verified_on"),
+        ("last_corrected_at", "last_corrected_on"),
+    ),
+}
 _INTEGER_COLUMNS = frozenset(
     {
         "assertion_count",
@@ -277,13 +286,20 @@ TABLE_SPECS: dict[str, TableSpec] = {
             "tags",
             "status",
             "assertions",
+            "type",
+            "authority",
+            "provisional_until",
+            "constraints",
+            "affected_by",
+            "testability",
+            "source_paths",
             "implementation_verified_at",
             "retired_at",
             "parent",
             "application_scope",
             *_CHANGE_COLUMNS,
         ),
-        json_columns=("tags", "assertions", "application_scope"),
+        json_columns=("tags", "assertions", "constraints", "affected_by", "source_paths"),
     ),
     "specification_deliberation_sources": _table(
         "specification_deliberation_sources",
@@ -302,6 +318,7 @@ TABLE_SPECS: dict[str, TableSpec] = {
             "assertion_count",
             "last_execution_status",
             "last_executed_at",
+            "last_executed_on",
             *_CHANGE_COLUMNS,
         ),
     ),
@@ -317,7 +334,9 @@ TABLE_SPECS: dict[str, TableSpec] = {
             "steps",
             "known_failure_modes",
             "last_verified_at",
+            "last_verified_on",
             "last_corrected_at",
+            "last_corrected_on",
             *_CHANGE_COLUMNS,
         ),
         json_columns=("variables", "steps", "known_failure_modes"),
@@ -350,10 +369,10 @@ TABLE_SPECS: dict[str, TableSpec] = {
             "expected_outcome",
             "last_result",
             "last_executed_at",
+            "last_executed_on",
             "application_scope",
             *_CHANGE_COLUMNS,
         ),
-        json_columns=("application_scope",),
     ),
     "test_plans": _table(
         "test_plans",
@@ -374,6 +393,7 @@ TABLE_SPECS: dict[str, TableSpec] = {
             "test_ids",
             "last_result",
             "last_executed_at",
+            "last_executed_on",
             *_CHANGE_COLUMNS,
         ),
         json_columns=("test_ids",),
@@ -1103,6 +1123,7 @@ def _validate_manifest_relationships(tables: Mapping[str, list[dict[str, Any]]])
 
     for row in tables["specifications"]:
         _require_reference(row["parent"], ids["specifications"], label="specifications.parent")
+        _require_reference(row["provisional_until"], ids["specifications"], label="specifications.provisional_until")
     for row in tables["specification_deliberation_sources"]:
         _require_reference(row["spec_id"], ids["specifications"], label="source.spec_id")
         _require_reference(row["deliberation_id"], ids["deliberations"], label="source.deliberation_id")
@@ -1186,6 +1207,17 @@ def _normalize_manifest_row(
         raise PostgresKernelError("invalid_manifest", f"Version is outside PostgreSQL range in {table_name}")
     if require_version_one and version != 1:
         raise PostgresKernelError("invalid_manifest", f"Imported version must restart at 1 in {table_name}")
+    for timestamp, calendar_date in _DATE_PRECISION_FIELDS.get(table_name, ()):
+        if row[timestamp] is not None and row[calendar_date] is not None:
+            raise PostgresKernelError(
+                "invalid_manifest", f"{table_name} must supply either {timestamp} or {calendar_date}, not both"
+            )
+    if table_name in {"specifications", "tests"} and row["application_scope"] not in (
+        None,
+        "gtkb_platform",
+        "agent_red_application",
+    ):
+        raise PostgresKernelError("invalid_manifest", f"Invalid {table_name}.application_scope")
     if table_name == "projects":
         if row.get("kind") not in {"program", "project"}:
             raise PostgresKernelError("invalid_manifest", "Invalid projects.kind")
@@ -1434,6 +1466,15 @@ def _transform_source_rows(
         for source in source_table_rows:
             row: dict[str, Any] = {column: source.get(column) for column in spec.columns}
             row["version"] = 1
+            for timestamp, calendar_date in _DATE_PRECISION_FIELDS.get(table_name, ()):
+                value = row[timestamp]
+                if isinstance(value, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+                    if row[calendar_date] is not None:
+                        raise PostgresKernelError(
+                            "invalid_source", f"Ambiguous date precision in {table_name}.{timestamp}"
+                        )
+                    row[calendar_date] = _canonical_date(value, label=f"{table_name}.{calendar_date}")
+                    row[timestamp] = None
             for column in spec.json_columns:
                 row[column] = _json_from_sqlite(row[column], table=table_name, column=column)
             for column in spec.boolean_columns:

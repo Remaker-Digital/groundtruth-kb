@@ -93,13 +93,110 @@ def _row(table_name: str, **values: object) -> dict[str, Any]:
     return {column: values.get(column) for column in TABLE_SPECS[table_name].columns}
 
 
-def test_packaged_schema_is_exact_native_twenty_plus_history_kernel():
+def test_source_transform_preserves_formal_semantics_and_scalar_application_scope():
+    source = {name: [] for name in CURRENT_TABLES}
+    metadata = dict(version=9, changed_by="fixture", changed_at="2026-09-01T00:00:00Z", change_reason="source")
+    source["specifications"] = [
+        dict(
+            id="SPEC-1",
+            title="Formal behavior",
+            status="active",
+            type="design_constraint",
+            authority="stated",
+            provisional_until=None,
+            constraints='{"atomic":true}',
+            affected_by='["SPEC-1"]',
+            testability="observable",
+            source_paths='["groundtruth-kb/src/groundtruth_kb/db.py"]',
+            application_scope="gtkb_platform",
+            **metadata,
+        )
+    ]
+    source["tests"] = [
+        dict(
+            id="TEST-1",
+            title="Behavior",
+            spec_id="SPEC-1",
+            test_type="integration",
+            expected_outcome="Correct effect",
+            application_scope="agent_red_application",
+            last_executed_at="2026-03-04",
+            **metadata,
+        )
+    ]
+    plan = _plan()
+    plan["projects"] = dict(expected_total=0, expected_authorized=0, expected_not_authorized=0, expected_programs=0)
+    plan["project_dependencies"].update(
+        preserve_dependency_ids=[],
+        retire_dependency_ids=[],
+        expected_source_count=0,
+        expected_active_after=0,
+        expected_retired_after=0,
+        expected_gate_transition_count=0,
+    )
+    transformed = kernel_module._transform_source_rows(source, plan)
+    spec = transformed["specifications"][0]
+    assert {
+        key: spec[key]
+        for key in (
+            "type",
+            "authority",
+            "constraints",
+            "affected_by",
+            "testability",
+            "source_paths",
+            "application_scope",
+        )
+    } == dict(
+        type="design_constraint",
+        authority="stated",
+        constraints={"atomic": True},
+        affected_by=["SPEC-1"],
+        testability="observable",
+        source_paths=["groundtruth-kb/src/groundtruth_kb/db.py"],
+        application_scope="gtkb_platform",
+    )
+    assert spec["version"] == 1
+    assert transformed["tests"][0]["application_scope"] == "agent_red_application"
+    assert transformed["tests"][0]["last_executed_at"] is None
+    assert transformed["tests"][0]["last_executed_on"] == "2026-03-04"
+    assert source["tests"][0]["last_executed_at"] == "2026-03-04"
+    assert source["specifications"][0]["version"] == 9
+    assert source["specifications"][0]["constraints"] == '{"atomic":true}'
+
+
+@pytest.mark.parametrize("table", ["specifications", "tests"])
+@pytest.mark.parametrize("value", ['"gtkb_platform"', "unknown", [], {}, 7])
+def test_application_scope_is_an_enum_not_arbitrary_json(table, value):
+    row = _row(table, id="EXAMPLE-1", version=1, application_scope=value)
+    with pytest.raises(PostgresKernelError, match="application_scope"):
+        kernel_module._normalize_manifest_row(table, row, require_version_one=True)
+
+
+@pytest.mark.parametrize(
+    "table,timestamp,calendar_date",
+    [
+        ("tests", "last_executed_at", "last_executed_on"),
+        ("test_procedures", "last_executed_at", "last_executed_on"),
+        ("test_plan_phases", "last_executed_at", "last_executed_on"),
+        ("operational_procedures", "last_verified_at", "last_verified_on"),
+        ("operational_procedures", "last_corrected_at", "last_corrected_on"),
+    ],
+)
+def test_event_date_and_instant_cannot_compete(table, timestamp, calendar_date):
+    row = _row(
+        table, id="EXAMPLE-1", version=1, **{timestamp: "2026-03-04T11:00:00+00:00", calendar_date: "2026-03-04"}
+    )
+    with pytest.raises(PostgresKernelError, match="not both"):
+        kernel_module._normalize_manifest_row(table, row, require_version_one=True)
+
+
+def test_packaged_schema_matches_the_native_domain_contract():
     raw = schema_sql_bytes()
     text = raw.decode("utf-8")
     created = re.findall(r"CREATE TABLE \{schema\}\.([a-z_]+)", text)
 
     assert tuple(created) == ALL_TABLES
-    assert len(created) == 21
     assert schema_sql_sha256() == hashlib.sha256(raw).hexdigest()
     for token in ("TIMESTAMPTZ", "JSONB", "BOOLEAN", "FOR UPDATE", "AUTOINCREMENT", "PRAGMA"):
         if token in {"FOR UPDATE", "AUTOINCREMENT", "PRAGMA"}:

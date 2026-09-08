@@ -108,10 +108,6 @@ EXPECTED_RETIRED_SOURCE = {
 }
 EXPECTED_SOURCE_TABLES = EXPECTED_CURRENT_SOURCE | EXPECTED_REBUILT_SOURCE | EXPECTED_RETIRED_SOURCE
 
-assert len(EXPECTED_CURRENT_SOURCE) == 20
-assert len(EXPECTED_REBUILT_SOURCE) == 7
-assert len(EXPECTED_RETIRED_SOURCE) == 22
-assert len(EXPECTED_SOURCE_TABLES) == 49
 assert set(CURRENT_TABLES) == EXPECTED_CURRENT_SOURCE
 assert REBUILT_LATER_TABLES == EXPECTED_REBUILT_SOURCE
 assert RETIRED_TABLES == EXPECTED_RETIRED_SOURCE
@@ -555,6 +551,11 @@ def _create_sqlite_fixture(path: Path) -> sqlite3.Connection:
                 "id TEXT, version INTEGER, title TEXT, status TEXT, tags TEXT, changed_by TEXT, "
                 "changed_at TEXT, change_reason TEXT"
             )
+        elif table_name == "tests":
+            definition = (
+                "id TEXT, version INTEGER, title TEXT, spec_id TEXT, test_type TEXT, "
+                "expected_outcome TEXT, application_scope TEXT, changed_by TEXT, changed_at TEXT, change_reason TEXT"
+            )
         elif table_name == "deliberations":
             definition = (
                 "id TEXT, version INTEGER, source_type TEXT, title TEXT, summary TEXT, content TEXT, "
@@ -600,6 +601,35 @@ def _create_sqlite_fixture(path: Path) -> sqlite3.Connection:
         "('SPEC-1',2,'Current spec','active','[0.123456789012345678901234567890,1e2,-0.0]',"
         "'integration','2026-09-01T00:00:00+00:00','fixture')"
     )
+    for column in (
+        "type",
+        "authority",
+        "provisional_until",
+        "constraints",
+        "affected_by",
+        "testability",
+        "source_paths",
+        "application_scope",
+    ):
+        connection.execute(f'ALTER TABLE specifications ADD COLUMN "{column}" TEXT')
+    connection.execute(
+        "UPDATE specifications SET type=?,authority=?,constraints=?,affected_by=?,testability=?,source_paths=?,application_scope=? WHERE version=2",
+        (
+            "architecture_decision",
+            "stated",
+            '{"atomic":true}',
+            "[]",
+            "observable",
+            '["groundtruth-kb/src/groundtruth_kb/db.py"]',
+            "gtkb_platform",
+        ),
+    )
+    connection.execute(
+        "INSERT INTO tests VALUES ('TEST-1',1,'Behavior','SPEC-1','integration','Current behavior is preserved',"
+        "'gtkb_platform','integration','2026-09-01T00:00:00+00:00','fixture')"
+    )
+    connection.execute("ALTER TABLE tests ADD COLUMN last_executed_at TEXT")
+    connection.execute("UPDATE tests SET last_executed_at='2026-03-04' WHERE id='TEST-1'")
     connection.execute(
         "INSERT INTO deliberations VALUES "
         "('DELIB-1',1,'integration','Deliberation','Summary','Content','integration',"
@@ -823,6 +853,30 @@ def test_snapshot_wal_export_authorization_dependency_and_immutable_boundaries(
         assert dependency_rows["opaque-preserve"]["affected_gate"] == "readiness"
         assert dependency_rows["opaque-retire"]["status"] == "retired"
         assert manifest["tables"]["specifications"][0]["title"] == "Current spec"
+        current_spec = manifest["tables"]["specifications"][0]
+        assert {
+            key: current_spec[key]
+            for key in (
+                "type",
+                "authority",
+                "constraints",
+                "affected_by",
+                "testability",
+                "source_paths",
+                "application_scope",
+            )
+        } == {
+            "type": "architecture_decision",
+            "authority": "stated",
+            "constraints": {"atomic": True},
+            "affected_by": [],
+            "testability": "observable",
+            "source_paths": ["groundtruth-kb/src/groundtruth_kb/db.py"],
+            "application_scope": "gtkb_platform",
+        }
+        assert manifest["tables"]["tests"][0]["application_scope"] == "gtkb_platform"
+        assert manifest["tables"]["tests"][0]["last_executed_at"] is None
+        assert manifest["tables"]["tests"][0]["last_executed_on"] == "2026-03-04"
         assert canonical_json_bytes(manifest["tables"]["specifications"][0]["tags"]) == (
             b"[0.123456789012345678901234567890,100,0.0]\n"
         )
@@ -883,7 +937,19 @@ def test_snapshot_wal_export_authorization_dependency_and_immutable_boundaries(
             row_count_before = connection.execute(
                 sql.SQL("SELECT count(*) FROM {}.projects").format(sql.Identifier(schema_name))
             ).fetchone()[0]
-        assert history_before == 9
+            with pytest.raises(psycopg.errors.CheckViolation):
+                connection.execute(
+                    sql.SQL("UPDATE {}.tests SET last_executed_at='2026-03-04T12:00:00Z' WHERE id='TEST-1'").format(
+                        sql.Identifier(schema_name)
+                    )
+                )
+            stored = connection.execute(
+                sql.SQL("SELECT last_executed_at,last_executed_on FROM {}.tests WHERE id='TEST-1'").format(
+                    sql.Identifier(schema_name)
+                )
+            ).fetchone()
+            assert stored[0] is None and stored[1].isoformat() == "2026-03-04"
+        assert history_before == 10  # Includes the TEST record with scalar application scope.
 
         different_manifest = parse_json_bytes(manifest_path.read_bytes())
         next(row for row in different_manifest["tables"]["projects"] if row["id"] == "PROJECT-A")["name"] = (
