@@ -587,9 +587,7 @@
       ".gtkb-state": 1
     },
     "groundtruth-kb/src/groundtruth_kb/bridge/proposal_filing.py": {
-      ".gtkb-state": 1,
-      "PAUTH": 6,
-      "TAFE": 1
+      ".gtkb-state": 1
     },
     "groundtruth-kb/src/groundtruth_kb/bridge/routing.py": {
       "NO-ACTION": 2
@@ -649,8 +647,7 @@
       "PAUTH": 5
     },
     "groundtruth-kb/src/groundtruth_kb/cli_bridge_propose.py": {
-      ".gtkb-state": 2,
-      "PAUTH": 2
+      ".gtkb-state": 2
     },
     "groundtruth-kb/src/groundtruth_kb/cli_deliberations_record.py": {
       "formal-artifact-approvals": 1
@@ -947,7 +944,7 @@
       ".gtkb-state": 1,
       "DEFERRED": 11,
       "NO-ACTION": 10,
-      "TAFE": 13,
+      "TAFE": 12,
       "config/agent-control": 1
     },
     "groundtruth-kb/templates/rules/prime-bridge-collaboration-protocol.md": {
@@ -1192,7 +1189,7 @@
     },
     "scripts/bridge_applicability_preflight.py": {
       "DEFERRED": 1,
-      "NO-ACTION": 3,
+      "NO-ACTION": 2,
       "PAUTH": 7
     },
     "scripts/bridge_author_metadata.py": {
