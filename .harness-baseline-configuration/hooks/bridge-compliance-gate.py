@@ -2442,6 +2442,14 @@ def _deny_reason_for_content(
                 "(Hard-block per DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001 + "
                 "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)"
             )
+        if first_line == "VERIFIED" and not _has_commit_finalization_evidence(content):
+            return (
+                "[Governance] VERIFIED bridge verdicts must include a Commit Finalization Evidence "
+                "section carrying the committed path set as `-` bullets, plus ONE of: "
+                "(a) 'Work-product commit: <sha>' -- the canonical form, where the commit precedes "
+                "the verdict; or (b) 'Same-transaction path set' -- the legacy atomic-helper form. "
+                "(Hard-block per the Mandatory VERIFIED Commit-Finalization Gate.)"
+            )
         if first_line in {"NO-GO", "VERIFIED"}:
             anchor_reason = _verdict_evidence_anchor_deny_reason(content, cwd_path)
             if anchor_reason:

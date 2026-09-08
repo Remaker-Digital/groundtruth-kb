@@ -90,7 +90,13 @@ author_model_configuration: test-config
     return fixture_root
 
 
-def test_verified_without_commit_finalization_evidence_is_blocked(tmp_path: Path) -> None:
+def test_verified_without_commit_finalization_evidence_is_blocked(monkeypatch, tmp_path: Path) -> None:
+    # The verdict-preflight freshness check rebuilds the applicability packet from
+    # the project's governance config and MemBase, which the temporary fixture root
+    # does not carry; it has its own tests. Stub it so this test reaches the
+    # commit-finalization deny it exists to guard (the deny was silently dropped
+    # by an unreviewed checkpoint on 2026-09-07 while this test could not reach it).
+    monkeypatch.setattr(_GATE, "_verdict_preflight_freshness_deny_reason", lambda *args, **kwargs: None)
     fixture_root = _write_reviewed_report(tmp_path)
 
     reason = _GATE._deny_reason_for_content(
@@ -104,7 +110,13 @@ def test_verified_without_commit_finalization_evidence_is_blocked(tmp_path: Path
     assert "Commit Finalization Evidence" in reason
 
 
-def test_verified_with_commit_finalization_evidence_is_allowed(tmp_path: Path) -> None:
+def test_verified_with_commit_finalization_evidence_is_allowed(monkeypatch, tmp_path: Path) -> None:
+    # The verdict-preflight freshness check rebuilds the applicability packet from
+    # the project's governance config and MemBase, which the temporary fixture root
+    # does not carry; it has its own tests. Stub it so this test reaches the
+    # commit-finalization deny it exists to guard (the deny was silently dropped
+    # by an unreviewed checkpoint on 2026-09-07 while this test could not reach it).
+    monkeypatch.setattr(_GATE, "_verdict_preflight_freshness_deny_reason", lambda *args, **kwargs: None)
     fixture_root = _write_reviewed_report(tmp_path)
 
     reason = _GATE._deny_reason_for_content(
