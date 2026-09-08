@@ -1816,3 +1816,38 @@ def test_sqlite_inventory_reads_not_null_column_values():
         }
     finally:
         connection.close()
+
+
+@pytest.mark.parametrize("status", ["removed", "retired", "moved", "superseded", "completed", "excluded", "rehomed"])
+def test_membership_migration_keeps_only_actual_current_parent(status):
+    source = {name: [] for name in MIGRATION_TABLES}
+    current = dict(id="CURRENT", version=8, project_id="PROJECT-1", work_item_id="WI-1", status="active")
+    historical = dict(current, id="OLD", status=status)
+    source["project_work_item_memberships"] = [historical, current]
+    plan = _plan()
+    plan["projects"] = dict(expected_total=0, expected_authorized=0, expected_not_authorized=0, expected_programs=0)
+    plan["project_dependencies"].update(
+        preserve_dependency_ids=[],
+        retire_dependency_ids=[],
+        expected_source_count=0,
+        expected_active_after=0,
+        expected_retired_after=0,
+        expected_gate_transition_count=0,
+    )
+    result = kernel_module._transform_source_rows(source, plan)
+    assert [(r["id"], r["version"], r["project_id"], r["status"]) for r in result["project_work_item_memberships"]] == [
+        ("CURRENT", 1, "PROJECT-1", "active")
+    ]
+    assert source["project_work_item_memberships"] == [historical, current]
+
+
+@pytest.mark.parametrize("status", [None, "", "actve", "inactive", "RETIRED"])
+def test_membership_migration_refuses_unrecognized_status_instead_of_dropping_it(status):
+    source = {name: [] for name in MIGRATION_TABLES}
+    source["project_work_item_memberships"] = [dict(id="AMBIGUOUS", status=status)]
+    plan = _plan()
+    plan["project_dependencies"].update(preserve_dependency_ids=[], retire_dependency_ids=[])
+    with pytest.raises(PostgresKernelError) as failure:
+        kernel_module._transform_source_rows(source, plan)
+    assert failure.value.code == "invalid_source"
+    assert failure.value.details == {"membership_id": "AMBIGUOUS", "status": status}

@@ -1508,6 +1508,18 @@ def _transform_source_rows(
     for table_name in CURRENT_TABLES:
         spec = TABLE_SPECS[table_name]
         source_table_rows = source_rows[table_name]
+        if table_name == "project_work_item_memberships":
+            # Migration restarts current state. Inactive links describe former
+            # associations, preserved in the source/backup, not extra parents.
+            historical_statuses = {"removed", "retired", "moved", "superseded", "completed", "excluded", "rehomed"}
+            for source_row in source_table_rows:
+                if source_row.get("status") not in historical_statuses | {"active"}:
+                    raise PostgresKernelError(
+                        "invalid_source",
+                        "Unknown project membership status",
+                        details={"membership_id": source_row.get("id"), "status": source_row.get("status")},
+                    )
+            source_table_rows = [row for row in source_table_rows if row["status"] == "active"]
         if table_name == "specification_deliberation_sources":
             for source_row in source_table_rows:
                 source_spec_id = str(source_row.get("spec_id"))

@@ -869,6 +869,21 @@ def test_snapshot_wal_export_authorization_dependency_and_immutable_boundaries(
     monkeypatch.delenv("GT_DB_PATH", raising=False)
     source = tmp_path / "source.db"
     writer = _create_sqlite_fixture(source)
+    for status in ("removed", "retired", "moved", "superseded", "completed", "excluded", "rehomed"):
+        writer.execute(
+            "INSERT INTO project_work_item_memberships VALUES (?,?,?,?,?,?,?,?)",
+            (
+                "HISTORICAL-" + status,
+                3,
+                "PROJECT-A",
+                "WI-OPAQUE",
+                status,
+                "integration",
+                "2026-09-01T00:00:00+00:00",
+                "old parent association",
+            ),
+        )
+    writer.commit()
     config = tmp_path / "groundtruth.toml"
     config.write_text(
         f'[groundtruth]\ndb_path="{source.as_posix()}"\nproject_root="{tmp_path.as_posix()}"\n'
@@ -1082,6 +1097,8 @@ def test_snapshot_wal_export_authorization_dependency_and_immutable_boundaries(
         assert manifest["tables"]["environment_config"][0]["sensitive"] is True
         assert manifest["tables"]["work_items"][0]["depends_on_work_items"] == []
         assert "related_bridge_threads" not in manifest["tables"]["work_items"][0]
+        assert [row["id"] for row in manifest["tables"]["project_work_item_memberships"]] == ["MEMBER-OPAQUE"]
+        assert writer.execute("SELECT COUNT(*) FROM project_work_item_memberships").fetchone()[0] == 8
         assert (
             next(row for row in manifest["tables"]["projects"] if row["id"] == "PROJECT-A")["start_date"]
             == "2026-09-01"

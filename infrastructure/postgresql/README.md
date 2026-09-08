@@ -152,6 +152,13 @@ not durable knowledge links or recovery inputs. The migration intentionally
 excludes that legacy source field; operative bridge state uses the native bridge
 service and is purged at terminal completion.
 
+Membership migration retains active parent relationships only, including the
+parents of completed work. Known inactive associations (`removed`, `retired`,
+`moved`, `superseded`, `completed`, `excluded`, `rehomed`) stay in the source and
+backup as history; they are not additional current parents in PostgreSQL. Unknown
+membership statuses refuse with the record identity, rather than being silently
+omitted. Missing or competing current parents still refuse import.
+
 Known retired/runtime source tables may already be absent. Every migratable
 table must be present, and any unknown table refuses export with its name so
 new state cannot be silently dropped. The snapshot's actual schema inventory
