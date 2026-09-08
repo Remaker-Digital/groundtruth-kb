@@ -43,3 +43,13 @@ def test_pre_commit_keeps_the_gates_with_a_live_predicate() -> None:
     text = PRE_COMMIT_HOOK.read_text(encoding="utf-8")
     for script in LIVE_GATES:
         assert _invocations(text, script), f"{script} must still run at pre-commit"
+
+
+def test_commit_preflight_mirrors_the_hook_without_the_retired_gate() -> None:
+    """``gt commit preflight`` (behind the .cmd/.ps1 wrappers) runs the same gates as the Bash hook."""
+    from groundtruth_kb.governance.commit_preflight import commit_preflight_commands
+
+    scripts = [spec.command[1] for spec in commit_preflight_commands("python")]
+    assert not any(RETIRED_GATE in script for script in scripts), scripts
+    for script in LIVE_GATES:
+        assert any(script in entry for entry in scripts), f"{script} must still run in gt commit preflight"

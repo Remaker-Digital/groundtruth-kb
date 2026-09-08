@@ -42,10 +42,6 @@ def commit_preflight_commands(python_bin: str) -> tuple[CommandSpec, ...]:
             (python_bin, "scripts/check_narrative_artifact_evidence.py", "--staged"),
         ),
         CommandSpec("ruff-format", (python_bin, "scripts/check_ruff_format.py", "--staged")),
-        CommandSpec(
-            "protected-commit-authorization",
-            (python_bin, "scripts/check_protected_commit_authorization.py", "--staged"),
-        ),
     )
 
 
