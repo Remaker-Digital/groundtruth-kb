@@ -38,6 +38,10 @@ scripts/production-keys-*.json
 !tests/secrets/*.py
 !tests/secrets/fixtures/
 !tests/secrets/fixtures/*.toml
+# The negations above carry a slash and are therefore root-anchored, so they
+# stopped covering the test package once it moved under applications/.
+!applications/Agent_Red/tests/secrets/
+!applications/Agent_Red/tests/secrets/*.py
 
 # =============================================================================
 # Python
@@ -50,6 +54,19 @@ __pycache__/
 build/
 develop-eggs/
 dist/
+# Agent Red's SPA and widget bundles are committed on purpose: the API gateway
+# workflow checks out and runs docker build with no Node step, so on a clean CI
+# checkout these are the only bytes that exist, and the Shopify source is
+# excluded from the build context entirely. Leaving them under the blanket
+# dist/ rule made rebuilds invisible to git status, which is how a bundle from
+# 2026-04-08 kept shipping against source last changed 2026-06-25, the exact
+# failure SPEC-1845 was written to prevent. Re-included so staleness is visible.
+# The older applications/Agent_Red/admin/dist/ aggregate is referenced by
+# nothing and stays ignored.
+!applications/Agent_Red/admin/provider/dist/
+!applications/Agent_Red/admin/shopify/dist/
+!applications/Agent_Red/admin/standalone/dist/
+!applications/Agent_Red/widget/dist/
 downloads/
 eggs/
 .eggs/
