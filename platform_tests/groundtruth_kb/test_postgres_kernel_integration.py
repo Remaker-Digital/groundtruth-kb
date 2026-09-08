@@ -12,8 +12,10 @@ import json
 import os
 import sqlite3
 import threading
+import time
 import uuid
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -353,6 +355,100 @@ def test_empty_import_roundtrip_already_current_and_atomic_failure(
         )
         assert (
             connection.execute(
+                sql.SQL("SELECT count(*) FROM {}.record_history").format(sql.Identifier(schema_name))
+            ).fetchone()[0]
+            == 0
+        )
+
+
+@pytest.mark.parametrize("occupied_table", ["session_init_bindings", "bridge_attempts"])
+def test_import_refuses_an_operating_coordination_target_even_for_an_identical_empty_manifest(
+    isolated_postgres: tuple[str, str], tmp_path: Path, occupied_table: str
+) -> None:
+    service, schema_name = isolated_postgres
+    kernel = PostgresKernel(PostgreSQLConfig(service=service))
+    kernel.initialize()
+    with psycopg.connect(service=service) as connection:
+        if occupied_table == "session_init_bindings":
+            connection.execute(
+                sql.SQL("INSERT INTO {}.session_init_bindings VALUES (%s,%s,%s,%s,clock_timestamp(),%s)").format(
+                    sql.Identifier(schema_name)
+                ),
+                ("existing-context", "SENV-" + "a" * 32, "gtkb", "prime-builder", "existing-idempotency"),
+            )
+        else:
+            connection.execute(
+                sql.SQL(
+                    "INSERT INTO {}.bridge_attempts (id,head_status,head_version) VALUES ('existing-advisory','ADVISORY',1)"
+                ).format(sql.Identifier(schema_name))
+            )
+    manifest = tmp_path / "empty-current.json"
+    manifest.write_bytes(canonical_json_bytes(_empty_manifest()))
+    with pytest.raises(PostgresKernelError) as refused:
+        kernel.import_current(input_path=manifest, actor="qualification", reason="Refuse live target")
+    assert refused.value.code == "target_coordination_not_empty"
+    assert refused.value.to_json_dict()["error"]["details"]["table"] == occupied_table
+    with psycopg.connect(service=service) as connection:
+        assert (
+            connection.execute(
+                sql.SQL("SELECT count(*) FROM {}.{}").format(
+                    sql.Identifier(schema_name), sql.Identifier(occupied_table)
+                )
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            connection.execute(
+                sql.SQL("SELECT count(*) FROM {}.record_history").format(sql.Identifier(schema_name))
+            ).fetchone()[0]
+            == 0
+        )
+
+
+def test_import_waits_for_an_inflight_binding_and_reads_its_committed_state(
+    isolated_postgres: tuple[str, str], tmp_path: Path
+) -> None:
+    service, schema_name = isolated_postgres
+    kernel = PostgresKernel(PostgreSQLConfig(service=service))
+    kernel.initialize()
+    manifest = tmp_path / "empty-current.json"
+    manifest.write_bytes(canonical_json_bytes(_empty_manifest()))
+    with psycopg.connect(service=service) as writer, psycopg.connect(service=service, autocommit=True) as observer:
+        writer.execute(
+            sql.SQL("INSERT INTO {}.session_init_bindings VALUES (%s,%s,%s,%s,clock_timestamp(),%s)").format(
+                sql.Identifier(schema_name)
+            ),
+            ("inflight-context", "SENV-" + "b" * 32, "gtkb", "prime-builder", "inflight-idempotency"),
+        )
+        with ThreadPoolExecutor(max_workers=1) as workers:
+            result = workers.submit(
+                kernel.import_current, input_path=manifest, actor="qualification", reason="Competing import"
+            )
+            waiting = False
+            deadline = time.monotonic() + 10
+            try:
+                while time.monotonic() < deadline and not result.done():
+                    waiting = observer.execute(
+                        "SELECT EXISTS(SELECT 1 FROM pg_locks WHERE relation=to_regclass(%s) AND mode='ShareRowExclusiveLock' AND NOT granted)",
+                        (schema_name + ".session_init_bindings",),
+                    ).fetchone()[0]
+                    if waiting:
+                        break
+                    threading.Event().wait(0.01)
+            finally:
+                writer.commit()
+            assert waiting, "The import did not wait for the in-flight coordination writer"
+            with pytest.raises(PostgresKernelError) as refused:
+                result.result(timeout=10)
+            assert refused.value.code == "target_coordination_not_empty"
+        assert (
+            observer.execute(
+                sql.SQL("SELECT count(*) FROM {}.session_init_bindings").format(sql.Identifier(schema_name))
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            observer.execute(
                 sql.SQL("SELECT count(*) FROM {}.record_history").format(sql.Identifier(schema_name))
             ).fetchone()[0]
             == 0

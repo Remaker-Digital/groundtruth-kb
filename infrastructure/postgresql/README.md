@@ -122,6 +122,13 @@ Configuring `authority_url` changes ordinary CLI routing. Unavailable services
 and unsupported native commands fail without opening SQLite. Do not set this
 value in the live GT-KB config as a partial migration.
 
+The current importer refuses existing coordination state, even when the
+knowledge manifest otherwise matches. Its bounded target-table locks wait for
+in-flight writers and inspect their committed state before importing. It never
+ignores or clears existing bindings, attempts or deliveries. Complete source
+table accounting and immutable-binding migration are still required; the
+current knowledge-only migration manifest is not a complete production export.
+
 The supported client commands include:
 
     gt --config <client-config.toml> service status --json

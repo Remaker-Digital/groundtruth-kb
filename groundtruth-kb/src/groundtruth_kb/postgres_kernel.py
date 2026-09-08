@@ -2235,10 +2235,33 @@ class PostgresKernel:
         try:
             with connection, connection.transaction():
                 cursor = connection.cursor()
-                cursor.execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
+                cursor.execute("SET TRANSACTION ISOLATION LEVEL READ COMMITTED")
                 self._configure_transaction(cursor)
                 schema_name = self._current_schema(cursor)
                 self._require_exact_schema(cursor, schema_name)
+                # A migration owns one bounded target transaction, not live
+                # agent work. After these locks, READ COMMITTED sees any writer
+                # that finished while we waited; no stale snapshot can hide it.
+                cursor.execute(
+                    sql.SQL("LOCK TABLE {} IN SHARE ROW EXCLUSIVE MODE").format(
+                        sql.SQL(",").join(
+                            sql.SQL("{}.{}").format(sql.Identifier(schema_name), sql.Identifier(table))
+                            for table in ALL_TABLES
+                        )
+                    )
+                )
+                for table in COORDINATION_TABLES:
+                    cursor.execute(
+                        sql.SQL("SELECT 1 FROM {}.{} LIMIT 1").format(
+                            sql.Identifier(schema_name), sql.Identifier(table)
+                        )
+                    )
+                    if cursor.fetchone() is not None:
+                        raise PostgresKernelError(
+                            "target_coordination_not_empty",
+                            "Migration requires an empty target without existing coordination state",
+                            details={"table": table},
+                        )
                 cursor.execute(
                     sql.SQL("SELECT count(*) AS count FROM {}.record_history").format(sql.Identifier(schema_name))
                 )
