@@ -229,15 +229,6 @@
             "timeout": 10
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/scripts/auto_finalize_sweep.py\"",
-            "timeout": 15
-          }
-        ]
       }
     ],
     "UserPromptSubmit": [

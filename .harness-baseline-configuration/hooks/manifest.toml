@@ -302,11 +302,3 @@ script_root = "project_scripts"
 args = ["--stop-hook"]
 blocking = true
 timeout_seconds = 10
-
-[[hook]]
-event = "turn_end"
-intents = ["all"]
-script = "auto_finalize_sweep.py"
-script_root = "project_scripts"
-blocking = true
-timeout_seconds = 15

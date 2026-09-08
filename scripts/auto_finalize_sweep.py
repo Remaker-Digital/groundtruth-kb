@@ -58,6 +58,11 @@ from windows_subprocess import no_window_subprocess_kwargs  # noqa: E402
 
 AUDIT_DIR = PROJECT_ROOT / ".gtkb-state" / "auto-finalize-sweep"
 AUDIT_LOG = AUDIT_DIR / "sweep.jsonl"
+# Owner decision, 2026-09-07: the sweep commits bridge material, which canon v8.92
+# forbids, and admits verdicts through the retired protected-commit predicate. It is
+# unregistered from every harness surface and exits without action until the
+# project-commit lifecycle slice retires it formally. The read-only --probe stays.
+SWEEP_DISABLED = True
 GIT_TIMEOUT_SECONDS = int(os.environ.get("GTKB_AUTO_FINALIZE_GIT_TIMEOUT_SECONDS", "60"))
 
 _VERSION_RE = re.compile(r"-(\d{3})\.md$")
@@ -456,6 +461,8 @@ def main() -> int:
     # WI-5767 C1: opt-in read-only probe mode emits JSON to stdout and exits.
     if "--probe" in sys.argv:
         sys.stdout.write(json.dumps(probe(), indent=2, sort_keys=True) + "\n")
+        return 0
+    if SWEEP_DISABLED:
         return 0
     # Stop-hook payload arrives on stdin; we do not need it. Drain to avoid blocking.
     try:

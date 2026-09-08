@@ -918,7 +918,12 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    root = args.project_root.resolve()
+    raise BatchFinalizationError(
+        "batch VERIFIED finalization is retired by owner decision (2026-09-07): it commits "
+        "bridge material, which canon v8.92 forbids, and depends on the retired "
+        "protected-commit gate; the project-commit lifecycle slice replaces it"
+    )
+    root = args.project_root.resolve()  # pragma: no cover - unreachable while retired
     slug = getattr(args, "slug", None)
     plan = build_plan(root, slug=slug)
     if args.command == "apply":

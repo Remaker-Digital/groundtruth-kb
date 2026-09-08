@@ -113,11 +113,6 @@
         "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/advisory_grilling_gate_lint.py --stop-hook",
         "timeout": 10,
         "blocking": true
-      },
-      {
-        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/auto_finalize_sweep.py",
-        "timeout": 15,
-        "blocking": true
       }
     ],
     "UserPromptSubmit": [

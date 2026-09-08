@@ -2571,6 +2571,17 @@ def _check_auto_finalize_sweep_liveness(target: Path) -> ToolCheck:
             status="info",
             message="auto-finalize sweep script not found; liveness probe skipped",
         )
+    if "SWEEP_DISABLED = True" in sweep_path.read_text(encoding="utf-8", errors="replace"):
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="info",
+            message=(
+                "auto-finalize sweep disabled by owner decision (2026-09-07); unregistered and "
+                "inert pending the project-commit lifecycle slice"
+            ),
+        )
     try:
         r = subprocess.run(
             [sys.executable, str(sweep_path), "--probe"],

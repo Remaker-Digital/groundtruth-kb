@@ -139,3 +139,17 @@ def test_liveness_no_bridge_info(tmp_path, doctor):
     check = doctor._check_auto_finalize_sweep_liveness(tmp_path)
     assert check.status == "info"
     assert "not applicable" in check.message
+
+
+def test_disabled_sweep_reports_info_without_probing(doctor, tmp_path: Path, monkeypatch) -> None:
+    """Owner decision 2026-09-07: a disabled sweep is reported, not probed."""
+    _write_sweep_script(tmp_path)
+    (tmp_path / "scripts" / "auto_finalize_sweep.py").write_text("SWEEP_DISABLED = True\n", encoding="utf-8")
+
+    def _no_probe(*args, **kwargs):
+        raise AssertionError("probe must not run while the sweep is disabled")
+
+    monkeypatch.setattr(doctor.subprocess, "run", _no_probe)
+    check = doctor._check_auto_finalize_sweep_liveness(tmp_path)
+    assert check.status == "info"
+    assert "disabled by owner decision" in check.message

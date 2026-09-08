@@ -496,10 +496,10 @@ def test_same_oid_symbolic_branch_switch_is_denied(
     assert _git(tmp_path, "rev-parse", "HEAD") == head
 
 
-def test_repository_canonical_hook_contains_protected_commit_gate() -> None:
-    hooks = batch._canonical_hook_dir(batch.PROJECT_ROOT)
-
-    assert hooks == batch.PROJECT_ROOT / ".githooks"
+def test_main_is_retired_by_owner_decision(tmp_path: Path) -> None:
+    """Owner decision 2026-09-07: the batch finalizer is inert until the project-commit lifecycle slice."""
+    with pytest.raises(batch.BatchFinalizationError, match="retired by owner decision"):
+        batch.main(["--project-root", str(tmp_path), "plan"])
 
 
 def test_hook_refusal_leaves_head_and_real_index_untouched(

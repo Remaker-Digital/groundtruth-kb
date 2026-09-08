@@ -19,6 +19,15 @@ This rule auto-loads via the `.claude/rules/` convention. It is the narrative
 authority for the auto-finalization sweep landed by WI-4889 (Slice 1 of the
 dispatch-treadmill-drain program).
 
+## Status
+
+Disabled by owner decision on 2026-09-07. The sweep commits bridge material,
+which canon forbids, and admits verdicts through the retired protected-commit
+predicate. Its hook registration is removed from every harness surface and
+`scripts/auto_finalize_sweep.py` exits without action; only the read-only
+`--probe` remains. The project-commit lifecycle slice retires it formally. The
+sections below record how it operated.
+
 ## Authority
 
 - `WI-4889` (PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY) — the implementation work item.

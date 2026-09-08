@@ -191,7 +191,9 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent(tmp_path) -> N
     # Stop matchers are not supported by Codex; entries must be matcher-less.
     for group in codex_stop_hooks:
         assert group.get("matcher") in (None, ""), "Codex Stop entries must not declare a matcher (Codex hooks docs)"
-    assert len(_expanded_routes(codex_hooks, "Stop", "auto_finalize_sweep.py")) == 1
+    assert len(_expanded_routes(codex_hooks, "Stop", "auto_finalize_sweep.py")) == 0, (
+        "auto-finalize sweep is disabled by owner decision (2026-09-07) and must not be registered"
+    )
     assert len(_expanded_routes(codex_hooks, "Stop", "advisory-router-scan.py")) == 1
     codex_stop_commands = [hook["command"] for group in codex_stop_hooks for hook in group["hooks"]]
     assert not any("session_wrapup" in cmd or "session_self_initialization.py" in cmd for cmd in codex_stop_commands), (

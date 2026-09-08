@@ -312,14 +312,25 @@ def test_git_timeout_returns_failed_completed_process(monkeypatch):
     assert "timed out after 1 seconds" in result.stderr
 
 
-def test_sweep_registered_in_both_harness_surfaces():
-    """Cross-harness parity: the shared script is a Stop hook in both surfaces."""
+def test_sweep_unregistered_from_every_harness_surface():
+    """Owner decision 2026-09-07: the sweep is disabled and registered nowhere."""
     claude = (_REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8")
-    codex = (_REPO_ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8")
     codex_batch = (_REPO_ROOT / ".codex" / "gtkb-hooks" / "run_py_no_window.py").read_text(encoding="utf-8")
-    assert "auto_finalize_sweep.py" in claude, "missing Claude .claude/settings.json registration"
-    assert "--batch stop" in codex, "missing Codex Stop batch registration"
-    assert "scripts/auto_finalize_sweep.py" in codex_batch, "missing Codex Stop batch auto-finalizer"
+    manifest = (_REPO_ROOT / ".harness-baseline-configuration" / "hooks" / "manifest.toml").read_text(encoding="utf-8")
+    assert "auto_finalize_sweep.py" not in claude, "sweep still registered in .claude/settings.json"
+    assert "auto_finalize_sweep.py" not in codex_batch, "sweep still in the Codex Stop batch catalog"
+    assert "auto_finalize_sweep.py" not in manifest, "sweep still in the baseline hook manifest"
+
+
+def test_main_is_inert_while_disabled(monkeypatch):
+    """The entry point returns without sweeping while SWEEP_DISABLED is set."""
+    assert sweep_mod.SWEEP_DISABLED is True
+    calls: list[str] = []
+    monkeypatch.setattr(sweep_mod, "sweep", lambda **kwargs: calls.append("sweep"))
+    monkeypatch.setattr(sweep_mod.sys, "argv", ["auto_finalize_sweep.py"])
+    monkeypatch.delenv("GTKB_AUTO_FINALIZE_SWEEP_DISABLE", raising=False)
+    assert sweep_mod.main() == 0
+    assert calls == []
 
 
 # --------------------------------------------------------------------------
