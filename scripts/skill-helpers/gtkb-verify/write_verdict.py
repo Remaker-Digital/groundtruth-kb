@@ -1020,42 +1020,6 @@ def _append_commit_finalization_evidence(body: str, *, commit_message: str, path
     )
 
 
-def _auto_retire_completed_projects_after_verified(project_root: Path) -> tuple[str, ...]:
-    """Best-effort project auto-retirement after VERIFIED finalization.
-
-    This is intentionally outside the git finalization transaction: an
-    actuation failure must never remove or roll back a valid VERIFIED verdict
-    commit.
-    """
-    try:
-        from groundtruth_kb.db import KnowledgeDB
-        from groundtruth_kb.project.lifecycle import ProjectLifecycleService
-    except ImportError as exc:
-        print(f"VERIFIED auto-retire skipped: import failed: {exc}", file=sys.stderr)
-        return ()
-
-    db_path = project_root / "groundtruth.db"
-    if not db_path.is_file():
-        return ()
-
-    db = KnowledgeDB(db_path)
-    try:
-        records = ProjectLifecycleService(db).auto_retire_completed_projects(
-            project_root=project_root,
-            changed_by="auto-verify-finalization",
-        )
-    except Exception as exc:  # noqa: BLE001 - VERIFIED finalization must stay committed.
-        print(f"VERIFIED auto-retire skipped: {exc}", file=sys.stderr)
-        return ()
-    finally:
-        db.close()
-
-    retired = tuple(str(record.get("project_id") or "") for record in records if record.get("project_id"))
-    if retired:
-        print(f"VERIFIED auto-retired completed project(s): {', '.join(retired)}", file=sys.stderr)
-    return retired
-
-
 def _assert_verdict_review_independence(
     slug: str,
     body: str,
@@ -1236,7 +1200,6 @@ def finalize_verified_commit(
     hunk_patch_paths: list[str] | None = None,
     commit_message: str,
     project_root: Path | None = None,
-    auto_retire_completed_projects: bool = True,
     pre_populate: bool = False,
     db: Any | bool | None = None,
     glossary_path: Path | None = None,
@@ -1393,8 +1356,6 @@ def finalize_verified_commit(
             temp_index.unlink(missing_ok=True)
 
     commit_sha = _git_lines(["rev-parse", "HEAD"], cwd=root)[0]
-    if auto_retire_completed_projects:
-        _auto_retire_completed_projects_after_verified(root)
     return VerifiedFinalizationResult(
         commit_sha=commit_sha,
         verdict_path=verdict_rel_path,
@@ -1431,14 +1392,6 @@ def main(argv: list[str] | None = None) -> int:
         "--finalize-verified",
         action="store_true",
         help="Atomically write a VERIFIED verdict and create the final local commit.",
-    )
-    parser.add_argument(
-        "--no-auto-retire",
-        action="store_true",
-        help=(
-            "Explicitly suppress the post-commit project auto-retirement sweep for this "
-            "finalization; requires separate governed keep-open authority."
-        ),
     )
     parser.add_argument(
         "--include",
@@ -1482,7 +1435,6 @@ def main(argv: list[str] | None = None) -> int:
             hunk_patch_paths=args.hunk_patch,
             commit_message=args.commit_message or "",
             project_root=args.project_root,
-            auto_retire_completed_projects=not args.no_auto_retire,
             pre_populate=not args.no_prepopulate,
             db=False if args.no_semantic_search else None,
             log_path=log_path,

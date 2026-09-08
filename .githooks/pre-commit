@@ -36,10 +36,8 @@ PYTHON_BIN="${PYTHON:-python}"
 # mandatory gate deny. Detection existed since WI-4464 but was never wired.
 "$PYTHON_BIN" scripts/check_commit_pathspec_safety.py --staged --strict --check-foreign-verdicts || exit $?
 
-# Harness surfaces are rendered from .harness-baseline-configuration. A commit
-# that edits the baseline and omits the re-rendered projections leaves every
-# harness running behaviour the baseline no longer describes. Cheap-gated: the
-# projector runs only when a baseline path is staged.
+# Validate that staged baseline/projector sources can produce their projections.
+# Installed projections are operational output and are not staged or committed.
 "$PYTHON_BIN" scripts/check_projection_drift.py --staged || exit $?
 
 # The protected-commit authorization gate is retired from this hook (owner

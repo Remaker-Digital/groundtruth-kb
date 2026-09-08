@@ -126,6 +126,8 @@ def test_project_terminal_state_requires_one_complete_real_commit(bridge):
     assert response.json()["status"] == "confirmed"
     project = client.get("/v1/projects/PROJECT-1").json()["project"]
     assert project["status"] == "verified"
+    memberships = client.get("/v1/projects/PROJECT-1").json()["memberships"]
+    assert {(row["work_item_id"], row["status"]) for row in memberships} == {("WI-1", "active"), ("WI-2", "active")}
     for number in (1, 2):
         work = client.get(f"/v1/work-items/WI-{number}").json()["work_item"]
         assert work["completion_evidence"] == "git:" + commit

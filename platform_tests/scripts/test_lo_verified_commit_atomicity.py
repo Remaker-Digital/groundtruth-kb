@@ -937,7 +937,6 @@ def test_binary_hunk_patch_finalization_commits_reviewed_binary_include_only(
     assert "+++ b/groundtruth.db" not in patch_text
     _write(repo / "groundtruth-db.patch", patch_text)
     _write_bytes(repo / "groundtruth.db", foreign)
-    monkeypatch.setattr(verify_helper, "_auto_retire_completed_projects_after_verified", lambda _root: ())
 
     result = verify_helper.finalize_verified_commit(
         "sample",

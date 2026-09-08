@@ -15,6 +15,7 @@ Modes:
     default   render the projection into the harness config directory and
               delete profile leftover_paths / leftover_trees
     --dry-run print the plan (files that would be written/removed), write nothing
+    --validate render in memory and refuse gaps without requiring installed output
     --check   compare current projection against a fresh render; report write
               drift and leftover files that still exist; exit 1 on any
               difference, 0 when clean
@@ -702,6 +703,9 @@ def run(harness: str, mode: str) -> int:
         if mode != "dry-run":
             print("FAIL: gaps present; nothing written (fail closed)")
             return 2
+    if mode == "validate":
+        print(f"VALID {harness}: {len(plan.writes)} derivable files")
+        return 0
     if mode == "dry-run":
         print(f"DRY-RUN plan for {harness}: {len(plan.writes)} files, {len(plan.removes)} leftovers")
         for rel in sorted(plan.writes):
@@ -748,10 +752,14 @@ def run(harness: str, mode: str) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--harness", required=True)
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--check", action="store_true")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--dry-run", action="store_true")
+    modes.add_argument("--check", action="store_true")
+    modes.add_argument(
+        "--validate", action="store_true", help="Validate derivation without reading or writing installed output."
+    )
     args = parser.parse_args()
-    mode = "dry-run" if args.dry_run else "check" if args.check else "write"
+    mode = "validate" if args.validate else "dry-run" if args.dry_run else "check" if args.check else "write"
     try:
         return run(args.harness, mode)
     except ProjectionError as exc:

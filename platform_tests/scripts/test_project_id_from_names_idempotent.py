@@ -1,40 +1,12 @@
-"""Tests for the idempotent ``_project_id_from_names`` defect fix.
+"""Project name normalization and explicit single-parent membership.
 
-Authority: bridge/gtkb-project-id-prefix-idempotent-fix-002.md (REVISED-1),
-Codex GO at bridge/gtkb-project-id-prefix-idempotent-fix-003.md.
-
-Source work items: WI-3411 (CLI symptom; member of PROJECT-GTKB-RELIABILITY-FIXES)
-and WI-3355 (root-cause diagnosis; orphan).
-
-Covers the 6-test Specification-Derived Verification Plan from the GO'd
-proposal:
-
-* T1 ``test_bare_name_prefixed`` — bare name unchanged.
-* T2 ``test_qualified_id_not_doubled`` — already-qualified id not doubled.
-* T3 ``test_subproject_bare`` — subproject with bare project name.
-* T4 ``test_subproject_qualified_not_doubled`` — subproject with qualified
-  project id.
-* T5 ``test_idempotent`` — ``f(f(x)) == f(x)`` for representative inputs.
-* T6 ``test_insert_work_item_no_doubled_membership`` — integration: after
-  ``insert_work_item(project_name="PROJECT-GTKB-RELIABILITY-FIXES")`` the
-  backfill files membership under ``PROJECT-GTKB-RELIABILITY-FIXES`` and
-  NOT under the doubled-prefix ``PROJECT-PROJECT-GTKB-RELIABILITY-FIXES``.
-
-T6 exercises the same code path that originally produced the doubled-prefix
-membership rows for WI-3411 and WI-3447: ``insert_work_item`` records the
-``work_items.project_name`` compatibility field, and the next call to
-``_backfill_project_artifacts_from_work_items`` derives the project id via
-``_project_id_from_names``. The test runs the backfill explicitly to keep
-the assertion deterministic and process-restart-independent.
-
-Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-Licensed under AGPL-3.0-or-later.
+Display labels never create projects or parent relationships, including on restart.
 """
 
 from __future__ import annotations
 
-import sqlite3
 import sys
+from contextlib import closing
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -66,42 +38,26 @@ def test_idempotent() -> None:
         assert once == twice, f"non-idempotent for input {bare!r}: once={once!r}, twice={twice!r}"
 
 
-def test_insert_work_item_no_doubled_membership(tmp_path: Path) -> None:
+def test_display_labels_never_create_or_duplicate_membership(tmp_path: Path) -> None:
     db_path = tmp_path / "groundtruth.db"
-    db = KnowledgeDB(db_path=db_path)
-    try:
+    with closing(KnowledgeDB(db_path=db_path)) as db:
         db.insert_work_item(
             id="WI-9999",
-            title="Test doubled-prefix membership integration path",
-            origin="defect",
+            title="Explicit parent survives a conflicting display label",
+            origin="improvement",
             component="backlog",
             resolution_status="open",
-            changed_by="test-project-id-from-names-idempotent",
-            change_reason=(
-                "integration test for _project_id_from_names idempotent fix "
-                "(bridge/gtkb-project-id-prefix-idempotent-fix-002.md)"
-            ),
-            project_name="PROJECT-GTKB-RELIABILITY-FIXES",
+            changed_by="test",
+            change_reason="seed",
+            project_name="PROJECT-DISPLAY-LABEL",
         )
-        # Re-run the backfill explicitly. In production, the doubled-prefix
-        # membership is created when a SUBSEQUENT KnowledgeDB() init runs the
-        # backfill against the now-present work_items row; calling it here
-        # reproduces that manifest path deterministically.
-        db._backfill_project_artifacts_from_work_items()
-    finally:
-        db.close()
-
-    with sqlite3.connect(db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT project_id, work_item_id, source FROM current_project_work_item_memberships WHERE work_item_id = ?",
-            ("WI-9999",),
-        ).fetchall()
-
-    project_ids = {row["project_id"] for row in rows}
-    assert "PROJECT-GTKB-RELIABILITY-FIXES" in project_ids, (
-        f"expected canonical membership PROJECT-GTKB-RELIABILITY-FIXES; got project_ids={project_ids!r}"
-    )
-    assert "PROJECT-PROJECT-GTKB-RELIABILITY-FIXES" not in project_ids, (
-        f"doubled-prefix membership present after fix; project_ids={project_ids!r}"
-    )
+    with closing(KnowledgeDB(db_path=db_path)) as db:
+        assert db.get_project("PROJECT-DISPLAY-LABEL") is None
+        assert db._get_conn().execute("SELECT COUNT(*) FROM project_work_item_memberships").fetchone()[0] == 0
+        db.insert_project("Actual parent", "test", "seed", id="PROJECT-PARENT")
+        membership = db.link_project_work_item("PROJECT-PARENT", "WI-9999", "test", "explicit parent")
+    with closing(KnowledgeDB(db_path=db_path)) as db:
+        assert db.get_project("PROJECT-DISPLAY-LABEL") is None
+        assert db.get_project_work_item_membership(membership["id"]) == membership
+        rows = db._get_conn().execute("SELECT id FROM current_project_work_item_memberships").fetchall()
+        assert [row["id"] for row in rows] == [membership["id"]]
