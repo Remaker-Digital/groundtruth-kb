@@ -64,10 +64,7 @@ def _plan(snapshot: bytes = b"snapshot") -> dict[str, Any]:
             "retire_dependency_ids": ["opaque-retire"],
         },
         "projects": {
-            "authorization_default": "authorized",
-            "authorization_overrides": [
-                {"authorization_status": "not authorized", "project_id": "PROJECT-GTKB-NEW-WORK-INTAKE"}
-            ],
+            "expected_programs": 0,
             "expected_authorized": 1,
             "expected_not_authorized": 1,
             "expected_total": 2,
@@ -91,6 +88,8 @@ def _empty_manifest() -> dict[str, Any]:
 
 
 def _row(table_name: str, **values: object) -> dict[str, Any]:
+    if table_name == "projects":
+        values.setdefault("kind", "project")
     return {column: values.get(column) for column in TABLE_SPECS[table_name].columns}
 
 
@@ -107,7 +106,8 @@ def test_packaged_schema_is_exact_native_twenty_plus_history_kernel():
             assert token not in text
         else:
             assert token in text
-    assert "authorization_status TEXT NOT NULL" in text
+    assert "kind TEXT NOT NULL" in text
+    assert '"authorization" TEXT,' in text
     assert "'authorized', 'not authorized'" in text
     assert "CREATE TABLE {schema}.record_history" in text
 
@@ -117,7 +117,8 @@ def test_packaged_schema_is_exact_native_twenty_plus_history_kernel():
         return tuple(
             token
             for line in block.splitlines()
-            if line.strip() and (token := line.strip().split()[0].rstrip(",")) not in ignored
+            if re.match(r'"?[a-z_]+"?\s+[A-Z]', line.strip())
+            and (token := line.strip().split()[0].rstrip(",").strip('"')) not in ignored
         )
 
     assert tuple(TABLE_SPECS) == CURRENT_TABLES
@@ -126,10 +127,11 @@ def test_packaged_schema_is_exact_native_twenty_plus_history_kernel():
 
         block = text.split(f"CREATE TABLE {{schema}}.{table_name} (", 1)[1].split("\n);", 1)[0]
         declarations = {
-            line.strip().split()[0].rstrip(","): line.strip()
+            line.strip().split()[0].rstrip(",").strip('"'): line.strip()
             for line in block.splitlines()
-            if line.strip()
-            and line.strip().split()[0].rstrip(",") not in {"PRIMARY", "FOREIGN", "UNIQUE", "CHECK", "CONSTRAINT"}
+            if re.match(r'"?[a-z_]+"?\s+[A-Z]', line.strip())
+            and line.strip().split()[0].rstrip(",").strip('"')
+            not in {"PRIMARY", "FOREIGN", "UNIQUE", "CHECK", "CONSTRAINT"}
         }
         spec = TABLE_SPECS[table_name]
         inline_primary_key = tuple(
@@ -180,7 +182,9 @@ def test_packaged_schema_is_exact_native_twenty_plus_history_kernel():
     )
     history_block = text.split("CREATE TABLE {schema}.record_history (", 1)[1].split("\n);", 1)[0]
     history_declarations = {
-        line.strip().split()[0].rstrip(","): line.strip() for line in history_block.splitlines() if line.strip()
+        line.strip().split()[0].rstrip(",").strip('"'): line.strip()
+        for line in history_block.splitlines()
+        if line.strip()
     }
     history_contract = {
         "history_id": ("BIGINT", True),
@@ -551,7 +555,7 @@ def test_manifest_rejects_duplicate_relationship_pair():
             version=1,
             name="Project",
             status="active",
-            authorization_status="authorized",
+            authorization="authorized",
             changed_by="actor",
             changed_at="2026-09-01T00:00:00+00:00",
             change_reason="reason",
@@ -588,6 +592,128 @@ def test_manifest_rejects_duplicate_relationship_pair():
     ]
     with pytest.raises(PostgresKernelError, match="Duplicate current project/work-item relationship"):
         normalize_manifest(manifest)
+
+
+def _work_model_manifest():
+    manifest = _empty_manifest()
+    metadata = {
+        "version": 1,
+        "changed_by": "test",
+        "changed_at": "2026-09-01T00:00:00+00:00",
+        "change_reason": "fixture",
+    }
+    manifest["tables"]["projects"] = [
+        _row("projects", id=pid, name=pid, status="active", authorization="authorized", **metadata)
+        for pid in ["PROJECT-ONE", "PROJECT-TWO"]
+    ]
+    manifest["tables"]["work_items"] = [
+        _row(
+            "work_items",
+            id="WI-ONE",
+            title="One",
+            origin="owner",
+            component="kernel",
+            resolution_status="open",
+            stage="created",
+            **metadata,
+        )
+    ]
+    manifest["tables"]["project_work_item_memberships"] = [
+        _row(
+            "project_work_item_memberships",
+            id="MEMBER-ONE",
+            project_id="PROJECT-ONE",
+            work_item_id="WI-ONE",
+            status="active",
+            **metadata,
+        )
+    ]
+    return manifest
+
+
+def test_manifest_rejects_two_active_parents_even_with_distinct_pairs():
+    manifest = _work_model_manifest()
+    first = manifest["tables"]["project_work_item_memberships"][0]
+    manifest["tables"]["project_work_item_memberships"].append(
+        {**first, "id": "MEMBER-TWO", "project_id": "PROJECT-TWO"}
+    )
+    with pytest.raises(PostgresKernelError, match="multiple active parent"):
+        normalize_manifest(manifest)
+    first["status"] = "removed"
+    assert normalize_manifest(manifest)["tables"]["project_work_item_memberships"]
+
+
+def test_manifest_rejects_program_work_item_membership():
+    manifest = _work_model_manifest()
+    manifest["tables"]["projects"][0].update(kind="program", authorization=None)
+    with pytest.raises(PostgresKernelError, match="program cannot contain work items"):
+        normalize_manifest(manifest)
+
+
+def test_manifest_requires_a_program_parent_for_execution_projects():
+    manifest = _work_model_manifest()
+    manifest["tables"]["projects"][0]["parent_project_id"] = "PROJECT-TWO"
+    with pytest.raises(PostgresKernelError, match="Only a program"):
+        normalize_manifest(manifest)
+    manifest["tables"]["projects"][1].update(kind="program", authorization=None)
+    assert normalize_manifest(manifest)["tables"]["projects"]
+
+
+def test_source_transform_preserves_project_authorization_and_program_kind():
+    source = {name: [] for name in CURRENT_TABLES}
+    metadata = {
+        "version": 7,
+        "changed_by": "test",
+        "changed_at": "2026-09-01T00:00:00+00:00",
+        "change_reason": "source",
+    }
+    source["projects"] = [
+        _row(
+            "projects",
+            id="PROJECT-A",
+            name="A",
+            kind="project",
+            authorization="not authorized",
+            status="active",
+            **metadata,
+        ),
+        _row(
+            "projects",
+            id="PROJECT-B",
+            name="B",
+            kind="project",
+            authorization="authorized",
+            status="active",
+            **metadata,
+        ),
+        _row("projects", id="PROGRAM-C", name="C", kind="program", authorization=None, status="active", **metadata),
+    ]
+    plan = _plan()
+    plan["projects"] = {
+        "expected_total": 3,
+        "expected_authorized": 1,
+        "expected_not_authorized": 1,
+        "expected_programs": 1,
+    }
+    plan["project_dependencies"].update(
+        expected_source_count=0,
+        expected_active_after=0,
+        expected_retired_after=0,
+        expected_gate_transition_count=0,
+        retire_dependency_ids=[],
+        preserve_dependency_ids=[],
+    )
+    result = kernel_module._transform_source_rows(source, plan)
+    assert {row["id"]: (row["kind"], row["authorization"]) for row in result["projects"]} == {
+        "PROJECT-A": ("project", "not authorized"),
+        "PROJECT-B": ("project", "authorized"),
+        "PROGRAM-C": ("program", None),
+    }
+    assert {row["version"] for row in result["projects"]} == {1}
+    validate_transform_plan(plan)
+    plan["projects"]["authorization_default"] = "authorized"
+    with pytest.raises(PostgresKernelError, match="keys"):
+        validate_transform_plan(plan)
 
 
 def test_manifest_canonicalizes_timestamps_to_utc_and_rejects_naive_values():
@@ -993,7 +1119,7 @@ def test_transform_surfaces_unknown_specification_source_link():
         expected_total=0,
         expected_authorized=0,
         expected_not_authorized=0,
-        authorization_overrides=[],
+        expected_programs=0,
     )
     plan["project_dependencies"].update(
         expected_source_count=0,

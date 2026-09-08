@@ -175,8 +175,9 @@ CREATE TABLE {schema}.projects (
     id TEXT PRIMARY KEY,
     version INTEGER NOT NULL CHECK (version >= 1),
     name TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('program', 'project')),
     status TEXT NOT NULL DEFAULT 'active',
-    authorization_status TEXT NOT NULL CHECK (authorization_status IN ('authorized', 'not authorized')),
+    "authorization" TEXT,
     rank INTEGER,
     parent_project_id TEXT,
     purpose TEXT,
@@ -191,7 +192,10 @@ CREATE TABLE {schema}.projects (
     changed_by TEXT NOT NULL,
     changed_at TIMESTAMPTZ NOT NULL,
     change_reason TEXT NOT NULL,
-    FOREIGN KEY (parent_project_id) REFERENCES {schema}.projects(id) DEFERRABLE INITIALLY DEFERRED
+    FOREIGN KEY (parent_project_id) REFERENCES {schema}.projects(id) DEFERRABLE INITIALLY DEFERRED,
+    CHECK ((kind = 'program' AND "authorization" IS NULL AND parent_project_id IS NULL) OR
+           (kind = 'project' AND "authorization" IS NOT NULL AND "authorization" IN ('authorized', 'not authorized'))),
+    CHECK (id <> 'PROJECT-GTKB-NEW-WORK-INTAKE' OR (kind = 'project' AND "authorization" = 'not authorized'))
 );
 
 CREATE TABLE {schema}.project_work_item_memberships (
@@ -363,7 +367,9 @@ ALTER TABLE {schema}.specification_deliberation_sources
 CREATE INDEX specifications_status_idx ON {schema}.specifications(status);
 CREATE INDEX tests_spec_id_idx ON {schema}.tests(spec_id);
 CREATE INDEX work_items_resolution_idx ON {schema}.work_items(resolution_status);
-CREATE INDEX projects_status_idx ON {schema}.projects(status, authorization_status);
+CREATE INDEX projects_status_idx ON {schema}.projects(status, "authorization");
+CREATE UNIQUE INDEX membership_single_active_parent_idx ON {schema}.project_work_item_memberships(work_item_id)
+    WHERE status = 'active';
 CREATE INDEX project_memberships_work_item_idx ON {schema}.project_work_item_memberships(work_item_id);
 CREATE INDEX project_dependencies_prerequisite_idx ON {schema}.project_dependencies(prerequisite_project_id, status);
 CREATE INDEX record_history_record_idx ON {schema}.record_history(record_type, new_version);

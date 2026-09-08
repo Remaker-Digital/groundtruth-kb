@@ -6085,6 +6085,7 @@ def _project_service(ctx: click.Context) -> tuple[KnowledgeDB, ProjectLifecycleS
 @click.option("--all", "include_terminal", is_flag=True, help="Include completed/retired/cancelled projects.")
 @click.option("--id", "project_ids", multiple=True, help="Limit to an explicit project id; repeatable.")
 @click.option("--status", default=None, help="Limit to a project status.")
+@click.option("--kind", type=click.Choice(["program", "project"]), default=None)
 @click.option("--contains", "contains_terms", multiple=True, help="Case-insensitive text filter; repeatable.")
 @click.option(
     "--field",
@@ -6113,6 +6114,7 @@ def projects_list(
     include_terminal: bool,
     project_ids: tuple[str, ...],
     status: str | None,
+    kind: str | None,
     contains_terms: tuple[str, ...],
     exact_specs: tuple[str, ...],
     match_specs: tuple[str, ...],
@@ -6124,7 +6126,7 @@ def projects_list(
     db, service = _project_service(ctx)
     try:
         include_terminal = include_terminal or bool(project_ids) or status is not None
-        projects = service.list_projects(include_terminal=include_terminal, status=status)
+        projects = service.list_projects(include_terminal=include_terminal, status=status, kind=kind)
     finally:
         db.close()
 
@@ -6152,7 +6154,7 @@ def projects_list(
     for project in projects:
         rank = project.get("rank")
         rank_prefix = "-" if rank is None else str(rank)
-        click.echo(f"{rank_prefix}\t{project['id']}\t{project['status']}\t{project['name']}")
+        click.echo(f"{rank_prefix}\t{project['id']}\t{project['kind']}\t{project['status']}\t{project['name']}")
 
 
 @projects_cmd.command("show")
@@ -6177,7 +6179,9 @@ def projects_show(ctx: click.Context, project_id: str, json_output: bool) -> Non
         click.echo(json.dumps(payload, indent=2, sort_keys=True))
         return
 
-    click.echo(f"{project['id']}: {project['name']} [{project['status']}]")
+    click.echo(f"{project['id']}: {project['name']} [{project['kind']}; {project['status']}]")
+    for child in payload["projects"]:
+        click.echo(f"  - {child['id']}: {child['status']} - {child['name']}")
     if work_items:
         click.echo("Work items:")
         for item in work_items:
@@ -6198,14 +6202,17 @@ def projects_show(ctx: click.Context, project_id: str, json_output: bool) -> Non
     # WI-7657: the Authorizations block is gone with the authorization
     # instrument. Authorization is a field on the project row, so it is shown
     # with the project rather than as a list of separate records.
-    click.echo(f"Authorization: {project.get('authorization') or 'unknown'}")
+    if project["kind"] == "project":
+        click.echo(f"Authorization: {project['authorization']}")
 
 
 @projects_cmd.command("create")
 @click.argument("name")
 @click.option("--id", "project_id", default=None, help="Explicit project id. Defaults to stable id from name.")
 @click.option("--rank", type=int, default=None, help="Project ordering rank.")
-@click.option("--parent-project-id", default=None, help="Parent project id for sub-project grouping.")
+@click.option("--kind", type=click.Choice(["program", "project"]), default="project", show_default=True)
+@click.option("--authorization", type=click.Choice(["authorized", "not authorized"]), default=None)
+@click.option("--parent-project-id", default=None, help="Program that sequences this execution project.")
 @click.option("--purpose", default=None, help="Project purpose.")
 @click.option("--target-outcome", default=None, help="Expected project outcome.")
 @click.option("--scope-note", default=None, help="Scope boundary note.")
@@ -6223,6 +6230,8 @@ def projects_create(
     name: str,
     project_id: str | None,
     rank: int | None,
+    kind: str,
+    authorization: str | None,
     parent_project_id: str | None,
     purpose: str | None,
     target_outcome: str | None,
@@ -6243,6 +6252,8 @@ def projects_create(
             name,
             project_id=project_id,
             rank=rank,
+            kind=kind,
+            authorization=authorization,
             parent_project_id=parent_project_id,
             purpose=purpose,
             target_outcome=target_outcome,
@@ -6255,7 +6266,7 @@ def projects_create(
             changed_by=changed_by,
             change_reason=change_reason,
         )
-    except ProjectLifecycleError as exc:
+    except (ProjectLifecycleError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
     finally:
         db.close()
@@ -6271,6 +6282,7 @@ def projects_create(
 @click.option("--name", default=None, help="New project name.")
 @click.option("--status", default=None, help="New project status.")
 @click.option("--rank", type=int, default=None, help="New project ordering rank.")
+@click.option("--kind", type=click.Choice(["program", "project"]), default=None)
 @click.option("--parent-project-id", default=None, help="New parent project id.")
 @click.option("--purpose", default=None, help="New project purpose.")
 @click.option("--target-outcome", default=None, help="New expected project outcome.")
@@ -6282,7 +6294,8 @@ def projects_create(
 @click.option("--source-project-name", default=None, help="Compatibility source project name.")
 @click.option("--source-subproject-name", default=None, help="Compatibility source sub-project name.")
 @click.option(
-    "--activation-status",
+    "--authorization",
+    "authorization",
     type=click.Choice(["authorized", "not authorized"]),
     default=None,
     help="Set project authorization. This is the governed path for authorizing a project.",
@@ -6297,6 +6310,7 @@ def projects_update(
     name: str | None,
     status: str | None,
     rank: int | None,
+    kind: str | None,
     parent_project_id: str | None,
     purpose: str | None,
     target_outcome: str | None,
@@ -6319,6 +6333,7 @@ def projects_update(
             "name": name,
             "status": status,
             "rank": rank,
+            "kind": kind,
             "parent_project_id": parent_project_id,
             "purpose": purpose,
             "target_outcome": target_outcome,
@@ -6344,7 +6359,7 @@ def projects_update(
             change_reason=change_reason,
             **updates,
         )
-    except ProjectLifecycleError as exc:
+    except (ProjectLifecycleError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
     finally:
         db.close()
@@ -6358,7 +6373,6 @@ def projects_update(
 @projects_cmd.command("add-item")
 @click.argument("project_id")
 @click.argument("work_item_id")
-@click.option("--role", "membership_role", default="member", show_default=True, help="Membership role.")
 @click.option("--order", "membership_order", type=int, default=None, help="Membership order.")
 @click.option("--source", default="gt projects add-item", show_default=True, help="Membership source.")
 @click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
@@ -6369,7 +6383,6 @@ def projects_add_item(
     ctx: click.Context,
     project_id: str,
     work_item_id: str,
-    membership_role: str,
     membership_order: int | None,
     source: str | None,
     changed_by: str,
@@ -6382,7 +6395,6 @@ def projects_add_item(
         membership = service.add_project_item(
             project_id,
             work_item_id,
-            membership_role=membership_role,
             membership_order=membership_order,
             source=source,
             changed_by=changed_by,
@@ -6396,7 +6408,48 @@ def projects_add_item(
     if json_output:
         click.echo(json.dumps(membership, indent=2, sort_keys=True))
         return
-    click.echo(f"Linked {membership['work_item_id']} to {membership['project_id']} as {membership['membership_role']}")
+    click.echo(f"Linked {membership['work_item_id']} to {membership['project_id']}")
+
+
+@projects_cmd.command("move-item")
+@click.argument("work_item_id")
+@click.option("--from-project", "source_project_id", required=True)
+@click.option("--to-project", "target_project_id", required=True)
+@click.option("--order", "membership_order", type=int, default=None)
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True)
+@click.option("--change-reason", required=True)
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def projects_move_item(
+    ctx: click.Context,
+    work_item_id: str,
+    source_project_id: str,
+    target_project_id: str,
+    membership_order: int | None,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Move a work item atomically without changing project authorization."""
+    from groundtruth_kb.project.membership_resolver import MembershipResolutionError
+
+    db, service = _project_service(ctx)
+    try:
+        result = service.move_project_item(
+            work_item_id,
+            source_project_id,
+            target_project_id,
+            changed_by=changed_by,
+            change_reason=change_reason,
+            membership_order=membership_order,
+        )
+    except (ProjectLifecycleError, MembershipResolutionError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+    click.echo(
+        json.dumps(result, indent=2, sort_keys=True) if json_output else f"Moved {work_item_id} to {target_project_id}"
+    )
 
 
 @projects_cmd.command("remove-item")

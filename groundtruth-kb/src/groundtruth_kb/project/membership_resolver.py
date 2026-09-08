@@ -1,4 +1,4 @@
-"""Typed resolution of exact execution-authority project membership."""
+"""Resolve a work item's single current parent project."""
 
 from __future__ import annotations
 
@@ -44,19 +44,24 @@ def list_current_memberships(db: Any, work_item_id: str) -> list[ExecutionMember
 
 def resolve_execution_membership(db: Any, work_item_id: str) -> ExecutionMembership:
     all_memberships = list_current_memberships(db, work_item_id)
-    executable = [
-        row for row in all_memberships if row.status == "active" and row.membership_role == "execution_authority"
-    ]
+    executable = [row for row in all_memberships if row.status == "active"]
     if not executable:
         raise MembershipResolutionError(
-            "execution_authority_membership_required",
-            f"work item {work_item_id} has no active execution_authority membership",
+            "project_membership_required",
+            f"work item {work_item_id} has no active parent project",
             memberships=[row.to_dict() for row in all_memberships],
         )
     if len(executable) != 1:
         raise MembershipResolutionError(
-            "execution_authority_membership_ambiguous",
-            f"work item {work_item_id} has {len(executable)} active execution_authority memberships",
+            "project_membership_ambiguous",
+            f"work item {work_item_id} has {len(executable)} active project memberships; reconcile to one parent",
+            memberships=[row.to_dict() for row in executable],
+        )
+    project = db.get_project(executable[0].project_id)
+    if project is None or project["kind"] != "project":
+        raise MembershipResolutionError(
+            "invalid_parent_project",
+            f"work item {work_item_id} must belong to an execution project, not a program or missing record",
             memberships=[row.to_dict() for row in executable],
         )
     return executable[0]

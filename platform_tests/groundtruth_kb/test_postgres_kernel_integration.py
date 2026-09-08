@@ -577,7 +577,7 @@ def _create_sqlite_fixture(path: Path) -> sqlite3.Connection:
             )
         elif table_name == "projects":
             definition = (
-                "id TEXT, version INTEGER, name TEXT, status TEXT, start_date TEXT, changed_by TEXT, "
+                "id TEXT, version INTEGER, name TEXT, kind TEXT, authorization TEXT, status TEXT, start_date TEXT, changed_by TEXT, "
                 "changed_at TEXT, change_reason TEXT"
             )
         elif table_name == "project_dependencies":
@@ -622,11 +622,11 @@ def _create_sqlite_fixture(path: Path) -> sqlite3.Connection:
     )
     connection.execute(
         "INSERT INTO projects VALUES "
-        "('PROJECT-A',1,'A','active','2026-09-01','integration','2026-09-01T00:00:00+00:00','fixture')"
+        "('PROJECT-A',1,'A','project','authorized','active','2026-09-01','integration','2026-09-01T00:00:00+00:00','fixture')"
     )
     connection.execute(
         "INSERT INTO projects VALUES "
-        "('PROJECT-GTKB-NEW-WORK-INTAKE',1,'Intake','active',NULL,'integration',"
+        "('PROJECT-GTKB-NEW-WORK-INTAKE',1,'Intake','project','not authorized','active',NULL,'integration',"
         "'2026-09-01T00:00:00+00:00','fixture')"
     )
     connection.execute(
@@ -718,13 +718,7 @@ def test_snapshot_wal_export_authorization_dependency_and_immutable_boundaries(
                 "retire_dependency_ids": ["opaque-retire"],
             },
             "projects": {
-                "authorization_default": "authorized",
-                "authorization_overrides": [
-                    {
-                        "authorization_status": "not authorized",
-                        "project_id": "PROJECT-GTKB-NEW-WORK-INTAKE",
-                    }
-                ],
+                "expected_programs": 0,
                 "expected_authorized": 1,
                 "expected_not_authorized": 1,
                 "expected_total": 2,
@@ -819,7 +813,7 @@ def test_snapshot_wal_export_authorization_dependency_and_immutable_boundaries(
         assert code == 0
         assert exported["status"] == "ok"
         manifest = parse_json_bytes(manifest_path.read_bytes())
-        project_statuses = {row["id"]: row["authorization_status"] for row in manifest["tables"]["projects"]}
+        project_statuses = {row["id"]: row["authorization"] for row in manifest["tables"]["projects"]}
         assert project_statuses == {
             "PROJECT-A": "authorized",
             "PROJECT-GTKB-NEW-WORK-INTAKE": "not authorized",

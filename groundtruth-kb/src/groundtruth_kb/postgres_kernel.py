@@ -169,7 +169,7 @@ _REQUIRED_COLUMNS: dict[str, frozenset[str]] = {
     "work_items": frozenset(
         {"id", "version", "title", "origin", "component", "resolution_status", "stage", *_CHANGE_COLUMNS}
     ),
-    "projects": frozenset({"id", "version", "name", "status", "authorization_status", *_CHANGE_COLUMNS}),
+    "projects": frozenset({"id", "version", "name", "kind", "status", *_CHANGE_COLUMNS}),
     "project_work_item_memberships": frozenset(
         {"id", "version", "project_id", "work_item_id", "status", *_CHANGE_COLUMNS}
     ),
@@ -427,8 +427,9 @@ TABLE_SPECS: dict[str, TableSpec] = {
             "id",
             "version",
             "name",
+            "kind",
             "status",
-            "authorization_status",
+            "authorization",
             "rank",
             "parent_project_id",
             "purpose",
@@ -983,8 +984,7 @@ def validate_transform_plan(value: object) -> dict[str, Any]:
         plan["projects"],
         {
             "expected_total",
-            "authorization_default",
-            "authorization_overrides",
+            "expected_programs",
             "expected_authorized",
             "expected_not_authorized",
         },
@@ -995,21 +995,9 @@ def validate_transform_plan(value: object) -> dict[str, Any]:
     expected_not_authorized = _nonnegative_int(
         projects["expected_not_authorized"], label="not-authorized project count"
     )
-    if expected_authorized + expected_not_authorized != expected_total:
+    expected_programs = _nonnegative_int(projects["expected_programs"], label="program count")
+    if expected_authorized + expected_not_authorized + expected_programs != expected_total:
         raise PostgresKernelError("invalid_transform_plan", "Project authorization counts do not sum to expected_total")
-    if projects["authorization_default"] not in {"authorized", "not authorized"}:
-        raise PostgresKernelError("invalid_transform_plan", "Invalid project authorization default")
-    if not isinstance(projects["authorization_overrides"], list):
-        raise PostgresKernelError("invalid_transform_plan", "Project authorization overrides must be an array")
-    override_ids: set[str] = set()
-    for index, raw_override in enumerate(projects["authorization_overrides"]):
-        override = _exact_keys(raw_override, {"project_id", "authorization_status"}, label=f"project override {index}")
-        project_id = _opaque_id(override["project_id"], label="project override id")
-        if project_id in override_ids:
-            raise PostgresKernelError("invalid_transform_plan", f"Duplicate project override: {project_id}")
-        if override["authorization_status"] not in {"authorized", "not authorized"}:
-            raise PostgresKernelError("invalid_transform_plan", "Invalid project authorization override")
-        override_ids.add(project_id)
 
     dependencies = _exact_keys(
         plan["project_dependencies"],
@@ -1125,10 +1113,15 @@ def _validate_manifest_relationships(tables: Mapping[str, list[dict[str, Any]]])
     for row in tables["work_items"]:
         _require_reference(row["source_spec_id"], ids["specifications"], label="work_items.source_spec_id")
         _require_reference(row["source_test_id"], ids["tests"], label="work_items.source_test_id")
+    projects = {row["id"]: row for row in tables["projects"]}
     for row in tables["projects"]:
         _require_reference(row["parent_project_id"], ids["projects"], label="projects.parent_project_id")
+        parent_id = row["parent_project_id"]
+        if parent_id is not None and (row["kind"] != "project" or projects[parent_id]["kind"] != "program"):
+            raise PostgresKernelError("invalid_manifest", "Only a program can contain execution projects")
 
     membership_pairs: set[tuple[str, str]] = set()
+    active_parents: set[str] = set()
     for row in tables["project_work_item_memberships"]:
         _require_reference(row["project_id"], ids["projects"], label="membership.project_id")
         _require_reference(row["work_item_id"], ids["work_items"], label="membership.work_item_id")
@@ -1136,6 +1129,12 @@ def _validate_manifest_relationships(tables: Mapping[str, list[dict[str, Any]]])
         if pair in membership_pairs:
             raise PostgresKernelError("invalid_manifest", "Duplicate current project/work-item relationship")
         membership_pairs.add(pair)
+        if row["status"] == "active":
+            if projects[row["project_id"]]["kind"] != "project":
+                raise PostgresKernelError("invalid_manifest", "A program cannot contain work items")
+            if row["work_item_id"] in active_parents:
+                raise PostgresKernelError("invalid_manifest", "A work item cannot have multiple active parent projects")
+            active_parents.add(row["work_item_id"])
 
     for row in tables["project_dependencies"]:
         _require_reference(row["dependent_project_id"], ids["projects"], label="dependency.dependent_project_id")
@@ -1187,8 +1186,15 @@ def _normalize_manifest_row(
         raise PostgresKernelError("invalid_manifest", f"Version is outside PostgreSQL range in {table_name}")
     if require_version_one and version != 1:
         raise PostgresKernelError("invalid_manifest", f"Imported version must restart at 1 in {table_name}")
-    if table_name == "projects" and row.get("authorization_status") not in {"authorized", "not authorized"}:
-        raise PostgresKernelError("invalid_manifest", "Invalid projects.authorization_status")
+    if table_name == "projects":
+        if row.get("kind") not in {"program", "project"}:
+            raise PostgresKernelError("invalid_manifest", "Invalid projects.kind")
+        if row["kind"] == "program" and row.get("authorization") is not None:
+            raise PostgresKernelError("invalid_manifest", "Programs have no authorization")
+        if row["kind"] == "project" and row.get("authorization") not in {"authorized", "not authorized"}:
+            raise PostgresKernelError("invalid_manifest", "Invalid projects.authorization")
+        if row["id"] == "PROJECT-GTKB-NEW-WORK-INTAKE" and row.get("authorization") != "not authorized":
+            raise PostgresKernelError("invalid_manifest", "Standing intake must remain not authorized")
     if table_name == "project_dependencies" and row.get("affected_gate") == "authorization":
         raise PostgresKernelError("invalid_manifest", "Project dependency affected_gate was not transformed")
     if table_name == "canonical_terms":
@@ -1376,21 +1382,11 @@ def _current_sqlite_rows(connection: sqlite3.Connection, table_name: str) -> lis
     return list(latest.values())
 
 
-def _project_authorizations(plan: Mapping[str, Any]) -> dict[str, str]:
-    projects = plan["projects"]
-    return {row["project_id"]: row["authorization_status"] for row in projects["authorization_overrides"]}
-
-
 def _transform_source_rows(
     source_rows: Mapping[str, list[dict[str, Any]]], plan: Mapping[str, Any]
 ) -> dict[str, list[dict[str, Any]]]:
     output: dict[str, list[dict[str, Any]]] = {}
     current_spec_versions = {str(row["id"]): int(row["version"]) for row in source_rows["specifications"]}
-    overrides = _project_authorizations(plan)
-    project_ids = {str(row["id"]) for row in source_rows["projects"]}
-    if set(overrides) - project_ids:
-        raise PostgresKernelError("transform_precondition_failed", "Authorization override names an unknown project")
-
     dependency_plan = plan["project_dependencies"]
     retire_ids = set(dependency_plan["retire_dependency_ids"])
     preserve_ids = set(dependency_plan["preserve_dependency_ids"])
@@ -1450,9 +1446,7 @@ def _transform_source_rows(
                     row[column] = _canonical_timestamp(row[column], label=f"{table_name}.{column}")
                 elif column in _DATE_COLUMNS:
                     row[column] = _canonical_date(row[column], label=f"{table_name}.{column}")
-            if table_name == "projects":
-                row["authorization_status"] = overrides.get(str(row["id"]), plan["projects"]["authorization_default"])
-            elif table_name == "project_dependencies":
+            if table_name == "project_dependencies":
                 if source.get("affected_gate") == dependency_plan["affected_gate_from"]:
                     row["affected_gate"] = dependency_plan["affected_gate_to"]
                     gate_transition_count += 1
@@ -1469,13 +1463,15 @@ def _transform_source_rows(
         output[table_name] = transformed
 
     projects = output["projects"]
-    authorized_count = sum(row["authorization_status"] == "authorized" for row in projects)
-    not_authorized_count = len(projects) - authorized_count
+    authorized_count = sum(row["authorization"] == "authorized" for row in projects)
+    not_authorized_count = sum(row["authorization"] == "not authorized" for row in projects)
+    program_count = sum(row["kind"] == "program" for row in projects)
     project_plan = plan["projects"]
     if (
         len(projects) != project_plan["expected_total"]
         or authorized_count != project_plan["expected_authorized"]
         or not_authorized_count != project_plan["expected_not_authorized"]
+        or program_count != project_plan["expected_programs"]
     ):
         raise PostgresKernelError("transform_precondition_failed", "Project count or authorization result drifted")
 

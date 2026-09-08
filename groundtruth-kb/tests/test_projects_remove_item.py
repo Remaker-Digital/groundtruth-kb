@@ -1,20 +1,6 @@
-"""Tests for `gt projects remove-item` (WI-4266).
+"""Removal reconciles extra legacy memberships while preserving one parent.
 
-Covers the spec-derived verification plan from
-`bridge/gtkb-projects-remove-item-cli-slice-1-005.md`:
-
-- removal detaches the active membership (append-only non-active version) (GOV-08)
-- prior active version preserved in history
-- fail-closed when no active membership exists
-- F2 non-active-status invariant (service + CLI): empty / case-insensitive
-  `active` is rejected
-- role/order carry-forward
-- active -> removed -> active round-trip (DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001)
-- CLI wiring
-
-All tests use a temporary KnowledgeDB; none mutate the live groundtruth.db.
-
-(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+New parent changes use the atomic move command. All databases are temporary.
 """
 
 from __future__ import annotations
@@ -32,13 +18,20 @@ PROJECT_ID = "PROJECT-REMOVE-ITEM-TEST"
 WORK_ITEM_ID = "WI-REMOVE-TEST-1"
 
 
+@pytest.fixture(autouse=True)
+def isolated_cli_database(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("GT_DB_PATH", str(tmp_path / "groundtruth.db"))
+    monkeypatch.setenv("GT_PROJECT_ROOT", str(tmp_path))
+
+
 def _seed(
     db_path: Path,
     *,
     membership_role: str = "member",
     membership_order: int | None = 1,
+    legacy_extra: bool = True,
 ) -> None:
-    """Create a project + work item + one active membership."""
+    """Create one current membership, optionally with a pre-correction extra."""
     db = KnowledgeDB(db_path=str(db_path))
     try:
         db.insert_project("Remove Item Test Project", "test", "test setup", id=PROJECT_ID)
@@ -56,11 +49,23 @@ def _seed(
             WORK_ITEM_ID,
             "test",
             "seed active membership",
-            membership_role=membership_role,
+            membership_role="member",
             membership_order=membership_order,
             status="active",
             source="seed",
         )
+        conn = db._get_conn()
+        conn.execute("UPDATE project_work_item_memberships SET membership_role=?", (membership_role,))
+        conn.commit()
+        if legacy_extra:
+            db.insert_project("Other parent", "test", "legacy fixture", id="PROJECT-OTHER")
+            conn.execute(
+                "INSERT INTO project_work_item_memberships "
+                "(id,version,project_id,work_item_id,membership_role,status,changed_by,changed_at,change_reason) "
+                "VALUES ('PWM-LEGACY',1,'PROJECT-OTHER',?,'planning','active','test','2026-01-01','legacy fixture')",
+                (WORK_ITEM_ID,),
+            )
+            conn.commit()
     finally:
         db.close()
 
@@ -144,27 +149,27 @@ def test_remove_rejects_active_status(tmp_path: Path, bad_status: str) -> None:
         db.close()
 
 
-def test_remove_carries_forward_role_and_order(tmp_path: Path) -> None:
+def test_remove_normalizes_legacy_role_and_preserves_order(tmp_path: Path) -> None:
     db_path = tmp_path / "groundtruth.db"
     _seed(db_path, membership_role="reviewer", membership_order=5)
     db, service = _service(db_path)
     try:
         membership = service.remove_project_item(PROJECT_ID, WORK_ITEM_ID, change_reason="detach test")
-        assert membership["membership_role"] == "reviewer"
+        assert membership["membership_role"] == "member"
         assert membership["membership_order"] == 5
         assert membership["source"] == "seed"
     finally:
         db.close()
 
 
-def test_remove_then_readd_cycle(tmp_path: Path) -> None:
+def test_remove_then_move_back(tmp_path: Path) -> None:
     db_path = tmp_path / "groundtruth.db"
     _seed(db_path)
     db, service = _service(db_path)
     try:
         service.remove_project_item(PROJECT_ID, WORK_ITEM_ID, change_reason="detach")
         assert WORK_ITEM_ID not in _active_work_item_ids(db, PROJECT_ID)
-        service.add_project_item(PROJECT_ID, WORK_ITEM_ID, change_reason="re-add")
+        service.move_project_item(WORK_ITEM_ID, "PROJECT-OTHER", PROJECT_ID, change_reason="move back")
         assert WORK_ITEM_ID in _active_work_item_ids(db, PROJECT_ID)
     finally:
         db.close()

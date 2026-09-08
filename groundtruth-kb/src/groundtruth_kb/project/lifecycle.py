@@ -172,6 +172,8 @@ class ProjectLifecycleService:
         notes: str | None = None,
         source_project_name: str | None = None,
         source_subproject_name: str | None = None,
+        authorization: str | None = None,
+        kind: str = "project",
     ) -> dict[str, Any]:
         project = self.db.insert_project(
             _require_nonempty(name, "name"),
@@ -189,13 +191,17 @@ class ProjectLifecycleService:
             notes=notes,
             source_project_name=source_project_name,
             source_subproject_name=source_subproject_name,
+            authorization=authorization,
+            kind=kind,
         )
         if project is None:
             raise ProjectLifecycleError("Project insert did not return a current project")
         return project
 
-    def list_projects(self, *, include_terminal: bool = False, status: str | None = None) -> list[dict[str, Any]]:
-        return self.db.list_projects(include_terminal=include_terminal, status=status)
+    def list_projects(
+        self, *, include_terminal: bool = False, status: str | None = None, kind: str | None = None
+    ) -> list[dict[str, Any]]:
+        return self.db.list_projects(include_terminal=include_terminal, status=status, kind=kind)
 
     def show_project(self, project_id: str) -> dict[str, Any]:
         project = self.db.get_project(_require_nonempty(project_id, "project_id"))
@@ -203,6 +209,13 @@ class ProjectLifecycleService:
             raise ProjectLifecycleError(f"Project not found: {project_id}")
         return {
             "project": project,
+            "projects": [
+                child
+                for child in self.db.list_projects(include_terminal=True)
+                if child.get("parent_project_id") == project_id
+            ]
+            if project["kind"] == "program"
+            else [],
             "work_items": self.db.list_project_work_items(project["id"]),
             "dependencies": self.list_project_dependencies(project["id"]),
             "artifact_links": self.db.list_project_artifact_links(project["id"]),
@@ -231,6 +244,7 @@ class ProjectLifecycleService:
             fields["authorization"] = candidate
 
         allowed_fields = {
+            "kind",
             "name",
             "status",
             "rank",
@@ -256,6 +270,10 @@ class ProjectLifecycleService:
             raise ProjectLifecycleError(f"Unsupported project fields: {', '.join(unknown)}")
 
         values = {field: fields.get(field, current.get(field)) for field in allowed_fields}
+        if values["kind"] == "program":
+            if "authorization" in fields:
+                raise ProjectLifecycleError("Programs have no authorization field")
+            values["authorization"] = None
         current_status = str(current.get("status") or "").strip().lower()
         requested_status = str(values.get("status") or "").strip().lower()
         if current_status not in PROJECT_TERMINAL_STATUSES and requested_status in PROJECT_TERMINAL_STATUSES:
@@ -297,12 +315,14 @@ class ProjectLifecycleService:
             notes=values["notes"],
             source_project_name=values["source_project_name"],
             source_subproject_name=values["source_subproject_name"],
+            authorization=values["authorization"],
+            kind=values["kind"],
         )
         if project is None:
             raise ProjectLifecycleError("Project update did not return a current project")
         return project
 
-    def _link_membership_with_reauthorization(
+    def _append_membership(
         self,
         *,
         project_id: str,
@@ -313,6 +333,7 @@ class ProjectLifecycleService:
     ) -> dict[str, Any]:
         conn = self.db._get_conn()
         try:
+            conn.execute("BEGIN IMMEDIATE")
             membership = link()
             if membership is None:
                 raise ProjectLifecycleError(missing_message)
@@ -358,13 +379,68 @@ class ProjectLifecycleService:
             except ValueError as exc:
                 raise ProjectLifecycleError(str(exc)) from exc
 
-        return self._link_membership_with_reauthorization(
+        return self._append_membership(
             project_id=normalized_project_id,
             changed_by=normalized_changed_by,
             change_reason=normalized_change_reason,
             link=_link,
             missing_message="Project membership insert did not return a current membership",
         )
+
+    def move_project_item(
+        self,
+        work_item_id: str,
+        source_project_id: str,
+        target_project_id: str,
+        *,
+        changed_by: str = PROJECTS_CHANGED_BY,
+        change_reason: str,
+        membership_order: int | None = None,
+    ) -> dict[str, Any]:
+        """Move a single-parent item atomically; neither project's authorization changes."""
+        from groundtruth_kb.project.membership_resolver import resolve_execution_membership
+
+        work_item_id = _require_nonempty(work_item_id, "work_item_id")
+        source_project_id = _require_nonempty(source_project_id, "source_project_id")
+        target_project_id = _require_nonempty(target_project_id, "target_project_id")
+        changed_by = _require_nonempty(changed_by, "changed_by")
+        change_reason = _require_nonempty(change_reason, "change_reason")
+        if source_project_id == target_project_id:
+            raise ProjectLifecycleError("A membership move requires different source and target projects")
+        conn = self.db._get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            current = resolve_execution_membership(self.db, work_item_id)
+            if current.project_id != source_project_id:
+                raise ProjectLifecycleError(
+                    f"Work item {work_item_id} belongs to {current.project_id}, not {source_project_id}"
+                )
+            self.db.link_project_work_item(
+                source_project_id,
+                work_item_id,
+                changed_by,
+                change_reason,
+                id=current.id,
+                status="removed",
+                membership_order=current.membership_order,
+                source=current.source,
+                commit=False,
+            )
+            self.db.link_project_work_item(
+                target_project_id,
+                work_item_id,
+                changed_by,
+                change_reason,
+                membership_order=membership_order,
+                source="gt projects move-item",
+                commit=False,
+            )
+            result = resolve_execution_membership(self.db, work_item_id).to_dict()
+            conn.commit()
+            return result
+        except Exception:
+            conn.rollback()
+            raise
 
     @staticmethod
     def dependency_kind_registry() -> dict[str, Any]:
@@ -808,29 +884,41 @@ class ProjectLifecycleService:
             )
         normalized_project_id = _require_nonempty(project_id, "project_id")
         normalized_work_item_id = _require_nonempty(work_item_id, "work_item_id")
-        current = next(
-            (
-                membership
-                for membership in self.db.list_project_work_items(normalized_project_id)
-                if membership.get("work_item_id") == normalized_work_item_id
-            ),
-            None,
-        )
-        if current is None:
-            raise ProjectLifecycleError(
-                f"No active membership to remove for {normalized_work_item_id} in {normalized_project_id}"
-            )
         normalized_changed_by = _require_nonempty(changed_by, "changed_by")
         normalized_change_reason = _require_nonempty(change_reason, "change_reason")
 
         def _link() -> dict[str, Any] | None:
+            current = next(
+                (
+                    membership
+                    for membership in self.db.list_project_work_items(normalized_project_id)
+                    if membership.get("work_item_id") == normalized_work_item_id
+                ),
+                None,
+            )
+            if current is None:
+                raise ProjectLifecycleError(
+                    f"No active membership to remove for {normalized_work_item_id} in {normalized_project_id}"
+                )
+            active_count = (
+                self.db._get_conn()
+                .execute(
+                    "SELECT COUNT(*) FROM current_project_work_item_memberships "
+                    "WHERE work_item_id=? AND status='active'",
+                    (normalized_work_item_id,),
+                )
+                .fetchone()[0]
+            )
+            if active_count <= 1:
+                raise ProjectLifecycleError("A work item must retain one parent project; use gt projects move-item")
             try:
                 return self.db.link_project_work_item(
                     normalized_project_id,
                     normalized_work_item_id,
                     normalized_changed_by,
                     normalized_change_reason,
-                    membership_role=current.get("membership_role") or "member",
+                    id=current["membership_id"],
+                    membership_role="member",
                     membership_order=current.get("membership_order"),
                     status=normalized_status,
                     source=current.get("membership_source"),
@@ -839,7 +927,7 @@ class ProjectLifecycleService:
             except ValueError as exc:
                 raise ProjectLifecycleError(str(exc)) from exc
 
-        return self._link_membership_with_reauthorization(
+        return self._append_membership(
             project_id=normalized_project_id,
             changed_by=normalized_changed_by,
             change_reason=normalized_change_reason,
@@ -961,7 +1049,7 @@ class ProjectLifecycleService:
                     normalized_work_item_id,
                     normalized_changed_by,
                     normalized_change_reason,
-                    membership_role=current.get("membership_role") or "member",
+                    membership_role="member",
                     membership_order=current.get("membership_order"),
                     status=normalized_status,
                     source=current.get("membership_source"),
@@ -970,7 +1058,7 @@ class ProjectLifecycleService:
             except ValueError as exc:
                 raise ProjectLifecycleError(str(exc)) from exc
 
-        return self._link_membership_with_reauthorization(
+        return self._append_membership(
             project_id=normalized_project_id,
             changed_by=normalized_changed_by,
             change_reason=normalized_change_reason,
@@ -1038,7 +1126,7 @@ class ProjectLifecycleService:
                     work_item_id,
                     _require_nonempty(changed_by, "changed_by"),
                     _require_nonempty(change_reason, "change_reason"),
-                    membership_role=current.get("membership_role") or "member",
+                    membership_role="member",
                     membership_order=start_at + offset,
                     status=current.get("membership_status") or "active",
                     source=current.get("membership_source"),
@@ -1488,7 +1576,7 @@ class ProjectLifecycleService:
                 work_item_id,
                 changed_by,
                 change_reason,
-                membership_role=membership.get("membership_role") or "member",
+                membership_role="member",
                 membership_order=membership.get("membership_order"),
                 status="retired",
                 source=membership.get("membership_source"),

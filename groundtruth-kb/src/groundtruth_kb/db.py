@@ -52,7 +52,7 @@ DEFAULT_SQLITE_BUSY_TIMEOUT_MS = 30_000
 #: re-stamped those databases forward, laundering the omission. The comment here
 #: previously cited ``test_schema_version_matches_migration_count`` as a CI
 #: guard; no such test ever existed. The stamp is no longer trusted alone.
-SCHEMA_VERSION = 19
+SCHEMA_VERSION = 20
 
 _GOVERNED_OPERATIONAL_EVENTS_DDL = """
 -- WI-6992: the operational-event record, derived from the canon section 9
@@ -116,11 +116,9 @@ CREATE INDEX IF NOT EXISTS idx_governed_operational_events_state ON governed_ope
 #: reads, so the WI-6609 property holds: an up-to-date database still takes no
 #: write lock at connect time. Add an entry for any column a migration adds to a
 #: table that already ships rows.
-#: WI-7657 emptied this tuple. Its sole entry named a column on
-#: ``project_authorizations``, a table this build no longer creates. A sentinel
-#: naming an absent relation would report every database stale on every open,
-#: which is the opposite of what a canary is for.
-_SCHEMA_STRUCTURAL_SENTINELS: tuple[tuple[str, str], ...] = ()
+#: Program/project classification is required even when an older database has
+#: an incorrect current-version stamp.
+_SCHEMA_STRUCTURAL_SENTINELS: tuple[tuple[str, str], ...] = (("projects", "kind"),)
 #: WI-7063: DDL restoring a missing sentinel column, run BEFORE ``SCHEMA_SQL``
 #: rather than as an ordinary ``_migrate_schema`` entry. Ordering is the point:
 #: ``_upgrade_schema`` executes ``SCHEMA_SQL`` first and only then calls
@@ -615,6 +613,7 @@ CREATE TABLE IF NOT EXISTS projects (
     id TEXT NOT NULL,
     version INTEGER NOT NULL,
     name TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'project' CHECK (kind IN ('program', 'project')),
     status TEXT NOT NULL DEFAULT 'active',
     rank INTEGER,
     parent_project_id TEXT,
@@ -627,11 +626,13 @@ CREATE TABLE IF NOT EXISTS projects (
     notes TEXT,
     source_project_name TEXT,
     source_subproject_name TEXT,
-    authorization TEXT NOT NULL DEFAULT 'authorized',
+    authorization TEXT DEFAULT 'authorized',
     changed_by TEXT NOT NULL,
     changed_at TEXT NOT NULL,
     change_reason TEXT NOT NULL,
-    UNIQUE(id, version)
+    UNIQUE(id, version),
+    CHECK ((kind = 'program' AND authorization IS NULL) OR
+           (kind = 'project' AND authorization IS NOT NULL AND authorization IN ('authorized', 'not authorized')))
 );
 
 CREATE TABLE IF NOT EXISTS project_work_item_memberships (
@@ -2251,8 +2252,8 @@ class KnowledgeDB:
         )
         conn.commit()
 
-        # Migration 7: first-class project layer over canonical work_items.
-        self._backfill_project_artifacts_from_work_items()
+        # Project membership is explicit canonical state. Opening a database
+        # must never infer projects or memberships from historical text labels.
 
         # Migration 8: TAFE flow definition schema compatibility.
         flow_cols = {row[1] for row in conn.execute("PRAGMA table_info(flow_definitions)").fetchall()}
@@ -2753,251 +2754,78 @@ class KnowledgeDB:
             conn.commit()
             _log.debug("Applied migration: projects.activation_status -> projects.authorization")
 
-    def _backfill_project_artifacts_from_work_items(self) -> None:
-        """Backfill project rows from compatibility work-item project strings.
+        self._migrate_project_kind()
 
-        Concurrency-safe (WI-5292): this keeps ``work_items`` /
-        ``current_work_items`` as the canonical backlog authority and creates
-        only organizing project records plus memberships. The migration is
-        idempotent and never deletes rows.
+    def _migrate_project_kind(self) -> None:
+        """Add explicit planning/program semantics without reclassifying old rows.
 
-        Race safety: the first pass reads the compatibility projection without
-        a write transaction and returns immediately when every required
-        project/subproject/membership row already exists (the common lock-free
-        path). When a gap is observed, one short ``BEGIN IMMEDIATE``
-        transaction re-reads the complete current input after lock acquisition,
-        repeats every existence decision on the same connection, appends only
-        rows still missing, commits once, and rolls back the whole transaction
-        on any exception before re-raising. This resolves concurrent backfill
-        races without a global leader, ``INSERT OR IGNORE`` laundering, or a
-        blanket ``IntegrityError`` suppression.
+        SQLite requires a table rebuild to allow a program's authorization to
+        be NULL. Preserve every historical value, index, trigger and view. Old
+        rows retain their project interpretation until explicit reconciliation.
         """
         conn = self._get_conn()
-        rows = conn.execute(
-            """SELECT id, project_name, subproject_name, implementation_order
-               FROM current_work_items
-               WHERE project_name IS NOT NULL AND TRIM(project_name) <> ''
-               ORDER BY project_name, subproject_name, implementation_order IS NULL, implementation_order, id"""
-        ).fetchall()
-        now = _now()
-
-        def _needs_backfill(conn: sqlite3.Connection) -> bool:
-            for row in rows:
-                project_name = str(row["project_name"]).strip()
-                subproject_name = str(row["subproject_name"]).strip() if row["subproject_name"] else None
-                project_id = _project_id_from_names(project_name)
-                if not self._project_exists_on(conn, project_id):
-                    return True
-                membership_id = _stable_project_link_id("PWM", project_id, str(row["id"]))
-                if not self._project_membership_exists_on(conn, membership_id):
-                    return True
-                if subproject_name:
-                    subproject_id = _project_id_from_names(project_name, subproject_name)
-                    if not self._project_exists_on(conn, subproject_id):
-                        return True
-                    sub_membership_id = _stable_project_link_id("PWM", subproject_id, str(row["id"]))
-                    if not self._project_membership_exists_on(conn, sub_membership_id):
-                        return True
-            return False
-
-        if not _needs_backfill(conn):
+        columns = {row[1]: row for row in conn.execute("PRAGMA table_info(projects)")}
+        if "kind" in columns and not columns["authorization"][3]:
             return
-
+        foreign_keys = int(conn.execute("PRAGMA foreign_keys").fetchone()[0])
+        conn.execute("PRAGMA foreign_keys=OFF")
         try:
             conn.execute("BEGIN IMMEDIATE")
-            try:
-                changed = self._backfill_project_artifacts_on(conn, rows, now)
-                if changed:
-                    conn.commit()
-            except Exception:
+            columns = {row[1]: row for row in conn.execute("PRAGMA table_info(projects)")}
+            if "kind" in columns and not columns["authorization"][3]:
                 conn.rollback()
-                raise
+                return
+            definition = conn.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='projects'"
+            ).fetchone()[0]
+            definition, count = re.subn(
+                r'CREATE TABLE(?: IF NOT EXISTS)? ["`\[]?projects["`\]]?\s*\(',
+                "CREATE TABLE _projects_work_model (",
+                definition,
+                count=1,
+                flags=re.IGNORECASE,
+            )
+            if count != 1:
+                raise ValueError("Cannot identify projects table definition for work-model migration")
+            definition = re.sub(
+                r"\bauthorization\s+TEXT\s+NOT\s+NULL", "authorization TEXT", definition, flags=re.IGNORECASE
+            )
+            if "kind" not in columns:
+                position = definition.index("(") + 1
+                definition = (
+                    definition[:position]
+                    + "\nkind TEXT NOT NULL DEFAULT 'project' CHECK (kind IN ('program', 'project')),"
+                    + definition[position:]
+                )
+                position = definition.rfind(")")
+                definition = (
+                    definition[:position]
+                    + ", CHECK ((kind = 'program' AND authorization IS NULL) OR (kind = 'project' AND authorization IS NOT NULL AND authorization IN ('authorized', 'not authorized')))"
+                    + definition[position:]
+                )
+            dependent_objects = conn.execute(
+                "SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL AND "
+                "(type='view' OR (tbl_name='projects' AND type IN ('index','trigger')))"
+            ).fetchall()
+            conn.execute(definition)
+            names = ",".join('"' + name.replace('"', '""') + '"' for name in columns)
+            conn.execute(f"INSERT INTO _projects_work_model ({names}) SELECT {names} FROM projects")
+            for row in dependent_objects:
+                if row["type"] == "view":
+                    name = row["name"].replace('"', '""')
+                    conn.execute(f'DROP VIEW "{name}"')
+            conn.execute("DROP TABLE projects")
+            conn.execute("ALTER TABLE _projects_work_model RENAME TO projects")
+            for row in dependent_objects:
+                conn.execute(row["sql"])
+            if foreign_keys and conn.execute("PRAGMA foreign_key_check").fetchone() is not None:
+                raise ValueError("Work-model migration would violate foreign keys")
+            conn.commit()
         except Exception:
             conn.rollback()
             raise
-
-    def _project_exists_on(self, conn: sqlite3.Connection, project_id: str) -> bool:
-        row = conn.execute("SELECT 1 FROM current_projects WHERE id = ?", (project_id,)).fetchone()
-        return row is not None
-
-    def _project_membership_exists_on(self, conn: sqlite3.Connection, membership_id: str) -> bool:
-        row = conn.execute(
-            "SELECT 1 FROM current_project_work_item_memberships WHERE id = ?", (membership_id,)
-        ).fetchone()
-        return row is not None
-
-    def _backfill_project_artifacts_on(
-        self,
-        conn: sqlite3.Connection,
-        rows: Any,
-        now: str,
-    ) -> bool:
-        """Append only missing project/subproject/membership rows on ``conn``.
-
-        Repeats every existence decision against the same connection after the
-        caller acquired ``BEGIN IMMEDIATE``, so concurrent backfills append at
-        most one version-1 row per logical identity and leave no partial rows.
-        """
-        changed = False
-        for row in rows:
-            project_name = str(row["project_name"]).strip()
-            subproject_name = str(row["subproject_name"]).strip() if row["subproject_name"] else None
-            work_item_id = str(row["id"])
-            order = row["implementation_order"]
-            project_id = _project_id_from_names(project_name)
-            if not self._project_exists_on(conn, project_id):
-                conn.execute(
-                    """INSERT INTO projects
-                       (id, version, name, status, rank, parent_project_id, purpose, target_outcome,
-                        scope_note, start_date, target_date, completed_at, notes, source_project_name,
-                        source_subproject_name, changed_by, changed_at, change_reason)
-                       VALUES (?, 1, ?, 'active', ?, NULL, NULL, NULL, ?, NULL, NULL, NULL, NULL, ?, NULL,
-                               'project-backfill', ?, ?)""",
-                    (
-                        project_id,
-                        project_name,
-                        order,
-                        "Backfilled from current_work_items.project_name compatibility field.",
-                        project_name,
-                        now,
-                        "Create first-class project record from work_items.project_name compatibility data.",
-                    ),
-                )
-                changed = True
-            changed = (
-                self._insert_project_membership_if_missing_on(
-                    conn=conn,
-                    project_id=project_id,
-                    work_item_id=work_item_id,
-                    membership_role="member",
-                    membership_order=order,
-                    source="work_items.project_name",
-                    changed_by="project-backfill",
-                    change_reason="Backfill project membership from work_items.project_name compatibility data.",
-                    changed_at=now,
-                )
-                or changed
-            )
-
-            if subproject_name:
-                subproject_id = _project_id_from_names(project_name, subproject_name)
-                if not self._project_exists_on(conn, subproject_id):
-                    conn.execute(
-                        """INSERT INTO projects
-                           (id, version, name, status, rank, parent_project_id, purpose, target_outcome,
-                            scope_note, start_date, target_date, completed_at, notes, source_project_name,
-                            source_subproject_name, changed_by, changed_at, change_reason)
-                           VALUES (?, 1, ?, 'active', ?, ?, NULL, NULL, ?, NULL, NULL, NULL, NULL, ?, ?,
-                                   'project-backfill', ?, ?)""",
-                        (
-                            subproject_id,
-                            subproject_name,
-                            order,
-                            project_id,
-                            "Backfilled from current_work_items.subproject_name compatibility field.",
-                            project_name,
-                            subproject_name,
-                            now,
-                            "Create first-class subproject record from work_items.subproject_name compatibility data.",
-                        ),
-                    )
-                    changed = True
-                changed = (
-                    self._insert_project_membership_if_missing_on(
-                        conn=conn,
-                        project_id=subproject_id,
-                        work_item_id=work_item_id,
-                        membership_role="subproject_member",
-                        membership_order=order,
-                        source="work_items.subproject_name",
-                        changed_by="project-backfill",
-                        change_reason="Backfill project membership from work_items.subproject_name compatibility data.",
-                        changed_at=now,
-                    )
-                    or changed
-                )
-        return changed
-
-    def _insert_project_membership_if_missing_on(
-        self,
-        *,
-        conn: sqlite3.Connection,
-        project_id: str,
-        work_item_id: str,
-        membership_role: str,
-        membership_order: int | None,
-        source: str,
-        changed_by: str,
-        change_reason: str,
-        changed_at: str | None = None,
-    ) -> bool:
-        membership_id = _stable_project_link_id("PWM", project_id, work_item_id)
-        if self._project_membership_exists_on(conn, membership_id):
-            return False
-        conn.execute(
-            """INSERT INTO project_work_item_memberships
-               (id, version, project_id, work_item_id, membership_role, membership_order, status,
-                source, changed_by, changed_at, change_reason)
-               VALUES (?, 1, ?, ?, ?, ?, 'active', ?, ?, ?, ?)""",
-            (
-                membership_id,
-                project_id,
-                work_item_id,
-                membership_role,
-                membership_order,
-                source,
-                changed_by,
-                changed_at or _now(),
-                change_reason,
-            ),
-        )
-        return True
-
-    def _project_exists(self, project_id: str) -> bool:
-        row = self._get_conn().execute("SELECT 1 FROM current_projects WHERE id = ?", (project_id,)).fetchone()
-        return row is not None
-
-    def _project_membership_exists(self, membership_id: str) -> bool:
-        row = (
-            self._get_conn()
-            .execute("SELECT 1 FROM current_project_work_item_memberships WHERE id = ?", (membership_id,))
-            .fetchone()
-        )
-        return row is not None
-
-    def _insert_project_membership_if_missing(
-        self,
-        *,
-        project_id: str,
-        work_item_id: str,
-        membership_role: str,
-        membership_order: int | None,
-        source: str,
-        changed_by: str,
-        change_reason: str,
-        changed_at: str | None = None,
-    ) -> bool:
-        membership_id = _stable_project_link_id("PWM", project_id, work_item_id)
-        if self._project_membership_exists(membership_id):
-            return False
-        self._get_conn().execute(
-            """INSERT INTO project_work_item_memberships
-               (id, version, project_id, work_item_id, membership_role, membership_order, status,
-                source, changed_by, changed_at, change_reason)
-               VALUES (?, 1, ?, ?, ?, ?, 'active', ?, ?, ?, ?)""",
-            (
-                membership_id,
-                project_id,
-                work_item_id,
-                membership_role,
-                membership_order,
-                source,
-                changed_by,
-                changed_at or _now(),
-                change_reason,
-            ),
-        )
-        return True
+        finally:
+            conn.execute(f"PRAGMA foreign_keys={foreign_keys}")
 
     @staticmethod
     def _auto_detect_spec_type(spec_id: str, declared_type: str) -> str:
@@ -5842,44 +5670,93 @@ class KnowledgeDB:
         notes: str | None = None,
         source_project_name: str | None = None,
         source_subproject_name: str | None = None,
+        authorization: str | None = None,
+        kind: str | None = None,
     ) -> dict[str, Any] | None:
         """Insert a new project version.
 
         Projects are lifecycle/planning artifacts over work items. They do not
         replace ``work_items`` or ``current_work_items`` as backlog authority.
         """
-        project_id = id or _project_id_from_names(name)
-        version = self._next_project_version(project_id)
         conn = self._get_conn()
-        conn.execute(
-            """INSERT INTO projects
-               (id, version, name, status, rank, parent_project_id, purpose, target_outcome,
-                scope_note, start_date, target_date, completed_at, notes, source_project_name,
-                source_subproject_name, changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                project_id,
-                version,
-                name,
-                status,
-                rank,
-                parent_project_id,
-                purpose,
-                target_outcome,
-                scope_note,
-                start_date,
-                target_date,
-                completed_at,
-                notes,
-                source_project_name,
-                source_subproject_name,
-                changed_by,
-                _now(),
-                change_reason,
-            ),
-        )
-        conn.commit()
-        return self.get_project(project_id)
+        owns_transaction = not conn.in_transaction
+        if owns_transaction:
+            conn.execute("BEGIN IMMEDIATE")
+        try:
+            project_id = id or (f"PROGRAM-{_stable_slug(name)}" if kind == "program" else _project_id_from_names(name))
+            current = self.get_project(project_id)
+            kind = kind if kind is not None else (current["kind"] if current else "project")
+            if kind not in {"program", "project"}:
+                raise ValueError("kind must be program or project")
+            if kind == "program":
+                if authorization is not None:
+                    raise ValueError("Programs have no authorization field")
+                if self.list_project_work_items(project_id):
+                    raise ValueError(
+                        "Move direct work-item memberships into execution projects before making a program"
+                    )
+                if parent_project_id is not None:
+                    raise ValueError("A program sequences execution projects and does not have a parent project")
+            elif authorization is None:
+                authorization = (
+                    current["authorization"]
+                    if current and current["kind"] == "project"
+                    else ("not authorized" if project_id == "PROJECT-GTKB-NEW-WORK-INTAKE" else "authorized")
+                )
+            if kind == "project" and authorization not in _VALID_AUTHORIZATION_VALUES:
+                raise ValueError(f"authorization must be one of {sorted(_VALID_AUTHORIZATION_VALUES)}")
+            if project_id == "PROJECT-GTKB-NEW-WORK-INTAKE" and authorization != "not authorized":
+                raise ValueError("The standing intake project must remain not authorized")
+            if parent_project_id is not None:
+                parent = self.get_project(parent_project_id)
+                if parent is None or parent["kind"] != "program":
+                    raise ValueError("An execution project's parent must be an existing program")
+                if parent_project_id == project_id:
+                    raise ValueError("A project cannot contain itself")
+            if (
+                kind == "project"
+                and self._get_conn()
+                .execute("SELECT 1 FROM current_projects WHERE parent_project_id=? LIMIT 1", (project_id,))
+                .fetchone()
+            ):
+                raise ValueError("An execution project cannot contain other projects; use a program")
+            version = self._next_project_version(project_id)
+            conn.execute(
+                """INSERT INTO projects
+                   (id, version, name, status, rank, parent_project_id, purpose, target_outcome,
+                    scope_note, start_date, target_date, completed_at, notes, source_project_name,
+                    source_subproject_name, authorization, kind, changed_by, changed_at, change_reason)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    project_id,
+                    version,
+                    name,
+                    status,
+                    rank,
+                    parent_project_id,
+                    purpose,
+                    target_outcome,
+                    scope_note,
+                    start_date,
+                    target_date,
+                    completed_at,
+                    notes,
+                    source_project_name,
+                    source_subproject_name,
+                    authorization,
+                    kind,
+                    changed_by,
+                    _now(),
+                    change_reason,
+                ),
+            )
+            if owns_transaction:
+                conn.commit()
+            return self.get_project(project_id)
+        except Exception:
+            if owns_transaction:
+                conn.rollback()
+            raise
 
     def get_project(self, project_id: str) -> dict[str, Any] | None:
         """Retrieve a project by its identifier.
@@ -5898,6 +5775,7 @@ class KnowledgeDB:
         *,
         status: str | None = None,
         include_terminal: bool = False,
+        kind: str | None = None,
     ) -> list[dict[str, Any]]:
         """List current projects with optional status filtering.
 
@@ -5910,6 +5788,11 @@ class KnowledgeDB:
         """
         query = "SELECT * FROM current_projects WHERE 1=1"
         params: list[Any] = []
+        if kind is not None:
+            if kind not in {"program", "project"}:
+                raise ValueError("kind must be program or project")
+            query += " AND kind = ?"
+            params.append(kind)
         if status:
             query += " AND status = ?"
             params.append(status)
@@ -5935,36 +5818,64 @@ class KnowledgeDB:
         id: str | None = None,
         commit: bool = True,
     ) -> dict[str, Any] | None:
-        """Link a project to a canonical work item without duplicating the work item."""
-        if self.get_project(project_id) is None:
-            raise ValueError(f"Project {project_id} not found")
-        if self.get_work_item(work_item_id) is None:
-            raise ValueError(f"Work item {work_item_id} not found")
-        membership_id = id or _stable_project_link_id("PWM", project_id, work_item_id)
-        version = self._next_project_membership_version(membership_id)
+        """Append a membership version while preserving the single-parent invariant."""
         conn = self._get_conn()
-        conn.execute(
-            """INSERT INTO project_work_item_memberships
-               (id, version, project_id, work_item_id, membership_role, membership_order,
-                status, source, changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                membership_id,
-                version,
-                project_id,
-                work_item_id,
-                membership_role,
-                membership_order,
-                status,
-                source,
-                changed_by,
-                _now(),
-                change_reason,
-            ),
-        )
-        if commit:
-            conn.commit()
-        return self.get_project_work_item_membership(membership_id)
+        owns_transaction = not conn.in_transaction
+        if owns_transaction:
+            conn.execute("BEGIN IMMEDIATE")
+        try:
+            project = self.get_project(project_id)
+            if project is None:
+                raise ValueError(f"Project {project_id} not found")
+            work_item = self.get_work_item(work_item_id)
+            if work_item is None:
+                raise ValueError(f"Work item {work_item_id} not found")
+            if membership_role != "member":
+                raise ValueError("Membership has no authority or planning role; use the single parent project")
+            if status == "active" and project["kind"] != "project":
+                raise ValueError("Programs sequence projects and cannot contain work items")
+            membership_id = id or _stable_project_link_id("PWM", project_id, work_item_id)
+            previous = self.get_project_work_item_membership(membership_id)
+            if previous and (previous["project_id"], previous["work_item_id"]) != (project_id, work_item_id):
+                raise ValueError("A membership identifier cannot be rebound to different records")
+            if status == "active":
+                conflicts = conn.execute(
+                    "SELECT project_id FROM current_project_work_item_memberships "
+                    "WHERE work_item_id=? AND status='active' AND id<>?",
+                    (work_item_id, membership_id),
+                ).fetchall()
+                if conflicts:
+                    parents = ", ".join(row["project_id"] for row in conflicts)
+                    raise ValueError(
+                        f"Work item {work_item_id} already belongs to {parents}; move its membership atomically"
+                    )
+            conn.execute(
+                """INSERT INTO project_work_item_memberships
+                   (id, version, project_id, work_item_id, membership_role, membership_order,
+                    status, source, changed_by, changed_at, change_reason)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    membership_id,
+                    self._next_project_membership_version(membership_id),
+                    project_id,
+                    work_item_id,
+                    "member",
+                    membership_order,
+                    status,
+                    source,
+                    changed_by,
+                    _now(),
+                    change_reason,
+                ),
+            )
+            membership = self.get_project_work_item_membership(membership_id)
+            if owns_transaction and commit:
+                conn.commit()
+            return membership
+        except Exception:
+            if owns_transaction:
+                conn.rollback()
+            raise
 
     def get_project_work_item_membership(self, membership_id: str) -> dict[str, Any] | None:
         """Retrieve a project work item membership by ID.
