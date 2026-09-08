@@ -694,6 +694,139 @@ def wrap_cmd(
         click.echo(result["summary"])
 
 
+@session_group.group("worktree")
+def worktree_group() -> None:
+    """Manage this session's own git checkout.
+
+    Sessions share one working tree and one index by default, which is how
+    commit 2f688c4ca folded 1,756 paths of other sessions' uncommitted work into
+    a single unreviewed commit. A session checkout gives this session bytes that
+    no peer can move, and gives a reviewer a preimage no peer can move either.
+    """
+
+
+def _resolve_session_context_id(project_root: Path, db_path: Path, explicit: str | None) -> str:
+    """Resolve this session's context id from its init binding."""
+    from groundtruth_kb.session.attestation.service import RoleAttestationError, binding_for_context
+    from groundtruth_kb.session.worktree import is_session_context_id
+
+    if explicit:
+        if not is_session_context_id(explicit):
+            raise click.ClickException(f"{explicit!r} is not a session context id")
+        return explicit
+
+    try:
+        from scripts.gtkb_session_id import MARKER_CONTINUITY_ORDER, resolve_session_id
+    except ImportError:  # pragma: no cover - direct-script sys.path shape
+        from gtkb_session_id import (  # type: ignore[no-redef]
+            MARKER_CONTINUITY_ORDER,
+            resolve_session_id,
+        )
+
+    native = resolve_session_id(order=MARKER_CONTINUITY_ORDER)
+    if not native:
+        raise click.ClickException(
+            "no native session id is visible in this environment; "
+            "a session checkout is keyed to the init binding, so run the canonical ::init first"
+        )
+    try:
+        return binding_for_context(db_path, native).session_context_id
+    except RoleAttestationError as exc:
+        raise click.ClickException(
+            f"no session-init binding for native context {native!r}: {exc}. Run the canonical ::init first."
+        ) from exc
+
+
+@worktree_group.command("open")
+@click.option("--base", default=None, help="Ref to branch from; defaults to the integration ref.")
+@click.option("--integration-ref", default="develop", show_default=True)
+@click.option("--session-context-id", default=None, help="Override the resolved binding; for diagnostics.")
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def worktree_open_cmd(
+    ctx: click.Context,
+    base: str | None,
+    integration_ref: str,
+    session_context_id: str | None,
+    json_output: bool,
+) -> None:
+    """Create this session's checkout, or report the one that already exists."""
+    from groundtruth_kb.session.worktree import SessionWorktreeError, open_worktree
+
+    config = _resolve_config(ctx)
+    root, db_path = Path(config.project_root), Path(config.db_path)
+    resolved = _resolve_session_context_id(root, db_path, session_context_id)
+    try:
+        state = open_worktree(root, resolved, db_path=db_path, base=base, integration_ref=integration_ref)
+    except SessionWorktreeError as exc:
+        raise click.ClickException(f"[{exc.code}] {exc}") from exc
+    if json_output:
+        click.echo(json.dumps(state.as_dict(), indent=2, sort_keys=True))
+    else:
+        click.echo(str(state.path))
+
+
+@worktree_group.command("show")
+@click.option("--integration-ref", default="develop", show_default=True)
+@click.option("--session-context-id", default=None, help="Inspect another session's checkout by id.")
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def worktree_show_cmd(
+    ctx: click.Context,
+    integration_ref: str,
+    session_context_id: str | None,
+    json_output: bool,
+) -> None:
+    """Report one session checkout: branch, head, work state, ownership."""
+    from groundtruth_kb.session.worktree import show_worktree
+
+    config = _resolve_config(ctx)
+    root, db_path = Path(config.project_root), Path(config.db_path)
+    resolved = _resolve_session_context_id(root, db_path, session_context_id)
+    state = show_worktree(root, resolved, db_path=db_path, integration_ref=integration_ref)
+    if json_output:
+        click.echo(json.dumps(state.as_dict() if state else None, indent=2, sort_keys=True))
+    elif state is None:
+        click.echo(f"no checkout for {resolved}; run: gt session worktree open")
+    else:
+        click.echo(str(state.path))
+        click.echo(
+            f"  branch={state.branch} classification={state.classification} "
+            f"tracked_dirty={state.tracked_dirty} untracked={state.untracked} "
+            f"head_is_ancestor={state.head_is_ancestor}"
+        )
+
+
+@worktree_group.command("close")
+@click.option("--integration-ref", default="develop", show_default=True)
+@click.option("--session-context-id", default=None, help="Close another session's checkout by id.")
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def worktree_close_cmd(
+    ctx: click.Context,
+    integration_ref: str,
+    session_context_id: str | None,
+    json_output: bool,
+) -> None:
+    """Remove a checkout that holds nothing. Refuses whenever it holds work."""
+    from groundtruth_kb.session.worktree import SessionWorktreeError, close_worktree
+
+    config = _resolve_config(ctx)
+    root, db_path = Path(config.project_root), Path(config.db_path)
+    resolved = _resolve_session_context_id(root, db_path, session_context_id)
+    try:
+        state = close_worktree(root, resolved, db_path=db_path, integration_ref=integration_ref)
+    except SessionWorktreeError as exc:
+        if exc.code == "holds_work":
+            click.echo(f"[{exc.code}] {exc}", err=True)
+            ctx.exit(2)
+        raise click.ClickException(f"[{exc.code}] {exc}") from exc
+    if json_output:
+        click.echo(json.dumps(state.as_dict(), indent=2, sort_keys=True))
+    else:
+        click.echo(f"removed {state.path}")
+
+
 @session_group.group("dispatcher")
 def dispatcher_group() -> None:
     """Validate and tick dispatch-envelope rules."""
