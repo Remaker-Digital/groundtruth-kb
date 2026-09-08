@@ -43,7 +43,6 @@ GOOSE_REQUIRED_BLOCKING_HOOK_SCRIPTS = frozenset(
         "credential-scan.py",
         "formal-artifact-approval-gate.py",
         "bridge-compliance-gate.py",
-        "implementation-start-gate.py",
         "lo-file-safety-gate.py",
         "sot-read-discipline.py",
         "narrative-artifact-approval-gate.py",

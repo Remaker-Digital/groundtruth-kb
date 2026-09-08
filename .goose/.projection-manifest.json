@@ -21,7 +21,6 @@
     ".goose/hooks/formal-artifact-approval-gate.py",
     ".goose/hooks/glossary-expansion.py",
     ".goose/hooks/gov09-capture.py",
-    ".goose/hooks/implementation-start-gate.py",
     ".goose/hooks/intake-classifier.py",
     ".goose/hooks/kb-not-markdown.py",
     ".goose/hooks/lo-file-safety-gate.py",

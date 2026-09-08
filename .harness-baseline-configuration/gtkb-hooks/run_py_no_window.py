@@ -35,7 +35,6 @@ BATCHES: dict[str, tuple[tuple[str, ...], ...]] = {
         ("cmd", ".codex/gtkb-hooks/credential-scan.cmd"),
         ("cmd", ".codex/gtkb-hooks/formal-artifact-approval.cmd"),
         ("cmd", ".codex/gtkb-hooks/bridge-compliance-gate.cmd"),
-        ("cmd", ".codex/gtkb-hooks/implementation-start-gate.cmd"),
         ("cmd", ".codex/gtkb-hooks/directive-enforcement.cmd"),
         ("cmd", ".codex/gtkb-hooks/lo-file-safety-gate.cmd"),
         ("cmd", ".codex/gtkb-hooks/code-quality-baseline-proposal-check.cmd"),
@@ -44,7 +43,6 @@ BATCHES: dict[str, tuple[tuple[str, ...], ...]] = {
     ),
     "pretooluse-apply-patch": (
         ("cmd", ".codex/gtkb-hooks/workstream-focus.cmd"),
-        ("cmd", ".codex/gtkb-hooks/implementation-start-gate.cmd"),
         ("cmd", ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.cmd"),
         ("py", ".codex/gtkb-hooks/document_author_provenance_gate.py"),
     ),

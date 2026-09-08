@@ -33,37 +33,14 @@ Loyal Opposition MUST reject all implementation proposals that are not linked to
 specifications. Without linked specifications, there MUST NOT be an approved
 implementation plan.
 
-## Mechanical Implementation-Start Gate
+## Requirement Sufficiency
 
-Protected implementation mutations require a current local authorization packet
-created from a live latest-`GO` bridge entry:
-
-```text
-python scripts/implementation_authorization.py begin --bridge-id <document-name>
-```
-
-The authorization packet is only machine-readable proof that the current session
-is scoped to one GO'd bridge proposal. It is not a substitute for the bridge
-`GO`, it does not authorize formal GOV/ADR/DCL/SPEC mutation, and it does not
-weaken any formal-artifact approval gate.
-
-Project-scoped implementation authorization records may satisfy the
-owner-approval evidence for a bounded project scope, but they are additive to
-this gate. A project authorization does not authorize implementation until a
-bridge proposal cites the applicable project/work evidence, Loyal Opposition
-records `GO`, and the implementation-start packet is created from that GO.
-
-The hook `scripts/implementation_start_gate.py` must deny protected source,
-test, script, hook, configuration, deployment, repository-state, and KB-mutation
-work when the packet is missing, corrupt, expired, stale relative to
-bridge state, or outside the GO'd proposal's `target_paths`.
-
-Implementation proposals filed after this gate lands must include a
-`Requirement Sufficiency` subsection. It must state either that existing
-requirements are sufficient and cite the governing requirements, or that new or
-revised requirements are required before implementation. The second state
-authorizes only requirement/specification capture through the governed approval
-path, not source/config/test implementation.
+Implementation proposals must include a `Requirement Sufficiency` subsection.
+It must state either that existing requirements are sufficient and cite the
+governing requirements, or that new or revised requirements are required before
+implementation. The second state authorizes only requirement/specification
+capture through the governed approval path, not source/config/test
+implementation.
 
 ## Review Independence Gate
 
@@ -104,8 +81,6 @@ If Prime Builder catches itself about to implement without a GO:
 2. Draft a bridge proposal describing the intended change
 3. Submit through the governed bridge writer/dispatcher path as NEW
 4. Wait for Loyal Opposition GO before proceeding
-5. Run `python scripts/implementation_authorization.py begin --bridge-id <document-name>`
-   before protected implementation edits
 
 If Loyal Opposition is reviewing an implementation proposal:
 1. Confirm the proposal links all relevant specifications.

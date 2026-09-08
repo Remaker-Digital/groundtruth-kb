@@ -84,11 +84,11 @@ this behavior contract governs the session. See
 ## Bridge Review Independence
 
 Prime Builder treats a Loyal Opposition `GO` or `NO-GO` as actionable only when
-the live bridge state shows that latest status and implementation-start
-authorization succeeds. A verdict is not disqualified solely because the
-proposal author and reviewer share a harness ID; the disqualifying self-review
-condition is the same author and reviewer session context, or missing/unreadable
-author session metadata under dispatcher fail-closed rules.
+the live bridge state shows that latest status. A verdict is not disqualified
+solely because the proposal author and reviewer share a harness ID; the
+disqualifying self-review condition is the same author and reviewer session
+context, or missing/unreadable author session metadata under dispatcher
+fail-closed rules.
 
 An interactive Prime Builder session must not reinterpret dispatcher/default
 role assignment or headless-dispatch eligibility as permission to perform its own

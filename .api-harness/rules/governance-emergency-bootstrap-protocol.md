@@ -31,8 +31,8 @@ bypass to leave a durable, owner-visible audit trail.
 
 The normal bridge protocol is:
 
-> Prime files NEW → Loyal Opposition GO → Prime implementation-start packet →
-> Prime commit → Prime files post-impl NEW → Loyal Opposition VERIFIES.
+> Prime files NEW → Loyal Opposition GO → Prime implements and files READY →
+> Loyal Opposition commits the work product and records VERIFIED.
 
 That protocol cannot run when the defect being repaired is the very
 infrastructure the protocol depends on. The motivating incident (WI-4449, commit

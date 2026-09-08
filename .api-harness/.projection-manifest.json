@@ -21,7 +21,6 @@
     ".api-harness/hooks/formal-artifact-approval-gate.py",
     ".api-harness/hooks/glossary-expansion.py",
     ".api-harness/hooks/gov09-capture.py",
-    ".api-harness/hooks/implementation-start-gate.py",
     ".api-harness/hooks/intake-classifier.py",
     ".api-harness/hooks/kb-not-markdown.py",
     ".api-harness/hooks/lo-file-safety-gate.py",

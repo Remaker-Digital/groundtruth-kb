@@ -86,7 +86,6 @@ def test_codex_hooks_file_may_be_empty(codex_hooks: dict[str, Any]) -> None:
 def test_claude_keeps_non_dispatch_governance_hooks(claude_settings: dict[str, Any]) -> None:
     commands = _hook_commands(claude_settings.get("hooks", {}))
     expected_fragments = (
-        ".claude/hooks/implementation-start-gate.py",
         ".claude/hooks/bridge-compliance-gate.py",
         "scripts/session_self_initialization.py",
     )

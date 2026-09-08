@@ -130,32 +130,26 @@ def test_dispatcher_status_rules_match_prime_and_lo_bridge_boundaries() -> None:
         assert "NO-ACTION" in _read_text(relative_path), relative_path
 
 
-def test_protected_mutation_surfaces_expose_go_packet_and_claim_requirements() -> None:
-    review_gate = _read_text(".claude/rules/codex-review-gate.md")
+def test_protected_mutation_surfaces_expose_go_and_claim_requirements() -> None:
+    review_gate = _read_text(".claude/rules/counterpart-review-gate.md")
     bridge_protocol = _read_text(".claude/rules/file-bridge-protocol.md")
-    protected_guard = _read_text("scripts/protected_mutation_guard.py")
     codex_hooks = _read_text(".codex/hooks.json")
+    codex_batches = _read_text(".codex/gtkb-hooks/run_py_no_window.py")
     claude_settings = _read_text(".claude/settings.json")
 
-    for needle in (
-        "current local authorization packet",
-        "implementation_authorization.py begin",
-        "Loyal Opposition GO status",
-    ):
-        assert needle in review_gate
+    assert "Loyal Opposition GO status" in review_gate
 
     assert "work-intent claim" in bridge_protocol
     assert "bridge_claim_cli.py claim" in bridge_protocol
 
-    for needle in ("missing_bridge_go", "missing_implementation_packet", "missing_or_stale_claim"):
-        assert needle in protected_guard
-
     assert "--batch pretooluse-bash" in codex_hooks
     assert "--batch pretooluse-apply-patch" in codex_hooks
-    assert "bridge-compliance-gate.cmd" in _read_text(".codex/gtkb-hooks/run_py_no_window.py")
-    assert "implementation-start-gate.cmd" in _read_text(".codex/gtkb-hooks/run_py_no_window.py")
-    assert "implementation-start-gate.py" in claude_settings
+    assert "bridge-compliance-gate.cmd" in codex_batches
     assert "bridge-compliance-gate.py" in claude_settings
+
+    # The mechanical implementation-start gate is retired (owner ruling 2026-09-07).
+    assert "implementation-start-gate.cmd" not in codex_batches
+    assert "implementation-start-gate.py" not in claude_settings
 
 
 def test_owner_action_visibility_contract_is_present_for_blocking_decisions() -> None:

@@ -113,15 +113,3 @@ def test_bridge_compliance_gate_block_logs_denial(tmp_path: Path) -> None:
 
     assert result["hookSpecificOutput"]["permissionDecision"] == "deny"
     assert _first_record(telemetry)["gate"] == "bridge-compliance-gate"
-
-
-def test_implementation_start_gate_block_logs_denial(tmp_path: Path) -> None:
-    telemetry = tmp_path / "impl.jsonl"
-    result = _run(
-        _ROOT / "scripts" / "implementation_start_gate.py",
-        {"tool_name": "Write", "tool_input": {"file_path": str(_ROOT / "pyproject.toml")}},
-        telemetry,
-    )
-
-    assert result["hookSpecificOutput"]["permissionDecision"] == "deny"
-    assert _first_record(telemetry)["gate"] == "implementation-start-gate"

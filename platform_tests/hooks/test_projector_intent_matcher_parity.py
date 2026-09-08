@@ -1,12 +1,12 @@
 """Regression lock: intent-matcher parity in the harness projector profiles (WI-6542).
 
-The implementation-start gate is registered per harness by neutral INTENT, and the
-projector translates each intent into that harness's native tool-matcher vocabulary
+Baseline hooks are registered per harness by neutral INTENT, and the projector
+translates each intent into that harness's native tool-matcher vocabulary
 through ``[harnesses.<name>.intent_matchers]`` in ``scripts/harness_projection/profiles.toml``.
 
 A matcher that omits a tool the harness actually exposes is a silent authorization
-bypass: the gate simply never fires for work done through the omitted tool, and
-nothing reports an error. WI-5481 recorded exactly that failure for a shell tool
+bypass: a blocking gate simply never fires for work done through the omitted tool,
+and nothing reports an error. WI-5481 recorded exactly that failure for a shell tool
 missing from ``shell_exec``.
 
 That specific gap is closed in the profile today. These tests exist so it cannot
@@ -120,7 +120,7 @@ def test_required_tool_coverage_is_present(profile: str) -> None:
         missing = [tool for tool in required_tools if tool not in alternatives]
         assert not missing, (
             f"{profile}.{intent} no longer matches {missing}; "
-            f"the implementation-start gate would not fire for work done through "
+            f"the blocking gates registered on that intent would not fire for work done through "
             f"those tools. Declared: {declared[intent]!r}"
         )
 
@@ -134,6 +134,5 @@ def test_shell_exec_still_covers_both_shell_tools() -> None:
     alternatives = _alternatives(_matchers("claude")["shell_exec"])
     for tool in ("Bash", "PowerShell"):
         assert tool in alternatives, (
-            f"shell_exec dropped {tool!r} - this reopens the WI-5481 "
-            f"implementation-start gate bypass. Declared: {alternatives}"
+            f"shell_exec dropped {tool!r} - this reopens the WI-5481 shell-tool gate bypass. Declared: {alternatives}"
         )

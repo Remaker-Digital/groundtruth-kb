@@ -31,7 +31,6 @@ CODEX_CMD_PYTHON_HOOK_WRAPPERS = (
     REPO_ROOT / ".codex" / "gtkb-hooks" / "destructive-gate.cmd",
     REPO_ROOT / ".codex" / "gtkb-hooks" / "directive-enforcement.cmd",
     REPO_ROOT / ".codex" / "gtkb-hooks" / "formal-artifact-approval.cmd",
-    REPO_ROOT / ".codex" / "gtkb-hooks" / "implementation-start-gate.cmd",
     REPO_ROOT / ".codex" / "gtkb-hooks" / "lo-file-safety-gate.cmd",
     REPO_ROOT / ".codex" / "gtkb-hooks" / "session-start.cmd",
     REPO_ROOT / ".codex" / "gtkb-hooks" / "session-stop.cmd",
@@ -81,7 +80,7 @@ def test_codex_hooks_registry_uses_hidden_launchers_without_retired_dispatch_wor
     assert all("run_py_no_window.py" not in command for command in commands)
     assert all("run_cmd_no_window.py" not in command for command in commands)
     assert any("--batch pretooluse-bash" in command for command in commands)
-    assert "implementation-start-gate.cmd" in batch_catalog_text
+    assert "implementation-start-gate.cmd" not in batch_catalog_text, "gate retired by owner ruling (2026-09-07)"
     assert "auto_finalize_sweep.py" not in batch_catalog_text, "sweep disabled by owner decision (2026-09-07)"
     forbidden = (
         "cross_" + "harness_" + "bridge_" + "trigger.py",

@@ -14,7 +14,7 @@ Before any third-party package or repository is imported or integrated into the 
 ## 2. Strict Containment and Isolation
 
 > [!IMPORTANT]
-> No third-party code, package, or tool may mutate GT-KB governance artifacts, rule files, or databases unless explicitly authorized by the owner via an approved work item and authorization packet.
+> No third-party code, package, or tool may mutate GT-KB governance artifacts, rule files, or databases unless explicitly authorized by the owner via an approved work item and a Loyal Opposition GO.
 
 - Third-party packages must run under strict security sandboxes.
 - Network access by third-party packages must be blocked or isolated to authorized endpoints.

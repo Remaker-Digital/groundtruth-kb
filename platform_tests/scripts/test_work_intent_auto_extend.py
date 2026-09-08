@@ -224,27 +224,3 @@ def test_repeated_auto_extend_bounded_by_max_hold(tmp_path: Path, monkeypatch) -
     # Final state is pinned exactly at the cap.
     final = registry.current_holder("go-thread", project_root=tmp_path)
     assert final["implementation_deadline"] == "2026-06-13T02:00:00Z"
-
-
-# --- Gate-verdict invariant --------------------------------------------------
-
-
-def test_gate_does_not_auto_extend_an_allowed_mutation(monkeypatch) -> None:
-    """An allowed protected mutation has no hidden lease-extension side effect."""
-    import scripts.bridge_work_intent_registry as registry_pkg
-    import scripts.implementation_start_gate as gate
-
-    # Force the gate down the authorized path with a protected, mutating target.
-    monkeypatch.setattr(gate, "changed_paths", lambda payload: (["scripts/foo.py"], True))
-    monkeypatch.setattr(gate, "is_protected_path", lambda path: True)
-    monkeypatch.setattr(gate, "resolve_work_intent_session_id", lambda payload: "sess")
-    monkeypatch.setattr(
-        gate, "validate_targets", lambda root, protected, session_id=None: {"packet": {"bridge_id": "thread"}}
-    )
-    monkeypatch.setattr(gate, "work_intent_claim_block_reason", lambda root, bridge_id, session_id: None)
-
-    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
-    monkeypatch.setattr(registry_pkg, "maybe_auto_extend", lambda *args, **kwargs: calls.append((args, kwargs)))
-
-    assert gate.gate_decision({}) == {}
-    assert calls == []

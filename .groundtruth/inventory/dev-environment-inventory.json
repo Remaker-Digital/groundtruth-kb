@@ -5,7 +5,7 @@
     "script_hash": "sha256:dcd84fc545cab6a5e9adeae7915b7f3c56abfc14d672728aaab1cf4a2a3362ec",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-09-08T00:14:14Z",
+  "generated_at": "2026-09-08T16:11:22Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -83,7 +83,7 @@
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 35,
+      "count": 34,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/_shell_payload.py",
@@ -102,7 +102,6 @@
         ".claude/hooks/formal-artifact-approval-gate.py",
         ".claude/hooks/glossary-expansion.py",
         ".claude/hooks/gov09-capture.py",
-        ".claude/hooks/implementation-start-gate.py",
         ".claude/hooks/intake-classifier.py",
         ".claude/hooks/kb-not-markdown.py",
         ".claude/hooks/lo-file-safety-gate.py",
@@ -124,7 +123,7 @@
     },
     "codex_hooks": {
       "classification": "public_safe",
-      "count": 29,
+      "count": 28,
       "items": [
         ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.py",
         ".codex/gtkb-hooks/bridge-compliance-gate-bash-adapter.py",
@@ -149,7 +148,6 @@
         ".codex/gtkb-hooks/destructive-gate.cmd",
         ".codex/gtkb-hooks/directive-enforcement.cmd",
         ".codex/gtkb-hooks/formal-artifact-approval.cmd",
-        ".codex/gtkb-hooks/implementation-start-gate.cmd",
         ".codex/gtkb-hooks/lo-file-safety-gate.cmd",
         ".codex/gtkb-hooks/session-start.cmd",
         ".codex/gtkb-hooks/session-stop.cmd",

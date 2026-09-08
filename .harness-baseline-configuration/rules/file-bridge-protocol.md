@@ -39,7 +39,7 @@ specifications. Loyal Opposition review must independently check the list for
 omissions. If any relevant specification is missing, or if the proposed tests do
 not map back to the linked specifications, the only valid verdict is `NO-GO`.
 
-## Mandatory Implementation-Start Authorization Metadata
+## Mandatory Implementation Proposal Metadata
 
 Implementation proposals that request source, test, script, hook,
 configuration, deployment, repository-state, or KB-mutation work must include:
@@ -51,26 +51,6 @@ configuration, deployment, repository-state, or KB-mutation work must include:
    `New or revised requirement required before implementation`.
 3. A specification-derived verification plan mapping the linked requirements to
    tests or verification commands.
-
-When an implementation proposal depends on a project-scoped implementation
-authorization, it should also cite machine-readable metadata lines for
-`Project Authorization`, `Project`, and the applicable `Work Item`. These lines
-let `scripts/implementation_authorization.py` validate that the authorization is
-current, active, unexpired, tied to the cited project, and either includes the
-work item or covers it through active project membership. Project authorization
-metadata never broadens `target_paths` and never replaces the live latest-`GO`
-requirement.
-
-After Loyal Opposition records `GO`, Prime Builder runs:
-
-```text
-python scripts/implementation_authorization.py begin --bridge-id <document-name>
-```
-
-The resulting packet is session-local implementation-scope evidence. It must be
-derived from bridge state, the approved proposal file, and the GO
-verdict file. It expires, fails closed on bridge status drift, and cannot
-replace formal-artifact approval packets.
 
 ## Mandatory Pre-Filing Preflight Subsection
 

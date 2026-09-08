@@ -1423,82 +1423,6 @@ def _parse_model_pin_confirmed_at(value: Any) -> datetime | None:
     return None
 
 
-def _json_file_contains_hook(path: Path, expected: str) -> bool:
-    try:
-        data = json.loads(_require_utf8_text(path))
-    except (OSError, json.JSONDecodeError):
-        return False
-    return expected in json.dumps(data, sort_keys=True)
-
-
-def _check_dispatcher_config_cli_only_guard(target: Path) -> ToolCheck:
-    """WI-4767: dispatcher rules.toml must be mutated only through CLI transactions."""
-    check_name = "Dispatcher config CLI-only guard"
-    platform_src = target / "groundtruth-kb" / "src" / "groundtruth_kb"
-    if not platform_src.is_dir():
-        return ToolCheck(
-            name=check_name,
-            required=True,
-            found=False,
-            status="pass",
-            message="Dispatcher config CLI-only guard skipped outside the GT-KB platform workspace",
-        )
-
-    findings: list[str] = []
-
-    gate_path = target / "scripts" / "implementation_start_gate.py"
-    guard_path = target / "scripts" / "protected_mutation_guard.py"
-    transactions_path = target / "groundtruth-kb" / "src" / "groundtruth_kb" / "bridge_dispatch_transactions.py"
-    codex_hooks_path = target / ".codex" / "hooks.json"
-    claude_settings_path = target / ".claude" / "settings.json"
-
-    try:
-        gate_text = _require_utf8_text(gate_path)
-    except OSError as exc:
-        findings.append(f"implementation-start gate unreadable: {exc}")
-        gate_text = ""
-    if "GTKB-DISPATCHER-CONFIG-CLI-ONLY" not in gate_text or "config/dispatcher/rules.toml" not in gate_text:
-        findings.append("implementation-start gate lacks dispatcher config CLI-only denial marker")
-
-    try:
-        guard_text = _require_utf8_text(guard_path)
-    except OSError as exc:
-        findings.append(f"protected mutation guard unreadable: {exc}")
-        guard_text = ""
-    if "dispatcher_config_cli_only" not in guard_text or "config/dispatcher/rules.toml" not in guard_text:
-        findings.append("protected mutation guard lacks stable dispatcher_config_cli_only reason")
-
-    if not _json_file_contains_hook(codex_hooks_path, "implementation-start-gate"):
-        findings.append(".codex/hooks.json does not register implementation-start-gate")
-    if not _json_file_contains_hook(claude_settings_path, "implementation-start-gate.py"):
-        findings.append(".claude/settings.json does not register implementation-start-gate.py")
-
-    try:
-        transaction_text = _require_utf8_text(transactions_path)
-    except OSError as exc:
-        findings.append(f"bridge dispatch transaction module unreadable: {exc}")
-        transaction_text = ""
-    for function_name in ("set_eligibility", "set_weights", "set_caps", "add_harness", "remove_harness"):
-        if f"def {function_name}(" not in transaction_text:
-            findings.append(f"dispatcher transaction helper missing: {function_name}")
-
-    if findings:
-        return ToolCheck(
-            name=check_name,
-            required=True,
-            found=True,
-            status="fail",
-            message="Dispatcher config CLI-only guard incomplete: " + "; ".join(findings),
-        )
-    return ToolCheck(
-        name=check_name,
-        required=True,
-        found=True,
-        status="pass",
-        message="Dispatcher config CLI-only guard active for direct edits; governed dispatch config CLI is present",
-    )
-
-
 def _check_ollama_harness(target: Path) -> ToolCheck:
     """WI-4323: four-store Ollama harness consistency check (Phase-1 Child 3).
 
@@ -7669,7 +7593,6 @@ def run_doctor(
         # intentionally out of scope; owner confirmation metadata is the durable
         # evidence.
         checks.append(_check_harness_model_pin_reconfirmation(target))
-        checks.append(_check_dispatcher_config_cli_only_guard(target))
         # WI-4323: Ollama harness 4-store consistency. Verifies identities + registry +
         # capability registry + routing TOML agree about ollama→D / status=registered /
         # role=[] / tool_calling models. Authorized by

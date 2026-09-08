@@ -22,7 +22,6 @@
     ".cursor/hooks/formal-artifact-approval-gate.py",
     ".cursor/hooks/glossary-expansion.py",
     ".cursor/hooks/gov09-capture.py",
-    ".cursor/hooks/implementation-start-gate.py",
     ".cursor/hooks/intake-classifier.py",
     ".cursor/hooks/kb-not-markdown.py",
     ".cursor/hooks/lo-file-safety-gate.py",

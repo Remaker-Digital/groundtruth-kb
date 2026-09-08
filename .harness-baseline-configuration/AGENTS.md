@@ -71,8 +71,8 @@ Interactive sessions MAY override the dispatcher/default role metadata for in-se
 
 When the resolved session role is Prime Builder, the active AI harness may
 create, modify, or delete project files as needed to execute Prime Builder work
-without separate file-by-file owner approval, subject to the bridge GO and
-implementation-start gates below.
+without separate file-by-file owner approval, subject to the bridge GO gate
+below.
 
 Prime Builder file authority does not waive formal artifact governance,
 credential-safety requirements, release/deployment approval gates, or the normal

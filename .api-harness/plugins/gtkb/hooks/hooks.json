@@ -43,11 +43,6 @@
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/implementation-start-gate.py",
-        "timeout": 5,
-        "blocking": true
-      },
-      {
         "command": "python .goose/hooks/directive-enforcement-adapter.py",
         "timeout": 5,
         "blocking": true

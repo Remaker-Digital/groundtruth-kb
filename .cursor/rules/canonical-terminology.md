@@ -322,7 +322,7 @@ allowed mutation classes, forbidden operations, included/excluded work items
 and specs, optional expiration, and audit metadata. It can remove repeated
 owner-approval prompts for bounded project implementation work, but it does not
 replace implementation proposals, Loyal Opposition review, bridge `GO`,
-proposal `target_paths`, implementation-start packets, spec-derived tests,
+proposal `target_paths`, spec-derived tests,
 implementation reports, or verification.
 
 *Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#project-authorization).*

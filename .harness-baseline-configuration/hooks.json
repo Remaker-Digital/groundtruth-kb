@@ -59,10 +59,6 @@
         "timeout": 5
       },
       {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\implementation-start-gate.py",
-        "timeout": 5
-      },
-      {
         "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\directive-enforcement-claude-adapter.py",
         "timeout": 5
       },
@@ -118,11 +114,6 @@
       },
       {
         "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\lo-file-safety-gate.py",
-        "matcher": "Write",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\implementation-start-gate.py",
         "matcher": "Write",
         "timeout": 5
       }

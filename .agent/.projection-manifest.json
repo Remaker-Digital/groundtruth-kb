@@ -21,7 +21,6 @@
     ".agent/hooks/formal-artifact-approval-gate.py",
     ".agent/hooks/glossary-expansion.py",
     ".agent/hooks/gov09-capture.py",
-    ".agent/hooks/implementation-start-gate.py",
     ".agent/hooks/intake-classifier.py",
     ".agent/hooks/kb-not-markdown.py",
     ".agent/hooks/lo-file-safety-gate.py",

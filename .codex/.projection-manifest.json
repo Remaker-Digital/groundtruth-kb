@@ -21,7 +21,6 @@
     ".codex/hooks/formal-artifact-approval-gate.py",
     ".codex/hooks/glossary-expansion.py",
     ".codex/hooks/gov09-capture.py",
-    ".codex/hooks/implementation-start-gate.py",
     ".codex/hooks/intake-classifier.py",
     ".codex/hooks/kb-not-markdown.py",
     ".codex/hooks/lo-file-safety-gate.py",

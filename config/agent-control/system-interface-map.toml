@@ -665,7 +665,7 @@ startup_visibility = "compact_status"
 dashboard_visibility = "summary_only"
 harness_caveats = "Authorization packets prove session-local scope for protected implementation edits; they do not replace bridge GO or formal artifact approval evidence."
 verification_method = "platform_tests/scripts/test_implementation_start_gate.py and platform_tests/scripts/test_hook_registration_parity.py"
-lifecycle_state = "active"
+lifecycle_state = "retired"
 related_specs = ["GOV-FILE-BRIDGE-AUTHORITY-001", "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001", "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001"]
 related_deliberations = ["DELIB-S321-IMPL-PROPOSAL-SPEC-LINKAGE", "DELIB-S321-SPEC-CREATION-STANDING-AUTH"]
 
