@@ -226,6 +226,37 @@ class _NoWindowsExpandGroup(click.Group):
     arbitrary file lists when taking arguments from sys.argv.
     """
 
+    @staticmethod
+    def _uses_authority(ctx: click.Context, *, defer_config_error: bool = False) -> bool:
+        path = ctx.params.get("config_path") or (ctx.obj or {}).get("config")
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                return GTConfig.load(config_path=Path(path) if path else None).authority_url is not None
+        except (GTConfigError, FileNotFoundError) as error:
+            if defer_config_error:
+                # The administrative database commands have their own canonical
+                # JSON configuration-error renderer. They still fail before I/O.
+                return False
+            raise click.ClickException(str(error)) from error
+
+    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
+        if self._uses_authority(ctx, defer_config_error=cmd_name == "db") and cmd_name != "service":
+            from groundtruth_kb.cli_authority import NATIVE_COMMANDS
+
+            command = NATIVE_COMMANDS.get(cmd_name)
+            if command is None:
+                raise click.ClickException(f"'{cmd_name}' has no native authority route. SQLite fallback is disabled.")
+            return command
+        return super().get_command(ctx, cmd_name)
+
+    def list_commands(self, ctx: click.Context) -> list[str]:
+        if self._uses_authority(ctx):
+            from groundtruth_kb.cli_authority import NATIVE_COMMANDS
+
+            return sorted([*NATIVE_COMMANDS, "service"])
+        return super().list_commands(ctx)
+
     def main(
         self,
         args: Any = None,
@@ -260,6 +291,10 @@ def main(ctx: click.Context, config_path: str | None) -> None:
 main.add_command(bridge_group)
 main.add_command(session_group)
 main.add_command(skills_group)
+
+from groundtruth_kb.cli_authority import service_group  # noqa: E402
+
+main.add_command(service_group)
 
 
 @main.group("env")

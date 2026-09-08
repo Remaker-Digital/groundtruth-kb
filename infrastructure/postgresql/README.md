@@ -82,3 +82,66 @@ outside the repository and all linked worktrees:
 Passing this drill demonstrates its isolated recovery scenario. Ordinary CLI
 cutover, the authority service, unattended backup/retention, service startup
 and a storage-loss recovery copy require their own operational validation.
+
+## Native domain service qualification
+
+The package's `authority` dependency extra installs FastAPI and Uvicorn. The
+service runs from the installed GT-KB package through `gt service serve`;
+its source is `groundtruth_kb/native_authority.py` and `authority_api.py`.
+It opens PostgreSQL using the server process's libpq configuration. A client
+receives no database credentials, connection string, or raw-table interface.
+
+This interface is currently for migration qualification. It provides typed
+specification, test, test-plan/phase, program/project, work-intake, membership,
+and current task-context operations. Session binding, bridge/claim lifecycle,
+review/finalization, complete domain coverage, and authority cutover must be
+qualified before ordinary agents are resumed. Attribution on these initial
+correction operations is not a session binding or a review assertion.
+
+For an explicitly initialized disposable database, an operator config selects
+the PostgreSQL service under `[postgresql]`. Start its HTTP service with:
+
+    gt --config <operator-config.toml> service serve --port 8765
+
+The listener binds only `127.0.0.1`. It refuses browser-origin requests, emits
+no access log by default, and uses the workstation's host/filesystem boundary.
+It does not implement or enable a LAN endpoint. The service process alone needs
+`PGSERVICEFILE`; do not place credential paths in harness configuration.
+
+A separate client config selects that service:
+
+```toml
+[groundtruth]
+project_root = "E:/GT-KB"
+authority_url = "http://127.0.0.1:8765"
+```
+
+Configuring `authority_url` changes ordinary CLI routing. Unavailable services
+and unsupported native commands fail without opening SQLite. Do not set this
+value in the live GT-KB config as a partial migration.
+
+The supported client commands include:
+
+    gt --config <client-config.toml> service status --json
+    gt --config <client-config.toml> projects list --kind program --json
+    gt --config <client-config.toml> projects show <project-id> --json
+    gt --config <client-config.toml> backlog show <work-item-id> --json
+    gt --config <client-config.toml> context work-item <work-item-id> --json
+    gt --config <client-config.toml> spec record --id <spec-id> --fields-file <fields.json> --expected-version <version> --actor <attribution> --change-reason <reason> --json
+
+`record` takes a JSON object of the domain fields to change. The service retains
+omitted fields, validates references and types, compares the expected version,
+and returns committed current state. Version 0 asserts that the record is new.
+It creates no permission packet or authorization history. Work intake requires
+one execution project, a current specification, an executable test, and an
+active test-plan phase. A membership move updates both relationships in one
+transaction and preserves each project's authorization. Programs never receive
+work-item membership or an authorization value.
+
+The behavioral qualification is
+`platform_tests/groundtruth_kb/test_native_authority_service.py`. It uses unique
+schemas on an explicitly selected disposable PostgreSQL service, including
+rollback after a partial transaction, competing writers, dependency write skew,
+exact JSON-number transport, and separate CLI processes with no PostgreSQL
+environment settings. The client test points SQLite at a deliberately invalid
+file and verifies its bytes are unchanged after success and service outage.

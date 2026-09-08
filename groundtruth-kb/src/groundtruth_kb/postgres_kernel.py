@@ -1,8 +1,8 @@
-"""Native PostgreSQL shadow kernel and current-state migration boundary.
+"""Native PostgreSQL domain transactions and current-state migration boundary.
 
-This module has no import-time database effects.  Agent-facing operations are
-exposed by ``gt db postgres``; the functions here provide the typed service
-boundary used by that CLI and by independently reviewed integration tests.
+This module has no import-time database effects. Operator initialization and
+migration use ``gt db postgres``. Ordinary clients use the typed domain service;
+they do not receive these internal storage primitives or database credentials.
 """
 
 from __future__ import annotations
@@ -2336,6 +2336,61 @@ class PostgresKernel:
         reason: str,
     ) -> dict[str, Any]:
         """Apply one trusted-service current-row CAS with literal row locking."""
+        self._validate_mutation(table, identity, expected_version, new_state, actor, reason)
+        with self.transaction(serializable=False) as transaction:
+            return transaction.mutate(
+                table=table,
+                identity=identity,
+                expected_version=expected_version,
+                new_state=new_state,
+                actor=actor,
+                reason=reason,
+            )
+
+    @contextmanager
+    def transaction(self, *, read_only: bool = False, serializable: bool = True) -> Iterator[PostgresTransaction]:
+        """Group a domain operation and its readback in one native transaction.
+
+        Serializable writes prevent write skew between membership and project
+        operations. Read-only requests see one repeatable canonical snapshot.
+        Conflicts are returned to the caller; effects are never retried blindly.
+        """
+        connection = self._connect()
+        try:
+            with connection, connection.transaction():
+                cursor = connection.cursor()
+                if read_only:
+                    cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+                elif serializable:
+                    cursor.execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
+                else:
+                    # A single-row CAS waits on that row and compares its latest
+                    # version. Multi-record domain operations use serializable.
+                    cursor.execute("SET TRANSACTION ISOLATION LEVEL READ COMMITTED")
+                self._configure_transaction(cursor)
+                schema_name = self._current_schema(cursor)
+                self._require_exact_schema(cursor, schema_name)
+                yield PostgresTransaction(self, cursor, schema_name)
+        except PostgresKernelError:
+            raise
+        except (SerializationFailure, DeadlockDetected, LockNotAvailable, UniqueViolation) as exc:
+            raise PostgresKernelError(
+                "retryable_conflict", "Concurrent canonical state changed; read current state before retrying"
+            ) from exc
+        except (CheckViolation, ForeignKeyViolation, NotNullViolation, DataError) as exc:
+            raise PostgresKernelError("invalid_state", "PostgreSQL rejected the domain state") from exc
+        except Exception as exc:
+            raise PostgresKernelError("postgres_operation_failed", "PostgreSQL domain operation failed") from exc
+
+    @staticmethod
+    def _validate_mutation(
+        table: str,
+        identity: Mapping[str, str],
+        expected_version: int,
+        new_state: Mapping[str, Any],
+        actor: str,
+        reason: str,
+    ) -> tuple[TableSpec, dict[str, str], dict[str, Any]]:
         if table not in TABLE_SPECS:
             raise PostgresKernelError("unknown_record_type", "Record type is not part of the PostgreSQL kernel")
         spec = TABLE_SPECS[table]
@@ -2371,120 +2426,198 @@ class PostgresKernel:
         _opaque_id(actor, label="actor")
         _opaque_id(reason, label="reason")
 
-        connection = self._connect()
-        try:
-            with connection, connection.transaction():
-                cursor = connection.cursor()
-                self._configure_transaction(cursor)
-                schema_name = self._current_schema(cursor)
-                self._require_exact_schema(cursor, schema_name)
-                where = sql.SQL(" AND ").join(
-                    sql.SQL("{}=%s").format(sql.Identifier(column)) for column in spec.identity_columns
-                )
-                identity_values = [normalized_identity[column] for column in spec.identity_columns]
-                cursor.execute(
-                    sql.SQL("SELECT {} FROM {}.{} WHERE {} FOR UPDATE").format(
-                        _select_columns(spec),
-                        sql.Identifier(schema_name),
-                        sql.Identifier(table),
-                        where,
-                    ),
-                    identity_values,
-                )
-                existing_raw = cursor.fetchone()
-                if existing_raw is None:
-                    if expected_version != 0:
-                        raise PostgresKernelError("cas_conflict", "Current record does not match expected version")
-                    cursor.execute(
-                        sql.SQL("INSERT INTO {}.{} ({}) VALUES ({})").format(
-                            sql.Identifier(schema_name),
-                            sql.Identifier(table),
-                            sql.SQL(",").join(sql.Identifier(column) for column in spec.columns),
-                            sql.SQL(",").join(sql.Placeholder() for _ in spec.columns),
-                        ),
-                        [self._adapt_value(column, candidate[column], spec) for column in spec.columns],
-                    )
-                    prior: dict[str, Any] | None = None
-                    cursor.execute(
-                        sql.SQL(
-                            "INSERT INTO {}.record_history "
-                            "(record_type,record_id,prior_version,new_version,prior_state,new_state,actor,reason) "
-                            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
-                        ).format(sql.Identifier(schema_name)),
-                        (
-                            table,
-                            Jsonb(normalized_identity, dumps=_postgres_json_dumps),
-                            None,
-                            candidate["version"],
-                            None,
-                            Jsonb(candidate, dumps=_postgres_json_dumps),
-                            actor,
-                            reason,
-                        ),
-                    )
-                else:
-                    prior = _normalize_pg_row(dict(existing_raw), spec)
-                    if prior.get("version") != expected_version:
-                        raise PostgresKernelError("cas_conflict", "Current record does not match expected version")
-                    cursor.execute(
-                        sql.SQL(
-                            "INSERT INTO {}.record_history "
-                            "(record_type,record_id,prior_version,new_version,prior_state,new_state,actor,reason) "
-                            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
-                        ).format(sql.Identifier(schema_name)),
-                        (
-                            table,
-                            Jsonb(normalized_identity, dumps=_postgres_json_dumps),
-                            prior["version"],
-                            candidate["version"],
-                            Jsonb(prior, dumps=_postgres_json_dumps),
-                            Jsonb(candidate, dumps=_postgres_json_dumps),
-                            actor,
-                            reason,
-                        ),
-                    )
-                    assignments = [column for column in spec.columns if column not in spec.identity_columns]
-                    cursor.execute(
-                        sql.SQL("UPDATE {}.{} SET {} WHERE {}").format(
-                            sql.Identifier(schema_name),
-                            sql.Identifier(table),
-                            sql.SQL(",").join(
-                                sql.SQL("{}=%s").format(sql.Identifier(column)) for column in assignments
-                            ),
-                            where,
-                        ),
-                        [self._adapt_value(column, candidate[column], spec) for column in assignments]
-                        + identity_values,
-                    )
-                cursor.execute(
-                    sql.SQL("SELECT {} FROM {}.{} WHERE {}").format(
-                        _select_columns(spec),
-                        sql.Identifier(schema_name),
-                        sql.Identifier(table),
-                        where,
-                    ),
-                    identity_values,
-                )
-                readback = cursor.fetchone()
-                if readback is None:
-                    raise PostgresKernelError(
-                        "mutation_readback_mismatch",
-                        "PostgreSQL current-row readback is missing",
-                    )
-                normalized_readback = _normalize_pg_row(dict(readback), spec)
-                if canonical_json_bytes(normalized_readback) != canonical_json_bytes(candidate):
-                    raise PostgresKernelError(
-                        "mutation_readback_mismatch",
-                        "PostgreSQL current-row readback differs from requested state",
-                    )
-                return {"record": normalized_readback, "status": "updated" if prior else "created"}
-        except PostgresKernelError:
-            raise
-        except (SerializationFailure, DeadlockDetected, LockNotAvailable, UniqueViolation) as exc:
+        return spec, normalized_identity, candidate
+
+    def _mutate_with_cursor(
+        self,
+        cursor: Any,
+        schema_name: str,
+        *,
+        table: str,
+        identity: Mapping[str, str],
+        expected_version: int,
+        new_state: Mapping[str, Any],
+        actor: str,
+        reason: str,
+    ) -> dict[str, Any]:
+        """Write and verify a current row inside the caller's transaction."""
+        spec, normalized_identity, candidate = self._validate_mutation(
+            table,
+            identity,
+            expected_version,
+            new_state,
+            actor,
+            reason,
+        )
+        where = sql.SQL(" AND ").join(
+            sql.SQL("{}=%s").format(sql.Identifier(column)) for column in spec.identity_columns
+        )
+        identity_values = [normalized_identity[column] for column in spec.identity_columns]
+        cursor.execute(
+            sql.SQL("SELECT {} FROM {}.{} WHERE {} FOR UPDATE").format(
+                _select_columns(spec),
+                sql.Identifier(schema_name),
+                sql.Identifier(table),
+                where,
+            ),
+            identity_values,
+        )
+        existing_raw = cursor.fetchone()
+        if existing_raw is None:
+            if expected_version != 0:
+                raise PostgresKernelError("cas_conflict", "Current record does not match expected version")
+            cursor.execute(
+                sql.SQL("INSERT INTO {}.{} ({}) VALUES ({})").format(
+                    sql.Identifier(schema_name),
+                    sql.Identifier(table),
+                    sql.SQL(",").join(sql.Identifier(column) for column in spec.columns),
+                    sql.SQL(",").join(sql.Placeholder() for _ in spec.columns),
+                ),
+                [self._adapt_value(column, candidate[column], spec) for column in spec.columns],
+            )
+            prior: dict[str, Any] | None = None
+            cursor.execute(
+                sql.SQL(
+                    "INSERT INTO {}.record_history "
+                    "(record_type,record_id,prior_version,new_version,prior_state,new_state,actor,reason) "
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
+                ).format(sql.Identifier(schema_name)),
+                (
+                    table,
+                    Jsonb(normalized_identity, dumps=_postgres_json_dumps),
+                    None,
+                    candidate["version"],
+                    None,
+                    Jsonb(candidate, dumps=_postgres_json_dumps),
+                    actor,
+                    reason,
+                ),
+            )
+        else:
+            prior = _normalize_pg_row(dict(existing_raw), spec)
+            if prior.get("version") != expected_version:
+                raise PostgresKernelError("cas_conflict", "Current record does not match expected version")
+            cursor.execute(
+                sql.SQL(
+                    "INSERT INTO {}.record_history "
+                    "(record_type,record_id,prior_version,new_version,prior_state,new_state,actor,reason) "
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
+                ).format(sql.Identifier(schema_name)),
+                (
+                    table,
+                    Jsonb(normalized_identity, dumps=_postgres_json_dumps),
+                    prior["version"],
+                    candidate["version"],
+                    Jsonb(prior, dumps=_postgres_json_dumps),
+                    Jsonb(candidate, dumps=_postgres_json_dumps),
+                    actor,
+                    reason,
+                ),
+            )
+            assignments = [column for column in spec.columns if column not in spec.identity_columns]
+            cursor.execute(
+                sql.SQL("UPDATE {}.{} SET {} WHERE {}").format(
+                    sql.Identifier(schema_name),
+                    sql.Identifier(table),
+                    sql.SQL(",").join(sql.SQL("{}=%s").format(sql.Identifier(column)) for column in assignments),
+                    where,
+                ),
+                [self._adapt_value(column, candidate[column], spec) for column in assignments] + identity_values,
+            )
+        cursor.execute(
+            sql.SQL("SELECT {} FROM {}.{} WHERE {}").format(
+                _select_columns(spec),
+                sql.Identifier(schema_name),
+                sql.Identifier(table),
+                where,
+            ),
+            identity_values,
+        )
+        readback = cursor.fetchone()
+        if readback is None:
             raise PostgresKernelError(
-                "retryable_conflict", "PostgreSQL mutation encountered a retryable conflict"
-            ) from exc
-        except (CheckViolation, ForeignKeyViolation, NotNullViolation, DataError) as exc:
-            raise PostgresKernelError("invalid_state", "PostgreSQL rejected the current-row state") from exc
-        except Exception as exc:
-            raise PostgresKernelError("postgres_operation_failed", "PostgreSQL mutation failed") from exc
+                "mutation_readback_mismatch",
+                "PostgreSQL current-row readback is missing",
+            )
+        normalized_readback = _normalize_pg_row(dict(readback), spec)
+        if canonical_json_bytes(normalized_readback) != canonical_json_bytes(candidate):
+            raise PostgresKernelError(
+                "mutation_readback_mismatch",
+                "PostgreSQL current-row readback differs from requested state",
+            )
+        return {"record": normalized_readback, "status": "updated" if prior else "created"}
+
+
+class PostgresTransaction:
+    """Internal row primitives; public callers use typed domain services."""
+
+    def __init__(self, kernel: PostgresKernel, cursor: Any, schema: str) -> None:
+        self.kernel = kernel
+        self.cursor = cursor
+        self.schema = schema
+
+    def get(self, table: str, identity: Mapping[str, str], *, lock: bool = False) -> dict[str, Any] | None:
+        spec = TABLE_SPECS[table]
+        if set(identity) != set(spec.identity_columns):
+            raise PostgresKernelError("invalid_identity", "Record identity does not match its domain")
+        where = sql.SQL(" AND ").join(sql.SQL("{}=%s").format(sql.Identifier(c)) for c in identity)
+        self.cursor.execute(
+            sql.SQL("SELECT {} FROM {}.{} WHERE {}{}").format(
+                _select_columns(spec),
+                sql.Identifier(self.schema),
+                sql.Identifier(table),
+                where,
+                sql.SQL(" FOR UPDATE" if lock else ""),
+            ),
+            list(identity.values()),
+        )
+        row = self.cursor.fetchone()
+        return _normalize_pg_row(dict(row), spec) if row else None
+
+    def list(
+        self,
+        table: str,
+        *,
+        filters: Mapping[str, Any] | None = None,
+        after: str | None = None,
+        limit: int = 200,
+        search: str | None = None,
+    ) -> list[dict[str, Any]]:
+        spec = TABLE_SPECS[table]
+        if spec.identity_columns != ("id",) or not 1 <= limit <= 1000:
+            raise PostgresKernelError("invalid_query", "This query requires an id domain and a limit from 1 to 1000")
+        terms, values = [], []
+        for column, value in (filters or {}).items():
+            if column not in spec.columns or column in spec.json_columns:
+                raise PostgresKernelError("invalid_query", "Unsupported domain filter")
+            terms.append(sql.SQL("{} IS NOT DISTINCT FROM %s").format(sql.Identifier(column)))
+            values.append(value)
+        if after is not None:
+            terms.append(sql.SQL('id COLLATE "C" > %s'))
+            values.append(after)
+        if search is not None:
+            search_columns = [c for c in ("title", "name", "description", "purpose") if c in spec.columns]
+            if not search_columns:
+                raise PostgresKernelError("invalid_query", "Search is unavailable for this domain")
+            terms.append(
+                sql.SQL("({})").format(
+                    sql.SQL(" OR ").join(
+                        sql.SQL("strpos(lower(coalesce({},'')),lower(%s)) > 0").format(sql.Identifier(c))
+                        for c in search_columns
+                    )
+                )
+            )
+            values.extend([search] * len(search_columns))
+        self.cursor.execute(
+            sql.SQL('SELECT {} FROM {}.{} WHERE {} ORDER BY id COLLATE "C" LIMIT %s').format(
+                _select_columns(spec),
+                sql.Identifier(self.schema),
+                sql.Identifier(table),
+                sql.SQL(" AND ").join(terms) if terms else sql.SQL("true"),
+            ),
+            [*values, limit],
+        )
+        return [_normalize_pg_row(dict(row), spec) for row in self.cursor.fetchall()]
+
+    def mutate(self, **request: Any) -> dict[str, Any]:
+        return self.kernel._mutate_with_cursor(self.cursor, self.schema, **request)

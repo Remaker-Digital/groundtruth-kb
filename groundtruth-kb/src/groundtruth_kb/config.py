@@ -16,6 +16,7 @@ import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 _DEFAULT_BRAND_COLOR = "#2563eb"
 _DEFAULT_APP_TITLE = "GroundTruth KB"
@@ -82,6 +83,7 @@ class GTConfig:
     gate_config: dict[str, dict[str, Any]] = field(default_factory=dict)
     backup: BackupConfig = field(default_factory=BackupConfig)
     postgresql: PostgreSQLConfig = field(default_factory=PostgreSQLConfig)
+    authority_url: str | None = None
 
     @classmethod
     def load(cls, config_path: Path | None = None, **overrides: object) -> GTConfig:
@@ -153,6 +155,8 @@ class GTConfig:
             )
 
         config = cls(**{k: v for k, v in merged.items() if k in cls.__dataclass_fields__})
+        if config.authority_url is not None:
+            config.authority_url = validate_authority_url(config.authority_url)
         # Only resolve paths to absolute when they came from config/overrides, not defaults
         if "project_root" in merged and not config.project_root.is_absolute():
             config.project_root = anchor / config.project_root
@@ -383,6 +387,7 @@ def _load_env() -> dict[str, Any]:
         "GT_LOGO_URL": "logo_url",
         "GT_LEGAL_FOOTER": "legal_footer",
         "GT_GOVERNANCE_GATES": "governance_gates",
+        "GT_AUTHORITY_URL": "authority_url",
     }
     result: dict[str, Any] = {}
     for env_key, config_key in mapping.items():
@@ -407,3 +412,25 @@ def _load_env() -> dict[str, Any]:
     if postgresql:
         result["postgresql"] = postgresql
     return result
+
+
+def validate_authority_url(value: str) -> str:
+    """Permit only the installed loopback transport, with no embedded secrets."""
+    try:
+        parsed = urlsplit(value)
+        valid = (
+            parsed.scheme == "http"
+            and parsed.hostname == "127.0.0.1"
+            and parsed.port is not None
+            and 1 <= parsed.port <= 65535
+            and parsed.username is None
+            and parsed.password is None
+            and parsed.path in {"", "/"}
+            and not parsed.query
+            and not parsed.fragment
+        )
+    except (TypeError, ValueError, AttributeError):
+        valid = False
+    if not valid:
+        raise GTConfigError("authority_url must be an HTTP loopback URL with an explicit port and no credentials")
+    return f"http://127.0.0.1:{parsed.port}"
