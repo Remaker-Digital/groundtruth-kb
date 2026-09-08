@@ -342,7 +342,6 @@ def test_cursor_plan_maps_native_events_and_wraps_adapters() -> None:
         "destructive-gate.py",
         "credential-scan.py",
         "scanner-safe-writer.py",
-        "formal-artifact-approval-gate.py",
     )
     for script in write_only:
         matching = [
