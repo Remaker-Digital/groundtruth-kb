@@ -40,6 +40,20 @@ try:
 except ImportError:  # pragma: no cover - direct script execution path
     from bridge_author_metadata import REQUIRED_AUTHOR_METADATA_FIELDS
 
+# Canon section 6: the status vocabulary has exactly one code of record,
+# groundtruth_kb.bridge.vocabulary; every status set below is derived from it
+# (mirrors scripts/gtkb_bridge_writer.py). bridge_author_metadata, imported
+# above, has already placed groundtruth-kb/src on sys.path, so this resolves in
+# every context the preflight loads in: gate in-process import, gate
+# subprocess, writer, and direct CLI.
+from groundtruth_kb.bridge.vocabulary import (
+    ACCEPTED_ON_READ,
+    LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
+    LOYAL_OPPOSITION_AUTHORED_STATUSES,
+    TRANSITIONS,
+    status_alternation,
+)
+
 try:
     # WI-7618 removed the operation-time authorization evaluation, so
     # ``evaluate_envelope`` and ``load_operation_taxonomy`` are no longer imported.
@@ -75,8 +89,13 @@ PACKET_HASH_MATERIAL_KEYS: Final[frozenset[str]] = frozenset(
     }
 )
 
+# Recognize every token a reader may see: the canonical twelve plus the
+# historical-inert tokens, so a historical chain still parses. The vocabulary
+# orders the alternation longest-first, so READY can never truncate NOT-READY
+# and NO-GO can never truncate NO-ACTION. Recognition is not authority: the
+# inert tokens are never chosen as operative below.
 BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED)\b",
+    r"^[#>*\-\s`]*(" + status_alternation(ACCEPTED_ON_READ) + r")\b",
     re.IGNORECASE,
 )
 SPEC_LINK_HEADING_RE: Final[re.Pattern[str]] = re.compile(
@@ -132,7 +151,14 @@ PAUTH_PHASE_OPERATIONS: Final[dict[str, tuple[str, ...]]] = {
     # report under any PAUTH that (correctly) forbids it.
     "finalization": ("protected_mutation",),
 }
-VERDICT_CANDIDATE_STATUSES: Final[frozenset[str]] = frozenset({"GO", "NO-GO", "VERIFIED"})
+# Loyal Opposition verdicts proper: GO, NO-GO, NOT-READY, VERIFIED, SUPERSEDED.
+# ADVISORY is authored by either role and is not a verdict (same derivation as
+# PROVIDER_VERDICT_STATUSES in scripts/gtkb_bridge_writer.py).
+VERDICT_CANDIDATE_STATUSES: Final[frozenset[str]] = LOYAL_OPPOSITION_AUTHORED_STATUSES - {"ADVISORY"}
+# Canon section 6: a status with no successors closes the thread.
+TERMINAL_STATUSES: Final[frozenset[str]] = frozenset(
+    status for status, successors in TRANSITIONS.items() if not successors
+)
 RESPONDS_TO_BRIDGE_PATH_RE: Final[re.Pattern[str]] = re.compile(
     r"(?im)^\s*Responds\s+to\s*:\s*`?(?P<path>[^`\r\n]+?\.md)`?\s*$"
 )
@@ -287,37 +313,29 @@ def parse_versioned_files_for_document(bridge_dir: Path, bridge_id: str) -> list
 
 
 def choose_operative_version(versions: list[BridgeVersion]) -> BridgeVersion | None:
-    if versions:
-        latest = max(versions, key=lambda v: v.version_number)
-        if latest.status == "WITHDRAWN":
-            return latest
-        earlier_no_actions = [
-            version
-            for version in versions
-            if version.status == "NO-ACTION" and version.version_number < latest.version_number
-        ]
-        if latest.status in {"GO", "NO-GO", "VERIFIED"} and earlier_no_actions:
-            references = _operative_reference_versions(latest)
-            if references:
-                return latest
+    """Return the file a Loyal Opposition preflight binds to.
+
+    Canon section 0.5 routing: the operative file is the latest
+    Loyal-Opposition-actionable Prime-authored file (NEW, REVISED, READY,
+    VERDICT-REJECTED). A terminal latest file (WITHDRAWN, SUPERSEDED) closes
+    the thread and is returned as-is. When nothing is actionable the latest
+    verdict is returned so the thread can still be reported. Historical-inert
+    tokens (NO-ACTION, DEFERRED, ACCEPTED) are recognized on read but confer no
+    lifecycle state, so they are never operative.
+    """
+    if not versions:
+        return None
+    latest = max(versions, key=lambda v: v.version_number)
+    if latest.status in TERMINAL_STATUSES:
+        return latest
     for status_set in (
-        {"NEW", "REVISED", "NO-ACTION"},
-        {"VERIFIED", "WITHDRAWN", "GO", "NO-GO"},
+        LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
+        VERDICT_CANDIDATE_STATUSES | TERMINAL_STATUSES,
     ):
         candidates = [v for v in versions if v.status in status_set]
         if candidates:
             return max(candidates, key=lambda v: v.version_number)
-    return versions[0] if versions else None
-
-
-def _operative_reference_versions(version: BridgeVersion) -> set[int]:
-    """Return explicit same-thread version references from verdict metadata."""
-    try:
-        content = version.abs_path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return set()
-    thread_name = re.sub(r"-\d+\.md$", "", Path(version.rel_path).name)
-    return {int(match.group(2)) for match in OPERATIVE_REFERENCE_RE.finditer(content) if match.group(1) == thread_name}
+    return versions[0]
 
 
 def extract_spec_links(content: str) -> set[str]:
@@ -1325,7 +1343,10 @@ def prepare_verdict_candidate(
     normalized = _normalize_lf(content)
     status = next((line.strip().upper() for line in normalized.splitlines() if line.strip()), "")
     if status not in VERDICT_CANDIDATE_STATUSES:
-        raise VerdictCandidatePreparationError("candidate preparation is limited to GO, NO-GO, and VERIFIED verdicts")
+        raise VerdictCandidatePreparationError(
+            "candidate preparation is limited to Loyal Opposition verdicts: "
+            + ", ".join(sorted(VERDICT_CANDIDATE_STATUSES))
+        )
     candidate_relative, _ = normalize_verdict_candidate_path(candidate_path, project_root)
     source_relative, source_path, bridge_id = resolve_verdict_responds_to_source(
         candidate_path=candidate_relative,

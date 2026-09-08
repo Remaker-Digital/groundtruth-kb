@@ -579,7 +579,7 @@ WITHDRAWN
     assert packet["preflight_passed"] is True
 
 
-def test_corrected_go_after_no_action_is_operative_and_packet_hash_is_stable(
+def test_inert_no_action_leaves_proposal_operative_and_packet_hash_is_stable(
     tmp_path: Path,
 ) -> None:
     bridge_id = "corrected-go"
@@ -618,12 +618,15 @@ def test_corrected_go_after_no_action_is_operative_and_packet_hash_is_stable(
         db_path=tmp_path / "missing.db",
     )
 
-    assert first["operative_version"]["path"] == f"bridge/{bridge_id}-003.md"
+    # Canon section 6: NO-ACTION is historical-inert and confers no lifecycle
+    # state, and a GO is a verdict, never the Loyal-Opposition-operative file.
+    assert first["operative_version"]["path"] == f"bridge/{bridge_id}-001.md"
+    assert first["operative_version"]["status"] == "NEW"
     assert first["preflight_passed"] is True
     assert first["packet_hash"] == second["packet_hash"]
 
 
-def test_latest_verified_after_no_action_is_operative_when_metadata_links_chain(
+def test_latest_verified_after_inert_no_action_does_not_displace_proposal(
     tmp_path: Path,
 ) -> None:
     bridge_id = "verified-correction"
@@ -639,19 +642,20 @@ def test_latest_verified_after_no_action_is_operative_when_metadata_links_chain(
 
     versions = preflight.parse_versioned_files_for_document(tmp_path / "bridge", bridge_id)
 
-    assert preflight.choose_operative_version(versions).version_number == 3
+    assert preflight.choose_operative_version(versions).version_number == 1
 
 
-def test_latest_standalone_no_action_remains_operative(tmp_path: Path) -> None:
+def test_latest_standalone_no_action_is_recognized_but_never_operative(tmp_path: Path) -> None:
     bridge_id = "standalone-no-action"
     _write_bridge_version(tmp_path, bridge_id, 1, "NEW", "# Proposal\n")
     _write_bridge_version(tmp_path, bridge_id, 2, "NO-ACTION", "# Dependency hold\n")
 
     versions = preflight.parse_versioned_files_for_document(tmp_path / "bridge", bridge_id)
 
+    assert [v.status for v in versions] == ["NO-ACTION", "NEW"]  # recognized on read
     operative = preflight.choose_operative_version(versions)
-    assert operative.status == "NO-ACTION"
-    assert operative.version_number == 2
+    assert operative.status == "NEW"
+    assert operative.version_number == 1
 
 
 def test_markdown_output_contains_hook_readable_clean_fields(tmp_path: Path) -> None:
