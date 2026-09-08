@@ -29,9 +29,7 @@ def _load_cli():
         sys.modules.pop(spec.name, None)
 
 
-def _run_cli(
-    tmp_path: Path, *args: str, env: dict[str, str] | None = None
-) -> subprocess.CompletedProcess[str]:
+def _run_cli(tmp_path: Path, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     run_env = os.environ.copy()
     for key in (
         "GTKB_BRIDGE_POLLER_RUN_ID",
@@ -113,13 +111,7 @@ def _write_prime_marker(root: Path, session_id: str) -> None:
             "dispatch_run_id": None,
         },
     }
-    envelope_path = (
-        root
-        / "harness-state"
-        / harness_name
-        / "session-envelopes"
-        / f"{session_id}.json"
-    )
+    envelope_path = root / "harness-state" / harness_name / "session-envelopes" / f"{session_id}.json"
     envelope_path.parent.mkdir(parents=True, exist_ok=True)
     envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
 
@@ -135,9 +127,7 @@ def _open_host_bound_prime_envelope(root: Path, session_id: str) -> None:
         json.dumps(
             {
                 "schema_version": 1,
-                "harnesses": [
-                    {"id": "A", "harness_name": "codex", "role": ["loyal-opposition"]}
-                ],
+                "harnesses": [{"id": "A", "harness_name": "codex", "role": ["loyal-opposition"]}],
             }
         ),
         encoding="utf-8",
@@ -330,9 +320,7 @@ def test_claim_go_implementation_uses_host_bound_cli_envelope_provenance(
 
 
 def test_claim_refused_when_other_session_holds_slug(tmp_path: Path) -> None:
-    first = _run_cli(
-        tmp_path, "claim", "gtkb-demo-thread", env={"CLAUDE_SESSION_ID": "session-a"}
-    )
+    first = _run_cli(tmp_path, "claim", "gtkb-demo-thread", env={"CLAUDE_SESSION_ID": "session-a"})
     assert first.returncode == 0, first.stderr
 
     second = _run_cli(
@@ -357,9 +345,7 @@ def test_claim_go_implementation_preempts_lingering_draft_claim(tmp_path: Path) 
     assert first.returncode == 0, first.stderr
     assert json.loads(first.stdout)["claim_kind"] == "draft"
 
-    (tmp_path / "bridge" / f"{slug}-002.md").write_text(
-        "GO\n\nFixture verdict.\n", encoding="utf-8"
-    )
+    (tmp_path / "bridge" / f"{slug}-002.md").write_text("GO\n\nFixture verdict.\n", encoding="utf-8")
     _write_prime_marker(tmp_path, prime_session)
 
     second = _run_cli(tmp_path, "claim", slug, env={"CODEX_THREAD_ID": prime_session})
