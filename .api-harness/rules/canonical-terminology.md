@@ -481,9 +481,10 @@ live data + interaction); non-interactive README-style views.
 
 **Definition:** The Prime Builder â†” Loyal Opposition coordination
 protocol implemented through dispatcher-backed bridge state and versioned
-markdown audit files under `bridge/`. Statuses: NEW, REVISED, GO, NO-GO,
-VERIFIED, ADVISORY, DEFERRED, WITHDRAWN. Aggregate queue artifacts are not
-canonical dispatcher or bridge-state authority. Implementation never proceeds without GO.
+markdown audit files under `bridge/`. The twelve statuses are fixed by
+`CANONICAL_STATUSES` in `groundtruth_kb.bridge.vocabulary`. Aggregate queue
+artifacts are not canonical dispatcher or bridge-state authority. Implementation
+never proceeds without GO.
 
 **Not to be confused with:** "the Bridge" as a generic concept (use
 "file bridge" in canonical text); the backlog; cross-system message bridges.
@@ -685,52 +686,48 @@ Dispatch eligibility and final target ranking are controlled by
 and Loyal Opposition on a single topic. A bridge thread is identified by a
 kebab-case slug and consists of an ordered sequence of versioned files
 (`bridge/<slug>-001.md`, `-002.md`, â€¦) plus a single entry in
-the dispatcher-backed bridge state. The thread terminates at `VERIFIED` or owner-directed
-retirement. `DEFERRED` parks a thread in owner-directed non-actionable state
-until its recorded clear/resume condition is met.
+the dispatcher-backed bridge state. The thread terminates at `VERIFIED`,
+`WITHDRAWN`, or `SUPERSEDED`. `BLOCKED` opens a thread with the typed refusal a
+headless session returns when the parent project is not authorized at filing
+time; it continues only when Prime Builder files `NEW` or `WITHDRAWN`.
 
 *Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#bridge-thread).*
 
-### GO / NO-GO / VERIFIED / DEFERRED
+### GO / NO-GO / NOT-READY / VERIFIED
 
-**Definition:** The terminal verdicts in the file-bridge protocol, set by
-Loyal Opposition. `GO` approves a `NEW` or `REVISED` proposal for
-implementation. `NO-GO` requires Prime Builder revision. `VERIFIED` is dated
-evidence that an implementation report has been verified against the linked
-specifications. `NEW` (Prime-set, fresh proposal) and `REVISED` (Prime-set,
-after a NO-GO) are upstream Prime-side states. `DEFERRED` is owner-directed
-bridge parking state; it is indexed and non-actionable, but it is not a Loyal
-Opposition verdict and does not authorize implementation.
+**Definition:** The Loyal Opposition verdicts in the file-bridge protocol.
+`GO` approves a `NEW` or `REVISED` proposal for implementation. `NO-GO`
+rejects a proposal and requires a `REVISED` proposal. `NOT-READY` rejects an
+implementation report (`READY`) and requires a corrected `READY` report; report
+rejection is never `NO-GO`. `VERIFIED` is dated evidence that an implementation
+report has been verified against the linked specifications, and is terminal.
+`NEW`, `REVISED`, and `READY` are the upstream Prime-side statuses. The code of
+record is `TRANSITIONS` in `groundtruth_kb.bridge.vocabulary`.
 
 *Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#go-no-go-verified-deferred).*
 
-### NO-ACTION
+### VERDICT-REJECTED
 
-**Definition:** A Prime Builder-authored bridge status: the Prime Builder
-response to a Loyal Opposition `GO` or `NO-GO` verdict, rejecting that verdict
-because it does not comply with applicable governance. A well-formed
-`NO-ACTION` sits on top of a prior Loyal Opposition verdict in the same thread,
-states in its reason what the reviewing role must fix, and routes the thread
-back to Loyal Opposition to re-issue a corrected verdict. It is
-Loyal-Opposition-actionable (`review_no_action`), not terminal, and not
-owner-visible.
+**Definition:** A Prime Builder-authored bridge status that rejects a
+governance-noncompliant, Prime-addressed Loyal Opposition verdict (`GO`,
+`NO-GO`, or `NOT-READY`) and routes a fresh Loyal Opposition correction. It is
+Loyal-Opposition-actionable and may never follow `VERIFIED`, `WITHDRAWN`,
+`SUPERSEDED`, or `ADVISORY`.
 
-**Not to be confused with:** `DEFERRED` (owner-directed parking, not a response
-to a verdict); a Prime advisory disposition (which stays under `ADVISORY`).
-`NO-ACTION` MUST NOT be used to close an `ADVISORY` thread or record a Prime
-"no further action" -- doing so mis-routes the thread into the Loyal Opposition
-queue with no verdict to correct.
+**Not to be confused with:** `NO-GO` and `NOT-READY` (Loyal Opposition
+rejections of a proposal or a report); `WITHDRAWN` (Prime Builder closing its
+own proposal before `GO`); an advisory disposition (which stays under
+`ADVISORY`, since an advisory carries no verdict to reject).
 
-**Source:** `DCL-NO-ACTION-STATUS-SEMANTICS-001`;
-`DELIB-20260708-NO-ACTION-CANONICAL-SEMANTICS` (owner decision, 2026-07-08);
-code of record `groundtruth_kb.bridge.routing` / `groundtruth_kb.bridge.disposition`.
+**Source:** `SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001`; code of record
+`TRANSITIONS` and `PRIME_AUTHORED_STATUSES` in `groundtruth_kb.bridge.vocabulary`.
 
 ### Loyal Opposition advisory
 
 **Definition:** A Loyal-Opposition-initiated bridge entry that delivers an advisory
 recommendation to Prime Builder, distinct from a Prime-initiated proposal.
-An LO advisory is filed at `bridge/<slug>-001.md` with status `NO-GO`
-(deliberate) and a `bridge_kind: loyal_opposition_advisory` header. It tasks
+An LO advisory is filed at `bridge/<slug>-001.md` with status `ADVISORY`
+and a `bridge_kind: loyal_opposition_advisory` header. It tasks
 Prime Builder with filing a normal implementation proposal that converts the
 advisory into scoped, testable GT-KB work.
 

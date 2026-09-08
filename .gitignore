@@ -280,26 +280,39 @@ stripe
 # is intentionally NOT tracked here. The blanket .claude/* ignore covers it
 # without needing a separate name-specific rule. Each workstation regenerates
 # its own settings.local.json; do not migrate it across machines.
-# Generated harness projection roots (WI-6691). Each root below is projected
-# from .harness-baseline-configuration by
-# scripts/harness_projection/project_harness.py, invoked per harness as
-#   python scripts/harness_projection/project_harness.py --harness <name>
-# (there is no `gt harness project` subcommand; `gt harness` exposes registry
-# operations only). The roster lives in scripts/harness_projection/profiles.toml. Per
-# GOV-HARNESS-NEUTRAL-BASELINE-001 the baseline is the tracked source of truth
-# and these are derived copies, so they are ignored rather than tracked.
-#
-# Do NOT re-add negation entries re-including projected paths. The S294 lesson
-# (if it is essential, it must be tracked) is satisfied at the baseline, which
-# is tracked; negations here re-enter every projected file into the
-# protected-commit population. Enforced by
-# platform_tests/scripts/test_projected_roots_untracked.py.
-.agent/
-.api-harness/
-.claude/
-.codex/
-.cursor/
-.goose/
+# Harness projection roots are rendered from .harness-baseline-configuration by
+# scripts/harness_projection/project_harness.py (one run per profile in
+# scripts/harness_projection/profiles.toml). The renders stay tracked until a
+# projector slice can render every harness's hook registration; untracking
+# them is WI-6691 and waits for its own governed change (owner decision,
+# 2026-09-07).
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+.claude/hooks/*
+!.claude/hooks/poller-freshness.py
+!.claude/hooks/credential-scan.py
+!.claude/hooks/*.py
+!.claude/rules/
+.claude/rules/*
+!.claude/rules/bridge-essential.md
+!.claude/rules/*.md
+# Dogfood install of canonical-terminology config for GT-KB self-doctor per
+# GTKB-GOV-TERM-PRIMER-STARTUP Slice 1 (S327, bridge -015 VERIFIED).
+!.claude/rules/canonical-terminology.toml
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/*/
+!.claude/skills/*/SKILL.md
+!.claude/skills/*/references/
+!.claude/skills/*/references/*.md
+!.claude/skills/*/scripts/
+!.claude/skills/*/scripts/*.py
+!.claude/skills/*/helpers/
+!.claude/skills/*/helpers/*.py
+!.claude/commands/
+.claude/commands/*
+!.claude/commands/registry.json
 
 .kiro/
 cookies.txt

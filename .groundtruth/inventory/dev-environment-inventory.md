@@ -1,6 +1,6 @@
 # GT-KB Development Environment Inventory
 
-Generated: 2026-09-07T21:12:30Z
+Generated: 2026-09-08T00:14:14Z
 Collector: gtkb-dev-environment-inventory-v1 (sha256:dcd84fc545cab6a5e9adeae7915b7f3c56abfc14d672728aaab1cf4a2a3362ec)
 
 ## Project
@@ -24,11 +24,11 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:dcd84fc545cab6a5e9adeae7915
 | `git` | verified | `2.51.2.windows.1` | `git --version` |
 | `node` | verified | `24.11.1` | `node --version` |
 | `npm` | verified | `11.6.2` | `npm --version` |
-| `pip` | verified | `25.2` | `python -m pip --version` |
+| `pip` | verified | `26.1.2` | `python -m pip --version` |
 | `playwright` | unsupported | `unknown` | `playwright --version` |
-| `pytest` | verified | `9.0.3` | `python -m pytest --version` |
+| `pytest` | verified | `9.0.2` | `python -m pytest --version` |
 | `python` | verified | `3.14.0` | `python --version` |
-| `ruff` | verified | `0.15.12` | `python -m ruff --version` |
+| `ruff` | verified | `0.15.5` | `python -m ruff --version` |
 
 ## Harness And Repo Surfaces
 
@@ -36,7 +36,7 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:dcd84fc545cab6a5e9adeae7915
 - Role assignment source present: False
 - Skills: 45
 - Claude hooks: 35
-- Codex hooks: 0
+- Codex hooks: 29
 - GitHub workflows: 17
 - MCP config: local_only presence only
 
@@ -45,9 +45,9 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:dcd84fc545cab6a5e9adeae7915
 | Harness | Role | Assignment Status | Configured/Verified Capabilities |
 |---|---|---|---:|
 | claude | prime-builder | configured | 11 |
-| codex | prime-builder | configured | 11 |
+| codex | prime-builder | configured | 13 |
 | claude | loyal-opposition | configured | 11 |
-| codex | loyal-opposition | configured | 11 |
+| codex | loyal-opposition | configured | 13 |
 
 ## Verification
 

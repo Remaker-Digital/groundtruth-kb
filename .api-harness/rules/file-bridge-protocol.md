@@ -304,7 +304,7 @@ numbered bridge file.
 
 ## Statuses
 
-Canon section 6 fixes the vocabulary at exactly ten. The code of record is
+Canon section 6 fixes the vocabulary at exactly twelve. The code of record is
 `CANONICAL_STATUSES` in `groundtruth_kb.bridge.vocabulary`, the single source
 named by `SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001` clause 5.
 
@@ -314,10 +314,12 @@ named by `SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001` clause 5.
 | REVISED | Prime Builder | Revised implementation proposal after a NO-GO. Addressed to Loyal Opposition. |
 | READY | Prime Builder | Implementation report, valid only after GO. Must carry `bridge_kind: implementation_report`, which the governed writer validates. READY cannot begin a thread. It replaces the historical use of NEW for post-implementation reports. |
 | VERDICT-REJECTED | Prime Builder | Rejects a governance-noncompliant, Prime-addressed Loyal Opposition verdict and routes a fresh Loyal Opposition correction. |
+| BLOCKED | Prime Builder | The typed refusal a headless session returns instead of a NEW proposal when the work item's parent project reads `not authorized` at filing time. Begins a thread and may occupy no other position; requests no review; not dispatchable; carries the project id, the observed authorization value, and the time of the read. An interactive session asks the owner instead. |
 | GO | Loyal Opposition | Approves a proposal for implementation. Addressed to Prime Builder. |
-| NO-GO | Loyal Opposition, or Dispatcher | Rejects a proposal and requires revision. Dispatcher may also author the finalization-repair NO-GO of section 7, which is addressed exclusively to Loyal Opposition. |
+| NO-GO | Loyal Opposition | Rejects a proposal and requires revision. Addressed to Prime Builder. It has exactly one form. |
 | NOT-READY | Loyal Opposition | Rejects an implementation report and requires a corrected report. The report-phase counterpart of NO-GO, so that no token is lawful in both the proposal phase and the report phase. |
-| VERIFIED | Loyal Opposition | Records review completion. Terminal for agents and not dispatchable; only Dispatcher may follow it, per section 7. |
+| SUPERSEDED | Loyal Opposition | Closes a non-terminal chain whose subject no longer exists: retired by canon or by formal record, absorbed into other work, or already landed elsewhere. Asserts nothing about verification. Must cite the canonical evidence that the subject is gone and name the carrier of any residual work. Terminal and not dispatchable; never authored while another context holds a work-intent claim on the chain. |
+| VERIFIED | Loyal Opposition | Records review completion for the exact reviewed bytes. Terminal for that snapshot and not dispatchable; only a fresh Loyal Opposition VERIFIED over the exact final bytes may follow it, per section 7. |
 | WITHDRAWN | Prime Builder | Valid only before GO. Terminal and not dispatchable. |
 | ADVISORY | Either role | Informational at any time. Not dispatchable, and not part of an implementation lifecycle. |
 
@@ -339,38 +341,52 @@ consults thread history, per `SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001` clause 4.
 
 | Previous status | Allowed successors |
 |---|---|
-| NEW | GO, NO-GO, WITHDRAWN |
-| REVISED | GO, NO-GO, WITHDRAWN |
-| GO | READY, VERDICT-REJECTED |
-| READY | VERIFIED, NOT-READY |
-| NOT-READY | READY, VERDICT-REJECTED |
-| NO-GO | REVISED, WITHDRAWN, VERDICT-REJECTED, VERIFIED |
-| VERDICT-REJECTED | GO, NO-GO, NOT-READY |
-| VERIFIED | NO-GO |
+| BLOCKED | NEW, WITHDRAWN |
+| NEW | GO, NO-GO, WITHDRAWN, SUPERSEDED |
+| REVISED | GO, NO-GO, WITHDRAWN, SUPERSEDED |
+| GO | READY, VERDICT-REJECTED, SUPERSEDED |
+| READY | VERIFIED, NOT-READY, SUPERSEDED |
+| NOT-READY | READY, VERDICT-REJECTED, SUPERSEDED |
+| NO-GO | REVISED, WITHDRAWN, VERDICT-REJECTED, SUPERSEDED |
+| VERDICT-REJECTED | GO, NO-GO, NOT-READY, SUPERSEDED |
+| VERIFIED | VERIFIED |
 | ADVISORY | ADVISORY |
 
-`WITHDRAWN` is terminal and has no successors, so it carries no row.
+`WITHDRAWN` and `SUPERSEDED` are terminal and have no successors, so they carry no row.
 
-`NO-GO` has two forms, distinguished by author rather than by the artifact
-adjudicated. The Loyal-Opposition form rejects a proposal and routes to Prime
-Builder for `REVISED`. The Dispatcher form reports a failed project commit and
-routes to Loyal Opposition for finalization repair; it is the only form whose
-successor may be `VERIFIED`, and the only status that may follow `VERIFIED`.
-The row above is the union of both forms, which keeps the relation a function
-of the current status alone; the restriction of `VERIFIED` to the Dispatcher
-form is an authorship check, not a successor-set difference. `NO-GO -> READY`
-is invalid, and READY is absent from the row accordingly.
+`NO-GO` has exactly one form. It is authored by Loyal Opposition, rejects a
+proposal, and routes to Prime Builder for `REVISED`. A failed project commit is
+canonical finalization state, never a verdict: it returns the affected work item
+to Loyal Opposition for fresh verification without inserting any
+Dispatcher-authored bridge status. `NO-GO -> READY` is invalid, and READY is
+absent from the row accordingly.
+
+`VERIFIED` is terminal for its exact reviewed snapshot. When canonical
+project/work-item state records a pre-commit verified-byte change or a failed
+project commit, Loyal Opposition may append a fresh `VERIFIED` over the exact
+final bytes; nothing else may follow it.
 
 Report rejection is never `NO-GO`; it is `NOT-READY`.
 
 `VERDICT-REJECTED` may immediately follow only an agent-authored,
 Prime-addressed Loyal Opposition `GO`, `NO-GO`, or `NOT-READY`. It may never
-follow `VERIFIED`, `WITHDRAWN`, `ADVISORY`, or a Dispatcher-authored
-finalization `NO-GO`.
+follow `VERIFIED`, `WITHDRAWN`, `SUPERSEDED`, `BLOCKED`, or `ADVISORY`: those
+are non-dispatchable or terminal, and no Prime Builder receives or rejects them.
 
 A later `ADVISORY` on the same advisory thread is the latest advisory message.
 No other status may follow `ADVISORY`. Work derived from an advisory begins a
 fresh `NEW` chain that cites it.
+
+`SUPERSEDED` may follow any non-terminal status, because a subject can be
+retired at any point in a chain's life and the chain must be closable when it
+is. It may never follow `VERIFIED`, `WITHDRAWN`, `ADVISORY`, or `BLOCKED`.
+Because it may follow a Prime-addressed status, the authoring Loyal Opposition
+must show the chain is not live: no work-intent claim held by another context.
+
+`BLOCKED` begins a thread and may occupy no other position, because the
+authorization check happens only before a NEW proposal and a change in project
+authorization does not affect a chain already initiated. It is followed only by
+`NEW` or `WITHDRAWN`.
 
 Chains committed before this vocabulary took effect may encode superseded
 pairs, most commonly `GO -> NEW` from the retired practice of filing a report
@@ -399,8 +415,10 @@ harness has a durable assignment or could be selected by headless dispatch.
 ## Body Status-Token Rule
 
 Versioned bridge files (`bridge/<slug>-NNN.md`) MUST begin with a canonical
-status token on the first non-blank line: one of `NEW`, `REVISED`, `GO`,
-`NO-GO`, `VERIFIED`, `NO-ACTION`, `ADVISORY`, `DEFERRED`, or `WITHDRAWN`. Headings and prose
+status token on the first non-blank line: one of the twelve statuses in
+`CANONICAL_STATUSES` (`NEW`, `REVISED`, `READY`, `VERDICT-REJECTED`, `GO`,
+`NO-GO`, `NOT-READY`, `VERIFIED`, `WITHDRAWN`, `SUPERSEDED`, `BLOCKED`, or
+`ADVISORY`). Headings and prose
 follow the token. This keeps each bridge file self-describing and makes the
 first line a reliable routing signal.
 
@@ -441,38 +459,15 @@ Source: `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1
 (`DELIB-S382-PROPOSAL-STANDARDS-COMPLETION-SCOPE`; GO at
 `bridge/gtkb-gov-proposal-standards-slice1-025.md`).
 
-## NO-ACTION Status
+## VERDICT-REJECTED Status
 
-`NO-ACTION` is a **Prime Builder-authored** response to a Loyal Opposition
-`GO` or `NO-GO` verdict. It rejects that verdict because the verdict does not
-comply with applicable governance. A well-formed `NO-ACTION` entry:
-
-1. is authored by Prime Builder;
-2. sits on top of a prior Loyal Opposition `GO` or `NO-GO` verdict in the same
-   numbered bridge thread;
-3. states, in its reason, what the reviewing role must do to correct the
-   verdict; and
-4. routes the thread back to the reviewing (Loyal Opposition) role so it can
-   re-issue a corrected, governance-compliant verdict.
-
-`NO-ACTION` is Loyal-Opposition-actionable (reason `lo_no_action_review_required`,
-next-action `review_no_action` per `groundtruth_kb.bridge.disposition`) and is a
-Prime-authored routing act per `groundtruth_kb.bridge.routing` (`_PRIME_STATUSES`
-includes `NEW`, `REVISED`, `NO-ACTION`). It is **not** terminal and **not**
-owner-visible.
-
-`NO-ACTION` MUST NOT be used to dispose of an `ADVISORY` thread, and MUST NOT be
-used to record a Prime Builder "no further action" close. Advisory reports are
-owner-visible informational input, never assigned or dispatched. They remain
-under `ADVISORY` (`advisory_owner_visible` / `none`) or move to a terminal
-status (`WITHDRAWN`) with recorded rationale and a cited owner decision. Writing
-`NO-ACTION` on an advisory that has no prior Loyal Opposition verdict flips the
-thread from owner-visible `ADVISORY` into Loyal-Opposition-actionable
-`NO-ACTION` with no verdict to correct, mis-routing it permanently into the
-Loyal Opposition queue.
-
-Authority: `DCL-NO-ACTION-STATUS-SEMANTICS-001`; owner decision
-`DELIB-20260708-NO-ACTION-CANONICAL-SEMANTICS`.
+`VERDICT-REJECTED` is a **Prime Builder-authored** rejection of a
+governance-noncompliant, Prime-addressed Loyal Opposition verdict (`GO`,
+`NO-GO`, or `NOT-READY`). It routes a fresh Loyal Opposition correction and is
+Loyal-Opposition-actionable. It may never follow `VERIFIED`, `WITHDRAWN`,
+`SUPERSEDED`, or `ADVISORY`. An `ADVISORY` thread carries no verdict to reject:
+later advisory messages stay `ADVISORY`, and work derived from an advisory
+begins a fresh `NEW` chain that cites it.
 
 ## Advisory Reports
 
@@ -486,28 +481,15 @@ Authority: `DCL-NO-ACTION-STATUS-SEMANTICS-001`; owner decision
 
 **Dashboard semantics:** ADVISORY rows are NOT failed proposals; dashboard counts must distinguish them from NO-GO entries. Exact dashboard-counter behavior is owned by the sibling `gtkb-advisory-report-dashboard-counters-spec` thread.
 
-## DEFERRED Status
+## BLOCKED Status
 
-`DEFERRED` is owner-only bridge parking state. It is not a Prime Builder
-revision, not a Loyal Opposition verdict, and not a replacement for parked
-drafts.
-
-A `DEFERRED` entry MUST be recorded as both:
-
-1. bridge state lifecycle state for the thread; and
-2. a versioned bridge file whose first non-blank line is exactly `DEFERRED`.
-
-The `DEFERRED` file MUST include:
-
-- concrete `Owner Decisions / Input` evidence, such as a cited DELIB/AUQ or an
-  explicit owner directive;
-- a deferral reason; and
-- a clear/resume condition describing when the thread becomes actionable again.
-
-`DEFERRED` is non-actionable for Prime Builder, Loyal Opposition, bridge
-dispatch, and normal scan queues. It may be cleared only by owner-directed
-follow-up that files the next appropriate lifecycle entry. Parked drafts remain
-unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
+`BLOCKED` is the **Prime Builder-authored** typed refusal a headless session
+returns instead of a `NEW` proposal when the work item's parent project reads
+`not authorized` at filing time. It begins a thread and may occupy no other
+position, requests no review, is not dispatchable, and carries the project id,
+the observed authorization value, and the time of the read. An interactive
+session asks the owner instead. The thread continues only when Prime Builder
+files `NEW` (the project is authorized) or `WITHDRAWN`.
 
 ## Prime Workflow
 
@@ -515,19 +497,19 @@ unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
    writer path
 2. Let the governed writer publish bridge state.
 3. Continue working on other tasks
-4. Periodically scan bridge state for GO or NO-GO
-   responses; GO and NO-GO are dispatchable implementation/revision work.
+4. Periodically scan bridge state for GO, NO-GO, or NOT-READY
+   responses; those are dispatchable implementation/revision work.
    ADVISORY is owner-visible informational input (never assigned or dispatched). Skip
-   DEFERRED, WITHDRAWN, and VERIFIED as non-actionable.
+   WITHDRAWN, SUPERSEDED, BLOCKED, and VERIFIED as non-actionable.
 5. On GO: proceed with implementation
 6. On NO-GO: read the NO-GO file, address findings, save revised file with
    incremented version, and use the governed writer to publish a REVISED state.
 
 ## Loyal Opposition Workflow
 
-1. Periodically scan bridge state for NEW, REVISED, or NO-ACTION entries;
-   skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED as non-actionable for Loyal
-   Opposition review work.
+1. Periodically scan bridge state for NEW, REVISED, READY, or VERDICT-REJECTED
+   entries; skip ADVISORY, WITHDRAWN, SUPERSEDED, BLOCKED, and VERIFIED as
+   non-actionable for Loyal Opposition review work.
 2. Process entries starting from the oldest actionable item.
 3. Read the indicated file and perform the review
 4. Save review findings as a new version with incremented number

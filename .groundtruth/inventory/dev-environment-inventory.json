@@ -5,7 +5,7 @@
     "script_hash": "sha256:dcd84fc545cab6a5e9adeae7915b7f3c56abfc14d672728aaab1cf4a2a3362ec",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-09-07T21:12:30Z",
+  "generated_at": "2026-09-08T00:14:14Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -21,16 +21,16 @@
         "classification": "public_safe",
         "evidence": ".codex/config.toml",
         "path": ".codex/config.toml",
-        "present": false
+        "present": true
       },
       "hooks": {
         "classification": "public_safe",
         "evidence": ".codex/hooks.json",
         "path": ".codex/hooks.json",
-        "present": false
+        "present": true
       },
-      "hooks_enabled": false,
-      "session_start_configured": false
+      "hooks_enabled": true,
+      "session_start_configured": true
     },
     "identities": {},
     "identity_source": {
@@ -124,8 +124,38 @@
     },
     "codex_hooks": {
       "classification": "public_safe",
-      "count": 0,
-      "items": []
+      "count": 29,
+      "items": [
+        ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.py",
+        ".codex/gtkb-hooks/bridge-compliance-gate-bash-adapter.py",
+        ".codex/gtkb-hooks/directive-enforcement-adapter.py",
+        ".codex/gtkb-hooks/document_author_provenance_gate.py",
+        ".codex/gtkb-hooks/glossary-expansion.py",
+        ".codex/gtkb-hooks/lo-file-safety-gate-bash-adapter.py",
+        ".codex/gtkb-hooks/project-completion-surface.py",
+        ".codex/gtkb-hooks/run_cmd_no_window.py",
+        ".codex/gtkb-hooks/run_py_no_window.py",
+        ".codex/gtkb-hooks/session_start_dispatch.py",
+        ".codex/gtkb-hooks/session_stop_dispatch.py",
+        ".codex/gtkb-hooks/session_wrapup_trigger_dispatch.py",
+        ".codex/gtkb-hooks/sot-read-discipline-bash-adapter.py",
+        ".codex/gtkb-hooks/wi-id-collision-gate-bash-adapter.py",
+        ".codex/gtkb-hooks/bridge-compliance-audit.cmd",
+        ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.cmd",
+        ".codex/gtkb-hooks/bridge-compliance-gate.cmd",
+        ".codex/gtkb-hooks/code-quality-baseline-proposal-check.cmd",
+        ".codex/gtkb-hooks/codex-mcp-worker-guard.cmd",
+        ".codex/gtkb-hooks/credential-scan.cmd",
+        ".codex/gtkb-hooks/destructive-gate.cmd",
+        ".codex/gtkb-hooks/directive-enforcement.cmd",
+        ".codex/gtkb-hooks/formal-artifact-approval.cmd",
+        ".codex/gtkb-hooks/implementation-start-gate.cmd",
+        ".codex/gtkb-hooks/lo-file-safety-gate.cmd",
+        ".codex/gtkb-hooks/session-start.cmd",
+        ".codex/gtkb-hooks/session-stop.cmd",
+        ".codex/gtkb-hooks/wi-id-collision-gate.cmd",
+        ".codex/gtkb-hooks/workstream-focus.cmd"
+      ]
     },
     "commands": {
       "classification": "public_safe",
@@ -375,7 +405,7 @@
         },
         "hook_support": {
           "evidence": ".codex/hooks.json",
-          "status": "unknown"
+          "status": "configured"
         },
         "mcp_support": {
           "evidence": ".mcp.json presence only; contents are local_only",
@@ -403,7 +433,7 @@
         },
         "startup_support": {
           "evidence": ".codex/hooks.json SessionStart",
-          "status": "unknown"
+          "status": "configured"
         },
         "subagent_team_support": {
           "evidence": "harness runtime; not repo-configured",
@@ -529,7 +559,7 @@
         },
         "hook_support": {
           "evidence": ".codex/hooks.json",
-          "status": "unknown"
+          "status": "configured"
         },
         "mcp_support": {
           "evidence": ".mcp.json presence only; contents are local_only",
@@ -557,7 +587,7 @@
         },
         "startup_support": {
           "evidence": ".codex/hooks.json SessionStart",
-          "status": "unknown"
+          "status": "configured"
         },
         "subagent_team_support": {
           "evidence": "harness runtime; not repo-configured",
@@ -617,7 +647,7 @@
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
       "status": "verified",
-      "version": "25.2"
+      "version": "26.1.2"
     },
     "playwright": {
       "classification": "unsupported",
@@ -631,7 +661,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.3"
+      "version": "9.0.2"
     },
     "python": {
       "classification": "verified",
@@ -645,7 +675,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.12"
+      "version": "0.15.5"
     }
   },
   "verification": {
