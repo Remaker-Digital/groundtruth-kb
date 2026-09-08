@@ -197,7 +197,27 @@ def main() -> int:
         )
         return 0
 
-    print(json.dumps({"systemMessage": "GT-KB exact-init session binding established."}))
+    # Open this session's own checkout so its edits never land in the shared
+    # working tree. Best-effort by the same transport contract as the binding
+    # itself: a failure is visible and the session continues, and the scope gate
+    # stays permissive until a checkout exists, so nothing here can block a
+    # session from starting.
+    worktree_note = ""
+    try:
+        from groundtruth_kb.session.attestation.service import binding_for_context  # noqa: PLC0415
+        from groundtruth_kb.session.worktree import open_worktree  # noqa: PLC0415
+
+        db_path = project_root / "groundtruth.db"
+        session_context_id = binding_for_context(db_path, session_id).session_context_id
+        state = open_worktree(project_root, session_context_id, db_path=db_path)
+        worktree_note = f" Session checkout: {state.path}."
+    except Exception as exc:  # noqa: BLE001 - transport stays non-blocking
+        worktree_note = (
+            f" Session checkout unavailable ({type(exc).__name__}); this session shares the main "
+            "working tree. Run `gt session worktree open` to isolate it."
+        )
+
+    print(json.dumps({"systemMessage": f"GT-KB exact-init session binding established.{worktree_note}"}))
     return 0
 
 

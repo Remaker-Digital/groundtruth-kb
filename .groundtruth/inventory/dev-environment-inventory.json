@@ -5,7 +5,7 @@
     "script_hash": "sha256:dcd84fc545cab6a5e9adeae7915b7f3c56abfc14d672728aaab1cf4a2a3362ec",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-09-08T16:46:28Z",
+  "generated_at": "2026-09-08T17:21:22Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -83,7 +83,7 @@
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 34,
+      "count": 35,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/_shell_payload.py",
@@ -118,7 +118,8 @@
         ".claude/hooks/spec-before-code.py",
         ".claude/hooks/spec-classifier.py",
         ".claude/hooks/spec-event-surfacer.py",
-        ".claude/hooks/workstream-focus.py"
+        ".claude/hooks/workstream-focus.py",
+        ".claude/hooks/worktree-scope-gate.py"
       ]
     },
     "codex_hooks": {

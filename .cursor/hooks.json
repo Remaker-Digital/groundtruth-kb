@@ -46,6 +46,12 @@
         "failClosed": true
       },
       {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/worktree-scope-gate.py",
+        "timeout": 30,
+        "matcher": "Write|StrReplace|Edit|MultiEdit|Delete",
+        "failClosed": true
+      },
+      {
         "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B scripts/cursor_hook_adapter.py .cursor/hooks/directive-enforcement-adapter.py",
         "timeout": 30,
         "matcher": "Write|StrReplace|Edit|MultiEdit|Delete|Shell|Bash",

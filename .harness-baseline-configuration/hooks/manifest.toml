@@ -72,6 +72,16 @@ script = "lo-file-safety-gate.py"
 blocking = true
 timeout_seconds = 5
 
+# Session write isolation. Self-migrating: a session with no checkout keeps
+# working and is told how to open one; enforcement begins when the checkout
+# does. An actor with no init binding, the owner included, is never gated.
+[[hook]]
+event = "pre_tool_use"
+intents = ["file_write"]
+script = "worktree-scope-gate.py"
+blocking = true
+timeout_seconds = 5
+
 [[hook]]
 event = "pre_tool_use"
 intents = ["file_write", "shell_exec"]

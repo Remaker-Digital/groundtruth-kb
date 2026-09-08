@@ -38,6 +38,7 @@
     ".agent/hooks/spec-classifier.py",
     ".agent/hooks/spec-event-surfacer.py",
     ".agent/hooks/workstream-focus.py",
+    ".agent/hooks/worktree-scope-gate.py",
     ".agent/rules/acting-prime-builder.md",
     ".agent/rules/active-workspace.md",
     ".agent/rules/auto-finalization-sweep.md",

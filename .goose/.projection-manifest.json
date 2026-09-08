@@ -38,6 +38,7 @@
     ".goose/hooks/spec-classifier.py",
     ".goose/hooks/spec-event-surfacer.py",
     ".goose/hooks/workstream-focus.py",
+    ".goose/hooks/worktree-scope-gate.py",
     ".goose/plugins/gtkb/hooks/hooks.json",
     ".goose/rules/acting-prime-builder.md",
     ".goose/rules/active-workspace.md",

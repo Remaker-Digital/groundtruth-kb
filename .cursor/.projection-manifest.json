@@ -39,6 +39,7 @@
     ".cursor/hooks/spec-classifier.py",
     ".cursor/hooks/spec-event-surfacer.py",
     ".cursor/hooks/workstream-focus.py",
+    ".cursor/hooks/worktree-scope-gate.py",
     ".cursor/rules/acting-prime-builder.md",
     ".cursor/rules/active-workspace.md",
     ".cursor/rules/auto-finalization-sweep.md",

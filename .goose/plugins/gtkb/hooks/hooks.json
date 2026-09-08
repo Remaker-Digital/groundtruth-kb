@@ -33,6 +33,11 @@
         "blocking": true
       },
       {
+        "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B .goose/hooks/worktree-scope-gate.py",
+        "timeout": 5,
+        "blocking": true
+      },
+      {
         "command": "\"groundtruth-kb/.venv/Scripts/python.exe\" -B .goose/hooks/directive-enforcement-adapter.py",
         "timeout": 5,
         "blocking": true

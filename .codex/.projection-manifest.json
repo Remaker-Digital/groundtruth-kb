@@ -38,6 +38,7 @@
     ".codex/hooks/spec-classifier.py",
     ".codex/hooks/spec-event-surfacer.py",
     ".codex/hooks/workstream-focus.py",
+    ".codex/hooks/worktree-scope-gate.py",
     ".codex/rules/acting-prime-builder.md",
     ".codex/rules/active-workspace.md",
     ".codex/rules/auto-finalization-sweep.md",

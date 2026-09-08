@@ -38,6 +38,7 @@
     ".api-harness/hooks/spec-classifier.py",
     ".api-harness/hooks/spec-event-surfacer.py",
     ".api-harness/hooks/workstream-focus.py",
+    ".api-harness/hooks/worktree-scope-gate.py",
     ".api-harness/rules/acting-prime-builder.md",
     ".api-harness/rules/active-workspace.md",
     ".api-harness/rules/auto-finalization-sweep.md",

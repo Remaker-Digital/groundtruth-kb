@@ -68,6 +68,16 @@
         ]
       },
       {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe\" -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/worktree-scope-gate.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "matcher": "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy|Bash|PowerShell",
         "hooks": [
           {
