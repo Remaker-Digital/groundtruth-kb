@@ -158,6 +158,16 @@ try:
     from groundtruth_kb.bridge.vocabulary import CANONICAL_STATUSES as _CANONICAL_STATUSES
 except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
     _CANONICAL_STATUSES = frozenset(BRIDGE_AUTHOR_METADATA_STATUSES)
+try:
+    from groundtruth_kb.bridge.vocabulary import (
+        LOYAL_OPPOSITION_ACTIONABLE_STATUSES as _LO_ACTIONABLE_STATUSES,
+    )
+except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
+    _LO_ACTIONABLE_STATUSES = frozenset({"NEW", "REVISED", "READY", "VERDICT-REJECTED"})
+# Prime-authored files that request Loyal Opposition review; the Owner Decisions /
+# Input section gate applies to these and to nothing else (verdicts, advisories,
+# withdrawals and typed refusals are evidence narratives, not approval claims).
+OWNER_DECISIONS_GATED_STATUSES = frozenset(_LO_ACTIONABLE_STATUSES)
 # Canon section 6: the twelve canonical statuses come from the single code of
 # record, groundtruth_kb.bridge.vocabulary; the gate does not restate them. The
 # tuple is ordered longest-first so no token in the alternation below can be
@@ -283,6 +293,26 @@ CANDIDATE_EVIDENCE_HASH_LINE_RE = re.compile(
 # (Loyal Opposition GO at -004): conditional check that fires only when proposal/report content
 # indicates owner-approval scope. Verdict files (GO/NO-GO/VERIFIED first line) are
 # excluded — they are evidence narratives, not approval claims.
+OWNER_DECISIONS_HEADING_RE = re.compile(
+    r"^#{1,6}\s*Owner Decisions(?:\s*/\s*Input)?\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+OWNER_EVIDENCE_RE = re.compile(
+    r"\b(?:DELIB-[A-Z0-9_.-]+|AUQ|AskUserQuestion|owner\s+(?:decision|directive|input|approval))\b",
+    re.IGNORECASE,
+)
+OWNER_APPROVAL_MARKER_RES = (
+    # Marker 1: cites Sub-slice B's VERIFIED rule (the AUQ-only rule)
+    re.compile(
+        r"gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-006\.md",
+        re.IGNORECASE,
+    ),
+    # Marker 2: AUQ + decision-context phrase within ~200 chars
+    re.compile(
+        r"\b(?:AUQ|AskUserQuestion)\b[^.]{0,200}\b(?:answer|approval|decision|directive|authorize|authorization)\b",
+        re.IGNORECASE,
+    ),
+)
 
 # Cross-Harness Disposition gate (Slice 4 of PROJECT-GTKB-CROSS-HARNESS-PARITY;
 # DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001 assertion PARITY-DISPOSITION-GATE;
@@ -2468,6 +2498,18 @@ def _deny_reason_for_content(
                 "[Governance] Implementation proposals must include concrete Specification Links "
                 "before bridge submission. "
                 "(Hard-block per DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)"
+            )
+        if (
+            first_line in OWNER_DECISIONS_GATED_STATUSES
+            and _proposal_claims_owner_approval(content)
+            and not _has_concrete_owner_decisions_section(content)
+        ):
+            return (
+                "[Governance] Bridge proposals/reports that claim owner-approval scope must "
+                "include a non-empty Owner Decisions / Input section enumerating the "
+                "AskUserQuestion answers that authorize the work. "
+                "(Hard-block per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK; "
+                "see bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-003.md.)"
             )
         if (
             first_line in PENDING_PREFLIGHT_STATUSES
