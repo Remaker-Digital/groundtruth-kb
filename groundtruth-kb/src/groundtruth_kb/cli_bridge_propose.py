@@ -347,13 +347,7 @@ def bridge_propose(
 @click.option("--wi", "wi_id", required=True, help="Existing MemBase work item id.")
 @click.option("--slug", required=True, help="Bridge slug, lowercase kebab-case.")
 @click.option("--target-path", "target_paths", multiple=True, required=True, help="Repeatable target path.")
-@click.option("--project", "project_id", help="Project id to use when membership is missing or ambiguous.")
-@click.option(
-    "--project-authorization",
-    "project_authorization_id",
-    help="Select one equally best-ranked current covering project authorization.",
-)
-@click.option("--owner-decision", help="DELIB id required when creating missing membership or PAUTH state.")
+@click.option("--project", "project_id", help="Optional assertion of the existing sole parent project.")
 @click.option("--add-spec", "add_specs", multiple=True, help="Repeatable spec id to add to generated links.")
 @click.option("--scope", "scope_lines", multiple=True, help="Repeatable proposed-scope bullet.")
 @click.option("--acceptance", "acceptance_criteria", multiple=True, help="Repeatable acceptance-criteria bullet.")
@@ -367,19 +361,7 @@ def bridge_propose(
     ),
 )
 @click.option("--verification", multiple=True, help="Repeatable SPEC_ID=verification text row.")
-@click.option(
-    "--cross-harness-disposition",
-    "cross_harness_dispositions",
-    multiple=True,
-    metavar="HARNESS_OR_SURFACE=DISPOSITION",
-    help="Repeatable explicit parity disposition for a harness or managed surface.",
-)
 @click.option("--summary", help="Override generated proposal summary.")
-@click.option(
-    "--create-missing-state",
-    is_flag=True,
-    help="Create missing project membership/PAUTH only when --owner-decision is supplied.",
-)
 @click.option("--dry-run", is_flag=True, help="Run candidate preflights and print content without writing.")
 @click.option("--json", "emit_json", is_flag=True, help="Emit JSON result metadata.")
 @click.pass_context
@@ -389,16 +371,12 @@ def bridge_file_implementation_proposal(
     slug: str,
     target_paths: tuple[str, ...],
     project_id: str | None,
-    project_authorization_id: str | None,
-    owner_decision: str | None,
     add_specs: tuple[str, ...],
     scope_lines: tuple[str, ...],
     acceptance_criteria: tuple[str, ...],
     simplification: tuple[str, ...],
     verification: tuple[str, ...],
-    cross_harness_dispositions: tuple[str, ...],
     summary: str | None,
-    create_missing_state: bool,
     dry_run: bool,
     emit_json: bool,
 ) -> None:
@@ -410,34 +388,17 @@ def bridge_file_implementation_proposal(
         slug=slug,
         target_paths=target_paths,
         project_id=project_id,
-        project_authorization_id=project_authorization_id,
-        owner_decision=owner_decision,
         add_specs=add_specs,
         scope_lines=scope_lines,
         acceptance_criteria=acceptance_criteria,
         simplification=simplification,
         verification=verification,
-        cross_harness_dispositions=cross_harness_dispositions,
         summary=summary,
-        create_missing_state=create_missing_state,
         dry_run=dry_run,
     )
     try:
         result = file_implementation_proposal(db, config.project_root, request)
     except ProposalFilingError as exc:
-        if exc.decision:
-            if emit_json:
-                click.echo(
-                    json.dumps(
-                        {"error": str(exc), "authorization_decision": exc.decision},
-                        indent=2,
-                        sort_keys=True,
-                    )
-                )
-                ctx.exit(1)
-            click.echo(
-                "Project Authorization Decision: " + json.dumps(exc.decision, sort_keys=True, separators=(",", ":"))
-            )
         raise click.ClickException(str(exc)) from exc
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
@@ -447,11 +408,6 @@ def bridge_file_implementation_proposal(
     payload = {
         "bridge_path": str(result.bridge_path) if result.bridge_path is not None else None,
         "project_id": result.project_id,
-        "project_authorization_id": result.project_authorization_id,
-        "project_authorization_candidates": [
-            candidate.to_dict() for candidate in result.project_authorization_candidates
-        ],
-        "authorization_decision": result.authorization_decision,
         "preflights": [
             {
                 "name": preflight.name,
@@ -467,19 +423,6 @@ def bridge_file_implementation_proposal(
         click.echo(result.content.rstrip())
         return
     click.echo(f"Wrote NEW: {result.bridge_path}")
-    click.echo(f"Project Authorization: {result.project_authorization_id}")
-    click.echo(
-        "Project Authorization Candidates: "
-        + json.dumps(
-            [candidate.to_dict() for candidate in result.project_authorization_candidates],
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-    )
-    click.echo(
-        "Project Authorization Decision: "
-        + json.dumps(result.authorization_decision, sort_keys=True, separators=(",", ":"))
-    )
     for preflight in result.preflight_results:
         click.echo(f"preflight {preflight.name}: exit {preflight.returncode}")
 

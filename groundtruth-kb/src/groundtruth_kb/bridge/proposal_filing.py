@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 import os
@@ -10,6 +9,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -19,7 +19,6 @@ from typing import Any
 from groundtruth_kb.bridge.proposal_autoload import (
     _dedupe,
     _normalize_rel_path,
-    auto_prior_delibs,
     auto_spec_links,
     auto_target_paths_in_root_evidence,
     get_work_item_or_raise,
@@ -27,17 +26,7 @@ from groundtruth_kb.bridge.proposal_autoload import (
 from groundtruth_kb.bridge.taxonomy import BridgeKind
 from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 from groundtruth_kb.db import KnowledgeDB
-from groundtruth_kb.governance.project_authorization_operation_time import (
-    classify_target,
-    evaluator_sha256,
-    load_operation_taxonomy,
-    normalize_operation,
-    normalized_envelope_hash,
-)
 
-APPROVED_SPEC_STATUSES = {"active", "specified", "implemented", "verified"}
-CHANGED_BY = "prime-builder/codex"
-FILING_OPERATION = "bridge_proposal_filing"
 NONIMPAIRMENT_REQUIRED_FIELDS = (
     "applicability",
     "provenance",
@@ -83,10 +72,6 @@ AUTHOR_METADATA_FIELDS: tuple[str, ...] = (
 class ProposalFilingError(RuntimeError):
     """Raised when a dispatchable implementation proposal cannot be filed."""
 
-    def __init__(self, message: str, *, decision: dict[str, Any] | None = None) -> None:
-        super().__init__(message)
-        self.decision = decision
-
 
 @dataclass(frozen=True)
 class FilingRequest:
@@ -94,16 +79,12 @@ class FilingRequest:
     slug: str
     target_paths: tuple[str, ...]
     project_id: str | None = None
-    project_authorization_id: str | None = None
-    owner_decision: str | None = None
     add_specs: tuple[str, ...] = ()
     scope_lines: tuple[str, ...] = ()
     acceptance_criteria: tuple[str, ...] = ()
     verification: tuple[str, ...] = ()
-    cross_harness_dispositions: tuple[str, ...] = ()
     simplification: tuple[str, ...] = ()
     summary: str | None = None
-    create_missing_state: bool = False
     dry_run: bool = False
 
 
@@ -116,48 +97,17 @@ class PreflightResult:
 
 
 @dataclass(frozen=True)
-class AuthorizationCandidateRank:
-    project_authorization_id: str
-    coverage: str
-    included_work_item_count: int | None
-    specificity_rank: tuple[int, int] | None
-    status: str = "active"
-    normalized_expiry: str | None = None
-    currentness: str = "current"
-    supersession_state: str = "current"
-    disposition: str = "eligible"
-    selected: bool = False
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "project_authorization_id": self.project_authorization_id,
-            "coverage": self.coverage,
-            "included_work_item_count": self.included_work_item_count,
-            "specificity_rank": list(self.specificity_rank) if self.specificity_rank is not None else None,
-            "status": self.status,
-            "normalized_expiry": self.normalized_expiry,
-            "currentness": self.currentness,
-            "supersession_state": self.supersession_state,
-            "disposition": self.disposition,
-            "selected": self.selected,
-        }
-
-
-@dataclass(frozen=True)
 class FilingResult:
     bridge_path: Path | None
     content: str
     project_id: str
-    project_authorization_id: str
-    project_authorization_candidates: tuple[AuthorizationCandidateRank, ...] = field(default_factory=tuple)
-    authorization_decision: dict[str, Any] = field(default_factory=dict)
     preflight_results: tuple[PreflightResult, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
 class _ProjectState:
     project_id: str
-    membership_created: bool
+    inputs: dict[str, Any]
 
 
 def _require(value: str | None, name: str) -> str:
@@ -175,110 +125,6 @@ def _active_memberships_for_work_item(db: KnowledgeDB, wi_id: str) -> list[dict[
             if membership.get("work_item_id") == wi_id:
                 memberships.append(membership)
     return memberships
-
-
-def _strict_authorization_list(row: dict[str, Any], field: str) -> list[str]:
-    parsed_key = f"{field}_parsed"
-    if parsed_key in row:
-        value = row[parsed_key]
-    elif f"_{field}_parsed" in row:
-        value = row[f"_{field}_parsed"]
-    else:
-        value = row.get(field)
-        if isinstance(value, str):
-            try:
-                value = json.loads(value)
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"{field} is not valid JSON") from exc
-    if value is None:
-        return []
-    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
-        raise ValueError(f"{field} must be a JSON list of strings")
-    return [item.strip() for item in value if item.strip()]
-
-
-def _normalize_expiry(value: object, *, decision_time: datetime) -> tuple[str | None, str]:
-    raw = str(value or "").strip()
-    if not raw:
-        return None, "current"
-    candidate = f"{raw[:-1]}+00:00" if raw.endswith("Z") else raw
-    try:
-        parsed = datetime.fromisoformat(candidate)
-    except ValueError:
-        return None, "malformed"
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        return None, "malformed"
-    normalized = parsed.astimezone(UTC).replace(microsecond=0)
-    rendered = normalized.isoformat().replace("+00:00", "Z")
-    return rendered, "expired" if normalized <= decision_time else "current"
-
-
-def _authorization_candidate_rank(
-    authorization: dict[str, Any],
-    wi_id: str,
-    *,
-    membership_active: bool,
-    decision_time: datetime,
-) -> AuthorizationCandidateRank:
-    authorization_id = str(authorization.get("id") or "").strip()
-    included = tuple(dict.fromkeys(_strict_authorization_list(authorization, "included_work_item_ids")))
-    excluded = set(_strict_authorization_list(authorization, "excluded_work_item_ids"))
-    if included == (wi_id,):
-        coverage = "exact_singleton"
-        rank: tuple[int, int] | None = (0, 1)
-        included_count: int | None = 1
-    elif included and wi_id in included:
-        coverage = "explicit_list"
-        rank = (1, len(included))
-        included_count = len(included)
-    elif not included and membership_active:
-        coverage = "project_membership_fallback"
-        rank = (2, 0)
-        included_count = None
-    else:
-        coverage = "not_covering"
-        rank = None
-        included_count = len(included) if included else None
-
-    disposition = "eligible" if rank is not None else "not_covering"
-    if wi_id in excluded:
-        disposition = "work_item_excluded"
-
-    normalized_expiry, currentness = _normalize_expiry(authorization.get("expires_at"), decision_time=decision_time)
-    superseded = bool(_strict_authorization_list(authorization, "superseded_by"))
-    supersession_state = "superseded" if superseded else "current"
-    if str(authorization.get("status") or "").strip().lower() != "active":
-        currentness = "inactive"
-    elif superseded:
-        currentness = "superseded"
-
-    return AuthorizationCandidateRank(
-        project_authorization_id=authorization_id,
-        coverage=coverage,
-        included_work_item_count=included_count,
-        specificity_rank=rank,
-        status=str(authorization.get("status") or ""),
-        normalized_expiry=normalized_expiry,
-        currentness=currentness,
-        supersession_state=supersession_state,
-        disposition=disposition,
-    )
-
-
-def _authorization_envelope(authorization: dict[str, Any]) -> dict[str, Any]:
-    envelope = dict(authorization)
-    for field_name in (
-        "allowed_mutation_classes",
-        "forbidden_operations",
-        "included_work_item_ids",
-        "excluded_work_item_ids",
-        "included_spec_ids",
-        "excluded_spec_ids",
-        "supersedes",
-        "superseded_by",
-    ):
-        envelope[field_name] = _strict_authorization_list(authorization, field_name)
-    return envelope
 
 
 def _resolve_actor_context(project_root: Path) -> dict[str, str]:
@@ -347,276 +193,51 @@ def _bridge_invalidation_inputs(project_root: Path, slug: str) -> dict[str, Any]
     }
 
 
-def _decision_payload(
-    *,
-    project_root: Path,
-    request: FilingRequest,
-    project_id: str,
-    spec_links: list[str],
-    actor: dict[str, str],
-    invalidation_inputs: dict[str, Any],
-    candidates: tuple[AuthorizationCandidateRank, ...],
-    best_rank: tuple[int, int] | None,
-    authorization: dict[str, Any] | None,
-    allowed: bool,
-    reason_code: str,
-    reason: str,
-    recovery: str,
-    decision_time: datetime,
-    envelope_decision: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    taxonomy = load_operation_taxonomy(project_root)
-    envelope = _authorization_envelope(authorization) if authorization is not None else {}
-    selected_id = str(authorization.get("id") or "") if authorization is not None else None
-    payload: dict[str, Any] = {
-        "schema_version": 1,
-        "selector_mode": "explicit" if request.project_authorization_id else "automatic",
-        "requested_project_authorization_id": request.project_authorization_id,
-        "selected_project_authorization_id": selected_id,
-        "project_authorization_candidates": [candidate.to_dict() for candidate in candidates],
-        "fixed_best_rank": list(best_rank) if best_rank is not None else None,
-        "fixed_best_cohort_ids": [
-            candidate.project_authorization_id
-            for candidate in candidates
-            if best_rank is not None and candidate.specificity_rank == best_rank
-        ],
-        "authorization": {
-            "id": selected_id,
-            "version": authorization.get("version") if authorization is not None else None,
-            "status": authorization.get("status") if authorization is not None else None,
-            "normalized_expiry": next(
-                (
-                    candidate.normalized_expiry
-                    for candidate in candidates
-                    if candidate.project_authorization_id == selected_id
-                ),
-                None,
-            ),
-            "supersession_state": next(
-                (
-                    candidate.supersession_state
-                    for candidate in candidates
-                    if candidate.project_authorization_id == selected_id
-                ),
-                None,
-            ),
-            "owner_decision_deliberation_id": (
-                authorization.get("owner_decision_deliberation_id") if authorization is not None else None
-            ),
-            "owner_decision_snapshot": (
-                authorization.get("_owner_decision_snapshot") if authorization is not None else None
-            ),
-            "normalized_envelope_hash": (
-                normalized_envelope_hash(envelope, taxonomy) if authorization is not None else None
-            ),
-            "included_work_item_ids": envelope.get("included_work_item_ids", []),
-            "excluded_work_item_ids": envelope.get("excluded_work_item_ids", []),
-            "included_spec_ids": envelope.get("included_spec_ids", []),
-            "excluded_spec_ids": envelope.get("excluded_spec_ids", []),
-            "allowed_mutation_classes": envelope.get("allowed_mutation_classes", []),
-            "forbidden_operations": envelope.get("forbidden_operations", []),
-        },
-        "actor": actor,
-        "request": {
-            "project_id": project_id,
-            "work_item_id": request.wi_id,
-            "bridge_document": request.slug,
-            "target_paths": list(request.target_paths),
-            "linked_specifications": list(spec_links),
-        },
-        "invalidation_inputs": invalidation_inputs,
-        "normalized_operation": normalize_operation(FILING_OPERATION, taxonomy),
-        "classified_targets": [
-            {"path": item.path, "mutation_class": item.mutation_class}
-            for item in (classify_target(path, taxonomy) for path in request.target_paths)
-        ],
-        "evaluator_id": taxonomy.evaluator_id,
-        "evaluator_version": taxonomy.evaluator_version,
-        "evaluator_sha256": evaluator_sha256(),
-        "taxonomy_version": taxonomy.taxonomy_version,
-        "taxonomy_sha256": taxonomy.source_sha256,
-        "decision_time": decision_time.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-        "allowed": allowed,
-        "reason_code": reason_code,
-        "reason": reason,
-        "recovery": recovery,
-    }
-    if envelope_decision is not None:
-        payload["envelope_decision"] = envelope_decision
-    identity_material = json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("ascii")
-    payload["decision_id"] = "sha256:" + hashlib.sha256(identity_material).hexdigest()
-    return payload
-
-
-def _deny_from_decision(
-    decision: dict[str, Any],
-    *,
-    reason_code: str,
-    reason: str,
-    recovery: str,
-) -> dict[str, Any]:
-    payload = json.loads(json.dumps(decision))
-    payload.pop("decision_id", None)
-    payload.update(
-        {
-            "allowed": False,
-            "reason_code": reason_code,
-            "reason": reason,
-            "recovery": recovery,
-        }
-    )
-    identity_material = json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("ascii")
-    payload["decision_id"] = "sha256:" + hashlib.sha256(identity_material).hexdigest()
-    return payload
-
-
-def _decision_invalidation_fingerprint(decision: dict[str, Any]) -> str:
-    """Return a stable identity for authorization inputs, excluding evaluation time."""
-    payload = json.loads(json.dumps(decision))
-    payload.pop("decision_id", None)
-    payload.pop("decision_time", None)
-    envelope_decision = payload.get("envelope_decision")
-    if isinstance(envelope_decision, dict):
-        envelope_decision.pop("decision_time", None)
-    material = json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("ascii")
-    return "sha256:" + hashlib.sha256(material).hexdigest()
-
-
-def _require_owner_decision(db: KnowledgeDB, owner_decision: str | None) -> str:
-    delib_id = _require(owner_decision, "owner_decision")
-    deliberation = db.get_deliberation(delib_id)
-    if deliberation is None:
-        raise ProposalFilingError(f"Owner-decision deliberation not found: {delib_id}")
-    if deliberation.get("source_type") != "owner_conversation":
-        raise ProposalFilingError(f"Owner-decision deliberation is not owner_conversation evidence: {delib_id}")
-    return delib_id
-
-
-def _approved_existing_specs(db: KnowledgeDB, spec_ids: list[str]) -> list[str]:
-    approved: list[str] = []
-    for spec_id in spec_ids:
-        row = db.get_spec(spec_id)
-        if row is not None and row.get("status") in APPROVED_SPEC_STATUSES:
-            approved.append(spec_id)
-    return _dedupe(tuple(approved))
-
-
 def _resolve_project_state(
     db: KnowledgeDB,
     project_root: Path,
     request: FilingRequest,
-    *,
-    spec_links: list[str],
-    decision_time: datetime,
-    allow_state_creation: bool = True,
 ) -> _ProjectState:
+    """Read existing membership and project authorization without creating state."""
     work_item = get_work_item_or_raise(db, request.wi_id)
+    if work_item.get("resolution_status") in {"resolved", "retired", "wont_fix", "not_a_defect", "verified"}:
+        raise ProposalFilingError(f"Work item {request.wi_id} is complete or awaiting finalization; cannot start NEW")
     memberships = _active_memberships_for_work_item(db, request.wi_id)
-
-    project_id = request.project_id.strip() if request.project_id else None
-    if not project_id and len(memberships) == 1:
-        project_id = str(memberships[0].get("project_id") or "")
-    elif not project_id and len(memberships) > 1:
-        raise ProposalFilingError(f"Work item {request.wi_id} has multiple active project memberships; pass --project.")
-    elif not project_id:
-        compatibility_project = str(work_item.get("project_name") or "").strip()
-        project_id = compatibility_project or None
-
-    project_id = _require(project_id, "project")
+    if len(memberships) != 1:
+        raise ProposalFilingError(
+            f"Work item {request.wi_id} requires exactly one active project membership; "
+            f"found {len(memberships)}. Reconcile membership before filing."
+        )
+    membership = memberships[0]
+    project_id = _require(membership.get("project_id"), "membership project")
+    if request.project_id and request.project_id.strip() != project_id:
+        raise ProposalFilingError(f"Work item {request.wi_id} belongs to {project_id}, not {request.project_id}")
     project = db.get_project(project_id)
-    if project is None:
-        raise ProposalFilingError(f"Project not found: {project_id}")
-    membership = next((item for item in memberships if item.get("project_id") == project_id), None)
-    actor = _resolve_actor_context(project_root)
-    invalidation_inputs = {
-        **_bridge_invalidation_inputs(project_root, request.slug),
-        "project_version": project.get("version"),
-        "project_status": project.get("status"),
-        "project_completed_at": project.get("completed_at"),
-        "membership_id": membership.get("id") if membership is not None else None,
-        "membership_version": membership.get("version") if membership is not None else None,
-        "membership_status": membership.get("status") if membership is not None else None,
-    }
-
-    def deny_state(code: str, reason: str, recovery: str) -> None:
-        decision = _decision_payload(
-            project_root=project_root,
-            request=request,
-            project_id=project_id,
-            spec_links=spec_links,
-            actor=actor,
-            invalidation_inputs=invalidation_inputs,
-            candidates=(),
-            best_rank=None,
-            authorization=None,
-            allowed=False,
-            reason_code=code,
-            reason=reason,
-            recovery=recovery,
-            decision_time=decision_time,
+    if project is None or project.get("status") != "active" or project.get("completed_at"):
+        raise ProposalFilingError(f"Project {project_id} is missing, inactive, or complete")
+    if project.get("authorization") != "authorized":
+        raise ProposalFilingError(
+            f"Project {project_id} authorization is {project.get('authorization')!r}; "
+            "NEW proposal filing requires 'authorized'. The owner must change the project field."
         )
-        raise ProposalFilingError(f"{reason} [{code}]", decision=decision)
-
-    if project.get("status") != "active":
-        deny_state(
-            "project_not_active",
-            f"Project {project_id} is not active",
-            "Reactivate the project through the governed append-only lifecycle before filing.",
-        )
-    if invalidation_inputs["latest_bridge_status"] != "ABSENT":
-        deny_state(
-            "bridge_preimage_not_absent",
-            f"Bridge thread {request.slug} already exists at version "
-            f"{invalidation_inputs['latest_bridge_version']} with status "
-            f"{invalidation_inputs['latest_bridge_status']}",
-            "Choose a fresh bridge slug or continue the existing thread through its role-correct workflow.",
-        )
-
-    # WI-7657: no authorization is selected, evaluated, or created here.
-    #
-    # This block used to rank candidate authorization rows, deny with
-    # no_current_covering_authorization when none covered the work item, and --
-    # under --create-missing-state -- mint a bounded PAUTH row for the filing.
-    # All three are gone. There is no authorization record to select, denying
-    # on its absence refused lawful work, and minting one reinstated the object
-    # being removed.
-    #
-    # What survives is the part that was always doing the real work: project
-    # membership. Work-item scope IS membership, so an absent membership is
-    # still a genuine blocker and is still creatable under owner-decision
-    # evidence. Authorization is a field on the project row, set by owner
-    # direction through gt projects update --activation-status, and gates
-    # dispatch rather than filing.
-    membership_created = False
-    if membership is None:
-        if not request.create_missing_state:
-            deny_state(
-                "no_active_project_membership",
-                f"Work item {request.wi_id} has no active membership in {project_id}",
-                "Add the membership with gt projects add-item, or pass --create-missing-state "
-                "with owner-decision evidence.",
-            )
-        try:
-            owner_decision = _require_owner_decision(db, request.owner_decision)
-        except ProposalFilingError as exc:
-            deny_state(
-                "owner_decision_unresolvable",
-                str(exc),
-                "Supply a resolvable owner_conversation deliberation id before creating membership state.",
-            )
-        if not request.dry_run and allow_state_creation:
-            db.link_project_work_item(
-                project_id,
-                request.wi_id,
-                CHANGED_BY,
-                f"gt bridge file-implementation-proposal membership creation approved by {owner_decision}",
-                source="gt bridge file-implementation-proposal",
-            )
-            membership_created = True
-
+    test_id = str(work_item.get("source_test_id") or "").strip()
+    test = db.get_test(test_id) if test_id else None
+    if test is None or not str(test.get("test_file") or "").strip():
+        raise ProposalFilingError(f"Work item {request.wi_id} requires a linked executable test before filing")
+    bridge_inputs = _bridge_invalidation_inputs(project_root, request.slug)
+    if bridge_inputs["latest_bridge_status"] != "ABSENT":
+        raise ProposalFilingError(f"Bridge thread {request.slug} already exists; continue its existing chain")
     return _ProjectState(
         project_id=project_id,
-        membership_created=membership_created,
+        inputs=deepcopy(
+            {
+                "project": project,
+                "membership": membership,
+                "work_item": work_item,
+                "bridge": bridge_inputs,
+                "test": test,
+            }
+        ),
     )
 
 
@@ -638,27 +259,6 @@ def _validate_target_paths(project_root: Path, target_paths: tuple[str, ...]) ->
     return tuple(_dedupe(tuple(normalized)))
 
 
-def _validate_cross_harness_dispositions(entries: tuple[str, ...]) -> tuple[str, ...]:
-    normalized: list[str] = []
-    seen_keys: set[str] = set()
-    for entry in entries:
-        if "=" not in entry:
-            raise ProposalFilingError("--cross-harness-disposition entries must use HARNESS_OR_SURFACE=DISPOSITION")
-        key, disposition = (part.strip() for part in entry.split("=", 1))
-        if not key or not disposition:
-            raise ProposalFilingError(
-                "--cross-harness-disposition requires a non-empty harness/surface and disposition"
-            )
-        if any(character in key or character in disposition for character in "\r\n"):
-            raise ProposalFilingError("--cross-harness-disposition entries must be single-line values")
-        normalized_key = key.casefold()
-        if normalized_key in seen_keys:
-            raise ProposalFilingError(f"Duplicate --cross-harness-disposition key: {key}")
-        seen_keys.add(normalized_key)
-        normalized.append(f"{key}={disposition}")
-    return tuple(normalized)
-
-
 def _format_bullets(values: list[str] | tuple[str, ...], *, empty: str) -> str:
     if not values:
         return f"- {empty}"
@@ -670,9 +270,8 @@ def _format_spec_links(spec_ids: list[str]) -> str:
         "GOV-FILE-BRIDGE-AUTHORITY-001": "preserves role-correct bridge authority and numbered-file filing.",
         "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001": "requires concrete specification links in implementation proposals.",
         "DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001": "requires spec-derived verification evidence before VERIFIED.",
-        "DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001": "requires project authorization, project, work item, and target path metadata.",
+        "DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001": "requires project, work item, and target path metadata.",
         "GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001": "governs bounded project implementation authority.",
-        "DCL-PROJECT-AUTHORIZATION-ENVELOPE-001": "requires bounded PAUTH envelopes for new authorization state.",
         "ADR-ISOLATION-APPLICATION-PLACEMENT-001": "keeps this platform command out of adopter application scope.",
     }
     return "\n".join(
@@ -699,10 +298,6 @@ def _format_verification_plan(spec_ids: list[str], explicit: tuple[str, ...]) ->
     return "\n".join(rows)
 
 
-def _format_cross_harness_dispositions(entries: tuple[str, ...]) -> str:
-    return "\n".join(f"- **{key}**: {disposition}" for key, disposition in (entry.split("=", 1) for entry in entries))
-
-
 def draft_nonimpairment_disposition() -> dict[str, Any]:
     """Return the complete, deliberately non-fileable draft schema."""
     return {
@@ -715,7 +310,6 @@ def build_nonimpairment_disposition(
     *,
     wi_id: str,
     project_id: str,
-    project_authorization_id: str,
     target_paths: tuple[str, ...],
     summary: str,
     description: str,
@@ -727,7 +321,7 @@ def build_nonimpairment_disposition(
     return {
         "schema_version": 1,
         "applicability": "applicable",
-        "provenance": f"{wi_id}; {project_authorization_id}; generated by gt bridge file-implementation-proposal",
+        "provenance": f"{wi_id}; {project_id}; generated by gt bridge file-implementation-proposal",
         "canonical_authority": ("GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001 and the governed bridge proposal generators"),
         "primary_route": "gt bridge file-implementation-proposal",
         "before_behavior": description or f"{wi_id} has no implemented behavior yet; this proposal defines the slice.",
@@ -738,9 +332,7 @@ def build_nonimpairment_disposition(
         "obsolete_guidance_disposition": (
             "No guidance is retired by proposal filing; implementation must explicitly disposition obsolete guidance."
         ),
-        "history_preservation": (
-            "The numbered bridge chain remains append-only; rollback never deletes proposal or verdict artifacts."
-        ),
+        "history_preservation": ("Git and formal history are preserved; bridge messages are disposable coordination."),
         "baseline": {
             "work_item": wi_id,
             "project": project_id,
@@ -757,18 +349,18 @@ def build_nonimpairment_disposition(
             "verification": "Rerun the proposal's specification-derived tests and bridge preflights.",
         },
         "hard_invariants": [
-            "Bridge review, implementation-start, and independent verification gates remain mandatory.",
+            "Independent proposal review and implementation verification remain mandatory.",
             "Only the declared in-root target paths are attributable to this implementation proposal.",
-            "Dispatcher, TAFE, credential, deployment, release, and unrelated work remain outside generated authority.",
+            "Credential, deployment, release, and unrelated work remain outside the proposed scope.",
         ],
         "fail_closed_conditions": [
-            "Project membership or active PAUTH coverage is missing.",
+            "Exactly one project membership and an authorized parent project are required for a NEW proposal.",
             "Target paths escape the project root or candidate/live preflights fail.",
             "Required proposal evidence is empty, malformed, duplicated, or still contains authoring placeholders.",
         ],
         "essential_context_preservation": (
-            "The generated proposal retains PAUTH, project, work item, targets, specifications, prior deliberations, "
-            "owner decisions, scope, verification, acceptance, risk, rollback, and expected file changes."
+            "The generated proposal retains project, work item, targets, specifications, "
+            "scope, verification, acceptance, risk, rollback, and expected file changes."
         ),
     }
 
@@ -798,31 +390,9 @@ def _session_scratch_dirname() -> str:
     return "proposal-filing-no-session"
 
 
-def _derive_kb_mutation_in_scope(
-    target_paths: tuple[str, ...],
-    authorization_decision: dict[str, Any],
-) -> bool:
-    """Derive ``kb_mutation_in_scope`` from declared targets and cross-check the decision.
-
-    WI-7326 defect 4. The flag was previously hard-coded ``false``. It is now derived
-    from ``target_paths`` and cross-checked against the classified mutation targets the
-    authorization evaluator already produced; a disagreement fails closed rather than
-    emitting a flag the decision does not corroborate.
-    """
-    kb_targets = tuple(
-        path for path in target_paths if PurePosixPath(str(path).replace("\\", "/")).name == KB_DB_FILENAME
-    )
-    if not kb_targets:
-        return False
-    classified = {str(entry.get("path")) for entry in (authorization_decision.get("classified_targets") or ())}
-    uncorroborated = [path for path in kb_targets if path not in classified]
-    if uncorroborated:
-        raise ProposalFilingError(
-            "kb_mutation_in_scope derivation disagrees with the authorization decision: "
-            f"{uncorroborated} declared as targets but absent from classified_targets. "
-            "Re-run filing from a fresh authorization snapshot."
-        )
-    return True
+def _derive_kb_mutation_in_scope(target_paths: tuple[str, ...]) -> bool:
+    """Derive database mutation scope directly from the declared paths."""
+    return any(PurePosixPath(path.replace("\\", "/")).name == KB_DB_FILENAME for path in target_paths)
 
 
 def _compliance_gate_script(project_root: Path) -> Path:
@@ -873,6 +443,8 @@ def _run_compliance_gate(project_root: Path, slug: str, content: str) -> Preflig
     gate_result = PreflightResult(
         name="compliance_gate", returncode=result.returncode, stdout=raw, stderr=result.stderr or ""
     )
+    if result.returncode != 0:
+        raise ProposalFilingError(f"Bridge compliance gate failed with exit {result.returncode}: {result.stderr}")
     if not raw:
         return gate_result
     try:
@@ -899,37 +471,24 @@ def _build_content(
     title = str(work_item.get("title") or request.wi_id)
     description = str(work_item.get("description") or "").strip()
     target_paths_json = json.dumps(list(request.target_paths), ensure_ascii=True)
-    prior_delibs = auto_prior_delibs(db, request.wi_id, request.slug)
-    owner_decisions = []
-    if request.owner_decision:
-        owner_decisions.append(f"`{request.owner_decision}` - owner-decision evidence supplied to this command.")
-    owner_decisions.append(
-        f"`{project_state.project_authorization_id}` - active project authorization covering `{request.wi_id}`."
-    )
     scope_lines = request.scope_lines or (
         f"File a dispatchable NEW implementation proposal for `{request.wi_id}`.",
-        "Preserve bridge review and implementation-start gates; this command does not bypass Loyal Opposition.",
-        "Fail closed on missing project membership, missing PAUTH coverage, preflight gaps, or invalid target paths.",
+        "Preserve independent proposal review and implementation verification.",
+        "Require one project membership, project authorization, valid targets, and passing preflights.",
     )
     acceptance = request.acceptance_criteria or (
         "A single command writes one `NEW` bridge proposal file through the governed bridge writer path.",
-        "The proposal contains project linkage, inline-JSON target paths, concrete spec links, prior deliberations, owner-decision evidence, and a spec-derived verification plan.",
+        "The proposal contains project linkage, inline-JSON target paths, concrete spec links and a spec-derived verification plan.",
         "Candidate and live bridge preflights pass or no bridge file is written.",
     )
     summary = request.summary or (
         f"File a governed implementation proposal for `{request.wi_id}` using deterministic project, "
         "authorization, target-path, and preflight wiring."
     )
-    cross_harness_section = (
-        f"## Cross-Harness Disposition\n\n{_format_cross_harness_dispositions(request.cross_harness_dispositions)}\n\n"
-        if request.cross_harness_dispositions
-        else ""
-    )
     nonimpairment_section = render_nonimpairment_disposition(
         build_nonimpairment_disposition(
             wi_id=request.wi_id,
             project_id=project_state.project_id,
-            project_authorization_id=project_state.project_authorization_id,
             target_paths=request.target_paths,
             summary=summary,
             description=description,
@@ -940,7 +499,7 @@ def _build_content(
     )
     actor = _resolve_actor_context(project_root)
     author_metadata_block = chr(10).join(f"{name}: {actor.get(name, '')}" for name in AUTHOR_METADATA_FIELDS)
-    kb_mutation_in_scope = _derive_kb_mutation_in_scope(request.target_paths, project_state.authorization_decision)
+    kb_mutation_in_scope = _derive_kb_mutation_in_scope(request.target_paths)
     simplification = request.simplification or (
         "No net reduction is claimed: this change adds capability without removing "
         "artifacts, lines, state locations, or concepts. Supply `--simplification` to "
@@ -960,15 +519,12 @@ Date: {date}
 
 {author_metadata_block}
 
-Project Authorization: {project_state.project_authorization_id}
-Project Authorization Candidates: {json.dumps([candidate.to_dict() for candidate in project_state.project_authorization_candidates], ensure_ascii=True, separators=(",", ":"))}
-Project Authorization Decision: {json.dumps(project_state.authorization_decision, ensure_ascii=True, separators=(",", ":"), sort_keys=True)}
+recipient_role: loyal-opposition
 Project: {project_state.project_id}
 Work Item: {request.wi_id}
-Latest Bridge Status: {project_state.authorization_decision["invalidation_inputs"]["latest_bridge_status"]}
-Reviewed Proposal Version: {project_state.authorization_decision["invalidation_inputs"]["reviewed_proposal_version"]}
 
 target_paths: {target_paths_json}
+test_artifact_targets: {json.dumps([project_state.inputs["test"]["id"]])}
 
 implementation_scope: source
 requires_review: true
@@ -983,11 +539,11 @@ Work item description: {description or "_No work item description supplied._"}
 
 ## Claim
 
-Prime Builder proposes a bounded implementation slice for `{request.wi_id}` and keeps the bridge, project authorization, owner-decision, and verification gates intact.
+Prime Builder proposes a bounded implementation slice for `{request.wi_id}` and requests independent proposal review before implementation.
 
 ## Requirement Sufficiency
 
-Existing requirements are sufficient for filing this proposal. The work item and active project authorization define the implementation boundary; any missing membership or PAUTH state is created only when explicit owner-decision evidence is supplied.
+Existing requirements sufficient for the proposed scope, subject to independent review. The linked specifications and proposed target paths define the change. Membership and the parent project authorization field are read from existing database state. Review must establish requirement sufficiency; filing does not establish it.
 
 ## In-Root Placement Evidence
 
@@ -997,14 +553,6 @@ Existing requirements are sufficient for filing this proposal. The work item and
 
 {_format_spec_links(spec_links)}
 
-## Prior Deliberations
-
-{_format_bullets(prior_delibs, empty="_No prior deliberations auto-loaded; author must confirm before review._")}
-
-## Owner Decisions / Input
-
-{_format_bullets(owner_decisions, empty="_No owner-decision evidence required for existing active authorization reuse._")}
-
 ## Simplification Accounting
 
 {_format_bullets(simplification, empty="_No simplification accounting supplied._")}
@@ -1013,7 +561,7 @@ Existing requirements are sufficient for filing this proposal. The work item and
 
 {_format_bullets(scope_lines, empty="_No proposed scope supplied._")}
 
-{cross_harness_section}{nonimpairment_section}
+{nonimpairment_section}
 
 ## Specification-Derived Verification Plan
 
@@ -1025,9 +573,9 @@ Existing requirements are sufficient for filing this proposal. The work item and
 
 ## Risks / Rollback
 
-Risk is moderate because implementation proposals authorize later protected-file work. The service must fail closed around owner-decision evidence, target paths, bridge slug collisions, author metadata, and preflight failures.
+The proposal requires independent review before implementation. Filing checks project state, target paths, bridge slug collisions, author metadata, and preflight failures.
 
-Rollback is a revert of the source and test changes. Bridge files and project authorization records are append-only audit artifacts and must not be deleted by rollback.
+Reversal of committed source and test changes is forward work. Bridge messages are ephemeral coordination and are excluded from work-product commits.
 
 ## Files Expected To Change
 
@@ -1045,10 +593,25 @@ def _project_root_from_module() -> Path:
 
 def _load_bridge_writer(project_root: Path) -> ModuleType:
     candidates = [
-        project_root / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py",
-        _project_root_from_module() / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py",
-        project_root / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py",
-        _project_root_from_module() / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py",
+        project_root
+        / ".harness-baseline-configuration"
+        / "skills"
+        / "gtkb-bridge-propose"
+        / "helpers"
+        / "write_bridge.py",
+        _project_root_from_module()
+        / ".harness-baseline-configuration"
+        / "skills"
+        / "gtkb-bridge-propose"
+        / "helpers"
+        / "write_bridge.py",
+        project_root / ".harness-baseline-configuration" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py",
+        _project_root_from_module()
+        / ".harness-baseline-configuration"
+        / "skills"
+        / "bridge-propose"
+        / "helpers"
+        / "write_bridge.py",
     ]
     helper_path = next((path for path in candidates if path.is_file()), None)
     if helper_path is None:
@@ -1119,16 +682,16 @@ def file_implementation_proposal(
 ) -> FilingResult:
     """File a dispatchable ``NEW`` implementation proposal through the bridge writer."""
     normalized_targets = _validate_target_paths(project_root, request.target_paths)
-    normalized_dispositions = _validate_cross_harness_dispositions(request.cross_harness_dispositions)
     request = FilingRequest(
         **{
             **request.__dict__,
             "wi_id": _require(request.wi_id, "wi"),
             "slug": _require(request.slug, "slug"),
             "target_paths": normalized_targets,
-            "cross_harness_dispositions": normalized_dispositions,
         }
     )
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", request.slug):
+        raise ProposalFilingError("Bridge slug must be lowercase kebab-case")
     spec_links = auto_spec_links(
         db,
         project_root,
@@ -1137,49 +700,21 @@ def file_implementation_proposal(
         request.target_paths,
         request.add_specs,
     )
-    decision_time = datetime.now(UTC).replace(microsecond=0)
-    project_state = _resolve_project_state(
-        db,
-        project_root,
-        request,
-        spec_links=spec_links,
-        decision_time=decision_time,
-    )
+    project_state = _resolve_project_state(db, project_root, request)
     content = _build_content(db, project_root, request, project_state, spec_links=spec_links)
 
     preflight_results: list[PreflightResult] = []
     if run_candidate_preflights:
         preflight_results.extend(_run_candidate_preflights(project_root, content))
-    revalidation_time = datetime.now(UTC).replace(microsecond=0)
-    revalidated_state = _resolve_project_state(
-        db,
-        project_root,
-        request,
-        spec_links=spec_links,
-        decision_time=revalidation_time,
-        allow_state_creation=False,
-    )
-    initial_fingerprint = _decision_invalidation_fingerprint(project_state.authorization_decision)
-    revalidated_fingerprint = _decision_invalidation_fingerprint(revalidated_state.authorization_decision)
-    if initial_fingerprint != revalidated_fingerprint:
-        denied = _deny_from_decision(
-            revalidated_state.authorization_decision,
-            reason_code="authorization_inputs_changed_before_filing",
-            reason="Project authorization or bridge invalidation inputs changed after candidate preflight",
-            recovery="Restart proposal filing from a fresh snapshot; do not reuse the stale authorization decision.",
-        )
-        raise ProposalFilingError("Authorization inputs changed before bridge filing", decision=denied)
-    # WI-7326 defect 5: evaluate the same gate the writer evaluates, on both paths, so a
-    # dry-run verdict and a write verdict cannot disagree for identical inputs.
     preflight_results.append(_run_compliance_gate(project_root, request.slug, content))
+    revalidated_state = _resolve_project_state(db, project_root, request)
+    if project_state != revalidated_state:
+        raise ProposalFilingError("Project, membership, work item, or bridge inputs changed before filing; retry")
     if request.dry_run:
         return FilingResult(
             bridge_path=None,
             content=content,
             project_id=project_state.project_id,
-            project_authorization_id=project_state.project_authorization_id,
-            project_authorization_candidates=project_state.project_authorization_candidates,
-            authorization_decision=project_state.authorization_decision,
             preflight_results=tuple(preflight_results),
         )
 
@@ -1202,8 +737,5 @@ def file_implementation_proposal(
         bridge_path=Path(bridge_path),
         content=content,
         project_id=project_state.project_id,
-        project_authorization_id=project_state.project_authorization_id,
-        project_authorization_candidates=project_state.project_authorization_candidates,
-        authorization_decision=project_state.authorization_decision,
         preflight_results=tuple(preflight_results),
     )
