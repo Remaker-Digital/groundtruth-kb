@@ -144,12 +144,23 @@ formal, project and test facts migrate from their existing domain rows, not
 from those historical bundles. The original source and out-of-band backups
 preserve history through the migration cleanup boundary.
 
+Current row payloads are selected inside SQLite; export does not load obsolete
+historical bodies merely to choose the newest version. Invalid source versions
+and duplicate identity/version pairs still refuse. Work items do not retain a
+`related_bridge_threads` column in PostgreSQL: disposable bridge addresses are
+not durable knowledge links or recovery inputs. The migration intentionally
+excludes that legacy source field; operative bridge state uses the native bridge
+service and is purged at terminal completion.
+
 Known retired/runtime source tables may already be absent. Every migratable
 table must be present, and any unknown table refuses export with its name so
 new state cannot be silently dropped. The snapshot's actual schema inventory
 and contents are still checked against the specific transform input. Accounting
 for the table set does not prove every field, citation or work relationship is
 valid; those reconciliations and the permanent cutover remain required.
+Every imported work item, including a previously verified item, must resolve
+to exactly one active parent-project relationship. Missing or multiple parents
+refuse the manifest; historical status is not an exception to the work model.
 
 The supported client commands include:
 

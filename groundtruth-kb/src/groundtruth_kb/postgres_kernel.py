@@ -157,6 +157,7 @@ FORBIDDEN_COLUMNS = frozenset(
         "reviewer_precedence",
         "authorization_name",
         "owner_decision_deliberation_id",
+        "related_bridge_threads",
     }
 )
 _CHANGE_COLUMNS = ("changed_by", "changed_at", "change_reason")
@@ -452,7 +453,6 @@ TABLE_SPECS: dict[str, TableSpec] = {
             "source_deliberation_query",
             "related_deliberation_ids",
             "related_spec_ids_at_creation",
-            "related_bridge_threads",
             "depends_on_work_items",
             "blocks_work_items",
             "acceptance_summary",
@@ -465,7 +465,6 @@ TABLE_SPECS: dict[str, TableSpec] = {
         json_columns=(
             "related_deliberation_ids",
             "related_spec_ids_at_creation",
-            "related_bridge_threads",
             "depends_on_work_items",
             "blocks_work_items",
             "supersedes",
@@ -1189,6 +1188,14 @@ def _validate_manifest_relationships(tables: Mapping[str, list[dict[str, Any]]])
                 raise PostgresKernelError("invalid_manifest", "A work item cannot have multiple active parent projects")
             active_parents.add(row["work_item_id"])
 
+    missing_parents = ids["work_items"] - active_parents
+    if missing_parents:
+        raise PostgresKernelError(
+            "invalid_manifest",
+            "Every work item requires one active parent project",
+            details={"missing_parent_count": len(missing_parents), "work_item_ids": sorted(missing_parents)[:20]},
+        )
+
     for row in tables["project_dependencies"]:
         _require_reference(row["dependent_project_id"], ids["projects"], label="dependency.dependent_project_id")
         _require_reference(
@@ -1448,27 +1455,33 @@ def _sqlite_inventory(connection: sqlite3.Connection) -> dict[str, Any]:
 
 def _current_sqlite_rows(connection: sqlite3.Connection, table_name: str) -> list[dict[str, Any]]:
     quoted = '"' + table_name.replace('"', '""') + '"'
-    rows = [dict(row) for row in connection.execute(f"SELECT * FROM {quoted}").fetchall()]
-    if not rows:
-        return []
-    if "version" not in rows[0]:
-        return rows
+    columns = {row["name"] for row in connection.execute(f"PRAGMA table_info({quoted})")}
+    if "version" not in columns:
+        return [dict(row) for row in connection.execute(f"SELECT * FROM {quoted}")]
     spec = TABLE_SPECS[table_name]
-    latest: dict[tuple[bytes, ...], dict[str, Any]] = {}
+    keys = ",".join('"' + key.replace('"', '""') + '"' for key in spec.identity_columns)
+    invalid = connection.execute(
+        f"SELECT 1 FROM {quoted} WHERE typeof(version) <> 'integer' OR version < 1 LIMIT 1"
+    ).fetchone()
+    if invalid is not None:
+        raise PostgresKernelError("invalid_source", f"Invalid source version in {table_name}")
+    duplicate = connection.execute(
+        f"SELECT 1 FROM {quoted} GROUP BY {keys},version HAVING COUNT(*) > 1 LIMIT 1"
+    ).fetchone()
+    if duplicate is not None:
+        raise PostgresKernelError("invalid_source", f"Duplicate source identity/version in {table_name}")
+    # Select current payloads in SQLite. Historical bodies can dominate the
+    # source size and are not migration input; never materialize them in Python.
+    rows = [
+        dict(row)
+        for row in connection.execute(
+            f"SELECT t.* FROM {quoted} t JOIN "
+            f"(SELECT {keys},MAX(version) version FROM {quoted} GROUP BY {keys}) h USING ({keys},version)"
+        )
+    ]
     for row in rows:
-        identity = _identity_key(spec, row)
-        version = row.get("version")
-        if not isinstance(version, int) or isinstance(version, bool) or version < 1:
-            raise PostgresKernelError("invalid_source", f"Invalid source version in {table_name}")
-        prior = latest.get(identity)
-        if prior is not None and int(prior["version"]) == version:
-            raise PostgresKernelError(
-                "invalid_source",
-                f"Duplicate source identity/version in {table_name}",
-            )
-        if prior is None or int(prior["version"]) < version:
-            latest[identity] = row
-    return list(latest.values())
+        _identity_key(spec, row)
+    return rows
 
 
 def _transform_source_rows(

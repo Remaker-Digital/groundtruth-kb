@@ -742,12 +742,18 @@ def _create_sqlite_fixture(path: Path) -> sqlite3.Connection:
         elif table_name == "work_items":
             definition = (
                 "id TEXT, version INTEGER, title TEXT, origin TEXT, component TEXT, resolution_status TEXT, "
-                "stage TEXT, depends_on_work_items TEXT, changed_by TEXT, changed_at TEXT, change_reason TEXT"
+                "stage TEXT, depends_on_work_items TEXT, changed_by TEXT, changed_at TEXT, change_reason TEXT, "
+                "related_bridge_threads TEXT"
             )
         elif table_name == "projects":
             definition = (
                 "id TEXT, version INTEGER, name TEXT, kind TEXT, authorization TEXT, status TEXT, start_date TEXT, changed_by TEXT, "
                 "changed_at TEXT, change_reason TEXT"
+            )
+        elif table_name == "project_work_item_memberships":
+            definition = (
+                "id TEXT, version INTEGER, project_id TEXT, work_item_id TEXT, status TEXT, "
+                "changed_by TEXT, changed_at TEXT, change_reason TEXT"
             )
         elif table_name == "project_dependencies":
             definition = (
@@ -827,11 +833,15 @@ def _create_sqlite_fixture(path: Path) -> sqlite3.Connection:
     connection.execute(
         "INSERT INTO work_items VALUES "
         "('WI-OPAQUE',1,'Opaque work','owner','kernel','open','created','[]','integration',"
-        "'2026-09-01T00:00:00+00:00','fixture')"
+        "'2026-09-01T00:00:00+00:00','fixture','[bridge/obsolete-payload-001.md]')"
     )
     connection.execute(
         "INSERT INTO projects VALUES "
         "('PROJECT-A',1,'A','project','authorized','active','2026-09-01','integration','2026-09-01T00:00:00+00:00','fixture')"
+    )
+    connection.execute(
+        "INSERT INTO project_work_item_memberships VALUES "
+        "('MEMBER-OPAQUE',1,'PROJECT-A','WI-OPAQUE','active','integration','2026-09-01T00:00:00+00:00','fixture')"
     )
     connection.execute(
         "INSERT INTO projects VALUES "
@@ -1071,6 +1081,7 @@ def test_snapshot_wal_export_authorization_dependency_and_immutable_boundaries(
         ]
         assert manifest["tables"]["environment_config"][0]["sensitive"] is True
         assert manifest["tables"]["work_items"][0]["depends_on_work_items"] == []
+        assert "related_bridge_threads" not in manifest["tables"]["work_items"][0]
         assert (
             next(row for row in manifest["tables"]["projects"] if row["id"] == "PROJECT-A")["start_date"]
             == "2026-09-01"
@@ -1138,7 +1149,7 @@ def test_snapshot_wal_export_authorization_dependency_and_immutable_boundaries(
                 )
             ).fetchone()
             assert stored[0] is None and stored[1].isoformat() == "2026-03-04"
-        assert history_before == 10  # Includes the TEST record with scalar application scope.
+        assert history_before == 11  # Includes TEST and parent membership; immutable binding adds no history.
 
         different_manifest = parse_json_bytes(manifest_path.read_bytes())
         next(row for row in different_manifest["tables"]["projects"] if row["id"] == "PROJECT-A")["name"] = (

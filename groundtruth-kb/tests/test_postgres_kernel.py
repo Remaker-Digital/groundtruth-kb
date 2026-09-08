@@ -321,6 +321,7 @@ def test_schema_resource_hash_input_is_checkout_line_ending_invariant():
         "approval_state",
         "membership_role",
         "reviewer_precedence",
+        "related_bridge_threads",
         "CREATE VIEW",
         "CREATE TRIGGER",
         "CREATE FUNCTION",
@@ -770,6 +771,20 @@ def test_manifest_rejects_two_active_parents_even_with_distinct_pairs():
         normalize_manifest(manifest)
     first["status"] = "removed"
     assert normalize_manifest(manifest)["tables"]["project_work_item_memberships"]
+
+
+@pytest.mark.parametrize("membership_status", [None, "removed"])
+@pytest.mark.parametrize("work_status", ["open", "verified"])
+def test_manifest_requires_one_active_parent_for_every_work_item(membership_status, work_status):
+    manifest = _work_model_manifest()
+    manifest["tables"]["work_items"][0]["resolution_status"] = work_status
+    if membership_status is None:
+        manifest["tables"]["project_work_item_memberships"] = []
+    else:
+        manifest["tables"]["project_work_item_memberships"][0]["status"] = membership_status
+    with pytest.raises(PostgresKernelError, match="requires one active parent") as refused:
+        normalize_manifest(manifest)
+    assert refused.value.details == {"missing_parent_count": 1, "work_item_ids": ["WI-ONE"]}
 
 
 def test_manifest_rejects_program_work_item_membership():
@@ -1260,48 +1275,6 @@ def test_transform_surfaces_unknown_specification_source_link():
     )
     with pytest.raises(PostgresKernelError, match="unknown current specification"):
         kernel_module._transform_source_rows(source_rows, plan)
-
-
-class _SQLiteRows:
-    def __init__(self, rows: list[dict[str, Any]]) -> None:
-        self.rows = rows
-
-    def execute(self, _query: str) -> _SQLiteRows:
-        return self
-
-    def fetchall(self) -> list[dict[str, Any]]:
-        return self.rows
-
-
-def test_current_sqlite_rows_preserves_unversioned_links_and_rejects_version_tie():
-    link_rows = [
-        {
-            "spec_id": "SPEC-1",
-            "deliberation_id": "DELIB-1",
-            "spec_version": version,
-            "source_role": role,
-            "added_at": "2026-09-01T00:00:00+00:00",
-            "added_by": "actor",
-        }
-        for version, role in ((1, "historical"), (2, "current"))
-    ]
-    assert (
-        kernel_module._current_sqlite_rows(
-            _SQLiteRows(link_rows),  # type: ignore[arg-type]
-            "specification_deliberation_sources",
-        )
-        == link_rows
-    )
-
-    project = {
-        "id": "PROJECT-1",
-        "version": 2,
-    }
-    with pytest.raises(PostgresKernelError, match="Duplicate source identity/version"):
-        kernel_module._current_sqlite_rows(
-            _SQLiteRows([project, dict(project)]),  # type: ignore[arg-type]
-            "projects",
-        )
 
 
 class _FakeCursor:

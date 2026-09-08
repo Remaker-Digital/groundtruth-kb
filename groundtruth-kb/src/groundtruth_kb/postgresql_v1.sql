@@ -174,7 +174,6 @@ CREATE TABLE {schema}.work_items (
     source_deliberation_query TEXT,
     related_deliberation_ids JSONB,
     related_spec_ids_at_creation JSONB,
-    related_bridge_threads JSONB,
     depends_on_work_items JSONB,
     blocks_work_items JSONB,
     acceptance_summary TEXT,
