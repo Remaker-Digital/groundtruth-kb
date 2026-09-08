@@ -547,6 +547,13 @@ memory/MEMORY.md.backup-*
 
 # Append pattern: .groundtruth/ (KB working directory (chroma + cache))
 .groundtruth/
+# The dev-environment inventory is tracked on purpose: the pre-commit drift
+# gate refuses a commit whose inventoried surfaces changed without it. Leaving
+# it under the blanket ignore meant every such commit needed `git add -f`, and
+# a regenerated inventory that nobody force-added looked like no change at all.
+!/.groundtruth/
+/.groundtruth/*
+!/.groundtruth/inventory/
 chroma/
 
 # Append pattern: .claude/settings.local.json (Adopter-owned local overlay)
