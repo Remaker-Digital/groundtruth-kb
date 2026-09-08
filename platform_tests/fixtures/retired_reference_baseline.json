@@ -1330,10 +1330,6 @@
       "PAUTH": 3,
       "config/agent-control": 1
     },
-    "scripts/command_surface_env.py": {
-      ".gtkb-state": 5,
-      "PAUTH": 1
-    },
     "scripts/controlled_artifact_paths.py": {
       ".gtkb-state": 8,
       "harness-state/": 1
