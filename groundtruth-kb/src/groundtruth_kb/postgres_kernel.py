@@ -76,6 +76,15 @@ CURRENT_TABLES = (
     "harnesses",
 )
 COORDINATION_TABLES = ("session_init_bindings", "bridge_attempts", "bridge_items", "work_intent_claims")
+MIGRATION_TABLES = (*CURRENT_TABLES, "session_init_bindings")
+BINDING_COLUMNS = (
+    "native_context_id",
+    "session_context_id",
+    "subject",
+    "role",
+    "created_at",
+    "minimum_idempotency_identity",
+)
 ALL_TABLES = (*CURRENT_TABLES, "record_history", *COORDINATION_TABLES)
 
 REBUILT_LATER_TABLES = frozenset(
@@ -113,9 +122,31 @@ RETIRED_TABLES = frozenset(
         "spec_quality_scores",
         "session_snapshots",
         "sot_registry_observation_capabilities",
+        # Obsolete dispatcher projections/metrics; no worker role survives in a lane.
+        "dispatch_default_metric_events",
+        "dispatch_default_metrics_snapshots",
+        "dispatch_lane_matrix",
+        "dispatch_lane_projection_metadata",
+        # Historical bootstrap permission/effect bundles. Current formal, project,
+        # work and test facts migrate through their domain tables; backups retain history.
+        "emergency_bootstrap_operational_event_tombstones",
+        "emergency_bootstrap_operational_events",
+        "governed_operational_events",
+        "operational_event_tombstones",
+        "operational_event_versions",
+        "operational_events",
+        # Mutable session containers and duplicate role provenance are not bindings.
+        "session_context_envelope_terminal_facts",
+        "session_context_envelopes",
+        "session_role_attestations",
+        # Retired per-effect permission and recovery receipts.
+        "sot_registry_bridge_publication_capabilities",
+        "sot_registry_bridge_recovery_receipts",
+        "sot_registry_transition_requests",
+        "test_artifact_update_requests",
     }
 )
-SOURCE_TABLES = frozenset(CURRENT_TABLES) | REBUILT_LATER_TABLES | RETIRED_TABLES
+SOURCE_TABLES = frozenset(MIGRATION_TABLES) | REBUILT_LATER_TABLES | RETIRED_TABLES
 FORBIDDEN_TABLES = (
     REBUILT_LATER_TABLES | RETIRED_TABLES | frozenset({"authorization_packets", "approval_receipts", "record_heads"})
 ) - frozenset(COORDINATION_TABLES)
@@ -1260,6 +1291,30 @@ def _normalize_manifest_row(
     return row
 
 
+def normalize_bindings(value: object) -> list[dict[str, Any]]:
+    """Preserve immutable attribution without inventing versions or change history."""
+    if not isinstance(value, list):
+        raise PostgresKernelError("invalid_manifest", "Session bindings must be an array")
+    result = []
+    native_ids, context_ids = set(), set()
+    for raw in value:
+        row = dict(_exact_keys(raw, set(BINDING_COLUMNS), label="session_init_bindings"))
+        for column in BINDING_COLUMNS:
+            if column != "created_at":
+                _opaque_id(row[column], label=f"session_init_bindings.{column}")
+        if row["subject"] not in {"gtkb", "application"} or row["role"] not in {"prime-builder", "loyal-opposition"}:
+            raise PostgresKernelError("invalid_manifest", "Invalid immutable session subject or role")
+        row["created_at"] = _canonical_timestamp(row["created_at"], label="session_init_bindings.created_at")
+        if row["created_at"] is None:
+            raise PostgresKernelError("invalid_manifest", "An immutable binding requires its actual creation time")
+        if row["native_context_id"] in native_ids or row["session_context_id"] in context_ids:
+            raise PostgresKernelError("invalid_manifest", "Session binding identities must be unique")
+        native_ids.add(row["native_context_id"])
+        context_ids.add(row["session_context_id"])
+        result.append(row)
+    return sorted(result, key=lambda row: row["native_context_id"].encode("utf-8"))
+
+
 def normalize_manifest(value: object, *, require_version_one: bool = True) -> dict[str, Any]:
     manifest = _exact_keys(value, {"format", "schema_version", "tables"}, label="manifest")
     if (
@@ -1268,7 +1323,7 @@ def normalize_manifest(value: object, *, require_version_one: bool = True) -> di
         or manifest["schema_version"] != SCHEMA_VERSION
     ):
         raise PostgresKernelError("invalid_manifest", "Unsupported migration-manifest format or schema version")
-    tables = _exact_keys(manifest["tables"], set(CURRENT_TABLES), label="manifest.tables")
+    tables = _exact_keys(manifest["tables"], set(MIGRATION_TABLES), label="manifest.tables")
     normalized_tables: dict[str, list[dict[str, Any]]] = {}
     for table_name in CURRENT_TABLES:
         rows = tables[table_name]
@@ -1290,6 +1345,7 @@ def normalize_manifest(value: object, *, require_version_one: bool = True) -> di
             normalized_rows.append(row)
         normalized_rows.sort(key=lambda row: _identity_key(spec, row))
         normalized_tables[table_name] = normalized_rows
+    normalized_tables["session_init_bindings"] = normalize_bindings(tables["session_init_bindings"])
     _validate_manifest_relationships(normalized_tables)
     return {"format": CURRENT_FORMAT, "schema_version": SCHEMA_VERSION, "tables": normalized_tables}
 
@@ -1527,6 +1583,7 @@ def _transform_source_rows(
         or retired_count != dependency_plan["expected_retired_after"]
     ):
         raise PostgresKernelError("transform_precondition_failed", "Dependency transform counts drifted")
+    output["session_init_bindings"] = normalize_bindings(source_rows["session_init_bindings"])
     return output
 
 
@@ -2032,9 +2089,16 @@ class PostgresKernel:
                 )
             inventory = _sqlite_inventory(connection)
             inventory_names = {row["name"] for row in inventory["tables"]}
-            if inventory_names != SOURCE_TABLES:
+            missing = set(MIGRATION_TABLES) - inventory_names
+            unclassified = inventory_names - SOURCE_TABLES
+            if missing or unclassified:
                 raise PostgresKernelError(
-                    "snapshot_table_set_mismatch", "SQLite source is not the exact reviewed 49-table set"
+                    "snapshot_table_set_mismatch",
+                    "SQLite source contains missing or unclassified tables",
+                    details={
+                        "missing": sorted(missing),
+                        "unclassified": sorted(unclassified),
+                    },
                 )
             source = {
                 "expected_pragma_user_version": user_version,
@@ -2133,7 +2197,7 @@ class PostgresKernel:
                     "snapshot_inventory_mismatch",
                     "SQLite table inventory drifted",
                 )
-            source_rows = {name: _current_sqlite_rows(connection, name) for name in CURRENT_TABLES}
+            source_rows = {name: _current_sqlite_rows(connection, name) for name in MIGRATION_TABLES}
             transformed = _transform_source_rows(source_rows, plan)
             manifest = normalize_manifest(
                 {"format": CURRENT_FORMAT, "schema_version": SCHEMA_VERSION, "tables": transformed}
@@ -2169,6 +2233,12 @@ class PostgresKernel:
                 rows.append(_normalize_pg_row(dict(raw_row), spec))
             rows.sort(key=lambda row: _identity_key(spec, row))
             tables[table_name] = rows
+        cursor.execute(
+            sql.SQL("SELECT {} FROM {}.session_init_bindings").format(
+                sql.SQL(",").join(sql.Identifier(column) for column in BINDING_COLUMNS), sql.Identifier(schema_name)
+            )
+        )
+        tables["session_init_bindings"] = normalize_bindings([dict(row) for row in cursor.fetchall()])
         return normalize_manifest(
             {"format": CURRENT_FORMAT, "schema_version": SCHEMA_VERSION, "tables": tables}, require_version_one=False
         )
@@ -2251,6 +2321,8 @@ class PostgresKernel:
                     )
                 )
                 for table in COORDINATION_TABLES:
+                    if table == "session_init_bindings":
+                        continue  # Immutable attribution is part of this import, not disposable bridge state.
                     cursor.execute(
                         sql.SQL("SELECT 1 FROM {}.{} LIMIT 1").format(
                             sql.Identifier(schema_name), sql.Identifier(table)
@@ -2267,6 +2339,15 @@ class PostgresKernel:
                 )
                 history_count = int(cursor.fetchone()["count"])
                 current = self._readback_with_cursor(cursor, schema_name)
+                if (
+                    current["tables"]["session_init_bindings"]
+                    and current["tables"]["session_init_bindings"] != manifest["tables"]["session_init_bindings"]
+                ):
+                    raise PostgresKernelError(
+                        "target_coordination_not_empty",
+                        "The target contains different immutable session bindings",
+                        details={"table": "session_init_bindings"},
+                    )
                 current_count = self._row_count(current)
                 expected_count = self._row_count(manifest)
                 if canonical_json_bytes(current) == canonical and self._history_matches_manifest(
@@ -2284,6 +2365,15 @@ class PostgresKernel:
                         "target_not_empty", "PostgreSQL target is partial or differs from manifest"
                     )
 
+                for row in manifest["tables"]["session_init_bindings"]:
+                    cursor.execute(
+                        sql.SQL("INSERT INTO {}.session_init_bindings ({}) VALUES ({})").format(
+                            sql.Identifier(schema_name),
+                            sql.SQL(",").join(sql.Identifier(column) for column in BINDING_COLUMNS),
+                            sql.SQL(",").join(sql.Placeholder() for _ in BINDING_COLUMNS),
+                        ),
+                        [row[column] for column in BINDING_COLUMNS],
+                    )
                 for table_name in CURRENT_TABLES:
                     spec = TABLE_SPECS[table_name]
                     for row in manifest["tables"][table_name]:

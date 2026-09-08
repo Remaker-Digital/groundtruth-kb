@@ -23,6 +23,7 @@ from groundtruth_kb.postgres_kernel import (
     ALL_TABLES,
     CURRENT_FORMAT,
     CURRENT_TABLES,
+    MIGRATION_TABLES,
     SQLITE_INVENTORY_FORMAT,
     TABLE_SPECS,
     TRANSFORM_FORMAT,
@@ -83,7 +84,7 @@ def _empty_manifest() -> dict[str, Any]:
     return {
         "format": CURRENT_FORMAT,
         "schema_version": 1,
-        "tables": {table_name: [] for table_name in CURRENT_TABLES},
+        "tables": {table_name: [] for table_name in MIGRATION_TABLES},
     }
 
 
@@ -94,7 +95,7 @@ def _row(table_name: str, **values: object) -> dict[str, Any]:
 
 
 def test_source_transform_preserves_formal_semantics_and_scalar_application_scope():
-    source = {name: [] for name in CURRENT_TABLES}
+    source = {name: [] for name in MIGRATION_TABLES}
     metadata = dict(version=9, changed_by="fixture", changed_at="2026-09-01T00:00:00Z", change_reason="source")
     source["specifications"] = [
         dict(
@@ -564,8 +565,39 @@ def test_transform_plan_rejects_unknown_key_and_boolean_count():
 
 def test_empty_manifest_is_complete_and_canonical():
     manifest = normalize_manifest(_empty_manifest())
-    assert tuple(manifest["tables"]) == CURRENT_TABLES
+    assert tuple(manifest["tables"]) == MIGRATION_TABLES
     assert parse_json_bytes(canonical_json_bytes(manifest)) == manifest
+
+
+def test_immutable_bindings_preserve_identity_precision_and_have_no_version_history():
+    original = {
+        "native_context_id": "native-original",
+        "session_context_id": "SENV-original",
+        "subject": "gtkb",
+        "role": "prime-builder",
+        "created_at": "2026-09-01T00:00:00.123456Z",
+        "minimum_idempotency_identity": "original-request",
+    }
+    manifest = _empty_manifest()
+    manifest["tables"]["session_init_bindings"] = [original]
+    normalized = normalize_manifest(manifest)["tables"]["session_init_bindings"]
+    assert normalized == [{**original, "created_at": "2026-09-01T00:00:00.123456+00:00"}]
+    assert "version" not in normalized[0] and "changed_at" not in normalized[0]
+    for invalid in (
+        {**original, "version": 1},
+        {**original, "role": "pb"},
+        {**original, "subject": "unspecified"},
+        {**original, "created_at": "2026-09-01T00:00:00"},
+        {**original, "created_at": None},
+        {**original, "minimum_idempotency_identity": ""},
+    ):
+        manifest["tables"]["session_init_bindings"] = [invalid]
+        with pytest.raises(PostgresKernelError):
+            normalize_manifest(manifest)
+    for duplicate in (original, {**original, "native_context_id": "another-native-context"}):
+        manifest["tables"]["session_init_bindings"] = [original, duplicate]
+        with pytest.raises(PostgresKernelError, match="identities must be unique"):
+            normalize_manifest(manifest)
 
 
 def test_manifest_rejects_missing_table_and_historical_version():
@@ -757,7 +789,7 @@ def test_manifest_requires_a_program_parent_for_execution_projects():
 
 
 def test_source_transform_preserves_project_authorization_and_program_kind():
-    source = {name: [] for name in CURRENT_TABLES}
+    source = {name: [] for name in MIGRATION_TABLES}
     metadata = {
         "version": 7,
         "changed_by": "test",
@@ -977,7 +1009,7 @@ def test_export_translates_close_only_failure_without_publishing(tmp_path, monke
     monkeypatch.setattr(
         kernel_module,
         "_transform_source_rows",
-        lambda _source, _plan_value: {table_name: [] for table_name in CURRENT_TABLES},
+        lambda _source, _plan_value: {table_name: [] for table_name in MIGRATION_TABLES},
     )
     monkeypatch.setattr(kernel_module, "_current_sqlite_rows", lambda _connection, _table: [])
     kernel = PostgresKernel(
@@ -1073,7 +1105,7 @@ def test_preflight_and_export_dispatch_through_one_inspection_implementation(tmp
     monkeypatch.setattr(
         kernel_module,
         "_transform_source_rows",
-        lambda _rows, _plan_value: {table_name: [] for table_name in CURRENT_TABLES},
+        lambda _rows, _plan_value: {table_name: [] for table_name in MIGRATION_TABLES},
     )
 
     assert (
@@ -1209,7 +1241,7 @@ def test_output_publication_does_not_report_failure_after_final_link(tmp_path, m
 
 
 def test_transform_surfaces_unknown_specification_source_link():
-    source_rows = {table_name: [] for table_name in CURRENT_TABLES}
+    source_rows = {table_name: [] for table_name in MIGRATION_TABLES}
     source_rows["specification_deliberation_sources"] = [{"spec_id": "SPEC-MISSING", "spec_version": 1}]
     plan = _plan()
     plan["projects"].update(

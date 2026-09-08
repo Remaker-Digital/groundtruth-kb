@@ -258,7 +258,7 @@ class NativeBridgeService:
         with self.kernel.transaction(serializable=False) as tx:
             existing = self._binding(tx, request.native_context_id, required=False)
             if existing:
-                if existing["minimum_idempotency_identity"] != identity:
+                if existing["subject"] != subject or existing["role"] != ROLE_NAMES[role]:
                     _error("session_init_conflict", "An existing context's subject and role cannot change")
                 return _public(existing)
             tx.cursor.execute(
@@ -271,7 +271,7 @@ class NativeBridgeService:
             )
             inserted = tx.cursor.fetchone()
             binding = dict(inserted) if inserted else self._binding(tx, request.native_context_id)
-            if binding["minimum_idempotency_identity"] != identity:
+            if binding["subject"] != subject or binding["role"] != ROLE_NAMES[role]:
                 _error("session_init_conflict", "An existing context's subject and role cannot change")
             return _public(binding)
 

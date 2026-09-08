@@ -8,7 +8,7 @@ import groundtruth_kb.postgres_kernel as kernel
 import pytest
 from groundtruth_kb.postgres_kernel import (
     CURRENT_FORMAT,
-    CURRENT_TABLES,
+    MIGRATION_TABLES,
     TABLE_SPECS,
     PostgresKernelError,
 )
@@ -40,7 +40,7 @@ def _test_plan_row(changed_at: object) -> dict[str, object]:
 
 
 def _through_manifest(value: object) -> object:
-    tables = {table_name: [] for table_name in CURRENT_TABLES}
+    tables = {table_name: [] for table_name in MIGRATION_TABLES}
     tables["test_plans"] = [_test_plan_row(value)]
     manifest = {
         "format": CURRENT_FORMAT,
@@ -63,8 +63,7 @@ def _zero_transform_plan() -> dict[str, Any]:
             "retire_dependency_ids": [],
         },
         "projects": {
-            "authorization_default": "authorized",
-            "authorization_overrides": [],
+            "expected_programs": 0,
             "expected_authorized": 0,
             "expected_not_authorized": 0,
             "expected_total": 0,
@@ -73,7 +72,7 @@ def _zero_transform_plan() -> dict[str, Any]:
 
 
 def _through_transform(value: object) -> object:
-    source_rows = {table_name: [] for table_name in CURRENT_TABLES}
+    source_rows = {table_name: [] for table_name in MIGRATION_TABLES}
     source_rows["test_plans"] = [_test_plan_row(value)]
     return kernel._transform_source_rows(source_rows, _zero_transform_plan())["test_plans"][0]["changed_at"]
 
@@ -84,22 +83,23 @@ def timestamp_caller(request: pytest.FixtureRequest) -> TimestampCaller:
 
 
 @pytest.mark.parametrize(
-    ("source", "expected"),
+    "source",
     [
-        ("2026-03-13T01:54:31", "2026-03-13T01:54:31+00:00"),
-        ("2026-03-13 01:54:31", "2026-03-13T01:54:31+00:00"),
-        ("2026-03-13T01:54:31.123456", "2026-03-13T01:54:31.123456+00:00"),
-        ("2000-02-29", "2000-02-29T00:00:00+00:00"),
-        ("2026-03-11", "2026-03-11T00:00:00+00:00"),
-        ("", None),
+        "2026-03-13T01:54:31",
+        "2026-03-13 01:54:31",
+        "2026-03-13T01:54:31.123456",
+        "2000-02-29",
+        "2026-03-11",
+        "",
     ],
 )
-def test_three_source_classes_apply_through_both_callers(
+def test_ambiguous_times_require_source_reconciliation_through_both_callers(
     timestamp_caller: TimestampCaller,
     source: str,
-    expected: object,
 ) -> None:
-    assert timestamp_caller(source) == expected
+    with pytest.raises(PostgresKernelError) as error:
+        timestamp_caller(source)
+    assert error.value.code == "invalid_timestamp"
 
 
 @pytest.mark.parametrize(

@@ -122,12 +122,34 @@ Configuring `authority_url` changes ordinary CLI routing. Unavailable services
 and unsupported native commands fail without opening SQLite. Do not set this
 value in the live GT-KB config as a partial migration.
 
-The current importer refuses existing coordination state, even when the
-knowledge manifest otherwise matches. Its bounded target-table locks wait for
-in-flight writers and inspect their committed state before importing. It never
-ignores or clears existing bindings, attempts or deliveries. Complete source
-table accounting and immutable-binding migration are still required; the
-current knowledge-only migration manifest is not a complete production export.
+The importer refuses existing bridge coordination state and divergent immutable
+bindings, even when the knowledge rows otherwise match. Its bounded target-table
+locks wait for in-flight writers and inspect their committed state before
+importing. It never clears another context's binding, attempt or delivery.
+An exact import retry compares knowledge, bindings and initial knowledge history.
+
+The current manifest contains 20 versioned knowledge/planning tables and the
+six-field `session_init_bindings` table. Knowledge starts PostgreSQL lineage at
+version 1. Binding identities, subject, role, creation time and original
+idempotency identity are preserved without invented versions or history rows.
+Initialization compares the actual stored subject and role; its digest is not
+a substitute role predicate or a legacy-format translation requirement.
+
+All 67 tables present in the reviewed SQLite source are accounted for: 21
+migrate, 7 contain runtime/derived data to rebuild when needed, and 39 are
+retired storage. The latter includes obsolete dispatcher metrics and lane
+projections, mutable session envelopes/role attestations, bootstrap permission
+bundles, publication capabilities and mutation receipts. Required current work,
+formal, project and test facts migrate from their existing domain rows, not
+from those historical bundles. The original source and out-of-band backups
+preserve history through the migration cleanup boundary.
+
+Known retired/runtime source tables may already be absent. Every migratable
+table must be present, and any unknown table refuses export with its name so
+new state cannot be silently dropped. The snapshot's actual schema inventory
+and contents are still checked against the specific transform input. Accounting
+for the table set does not prove every field, citation or work relationship is
+valid; those reconciliations and the permanent cutover remain required.
 
 The supported client commands include:
 

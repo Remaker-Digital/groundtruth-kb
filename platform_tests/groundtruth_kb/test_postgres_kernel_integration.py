@@ -32,6 +32,7 @@ from groundtruth_kb.postgres_kernel import (
     CURRENT_TABLES,
     FORBIDDEN_COLUMNS,
     FORBIDDEN_TABLES,
+    MIGRATION_TABLES,
     REBUILT_LATER_TABLES,
     RETIRED_TABLES,
     SCHEMA_VERSION,
@@ -90,6 +91,23 @@ EXPECTED_REBUILT_SOURCE = {
     "work_intent_claims",
 }
 EXPECTED_RETIRED_SOURCE = {
+    "dispatch_default_metric_events",
+    "dispatch_default_metrics_snapshots",
+    "dispatch_lane_matrix",
+    "dispatch_lane_projection_metadata",
+    "emergency_bootstrap_operational_event_tombstones",
+    "emergency_bootstrap_operational_events",
+    "governed_operational_events",
+    "operational_event_tombstones",
+    "operational_event_versions",
+    "operational_events",
+    "session_context_envelope_terminal_facts",
+    "session_context_envelopes",
+    "session_role_attestations",
+    "sot_registry_bridge_publication_capabilities",
+    "sot_registry_bridge_recovery_receipts",
+    "sot_registry_transition_requests",
+    "test_artifact_update_requests",
     "agent_capability_snapshots",
     "backlog_snapshots",
     "dispatch_events",
@@ -113,7 +131,9 @@ EXPECTED_RETIRED_SOURCE = {
     "stage_leases",
     "test_coverage",
 }
-EXPECTED_SOURCE_TABLES = EXPECTED_CURRENT_SOURCE | EXPECTED_REBUILT_SOURCE | EXPECTED_RETIRED_SOURCE
+EXPECTED_SOURCE_TABLES = (
+    EXPECTED_CURRENT_SOURCE | EXPECTED_REBUILT_SOURCE | EXPECTED_RETIRED_SOURCE | {"session_init_bindings"}
+)
 
 assert set(CURRENT_TABLES) == EXPECTED_CURRENT_SOURCE
 assert REBUILT_LATER_TABLES == EXPECTED_REBUILT_SOURCE
@@ -180,7 +200,7 @@ def _empty_manifest() -> dict[str, Any]:
     return {
         "format": CURRENT_FORMAT,
         "schema_version": 1,
-        "tables": {table_name: [] for table_name in CURRENT_TABLES},
+        "tables": {table_name: [] for table_name in MIGRATION_TABLES},
     }
 
 
@@ -455,6 +475,51 @@ def test_import_waits_for_an_inflight_binding_and_reads_its_committed_state(
         )
 
 
+def test_migrated_bindings_roundtrip_without_history_and_keep_the_original_role(
+    isolated_postgres: tuple[str, str], tmp_path: Path
+) -> None:
+    from groundtruth_kb.bridge.native import BindSession, NativeBridgeService
+
+    service, schema_name = isolated_postgres
+    kernel = PostgresKernel(PostgreSQLConfig(service=service))
+    kernel.initialize()
+    original = {
+        "native_context_id": "original-native",
+        "session_context_id": "SENV-" + "c" * 32,
+        "subject": "gtkb",
+        "role": "prime-builder",
+        "created_at": "2026-09-01T01:02:03.123456+00:00",
+        "minimum_idempotency_identity": "original-idempotency",
+    }
+    manifest = _empty_manifest()
+    manifest["tables"]["session_init_bindings"] = [original]
+    path = tmp_path / "current.json"
+    path.write_bytes(canonical_json_bytes(manifest))
+    assert (
+        kernel.import_current(input_path=path, actor="qualification", reason="Preserve immutable attribution")["status"]
+        == "imported"
+    )
+    bridge = NativeBridgeService(kernel, tmp_path)
+    binding = bridge.bind(BindSession(native_context_id="original-native", init_command="::init gtkb pb"))
+    assert binding["session_context_id"] == original["session_context_id"]
+    with pytest.raises(PostgresKernelError):
+        bridge.bind(BindSession(native_context_id="original-native", init_command="::init gtkb lo"))
+    assert (
+        kernel.import_current(input_path=path, actor="qualification", reason="Exact retry")["status"]
+        == "already_current"
+    )
+    readback = tmp_path / "readback.json"
+    kernel.readback_current(output=readback)
+    assert readback.read_bytes() == path.read_bytes()
+    with psycopg.connect(service=service) as connection:
+        assert (
+            connection.execute(
+                sql.SQL("SELECT count(*) FROM {}.record_history").format(sql.Identifier(schema_name))
+            ).fetchone()[0]
+            == 0
+        )
+
+
 def test_literal_concurrent_cas_has_one_winner_and_no_lost_update(isolated_postgres: tuple[str, str]) -> None:
     service, schema_name = isolated_postgres
     assert _invoke("db", "postgres", "init")[0] == 0
@@ -647,7 +712,9 @@ def _create_sqlite_fixture(path: Path) -> sqlite3.Connection:
     connection.execute("PRAGMA journal_mode=WAL")
     connection.execute("PRAGMA wal_autocheckpoint=0")
     for table_name in sorted(EXPECTED_SOURCE_TABLES):
-        if table_name == "specifications":
+        if table_name == "session_init_bindings":
+            definition = "native_context_id TEXT PRIMARY KEY, session_context_id TEXT UNIQUE, subject TEXT, role TEXT, created_at TEXT, minimum_idempotency_identity TEXT"
+        elif table_name == "specifications":
             definition = (
                 "id TEXT, version INTEGER, title TEXT, status TEXT, tags TEXT, changed_by TEXT, "
                 "changed_at TEXT, change_reason TEXT"
@@ -692,6 +759,17 @@ def _create_sqlite_fixture(path: Path) -> sqlite3.Connection:
         else:
             definition = "marker TEXT"
         connection.execute(f'CREATE TABLE "{table_name}" ({definition})')
+    connection.execute(
+        "INSERT INTO session_init_bindings VALUES (?,?,?,?,?,?)",
+        (
+            "native-context-original",
+            "SENV-" + "d" * 32,
+            "gtkb",
+            "prime-builder",
+            "2026-09-01T01:02:03.456789+00:00",
+            "original-idempotency",
+        ),
+    )
     connection.execute("PRAGMA user_version=7")
     connection.commit()
     connection.execute("INSERT INTO session_prompts(marker) VALUES ('wal-visible-marker')")
@@ -997,7 +1075,17 @@ def test_snapshot_wal_export_authorization_dependency_and_immutable_boundaries(
             next(row for row in manifest["tables"]["projects"] if row["id"] == "PROJECT-A")["start_date"]
             == "2026-09-01"
         )
-        assert all(row["version"] == 1 for rows in manifest["tables"].values() for row in rows)
+        assert all(row["version"] == 1 for table in CURRENT_TABLES for row in manifest["tables"][table])
+        assert manifest["tables"]["session_init_bindings"] == [
+            {
+                "native_context_id": "native-context-original",
+                "session_context_id": "SENV-" + "d" * 32,
+                "subject": "gtkb",
+                "role": "prime-builder",
+                "created_at": "2026-09-01T01:02:03.456789+00:00",
+                "minimum_idempotency_identity": "original-idempotency",
+            }
+        ]
 
         assert _invoke("db", "postgres", "init")[0] == 0
         import_code, imported, _ = _invoke(
