@@ -5,7 +5,7 @@
     "script_hash": "sha256:dcd84fc545cab6a5e9adeae7915b7f3c56abfc14d672728aaab1cf4a2a3362ec",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-09-08T16:11:22Z",
+  "generated_at": "2026-09-08T16:46:28Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,

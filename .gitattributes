@@ -1,3 +1,38 @@
+# Default for every tracked text file: normalized to LF in the index and
+# checked out as LF whatever core.autocrlf says. Without this the Windows
+# checkout rewrites thousands of tracked files to CRLF, and git reports them
+# as modified forever; 3,453 tracked files were in that state before this rule
+# (owner decision, 2026-09-08). Binary types are declared rather than guessed.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.whl binary
+*.db binary
+*.sqlite binary
+*.bundle binary
+*.docx binary
+*.xlsx binary
+*.pptx binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.exe binary
+*.dll binary
+
+# Windows entry points keep CRLF: cmd.exe mis-parses multi-line batch files
+# with LF-only endings. The projection-root rules below still win for the
+# projector-written copies under the harness roots, which are LF by design.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
 /.gitattributes text eol=lf
 /.gitignore text eol=lf
 
