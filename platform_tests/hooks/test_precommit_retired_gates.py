@@ -24,6 +24,8 @@ LIVE_GATES = (
     "check_dev_environment_inventory_drift.py",
     "check_narrative_artifact_evidence.py",
     "check_ruff_format.py",
+    "check_commit_pathspec_safety.py",
+    "check_projection_drift.py",
 )
 
 

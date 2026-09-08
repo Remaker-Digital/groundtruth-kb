@@ -42,6 +42,20 @@ def commit_preflight_commands(python_bin: str) -> tuple[CommandSpec, ...]:
             (python_bin, "scripts/check_narrative_artifact_evidence.py", "--staged"),
         ),
         CommandSpec("ruff-format", (python_bin, "scripts/check_ruff_format.py", "--staged")),
+        CommandSpec(
+            "commit-pathspec-safety",
+            (
+                python_bin,
+                "scripts/check_commit_pathspec_safety.py",
+                "--staged",
+                "--strict",
+                "--check-foreign-verdicts",
+            ),
+        ),
+        CommandSpec(
+            "projection-drift",
+            (python_bin, "scripts/check_projection_drift.py", "--staged"),
+        ),
     )
 
 

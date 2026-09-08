@@ -29,6 +29,19 @@ PYTHON_BIN="${PYTHON:-python}"
 # not fail open when PYTHON_BIN lacks ruff while the project venv has it.
 "$PYTHON_BIN" scripts/check_ruff_format.py --staged || exit $?
 
+# Scoped commits only (bridge-essential.md): refuse a staged set that mixes
+# bridge-queue files with unrelated source, and one carrying verdict files
+# authored by another session. Commit 2f688c4ca is why: 1,756 paths of other
+# sessions' in-flight work landed in one commit and silently removed a
+# mandatory gate deny. Detection existed since WI-4464 but was never wired.
+"$PYTHON_BIN" scripts/check_commit_pathspec_safety.py --staged --strict --check-foreign-verdicts || exit $?
+
+# Harness surfaces are rendered from .harness-baseline-configuration. A commit
+# that edits the baseline and omits the re-rendered projections leaves every
+# harness running behaviour the baseline no longer describes. Cheap-gated: the
+# projector runs only when a baseline path is staged.
+"$PYTHON_BIN" scripts/check_projection_drift.py --staged || exit $?
+
 # The protected-commit authorization gate is retired from this hook (owner
 # direction, 2026-09-07, canon v8.92). Its predicates no longer exist: project
 # authorization is a field on the project row and gates dispatch, not commits

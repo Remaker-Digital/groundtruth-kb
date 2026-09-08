@@ -41,13 +41,23 @@ def test_commit_preflight_runs_bash_hook_checks_in_order_without_ps1(monkeypatch
         "dev-environment-inventory-drift",
         "narrative-artifact-evidence",
         "ruff-format",
+        "commit-pathspec-safety",
+        "projection-drift",
         "powershell-syntax",
     ]
-    assert calls[:4] == [
+    assert calls[:6] == [
         ["python", "scripts/scan_secrets.py", "--staged"],
         ["python", "scripts/check_dev_environment_inventory_drift.py", "--staged", "--allow-review-evidence"],
         ["python", "scripts/check_narrative_artifact_evidence.py", "--staged"],
         ["python", "scripts/check_ruff_format.py", "--staged"],
+        [
+            "python",
+            "scripts/check_commit_pathspec_safety.py",
+            "--staged",
+            "--strict",
+            "--check-foreign-verdicts",
+        ],
+        ["python", "scripts/check_projection_drift.py", "--staged"],
     ]
     assert evidence.checks[-1].summary == "no staged PowerShell files"
 
