@@ -378,6 +378,71 @@ CREATE TABLE {schema}.record_history (
     reason TEXT NOT NULL
 );
 
+-- Attribution is immutable and contains no activity, work container or role history.
+CREATE TABLE {schema}.session_init_bindings (
+    native_context_id TEXT PRIMARY KEY,
+    session_context_id TEXT NOT NULL UNIQUE,
+    subject TEXT NOT NULL CHECK (subject IN ('gtkb', 'application')),
+    role TEXT NOT NULL CHECK (role IN ('prime-builder', 'loyal-opposition')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    minimum_idempotency_identity TEXT NOT NULL
+);
+
+-- Current coordination facts survive an agent context, but not bridge payloads.
+-- Terminal cleanup reduces an attempt to its anti-replay identity/disposition.
+CREATE TABLE {schema}.bridge_attempts (
+    id TEXT PRIMARY KEY,
+    work_item_id TEXT REFERENCES {schema}.work_items(id),
+    project_id TEXT REFERENCES {schema}.projects(id),
+    head_version INTEGER NOT NULL DEFAULT 0 CHECK (head_version >= 0),
+    head_status TEXT,
+    disposition TEXT NOT NULL DEFAULT 'active'
+        CHECK (disposition IN ('active', 'abandoned', 'withdrawn', 'superseded', 'committed')),
+    work_item_version INTEGER,
+    proposal_paths JSONB NOT NULL DEFAULT '[]',
+    test_targets JSONB NOT NULL DEFAULT '[]',
+    spec_versions JSONB NOT NULL DEFAULT '{{}}',
+    proposal_context_id TEXT,
+    go_context_id TEXT,
+    report_context_id TEXT,
+    verified_artifacts JSONB,
+    finalization_failure TEXT,
+    terminal_commit TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    closed_at TIMESTAMPTZ,
+    CHECK (work_item_id IS NOT NULL OR head_status IS NULL OR head_status = 'ADVISORY'),
+    CHECK ((work_item_id IS NULL) = (project_id IS NULL))
+);
+
+CREATE TABLE {schema}.bridge_items (
+    attempt_id TEXT NOT NULL REFERENCES {schema}.bridge_attempts(id),
+    version INTEGER NOT NULL CHECK (version >= 1),
+    status TEXT NOT NULL,
+    author_session_context_id TEXT NOT NULL,
+    delivery_fence BIGINT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (attempt_id, version)
+);
+
+-- One exact successor slot. A successful delivery deletes its claim immediately.
+-- Fences never reset when an expired claim is replaced. There is no renewal.
+CREATE TABLE {schema}.work_intent_claims (
+    attempt_id TEXT PRIMARY KEY REFERENCES {schema}.bridge_attempts(id),
+    next_version INTEGER NOT NULL CHECK (next_version >= 1),
+    intended_status TEXT NOT NULL,
+    predecessor_sha256 TEXT,
+    claimant_session_context_id TEXT NOT NULL,
+    fence BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE,
+    request_id TEXT NOT NULL,
+    acquired_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp() + interval '600 seconds'
+);
+
+CREATE UNIQUE INDEX bridge_one_active_attempt_idx ON {schema}.bridge_attempts(work_item_id)
+    WHERE disposition = 'active';
+CREATE INDEX bridge_claim_expiry_idx ON {schema}.work_intent_claims(expires_at);
+
 ALTER TABLE {schema}.specification_deliberation_sources
     ADD CONSTRAINT specification_deliberation_sources_deliberation_fk
     FOREIGN KEY (deliberation_id) REFERENCES {schema}.deliberations(id) DEFERRABLE INITIALLY DEFERRED;

@@ -6,7 +6,6 @@ from enum import StrEnum
 
 class BridgeKind(StrEnum):
     IMPLEMENTATION_PROPOSAL = "implementation_proposal"
-    PRIME_PROPOSAL = "prime_proposal"  # legacy alias; implementation_proposal is canonical
     LO_VERDICT = "lo_verdict"
     IMPLEMENTATION_REPORT = "implementation_report"
     GOVERNANCE_REVIEW = "governance_review"

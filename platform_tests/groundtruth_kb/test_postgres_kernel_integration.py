@@ -25,6 +25,7 @@ from groundtruth_kb.cli import main
 from groundtruth_kb.config import PostgreSQLConfig
 from groundtruth_kb.postgres_kernel import (
     ALL_TABLES,
+    COORDINATION_TABLES,
     CURRENT_FORMAT,
     CURRENT_TABLES,
     FORBIDDEN_COLUMNS,
@@ -71,8 +72,12 @@ EXPECTED_TABLES = {
     "testable_elements",
     "tests",
     "work_items",
+    "session_init_bindings",
+    "bridge_attempts",
+    "bridge_items",
+    "work_intent_claims",
 }
-EXPECTED_CURRENT_SOURCE = EXPECTED_TABLES - {"record_history"}
+EXPECTED_CURRENT_SOURCE = EXPECTED_TABLES - {"record_history", *COORDINATION_TABLES}
 EXPECTED_REBUILT_SOURCE = {
     "assertion_runs",
     "pipeline_events",

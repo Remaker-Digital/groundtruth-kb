@@ -8,6 +8,7 @@ authentication boundary before it can be enabled.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, Query, Request
@@ -15,6 +16,15 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from fastapi.routing import APIRoute
 
+from groundtruth_kb.bridge.native import (
+    AbandonRequest,
+    BindSession,
+    ClaimRequest,
+    DeliverRequest,
+    FenceRequest,
+    NativeBridgeService,
+    SessionRequest,
+)
 from groundtruth_kb.native_authority import (
     AuthorityService,
     Identifier,
@@ -58,10 +68,11 @@ def _result(value: object) -> Response:
     return CanonicalJSONResponse(value)
 
 
-def create_authority_app(service: AuthorityService) -> FastAPI:
+def create_authority_app(service: AuthorityService, *, project_root: Path | None = None) -> FastAPI:
     """Build the service without opening a database at import time."""
     app = FastAPI(title="GT-KB authority", version="1", docs_url=None, redoc_url=None)
     app.router.route_class = CanonicalRoute
+    bridge = NativeBridgeService(service.kernel, project_root or Path.cwd())
 
     @app.middleware("http")
     async def local_cli_boundary(request: Request, call_next):
@@ -105,6 +116,50 @@ def create_authority_app(service: AuthorityService) -> FastAPI:
     @app.get("/v1/status")
     def status() -> Response:
         return _result(service.kernel.status())
+
+    @app.post("/v1/sessions/bind")
+    def bind_session(request: BindSession) -> Response:
+        return _result(bridge.bind(request))
+
+    @app.get("/v1/sessions/binding")
+    def session_binding(native_context_id: str) -> Response:
+        return _result(bridge.session(native_context_id))
+
+    @app.post("/v1/sessions/retire")
+    def retire_session(request: SessionRequest) -> Response:
+        return _result(bridge.retire_session(request.native_context_id))
+
+    @app.get("/v1/bridge/queue")
+    def bridge_queue(role: Literal["pb", "lo"]) -> Response:
+        return _result(bridge.queue(role))
+
+    @app.get("/v1/bridge/{document}/show")
+    def bridge_show(document: Identifier, include_content: bool = False) -> Response:
+        return _result(bridge.show(document, include_content=include_content))
+
+    @app.get("/v1/bridge/{document}/artifacts")
+    def bridge_artifacts(document: Identifier) -> Response:
+        return _result(bridge.artifacts(document))
+
+    @app.post("/v1/bridge/{document}/claim")
+    def bridge_claim(document: Identifier, request: ClaimRequest) -> Response:
+        return _result(bridge.claim(document, request))
+
+    @app.post("/v1/bridge/{document}/check")
+    def bridge_check(document: Identifier, request: FenceRequest) -> Response:
+        return _result(bridge.check(document, request))
+
+    @app.post("/v1/bridge/{document}/release")
+    def bridge_release(document: Identifier, request: FenceRequest) -> Response:
+        return _result(bridge.release(document, request))
+
+    @app.post("/v1/bridge/{document}/deliver")
+    def bridge_deliver(document: Identifier, request: DeliverRequest) -> Response:
+        return _result(bridge.deliver(document, request))
+
+    @app.post("/v1/bridge/{document}/abandon")
+    def bridge_abandon(document: Identifier, request: AbandonRequest) -> Response:
+        return _result(bridge.abandon(document, request))
 
     @app.get("/v1/{domain}")
     def list_records(

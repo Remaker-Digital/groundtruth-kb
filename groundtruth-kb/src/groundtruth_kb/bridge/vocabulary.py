@@ -7,10 +7,9 @@ restated in nine places inside `scripts/bridge_lifecycle_resolver.py` alone --
 eight top-level definitions plus a hand-maintained regex -- and again across
 dozens of consumers. Consumers import from here; they do not re-declare.
 
-Authority is canon section 6 ("Status vocabulary -- exactly twelve" and
-"Legal transition table -- complete"), frozen at v8.92 (2026-09-07). The
-Dispatcher authors no status; NO-GO has exactly one form; SUPERSEDED and
-BLOCKED are canonical, not historical.
+The active SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001 defines the vocabulary and
+transition contract. Dispatcher authors no status; NO-GO has exactly one form;
+SUPERSEDED and BLOCKED are canonical, not historical.
 """
 
 from __future__ import annotations
@@ -140,8 +139,6 @@ PRIME_AUTHORED_STATUSES: frozenset[str] = frozenset(
 LOYAL_OPPOSITION_AUTHORED_STATUSES: frozenset[str] = frozenset(
     {"GO", "NO-GO", "NOT-READY", "VERIFIED", "SUPERSEDED", "ADVISORY"}
 )
-# Canon section 7: the finalization-repair NO-GO is the only Dispatcher-authored
-# status, and it is addressed to Loyal Opposition rather than Prime Builder.
 # Canon sections 6 and 10: the Dispatcher never authors a proposal, verdict, or
 # bridge lifecycle item. Kept as an empty set so any remaining consumer reads the
 # canon rather than a stale token; delete once no consumer imports it.

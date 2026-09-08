@@ -512,7 +512,7 @@ def _build_content(
 
 # Implementation Proposal - {title}
 
-bridge_kind: {BridgeKind.PRIME_PROPOSAL.value}
+bridge_kind: {BridgeKind.IMPLEMENTATION_PROPOSAL.value}
 Document: {request.slug}
 Version: 001
 Date: {date}

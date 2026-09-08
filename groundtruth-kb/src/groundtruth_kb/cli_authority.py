@@ -203,7 +203,148 @@ def serve(ctx: click.Context, port: int) -> None:
     kernel = PostgresKernel(config.postgresql)
     with kernel.transaction(read_only=True):
         pass
-    uvicorn.run(create_authority_app(AuthorityService(kernel)), host="127.0.0.1", port=port, access_log=False)
+    uvicorn.run(
+        create_authority_app(AuthorityService(kernel), project_root=config.project_root),
+        host="127.0.0.1",
+        port=port,
+        access_log=False,
+    )
+
+
+@click.group("session")
+def native_session_group() -> None:
+    """Resolve immutable attribution for the actual native context."""
+
+
+@native_session_group.command("bind")
+@click.option("--native-context-id", required=True)
+@click.option("--init-keyword", "init_command", required=True)
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def bind_session(ctx: click.Context, json_output: bool, **body: Any) -> None:
+    """Bind one exact init marker; identical retries return the same identity."""
+    _emit(_call(ctx, "POST", "/v1/sessions/bind", body=body), json_output)
+
+
+@native_session_group.command("show")
+@click.option("--native-context-id", required=True)
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def show_session(ctx: click.Context, native_context_id: str, json_output: bool) -> None:
+    """Resolve the supplied native context, with no fallback to another session."""
+    _emit(_call(ctx, "GET", "/v1/sessions/binding", query={"native_context_id": native_context_id}), json_output)
+
+
+@native_session_group.command("retire")
+@click.option("--native-context-id", required=True)
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def retire_session(ctx: click.Context, native_context_id: str, json_output: bool) -> None:
+    """Retire a context after its artifact claim is delivered or released."""
+    _emit(_call(ctx, "POST", "/v1/sessions/retire", body={"native_context_id": native_context_id}), json_output)
+
+
+@click.group("bridge")
+def native_bridge_group() -> None:
+    """Deliver disposable bridge messages through native fenced domain operations."""
+
+
+@native_bridge_group.command("queue")
+@click.option("--role", type=click.Choice(["pb", "lo"]), required=True)
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def bridge_queue(ctx: click.Context, role: str, json_output: bool) -> None:
+    """Report eligible next actions for owner or dispatcher selection."""
+    _emit(_call(ctx, "GET", "/v1/bridge/queue", query={"role": role}), json_output)
+
+
+@native_bridge_group.command("show")
+@click.argument("document")
+@click.option("--content", is_flag=True, help="Include disposable messages for the active attempt.")
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def bridge_show(ctx: click.Context, document: str, content: bool, json_output: bool) -> None:
+    """Read canonical attempt state and optionally its available bridge messages."""
+    _emit(
+        _call(
+            ctx, "GET", f"/v1/bridge/{quote(document, safe='')}/show", query={"include_content": str(content).lower()}
+        ),
+        json_output,
+    )
+
+
+@native_bridge_group.command("claim")
+@click.argument("document")
+@click.option("--work-item-id", default=None, help="Required for implementation; omit for an advisory.")
+@click.option("--native-context-id", required=True)
+@click.option("--expected-version", type=click.IntRange(0), required=True)
+@click.option("--status", "intended_status", required=True)
+@click.option("--request-id", required=True, help="Reuse only when retrying this exact claim request.")
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def claim_bridge(ctx: click.Context, document: str, json_output: bool, **body: Any) -> None:
+    """Reserve one exact successor slot for 600 seconds, without renewal."""
+    _emit(_call(ctx, "POST", f"/v1/bridge/{quote(document, safe='')}/claim", body=body), json_output)
+
+
+def _fence_command(name: str) -> None:
+    @native_bridge_group.command(name)
+    @click.argument("document")
+    @click.option("--native-context-id", required=True)
+    @click.option("--fence", type=click.IntRange(1), required=True)
+    @click.option("--json", "json_output", is_flag=True)
+    @click.pass_context
+    def action(ctx: click.Context, document: str, json_output: bool, **body: Any) -> None:
+        """Check or release only the exact current artifact claim."""
+        _emit(_call(ctx, "POST", f"/v1/bridge/{quote(document, safe='')}/{name}", body=body), json_output)
+
+
+for _operation in ("check", "release"):
+    _fence_command(_operation)
+
+
+@native_bridge_group.command("deliver")
+@click.argument("document")
+@click.option("--native-context-id", required=True)
+@click.option("--fence", type=click.IntRange(1), required=True)
+@click.option("--content-file", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
+@click.option("--headless", is_flag=True, help="Use the headless BLOCKED response when a NEW proposal is unauthorized.")
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def deliver_bridge(
+    ctx: click.Context, document: str, content_file: Path, headless: bool, json_output: bool, **body: Any
+) -> None:
+    """Publish the author's complete UTF-8 bytes and consume the exact claim."""
+    try:
+        body["content"] = content_file.read_bytes().decode("utf-8")
+    except (OSError, UnicodeError) as error:
+        raise click.ClickException("The authored bridge message must be a readable UTF-8 file") from error
+    body["mode"] = "headless" if headless else "interactive"
+    _emit(_call(ctx, "POST", f"/v1/bridge/{quote(document, safe='')}/deliver", body=body), json_output)
+
+
+@native_bridge_group.command("artifacts")
+@click.argument("document")
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def artifact_snapshot(ctx: click.Context, document: str, json_output: bool) -> None:
+    """Identify current Git-normalized artifact bytes; this is not a verdict."""
+    _emit(_call(ctx, "GET", f"/v1/bridge/{quote(document, safe='')}/artifacts"), json_output)
+
+
+@native_bridge_group.command("abandon")
+@click.argument("document")
+@click.option("--native-context-id", required=True)
+@click.option("--expected-version", type=click.IntRange(0), required=True)
+@click.option("--reason", required=True)
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def abandon_attempt(ctx: click.Context, document: str, json_output: bool, **body: Any) -> None:
+    """Abandon a broken or invalidated attempt when no live claim remains."""
+    _emit(_call(ctx, "POST", f"/v1/bridge/{quote(document, safe='')}/abandon", body=body), json_output)
+
+
+NATIVE_COMMANDS.update(session=native_session_group, bridge=native_bridge_group)
 
 
 @service_group.command("status")

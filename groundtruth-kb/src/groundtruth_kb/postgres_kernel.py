@@ -75,7 +75,8 @@ CURRENT_TABLES = (
     "canonical_terms",
     "harnesses",
 )
-ALL_TABLES = (*CURRENT_TABLES, "record_history")
+COORDINATION_TABLES = ("session_init_bindings", "bridge_attempts", "bridge_items", "work_intent_claims")
+ALL_TABLES = (*CURRENT_TABLES, "record_history", *COORDINATION_TABLES)
 
 REBUILT_LATER_TABLES = frozenset(
     {
@@ -117,7 +118,7 @@ RETIRED_TABLES = frozenset(
 SOURCE_TABLES = frozenset(CURRENT_TABLES) | REBUILT_LATER_TABLES | RETIRED_TABLES
 FORBIDDEN_TABLES = (
     REBUILT_LATER_TABLES | RETIRED_TABLES | frozenset({"authorization_packets", "approval_receipts", "record_heads"})
-)
+) - frozenset(COORDINATION_TABLES)
 FORBIDDEN_COLUMNS = frozenset(
     {
         "approval_state",

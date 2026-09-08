@@ -188,6 +188,27 @@ def _current_parent(tx: PostgresTransaction, work_item_id: str) -> dict[str, Any
     return memberships[0]
 
 
+def _work_evidence(tx: PostgresTransaction, state: dict[str, Any]) -> None:
+    """Recheck current executable evidence at intake and proposal publication."""
+    for field, table in (("source_spec_id", "specifications"), ("source_test_id", "tests")):
+        if not state.get(field):
+            _error("work_evidence_required", "Implementation work requires a specification and executable test")
+        evidence = _required(tx, table, state[field])
+        if table == "specifications" and evidence["status"] in {"retired", "superseded"}:
+            _error("inactive_evidence", "Work must refer to current evidence", id=evidence["id"])
+        if table == "tests" and not evidence.get("test_file"):
+            _error("executable_test_required", "The linked test must identify executable work")
+    tx.cursor.execute(
+        sql.SQL(
+            "SELECT 1 FROM {}.test_plan_phases phase JOIN {}.test_plans plan ON plan.id=phase.plan_id "
+            "WHERE phase.test_ids @> jsonb_build_array(%s::text) AND plan.status='active' LIMIT 1"
+        ).format(sql.Identifier(tx.schema), sql.Identifier(tx.schema)),
+        (state["source_test_id"],),
+    )
+    if tx.cursor.fetchone() is None:
+        _error("test_phase_required", "The executable test must belong to an active test plan phase")
+
+
 def _execution_project(tx: PostgresTransaction, project_id: str) -> dict[str, Any]:
     project = _required(tx, "projects", project_id, lock=True)
     if project["kind"] != "project":
@@ -348,23 +369,7 @@ class AuthorityService:
                     _error("project_required", "New work requires an existing execution project")
                 project = _execution_project(tx, request.project_id)
             state = {**(current or {}), **fields}
-            for field, table in (("source_spec_id", "specifications"), ("source_test_id", "tests")):
-                if not state.get(field):
-                    _error("work_evidence_required", "Implementation work requires a specification and executable test")
-                evidence = _required(tx, table, state[field])
-                if table == "specifications" and evidence["status"] in {"retired", "superseded"}:
-                    _error("inactive_evidence", "Work must refer to current evidence", id=evidence["id"])
-                if table == "tests" and not evidence.get("test_file"):
-                    _error("executable_test_required", "The linked test must identify executable work")
-            tx.cursor.execute(
-                sql.SQL(
-                    "SELECT 1 FROM {}.test_plan_phases phase JOIN {}.test_plans plan ON plan.id=phase.plan_id "
-                    "WHERE phase.test_ids @> jsonb_build_array(%s::text) AND plan.status='active' LIMIT 1"
-                ).format(sql.Identifier(tx.schema), sql.Identifier(tx.schema)),
-                (state["source_test_id"],),
-            )
-            if tx.cursor.fetchone() is None:
-                _error("test_phase_required", "The executable test must belong to an active test plan phase")
+            _work_evidence(tx, state)
             self._check_dependencies(tx, record_id, state.get("depends_on_work_items") or [])
             row = _write(
                 tx,

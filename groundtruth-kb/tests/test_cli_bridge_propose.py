@@ -115,7 +115,7 @@ def test_scaffold_author_block_after_date_before_project_line(
     assert rendered.index("author_model_configuration:") < rendered.index("Project: ")
 
 
-def test_scaffold_author_block_populates_resolvable_fields_from_env(
+def test_scaffold_environment_cannot_establish_unbound_authorship(
     project_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _clear_author_env(monkeypatch)
@@ -133,13 +133,10 @@ def test_scaffold_author_block_populates_resolvable_fields_from_env(
     _seed_project(project_dir)
     rendered = render_proposal_draft("implementation", _context(project_dir))
 
-    assert "author_identity: prime-builder/test-harness" in rendered
-    assert "author_harness_id: T" in rendered
-    assert "author_session_context_id: test-session-123" in rendered
-    assert "author_model: test-model" in rendered
-    assert "author_model_version: test-model-version" in rendered
-    assert "author_model_configuration: test-config" in rendered
-    assert "TODO: <fill" not in rendered
+    # Caller-controlled environment values do not create the immutable
+    # exact-init context binding. A draft must expose missing provenance.
+    for field in REQUIRED_AUTHOR_METADATA_FIELDS:
+        assert f"{field}: TODO: <fill {field}>" in rendered
 
 
 def test_scaffold_author_block_degrades_to_placeholder_when_unresolvable(
@@ -212,8 +209,8 @@ def test_template_bridge_kind_default_matches_taxonomy(project_dir: Path) -> Non
     _seed_project(project_dir)
     rendered = render_proposal_draft("implementation", _context(project_dir))
     allowed_kinds = {kind.value for kind in BridgeKind}
-    assert f"bridge_kind: {BridgeKind.PRIME_PROPOSAL.value}" in rendered
-    assert BridgeKind.PRIME_PROPOSAL.value in allowed_kinds
+    assert f"bridge_kind: {BridgeKind.IMPLEMENTATION_PROPOSAL.value}" in rendered
+    assert BridgeKind.IMPLEMENTATION_PROPOSAL.value in allowed_kinds
     assert "bridge_kind: implementation_proposal_draft" not in rendered
 
 

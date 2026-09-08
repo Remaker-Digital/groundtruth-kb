@@ -93,10 +93,11 @@ receives no database credentials, connection string, or raw-table interface.
 
 This interface is currently for migration qualification. It provides typed
 specification, test, test-plan/phase, program/project, work-intake, membership,
-and current task-context operations. Session binding, bridge/claim lifecycle,
-review/finalization, complete domain coverage, and authority cutover must be
-qualified before ordinary agents are resumed. Attribution on these initial
-correction operations is not a session binding or a review assertion.
+and current task-context operations. Native session binding and bridge claims,
+publication and independent review have behavioral qualification. Project
+finalization, complete domain coverage, worktree/effect integration and authority
+cutover remain required before ordinary agents are resumed. Attribution on
+knowledge correction operations is not a session binding or a review assertion.
 
 For an explicitly initialized disposable database, an operator config selects
 the PostgreSQL service under `[postgresql]`. Start its HTTP service with:
@@ -145,3 +146,49 @@ rollback after a partial transaction, competing writers, dependency write skew,
 exact JSON-number transport, and separate CLI processes with no PostgreSQL
 environment settings. The client test points SQLite at a deliberately invalid
 file and verifies its bytes are unchanged after success and service outage.
+
+## Native session and bridge qualification
+
+The native bridge uses an immutable binding of the actual harness context to
+one GT-KB subject and role. The owner or received dispatch supplies the exact
+init marker. Environment variables and harness names do not supply the role.
+Repeated identical initialization returns the same binding; a conflicting
+marker is rejected. A context's end does not require its successor to reuse
+that identity or inspect another harness.
+
+    gt session bind --native-context-id <actual-context-id> --init-keyword '::init gtkb pb' --json
+    gt bridge claim <document-id> --work-item-id <work-item-id> --native-context-id <actual-context-id> --expected-version <current-version> --status <intended-successor> --request-id <unique-request-id> --json
+    gt bridge check <document-id> --native-context-id <actual-context-id> --fence <returned-fence> --json
+    gt bridge deliver <document-id> --native-context-id <actual-context-id> --fence <returned-fence> --content-file <authored-message.txt> --json
+
+Use these commands with the explicit disposable client config during
+qualification. A claim atomically returns the complete predecessor and reserves
+one successor artifact for 600 seconds. It has no renewal. An identical claim
+retry preserves the original expiry; a competing request is rejected even from
+the same context. Publication validates the complete authored header and
+consumes the claim in the same transaction. No writer fills or repairs a header.
+Call `bridge check` immediately before a protected implementation effect.
+
+`bridge show --content` retrieves the active message chain. `bridge artifacts`
+returns actual Git-normalized file identities for independent review, not a
+verdict. VERIFIED requires the agent-authored reviewed map to match those bytes.
+The response reports whether all current project members are verified; that
+boolean does not claim a commit or project terminality. Project commit and
+failure recovery are still being implemented.
+
+`bridge release` ends the named claim by current fence. `session retire` removes
+the binding only after its live artifact claim is delivered or released.
+Later contexts use their own bindings and fresh claims. `bridge abandon` closes
+an unusable attempt from canonical evidence without inventing a withdrawal or
+inheriting its GO. Withdrawn, superseded and abandoned attempts purge their
+payloads. `bridge queue --role <pb|lo>` reports eligible work without selecting it.
+An ADVISORY claim omits `--work-item-id` and reserves no implementation attempt.
+
+`platform_tests/groundtruth_kb/test_native_bridge.py` exercises fresh-context
+continuation, role and header errors, competing requests and effect paths,
+expiry/replacement, exact retries, current evidence changes, all phase-specific
+statuses, headless BLOCKED, advisory isolation, independent verification of
+actual Git bytes and payload purge. The separate CLI-process test in
+`test_native_authority_service.py` also completes NEW/GO/READY/VERIFIED using four
+fresh contexts with no PostgreSQL client environment settings. These tests use
+an explicit disposable PostgreSQL service and isolated Git roots.

@@ -242,7 +242,7 @@ def build_propose_context(
         "project_id": metadata["project_id"],
         "project_name": metadata["project_name"],
         "target_paths_json": target_paths_json,
-        "bridge_kind": BridgeKind.PRIME_PROPOSAL.value,
+        "bridge_kind": BridgeKind.IMPLEMENTATION_PROPOSAL.value,
         "target_paths_bullets": _format_bullets(
             [f"`{path}`" for path in target_paths],
             empty="_No target paths supplied; fill before filing._",

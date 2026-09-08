@@ -13,6 +13,7 @@ import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -23,7 +24,13 @@ from groundtruth_kb.authority_api import create_authority_app
 from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 from groundtruth_kb.config import PostgreSQLConfig
 from groundtruth_kb.native_authority import AuthorityService, WorkItemMutation
-from groundtruth_kb.postgres_kernel import PostgresKernel, PostgresKernelError, canonical_json_bytes, parse_json_bytes
+from groundtruth_kb.postgres_kernel import (
+    TABLE_SPECS,
+    PostgresKernel,
+    PostgresKernelError,
+    canonical_json_bytes,
+    parse_json_bytes,
+)
 from psycopg import sql
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
@@ -316,6 +323,29 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
     service, client, _, service_name = native
     seed(client)
     assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, capture_output=True)
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "code.py").write_text("value = 1\n", encoding="utf-8")
+    (tmp_path / "tests/test_effect.py").write_text("def test_effect(): assert 1 == 1\n", encoding="utf-8")
+    harness = {column: None for column in TABLE_SPECS["harnesses"].columns}
+    harness.update(
+        id="HARNESS-CLI",
+        version=1,
+        harness_name="cli-qualification",
+        harness_type="test",
+        status="registered",
+        changed_at=datetime.now(UTC).isoformat(),
+        changed_by="qualification",
+        change_reason="CLI bridge test",
+    )
+    service.kernel.mutate_current(
+        table="harnesses",
+        identity={"id": harness["id"]},
+        expected_version=0,
+        new_state=harness,
+        actor="qualification",
+        reason="CLI bridge test",
+    )
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
         port = listener.getsockname()[1]
@@ -405,6 +435,101 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
             result = cli("context", "work-item", "WI-1", "--json")
             assert result.returncode == 0, result.stderr
             assert json.loads(result.stdout)["specifications"][0]["description"].endswith("漢字 café")
+            # Each call starts a fresh CLI process without PostgreSQL credentials.
+            for version, (role, status) in enumerate(
+                (("pb", "NEW"), ("lo", "GO"), ("pb", "READY"), ("lo", "VERIFIED")), 1
+            ):
+                context = f"qualification-{role}-{version}"
+                bound = cli(
+                    "session", "bind", "--native-context-id", context, "--init-keyword", f"::init gtkb {role}", "--json"
+                )
+                assert bound.returncode == 0, bound.stderr
+                session_id = json.loads(bound.stdout)["session_context_id"]
+                claim = cli(
+                    "bridge",
+                    "claim",
+                    "cli-chain",
+                    "--work-item-id",
+                    "WI-1",
+                    "--native-context-id",
+                    context,
+                    "--expected-version",
+                    str(version - 1),
+                    "--status",
+                    status,
+                    "--request-id",
+                    str(uuid4()),
+                    "--json",
+                )
+                assert claim.returncode == 0, claim.stderr
+                fence = json.loads(claim.stdout)["fence"]
+                receiver = "lo" if status in {"NEW", "READY"} else "pb" if status == "GO" else None
+                lines = [f"::init gtkb {receiver}", "::open build", status] if receiver else [status]
+                kind = (
+                    "implementation_proposal"
+                    if status == "NEW"
+                    else "implementation_report"
+                    if status == "READY"
+                    else "lo_verdict"
+                )
+                metadata = {
+                    "bridge_kind": kind,
+                    "Document": "cli-chain",
+                    "Version": str(version),
+                    "Date": datetime.now(UTC).date().isoformat(),
+                    "author_identity": "qualified-agent",
+                    "author_harness_id": "HARNESS-CLI",
+                    "author_session_context_id": session_id,
+                    "author_model": "qualification",
+                    "Project": "PROJECT-1",
+                    "Work Item": "WI-1",
+                }
+                if receiver:
+                    metadata["recipient_role"] = "loyal-opposition" if receiver == "lo" else "prime-builder"
+                if status == "NEW":
+                    metadata.update(
+                        target_paths='["code.py"]',
+                        test_artifact_targets='["tests/test_effect.py"]',
+                        spec_ids='["SPEC-1"]',
+                    )
+                if status == "READY":
+                    checked = cli(
+                        "bridge", "check", "cli-chain", "--native-context-id", context, "--fence", str(fence), "--json"
+                    )
+                    assert checked.returncode == 0, checked.stderr
+                    (tmp_path / "code.py").write_text("value = 2\n", encoding="utf-8")
+                if status == "VERIFIED":
+                    snapshot = cli("bridge", "artifacts", "cli-chain", "--json")
+                    assert snapshot.returncode == 0, snapshot.stderr
+                    metadata["verified_artifacts"] = json.dumps(json.loads(snapshot.stdout))
+                artifact = tmp_path / f"authored-{version}.md"
+                artifact.write_bytes(
+                    "\r\n".join(
+                        [
+                            *lines,
+                            *(f"{key}: {value}" for key, value in metadata.items()),
+                            "",
+                            "Complete authored message.",
+                        ]
+                    ).encode("utf-8")
+                )
+                delivered = cli(
+                    "bridge",
+                    "deliver",
+                    "cli-chain",
+                    "--native-context-id",
+                    context,
+                    "--fence",
+                    str(fence),
+                    "--content-file",
+                    str(artifact),
+                    "--json",
+                )
+                assert delivered.returncode == 0, delivered.stderr
+                if status == "VERIFIED":
+                    assert json.loads(delivered.stdout)["project_ready_for_commit"] is True
+                retired = cli("session", "retire", "--native-context-id", context, "--json")
+                assert retired.returncode == 0, retired.stderr
             disabled = cli("db", "postgres", "status")
             assert disabled.returncode != 0 and "fallback is disabled" in disabled.stderr
         finally:
