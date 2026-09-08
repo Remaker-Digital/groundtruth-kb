@@ -3419,6 +3419,44 @@ def hygiene_supersession_scan(
         raise SystemExit(2)
 
 
+@hygiene_group.command("worktrees")
+@click.option("--root", type=click.Path(file_okay=False), default=".", show_default=True)
+@click.option("--integration-ref", default="develop", show_default=True)
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def hygiene_worktrees_cmd(ctx, root, integration_ref, json_output):
+    """Classify every git checkout. Read-only; writes nothing, removes nothing.
+
+    Disposition is never automatic. A checkout holding work is reported as
+    preserve_then_close and is never a removal candidate, because folding one
+    session's bytes into another session's commit is the failure this whole
+    lifecycle exists to prevent.
+    """
+    from groundtruth_kb.session.worktree import classify_worktrees
+
+    config = _resolve_config(ctx)
+    project_root = Path(root).resolve() if root != "." else Path(config.project_root)
+    states = classify_worktrees(project_root, Path(config.db_path), integration_ref=integration_ref)
+
+    if json_output:
+        click.echo(json.dumps([state.as_dict() for state in states], indent=2, sort_keys=True))
+        return
+
+    if not states:
+        click.echo("No checkouts beside the main tree.")
+        return
+    counts: dict[str, int] = {}
+    for state in states:
+        counts[state.classification] = counts.get(state.classification, 0) + 1
+    for state in states:
+        click.echo(
+            f"{state.classification:20} {state.candidate_action:22} "
+            f"dirty={state.tracked_dirty:<4} untracked={state.untracked:<4} {state.path}"
+        )
+    click.echo("")
+    click.echo("  ".join(f"{name}={count}" for name, count in sorted(counts.items())))
+
+
 @hygiene_group.command("strays")
 @click.option(
     "--root",
