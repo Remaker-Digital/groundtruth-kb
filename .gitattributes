@@ -13,3 +13,14 @@ groundtruth-kb/templates/hooks/** text eol=lf
 groundtruth-kb/templates/skills/** text eol=lf
 .harness-baseline-configuration/hooks/** text eol=lf
 .claude/hooks/** text eol=lf
+
+# Harness projection roots and the neutral baseline are projector outputs
+# written with LF. Normalize them so a checkout matches the projector byte
+# for byte and `--check` stays green after checkout (owner decision, 2026-09-07).
+.claude/** text eol=lf
+.goose/** text eol=lf
+.codex/** text eol=lf
+.cursor/** text eol=lf
+.agent/** text eol=lf
+.api-harness/** text eol=lf
+.harness-baseline-configuration/** text eol=lf
