@@ -108,6 +108,7 @@ def create_authority_app(service: AuthorityService) -> FastAPI:
 
     @app.get("/v1/{domain}")
     def list_records(
+        request: Request,
         domain: Domain,
         after: str | None = None,
         limit: Annotated[int, Query(ge=1, le=1000)] = 200,
@@ -123,6 +124,23 @@ def create_authority_app(service: AuthorityService) -> FastAPI:
         parent_project_id: str | None = None,
         application_scope: str | None = None,
     ) -> Response:
+        accepted = {
+            "after",
+            "limit",
+            "search",
+            "status",
+            "kind",
+            "priority",
+            "spec_id",
+            "plan_id",
+            "resolution_status",
+            "component",
+            "test_type",
+            "parent_project_id",
+            "application_scope",
+        }
+        if set(request.query_params) - accepted or len(request.query_params.multi_items()) != len(request.query_params):
+            raise PostgresKernelError("invalid_query", "Unknown or repeated query fields are not accepted")
         filters = {
             key: value
             for key, value in {

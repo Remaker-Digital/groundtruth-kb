@@ -263,6 +263,10 @@ def test_transport_rejects_foreign_authority_fields_and_preserves_json_precision
     refused = client.put("/v1/projects/PROJECT-1", json={"secret": "do-not-echo"})
     assert refused.status_code == 422 and "do-not-echo" not in refused.text
     assert client.get("/v1/projects", headers={"Origin": "https://unrelated.example"}).status_code == 403
+    for query in ("?ignored_filter=value", "?status=active&status=retired"):
+        refused = client.get("/v1/projects" + query)
+        assert refused.status_code == 422
+        assert refused.json()["error"]["code"] == "invalid_query"
     assert client.post("/v1/work-items/WI-1/move", content="{}").status_code == 415
     number = Decimal("0.123456789012345678901234567890123456789")
     body = {
@@ -301,6 +305,7 @@ def test_fresh_task_context_uses_current_canon_and_rejects_retired_source(native
     fresh = client.get("/v1/work-items/WI-1/context").json()
     assert fresh["specifications"][0]["description"] == "Owner's current direction"
     assert fresh["specifications"][0]["version"] == 2
+    assert fresh["work_item"]["origin"] == "manual"
     assert put(client, "specifications", "SPEC-1", {"status": "retired"}, expected_version=2).status_code == 200
     refused = client.get("/v1/work-items/WI-1/context")
     assert refused.status_code == 422

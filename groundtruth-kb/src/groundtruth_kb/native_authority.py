@@ -372,7 +372,7 @@ class AuthorityService:
                 record_id,
                 fields,
                 request,
-                defaults={"origin": "owner", "component": "gtkb", "resolution_status": "open", "stage": "created"},
+                defaults={"origin": "manual", "component": "gtkb", "resolution_status": "open", "stage": "created"},
             )
             if not current:
                 _write(
