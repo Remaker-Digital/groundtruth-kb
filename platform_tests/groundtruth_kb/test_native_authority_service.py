@@ -260,6 +260,35 @@ def test_concurrent_creation_and_dependency_write_skew(native):
     assert any(value in ("dependency_cycle", "retryable_conflict") for value in outcomes if isinstance(value, str))
 
 
+def test_work_item_dependency_replacement_refuses_invalid_graph_without_partial_effects(native):
+    service, client, _, _ = native
+    seed(client)
+    for item in ("WI-1", "WI-2"):
+        assert put(client, "work-items", item, work_fields(), project_id="PROJECT-1").status_code == 200
+    for dependencies, code in (
+        (["MISSING"], "missing_work_item_dependency"),
+        (["WI-2", "WI-2"], "duplicate_work_item_dependency"),
+        (["WI-1"], "dependency_cycle"),
+    ):
+        before = client.get("/v1/work-items/WI-1").content
+        count = history_count(service)
+        refused = put(client, "work-items", "WI-1", {"depends_on_work_items": dependencies}, expected_version=1)
+        assert refused.json()["error"]["code"] == code, refused.text
+        assert "WI-1" in str(refused.json()["error"]["details"])
+        assert client.get("/v1/work-items/WI-1").content == before
+        assert history_count(service) == count
+    result = put(client, "work-items", "WI-1", {"depends_on_work_items": ["WI-2"]}, expected_version=1)
+    assert result.status_code == 200, result.text
+    assert [row["id"] for row in client.get("/v1/work-items/WI-1/context").json()["predecessors"]] == ["WI-2"]
+    before = history_count(service)
+    refused = put(client, "work-items", "WI-2", {"depends_on_work_items": ["WI-1"]}, expected_version=1)
+    assert refused.json()["error"]["code"] == "dependency_cycle"
+    assert history_count(service) == before
+    result = put(client, "work-items", "WI-1", {"depends_on_work_items": []}, expected_version=2)
+    assert result.status_code == 200, result.text
+    assert client.get("/v1/work-items/WI-1/context").json()["predecessors"] == []
+
+
 def test_transport_rejects_foreign_authority_fields_and_preserves_json_precision(native):
     _, client, _, _ = native
     seed(client)

@@ -22,6 +22,7 @@ from groundtruth_kb.postgres_kernel import (
     PostgresTransaction,
     dependency_shape,
     validate_project_dependencies,
+    validate_work_item_dependencies,
 )
 
 Identifier = Annotated[str, Field(min_length=1, max_length=256, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")]
@@ -554,19 +555,14 @@ class AuthorityService:
 
     @staticmethod
     def _check_dependencies(tx: PostgresTransaction, record_id: str, dependencies: list[str]) -> None:
-        if len(set(dependencies)) != len(dependencies):
-            _error("invalid_dependency", "Dependency identifiers must be distinct")
-        pending = list(dependencies)
-        seen: set[str] = set()
-        while pending:
-            predecessor = pending.pop()
-            if predecessor == record_id:
-                _error("dependency_cycle", "A work dependency cycle cannot be executed")
-            if predecessor in seen:
-                continue
-            seen.add(predecessor)
-            row = _required(tx, "work_items", predecessor)
-            pending.extend(row.get("depends_on_work_items") or [])
+        tx.cursor.execute(
+            sql.SQL("SELECT id,depends_on_work_items FROM {}.work_items WHERE id<>%s").format(
+                sql.Identifier(tx.schema)
+            ),
+            (record_id,),
+        )
+        rows = [dict(row) for row in tx.cursor.fetchall()]
+        validate_work_item_dependencies(rows + [{"id": record_id, "depends_on_work_items": dependencies}])
 
     def move_work_item(self, record_id: str, request: MembershipMove) -> dict[str, Any]:
         with self.kernel.transaction() as tx:

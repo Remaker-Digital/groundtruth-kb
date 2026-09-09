@@ -1898,3 +1898,62 @@ def test_migration_refuses_invalid_native_dependency_graph(defect, code):
     with pytest.raises(PostgresKernelError) as error:
         normalize_manifest(manifest)
     assert error.value.code == code
+
+
+@pytest.mark.parametrize(
+    "dependencies,code",
+    [
+        ([{"work_item_id": "WI-TWO", "required_state": "terminal_published"}], "invalid_work_item_dependencies"),
+        ([42], "invalid_work_item_dependencies"),
+        ([" WI-TWO"], "invalid_work_item_dependencies"),
+        ([""], "invalid_work_item_dependencies"),
+        (["WI-MISSING"], "missing_work_item_dependency"),
+        (["WI-TWO", "WI-TWO"], "duplicate_work_item_dependency"),
+        (["WI-ONE"], "dependency_cycle"),
+    ],
+)
+def test_migration_checks_work_item_dependency_elements_and_endpoints(dependencies, code):
+    manifest = _work_model_manifest()
+    first = manifest["tables"]["work_items"][0]
+    manifest["tables"]["work_items"].append({**first, "id": "WI-TWO"})
+    membership = manifest["tables"]["project_work_item_memberships"][0]
+    manifest["tables"]["project_work_item_memberships"].append(
+        {**membership, "id": "MEMBER-TWO", "work_item_id": "WI-TWO", "project_id": "PROJECT-TWO"}
+    )
+    first["depends_on_work_items"] = ["WI-TWO"]
+    assert normalize_manifest(manifest)["tables"]["work_items"][0]["depends_on_work_items"] == ["WI-TWO"]
+    first["depends_on_work_items"] = dependencies
+    before = canonical_json_bytes(manifest)
+    with pytest.raises(PostgresKernelError) as refused:
+        normalize_manifest(manifest)
+    assert refused.value.code == code
+    assert "WI-ONE" in str(refused.value.details)
+    assert canonical_json_bytes(manifest) == before
+
+
+@pytest.mark.parametrize("status", ["open", "verified"])
+def test_migration_refuses_closed_or_open_work_item_cycles(status):
+    manifest = _work_model_manifest()
+    first = manifest["tables"]["work_items"][0]
+    first.update(depends_on_work_items=["WI-TWO"], resolution_status=status)
+    manifest["tables"]["work_items"].append({**first, "id": "WI-TWO", "depends_on_work_items": ["WI-ONE"]})
+    membership = manifest["tables"]["project_work_item_memberships"][0]
+    manifest["tables"]["project_work_item_memberships"].append(
+        {**membership, "id": "MEMBER-TWO", "work_item_id": "WI-TWO"}
+    )
+    with pytest.raises(PostgresKernelError) as refused:
+        normalize_manifest(manifest)
+    assert refused.value.code == "dependency_cycle"
+    assert set(refused.value.details["work_item_ids"]) == {"WI-ONE", "WI-TWO"}
+
+
+def test_work_item_dependency_graph_handles_deep_shared_predecessors():
+    # Longer than Python's recursion limit, with shared predecessors and no cycle.
+    rows = [{"id": "WI-0", "depends_on_work_items": None}]
+    for index in range(1, 3000):
+        rows.append({"id": f"WI-{index}", "depends_on_work_items": list({"WI-0", f"WI-{index - 1}"})})
+    kernel_module.validate_work_item_dependencies(rows)
+    rows[0]["depends_on_work_items"] = ["WI-2999"]
+    with pytest.raises(PostgresKernelError) as refused:
+        kernel_module.validate_work_item_dependencies(rows)
+    assert refused.value.code == "dependency_cycle"

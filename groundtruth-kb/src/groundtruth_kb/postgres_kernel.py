@@ -1197,6 +1197,68 @@ def validate_project_dependencies(records: list[dict[str, Any]], projects: dict[
         pending = {key: values - leaves for key, values in pending.items() if key not in leaves}
 
 
+def validate_work_item_dependencies(records: list[dict[str, Any]]) -> None:
+    """Require the same executable predecessor graph on import and ordinary writes."""
+    rows = {row["id"]: row for row in records}
+    edges = {}
+    for key, row in rows.items():
+        dependencies = row.get("depends_on_work_items")
+        if dependencies is None:
+            dependencies = []
+        if not isinstance(dependencies, list) or any(
+            not isinstance(value, str)
+            or len(value) > 256
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]*", value) is None
+            for value in dependencies
+        ):
+            raise PostgresKernelError(
+                "invalid_work_item_dependencies",
+                "Work-item predecessors must be identifier strings; "
+                "reconcile legacy predicates and non-work references",
+                details={"work_item_id": key},
+            )
+        if len(set(dependencies)) != len(dependencies):
+            raise PostgresKernelError(
+                "duplicate_work_item_dependency",
+                "A work item names each predecessor once",
+                details={"work_item_id": key},
+            )
+        missing = sorted(set(dependencies) - rows.keys())
+        if missing:
+            raise PostgresKernelError(
+                "missing_work_item_dependency",
+                "Every predecessor must resolve to a current work item",
+                details={"work_item_id": key, "missing_work_item_ids": missing},
+            )
+        edges[key] = dependencies
+
+    # An iterative DFS reports the actual cycle, not unrelated nodes waiting on it.
+    # Closed source labels do not make an invalid current graph safe to migrate.
+    complete = set()
+    for root in edges:
+        if root in complete:
+            continue
+        path, positions = [root], {root: 0}
+        stack = [iter(edges[root])]
+        while stack:
+            predecessor = next(stack[-1], None)
+            if predecessor is None:
+                finished = path.pop()
+                complete.add(finished)
+                positions.pop(finished)
+                stack.pop()
+            elif predecessor in positions:
+                raise PostgresKernelError(
+                    "dependency_cycle",
+                    "The current work-item predecessor graph contains a cycle",
+                    details={"work_item_ids": path[positions[predecessor] :] + [predecessor]},
+                )
+            elif predecessor not in complete:
+                positions[predecessor] = len(path)
+                path.append(predecessor)
+                stack.append(iter(edges[predecessor]))
+
+
 def _validate_manifest_relationships(tables: Mapping[str, list[dict[str, Any]]]) -> None:
     ids = {
         table_name: {str(row["id"]) for row in tables[table_name]}
@@ -1216,6 +1278,7 @@ def _validate_manifest_relationships(tables: Mapping[str, list[dict[str, Any]]])
     for row in tables["work_items"]:
         _require_reference(row["source_spec_id"], ids["specifications"], label="work_items.source_spec_id")
         _require_reference(row["source_test_id"], ids["tests"], label="work_items.source_test_id")
+    validate_work_item_dependencies(tables["work_items"])
     projects = {row["id"]: row for row in tables["projects"]}
     for row in tables["projects"]:
         _require_reference(row["parent_project_id"], ids["projects"], label="projects.parent_project_id")

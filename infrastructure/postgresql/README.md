@@ -365,6 +365,20 @@ client database credentials. Migration tests reject invalid native dependency
 contracts before import. Work-item predecessor readiness and the remaining
 legacy dependency consumers are still separate outstanding repair work.
 
+Work-item `depends_on_work_items` is a list of distinct current work-item
+identifiers. An absent list means no predecessors. Predicate objects, non-work
+references, missing endpoints, duplicate entries and cycles must be reconciled
+in the source; import does not translate or discard them. Closed source labels
+do not exempt a current record from this contract. Migration and ordinary
+work-item amendments use the same graph validator. Refusals identify the affected
+item and missing endpoints or the actual cycle, without a partial mutation.
+
+The kernel and native authority suites exercise accepted same- and cross-project
+references, malformed source arrays, missing endpoints, closed/open cycles, deep
+shared predecessors, atomic amendments, and concurrent opposing dependency
+writes. Graph validity does not assert that predecessor work has been performed;
+the runtime predecessor-readiness checks noted above remain to be completed.
+
 
 Successive work items in one project may change the same artifact. Finalization
 compares every member's own reviewed map with the final project bytes before
