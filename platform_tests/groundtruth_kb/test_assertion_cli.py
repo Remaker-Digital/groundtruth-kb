@@ -126,6 +126,8 @@ def test_cli_observes_current_definitions_without_recording_or_schema_bootstrap(
     assert result.exit_code == (1 if behavior_required else 0), result.output
     report = json.loads(result.output)
     assert report["aggregate_result"] == ("PARTIAL" if behavior_required else "PASS")
+    assert report["failed"] == 0
+    assert report["partial"] == int(behavior_required)
     assert report["total_specs"] == 1
     assert report["details"][0]["spec_version"] == 1
     assert snapshot() == before
@@ -161,6 +163,7 @@ def test_changed_canonical_definition_invalidates_an_earlier_passing_observation
     assert result.exit_code == 1, result.output
     report = json.loads(result.output)
     assert report["aggregate_result"] == "UNASSESSED"
+    assert report["unassessed"] == 1 and report["failed"] == 0
     detail = report["details"][0]
     assert detail["spec_version"] == 1 and not detail["overall_passed"]
     assert detail["results"][-1]["type"] == "source_changed"

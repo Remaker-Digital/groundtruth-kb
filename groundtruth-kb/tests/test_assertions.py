@@ -396,7 +396,39 @@ class TestSpecAssertions:
         summary = run_all_assertions(db, project_dir, spec_id="SPEC-U01")
 
         assert summary["aggregate_result"] == "UNASSESSED"
-        assert summary["failed"] == 1
+        assert summary["failed"] == 0
+        assert summary["unassessed"] == 1
+
+    def test_summary_counts_distinguish_violations_from_missing_qualification(self, db, project_dir):
+        passing = {"type": "file_exists", "file": "README.md"}
+        for ident, definitions in {
+            "PASS": [passing],
+            "FAIL": [{"type": "file_exists", "file": "missing.py"}],
+            "PARTIAL": [passing, "Required independent review"],
+            "UNASSESSED": ["Required independent review"],
+            "NONE": None,
+        }.items():
+            db.insert_spec(
+                id=f"SPEC-{ident}",
+                title=ident,
+                status="active",
+                changed_by="test",
+                change_reason="test",
+                assertions=definitions,
+            )
+        summary = run_all_assertions(db, project_dir)
+        assert summary["aggregate_result"] == "FAIL"
+        assert {key: summary[key] for key in ("passed", "failed", "partial", "unassessed", "skipped")} == {
+            "passed": 1,
+            "failed": 1,
+            "partial": 1,
+            "unassessed": 1,
+            "skipped": 1,
+        }
+        assert (
+            sum(summary[key] for key in ("passed", "failed", "partial", "unassessed", "skipped"))
+            == summary["total_specs"]
+        )
 
     def test_mixed_pass_and_unassessed_summary_is_partial(self, db: KnowledgeDB, project_dir: Path) -> None:
         db.insert_spec(
@@ -438,7 +470,8 @@ class TestFormatSummary:
         )
         summary = run_all_assertions(db, project_dir)
         text = format_summary(summary)
-        assert "FAILURES" in text
+        assert "NON-PASS OBSERVATIONS" in text
+        assert "[FAIL]" in text
         assert "SPEC-FMT1" in text
 
     def test_format_error(self) -> None:
@@ -988,5 +1021,6 @@ class TestFormatSummaryComposition:
         )
         summary = run_all_assertions(db, project_dir)
         text = format_summary(summary)
-        assert "FAILURES" in text
+        assert "NON-PASS OBSERVATIONS" in text
+        assert "[FAIL]" in text
         assert "SPEC-COMP1" in text

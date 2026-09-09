@@ -853,7 +853,6 @@ def run_all_assertions(
     skipped = 0
     partial = 0
     unassessed = 0
-    direct_failures = 0
 
     for spec in specs:
         if spec.get("status") in {"retired", "superseded"}:
@@ -892,15 +891,14 @@ def run_all_assertions(
         elif evaluation_result == "PASS":
             passed += 1
         else:
-            failed += 1
             if evaluation_result == "PARTIAL":
                 partial += 1
             elif evaluation_result == "UNASSESSED":
                 unassessed += 1
             else:
-                direct_failures += 1
+                failed += 1
 
-    if direct_failures:
+    if failed:
         aggregate_result = "FAIL"
     elif partial or (unassessed and passed):
         aggregate_result = "PARTIAL"
@@ -940,7 +938,7 @@ def format_summary(summary: dict[str, Any]) -> str:
     lines.append(f"  FAILED:            {summary['failed']}")
     lines.append(f"  PARTIAL:           {summary.get('partial', 0)}")
     lines.append(f"  UNASSESSED:        {summary.get('unassessed', 0)}")
-    lines.append(f"  Skipped (no def):  {summary['skipped']}")
+    lines.append(f"  NOT_APPLICABLE:    {summary['skipped']}")
     lines.append(f"  Aggregate result:  {summary.get('aggregate_result', 'UNASSESSED')}")
     lines.append(f"{'=' * 60}\n")
 
@@ -949,7 +947,7 @@ def format_summary(summary: dict[str, Any]) -> str:
         detail for detail in summary["details"] if detail.get("evaluation_result") not in {"PASS", "NOT_APPLICABLE"}
     ]
     if failures:
-        lines.append("FAILURES:\n")
+        lines.append("NON-PASS OBSERVATIONS:\n")
         for f in failures:
             lines.append(f"  [{f['spec_id']}] {f['title']}")
             for r in f["results"]:
