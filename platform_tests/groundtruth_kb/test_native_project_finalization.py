@@ -273,3 +273,56 @@ def test_successor_confirms_git_fact_after_uncertain_database_acknowledgement(br
     )
     assert response.json()["status"] == "confirmed"
     assert git(main, "rev-list", "--count", parent + "..HEAD").stdout.strip() == "1"
+
+
+@pytest.mark.parametrize("order", [(1, 2), (2, 1)])
+def test_successive_changes_to_one_artifact_request_only_stale_reviews(bridge, order):
+    _, client, contexts, root = bridge
+    assert (
+        put(
+            client, "work-items", "WI-2", work_fields(title="Successive artifact change"), project_id="PROJECT-1"
+        ).status_code
+        == 200
+    )
+    parent = base(integration(root))
+    first, second = order
+    verify(client, contexts, root, first, "code.py")
+    verify(client, contexts, root, second, "code.py")
+    # Confirmation must also catch stale per-member reviews before consulting
+    # an offered candidate; a union map must not overwrite a member's evidence.
+    blocked = post(client, "confirm-commit", commit_id="f" * 40, expected_parent=parent)
+    assert blocked.status_code == 200, blocked.text
+    assert blocked.json() == {
+        "status": "fresh_verification_required",
+        "reason": "verified_bytes_changed",
+        "work_item_ids": [f"WI-{first}"],
+    }
+    prepared = post(client, "prepare-commit")
+    assert prepared.status_code == 200, prepared.text
+    assert prepared.json()["work_item_ids"] == [f"WI-{first}"]
+    queue = client.get("/v1/bridge/queue", params={"role": "lo"}).json()["eligible"]
+    assert [row["work_item_id"] for row in queue] == [f"WI-{first}"]
+    for number in order:
+        state = client.get(f"/v1/bridge/chain-{number}/show", params={"include_content": True}).json()
+        assert state["attempt"]["head_version"] == 4
+        assert bool(state["attempt"]["finalization_failure"]) == (number == first)
+        assert client.get(f"/v1/work-items/WI-{number}").json()["work_item"]["resolution_status"] == "verified"
+    assert base(integration(root)) == parent
+    artifacts = client.get(f"/v1/bridge/chain-{first}/artifacts").json()
+    deliver(
+        client,
+        contexts,
+        f"chain-{first}",
+        "lo3",
+        5,
+        "VERIFIED",
+        work_item_id=f"WI-{first}",
+        verified_artifacts=json.dumps(artifacts),
+    )
+    ready = post(client, "prepare-commit").json()
+    assert ready["status"] == "ready_to_commit"
+    assert ready["reviewed_artifacts"]["code.py"] == artifacts["code.py"]
+    commit = commit_product(Path(ready["checkout"]["path"]))
+    confirmed = post(client, "confirm-commit", commit_id=commit, expected_parent=parent)
+    assert confirmed.status_code == 200 and confirmed.json()["status"] == "confirmed", confirmed.text
+    assert (integration(root) / "code.py").read_text() == f"result = {second + 1}\n"

@@ -130,12 +130,9 @@ class NativeProjectFinalization:
             for path, blob in attempt["verified_artifacts"].items():
                 if path.casefold().split("/")[0] == "bridge":
                     _error("bridge_payload_in_cohort", "Bridge payloads cannot enter a project work-product commit")
-                if path in artifacts and artifacts[path] != blob:
-                    _error(
-                        "inconsistent_reviews",
-                        "Members verified different final bytes for the same artifact",
-                        path=path,
-                    )
+                # This union enumerates the complete project scope. It is usable
+                # as commit evidence only after every member's own review has
+                # been compared with the current bytes below.
                 artifacts[path] = blob
             attempts.append(attempt)
             work_items.append(work)
@@ -166,6 +163,21 @@ class NativeProjectFinalization:
             affected.append(attempt["work_item_id"])
         return {"status": "fresh_verification_required", "reason": code, "work_item_ids": affected}
 
+    def _request_changed_reviews(self, tx, attempts, actual):
+        stale = [
+            attempt
+            for attempt in attempts
+            if any(actual[path] != blob for path, blob in attempt["verified_artifacts"].items())
+        ]
+        if not stale:
+            return None
+        paths = sorted(
+            {path for attempt in stale for path, blob in attempt["verified_artifacts"].items() if actual[path] != blob}
+        )
+        # A later work item can legitimately change an earlier item's artifact.
+        # Preserve reviews already matching the final bytes, even on shared paths.
+        return self._request_verification(tx, stale, "verified_bytes_changed", {"paths": paths})
+
     def prepare(self, project_id: str, request: FinalizationRequest) -> dict[str, Any]:
         with self.kernel.transaction(serializable=False) as tx:
             self.bridge.lock_worktrees(tx)
@@ -178,11 +190,9 @@ class NativeProjectFinalization:
                 # and refuses overlapping local edits. Never reset the cohort.
                 self._git("merge", "--ff-only", "--no-autostash", "--no-overwrite-ignore", parent, root=source)
             actual = self.bridge._snapshot(sorted(artifacts), root=source)
-            changed = [path for path, blob in artifacts.items() if actual[path] != blob]
-            if changed:
-                return self._request_verification(
-                    tx, attempts, "verified_bytes_changed", {"paths": changed}, paths=changed
-                )
+            changed_reviews = self._request_changed_reviews(tx, attempts, actual)
+            if changed_reviews:
+                return changed_reviews
             failures = [attempt["work_item_id"] for attempt in attempts if attempt["finalization_failure"]]
             if failures:
                 return {"status": "fresh_verification_required", "work_item_ids": failures}
@@ -307,11 +317,9 @@ class NativeProjectFinalization:
             if any(attempt["finalization_failure"] for attempt in attempts):
                 _error("fresh_verification_required", "Fresh independent verification must finish before confirmation")
             actual = self.bridge._snapshot(sorted(artifacts), root=self.bridge.work_root(project_id))
-            changed = [path for path, blob in artifacts.items() if actual[path] != blob]
-            if changed:
-                return self._request_verification(
-                    tx, attempts, "verified_bytes_changed", {"paths": changed}, paths=changed
-                )
+            changed_reviews = self._request_changed_reviews(tx, attempts, actual)
+            if changed_reviews:
+                return changed_reviews
             try:
                 self._verify_commit(request, binding, works, artifacts)
             except PostgresKernelError as error:

@@ -364,3 +364,13 @@ dependency creation/readback, useful readiness output and retirement without
 client database credentials. Migration tests reject invalid native dependency
 contracts before import. Work-item predecessor readiness and the remaining
 legacy dependency consumers are still separate outstanding repair work.
+
+
+Successive work items in one project may change the same artifact. Finalization
+compares every member's own reviewed map with the final project bytes before
+using the combined artifact set for a commit. Only stale members return for
+fresh independent verification; a later member whose review already matches
+those bytes stays verified. Differing snapshots are neither silently collapsed
+nor a permanent refusal with no recovery. Both commit preparation and
+confirmation enforce this comparison, and the project still commits once after
+all members have verified their committed form.
