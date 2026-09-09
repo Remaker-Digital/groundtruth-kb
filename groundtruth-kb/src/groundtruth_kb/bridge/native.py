@@ -418,12 +418,18 @@ class NativeBridgeService:
                 self._scope(tx, attempt)
                 tx.cursor.execute(
                     sql.SQL(
-                        "SELECT a.proposal_paths FROM {}.work_intent_claims c JOIN {}.bridge_attempts a ON a.id=c.attempt_id "
+                        "SELECT a.proposal_paths,a.test_targets FROM {}.work_intent_claims c JOIN {}.bridge_attempts a ON a.id=c.attempt_id "
                         "WHERE c.expires_at>clock_timestamp() AND c.intended_status='READY' AND c.attempt_id<>%s"
                     ).format(sql.Identifier(tx.schema), sql.Identifier(tx.schema)),
                     (document,),
                 )
-                if any(self._overlap(attempt["proposal_paths"], row["proposal_paths"]) for row in tx.cursor.fetchall()):
+                if any(
+                    self._overlap(
+                        attempt["proposal_paths"] + attempt["test_targets"],
+                        row["proposal_paths"] + row["test_targets"],
+                    )
+                    for row in tx.cursor.fetchall()
+                ):
                     _error("artifact_effect_conflict", "An overlapping artifact effect is currently reserved")
             tx.cursor.execute(
                 sql.SQL("DELETE FROM {}.work_intent_claims WHERE attempt_id=%s").format(sql.Identifier(tx.schema)),
@@ -479,7 +485,9 @@ class NativeBridgeService:
             return {
                 "status": "current",
                 "claim": _public({key: value for key, value in claim.items() if key != "live"}),
-                "target_paths": attempt["proposal_paths"] if claim["intended_status"] == "READY" else [],
+                "target_paths": sorted(set(attempt["proposal_paths"] + attempt["test_targets"]))
+                if claim["intended_status"] == "READY"
+                else [],
             }
 
     def release(self, document: str, request: FenceRequest) -> dict[str, Any]:

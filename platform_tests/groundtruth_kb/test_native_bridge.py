@@ -7,6 +7,7 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Barrier
 from uuid import uuid4
 
 import pytest
@@ -192,7 +193,10 @@ def test_fresh_context_chain_preserves_bytes_consumes_claims_and_verifies(bridge
     assert client.post("/v1/bridge/chain/deliver", json=go).status_code == 200
     ready_claim = claim(client, "chain", "pb2", 2, "READY").json()
     fence = {"native_context_id": "pb2", "fence": ready_claim["fence"]}
-    assert client.post("/v1/bridge/chain/check", json=fence).json()["target_paths"] == ["code.py"]
+    assert client.post("/v1/bridge/chain/check", json=fence).json()["target_paths"] == [
+        "code.py",
+        "tests/test_effect.py",
+    ]
     (root / "code.py").write_text("value = 2\n", encoding="utf-8")
     ready = {**fence, "content": authored(contexts["pb2"], "chain", 3, "READY")}
     assert client.post("/v1/bridge/chain/deliver", json=ready).status_code == 200
@@ -519,3 +523,115 @@ def test_overlapping_effect_claims_and_source_change_require_fresh_work(bridge):
     assert abandoned.status_code == 200
     assert claim(client, "replacement", "pb3", 0, "READY").status_code == 422
     deliver(client, contexts, "replacement", "pb3", 1, "NEW")
+
+
+@pytest.mark.parametrize("scope", ["shared_test", "test_is_source", "source_is_test", "independent"])
+def test_effect_claim_arbitration_includes_test_artifacts(bridge, scope):
+    service, client, contexts, _ = bridge
+    second_test = "tests/test_second.py"
+    assert (
+        put(
+            client,
+            "tests",
+            "TEST-2",
+            {
+                "title": "Second effect test",
+                "spec_id": "SPEC-1",
+                "test_type": "integration",
+                "test_file": second_test,
+                "expected_outcome": "Second effect observed",
+            },
+        ).status_code
+        == 200
+    )
+    assert (
+        put(client, "test-phases", "PHASE-1", {"test_ids": ["TEST-1", "TEST-2"]}, expected_version=1).status_code == 200
+    )
+    assert (
+        put(client, "work-items", "WI-2", work_fields(source_test_id="TEST-2"), project_id="PROJECT-1").status_code
+        == 200
+    )
+    targets = ["second.py"]
+    tests = [second_test]
+    if scope == "shared_test":
+        tests.append("tests/test_effect.py")
+    elif scope == "test_is_source":
+        targets.append("tests/test_effect.py")
+    elif scope == "source_is_test":
+        tests.append("CODE.PY")
+    deliver(client, contexts, "first", "pb1", 1, "NEW")
+    deliver(client, contexts, "first", "lo1", 2, "GO")
+    deliver(
+        client,
+        contexts,
+        "second",
+        "pb3",
+        1,
+        "NEW",
+        work_item_id="WI-2",
+        target_paths=json.dumps(targets),
+        test_artifact_targets=json.dumps(tests),
+    )
+    deliver(client, contexts, "second", "lo3", 2, "GO", work_item_id="WI-2")
+    first = claim(client, "first", "pb2", 2, "READY")
+    assert first.status_code == 200, first.text
+    second = claim(client, "second", "pb3", 2, "READY", work_item_id="WI-2")
+    if scope == "independent":
+        assert second.status_code == 200, second.text
+    else:
+        assert second.status_code == 422, second.text
+        assert second.json()["error"]["code"] == "artifact_effect_conflict"
+        with service.kernel.transaction(read_only=True) as tx:
+            tx.cursor.execute(
+                sql.SQL("SELECT count(*) AS n FROM {}.work_intent_claims WHERE attempt_id='second'").format(
+                    sql.Identifier(tx.schema)
+                )
+            )
+            assert tx.cursor.fetchone()["n"] == 0
+        assert (
+            client.post(
+                "/v1/bridge/first/release", json={"native_context_id": "pb2", "fence": first.json()["fence"]}
+            ).status_code
+            == 200
+        )
+        second = claim(client, "second", "pb3", 2, "READY", work_item_id="WI-2")
+        assert second.status_code == 200, second.text
+    checked = client.post("/v1/bridge/second/check", json={"native_context_id": "pb3", "fence": second.json()["fence"]})
+    assert checked.status_code == 200, checked.text
+    assert checked.json()["target_paths"] == sorted(set(targets + tests))
+
+
+def test_simultaneous_test_artifact_claims_leave_one_live_reservation(bridge, monkeypatch):
+    service, client, contexts, _ = bridge
+    assert put(client, "work-items", "WI-2", work_fields(), project_id="PROJECT-1").status_code == 200
+    for document, work, path in (("first", "WI-1", "code.py"), ("second", "WI-2", "second.py")):
+        deliver(client, contexts, document, "pb1", 1, "NEW", work_item_id=work, target_paths=json.dumps([path]))
+        deliver(client, contexts, document, "lo1", 2, "GO", work_item_id=work)
+    barrier = Barrier(2, timeout=15)
+    original_scope = NativeBridgeService._scope
+
+    def simultaneous_scope(tx, attempt, **kwargs):
+        original_scope(tx, attempt, **kwargs)
+        barrier.wait()
+
+    with monkeypatch.context() as racing:
+        racing.setattr(NativeBridgeService, "_scope", staticmethod(simultaneous_scope))
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            futures = [
+                workers.submit(claim, client, document, context, 2, "READY", work_item_id=work)
+                for document, context, work in (("first", "pb2", "WI-1"), ("second", "pb3", "WI-2"))
+            ]
+            responses = [future.result() for future in futures]
+    assert sum(response.status_code == 200 for response in responses) == 1
+    failure = next(response for response in responses if response.status_code != 200)
+    assert (failure.status_code, failure.json()["error"]["code"]) in {
+        (422, "artifact_effect_conflict"),
+        (409, "retryable_conflict"),
+    }
+    with service.kernel.transaction(read_only=True) as tx:
+        tx.cursor.execute(sql.SQL("SELECT attempt_id FROM {}.work_intent_claims").format(sql.Identifier(tx.schema)))
+        assert len(tx.cursor.fetchall()) == 1
+    loser = responses.index(failure)
+    document, context, work = [("first", "pb2", "WI-1"), ("second", "pb3", "WI-2")][loser]
+    retry = claim(client, document, context, 2, "READY", work_item_id=work)
+    assert retry.status_code == 422 and retry.json()["error"]["code"] == "artifact_effect_conflict"

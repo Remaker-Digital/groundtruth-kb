@@ -214,7 +214,12 @@ qualification. A claim atomically returns the complete predecessor and reserves
 one successor artifact for 600 seconds. It has no renewal. An identical claim
 retry preserves the original expiry; a competing request is rejected even from
 the same context. Publication validates the complete authored header and
-consumes the claim in the same transaction. No writer fills or repairs a header.
+consumes the claim in the same transaction. No writer fills or repairs a header. An
+implementation effect covers the union of proposal `target_paths` and
+`test_artifact_targets`. Both sets participate in overlap arbitration, and
+`gt bridge check` returns that complete mutable artifact set. A shared test is
+protected even when the builders modify different implementation files. Release
+or expiry frees the next-artifact reservation; it creates no thread ownership.
 Call `bridge check` immediately before a protected implementation effect.
 
 `bridge show --content` retrieves the active message chain. `bridge artifacts`
