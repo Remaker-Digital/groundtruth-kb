@@ -1514,27 +1514,7 @@ CREATE TABLE IF NOT EXISTS sot_registry_transaction_journal (
 
 CREATE INDEX IF NOT EXISTS idx_sot_registry_txn_journal_state ON sot_registry_transaction_journal(journal_state);
 
-CREATE TABLE IF NOT EXISTS sot_registry_observation_capabilities (
-    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
-    capability_hash TEXT NOT NULL,
-    session_id TEXT NOT NULL,
-    tool_event_id TEXT NOT NULL,
-    paths_json TEXT NOT NULL,
-    preimage_digests_json TEXT NOT NULL,
-    bridge_id TEXT NOT NULL,
-    start_packet_hash TEXT NOT NULL,
-    pauth_decision_json TEXT NOT NULL,
-    expires_at TEXT NOT NULL,
-    operation TEXT NOT NULL,
-    capability_state TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    consumed_at TEXT,
-    result_digest TEXT,
-    UNIQUE(capability_hash)
-);
 
-CREATE INDEX IF NOT EXISTS idx_sot_registry_observation_state
-    ON sot_registry_observation_capabilities(capability_state, expires_at);
 
 -- WI-5441 Phase 1B: quarantine receipts. Each receipt binds identity, source stat,
 -- digests, and immutable quarantined_at/expires_at plus restore_pending

@@ -253,14 +253,6 @@ blocking = true
 timeout_seconds = 5
 
 [[hook]]
-event = "post_tool_use"
-intents = ["all"]
-script = "registry_observation_hook.py"
-script_root = "project_scripts"
-blocking = false
-timeout_seconds = 10
-
-[[hook]]
 event = "turn_end"
 intents = ["all"]
 script = "session_self_initialization.py"

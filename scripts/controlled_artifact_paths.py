@@ -225,15 +225,15 @@ def classify_controlled_artifact(
     return ControlledArtifactClassification(rel, False, False, "not_protected", rel)
 
 
-def is_protected_path(relative_path: str) -> bool:
-    return classify_controlled_artifact(relative_path).is_controlled
+def is_protected_path(relative_path: str, *, project_root: Path | None = None) -> bool:
+    return classify_controlled_artifact(relative_path, project_root=project_root).is_controlled
 
 
-def direct_write_block_reason_code(paths: list[str]) -> str | None:
+def direct_write_block_reason_code(paths: list[str], *, project_root: Path | None = None) -> str | None:
     reason_codes = {
         classification.reason_code
         for path in paths
-        if (classification := classify_controlled_artifact(path)).direct_write_blocked
+        if (classification := classify_controlled_artifact(path, project_root=project_root)).direct_write_blocked
     }
     if not reason_codes:
         return None
@@ -242,8 +242,8 @@ def direct_write_block_reason_code(paths: list[str]) -> str | None:
     return "controlled_artifact_direct_mutation"
 
 
-def protected_path_classification(relative_path: str) -> str:
-    return classify_controlled_artifact(relative_path).classification
+def protected_path_classification(relative_path: str, *, project_root: Path | None = None) -> str:
+    return classify_controlled_artifact(relative_path, project_root=project_root).classification
 
 
 __all__ = [

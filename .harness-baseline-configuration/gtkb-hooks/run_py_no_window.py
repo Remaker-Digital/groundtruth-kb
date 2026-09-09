@@ -49,12 +49,8 @@ BATCHES: dict[str, tuple[tuple[str, ...], ...]] = {
     "posttooluse-bash": (
         ("cmd", ".codex/gtkb-hooks/bridge-compliance-audit.cmd"),
         ("py", ".claude/hooks/spec-event-surfacer.py"),
-        ("py", "scripts/registry_observation_hook.py"),
     ),
-    "posttooluse-apply-patch": (
-        ("py", ".claude/hooks/spec-event-surfacer.py"),
-        ("py", "scripts/registry_observation_hook.py"),
-    ),
+    "posttooluse-apply-patch": (("py", ".claude/hooks/spec-event-surfacer.py"),),
     "stop": (
         ("py", ".claude/hooks/advisory-router-scan.py"),
         ("py", "scripts/advisory_grilling_gate_lint.py", "--stop-hook"),

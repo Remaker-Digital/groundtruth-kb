@@ -18,8 +18,6 @@ import pytest
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.project.registry_control_plane import (
     apply_registry_transaction,
-    consume_observation_capability,
-    mint_observation_capability,
     serialize_registry,
 )
 from groundtruth_kb.project.sot_registry import SoTArtifact, sync_projection
@@ -1040,7 +1038,6 @@ def test_json_shape_for_cli_paths(tmp_path: Path, capsys, monkeypatch: pytest.Mo
         "cleared",
         "skipped_unprotected",
         "protected_paths",
-        "audit_gaps",
         "evidence_summary",
     }
     assert "transaction-local" not in parsed["findings"][0]["reason"]
@@ -2991,10 +2988,9 @@ def test_registry_commit_reports_stale_registered_content_without_blocking(
     member = _seed_registered_commit_fixture(tmp_path)
     member.write_text("changed without observation\n", encoding="utf-8")
 
-    findings, audit_gaps = module._registry_commit_assessment(tmp_path, ["registered.txt"], None)
+    findings = module._registry_commit_findings(tmp_path, ["registered.txt"], None)
 
     assert findings == []
-    assert any(gap["path"] == "registered.txt" for gap in audit_gaps)
 
 
 def test_registry_commit_blocks_incomplete_journal(tmp_path: Path) -> None:
@@ -3142,54 +3138,6 @@ def test_staged_transient_add_and_unregistered_delete_follow_recurrence_rule(
     with module._index_snapshot(tmp_path) as snapshot:
         assert snapshot.status_by_path[transient] == "D"
         assert module._registry_commit_findings(tmp_path, [transient], snapshot) == []
-
-
-def test_registry_commit_rejects_mismatched_capability_start_packet(
-    tmp_path: Path,
-) -> None:
-    module = _load_module()
-    member = _seed_registered_commit_fixture(tmp_path)
-    capability = mint_observation_capability(
-        target_paths=["registered.txt"],
-        session_id="pb-session",
-        tool_event_id="event-1",
-        bridge_id="gtkb-wi5441-registry-control-plane-reverse-coverage",
-        start_packet_hash="sha256:packet",
-        pauth_decision={"allowed": True},
-        operation="Edit",
-        authorized=True,
-        project_root=tmp_path,
-    )
-    member.write_text("observed change\n", encoding="utf-8")
-    consume_observation_capability(
-        capability=capability["capability"],
-        target_paths=["registered.txt"],
-        preimage_digests=capability["preimage_digests"],
-        session_id="pb-session",
-        tool_event_id="event-1",
-        bridge_id="gtkb-wi5441-registry-control-plane-reverse-coverage",
-        start_packet_hash="sha256:packet",
-        operation="Edit",
-        tool_succeeded=True,
-        tool_result={"ok": True},
-        changed_by="test/prime-builder",
-        change_reason="WI-5441 observation",
-        project_root=tmp_path,
-    )
-    conn = sqlite3.connect(tmp_path / "groundtruth.db")
-    try:
-        conn.execute(
-            "UPDATE sot_registry_observation_capabilities SET start_packet_hash = 'sha256:mismatch' "
-            "WHERE tool_event_id = 'event-1'"
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-    findings, audit_gaps = module._registry_commit_assessment(tmp_path, ["registered.txt"], None)
-
-    assert findings == []
-    assert any("lacks automatic observation" in gap["reason"] for gap in audit_gaps)
 
 
 def _staged_registry_findings(module, root: Path, rel_paths: list[str]) -> list[dict[str, object]]:

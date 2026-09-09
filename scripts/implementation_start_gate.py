@@ -4,8 +4,6 @@
 from __future__ import annotations
 
 import ast
-import datetime as _dt
-import hashlib
 import json
 import os
 import re
@@ -297,12 +295,12 @@ def _preserve_dot_prefixed_relative_path(relative_path: str) -> str:
     return normalize_relative_path_text(relative_path)
 
 
-def is_protected_path(relative_path: str) -> bool:
-    return _controlled_is_protected_path(relative_path)
+def is_protected_path(relative_path: str, *, project_root: Path | None = None) -> bool:
+    return _controlled_is_protected_path(relative_path, project_root=project_root)
 
 
-def _protected_path_classification(relative_path: str) -> str:
-    return _controlled_path_classification(relative_path)
+def _protected_path_classification(relative_path: str, *, project_root: Path | None = None) -> str:
+    return _controlled_path_classification(relative_path, project_root=project_root)
 
 
 def _is_bridge_function_path(relative_path: str) -> bool:
@@ -1768,7 +1766,7 @@ def _verification_finalization_evidence_clearance(
         if rel is None:
             return None  # an unresolvable redirect target cannot be bounded
         redirects.append(rel)
-    if any(is_protected_path(rel) for rel in redirects):
+    if any(is_protected_path(rel, project_root=root) for rel in redirects):
         return None
 
     normalized_includes: list[str] = []
@@ -1805,160 +1803,6 @@ def _verification_finalization_evidence_clearance(
         "(terminal-evidence-sufficient packet semantics per DELIB-202667723; "
         "historical evidence only - no active mutation authority conferred)."
     )
-
-
-def _registry_observation_intent(
-    root: Path,
-    payload: dict[str, Any],
-    protected: list[str],
-    *,
-    session_id: str,
-    bridge_id: str,
-    packet: dict[str, Any],
-    project_authorization: dict[str, Any],
-) -> dict[str, Any] | None:
-    """Best-effort observation setup for content edits; identity changes stay strict."""
-
-    if payload.get("__gtkb_registry_diagnostic__") is True:
-        return None
-    tool = _tool_name(payload).strip() or "unknown"
-    data = _tool_input(payload)
-    command = str(data.get("command") or payload.get("command") or "") if isinstance(data, dict) else ""
-    patch_text = str(data.get("patch") or "") if isinstance(data, dict) else ""
-    identity_change = (
-        tool.casefold() in {"delete", "move"}
-        or bool(re.search(r"\b(?:remove-item|move-item|git\s+(?:mv|rm)|rm|del)\b", command, re.IGNORECASE))
-        or bool(re.search(r"^\*\*\* (?:Delete File:|Move to:)", patch_text, re.MULTILINE))
-    )
-
-    def audit_gap(code: str, detail: str) -> dict[str, Any]:
-        row = {
-            "schema_version": 1,
-            "kind": "registry_observation_gap",
-            "code": code,
-            "detail": detail,
-            "target_paths": sorted(set(protected)),
-            "session_id": session_id or None,
-            "bridge_id": bridge_id or None,
-            "tool_event_id": str(
-                payload.get("tool_use_id")
-                or payload.get("toolUseID")
-                or payload.get("tool_event_id")
-                or payload.get("event_id")
-                or ""
-            )
-            or None,
-            "observed_at": _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        }
-        return {"audit_gap": row}
-
-    registry_path = root / "config" / "registry" / "sot-artifacts.toml"
-    if not registry_path.exists():
-        return None
-    package_src = root / "groundtruth-kb" / "src"
-    if str(package_src) not in sys.path:
-        sys.path.insert(0, str(package_src))
-    try:
-        from groundtruth_kb.project.registry_control_plane import (
-            RegistryControlPlaneError,
-            load_registry_snapshot,
-            mint_observation_capability,
-        )
-
-        from scripts.registry_observation_hook import intent_path
-    except ImportError as exc:
-        if identity_change:
-            raise AuthorizationError("registry identity check is unavailable for a delete, move, or rename") from exc
-        return audit_gap("registry_control_plane_unavailable", str(exc))
-    try:
-        snapshot = load_registry_snapshot(project_root=root, db_path=root / "groundtruth.db")
-        registered: dict[str, Any] = {}
-        registered_paths: list[str] = []
-        for path in protected:
-            record = snapshot.resolver.resolve(path)
-            if record is not None:
-                registered[record.id] = record
-                registered_paths.append(path)
-        if not registered:
-            return None
-        if identity_change:
-            raise AuthorizationError(
-                "registered deletion, move, rename, or locator change requires separately reviewed transition authority"
-            )
-        denied_roles = sorted(
-            record.id for record in registered.values() if record.owner_role not in {"shared", "prime_builder"}
-        )
-        if denied_roles:
-            return audit_gap(
-                "legacy_owner_role_metadata",
-                f"registered content targets carry non-Prime legacy owner metadata: {denied_roles}",
-            )
-        missing_api = sorted(record.id for record in registered.values() if not record.mutation_api.strip())
-        if missing_api:
-            return audit_gap(
-                "missing_mutation_api_metadata",
-                f"registered content targets have no mutation API metadata: {missing_api}",
-            )
-        event_id = str(
-            payload.get("tool_use_id")
-            or payload.get("toolUseID")
-            or payload.get("tool_event_id")
-            or payload.get("event_id")
-            or ""
-        ).strip()
-        if not session_id or not event_id:
-            return audit_gap(
-                "missing_observation_identity",
-                "content edit has no session/tool-event pair for automatic observation",
-            )
-        start_packet_hash = str(packet.get("packet_hash") or "")
-        if not start_packet_hash:
-            start_packet_hash = (
-                "sha256:"
-                + hashlib.sha256(json.dumps(packet, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-            )
-        minted = mint_observation_capability(
-            target_paths=registered_paths,
-            session_id=session_id,
-            tool_event_id=event_id,
-            bridge_id=bridge_id,
-            start_packet_hash=start_packet_hash,
-            pauth_decision=project_authorization,
-            operation=tool,
-            authorized=True,
-            project_root=root,
-            db_path=root / "groundtruth.db",
-        )
-        intent = {
-            "capability": minted["capability"],
-            "capability_hash": minted["capability_hash"],
-            "target_paths": minted["paths"],
-            "preimage_digests": minted["preimage_digests"],
-            "session_id": session_id,
-            "tool_event_id": event_id,
-            "bridge_id": bridge_id,
-            "start_packet_hash": start_packet_hash,
-            "operation": tool,
-            "change_reason": f"authorized observation for bridge {bridge_id}",
-        }
-        destination = intent_path(root, session_id, event_id)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        temporary = destination.with_suffix(".tmp")
-        temporary.write_text(json.dumps(intent, sort_keys=True), encoding="utf-8")
-        os.replace(temporary, destination)
-        return {"capability_hash": minted["capability_hash"], "tool_event_id": event_id}
-    except RegistryControlPlaneError as exc:
-        if identity_change:
-            raise AuthorizationError(
-                "registry identity check failed for a delete, move, or rename: " + str(exc)
-            ) from exc
-        return audit_gap("registry_observation_unavailable", str(exc))
-    except (OSError, ValueError) as exc:
-        if identity_change:
-            raise AuthorizationError(
-                "registry identity check failed for a delete, move, or rename: " + str(exc)
-            ) from exc
-        return audit_gap("registry_observation_setup_failed", f"{type(exc).__name__}: {exc}")
 
 
 def _claimed_bridge_id(root: Path, session_id: str | None) -> str:
@@ -2058,12 +1902,14 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     if not paths:
         protected = [UNKNOWN_MUTATING_TARGET]  # mutating, but no target extractable → fabricate sentinel → deny
     else:
-        protected = [path for path in paths if is_protected_path(path)]
+        protected = [path for path in paths if is_protected_path(path, project_root=root)]
     if not protected:
         return {}
-    direct_reason_code = direct_write_block_reason_code(protected)
+    direct_reason_code = direct_write_block_reason_code(protected, project_root=root)
     if direct_reason_code is not None:
-        classifications = ", ".join(sorted({_protected_path_classification(path) for path in protected}))
+        classifications = ", ".join(
+            sorted({_protected_path_classification(path, project_root=root) for path in protected})
+        )
         return {
             "decision": "block",
             "reason_code": direct_reason_code,
@@ -2163,17 +2009,10 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
         )
         if peer_report_reason:
             raise AuthorizationError(peer_report_reason)
-        observation_intent = _registry_observation_intent(
-            root,
-            payload,
-            protected,
-            session_id=session_id or "",
-            bridge_id=bridge_id,
-            packet={},
-            project_authorization={},
-        )
     except AuthorizationError as exc:
-        classifications = ", ".join(sorted({_protected_path_classification(path) for path in protected}))
+        classifications = ", ".join(
+            sorted({_protected_path_classification(path, project_root=root) for path in protected})
+        )
         return {
             "decision": "block",
             "reason": (
@@ -2185,8 +2024,6 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
                 "`python scripts/implementation_authorization.py begin --bridge-id <id>` before mutating protected targets."
             ),
         }
-    if observation_intent is not None:
-        return {"registryObservationIntent": observation_intent}
     return {}
 
 

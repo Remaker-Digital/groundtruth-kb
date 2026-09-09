@@ -53,9 +53,9 @@ def _preserve_dot_prefixed_relative_path(relative_path: str) -> str:
     return normalize_relative_path_text(relative_path)
 
 
-def is_protected_path(relative_path: str) -> bool:
+def is_protected_path(relative_path: str, *, project_root: Path | None = None) -> bool:
     """Return True if relative_path is a protected workspace path."""
-    return _controlled_is_protected_path(relative_path)
+    return _controlled_is_protected_path(relative_path, project_root=project_root)
 
 
 def _dispatcher_config_direct_edit_targets(paths: Iterable[str]) -> list[str]:
@@ -88,10 +88,16 @@ def evaluate_mutation(
                 details=f"Target path escapes project root: {target}",
             )
 
-    direct_reason_code = direct_write_block_reason_code(normalized_targets)
+    direct_reason_code = direct_write_block_reason_code(normalized_targets, project_root=root)
     if direct_reason_code is not None:
         classifications = ", ".join(
-            sorted({protected_path_classification(path) for path in normalized_targets if is_protected_path(path)})
+            sorted(
+                {
+                    protected_path_classification(path, project_root=root)
+                    for path in normalized_targets
+                    if is_protected_path(path, project_root=root)
+                }
+            )
         )
         return GuardResult(
             allowed=False,
@@ -139,7 +145,7 @@ def evaluate_mutation(
         )
 
     # 3. Filter target paths to find only protected targets
-    protected_targets = [t for t in normalized_targets if is_protected_path(t)]
+    protected_targets = [t for t in normalized_targets if is_protected_path(t, project_root=root)]
     if not protected_targets:
         return GuardResult(
             allowed=True,

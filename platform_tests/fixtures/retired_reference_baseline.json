@@ -1493,9 +1493,6 @@
     "scripts/record_core_spec_intake_governance.py": {
       "formal-artifact-approvals": 1
     },
-    "scripts/registry_observation_hook.py": {
-      ".gtkb-state": 1
-    },
     "scripts/release_candidate_gate.py": {
       ".gtkb-state": 1
     },

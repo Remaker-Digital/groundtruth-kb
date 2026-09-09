@@ -24,6 +24,14 @@ GATE = load(REPO_ROOT / "scripts/check_projection_drift.py", "projection_gate")
 PROJECTOR = load(REPO_ROOT / "scripts/harness_projection/project_harness.py", "projection_engine")
 
 
+@pytest.mark.parametrize("harness", GATE.renderable_harnesses(REPO_ROOT))
+def test_rendered_harness_does_not_require_registry_observation_receipts(harness):
+    plan = PROJECTOR.build_plan(harness)
+    assert not plan.gaps, plan.gaps
+    assert plan.writes
+    assert all("registry_observation_hook.py" not in content for content in plan.writes.values())
+
+
 def git(root, *args):
     return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=True)
 

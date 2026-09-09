@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -12,8 +13,9 @@ sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 from groundtruth_kb.cli import main  # noqa: E402
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 from groundtruth_kb.project.registry_control_plane import (  # noqa: E402
-    append_passive_observation,
+    _append_revision,
     consume_bridge_publication_capability,
+    ensure_control_plane_schema,
     load_registry_snapshot,
     mint_bridge_publication_capability,
     registry_currentness,
@@ -189,16 +191,20 @@ def _enable_bridge_registry(root: Path) -> tuple[Path, Path, Path]:
     db = KnowledgeDB(db_path=db_path)
     db.close()
     sync_projection([record], db_path, changed_by="test", change_reason="state-report fixture")
-    append_passive_observation(
-        target_paths=["bridge/alpha-001.md"],
-        actor_session="test-session",
-        changed_by="test",
-        change_reason="establish current bridge aggregate",
-        project_root=root,
-        registry_path=canonical,
-        packaged_registry_path=packaged,
-        db_path=db_path,
-    )
+    # Seed historical content state for the still-live publication diagnostics.
+    with sqlite3.connect(db_path) as conn:
+        ensure_control_plane_schema(conn)
+        _append_revision(
+            conn,
+            project_root=root,
+            record=record,
+            actor_session="unattributed_external",
+            operation="fixture",
+            changed_by="test",
+            changed_at="2026-09-09T00:00:00Z",
+            change_reason="historical bridge aggregate fixture",
+            evidence_view="working_tree",
+        )
     return canonical, packaged, db_path
 
 

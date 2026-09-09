@@ -27,7 +27,6 @@ if str(ROOT) not in sys.path:
 
 from scripts import implementation_authorization as auth  # noqa: E402
 from scripts import implementation_start_gate as gate  # noqa: E402
-from scripts import registry_observation_hook as observer  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -309,12 +308,7 @@ def _bind_prime_session(root: Path, session_id: str) -> None:
     except RoleAttestationError as exc:
         if exc.code != "no_session_binding":
             raise
-        bind_exact_init(
-            root / "groundtruth.db",
-            invoking_context=session_id,
-            init_command="::init gtkb pb",
-            issuer="test/exact-init",
-        )
+        bind_exact_init(root / "groundtruth.db", native_context_id=session_id, init_command="::init gtkb pb")
 
 
 def _claim_bridge(root: Path, bridge_id: str = "sample-implementation", session_id: str | None = None) -> None:
@@ -2859,84 +2853,6 @@ def test_finalization_git_add_targets_parses_and_rejects() -> None:
     assert gate._finalization_git_add_targets("git rm scripts/a.py") is None
 
 
-def test_registered_content_edit_can_refresh_stale_registry_observation(
-    tmp_path: Path,
-) -> None:
-    _authorize_registered_target(tmp_path)
-    (tmp_path / "scripts" / "sample.py").write_text("stale\n", encoding="utf-8")
-
-    result = gate.gate_decision(_registered_payload(tmp_path))
-
-    assert "decision" not in result
-    assert "capability_hash" in result["registryObservationIntent"]
-    assert observer.intent_path(tmp_path, "session-1", "fixture-tool-event").exists()
-
-
-def test_incomplete_registry_journal_records_nonblocking_audit_gap(
-    tmp_path: Path,
-) -> None:
-    _authorize_registered_target(tmp_path)
-    with sqlite3.connect(tmp_path / "groundtruth.db") as conn:
-        conn.execute(
-            """
-            INSERT INTO sot_registry_transaction_journal (
-                journal_id, operation, intent_recorded_at, journal_state,
-                actor_session, changed_by, changed_at, change_reason
-            ) VALUES ('fixture-incomplete', 'amend', '2026-07-25T00:00:00Z',
-                      'prepared', 'fixture', 'test', '2026-07-25T00:00:00Z', 'fixture')
-            """
-        )
-        conn.commit()
-
-    result = gate.gate_decision(_registered_payload(tmp_path))
-
-    assert "decision" not in result
-    gap = result["registryObservationIntent"]["audit_gap"]
-    assert gap["code"] == "registry_observation_unavailable"
-    assert "fixture-incomplete" in gap["detail"]
-
-
-def test_registered_identity_change_requires_transition(tmp_path: Path) -> None:
-    _authorize_registered_target(tmp_path)
-    payload = _registered_payload(tmp_path)
-    payload["tool_input"] = {"patch": "*** Begin Patch\n*** Delete File: scripts/sample.py\n*** End Patch\n"}
-
-    result = gate.gate_decision(payload)
-
-    assert result["decision"] == "block"
-    assert "separately reviewed transition authority" in result["reason"]
-    assert not observer.intent_path(tmp_path, "session-1", "fixture-tool-event").exists()
-
-
-def test_authorized_write_mints_observation_intent(tmp_path: Path) -> None:
-    _authorize_registered_target(tmp_path)
-
-    result = gate.gate_decision(_registered_payload(tmp_path))
-
-    assert "registryObservationIntent" in result
-    intent = observer.intent_path(tmp_path, "session-1", "fixture-tool-event")
-    assert intent.exists()
-    intent_payload = json.loads(intent.read_text(encoding="utf-8"))
-    assert intent_payload["target_paths"] == ["scripts/sample.py"]
-    assert intent_payload["session_id"] == "session-1"
-    assert intent_payload["tool_event_id"] == "fixture-tool-event"
-    with sqlite3.connect(tmp_path / "groundtruth.db") as conn:
-        row = conn.execute("SELECT capability_state FROM sot_registry_observation_capabilities").fetchone()
-    assert row == ("minted",)
-
-
-def test_unauthorized_write_mints_no_observation_intent(tmp_path: Path) -> None:
-    _seed_registered_target(tmp_path)
-
-    result = gate.gate_decision(_registered_payload(tmp_path))
-
-    assert result["decision"] == "block"
-    assert not observer.intent_path(tmp_path, "session-1", "fixture-tool-event").exists()
-    with sqlite3.connect(tmp_path / "groundtruth.db") as conn:
-        count = conn.execute("SELECT COUNT(*) FROM sot_registry_observation_capabilities").fetchone()[0]
-    assert count == 0
-
-
 @pytest.mark.parametrize(
     ("command", "expected", "rationale"),
     [
@@ -3013,3 +2929,47 @@ def test_change7_drops_argument_position_false_positives(command: str, rationale
     was carrying a write verb inside a flag value.
     """
     assert not gate._has_mutating_signal(command), rationale
+
+
+@pytest.mark.parametrize("delete", [False, True])
+def test_reviewed_claimed_target_needs_no_registry_observation_receipt(tmp_path: Path, delete: bool) -> None:
+    _authorize_registered_target(tmp_path)
+    payload = _registered_payload(tmp_path)
+    if delete:
+        payload["tool_input"] = {"patch": "*** Begin Patch\n*** Delete File: scripts/sample.py\n*** End Patch\n"}
+    result = gate.gate_decision(payload)
+    assert result == {}
+    with sqlite3.connect(tmp_path / "groundtruth.db") as conn:
+        assert (
+            conn.execute("SELECT name FROM sqlite_master WHERE name='sot_registry_observation_capabilities'").fetchone()
+            is None
+        )
+
+
+def test_unreviewed_target_is_still_refused_without_an_observation_system(tmp_path: Path) -> None:
+    _seed_registered_target(tmp_path)
+    result = gate.gate_decision(_registered_payload(tmp_path))
+    assert result["decision"] == "block"
+    assert "registryObservationIntent" not in result
+
+
+def test_selected_registry_failure_still_refuses_reviewed_target(tmp_path: Path) -> None:
+    _authorize_registered_target(tmp_path)
+    registry = tmp_path / "config" / "registry" / "sot-artifacts.toml"
+    registry.write_text("not valid TOML [", encoding="utf-8")
+
+    result = gate.gate_decision(_registered_payload(tmp_path))
+
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "registry_authority_unavailable"
+
+
+def test_mutation_guard_uses_selected_registry_for_unregistered_target(tmp_path: Path) -> None:
+    from scripts.protected_mutation_guard import evaluate_mutation
+
+    _seed_registered_target(tmp_path)
+
+    result = evaluate_mutation(tmp_path, ["notes/uncontrolled.txt"])
+
+    assert result.allowed is True
+    assert result.reason_code == "not_protected"

@@ -150,9 +150,9 @@ recovery = "Accepted as non-durable."
 
 [[exclude]]
 table = "sot_registry_observation_capabilities"
-reason = "Derived observation-capability cache; peer of the excluded publication-capability cache."
-recoverable = true
-recovery = "Recomputed from the registry."
+reason = "Retired per-tool observation permissions; no current producer or consumer."
+recoverable = false
+recovery = "Historical rows remain in existing SQLite backups until qualified migration cleanup; they are not regenerated as runtime state."
 
 [[exclude]]
 table = "dispatch_events"

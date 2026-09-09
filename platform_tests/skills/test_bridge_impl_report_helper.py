@@ -78,12 +78,7 @@ def exact_author_binding(request):
     if "tmp_path" not in request.fixturenames:
         return
     project_root = request.getfixturevalue("tmp_path")
-    bind_exact_init(
-        project_root / "groundtruth.db",
-        invoking_context="session-123",
-        init_command="::init gtkb pb",
-        issuer="test-fixture",
-    )
+    bind_exact_init(project_root / "groundtruth.db", native_context_id="session-123", init_command="::init gtkb pb")
 
 
 @pytest.fixture(autouse=True)
@@ -475,12 +470,7 @@ def test_wi4468_exact_init_lo_stamps_loyal_opposition_codex_harness_a(helper, tm
     monkeypatch.delenv("GTKB_AUTHOR_IDENTITY", raising=False)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
     monkeypatch.setenv("GTKB_AUTHOR_SESSION_CONTEXT_ID", "lo-session-4468")
-    bind_exact_init(
-        tmp_path / "groundtruth.db",
-        invoking_context="lo-session-4468",
-        init_command="::init gtkb lo",
-        issuer="test-fixture",
-    )
+    bind_exact_init(tmp_path / "groundtruth.db", native_context_id="lo-session-4468", init_command="::init gtkb lo")
 
     live = helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
 

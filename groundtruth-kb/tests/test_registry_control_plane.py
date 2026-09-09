@@ -21,8 +21,6 @@ from groundtruth_kb.cli import main
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.project import registry_control_plane, sot_registry
 from groundtruth_kb.project.registry_control_plane import (
-    IMPLEMENTATION_ARTIFACTS,
-    LEGACY_COVERAGE_MODES,
     RegistryAuthorizationError,
     RegistryCoverageError,
     RegistryGenerationConflict,
@@ -31,16 +29,12 @@ from groundtruth_kb.project.registry_control_plane import (
     RegistryResolver,
     RegistryTransactionInProgress,
     amend_artifact,
-    append_passive_observation,
     apply_registry_transaction,
-    bootstrap_legacy_registry,
     census_registry,
     compensate_bridge_publication,
     consume_bridge_publication_capability,
-    consume_observation_capability,
     load_registry_snapshot,
     mint_bridge_publication_capability,
-    mint_observation_capability,
     preview_registry_registration,
     recover_bridge_publication,
     recover_registry,
@@ -51,7 +45,6 @@ from groundtruth_kb.project.registry_control_plane import (
 )
 from groundtruth_kb.project.sot_registry import (
     SoTArtifact,
-    _load_toml_unlocked,
     load_projection,
     load_toml,
     sync_projection,
@@ -217,20 +210,6 @@ def _terminal_generation_fixture(
         **_transaction_kwargs(tmp_path, registry, packaged, db_path),
     )
     return registry, packaged, db_path
-
-
-def test_reviewed_legacy_map_is_exactly_fifty_and_explicit() -> None:
-    assert len(LEGACY_COVERAGE_MODES) == 50
-    assert set(LEGACY_COVERAGE_MODES.values()) == {
-        "exact",
-        "recursive",
-        "glob",
-        "opaque_container",
-        "virtual",
-    }
-    assert LEGACY_COVERAGE_MODES["bridge-versioned-files"] == "glob"
-    assert LEGACY_COVERAGE_MODES["generated-runtime-state-tree"] == "opaque_container"
-    assert LEGACY_COVERAGE_MODES["governance-config-tree"] == "recursive"
 
 
 def test_resolver_rejects_unsafe_case_collision_and_overlap() -> None:
@@ -844,47 +823,6 @@ def test_registry_transaction_updates_both_declaration_revisions(tmp_path: Path)
     }
 
 
-def test_bootstrap_binds_exact_legacy_input_and_is_idempotent(tmp_path: Path) -> None:
-    source = Path(__file__).resolve().parents[2] / "config" / "registry" / "sot-artifacts.toml"
-    current_records = _load_toml_unlocked(source, allow_missing_coverage=True)
-    old_records = [record for record in current_records if record.id in LEGACY_COVERAGE_MODES]
-    assert {record.id for record in old_records} == set(LEGACY_COVERAGE_MODES)
-    legacy_payload = serialize_registry(old_records)
-    registry = tmp_path / "config" / "registry" / "sot-artifacts.toml"
-    packaged = (
-        tmp_path
-        / "groundtruth-kb"
-        / "src"
-        / "groundtruth_kb"
-        / "context"
-        / "registries"
-        / "v1"
-        / "config"
-        / "registry"
-        / "sot-artifacts.toml"
-    )
-    registry.parent.mkdir(parents=True)
-    packaged.parent.mkdir(parents=True)
-    registry.write_bytes(legacy_payload)
-    packaged.write_bytes(legacy_payload)
-    for artifact in IMPLEMENTATION_ARTIFACTS:
-        target = tmp_path / artifact.storage_path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text("# fixture\n", encoding="utf-8")
-    db_path = tmp_path / "groundtruth.db"
-    KnowledgeDB(db_path=db_path)
-    sync_projection(old_records, db_path, changed_by="test", change_reason="legacy fixture")
-    kwargs = _transaction_kwargs(tmp_path, registry, packaged, db_path)
-    first = bootstrap_legacy_registry(**kwargs)
-    second = bootstrap_legacy_registry(**kwargs)
-    assert first.receipt_digest == second.receipt_digest
-    assert second.idempotent_retry is True
-    assert registry.read_bytes() == packaged.read_bytes()
-    records = load_toml(registry)
-    assert len(records) == 54
-    assert all(record.coverage_mode is not None for record in records)
-
-
 def test_census_uses_only_git_and_application_root_boundaries(tmp_path: Path) -> None:
     (tmp_path / ".git").mkdir()
     (tmp_path / ".git" / "hidden").write_text("x", encoding="utf-8")
@@ -924,75 +862,6 @@ def test_opaque_container_may_register_a_service_owned_file(tmp_path: Path) -> N
     )
 
     assert snapshot.resolver.resolve("groundtruth.db") == records[0]
-
-
-def test_passive_observation_records_view_without_authorizing_content(tmp_path: Path) -> None:
-    member = tmp_path / "member.txt"
-    member.write_text("before", encoding="utf-8")
-    records = [_record("member", "member.txt")]
-    registry, packaged, db_path = _fixture_generation(tmp_path, records)
-    member.write_text("direct owner edit", encoding="utf-8")
-
-    revisions = append_passive_observation(
-        target_paths=["member.txt"],
-        evidence_view="working_tree",
-        evidence_source_reference="filesystem-audit:test",
-        project_root=tmp_path,
-        registry_path=registry,
-        packaged_registry_path=packaged,
-        db_path=db_path,
-    )
-
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    try:
-        row = conn.execute(
-            "SELECT * FROM sot_artifact_revisions WHERE revision_id = ?",
-            (revisions[0],),
-        ).fetchone()
-    finally:
-        conn.close()
-    assert member.read_text(encoding="utf-8") == "direct owner edit"
-    assert row["actor_session"] == "unattributed_external"
-    assert row["evidence_view"] == "working_tree"
-    assert row["evidence_source_reference"] == "filesystem-audit:test"
-
-
-def test_passive_observation_accepts_exact_aggregate_record_id(tmp_path: Path) -> None:
-    bridge = tmp_path / "bridge"
-    bridge.mkdir()
-    (bridge / "existing-001.md").write_text("NEW\n", encoding="utf-8")
-    records = [_record("bridge-versioned-files", "bridge/*-[0-9][0-9][0-9].md", "glob")]
-    registry, packaged, db_path = _fixture_generation(tmp_path, records)
-    apply_registry_transaction(
-        records,
-        operation="legacy_bootstrap",
-        **_transaction_kwargs(tmp_path, registry, packaged, db_path),
-    )
-    (bridge / "observed-001.md").write_text("NEW\n", encoding="utf-8")
-
-    revisions = append_passive_observation(
-        record_ids=["bridge-versioned-files"],
-        evidence_source_reference="aggregate-observer:test",
-        project_root=tmp_path,
-        registry_path=registry,
-        packaged_registry_path=packaged,
-        db_path=db_path,
-    )
-
-    assert len(revisions) == 1
-    snapshot = load_registry_snapshot(
-        project_root=tmp_path,
-        registry_path=registry,
-        packaged_registry_path=packaged,
-        db_path=db_path,
-    )
-    assert registry_currentness(
-        snapshot,
-        project_root=tmp_path,
-        db_path=db_path,
-        record_ids={"bridge-versioned-files"},
-    )["current"]
 
 
 def test_registration_preview_binds_generation_manifest_and_authority(tmp_path: Path) -> None:
@@ -1069,63 +938,6 @@ def test_registration_preview_binds_generation_manifest_and_authority(tmp_path: 
             observer_input_digests={**observer_digests, "physical_census": f"sha256:{7:064x}"},
             reconciliation_evidence_digest=evidence_digest,
             dry_run_receipt=preview.dry_run_receipt,
-            **kwargs,
-        )
-
-
-def test_observation_capability_is_bound_single_use_and_updates_revision(tmp_path: Path) -> None:
-    member = tmp_path / "member.txt"
-    member.write_text("before", encoding="utf-8")
-    records = [_record("member", "member.txt")]
-    registry, packaged, db_path = _fixture_generation(tmp_path, records)
-    kwargs = {
-        "project_root": tmp_path,
-        "registry_path": registry,
-        "packaged_registry_path": packaged,
-        "db_path": db_path,
-    }
-    capability = mint_observation_capability(
-        target_paths=["member.txt"],
-        session_id="session",
-        tool_event_id="event",
-        bridge_id="bridge",
-        start_packet_hash="packet",
-        pauth_decision={"allowed": True},
-        operation="edit",
-        authorized=True,
-        **kwargs,
-    )
-    member.write_text("after", encoding="utf-8")
-    revisions = consume_observation_capability(
-        capability=capability["capability"],
-        target_paths=["member.txt"],
-        preimage_digests=capability["preimage_digests"],
-        session_id="session",
-        tool_event_id="event",
-        bridge_id="bridge",
-        start_packet_hash="packet",
-        operation="edit",
-        tool_succeeded=True,
-        tool_result={"ok": True},
-        changed_by="test",
-        change_reason="test observation",
-        **kwargs,
-    )
-    assert len(revisions) == 1
-    with pytest.raises(RegistryAuthorizationError, match="already consumed"):
-        consume_observation_capability(
-            capability=capability["capability"],
-            target_paths=["member.txt"],
-            preimage_digests=capability["preimage_digests"],
-            session_id="session",
-            tool_event_id="event",
-            bridge_id="bridge",
-            start_packet_hash="packet",
-            operation="edit",
-            tool_succeeded=True,
-            tool_result={"ok": True},
-            changed_by="test",
-            change_reason="replay",
             **kwargs,
         )
 
@@ -1413,7 +1225,7 @@ def test_registry_cli_register_amend_sync_and_direct_observe_denial(tmp_path: Pa
         ["--config", str(config), "registry", "observe", "--event-file", str(event)],
     )
     assert observed.exit_code != 0
-    assert "capability" in observed.output.lower()
+    assert "No such command" in observed.output
 
 
 def _bridge_publication_fixture(

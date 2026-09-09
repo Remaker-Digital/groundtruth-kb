@@ -137,10 +137,10 @@ def test_bound_cannot_exceed_paired_capability_ttl(tmp_path, monkeypatch, bound,
 
 
 def test_capability_ttl_ceiling_matches_mint_time_rejection(tmp_path, monkeypatch):
-    """A TTL above the 300s mint-time ceiling is rejected at configuration time."""
+    """A TTL above the current 800s mint-time ceiling is rejected in configuration."""
     monkeypatch.delenv(_BOUND_ENV_VAR, raising=False)
     monkeypatch.delenv(_TTL_ENV_VAR, raising=False)
-    _write_timers(tmp_path, bound=10, ttl=301)
+    _write_timers(tmp_path, bound=10, ttl=801)
     with pytest.raises(TimerConfigError) as excinfo:
         resolve_protected_commit_timers(tmp_path)
     assert "ceiling" in str(excinfo.value)
@@ -488,7 +488,7 @@ def test_classification_partitions_are_complete_and_disjoint(tmp_path, gate, mon
 
     monkeypatch.setattr(gate, "is_protected_path", _fake_is_protected)
     monkeypatch.setattr(gate, "_verified_bridge_finalization_finding", lambda *a, **k: None)
-    monkeypatch.setattr(gate, "_registry_commit_assessment", lambda *a, **k: ([], []))
+    monkeypatch.setattr(gate, "_registry_commit_findings", lambda *a, **k: [])
 
     result = gate._evaluate_selected(tmp_path, selected, None, None)
 
@@ -504,25 +504,11 @@ def test_registry_assessment_runs_once(tmp_path, gate, monkeypatch):
 
     def _fake_assessment(root, selected_paths, snapshot):
         calls.append((root, tuple(selected_paths)))
-        return [], []
+        return []
 
-    monkeypatch.setattr(gate, "_registry_commit_assessment", _fake_assessment)
+    monkeypatch.setattr(gate, "_registry_commit_findings", _fake_assessment)
     monkeypatch.setattr(gate, "is_protected_path", lambda path, **k: False)
     monkeypatch.setattr(gate, "_verified_bridge_finalization_finding", lambda *a, **k: None)
 
     gate._evaluate_selected(tmp_path, ["docs/a.md", "docs/b.md"], None, None)
     assert len(calls) == 1, f"expected exactly one registry assessment, got {len(calls)}"
-
-
-def test_registry_commit_findings_delegates_to_one_assessment(tmp_path, gate, monkeypatch):
-    """The compatibility view delegates rather than triggering a second assessment."""
-    calls: list[int] = []
-
-    def _fake_assessment(root, selected_paths, snapshot):
-        calls.append(1)
-        return [{"path": "x", "reason": "y"}], [{"gap": "z"}]
-
-    monkeypatch.setattr(gate, "_registry_commit_assessment", _fake_assessment)
-    findings = gate._registry_commit_findings(tmp_path, ["scripts/a.py"], None)
-    assert len(calls) == 1
-    assert findings == [{"path": "x", "reason": "y"}]

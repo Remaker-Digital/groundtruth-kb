@@ -104,10 +104,6 @@
       },
       {
         "command": "python .goose/hooks/owner-decision-capture.py"
-      },
-      {
-        "command": "python scripts/registry_observation_hook.py",
-        "timeout": 10
       }
     ],
     "Stop": [

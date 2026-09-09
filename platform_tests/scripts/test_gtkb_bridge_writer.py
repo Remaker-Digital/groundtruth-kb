@@ -7,6 +7,7 @@ state and helper-level latest-status validation live above this module.
 from __future__ import annotations
 
 import json
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -17,7 +18,6 @@ from groundtruth_kb.bridge.vocabulary import CANONICAL_STATUSES
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.project import registry_control_plane
 from groundtruth_kb.project.registry_control_plane import (
-    append_passive_observation,
     load_registry_snapshot,
     registry_currentness,
     serialize_registry,
@@ -292,13 +292,19 @@ def _enable_real_typed_publication(tmp_path: Path, slug: str, session_id: str) -
     db_path = tmp_path / "groundtruth.db"
     KnowledgeDB(db_path=db_path)
     sync_projection([record], db_path, changed_by="test", change_reason="writer crash fixture")
-    append_passive_observation(
-        record_ids=[record.id],
-        actor_session=session_id,
-        changed_by="test",
-        change_reason="establish bridge aggregate preimage",
-        project_root=tmp_path,
-    )
+    with sqlite3.connect(db_path) as conn:
+        registry_control_plane.ensure_control_plane_schema(conn)
+        registry_control_plane._append_revision(
+            conn,
+            record=record,
+            actor_session=session_id,
+            operation="fixture",
+            changed_by="test",
+            changed_at="2026-09-09T00:00:00Z",
+            change_reason="historical bridge aggregate fixture",
+            project_root=tmp_path,
+            evidence_view="working_tree",
+        )
     assert acquire(slug, session_id, project_root=tmp_path)
 
 
