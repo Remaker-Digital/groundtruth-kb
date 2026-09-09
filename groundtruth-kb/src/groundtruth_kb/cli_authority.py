@@ -164,6 +164,42 @@ NATIVE_COMMANDS = {
 NATIVE_COMMANDS["projects"].add_command(_domain_group("dependencies", "project-dependencies"))
 
 
+@click.command("assert")
+@click.option("--spec", "spec_id", default=None, help="Evaluate one current specification.")
+@click.option("--triggered-by", default="cli", help="Label this observation; no execution history is written.")
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def native_assert(ctx: click.Context, spec_id: str | None, triggered_by: str, json_output: bool) -> None:
+    """Evaluate current assertions through the service without changing canonical state."""
+    from groundtruth_kb.assertions import format_summary, run_all_assertions
+
+    class CurrentSpecifications:
+        def get_spec(self, ident):
+            return _call(ctx, "GET", f"/v1/specifications/{quote(ident, safe='')}")
+
+        def list_specs(self, **filters):
+            records, after = [], None
+            while True:
+                page = _call(ctx, "GET", "/v1/specifications", query={**filters, "after": after, "limit": 1000})
+                records.extend(page["records"])
+                after = page["next_after"]
+                if not after:
+                    return records
+
+    summary = run_all_assertions(
+        CurrentSpecifications(), _config(ctx).project_root.resolve(), triggered_by=triggered_by, spec_id=spec_id
+    )
+    if json_output:
+        _emit(summary, True)
+    else:
+        click.echo(format_summary(summary))
+    if summary.get("aggregate_result") != "PASS":
+        raise click.exceptions.Exit(1)
+
+
+NATIVE_COMMANDS["assert"] = native_assert
+
+
 @NATIVE_COMMANDS["projects"].command("readiness")
 @click.argument("project_id")
 @click.option("--gate", type=click.Choice(["readiness", "closure"]), default="readiness", show_default=True)

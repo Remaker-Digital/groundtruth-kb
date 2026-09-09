@@ -86,6 +86,18 @@ def test_projection_idempotent():
     assert not plan_a.gaps, f"projector gaps present: {plan_a.gaps}"
 
 
+@pytest.mark.parametrize("harness", ["antigravity", "claude", "codex", "cursor", "goose", "openrouter"])
+def test_fresh_projection_does_not_launch_automatic_assertion_or_handoff_consumer(harness):
+    plan = project_harness.build_plan(harness)
+    assert plan.writes and not plan.gaps, plan.gaps
+    assert not any(path.endswith("/assertion-check.py") for path in plan.writes)
+    registrations = {path: text for path, text in plan.writes.items() if path.endswith(".json")}
+    assert registrations
+    assert not any("assertion-check.py" in text for text in registrations.values())
+    plugin = json.loads((BASELINE / "plugins/gtkb/hooks/hooks.json").read_text(encoding="utf-8"))
+    assert not any("assertion-check.py" in hook["command"] for hook in plugin["hooks"]["SessionStart"])
+
+
 def test_api_harness_projection_idempotent_and_clean() -> None:
     """WI-5960 Slice 2: the shared .api-harness surface renders (TEST-11985, TEST-12488).
 

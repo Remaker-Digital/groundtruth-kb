@@ -1,8 +1,8 @@
 """
 GroundTruth KB — Feature Assertion Runner.
 
-Reads assertion definitions from the knowledge database, executes checks
-against a project codebase, and writes results back.
+Reads current assertion definitions and evaluates checks against a project
+codebase. Evaluation returns observations without writing execution history.
 
 Executable assertion types:
   - grep:        re.findall(pattern, file_content) count >= min_count
@@ -26,6 +26,7 @@ import json
 import operator
 import re
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import TYPE_CHECKING, Any
@@ -741,18 +742,59 @@ def run_spec_assertions(
     triggered_by: str,
     project_root: Path,
 ) -> dict[str, Any]:
-    """Run all assertions for a single spec and record results.
+    """Evaluate a specification without recording results or changing its state.
 
     Returns:
       {spec_id, title, overall_passed, results: [...], assertion_count}
     """
     spec_id = spec["id"]
-    spec_version = spec["version"]
-    assertions = spec.get("_assertions_parsed") or []
+    definitions = {}
+    results = []
+    for key, empty in (("assertions", []), ("constraints", {})):
+        # SQLite retains the raw field alongside lossy parsed aliases; validate
+        # that current value so malformed JSON cannot erase an obligation.
+        value = spec.get(key, spec.get(f"{key}_parsed", spec.get(f"_{key}_parsed")))
+        if isinstance(value, str):
+            with suppress(json.JSONDecodeError):
+                value = json.loads(value)
+        if value is None:
+            value = empty
+        if not isinstance(value, type(empty)):
+            results.append(
+                _skip(
+                    "invalid_definition",
+                    "Invalid current definition",
+                    f"{key} must be a {type(empty).__name__} or null",
+                )
+            )
+            value = empty
+        definitions[key] = value
 
-    if not assertions:
+    ctx = AssertionContext(project_root=project_root)
+    results.extend(_dispatch_single(a, ctx) for a in definitions["assertions"])
+    required = definitions["constraints"].get("behavioral_validation_required", False)
+    if not isinstance(required, bool):
+        results.append(
+            _skip(
+                "invalid_definition",
+                "Invalid current definition",
+                "constraints.behavioral_validation_required must be boolean",
+            )
+        )
+    elif required:
+        results.append(
+            _skip(
+                "behavioral_validation",
+                "Required behavioral validation",
+                "Structural assertions do not execute the required behavioral qualification. "
+                "Run the applicable executable tests and independent review; this observation cannot prove completion.",
+            )
+        )
+
+    if not results:
         return {
             "spec_id": spec_id,
+            "spec_version": spec["version"],
             "title": spec["title"],
             "overall_passed": False,
             "evaluation_result": "NOT_APPLICABLE",
@@ -760,9 +802,6 @@ def run_spec_assertions(
             "assertion_count": 0,
             "skipped": True,
         }
-
-    ctx = AssertionContext(project_root=project_root)
-    results = [_dispatch_single(a, ctx) for a in assertions]
 
     statuses = [_result_status(result) for result in results]
     if all(status == "PASS" for status in statuses):
@@ -775,17 +814,9 @@ def run_spec_assertions(
         evaluation_result = "PARTIAL"
     overall_passed = evaluation_result == "PASS"
 
-    # Record in database
-    db.insert_assertion_run(
-        spec_id=spec_id,
-        spec_version=spec_version,
-        overall_passed=overall_passed,
-        results=results,
-        triggered_by=triggered_by,
-    )
-
     return {
         "spec_id": spec_id,
+        "spec_version": spec["version"],
         "title": spec["title"],
         "overall_passed": overall_passed,
         "evaluation_result": evaluation_result,
@@ -814,7 +845,7 @@ def run_all_assertions(
             return {"error": f"Spec {spec_id} not found"}
         specs = [spec]
     else:
-        specs = db.list_specs()
+        specs = db.list_specs(status="active")
 
     details = []
     passed = 0
@@ -825,7 +856,35 @@ def run_all_assertions(
     direct_failures = 0
 
     for spec in specs:
-        result = run_spec_assertions(db, spec, triggered_by, project_root)
+        if spec.get("status") in {"retired", "superseded"}:
+            result = {
+                "spec_id": spec["id"],
+                "spec_version": spec["version"],
+                "title": spec["title"],
+                "overall_passed": False,
+                "evaluation_result": "NOT_APPLICABLE",
+                "results": [],
+                "assertion_count": 0,
+                "skipped": True,
+            }
+        else:
+            result = run_spec_assertions(db, spec, triggered_by, project_root)
+            current = db.get_spec(spec["id"])
+            if current is None or (current["version"], current.get("status")) != (spec["version"], spec.get("status")):
+                result["results"].append(
+                    _skip(
+                        "source_changed",
+                        "Canonical definition changed during evaluation",
+                        "Read the current specification and evaluate it again; "
+                        "the previous observation cannot establish current conformance.",
+                    )
+                )
+                result.update(
+                    overall_passed=False,
+                    evaluation_result="UNASSESSED",
+                    skipped=True,
+                    assertion_count=len(result["results"]),
+                )
         details.append(result)
         evaluation_result = result.get("evaluation_result")
         if evaluation_result == "NOT_APPLICABLE":

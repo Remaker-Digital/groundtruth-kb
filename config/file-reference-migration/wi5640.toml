@@ -625,13 +625,6 @@ authority = "transformed_source"
 divergence = "newline_only"
 
 [[content_reconciliation]]
-mapping_id = "M003"
-source = ".claude/hooks/assertion-check.py"
-destination = "config/hooks/gtkb-assertion-check.py"
-authority = "transformed_source"
-divergence = "newline_only"
-
-[[content_reconciliation]]
 mapping_id = "M004"
 source = ".claude/hooks/bridge-axis-2-surface.py"
 destination = "config/hooks/gtkb-bridge-axis-2-surface.py"

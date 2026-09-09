@@ -7,7 +7,7 @@ Covers:
 - lifecycle-axis invariants (``managed ⊆ initial``, ``doctor_required ⊆ initial``)
 - lifecycle-matrix tests (scaffold × profile, upgrade × profile)
 - doctor-axis parity per profile
-- settings-registration parity (exact 14-row event-to-hook matrix)
+- settings-registration parity (exact retained event-to-hook matrix)
 - Condition 2 composite-ID trio (Codex GO at
   ``bridge/gtkb-managed-artifact-registry-008.md``).
 
@@ -85,7 +85,7 @@ def test_registry_total_matches_current_manifest() -> None:
     # (upgrade-rehearsal-recipe). Total: 59 + 1 = 60.
     # Follow-on policy hook: +1 hook. Tier A bridge skill: +5 skills.
     # Retired dead-stub hook cleanup removed two hooks and two settings registrations.
-    assert len(records) == 64, f"expected 64 total registry records; got {len(records)}"
+    assert len(records) == 62, f"expected 62 total registry records; got {len(records)}"
 
 
 def test_registry_class_counts_match_proposal() -> None:
@@ -99,11 +99,11 @@ def test_registry_class_counts_match_proposal() -> None:
     for r in records:
         counts[r.class_] = counts.get(r.class_, 0) + 1
     assert counts == {
-        "hook": 18,
+        "hook": 17,
         "rule": 12,  # +1: session-start-orientation (gtkb-session-start-orientation-gate)
         "skill": 12,
         "file": 4,  # GTKB-ISOLATION-017 Slice 3/4 records + WI-4225 template-only coverage record
-        "settings-hook-registration": 14,
+        "settings-hook-registration": 13,
         "gitignore-pattern": 4,
     }
 
@@ -253,9 +253,9 @@ def test_scaffold_local_only_copies_all_hooks_and_initial_rules() -> None:
     ``session-start-orientation.md``.
     """
     scaffolded = artifacts_for_scaffold("local-only")
-    # 13 hooks
+    # 12 retained hooks
     hooks = [r for r in scaffolded if r.class_ == "hook"]
-    assert len(hooks) == 13
+    assert len(hooks) == 12
     # 5 rules (prime-builder + canonical-terminology surface + session-start-orientation)
     rules = [r for r in scaffolded if r.class_ == "rule"]
     rule_paths = {r.target_path for r in rules if isinstance(r, FileArtifact)}
@@ -290,11 +290,11 @@ def test_scaffold_dual_agent_copies_everything() -> None:
     for r in scaffolded:
         by_class[r.class_] = by_class.get(r.class_, 0) + 1
     assert by_class == {
-        "hook": 18,
+        "hook": 17,
         "rule": 12,  # +1: session-start-orientation (gtkb-session-start-orientation-gate)
         "skill": 12,
         "file": 3,  # Slice 3 (README + release-readiness) + Slice 4 (upgrade-rehearsal-recipe)
-        "settings-hook-registration": 14,
+        "settings-hook-registration": 13,
         "gitignore-pattern": 4,
     }
 
@@ -306,8 +306,8 @@ def test_scaffold_dual_agent_webapp_matches_dual_agent() -> None:
     assert a == b
 
 
-def test_upgrade_local_only_manages_two_hooks() -> None:
-    """local-only upgrade manages 2 hooks plus 5 rules and 1 skill.
+def test_upgrade_local_only_manages_retained_hook() -> None:
+    """local-only upgrade manages 1 hook plus 5 rules and 1 skill.
 
     Post-canonical-terminology-surface: local-only upgrade-managed rules grew
     from 1 to 3 because both new canonical-terminology records have
@@ -317,7 +317,6 @@ def test_upgrade_local_only_manages_two_hooks() -> None:
     managed = artifacts_for_upgrade("local-only")
     hooks = {r.target_path for r in managed if isinstance(r, FileArtifact) and r.class_ == "hook"}
     assert hooks == {
-        ".claude/hooks/assertion-check.py",
         ".claude/hooks/spec-classifier.py",
     }
     rules = {r.target_path for r in managed if isinstance(r, FileArtifact) and r.class_ == "rule"}
@@ -371,13 +370,13 @@ def test_upgrade_dual_agent_manages_full_set_including_gap_28_rules() -> None:
 
 
 def test_doctor_hooks_local_only_matches_prior_hardcoded() -> None:
-    """For local-only, doctor requires exactly {assertion-check, spec-classifier}."""
+    """For local-only, doctor requires only the retained spec-classifier hook."""
     hook_names = {
         r.target_path.split("/")[-1]
         for r in artifacts_for_doctor("local-only", class_="hook")
         if isinstance(r, FileArtifact)
     }
-    assert hook_names == {"assertion-check.py", "spec-classifier.py"}
+    assert hook_names == {"spec-classifier.py"}
 
 
 def test_doctor_hooks_dual_agent_matches_prior_hardcoded() -> None:
@@ -395,7 +394,6 @@ def test_doctor_hooks_dual_agent_matches_prior_hardcoded() -> None:
             if isinstance(r, FileArtifact)
         }
         assert hook_names == {
-            "assertion-check.py",
             "spec-classifier.py",
             "destructive-gate.py",
             "credential-scan.py",
@@ -428,12 +426,12 @@ def test_doctor_rules_local_only_is_empty() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Settings-registration parity — exact 11-row event-to-hook matrix
+# Settings-registration parity — exact retained event-to-hook matrix
 # ---------------------------------------------------------------------------
 
 
-def test_settings_parity_exact_fourteen_row_matrix() -> None:
-    """Registry produces the exact 14-row event-to-hook matrix enforced by scaffold.
+def test_settings_parity_exact_retained_event_matrix() -> None:
+    """Registry produces the exact retained event-to-hook matrix enforced by scaffold.
 
     Current governance-completeness registrations add gov09-capture on
     UserPromptSubmit and owner-decision-capture on PostToolUse; retired
@@ -442,8 +440,8 @@ def test_settings_parity_exact_fourteen_row_matrix() -> None:
     bridge -006 GO) adds spec-event-surfacer.py on PostToolUse.
     """
     registrations = artifacts_for_scaffold("dual-agent", class_="settings-hook-registration")
-    assert len(registrations) == 14, (
-        f"expected 14 settings-hook-registration records for dual-agent; got {len(registrations)}"
+    assert len(registrations) == 13, (
+        f"expected 13 settings-hook-registration records for dual-agent; got {len(registrations)}"
     )
     # Collect per-event sorted hook filenames
     by_event: dict[str, list[str]] = {}
@@ -454,7 +452,7 @@ def test_settings_parity_exact_fourteen_row_matrix() -> None:
         by_event[event].sort()
 
     expected = {
-        "SessionStart": sorted(["session-start-governance.py", "assertion-check.py"]),
+        "SessionStart": sorted(["session-start-governance.py"]),
         "UserPromptSubmit": sorted(
             [
                 "delib-search-gate.py",
@@ -493,14 +491,13 @@ def test_settings_upgrade_managed_set_post_c4() -> None:
     0 scaffolded .claude/settings.json registrations remain unrepairable.
     """
     managed = artifacts_for_upgrade("dual-agent", class_="settings-hook-registration")
-    assert len(managed) == 14, (
-        f"expected 14 upgrade-managed settings-hook-registrations post-spec-event-surfacer; got {len(managed)}"
+    assert len(managed) == 13, (
+        f"expected 13 upgrade-managed settings-hook-registrations post-spec-event-surfacer; got {len(managed)}"
     )
     by_filename = {r.hook_filename: r.event for r in managed if isinstance(r, SettingsHookRegistration)}
     assert by_filename == {
         # SessionStart (promoted in C4)
         "session-start-governance.py": "SessionStart",
-        "assertion-check.py": "SessionStart",
         # UserPromptSubmit (1 governance + 2 promoted in C4)
         "gov09-capture.py": "UserPromptSubmit",
         "delib-search-gate.py": "UserPromptSubmit",
@@ -580,21 +577,43 @@ def test_condition2_composite_ids_exist_and_resolve() -> None:
     assert len({hook.id, settings.id, gitignore.id}) == 3
 
 
-def test_condition2_doctor_composite_uses_registry_ids() -> None:
-    """``_check_scanner_safe_writer_drift`` resolves its inputs via registry IDs.
-
-    Source-level check that the composite check references the three
-    canonical IDs (rather than hardcoded strings) — protects against a
-    regression where someone re-hardcodes the file paths.
-    """
-    import inspect
+def test_condition2_doctor_composite_uses_registry_ids(tmp_path, monkeypatch) -> None:
+    """The executed diagnostic follows registry paths and reports actual absence."""
+    import json
+    from dataclasses import replace
 
     from groundtruth_kb.project import doctor
 
-    src = inspect.getsource(doctor._check_scanner_safe_writer_drift)
-    assert '"hook.scanner-safe-writer"' in src
-    assert '"settings.hook.scanner-safe-writer.pretooluse"' in src
-    assert '"gitignore.hook-logs"' in src
+    records = {
+        "hook.scanner-safe-writer": replace(
+            find_artifact_by_id("hook.scanner-safe-writer"), target_path="custom/check.py"
+        ),
+        "settings.hook.scanner-safe-writer.pretooluse": replace(
+            find_artifact_by_id("settings.hook.scanner-safe-writer.pretooluse"),
+            target_settings_path="custom/settings.json",
+            hook_filename="check.py",
+        ),
+        "gitignore.hook-logs": replace(find_artifact_by_id("gitignore.hook-logs"), pattern="custom/*.log"),
+    }
+    reads = []
+
+    def lookup(ident):
+        reads.append(ident)
+        return records[ident]
+
+    monkeypatch.setattr(doctor, "find_artifact_by_id", lookup)
+    (tmp_path / "custom").mkdir()
+    hook = tmp_path / "custom/check.py"
+    hook.write_text("# fixture\n", encoding="utf-8")
+    (tmp_path / "custom/settings.json").write_text(
+        json.dumps({"hooks": {"PreToolUse": [{"hooks": [{"command": "python custom/check.py"}]}]}}), encoding="utf-8"
+    )
+    (tmp_path / ".gitignore").write_text("custom/*.log\n", encoding="utf-8")
+    assert doctor._check_scanner_safe_writer_drift(tmp_path, "dual-agent").status == "pass"
+    assert set(reads) == set(records)
+    hook.unlink()
+    missing = doctor._check_scanner_safe_writer_drift(tmp_path, "dual-agent")
+    assert missing.status == "fail" and not missing.found
 
 
 # ---------------------------------------------------------------------------
@@ -605,17 +624,17 @@ def test_condition2_doctor_composite_uses_registry_ids() -> None:
 def test_load_managed_artifacts_unions_three_axes() -> None:
     """Loader returns records touching the profile in any lifecycle axis."""
     dual_agent = load_managed_artifacts("dual-agent")
-    # dual-agent sees all 63 records:
-    # 18 hooks + 12 rules + 12 skills + 3 files + 14 settings + 4 gitignore.
-    assert len(dual_agent) == 63
+    # dual-agent sees all 61 retained records:
+    # 17 hooks + 12 rules + 12 skills + 3 files + 13 settings + 4 gitignore.
+    assert len(dual_agent) == 61
 
     local_only = load_managed_artifacts("local-only")
-    # local-only sees all 13 ORIGINAL hooks + rule.prime-builder + 3
+    # local-only sees all 12 retained original hooks + rule.prime-builder + 3
     # canonical-terminology rules + session-start-orientation + baseline-audit skill
-    # + 3 file-class records (Slice 3 + Slice 4 upgrade-rehearsal-recipe) = 22.
+    # + 3 file-class records (Slice 3 + Slice 4 upgrade-rehearsal-recipe) = 21.
     # The 5 new governance hooks are dual-agent-only, and the 3 new gitignore rows
     # are dual-agent-only.
-    assert len(local_only) == 22
+    assert len(local_only) == 21
 
 
 def test_find_artifact_by_id_raises_on_unknown() -> None:

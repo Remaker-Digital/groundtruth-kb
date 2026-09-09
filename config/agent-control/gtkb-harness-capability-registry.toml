@@ -1754,31 +1754,6 @@ reason = "This harness has no Codex apply_patch/Bash post-tool audit hook surfac
 status = "unsupported"
 reason = "This harness has no Codex apply_patch/Bash post-tool audit hook surface."
 [[capabilities]]
-id = "hook.assertion-check"
-kind = "hook"
-canonical_name = "assertion-check"
-canonical_purpose = "Claude SessionStart assertion surfacing; Codex handles assertions outside the hook surface."
-canonical_source = "config/hooks/gtkb-assertion-check.py"
-required_for_roles = ["prime-builder", "loyal-opposition"]
-parity_class = "shared"
-applicability = "universal"
-
-[capabilities.claude]
-surface = "config/hooks/gtkb-assertion-check.py"
-status = "native"
-
-[capabilities.antigravity]
-status = "unsupported"
-reason = "This harness has no Claude-style SessionStart assertion surfacing hook; assertion visibility is handled outside this registered hook surface."
-
-[capabilities.codex]
-status = "unsupported"
-reason = "This harness has no Claude-style SessionStart assertion surfacing hook; assertion visibility is handled outside this registered hook surface."
-
-[capabilities.cursor]
-status = "unsupported"
-reason = "This harness has no Claude-style SessionStart assertion surfacing hook; assertion visibility is handled outside this registered hook surface."
-[[capabilities]]
 id = "hook.bridge-axis-2-surface"
 kind = "hook"
 canonical_name = "bridge-axis-2-surface"
@@ -2300,14 +2275,6 @@ capability_id = "hook.bridge-compliance-audit"
 harness = "claude"
 reason_class = "harness-surface-difference"
 rationale = "Codex PostToolUse audit of the apply_patch path; Claude enforces bridge compliance at PreToolUse Write."
-owner_approval_ref = "DELIB-20266285"
-review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
-
-[[parity_waivers]]
-capability_id = "hook.assertion-check"
-harness = "codex"
-reason_class = "harness-surface-difference"
-rationale = "Claude SessionStart assertion surfacing; Codex handles assertions outside the hook surface."
 owner_approval_ref = "DELIB-20266285"
 review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
 

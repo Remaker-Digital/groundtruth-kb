@@ -1,17 +1,8 @@
-"""Semantic-evaluator coverage for the assertion surface the lifecycle records use.
+"""Structural assertion primitive coverage.
 
-``ADR-GOVERNED-TWO-TIER-GIT-LIFECYCLE-001`` and
-``REQ-GTKB-GOVERNED-GIT-LIFECYCLE-001`` register their canonical evaluator and
-regression test through ``file_exists``, ``grep`` and ``count`` assertions. This
-module covers that surface directly: each assertion type is exercised on both its
-satisfied and unsatisfied branch, so a regression that makes an assertion silently
-pass is caught here rather than at release time.
-
-SPEC-1662 (GOV-18) requires assertions to be meaningful rather than merely present.
-The negative branches below are the meaningfulness evidence: an assertion that
-cannot fail proves nothing.
-
-WI-6547 (PROJECT-GTKB-GET-HEALTHY-PHASE-3).
+These tests exercise matching, counting and path confinement on both positive
+and negative inputs. A passing file or marker check does not execute a referenced
+evaluator, prove test coverage, or establish behavioral conformance.
 """
 
 from __future__ import annotations
@@ -98,7 +89,7 @@ def test_count_passes_at_threshold(tmp_path: Path) -> None:
         "pattern": r"\bassert\b",
         "operator": ">=",
         "expected": 2,
-        "description": "at least two executable assertions",
+        "description": "at least two matching text occurrences",
     }
     assert _status(assertion, tmp_path) == "PASS"
 
@@ -112,7 +103,7 @@ def test_count_fails_below_threshold(tmp_path: Path) -> None:
         "pattern": r"\bassert\b",
         "operator": ">=",
         "expected": 2,
-        "description": "at least two executable assertions",
+        "description": "at least two matching text occurrences",
     }
     assert _status(assertion, tmp_path) == "FAIL"
 

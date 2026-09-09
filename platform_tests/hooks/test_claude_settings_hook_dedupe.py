@@ -1,12 +1,12 @@
 """WI-5480 (W0.3 item 5): `.claude/settings.json` duplicate-registration regression.
 
-Five hook commands were registered twice within the same event, each via a
+Four retained hook commands were registered twice within the same event, each via a
 redundant matcher-less group appended after the primary group. Every duplicate
 cost one extra process spawn per event with no added enforcement, because the
 second registration was byte-identical to the first.
 
 This module pins the deduped state and, critically, also pins that dedupe did
-not become removal: each of the five gates keeps exactly one registration.
+not become removal: each retained gate keeps exactly one registration.
 
 Authority: bridge/gtkb-w0-gate-false-positive-repair-001.md item 5 (GO at -002).
 """
@@ -22,9 +22,8 @@ import pytest
 _ROOT = Path(__file__).resolve().parents[2]
 _SETTINGS_PATH = _ROOT / ".claude" / "settings.json"
 
-# The five commands the W0.3 GO deduped, with the event each belongs to.
+# Retained duplicate-prone commands; automatic assertion startup was retired.
 _DEDUPED_REGISTRATIONS = (
-    ("SessionStart", "assertion-check.py"),
     ("PostToolUse", "owner-decision-capture.py"),
     ("PostToolUse", "spec-event-surfacer.py"),
     ("UserPromptSubmit", "intake-classifier.py"),

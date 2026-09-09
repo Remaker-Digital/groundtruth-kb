@@ -127,13 +127,6 @@ timeout_seconds = 60
 [[hook]]
 event = "session_start"
 intents = ["all"]
-script = "assertion-check.py"
-blocking = false
-timeout_seconds = 60
-
-[[hook]]
-event = "session_start"
-intents = ["all"]
 script = "session_start_dispatch.py"
 blocking = false
 timeout_seconds = 60

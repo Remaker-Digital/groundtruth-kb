@@ -2,9 +2,9 @@
 #
 # Managed Artifact Registry — single source of truth for scaffold, upgrade, and doctor.
 #
-# 62 records = 18 hooks + 11 rules + 11 skills + 4 files + 14 settings-hook-registrations + 4 gitignore-patterns.
+# 62 records = 17 hooks + 12 rules + 12 skills + 4 files + 13 settings-hook-registrations + 4 gitignore-patterns.
 #
-# Session-start orientation gate (gtkb-session-start-orientation-gate): +1 rule, +1 skill => 64 records.
+# Automatic SessionStart assertion evaluation and its registration are retired.
 #
 # Three independent lifecycle axes per record:
 #   - initial_profiles:          scaffold copies this artifact for these profiles
@@ -25,19 +25,6 @@
 # HOOKS (19 records: 14 original plus active governance and follow-on policy
 # hooks after retired dead-stub hooks were removed)
 # =========================================================================
-
-[[artifacts]]
-class = "hook"
-id = "hook.assertion-check"
-template_path = "hooks/assertion-check.py"
-target_path = ".claude/hooks/assertion-check.py"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "SessionStart assertion-catalog enforcement; product-managed because assertion semantics are framework-defined."
 
 [[artifacts]]
 class = "hook"
@@ -616,20 +603,6 @@ ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
 notes = "Registers session-start-governance on SessionStart; product-managed framework registration."
-
-[[artifacts]]
-class = "settings-hook-registration"
-id = "settings.hook.assertion-check.sessionstart"
-event = "SessionStart"
-hook_filename = "assertion-check.py"
-target_settings_path = ".claude/settings.json"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "structured-merge"
-adopter_divergence_policy = "warn"
-notes = "Registers assertion-check hook on SessionStart; product-managed because the registration is part of the framework hook contract."
 
 [[artifacts]]
 class = "settings-hook-registration"

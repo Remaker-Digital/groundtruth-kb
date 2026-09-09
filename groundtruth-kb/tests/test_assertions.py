@@ -211,6 +211,65 @@ class TestNonMachineAssertions:
 
 
 class TestSpecAssertions:
+    @pytest.mark.parametrize(
+        "field,value",
+        [
+            ("assertions", {"type": "file_exists", "file": "README.md"}),
+            ("assertions", "invalid JSON"),
+            ("constraints", "invalid JSON"),
+            ("constraints", []),
+            ("constraints", {"behavioral_validation_required": "true"}),
+        ],
+    )
+    def test_invalid_definition_cannot_be_hidden_by_parsed_aliases(self, project_dir: Path, field, value) -> None:
+        spec = {
+            "id": "SPEC-INVALID",
+            "version": 1,
+            "title": "Invalid current definition",
+            "assertions": [{"type": "file_exists", "file": "README.md"}],
+            "constraints": None,
+            field: value,
+            f"{field}_parsed": None,
+            f"_{field}_parsed": None,
+        }
+        result = run_spec_assertions(None, spec, "test", project_dir)
+        assert result["evaluation_result"] == ("UNASSESSED" if field == "assertions" else "PARTIAL")
+        assert not result["overall_passed"]
+        assert any(r["type"] == "invalid_definition" and field in r["detail"] for r in result["results"])
+
+    @pytest.mark.parametrize("assertions", [None, [], [{"type": "file_exists", "file": "README.md"}]])
+    @pytest.mark.parametrize("native", [False, True])
+    def test_required_behavior_is_not_proved_by_empty_or_structural_assertions(
+        self, db: KnowledgeDB, project_dir: Path, assertions, native
+    ) -> None:
+        spec = {
+            "id": "SPEC-BEHAVIOR",
+            "version": 1,
+            "title": "Observable behavior is required",
+            "assertions" if native else "_assertions_parsed": assertions,
+            "constraints" if native else "_constraints_parsed": {"behavioral_validation_required": True},
+        }
+        before = db._get_conn().total_changes
+        result = run_spec_assertions(db, spec, "test", project_dir)
+        assert result["evaluation_result"] == ("PARTIAL" if assertions else "UNASSESSED")
+        assert result["overall_passed"] is False
+        assert any("behavior" in r["detail"].lower() and r["status"] == "UNASSESSED" for r in result["results"])
+        assert db._get_conn().total_changes == before
+
+    def test_evaluation_does_not_write_runs_or_pipeline_events(self, db: KnowledgeDB, project_dir: Path) -> None:
+        db.insert_spec(
+            id="SPEC-READ-ONLY",
+            title="Read-only evaluation",
+            status="active",
+            changed_by="test",
+            change_reason="test",
+            assertions=[{"type": "file_exists", "file": "README.md"}],
+        )
+        before = db._get_conn().total_changes
+        summary = run_all_assertions(db, project_dir, spec_id="SPEC-READ-ONLY")
+        assert summary["aggregate_result"] == "PASS"
+        assert db._get_conn().total_changes == before
+
     def test_spec_with_assertions(self, db: KnowledgeDB, project_dir: Path) -> None:
         assertions = [
             {"type": "glob", "pattern": "**/main.py", "description": "main exists"},
@@ -219,7 +278,7 @@ class TestSpecAssertions:
         db.insert_spec(
             id="SPEC-T01",
             title="Test spec",
-            status="implemented",
+            status="active",
             changed_by="test",
             change_reason="test",
             assertions=assertions,
@@ -233,7 +292,7 @@ class TestSpecAssertions:
         db.insert_spec(
             id="SPEC-T02",
             title="No assertions",
-            status="specified",
+            status="active",
             changed_by="test",
             change_reason="test",
         )
@@ -247,7 +306,7 @@ class TestSpecAssertions:
         db.insert_spec(
             id="SPEC-T03",
             title="Text assertion",
-            status="implemented",
+            status="active",
             changed_by="test",
             change_reason="test",
             assertions=["Check manually that the UI renders correctly"],
@@ -262,7 +321,7 @@ class TestSpecAssertions:
         db.insert_spec(
             id="SPEC-T04",
             title="Partially evaluable",
-            status="implemented",
+            status="active",
             changed_by="test",
             change_reason="test",
             assertions=[
@@ -281,7 +340,7 @@ class TestSpecAssertions:
         db.insert_spec(
             id="SPEC-A01",
             title="With assertion",
-            status="implemented",
+            status="active",
             changed_by="test",
             change_reason="test",
             assertions=assertions,
@@ -289,7 +348,7 @@ class TestSpecAssertions:
         db.insert_spec(
             id="SPEC-A02",
             title="No assertion",
-            status="specified",
+            status="active",
             changed_by="test",
             change_reason="test",
         )
@@ -303,7 +362,7 @@ class TestSpecAssertions:
         db.insert_spec(
             id="SPEC-F01",
             title="First",
-            status="implemented",
+            status="active",
             changed_by="test",
             change_reason="test",
             assertions=[{"type": "glob", "pattern": "README.md", "description": "readme"}],
@@ -311,7 +370,7 @@ class TestSpecAssertions:
         db.insert_spec(
             id="SPEC-F02",
             title="Second",
-            status="implemented",
+            status="active",
             changed_by="test",
             change_reason="test",
             assertions=[{"type": "glob", "pattern": "MISSING.md", "description": "missing"}],
@@ -328,7 +387,7 @@ class TestSpecAssertions:
         db.insert_spec(
             id="SPEC-U01",
             title="Manual only",
-            status="implemented",
+            status="active",
             changed_by="test",
             change_reason="test",
             assertions=[{"type": "human_review", "description": "manual"}],
@@ -343,7 +402,7 @@ class TestSpecAssertions:
         db.insert_spec(
             id="SPEC-P01",
             title="Passing",
-            status="implemented",
+            status="active",
             changed_by="test",
             change_reason="test",
             assertions=[{"type": "file_exists", "file": "README.md"}],
@@ -351,7 +410,7 @@ class TestSpecAssertions:
         db.insert_spec(
             id="SPEC-P02",
             title="Manual",
-            status="implemented",
+            status="active",
             changed_by="test",
             change_reason="test",
             assertions=[{"type": "human_review", "description": "manual"}],
@@ -372,7 +431,7 @@ class TestFormatSummary:
         db.insert_spec(
             id="SPEC-FMT1",
             title="Failing spec",
-            status="implemented",
+            status="active",
             changed_by="test",
             change_reason="test",
             assertions=[{"type": "glob", "pattern": "NONEXISTENT.xyz", "description": "missing file"}],
@@ -390,7 +449,7 @@ class TestFormatSummary:
         db.insert_spec(
             id="SPEC-FMT2",
             title="Passing spec",
-            status="implemented",
+            status="active",
             changed_by="test",
             change_reason="test",
             assertions=[{"type": "glob", "pattern": "README.md", "description": "readme"}],
@@ -913,7 +972,7 @@ class TestFormatSummaryComposition:
         db.insert_spec(
             id="SPEC-COMP1",
             title="Composed spec",
-            status="implemented",
+            status="active",
             changed_by="test",
             change_reason="test",
             assertions=[

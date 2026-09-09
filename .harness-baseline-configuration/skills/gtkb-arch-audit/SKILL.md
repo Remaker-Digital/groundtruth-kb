@@ -20,7 +20,7 @@ Run all ADR/DCL assertions and produce a family-grouped compliance matrix.
 
 ## Behavior
 
-1. Run `/kb-assert --dry-run` to get assertion results for all ADR/DCL specs
+1. Run `gt assert --json` for a broad assigned audit, or `gt assert --spec <id> --json` for the selected scope. The command is read-only; its structural results do not prove behavioral conformance
 2. Classify each artifact:
    - **ENFORCED**: implemented/verified + assertions passing
    - **SPECIFIED**: specified status + assertions exist

@@ -83,8 +83,8 @@ def test_settings_json_exact_event_placement(tmp_project):
                     names.append(cmd.rsplit("/", 1)[-1])
         return sorted(names)
 
-    # SessionStart hooks (governance + assertion check)
-    assert _hook_names_for_event("SessionStart") == ["assertion-check.py", "session-start-governance.py"]
+    # Retained SessionStart governance hook; no automatic assertion producer
+    assert _hook_names_for_event("SessionStart") == ["session-start-governance.py"]
 
     # UserPromptSubmit hooks: delib-search-gate + intake-classifier + 1
     # governance-completeness hook (gov09-capture) per gtkb-da-governance-completeness-implementation-016.

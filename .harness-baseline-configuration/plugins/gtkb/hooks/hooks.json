@@ -84,15 +84,7 @@
         "timeout": 60
       },
       {
-        "command": "python .goose/hooks/assertion-check.py",
-        "timeout": 60
-      },
-      {
         "command": "python .goose/hooks/session_start_dispatch.py",
-        "timeout": 60
-      },
-      {
-        "command": "python .goose/hooks/assertion-check.py",
         "timeout": 60
       }
     ],

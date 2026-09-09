@@ -447,6 +447,25 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
                     if process.poll() is not None or time.monotonic() >= deadline:
                         pytest.fail("Native authority did not start; inspect disposable service.log")
                     time.sleep(0.1)
+            observation_fields = {
+                "title": "Read-only CLI observation",
+                "status": "active",
+                "assertions": [{"type": "file_exists", "file": "code.py"}],
+            }
+            for version, expected_result in ((0, "PASS"), (1, "PARTIAL")):
+                if version:
+                    observation_fields["constraints"] = {"behavioral_validation_required": True}
+                recorded = put(
+                    client, "specifications", "SPEC-OBSERVATION", observation_fields, expected_version=version
+                )
+                assert recorded.status_code == 200, recorded.text
+                before_observation = history_count(service)
+                observation = cli("assert", "--spec", "SPEC-OBSERVATION", "--json")
+                assert observation.returncode == version, observation.stderr
+                report = json.loads(observation.stdout)
+                assert report["aggregate_result"] == expected_result
+                assert report["details"][0]["spec_version"] == version + 1
+                assert history_count(service) == before_observation
             result = cli("projects", "show", "PROJECT-1", "--json")
             assert result.returncode == 0, result.stderr
             assert json.loads(result.stdout)["project"]["authorization"] == "authorized"

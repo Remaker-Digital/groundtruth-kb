@@ -34,7 +34,6 @@ The shipped CLAUDE.md / MEMORY.md / deliberation-protocol templates implement AD
 | `rules/canonical-terminology.toml` | Profile-aware doctor config for required canonical terms | `.claude/rules/canonical-terminology.toml` |
 | `BRIDGE-INVENTORY.md` | Optional inventory of bridge directives, roles, schedules, prompts, and automations | Project root |
 | `bridge-os-poller-setup-prompt.md` | DEPRECATED stub. Smart poller and OS poller both retired in Slice 4 (2026-05-09); retained as compatibility stub for two release cycles. Use the dispatcher daemon via `gt project init my-project --profile dual-agent`. | Project root or operations docs |
-| `hooks/assertion-check.py` | SessionStart hook — run assertions on session start | `.claude/hooks/` |
 | `hooks/spec-classifier.py` | UserPromptSubmit hook — detect spec language, enforce spec-first | `.claude/hooks/` |
 | `rules/loyal-opposition.md` | Review agent behavior rules | `.claude/rules/` |
 | `rules/prime-builder.md` | Build agent behavior rules | `.claude/rules/` |

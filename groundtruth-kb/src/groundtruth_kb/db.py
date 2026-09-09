@@ -1834,12 +1834,14 @@ class KnowledgeDB:
         gate_registry: GateRegistry | None = None,
         check_same_thread: bool = True,
         chroma_path: str | Path | None = None,
+        read_only: bool = False,
     ):
         self.db_path = Path(db_path) if db_path else DB_PATH
         self._chroma_path = Path(chroma_path) if chroma_path else None
         self._conn: sqlite3.Connection | None = None
         self._gate_registry = gate_registry
         self._check_same_thread = check_same_thread
+        self._read_only = read_only
         self._last_deliberation_search_status: dict[str, Any] = {
             "semantic_expected": bool(HAS_CHROMADB),
             "semantic_attempted": False,
@@ -1847,7 +1849,8 @@ class KnowledgeDB:
             "semantic_degraded": False,
             "degradation_reason": None,
         }
-        self._ensure_schema()
+        if not read_only:
+            self._ensure_schema()
 
     def _deliberation_search_status(self) -> dict[str, Any]:
         """Return metadata for the most recent ``search_deliberations`` call."""
@@ -1937,12 +1940,14 @@ class KnowledgeDB:
     def _get_conn(self) -> sqlite3.Connection:
         if self._conn is None:
             self._conn = sqlite3.connect(
-                str(self.db_path),
+                self.db_path.resolve().as_uri() + "?mode=ro" if self._read_only else str(self.db_path),
+                uri=self._read_only,
                 timeout=DEFAULT_SQLITE_BUSY_TIMEOUT_MS / 1000,
                 check_same_thread=self._check_same_thread,
             )
             self._conn.row_factory = sqlite3.Row
-            self._conn.execute("PRAGMA journal_mode=WAL")
+            if not self._read_only:
+                self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.execute("PRAGMA foreign_keys=ON")
             self._conn.execute(f"PRAGMA busy_timeout={DEFAULT_SQLITE_BUSY_TIMEOUT_MS}")
         return self._conn

@@ -4180,19 +4180,24 @@ def bootstrap_desktop_cmd(
 @main.command("assert")
 @click.option("--spec", "spec_id", default=None, help="Run assertions for a single spec ID")
 @click.option("--triggered-by", default="cli", help="Trigger label (default: cli)")
+@click.option("--json", "emit_json", is_flag=True, help="Return structured evaluation observations.")
 @click.pass_context
-def assert_cmd(ctx: click.Context, spec_id: str | None, triggered_by: str) -> None:
-    """Run feature assertions against the project codebase."""
+def assert_cmd(ctx: click.Context, spec_id: str | None, triggered_by: str, emit_json: bool) -> None:
+    """Evaluate current assertions without writing results or changing work state."""
+    import sqlite3
+
     from groundtruth_kb.assertions import format_summary, run_all_assertions
 
     config = _resolve_config(ctx)
-    db = _open_db(config)
+    db = KnowledgeDB(db_path=config.db_path, read_only=True)
     try:
         project_root = config.project_root.resolve()
         summary = run_all_assertions(db, project_root, triggered_by=triggered_by, spec_id=spec_id)
-        click.echo(format_summary(summary))
+        click.echo(json.dumps(summary, ensure_ascii=False) if emit_json else format_summary(summary))
         if summary.get("aggregate_result") != "PASS":
             raise SystemExit(1)
+    except sqlite3.Error as error:
+        raise click.ClickException(f"Cannot read the configured SQLite source: {error}") from error
     finally:
         db.close()
 
