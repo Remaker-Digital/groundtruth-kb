@@ -260,6 +260,93 @@ def test_scoped_publication_preserves_local_work_and_supports_a_fresh_successor(
     assert (own / "code.py").read_text() == "Unpublished prior-context edit\n"
 
 
+@pytest.mark.parametrize("next_status", ["GO", "READY", "VERIFIED"])
+@pytest.mark.parametrize("changed_scope", ["work", "formal", "parent"])
+@pytest.mark.parametrize("claim_before_change", [False, True])
+def test_claim_operations_reject_changed_scope_without_consuming_the_reservation(
+    bridge, next_status, changed_scope, claim_before_change
+):
+    service, client, contexts, root = bridge
+    chain = [("pb1", "NEW"), ("lo1", "GO"), ("pb2", "READY"), ("lo2", "VERIFIED")]
+    for version, (context, status) in enumerate(chain, 1):
+        if status == next_status:
+            break
+        deliver(client, contexts, "chain", context, version, status)
+    head_version = version - 1
+    request_id = str(uuid4())
+    reserved = None
+    if claim_before_change:
+        granted = claim(client, "chain", context, head_version, next_status, request_id=request_id)
+        assert granted.status_code == 200, granted.text
+        reserved = granted.json()
+
+    if changed_scope == "work":
+        changed = put(client, "work-items", "WI-1", {"description": "A different required effect"}, expected_version=1)
+    elif changed_scope == "formal":
+        changed = put(client, "specifications", "SPEC-1", {"description": "Changed formal intent"}, expected_version=1)
+    else:
+        assert put(client, "projects", "PROJECT-2", {"name": "Different complete outcome"}).status_code == 200
+        membership = client.get("/v1/work-items/WI-1").json()["membership"]
+        changed = client.post(
+            "/v1/work-items/WI-1/move",
+            json={
+                "expected_version": membership["version"],
+                "source_project_id": "PROJECT-1",
+                "destination_project_id": "PROJECT-2",
+                "actor": "qualification",
+                "reason": "Current parent changes during an unfinished attempt",
+            },
+        )
+    assert changed.status_code == 200, changed.text
+    with service.kernel.transaction(read_only=True) as tx:
+        tx.cursor.execute(
+            sql.SQL("SELECT * FROM {}.bridge_attempts WHERE id='chain'").format(sql.Identifier(tx.schema))
+        )
+        attempt_before = dict(tx.cursor.fetchone())
+        tx.cursor.execute(sql.SQL("SELECT * FROM {}.work_intent_claims").format(sql.Identifier(tx.schema)))
+        claims_before = list(tx.cursor.fetchall())
+
+    responses = {
+        "claim": claim(client, "chain", context, head_version, next_status, request_id=request_id),
+    }
+    checkouts_before = set(root.parent.parent.glob("SENV-*"))
+    if reserved:
+        fence = {"native_context_id": context, "fence": reserved["fence"]}
+        responses.update(
+            {operation: client.post(f"/v1/bridge/chain/{operation}", json=fence) for operation in ("check", "worktree")}
+        )
+        responses["deliver"] = client.post(
+            "/v1/bridge/chain/deliver",
+            json={**fence, "content": authored(contexts[context], "chain", version, next_status)},
+        )
+    assert {
+        name: (result.status_code, result.json().get("error", {}).get("code")) for name, result in responses.items()
+    } == {name: (422, "scope_changed") for name in responses}
+    assert set(root.parent.parent.glob("SENV-*")) == checkouts_before
+    with service.kernel.transaction(read_only=True) as tx:
+        tx.cursor.execute(
+            sql.SQL("SELECT * FROM {}.bridge_attempts WHERE id='chain'").format(sql.Identifier(tx.schema))
+        )
+        assert dict(tx.cursor.fetchone()) == attempt_before
+        tx.cursor.execute(sql.SQL("SELECT * FROM {}.work_intent_claims").format(sql.Identifier(tx.schema)))
+        assert list(tx.cursor.fetchall()) == claims_before
+    if reserved:
+        released = client.post("/v1/bridge/chain/release", json=fence)
+        assert released.status_code == 200 and released.json()["status"] == "released"
+        assert claim(client, "chain", context, head_version, next_status).json()["error"]["code"] == "scope_changed"
+
+
+def test_changed_scope_can_be_rejected_and_revised_without_reusing_the_old_proposal(bridge):
+    _, client, contexts, _ = bridge
+    deliver(client, contexts, "chain", "pb1", 1, "NEW")
+    changed = put(client, "work-items", "WI-1", {"description": "Corrected required effect"}, expected_version=1)
+    assert changed.status_code == 200, changed.text
+    deliver(client, contexts, "chain", "lo1", 2, "NO-GO")
+    deliver(client, contexts, "chain", "pb2", 3, "REVISED")
+    deliver(client, contexts, "chain", "lo2", 4, "GO")
+    assert claim(client, "chain", "pb3", 4, "READY").status_code == 200
+
+
 def test_claim_expiry_and_different_successor_contention_are_not_thread_ownership(bridge):
     service, client, contexts, _ = bridge
     deliver(client, contexts, "chain", "pb1", 1, "NEW")

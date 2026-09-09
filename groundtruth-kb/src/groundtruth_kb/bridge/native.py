@@ -469,6 +469,20 @@ class NativeBridgeService:
                 **result,
             )
 
+    def _claim_readiness(self, tx, attempt, intended_status, *, lock=False):
+        if not attempt["work_item_id"]:
+            return
+        work = _required(tx, "work_items", attempt["work_item_id"], lock=lock)
+        if _current_parent(tx, work["id"])["project_id"] != attempt["project_id"]:
+            _error("scope_changed", "Current project membership differs from the attempt")
+        # Rejection and revision can address changed intent. Approval,
+        # implementation and verification must use the accepted proposal scope.
+        if intended_status in {"GO", "READY", "VERIFIED"}:
+            self._scope(tx, attempt, lock=lock)
+        if intended_status in {"NEW", "REVISED", "GO", "READY", "VERIFIED"}:
+            _require_project_dependencies(tx, attempt["project_id"], lock=lock)
+            self._require_work_dependencies(tx, work["id"], attempt=attempt, lock=lock)
+
     def claim(self, document: str, request: ClaimRequest) -> dict[str, Any]:
         with self.kernel.transaction() as tx:
             binding = self._binding(tx, request.native_context_id)
@@ -505,11 +519,9 @@ class NativeBridgeService:
             allowed = TRANSITIONS[attempt["head_status"]] if attempt["head_status"] else THREAD_START_STATUSES
             if request.intended_status not in allowed:
                 _error("invalid_transition", "The intended artifact cannot follow the current bridge status")
+            self._claim_readiness(tx, attempt, request.intended_status)
             if request.intended_status == "NEW" and project["authorization"] != "authorized":
                 _error("project_not_authorized", "The parent project is not authorized for a NEW proposal")
-            if request.intended_status in {"NEW", "REVISED", "GO", "READY", "VERIFIED"}:
-                _require_project_dependencies(tx, project_id)
-                self._require_work_dependencies(tx, work["id"], attempt=attempt)
             if project_id:
                 self.work_root(project_id)
             if request.intended_status == "VERIFIED" and attempt["head_status"] == "VERIFIED":
@@ -541,7 +553,6 @@ class NativeBridgeService:
                     }
                 _error("artifact_already_claimed", "Another request reserves the exact next bridge artifact")
             if request.intended_status == "READY":
-                self._scope(tx, attempt)
                 tx.cursor.execute(
                     sql.SQL(
                         "SELECT a.proposal_paths,a.test_targets FROM {}.work_intent_claims c JOIN {}.bridge_attempts a ON a.id=c.attempt_id "
@@ -606,10 +617,7 @@ class NativeBridgeService:
     def check(self, document: str, request: FenceRequest) -> dict[str, Any]:
         with self.kernel.transaction() as tx:
             _, attempt, claim = self._fenced(tx, document, request)
-            if claim["intended_status"] == "READY":
-                self._scope(tx, attempt)
-                _require_project_dependencies(tx, attempt["project_id"])
-                self._require_work_dependencies(tx, attempt["work_item_id"], attempt=attempt)
+            self._claim_readiness(tx, attempt, claim["intended_status"])
             return {
                 "status": "current",
                 "claim": _public({key: value for key, value in claim.items() if key != "live"}),
@@ -641,9 +649,7 @@ class NativeBridgeService:
         with self.kernel.transaction(serializable=False) as tx:
             self.lock_worktrees(tx)
             binding, attempt, claim = self._fenced(tx, document, request)
-            if claim["intended_status"] in {"NEW", "REVISED", "GO", "READY", "VERIFIED"}:
-                _require_project_dependencies(tx, attempt["project_id"], lock=True)
-                self._require_work_dependencies(tx, attempt["work_item_id"], attempt=attempt, lock=True)
+            self._claim_readiness(tx, attempt, claim["intended_status"], lock=True)
             own_paths = set(attempt["proposal_paths"] + attempt["test_targets"])
             paths = set(own_paths)
             tx.cursor.execute(
