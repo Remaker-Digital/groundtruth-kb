@@ -421,9 +421,52 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
             result = cli("projects", "show", "PROJECT-1", "--json")
             assert result.returncode == 0, result.stderr
             assert json.loads(result.stdout)["project"]["authorization"] == "authorized"
+            dependency_file = tmp_path / "dependency.json"
+            dependency_file.write_text(
+                json.dumps(
+                    {
+                        "dependent_project_id": "PROJECT-1",
+                        "prerequisite_project_id": "PROJECT-GTKB-NEW-WORK-INTAKE",
+                        "required_prerequisite_state": "verified",
+                        "affected_gate": "readiness",
+                        "rationale": "Qualify prerequisite diagnostics and canonical correction through ordinary CLI",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            def dependency_record(version):
+                return cli(
+                    "projects",
+                    "dependencies",
+                    "record",
+                    "--id",
+                    "DEP-CLI",
+                    "--fields-file",
+                    str(dependency_file),
+                    "--expected-version",
+                    str(version),
+                    "--actor",
+                    "qualification",
+                    "--change-reason",
+                    "Current dependency correction",
+                    "--json",
+                )
+
+            created = dependency_record(0)
+            assert created.returncode == 0, created.stderr
+            listed = cli("projects", "dependencies", "list", "--dependent-project", "PROJECT-1", "--json")
+            assert listed.returncode == 0 and json.loads(listed.stdout)[0]["id"] == "DEP-CLI", listed.stderr
+            readiness = cli("projects", "readiness", "PROJECT-1", "--json")
+            assert readiness.returncode == 0 and json.loads(readiness.stdout)["ready"] is False, readiness.stderr
+            shown = cli("projects", "dependencies", "show", "DEP-CLI")
+            assert shown.returncode == 0 and "PROJECT-GTKB-NEW-WORK-INTAKE = verified" in shown.stdout, shown.stderr
+            dependency_file.write_text('{"status":"retired"}', encoding="utf-8")
+            retired = dependency_record(1)
+            assert retired.returncode == 0 and json.loads(retired.stdout)["status"] == "retired", retired.stderr
             amendment = tmp_path / "fields.json"
             amendment.write_text(
-                json.dumps({"description": "Fresh context reads current canon: 漢字 café"}), encoding="utf-8"
+                json.dumps({"description": "Fresh context reads current canon: æ¼¢å­— cafÃ©"}), encoding="utf-8"
             )
             result = cli(
                 "spec",
@@ -443,7 +486,7 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
             assert result.returncode == 0, result.stderr
             result = cli("context", "work-item", "WI-1", "--json")
             assert result.returncode == 0, result.stderr
-            assert json.loads(result.stdout)["specifications"][0]["description"].endswith("漢字 café")
+            assert json.loads(result.stdout)["specifications"][0]["description"].endswith("æ¼¢å­— cafÃ©")
             # Each call starts a fresh CLI process without PostgreSQL credentials.
             for version, (role, status) in enumerate(
                 (("pb", "NEW"), ("lo", "GO"), ("pb", "READY"), ("lo", "VERIFIED")), 1

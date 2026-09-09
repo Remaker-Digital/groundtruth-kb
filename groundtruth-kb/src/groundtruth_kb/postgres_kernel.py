@@ -1146,6 +1146,57 @@ def _require_reference(value: object, allowed: set[str], *, label: str) -> None:
         raise PostgresKernelError("invalid_manifest", f"{label} references a missing current record")
 
 
+def dependency_shape(record: Mapping[str, Any]) -> bool:
+    """The native dependency contract has exact states, never completion aliases."""
+    return (
+        record.get("dependency_kind") == "requires_project_state"
+        and record.get("required_prerequisite_state") in {"active", "verified", "retired", "cancelled"}
+        and record.get("affected_gate") in {"readiness", "closure"}
+        and isinstance(record.get("rationale"), str)
+        and bool(record["rationale"].strip())
+    )
+
+
+def validate_project_dependencies(records: list[dict[str, Any]], projects: dict[str, dict[str, Any]]) -> None:
+    """Validate the same current graph for native writes and migration input."""
+    edges, semantic = {}, set()
+    for record in records:
+        if record["status"] != "active":
+            continue
+        if not dependency_shape(record):
+            raise PostgresKernelError(
+                "invalid_dependency_contract",
+                "Reconcile the dependency kind, exact state, gate and rationale",
+                details={"id": record["id"]},
+            )
+        dependent, prerequisite = record["dependent_project_id"], record["prerequisite_project_id"]
+        for key in (dependent, prerequisite):
+            if key not in projects or projects[key]["kind"] != "project":
+                raise PostgresKernelError(
+                    "invalid_dependency_endpoint", "Dependencies sequence execution projects", details={"id": key}
+                )
+        key = (dependent, prerequisite, record["affected_gate"])
+        if key in semantic:
+            raise PostgresKernelError(
+                "duplicate_dependency", "One prerequisite state per project pair and gate is sufficient"
+            )
+        semantic.add(key)
+        edges.setdefault(dependent, set()).add(prerequisite)
+        edges.setdefault(prerequisite, set())
+    # Closed outcomes remain in the graph; readiness evaluates their state.
+    # Iterative cycle detection does not depend on the Python recursion limit.
+    pending = {key: set(value) for key, value in edges.items()}
+    while pending:
+        leaves = {key for key, values in pending.items() if not values}
+        if not leaves:
+            raise PostgresKernelError(
+                "dependency_cycle",
+                "The active project dependency graph contains a cycle",
+                details={"projects": sorted(pending)},
+            )
+        pending = {key: values - leaves for key, values in pending.items() if key not in leaves}
+
+
 def _validate_manifest_relationships(tables: Mapping[str, list[dict[str, Any]]]) -> None:
     ids = {
         table_name: {str(row["id"]) for row in tables[table_name]}
@@ -1204,6 +1255,7 @@ def _validate_manifest_relationships(tables: Mapping[str, list[dict[str, Any]]])
             label="dependency.prerequisite_project_id",
         )
         _require_reference(row["related_work_item_id"], ids["work_items"], label="dependency.related_work_item_id")
+    validate_project_dependencies(tables["project_dependencies"], projects)
     for row in tables["project_artifact_links"]:
         _require_reference(row["project_id"], ids["projects"], label="artifact_link.project_id")
     for row in tables["testable_elements"]:

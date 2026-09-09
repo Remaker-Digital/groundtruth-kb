@@ -37,7 +37,9 @@ from groundtruth_kb.native_authority import (
     Text,
     _current_parent,
     _error,
+    _project_dependency_readiness,
     _related,
+    _require_project_dependencies,
     _required,
     _work_evidence,
     _write,
@@ -384,6 +386,8 @@ class NativeBridgeService:
                 _error("invalid_transition", "The intended artifact cannot follow the current bridge status")
             if request.intended_status == "NEW" and project["authorization"] != "authorized":
                 _error("project_not_authorized", "The parent project is not authorized for a NEW proposal")
+            if request.intended_status in {"NEW", "REVISED", "GO", "READY", "VERIFIED"}:
+                _require_project_dependencies(tx, project_id)
             if project_id:
                 self.work_root(project_id)
             if request.intended_status == "VERIFIED" and attempt["head_status"] == "VERIFIED":
@@ -482,6 +486,7 @@ class NativeBridgeService:
             _, attempt, claim = self._fenced(tx, document, request)
             if claim["intended_status"] == "READY":
                 self._scope(tx, attempt)
+                _require_project_dependencies(tx, attempt["project_id"])
             return {
                 "status": "current",
                 "claim": _public({key: value for key, value in claim.items() if key != "live"}),
@@ -512,7 +517,9 @@ class NativeBridgeService:
         """Materialize current project work into only the receiving context's checkout."""
         with self.kernel.transaction(serializable=False) as tx:
             self.lock_worktrees(tx)
-            binding, attempt, _ = self._fenced(tx, document, request)
+            binding, attempt, claim = self._fenced(tx, document, request)
+            if claim["intended_status"] in {"NEW", "REVISED", "GO", "READY", "VERIFIED"}:
+                _require_project_dependencies(tx, attempt["project_id"], lock=True)
             own_paths = set(attempt["proposal_paths"] + attempt["test_targets"])
             paths = set(own_paths)
             tx.cursor.execute(
@@ -553,6 +560,7 @@ class NativeBridgeService:
                     "implementation_claim_required", "Work publication requires the exact implementation-report claim"
                 )
             self._scope(tx, attempt, lock=True)
+            _require_project_dependencies(tx, attempt["project_id"], lock=True)
             try:
                 artifacts = publish_context_work(
                     self.project_root,
@@ -678,6 +686,8 @@ class NativeBridgeService:
             updates: dict[str, Any] = {"head_version": message["version"], "head_status": status}
             if status == "NEW" and project["authorization"] != "authorized":
                 _error("project_not_authorized", "The parent project is not authorized at NEW proposal filing")
+            if status in {"NEW", "REVISED", "GO", "READY", "VERIFIED"}:
+                _require_project_dependencies(tx, project["id"])
             if status == "BLOCKED":
                 if request.mode != "headless":
                     _error(
@@ -849,7 +859,7 @@ class NativeBridgeService:
 
     def queue(self, role: Literal["pb", "lo"]) -> dict[str, Any]:
         """Report eligible work; selection remains the owner's or dispatcher's act."""
-        eligible = []
+        eligible, blocked = [], []
         with self.kernel.transaction(read_only=True) as tx:
             tx.cursor.execute(
                 sql.SQL(
@@ -867,8 +877,12 @@ class NativeBridgeService:
                 )
                 fresh_verification = role == "lo" and row["head_status"] == "VERIFIED" and row["finalization_failure"]
                 if ordinary or fresh_verification:
-                    eligible.append(_public(row))
-            return {"role": role, "eligible": eligible}
+                    readiness = _project_dependency_readiness(tx, row["project_id"], "readiness")
+                    if readiness["ready"]:
+                        eligible.append(_public(row))
+                    else:
+                        blocked.append({**_public(row), "readiness": readiness})
+            return {"role": role, "eligible": eligible, "blocked": blocked}
 
     def abandon(self, document: str, request: AbandonRequest) -> dict[str, Any]:
         """Close an unusable attempt from canonical evidence, without a false verdict."""

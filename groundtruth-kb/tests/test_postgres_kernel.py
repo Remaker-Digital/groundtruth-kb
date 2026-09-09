@@ -348,11 +348,11 @@ def test_schema_encodes_relationship_and_authorization_boundaries():
 
 
 def test_canonical_json_is_compact_sorted_unicode_preserving_and_lf_terminated():
-    value = {"z": "é", "a": [True, None, 3]}
+    value = {"z": "Ã©", "a": [True, None, 3]}
 
-    assert canonical_json_bytes(value) == '{"a":[true,null,3],"z":"é"}\n'.encode()
+    assert canonical_json_bytes(value) == '{"a":[true,null,3],"z":"Ã©"}\n'.encode()
     assert canonical_sha256(value) == hashlib.sha256(canonical_json_bytes(value)).hexdigest()
-    assert canonical_json_bytes({"value": "é"}) != canonical_json_bytes({"value": "e\u0301"})
+    assert canonical_json_bytes({"value": "Ã©"}) != canonical_json_bytes({"value": "e\u0301"})
 
 
 def test_canonical_json_preserves_precise_fractional_numbers_without_exponents():
@@ -1851,3 +1851,50 @@ def test_membership_migration_refuses_unrecognized_status_instead_of_dropping_it
         kernel_module._transform_source_rows(source, plan)
     assert failure.value.code == "invalid_source"
     assert failure.value.details == {"membership_id": "AMBIGUOUS", "status": status}
+
+
+@pytest.mark.parametrize(
+    "defect,code",
+    [
+        ("completed_alias", "invalid_dependency_contract"),
+        ("promotion_gate", "invalid_dependency_contract"),
+        ("cycle", "dependency_cycle"),
+        ("duplicate", "duplicate_dependency"),
+        ("program_endpoint", "invalid_dependency_endpoint"),
+    ],
+)
+def test_migration_refuses_invalid_native_dependency_graph(defect, code):
+    manifest = _work_model_manifest()
+    metadata = dict(version=1, changed_by="test", changed_at="2026-09-01T00:00:00Z", change_reason="fixture")
+    dependency = _row(
+        "project_dependencies",
+        id="DEP-ONE",
+        dependent_project_id="PROJECT-ONE",
+        prerequisite_project_id="PROJECT-TWO",
+        dependency_kind="requires_project_state",
+        required_prerequisite_state="verified",
+        affected_gate="readiness",
+        status="active",
+        rationale="The successor needs the complete predecessor result",
+        provenance="test",
+        registry_version=1,
+        blocking_status="open",
+        **metadata,
+    )
+    manifest["tables"]["project_dependencies"] = [dependency]
+    # A valid graph may be unready; import does not claim prerequisite completion.
+    assert normalize_manifest(manifest)["tables"]["project_dependencies"][0]["id"] == "DEP-ONE"
+    if defect == "completed_alias":
+        dependency["required_prerequisite_state"] = "completed"
+    elif defect == "promotion_gate":
+        dependency["affected_gate"] = "promotion"
+    elif defect in {"cycle", "duplicate"}:
+        second = {**dependency, "id": "DEP-TWO"}
+        if defect == "cycle":
+            second.update(dependent_project_id="PROJECT-TWO", prerequisite_project_id="PROJECT-ONE")
+        manifest["tables"]["project_dependencies"].append(second)
+    else:
+        manifest["tables"]["projects"][1].update(kind="program", authorization=None)
+    with pytest.raises(PostgresKernelError) as error:
+        normalize_manifest(manifest)
+    assert error.value.code == code

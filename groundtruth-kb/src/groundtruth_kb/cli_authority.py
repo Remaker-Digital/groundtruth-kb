@@ -29,7 +29,8 @@ def _call(ctx: click.Context, method: str, path: str, **kwargs: Any) -> Any:
     try:
         return _client(ctx).request(method, path, **kwargs)
     except AuthorityClientError as error:
-        raise click.ClickException(f"{error.code}: {error}") from error
+        details = "\n" + canonical_json_bytes(error.details).decode("utf-8").strip() if error.details else ""
+        raise click.ClickException(f"{error.code}: {error}{details}") from error
 
 
 def _emit(value: Any, json_output: bool) -> None:
@@ -41,6 +42,11 @@ def _emit(value: Any, json_output: bool) -> None:
         if isinstance(row, dict):
             record = row.get("project", row.get("work_item", row))
             label = record.get("title", record.get("name", ""))
+            if "dependent_project_id" in record:
+                label = (
+                    f"{record['dependent_project_id']} requires {record['prerequisite_project_id']} "
+                    f"= {record['required_prerequisite_state']} at {record['affected_gate']} [{record['status']}]"
+                )
             if "id" in record:
                 click.echo(f"{record['id']} v{record.get('version', '?')}: {label}")
                 if record.get("description"):
@@ -81,6 +87,16 @@ def _domain_group(name: str, domain: str) -> click.Group:
     @click.option("--priority", default=None)
     @click.option("--spec-id", default=None)
     @click.option("--plan-id", default=None)
+    @click.option("--dependent-project", "dependent_project_id", default=None, hidden=domain != "project-dependencies")
+    @click.option(
+        "--prerequisite-project", "prerequisite_project_id", default=None, hidden=domain != "project-dependencies"
+    )
+    @click.option(
+        "--affected-gate",
+        type=click.Choice(["readiness", "closure"]),
+        default=None,
+        hidden=domain != "project-dependencies",
+    )
     @click.option("--json", "json_output", is_flag=True)
     @click.pass_context
     def list_records(ctx: click.Context, limit: int, after: str | None, json_output: bool, **filters: Any) -> None:
@@ -143,6 +159,19 @@ NATIVE_COMMANDS = {
     "test-plans": _domain_group("test-plans", "test-plans"),
     "test-phases": _domain_group("test-phases", "test-phases"),
 }
+
+
+NATIVE_COMMANDS["projects"].add_command(_domain_group("dependencies", "project-dependencies"))
+
+
+@NATIVE_COMMANDS["projects"].command("readiness")
+@click.argument("project_id")
+@click.option("--gate", type=click.Choice(["readiness", "closure"]), default="readiness", show_default=True)
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def project_readiness(ctx: click.Context, project_id: str, gate: str, json_output: bool) -> None:
+    """Explain whether the project's exact prerequisite outcomes are available."""
+    _emit(_call(ctx, "GET", f"/v1/projects/{quote(project_id, safe='')}/readiness", query={"gate": gate}), json_output)
 
 
 @NATIVE_COMMANDS["projects"].command("move-item")
@@ -270,7 +299,7 @@ def work_context(ctx: click.Context, work_item_id: str, json_output: bool) -> No
     """Read project, program, formal sources, test, and predecessor state together."""
     result = _call(ctx, "GET", f"/v1/work-items/{quote(work_item_id, safe='')}/context")
     if not json_output:
-        for key in ("program", "project", "work_item", "specifications", "test", "predecessors"):
+        for key in ("program", "project", "work_item", "specifications", "test", "predecessors", "readiness"):
             if result.get(key):
                 click.echo(f"{key}:")
                 _emit(result[key], False)

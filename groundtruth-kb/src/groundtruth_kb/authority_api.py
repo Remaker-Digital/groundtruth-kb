@@ -27,6 +27,7 @@ from groundtruth_kb.bridge.native import (
 )
 from groundtruth_kb.native_authority import (
     AuthorityService,
+    DependencyMutation,
     Identifier,
     MembershipMove,
     ProjectMutation,
@@ -44,7 +45,9 @@ from groundtruth_kb.project.native_finalization import (
     NativeProjectFinalization,
 )
 
-Domain = Literal["specifications", "tests", "projects", "work-items", "test-plans", "test-phases"]
+Domain = Literal[
+    "specifications", "tests", "projects", "work-items", "test-plans", "test-phases", "project-dependencies"
+]
 
 
 class CanonicalJSONResponse(Response):
@@ -189,6 +192,9 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
         test_type: str | None = None,
         parent_project_id: str | None = None,
         application_scope: str | None = None,
+        dependent_project_id: str | None = None,
+        prerequisite_project_id: str | None = None,
+        affected_gate: str | None = None,
     ) -> Response:
         accepted = {
             "after",
@@ -204,6 +210,9 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
             "test_type",
             "parent_project_id",
             "application_scope",
+            "dependent_project_id",
+            "prerequisite_project_id",
+            "affected_gate",
         }
         if set(request.query_params) - accepted or len(request.query_params.multi_items()) != len(request.query_params):
             raise PostgresKernelError("invalid_query", "Unknown or repeated query fields are not accepted")
@@ -220,6 +229,9 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
                 "test_type": test_type,
                 "parent_project_id": parent_project_id,
                 "application_scope": application_scope,
+                "dependent_project_id": dependent_project_id,
+                "prerequisite_project_id": prerequisite_project_id,
+                "affected_gate": affected_gate,
             }.items()
             if value is not None
         }
@@ -260,6 +272,14 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     @app.put("/v1/projects/{record_id}")
     def amend_project(record_id: Identifier, request: ProjectMutation) -> Response:
         return _result(service.amend_project(record_id, request))
+
+    @app.put("/v1/project-dependencies/{record_id}")
+    def amend_dependency(record_id: Identifier, request: DependencyMutation) -> Response:
+        return _result(service.amend_dependency(record_id, request))
+
+    @app.get("/v1/projects/{record_id}/readiness")
+    def project_readiness(record_id: Identifier, gate: Literal["readiness", "closure"] = "readiness") -> Response:
+        return _result(service.project_readiness(record_id, gate))
 
     @app.put("/v1/work-items/{record_id}")
     def amend_work_item(record_id: Identifier, request: WorkItemMutation) -> Response:

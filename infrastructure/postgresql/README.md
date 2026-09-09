@@ -307,3 +307,60 @@ commits, overlapping integration edits, fresh verification and confirmation
 after an uncertain acknowledgement. The ordinary CLI-process suite includes
 publication, successor review and project commit. These are disposable native
 qualification scenarios, not proof of the still-pending production cutover.
+
+
+### Project prerequisites through the ordinary CLI
+
+Project dependencies describe exact prerequisite outcomes. They never set or
+recheck project authorization. With the native authority configured:
+
+    gt projects dependencies list --dependent-project <project-id> --json
+    gt projects dependencies show <dependency-id> --json
+    gt projects readiness <project-id> --gate readiness --json
+    gt projects readiness <project-id> --gate closure --json
+
+Readiness reports each dependency's required state, current state and reason.
+Task context includes the same readiness report. This evaluates project
+prerequisites; it is not a claim that all work-item readiness conditions pass.
+The bridge queue separates blocked advancement from eligible work and retains
+the prerequisite explanation. Corrective rejection, withdrawal and supersession
+remain available through their lawful transitions.
+
+Create or amend a dependency with an authored JSON fields file:
+
+```json
+{
+  "dependent_project_id": "PROJECT-SUCCESSOR",
+  "prerequisite_project_id": "PROJECT-PREDECESSOR",
+  "required_prerequisite_state": "verified",
+  "affected_gate": "readiness",
+  "rationale": "The successor needs the predecessor's complete committed result."
+}
+```
+
+    gt projects dependencies record --id <dependency-id> --fields-file <fields.json> --expected-version 0 --actor <actor> --change-reason <reason> --json
+
+Use the current returned version for amendments. `{"status":"retired"}` removes
+an edge from current gating; `{"status":"active"}` recovers it only if its
+endpoints and the resulting graph are valid. Both preserve prior versions and
+project authorization. Cycles, duplicate edges, invalid endpoints and stale
+versions refuse without partial mutation. Current-state migration validates the
+same graph contract; it never aliases `completed` to `verified`.
+
+Supported required states are exactly `active`, `verified`, `retired` and
+`cancelled`. A required `verified` outcome is satisfied only by verified project
+state with its canonical activation Git link. Retirement is a separate outcome.
+The `readiness` gate applies to forward bridge claims/delivery, implementation
+fence checks and publication. `closure` additionally gates complete-project
+preparation and confirmation. Publication and integration hold the relevant
+project rows while checking prerequisites and performing the short effect, so a
+concurrent dependency edit cannot pass between that check and the effect.
+
+`platform_tests/groundtruth_kb/test_native_project_dependencies.py` exercises
+blocked new claims, changes after retrieval, independent corrective rejection,
+concurrent cycle creation, publication/edit arbitration, and a real predecessor
+commit unblocking its successor. The ordinary CLI-process qualification covers
+dependency creation/readback, useful readiness output and retirement without
+client database credentials. Migration tests reject invalid native dependency
+contracts before import. Work-item predecessor readiness and the remaining
+legacy dependency consumers are still separate outstanding repair work.

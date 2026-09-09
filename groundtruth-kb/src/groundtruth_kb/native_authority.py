@@ -7,6 +7,7 @@ its resulting current-state/history changes commit together.
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 from uuid import uuid4
@@ -14,7 +15,14 @@ from uuid import uuid4
 from psycopg import sql
 from pydantic import BaseModel, ConfigDict, Field
 
-from groundtruth_kb.postgres_kernel import TABLE_SPECS, PostgresKernel, PostgresKernelError, PostgresTransaction
+from groundtruth_kb.postgres_kernel import (
+    TABLE_SPECS,
+    PostgresKernel,
+    PostgresKernelError,
+    PostgresTransaction,
+    dependency_shape,
+    validate_project_dependencies,
+)
 
 Identifier = Annotated[str, Field(min_length=1, max_length=256, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")]
 Text = Annotated[str, Field(min_length=1)]
@@ -115,6 +123,22 @@ class ProjectMutation(Mutation):
     fields: ProjectFields
 
 
+class DependencyFields(Request):
+    dependent_project_id: Identifier | None = None
+    prerequisite_project_id: Identifier | None = None
+    dependency_kind: Literal["requires_project_state"] | None = None
+    required_prerequisite_state: Literal["active", "verified", "retired", "cancelled"] | None = None
+    affected_gate: Literal["readiness", "closure"] | None = None
+    rationale: Text | None = None
+    provenance: Text | None = None
+    related_work_item_id: Identifier | None = None
+    status: Literal["active", "retired"] | None = None
+
+
+class DependencyMutation(Mutation):
+    fields: DependencyFields
+
+
 class WorkItemFields(Request):
     title: Text | None = None
     description: str | None = None
@@ -147,6 +171,7 @@ DOMAINS = {
     "work-items": "work_items",
     "test-plans": "test_plans",
     "test-phases": "test_plan_phases",
+    "project-dependencies": "project_dependencies",
 }
 FILTERS = {
     "specifications": {"status", "type", "priority", "authority", "testability", "application_scope"},
@@ -155,6 +180,7 @@ FILTERS = {
     "work-items": {"resolution_status", "priority", "component", "source_spec_id"},
     "test-plans": {"status"},
     "test-phases": {"plan_id"},
+    "project-dependencies": {"status", "dependent_project_id", "prerequisite_project_id", "affected_gate"},
 }
 
 
@@ -216,6 +242,72 @@ def _execution_project(tx: PostgresTransaction, project_id: str) -> dict[str, An
     if project["status"] != "active":
         _error("project_closed", "Membership cannot change in a closed project")
     return project
+
+
+def _project_commit(tx: PostgresTransaction, project_id: str) -> str | None:
+    links = _related(
+        tx,
+        "project_artifact_links",
+        project_id=project_id,
+        artifact_type="git_commit",
+        relationship="activation",
+        status="active",
+    )
+    commit = links[0]["artifact_ref"] if len(links) == 1 else None
+    return commit if isinstance(commit, str) and re.fullmatch(r"[0-9a-f]{40}(?:[0-9a-f]{24})?", commit) else None
+
+
+def _project_dependency_readiness(
+    tx: PostgresTransaction, project_id: str, gate: str, *, lock: bool = False
+) -> dict[str, Any]:
+    if gate not in {"readiness", "closure"}:
+        _error("invalid_dependency_gate", "Dependencies affect readiness or project closure")
+    project = _required(tx, "projects", project_id, lock=lock)
+    if project["kind"] != "project":
+        _error("program_has_no_readiness", "Readiness applies to the execution projects sequenced by a program")
+    results = []
+    for record in _related(tx, "project_dependencies", dependent_project_id=project_id, status="active"):
+        if dependency_shape(record) and record["affected_gate"] != gate:
+            continue
+        prerequisite = tx.get("projects", {"id": record["prerequisite_project_id"]}, lock=lock)
+        current = prerequisite["status"] if prerequisite else None
+        reason = None
+        if not dependency_shape(record):
+            reason = "invalid_dependency_contract"
+        elif not prerequisite or prerequisite["kind"] != "project":
+            reason = "invalid_prerequisite_project"
+        elif current != record["required_prerequisite_state"]:
+            reason = "prerequisite_state_not_reached"
+        elif current == "verified" and not _project_commit(tx, prerequisite["id"]):
+            reason = "prerequisite_commit_missing"
+        results.append(
+            {
+                "dependency_id": record["id"],
+                "prerequisite_project_id": record["prerequisite_project_id"],
+                "required_state": record["required_prerequisite_state"],
+                "current_state": current,
+                "satisfied": reason is None,
+                "reason": reason,
+            }
+        )
+    return {
+        "project_id": project_id,
+        "gate": gate,
+        "ready": all(row["satisfied"] for row in results),
+        "dependencies": results,
+    }
+
+
+def _require_project_dependencies(
+    tx: PostgresTransaction, project_id: str, gate: str = "readiness", *, lock: bool = False
+) -> None:
+    result = _project_dependency_readiness(tx, project_id, gate, lock=lock)
+    if not result["ready"]:
+        _error(
+            "project_dependencies_unsatisfied",
+            "Required predecessor results are not available; read project readiness",
+            **result,
+        )
 
 
 def _write(
@@ -353,6 +445,71 @@ class AuthorityService:
                 defaults["authorization"] = "not authorized"
             return _write(tx, "projects", record_id, fields, request, defaults=defaults)
 
+    def amend_dependency(self, record_id: str, request: DependencyMutation) -> dict[str, Any]:
+        with self.kernel.transaction() as tx:
+            current = tx.get("project_dependencies", {"id": record_id}, lock=True)
+            actual = current["version"] if current else 0
+            if actual != request.expected_version:
+                _error(
+                    "cas_conflict",
+                    "Read the current dependency before changing it",
+                    id=record_id,
+                    expected=request.expected_version,
+                    actual=actual,
+                )
+            fields = request.fields.model_dump(exclude_unset=True)
+            candidate = {
+                **(current or {"id": record_id, "status": "active", "dependency_kind": "requires_project_state"}),
+                **fields,
+            }
+            if not current and fields.get("status", "active") != "active":
+                _error("invalid_dependency_transition", "A new dependency starts active")
+            for key in ("dependent_project_id", "prerequisite_project_id"):
+                if not candidate.get(key):
+                    _error("dependency_endpoint_required", "A dependency names both execution projects")
+                _required(tx, "projects", candidate[key])
+            # Publication and finalization hold this same project row before
+            # reading its edges. New or changed prerequisites cannot cross an effect.
+            affected = {candidate["dependent_project_id"]}
+            if current:
+                affected.add(current["dependent_project_id"])
+            for project_id in sorted(affected):
+                project = _required(tx, "projects", project_id, lock=True)
+                if project["kind"] != "project":
+                    _error("invalid_dependency_endpoint", "Dependencies sequence execution projects")
+                if candidate["status"] == "active" and project["status"] != "active":
+                    _error("closed_dependent_project", "A closed project cannot acquire or change an active dependency")
+            prerequisite = _required(tx, "projects", candidate["prerequisite_project_id"])
+            if (
+                candidate["status"] == "active"
+                and prerequisite["status"] in {"retired", "cancelled", "verified"}
+                and prerequisite["status"] != candidate.get("required_prerequisite_state")
+            ):
+                _error("unreachable_dependency", "The closed prerequisite cannot reach the requested state")
+            if candidate.get("related_work_item_id"):
+                _required(tx, "work_items", candidate["related_work_item_id"])
+            graph = [row for row in _related(tx, "project_dependencies", status="active") if row["id"] != record_id]
+            projects = {row["id"]: row for row in _related(tx, "projects")}
+            validate_project_dependencies(graph + [candidate], projects)
+            return _write(
+                tx,
+                "project_dependencies",
+                record_id,
+                fields,
+                request,
+                defaults={
+                    "status": "active",
+                    "dependency_kind": "requires_project_state",
+                    "registry_version": 1,
+                    "provenance": request.actor,
+                    "blocking_status": "open",
+                },
+            )
+
+    def project_readiness(self, project_id: str, gate: str = "readiness") -> dict[str, Any]:
+        with self.kernel.transaction(read_only=True) as tx:
+            return _project_dependency_readiness(tx, project_id, gate)
+
     def amend_work_item(self, record_id: str, request: WorkItemMutation) -> dict[str, Any]:
         fields = request.fields.model_dump(exclude_unset=True)
         with self.kernel.transaction() as tx:
@@ -473,6 +630,7 @@ class AuthorityService:
                 "specifications": formals,
                 "test": _required(tx, "tests", work["source_test_id"]) if work.get("source_test_id") else None,
                 "predecessors": [_required(tx, "work_items", key) for key in work.get("depends_on_work_items") or []],
+                "readiness": _project_dependency_readiness(tx, project["id"], "readiness"),
                 "project_dependencies": _related(
                     tx, "project_dependencies", dependent_project_id=project["id"], status="active"
                 ),

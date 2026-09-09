@@ -760,7 +760,7 @@ def _create_sqlite_fixture(path: Path) -> sqlite3.Connection:
                 "id TEXT, version INTEGER, dependent_project_id TEXT, prerequisite_project_id TEXT, "
                 "dependency_kind TEXT, required_prerequisite_state TEXT, affected_gate TEXT, provenance TEXT, "
                 "registry_version INTEGER, blocking_status TEXT, status TEXT, changed_by TEXT, changed_at TEXT, "
-                "change_reason TEXT"
+                "change_reason TEXT, rationale TEXT"
             )
         else:
             definition = "marker TEXT"
@@ -851,12 +851,12 @@ def _create_sqlite_fixture(path: Path) -> sqlite3.Connection:
     connection.execute(
         "INSERT INTO project_dependencies VALUES "
         "('opaque-preserve',1,'PROJECT-A','PROJECT-GTKB-NEW-WORK-INTAKE','requires_project_state','retired',"
-        "'authorization','integration',1,'open','active','integration','2026-09-01T00:00:00+00:00','fixture')"
+        "'authorization','integration',1,'open','active','integration','2026-09-01T00:00:00+00:00','fixture','Wait for the required retirement outcome')"
     )
     connection.execute(
         "INSERT INTO project_dependencies VALUES "
         "('opaque-retire',1,'PROJECT-GTKB-NEW-WORK-INTAKE','PROJECT-A','requires_project_state','retired',"
-        "'readiness','integration',1,'open','active','integration','2026-09-01T00:00:00+00:00','fixture')"
+        "'readiness','integration',1,'open','active','integration','2026-09-01T00:00:00+00:00','fixture','Obsolete reverse ordering to retire')"
     )
     connection.commit()
     return connection

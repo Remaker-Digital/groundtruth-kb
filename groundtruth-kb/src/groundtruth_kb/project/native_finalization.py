@@ -16,7 +16,15 @@ from psycopg import sql
 from pydantic import Field
 
 from groundtruth_kb.bridge.native import NativeBridgeService, SessionRequest
-from groundtruth_kb.native_authority import Mutation, Text, _error, _related, _required, _write
+from groundtruth_kb.native_authority import (
+    Mutation,
+    Text,
+    _error,
+    _related,
+    _require_project_dependencies,
+    _required,
+    _write,
+)
 from groundtruth_kb.postgres_kernel import PostgresKernelError, canonical_json_bytes
 from groundtruth_kb.session.worktree import (
     SessionWorktreeError,
@@ -86,6 +94,8 @@ class NativeProjectFinalization:
         return binding, project
 
     def _cohort(self, tx, project):
+        _require_project_dependencies(tx, project["id"], lock=True)
+        _require_project_dependencies(tx, project["id"], "closure", lock=True)
         members = _related(tx, "project_work_item_memberships", project_id=project["id"], status="active")
         if not members:
             _error("empty_project", "An empty project is not a completed work product")
