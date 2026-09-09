@@ -493,6 +493,22 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
             dependency_file.write_text('{"status":"retired"}', encoding="utf-8")
             retired = dependency_record(1)
             assert retired.returncode == 0 and json.loads(retired.stdout)["status"] == "retired", retired.stderr
+            assert put(client, "projects", "PROJECT-DEPENDENT", {"name": "Downstream project"}).status_code == 200
+            assert (
+                put(
+                    client,
+                    "work-items",
+                    "WI-DEPENDENT",
+                    work_fields(depends_on_work_items=["WI-1"]),
+                    project_id="PROJECT-DEPENDENT",
+                ).status_code
+                == 200
+            )
+            work_readiness = cli("backlog", "readiness", "WI-DEPENDENT", "--json")
+            assert work_readiness.returncode == 0, work_readiness.stderr
+            assert json.loads(work_readiness.stdout)["ready"] is False
+            work_context = cli("context", "work-item", "WI-DEPENDENT", "--json")
+            assert json.loads(work_context.stdout)["work_item_readiness"] == json.loads(work_readiness.stdout)
             amendment = tmp_path / "fields.json"
             amendment.write_text(
                 json.dumps({"description": "Fresh context reads current canon: æ¼¢å­— cafÃ©"}), encoding="utf-8"
@@ -673,6 +689,9 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
             assert (tmp_path / "code.py").read_text() == "value = 2\n"
             terminal = cli("projects", "show", "PROJECT-1", "--json")
             assert json.loads(terminal.stdout)["project"]["status"] == "verified"
+            work_readiness = cli("backlog", "readiness", "WI-DEPENDENT", "--json")
+            assert work_readiness.returncode == 0, work_readiness.stderr
+            assert json.loads(work_readiness.stdout)["ready"] is True
             disabled = cli("db", "postgres", "status")
             assert disabled.returncode != 0 and "fallback is disabled" in disabled.stderr
         finally:

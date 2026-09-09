@@ -37,6 +37,7 @@ from groundtruth_kb.native_authority import (
     Text,
     _current_parent,
     _error,
+    _project_commit,
     _project_dependency_readiness,
     _related,
     _require_project_dependencies,
@@ -244,9 +245,9 @@ class NativeBridgeService:
         self.kernel = kernel
         self.project_root = project_root.resolve()
 
-    def work_root(self, project_id: str) -> Path:
+    def work_root(self, project_id: str, *, create: bool = True, refresh_base: bool = False) -> Path:
         try:
-            return project_worktree(self.project_root, project_id)
+            return project_worktree(self.project_root, project_id, create=create, refresh_base=refresh_base)
         except SessionWorktreeError as error:
             raise PostgresKernelError(error.code, str(error)) from error
 
@@ -348,6 +349,126 @@ class NativeBridgeService:
             for b in right
         )
 
+    def _dependency_readiness(self, tx, work_item_id, *, attempt=None, lock=False, cross_project_only=False):
+        work = _required(tx, "work_items", work_item_id, lock=lock)
+        project_id = _current_parent(tx, work_item_id)["project_id"]
+        if attempt is None:
+            tx.cursor.execute(
+                sql.SQL("SELECT * FROM {}.bridge_attempts WHERE work_item_id=%s AND disposition='active'").format(
+                    sql.Identifier(tx.schema)
+                ),
+                (work_item_id,),
+            )
+            attempts = tx.cursor.fetchall()
+            attempt = dict(attempts[0]) if len(attempts) == 1 else None
+        change_paths = []
+        if attempt and attempt["go_context_id"] and attempt["head_status"] in {"GO", "READY", "NOT-READY", "VERIFIED"}:
+            try:
+                self._scope(tx, attempt, lock=lock)
+            except PostgresKernelError as error:
+                if error.code not in {"scope_changed", "not_found"}:
+                    raise
+            else:
+                # An accepted successor intentionally changes these artifacts.
+                # Project finalization independently verifies every final map.
+                change_paths = attempt["proposal_paths"] + attempt["test_targets"]
+        results = []
+        for predecessor_id in work.get("depends_on_work_items") or []:
+            predecessor = _required(tx, "work_items", predecessor_id, lock=lock)
+            parent = _current_parent(tx, predecessor_id)["project_id"]
+            if cross_project_only and parent == project_id:
+                continue
+            project = _required(tx, "projects", parent, lock=lock)
+            required = (
+                "project_commit" if parent != project_id or project["status"] == "verified" else "independent_review"
+            )
+            reason, changed_paths = None, []
+            if predecessor["resolution_status"] != "verified":
+                reason = "predecessor_not_verified"
+            elif required == "project_commit":
+                commit = _project_commit(tx, parent)
+                if project["status"] != "verified" or not commit:
+                    reason = "predecessor_project_not_committed"
+                elif predecessor["completion_evidence"] != "git:" + commit:
+                    reason = "predecessor_terminal_commit_mismatch"
+            else:
+                tx.cursor.execute(
+                    sql.SQL("SELECT * FROM {}.bridge_attempts WHERE work_item_id=%s AND disposition='active'").format(
+                        sql.Identifier(tx.schema)
+                    )
+                    + (sql.SQL(" FOR UPDATE") if lock else sql.SQL("")),
+                    (predecessor_id,),
+                )
+                reviews = tx.cursor.fetchall()
+                if len(reviews) != 1 or reviews[0]["head_status"] != "VERIFIED" or not reviews[0]["verified_artifacts"]:
+                    reason = "predecessor_review_missing"
+                else:
+                    review = dict(reviews[0])
+                    if review["finalization_failure"]:
+                        reason = "predecessor_reverification_required"
+                    else:
+                        try:
+                            self._scope(tx, review, lock=lock)
+                        except PostgresKernelError as error:
+                            if error.code not in {"scope_changed", "not_found"}:
+                                raise
+                            reason = "predecessor_scope_changed"
+                        else:
+                            required_artifacts = {
+                                path: blob
+                                for path, blob in review["verified_artifacts"].items()
+                                if not self._overlap([path], change_paths)
+                            }
+                            try:
+                                actual = self._snapshot(
+                                    sorted(required_artifacts), root=self.work_root(parent, create=False)
+                                )
+                            except PostgresKernelError as error:
+                                if error.code not in {
+                                    "project_checkout_missing",
+                                    "project_checkout_unregistered",
+                                    "artifact_snapshot_failed",
+                                }:
+                                    raise
+                                reason = "predecessor_artifacts_unavailable"
+                            else:
+                                changed_paths = sorted(
+                                    path for path, blob in required_artifacts.items() if actual[path] != blob
+                                )
+                                if changed_paths:
+                                    reason = "predecessor_reviewed_bytes_changed"
+            results.append(
+                {
+                    "work_item_id": predecessor_id,
+                    "project_id": parent,
+                    "required_result": required,
+                    "current_status": predecessor["resolution_status"],
+                    "satisfied": reason is None,
+                    "reason": reason,
+                    "changed_paths": changed_paths,
+                }
+            )
+        return {
+            "work_item_id": work_item_id,
+            "project_id": project_id,
+            "ready": all(row["satisfied"] for row in results),
+            "predecessors": results,
+            "accepted_change_paths": sorted(set(change_paths)),
+        }
+
+    def work_item_readiness(self, work_item_id: str) -> dict[str, Any]:
+        with self.kernel.transaction(read_only=True) as tx:
+            return self._dependency_readiness(tx, work_item_id)
+
+    def _require_work_dependencies(self, tx, work_item_id, **options):
+        result = self._dependency_readiness(tx, work_item_id, **options)
+        if not result["ready"]:
+            _error(
+                "work_item_dependencies_unsatisfied",
+                "Required work-item results are unavailable; read backlog readiness",
+                **result,
+            )
+
     def claim(self, document: str, request: ClaimRequest) -> dict[str, Any]:
         with self.kernel.transaction() as tx:
             binding = self._binding(tx, request.native_context_id)
@@ -388,6 +509,7 @@ class NativeBridgeService:
                 _error("project_not_authorized", "The parent project is not authorized for a NEW proposal")
             if request.intended_status in {"NEW", "REVISED", "GO", "READY", "VERIFIED"}:
                 _require_project_dependencies(tx, project_id)
+                self._require_work_dependencies(tx, work["id"], attempt=attempt)
             if project_id:
                 self.work_root(project_id)
             if request.intended_status == "VERIFIED" and attempt["head_status"] == "VERIFIED":
@@ -487,6 +609,7 @@ class NativeBridgeService:
             if claim["intended_status"] == "READY":
                 self._scope(tx, attempt)
                 _require_project_dependencies(tx, attempt["project_id"])
+                self._require_work_dependencies(tx, attempt["work_item_id"], attempt=attempt)
             return {
                 "status": "current",
                 "claim": _public({key: value for key, value in claim.items() if key != "live"}),
@@ -520,6 +643,7 @@ class NativeBridgeService:
             binding, attempt, claim = self._fenced(tx, document, request)
             if claim["intended_status"] in {"NEW", "REVISED", "GO", "READY", "VERIFIED"}:
                 _require_project_dependencies(tx, attempt["project_id"], lock=True)
+                self._require_work_dependencies(tx, attempt["work_item_id"], attempt=attempt, lock=True)
             own_paths = set(attempt["proposal_paths"] + attempt["test_targets"])
             paths = set(own_paths)
             tx.cursor.execute(
@@ -530,7 +654,11 @@ class NativeBridgeService:
             )
             for row in tx.cursor.fetchall():
                 paths.update(row["proposal_paths"] + row["test_targets"])
-            source = self.work_root(attempt["project_id"]) if attempt["project_id"] else self.project_root
+            source = (
+                self.work_root(attempt["project_id"], refresh_base=True) if attempt["project_id"] else self.project_root
+            )
+            if claim["intended_status"] in {"NEW", "REVISED", "GO", "READY", "VERIFIED"}:
+                self._require_work_dependencies(tx, attempt["work_item_id"], attempt=attempt, lock=True)
             head = subprocess.run(
                 ["git", "-C", str(source), "rev-parse", "HEAD"], capture_output=True, text=True, check=True
             ).stdout.strip()
@@ -561,6 +689,7 @@ class NativeBridgeService:
                 )
             self._scope(tx, attempt, lock=True)
             _require_project_dependencies(tx, attempt["project_id"], lock=True)
+            self._require_work_dependencies(tx, attempt["work_item_id"], attempt=attempt, lock=True)
             try:
                 artifacts = publish_context_work(
                     self.project_root,
@@ -688,6 +817,7 @@ class NativeBridgeService:
                 _error("project_not_authorized", "The parent project is not authorized at NEW proposal filing")
             if status in {"NEW", "REVISED", "GO", "READY", "VERIFIED"}:
                 _require_project_dependencies(tx, project["id"])
+                self._require_work_dependencies(tx, work["id"], attempt=attempt)
             if status == "BLOCKED":
                 if request.mode != "headless":
                     _error(
@@ -878,10 +1008,11 @@ class NativeBridgeService:
                 fresh_verification = role == "lo" and row["head_status"] == "VERIFIED" and row["finalization_failure"]
                 if ordinary or fresh_verification:
                     readiness = _project_dependency_readiness(tx, row["project_id"], "readiness")
-                    if readiness["ready"]:
+                    work_readiness = self._dependency_readiness(tx, row["work_item_id"], attempt=row)
+                    if readiness["ready"] and work_readiness["ready"]:
                         eligible.append(_public(row))
                     else:
-                        blocked.append({**_public(row), "readiness": readiness})
+                        blocked.append({**_public(row), "readiness": readiness, "work_item_readiness": work_readiness})
             return {"role": role, "eligible": eligible, "blocked": blocked}
 
     def abandon(self, document: str, request: AbandonRequest) -> dict[str, Any]:

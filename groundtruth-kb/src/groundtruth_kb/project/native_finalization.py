@@ -127,6 +127,7 @@ class NativeProjectFinalization:
             for spec_id in sorted(attempt["spec_versions"]):
                 _required(tx, "specifications", spec_id, lock=True)
             self.bridge._scope(tx, attempt)
+            self.bridge._require_work_dependencies(tx, work["id"], attempt=attempt, lock=True, cross_project_only=True)
             for path, blob in attempt["verified_artifacts"].items():
                 if path.casefold().split("/")[0] == "bridge":
                     _error("bridge_payload_in_cohort", "Bridge payloads cannot enter a project work-product commit")

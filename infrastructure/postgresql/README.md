@@ -362,8 +362,8 @@ concurrent cycle creation, publication/edit arbitration, and a real predecessor
 commit unblocking its successor. The ordinary CLI-process qualification covers
 dependency creation/readback, useful readiness output and retirement without
 client database credentials. Migration tests reject invalid native dependency
-contracts before import. Work-item predecessor readiness and the remaining
-legacy dependency consumers are still separate outstanding repair work.
+contracts before import. The remaining legacy dependency consumers still need
+reconciliation with this native contract.
 
 Work-item `depends_on_work_items` is a list of distinct current work-item
 identifiers. An absent list means no predecessors. Predicate objects, non-work
@@ -376,8 +376,53 @@ item and missing endpoints or the actual cycle, without a partial mutation.
 The kernel and native authority suites exercise accepted same- and cross-project
 references, malformed source arrays, missing endpoints, closed/open cycles, deep
 shared predecessors, atomic amendments, and concurrent opposing dependency
-writes. Graph validity does not assert that predecessor work has been performed;
-the runtime predecessor-readiness checks noted above remain to be completed.
+writes. Graph validity does not assert that predecessor work has been performed.
+
+### Work-item predecessor results
+
+    gt backlog readiness <work-item-id> --json
+    gt context work-item <work-item-id> --json
+
+The work-item readiness report identifies the required result, current status and
+specific reason for each unavailable predecessor. Task context reads the same
+report together with project readiness. These prerequisite checks do not replace
+the separate role, proposal, claim, review or NEW-authorization checks.
+
+Within one project, an independently VERIFIED predecessor can support dependent
+work before the shared project commit. Its current attempt, work/formal scope
+and exact reviewed artifacts must exist; known fresh-verification state blocks
+advancement. Before GO, the predecessor bytes must still match that review. After
+GO, paths covered by the dependent item's current accepted proposal may change
+as that work proceeds. The report names these `accepted_change_paths`; predecessor
+artifacts outside that scope must still match their review. Final project
+preparation/confirmation checks every member's complete final artifact map and
+requests fresh verification of stale members before committing once.
+
+Across projects, the predecessor must have verified project state, the sole
+canonical activation commit and matching work-item terminal commit evidence.
+A status label, retirement, missing review or uncommitted project is insufficient.
+An item dependency neither creates a project-dependency edge nor blocks unrelated
+sibling work.
+
+Forward claims/delivery, implementation fence checks and publication use current
+predecessor facts. Short effects lock those facts through the publication boundary.
+Corrective negative verdicts remain available without fabricating a new lifecycle
+status. Queue diagnostics identify blocked work and its missing predecessor result.
+The unresolved recovery contract for materially changed formal intent still needs
+closure; detection alone does not supply a lawful new implementation transition.
+
+Context loading incorporates committed integration results into the service's
+project checkout with an ordinary fast-forward before creating the receiving
+context's checkout. Unrelated unfinished project work is preserved; conflicting
+work returns `project_base_reconciliation_required`. Existing context work is not
+reset to a new base: the receiving context must be fresh when its previous base
+differs. Read-only readiness neither creates nor refreshes a project checkout.
+
+`platform_tests/groundtruth_kb/test_native_work_item_dependencies.py` exercises
+same-project dependencies, shared-artifact final review/commit, cross-project
+commit/loading, changed prerequisites, effect arbitration, missing checkouts and
+preservation of conflicting local work. The native CLI-process suite exercises
+ordinary readiness/context reads without client database credentials.
 
 
 Successive work items in one project may change the same artifact. Finalization

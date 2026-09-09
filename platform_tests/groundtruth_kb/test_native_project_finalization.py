@@ -45,10 +45,20 @@ def integration(root):
     return Path(git(root, "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.strip()).parent
 
 
-def verify(client, contexts, root, number, path):
+def verify(client, contexts, root, number, path, **proposal_fields):
     document = f"chain-{number}"
     work = f"WI-{number}"
-    deliver(client, contexts, document, "pb1", 1, "NEW", work_item_id=work, target_paths=json.dumps([path]))
+    deliver(
+        client,
+        contexts,
+        document,
+        "pb1",
+        1,
+        "NEW",
+        work_item_id=work,
+        target_paths=json.dumps([path]),
+        **proposal_fields,
+    )
     deliver(client, contexts, document, "lo1", 2, "GO", work_item_id=work)
     reserved = claim(client, document, "pb2", 2, "READY", work_item_id=work)
     assert reserved.status_code == 200, reserved.text

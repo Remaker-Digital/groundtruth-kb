@@ -174,6 +174,15 @@ def project_readiness(ctx: click.Context, project_id: str, gate: str, json_outpu
     _emit(_call(ctx, "GET", f"/v1/projects/{quote(project_id, safe='')}/readiness", query={"gate": gate}), json_output)
 
 
+@NATIVE_COMMANDS["backlog"].command("readiness")
+@click.argument("work_item_id")
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def work_item_readiness(ctx: click.Context, work_item_id: str, json_output: bool) -> None:
+    """Explain whether this item's reviewed or committed predecessors are available."""
+    _emit(_call(ctx, "GET", f"/v1/work-items/{quote(work_item_id, safe='')}/readiness"), json_output)
+
+
 @NATIVE_COMMANDS["projects"].command("move-item")
 @click.option("--work-item-id", required=True)
 @click.option("--from-project", "source_project_id", required=True)
@@ -299,7 +308,16 @@ def work_context(ctx: click.Context, work_item_id: str, json_output: bool) -> No
     """Read project, program, formal sources, test, and predecessor state together."""
     result = _call(ctx, "GET", f"/v1/work-items/{quote(work_item_id, safe='')}/context")
     if not json_output:
-        for key in ("program", "project", "work_item", "specifications", "test", "predecessors", "readiness"):
+        for key in (
+            "program",
+            "project",
+            "work_item",
+            "specifications",
+            "test",
+            "predecessors",
+            "readiness",
+            "work_item_readiness",
+        ):
             if result.get(key):
                 click.echo(f"{key}:")
                 _emit(result[key], False)

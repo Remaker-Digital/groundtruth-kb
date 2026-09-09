@@ -291,6 +291,10 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
 
     @app.get("/v1/work-items/{record_id}/context")
     def context(record_id: Identifier) -> Response:
-        return _result(service.task_context(record_id))
+        return _result(service.task_context(record_id, predecessor_readiness=bridge._dependency_readiness))
+
+    @app.get("/v1/work-items/{record_id}/readiness")
+    def work_item_readiness(record_id: Identifier) -> Response:
+        return _result(bridge.work_item_readiness(record_id))
 
     return app

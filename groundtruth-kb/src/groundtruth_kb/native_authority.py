@@ -600,7 +600,7 @@ class AuthorityService:
             )
             return {"work_item_id": record_id, "membership": updated}
 
-    def task_context(self, record_id: str) -> dict[str, Any]:
+    def task_context(self, record_id: str, *, predecessor_readiness=None) -> dict[str, Any]:
         """Load linked current facts without another context's memory or state."""
         with self.kernel.transaction(read_only=True) as tx:
             work = _required(tx, "work_items", record_id)
@@ -627,6 +627,7 @@ class AuthorityService:
                 "test": _required(tx, "tests", work["source_test_id"]) if work.get("source_test_id") else None,
                 "predecessors": [_required(tx, "work_items", key) for key in work.get("depends_on_work_items") or []],
                 "readiness": _project_dependency_readiness(tx, project["id"], "readiness"),
+                **({"work_item_readiness": predecessor_readiness(tx, record_id)} if predecessor_readiness else {}),
                 "project_dependencies": _related(
                     tx, "project_dependencies", dependent_project_id=project["id"], status="active"
                 ),

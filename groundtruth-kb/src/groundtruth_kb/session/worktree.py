@@ -634,7 +634,7 @@ def publish_context_work(
     return result
 
 
-def project_worktree(project_root: Path, project_id: str) -> Path:
+def project_worktree(project_root: Path, project_id: str, *, create: bool = True, refresh_base: bool = False) -> Path:
     """Keep a project's uncommitted work out of the integration checkout."""
     import hashlib
 
@@ -646,6 +646,8 @@ def project_worktree(project_root: Path, project_id: str) -> Path:
         raise SessionWorktreeError("project_checkout_outside_root", "The project checkout escapes its directory")
     branch = "project/" + key
     if not path.exists():
+        if not create:
+            raise SessionWorktreeError("project_checkout_missing", "The project's current work checkout is unavailable")
         existing = _git(root, "rev-parse", "--verify", "--quiet", "refs/heads/" + branch)
         if existing.returncode == 0:
             raise SessionWorktreeError("project_branch_preserved", "An existing project branch needs reconciliation")
@@ -662,4 +664,17 @@ def project_worktree(project_root: Path, project_id: str) -> Path:
         for record in records
     ):
         raise SessionWorktreeError("project_checkout_unregistered", "The exact project checkout is not registered")
+    if refresh_base:
+        upstream = _git(root, "rev-parse", "--verify", "HEAD")
+        if upstream.returncode:
+            raise SessionWorktreeError("project_base_missing", "The integration commit is unavailable")
+        current = _git(path, "rev-parse", "HEAD").stdout.strip()
+        if current != upstream.stdout.strip():
+            refreshed = _git(path, "merge", "--ff-only", upstream.stdout.strip())
+            if refreshed.returncode:
+                raise SessionWorktreeError(
+                    "project_base_reconciliation_required",
+                    "The committed integration result could not be incorporated without changing project work: "
+                    + refreshed.stderr.strip(),
+                )
     return path
