@@ -26,10 +26,10 @@ Already a developer-preview adopter? Jump straight to:
 
 - [CTO Evaluation Guide](docs/cto-evaluation.md) - pip install, dashboard, lifecycle, services, roles
 
-- [Day in the Life](docs/day-in-the-life.md) — a synthetic first week
-- [Evidence](docs/evidence.md) — live metrics, every row dated + pinned to a commit
-- [Known Limitations](docs/known-limitations.md) — open gaps, stated plainly
-- [Executive Overview](docs/groundtruth-kb-executive-overview.md) — the business case
+- [Day in the Life](docs/day-in-the-life.md) â€” a synthetic first week
+- [Evidence](docs/evidence.md) â€” live metrics, every row dated + pinned to a commit
+- [Known Limitations](docs/known-limitations.md) â€” open gaps, stated plainly
+- [Executive Overview](docs/groundtruth-kb-executive-overview.md) â€” the business case
 
 ## At a Glance
 
@@ -140,19 +140,19 @@ discipline behind GroundTruth:
 
 | Guide | Topic |
 |-------|-------|
-| [01 — Overview](docs/method/01-overview.md) | Core workflow and governance model |
-| [02 — Specifications](docs/method/02-specifications.md) | Writing and managing specifications |
-| [03 — Testing](docs/method/03-testing.md) | Test forms, outside-in testing, pipeline organization |
-| [04 — Work Items](docs/method/04-work-items.md) | Gap tracking, stage lifecycle, prioritization |
-| [05 — Governance](docs/method/05-governance.md) | GOV specs, gates, assertions, protected behaviors |
-| [06 — Dual-Agent](docs/method/06-dual-agent.md) | Prime Builder + Loyal Opposition collaboration |
-| [07 — Sessions](docs/method/07-sessions.md) | Session IDs, wrap-up, audit cadence |
-| [08 — Architecture](docs/method/08-architecture.md) | ADR/DCL/IPR/CVR workflow |
-| [09 — Adoption](docs/method/09-adoption.md) | Upstream/downstream model, update procedures |
-| [10 — Tooling](docs/method/10-tooling.md) | CLI commands, web UI, Python API, configuration |
-| [11 — Operational Config](docs/method/11-operational-configuration.md) | Bridges, automations, directives, roles |
-| [12 — File Bridge Automation](docs/method/12-file-bridge-automation.md) | Durable file bridge polling, prompts, plugins, skills, and scheduler capture |
-| [13 — Deliberation Archive](docs/method/13-deliberation-archive.md) | Decision log with semantic search |
+| [01 â€” Overview](docs/method/01-overview.md) | Core workflow and governance model |
+| [02 â€” Specifications](docs/method/02-specifications.md) | Writing and managing specifications |
+| [03 â€” Testing](docs/method/03-testing.md) | Test forms, outside-in testing, pipeline organization |
+| [04 â€” Work Items](docs/method/04-work-items.md) | Gap tracking, stage lifecycle, prioritization |
+| [05 â€” Governance](docs/method/05-governance.md) | GOV specs, gates, assertions, protected behaviors |
+| [06 â€” Dual-Agent](docs/method/06-dual-agent.md) | Prime Builder + Loyal Opposition collaboration |
+| [07 â€” Sessions](docs/method/07-sessions.md) | Session IDs, wrap-up, audit cadence |
+| [08 â€” Architecture](docs/method/08-architecture.md) | ADR/DCL/IPR/CVR workflow |
+| [09 â€” Adoption](docs/method/09-adoption.md) | Upstream/downstream model, update procedures |
+| [10 â€” Tooling](docs/method/10-tooling.md) | CLI commands, web UI, Python API, configuration |
+| [11 â€” Operational Config](docs/method/11-operational-configuration.md) | Bridges, automations, directives, roles |
+| [12 â€” File Bridge Automation](docs/method/12-file-bridge-automation.md) | Durable file bridge polling, prompts, plugins, skills, and scheduler capture |
+| [13 â€” Deliberation Archive](docs/method/13-deliberation-archive.md) | Decision log with semantic search |
 
 **Reference:**
 [Assertion Language](docs/reference/assertion-language.md) |
@@ -194,10 +194,28 @@ agent configuration, including a file bridge OS-poller setup prompt. Use
 `gt project init my-project --profile <profile>` for automated setup, or
 copy templates manually and customize the placeholders.
 
+## Current GT-KB task context
+
+For an assigned work item, `gt context work-item WI-NNNN --json` reads the
+native authority's current work, project, declared formal requirements and test
+instructions. Missing or inactive required sources and unavailable authority
+produce a non-success result. The declared relationship closure is a minimum;
+it does not replace judgment about additional applicable requirements.
+
+The descriptor manifest/freshness APIs and standalone modernization workflow
+and qualification commands are retired. Their metadata, copied profiles and
+frozen receipts cannot establish current requirements or completed work. Fresh
+and successor contexts use the ordinary CLI and Bridge interface. Complete
+installed startup, activity loading and migration qualification remain required.
+
+The copied SoT artifact registry still serves the legacy registry control plane
+and bridge publication writer. It is retained until those consumers are
+corrected together; it is not a task-context source or a fallback authority.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute. We especially
-value feedback about the engineering method itself — tag issues with
+value feedback about the engineering method itself â€” tag issues with
 `method-feedback`.
 
 ## License
@@ -206,4 +224,4 @@ value feedback about the engineering method itself — tag issues with
 
 ---
 
-*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
+*Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

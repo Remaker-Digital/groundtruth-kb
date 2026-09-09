@@ -30,9 +30,7 @@ HELPER_PATH = _resolve_repo_helper(
 
 def _load_helper_module():
     sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
-    spec = importlib.util.spec_from_file_location(
-        "bridge_impl_report_helper_under_test", HELPER_PATH
-    )
+    spec = importlib.util.spec_from_file_location("bridge_impl_report_helper_under_test", HELPER_PATH)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules["bridge_impl_report_helper_under_test"] = module
@@ -49,15 +47,11 @@ def test_governed_bridge_helper_paths_prefer_canonical_gtkb_prefix():
     from groundtruth_kb.bridge import proposal_filing
 
     module = proposal_filing._load_bridge_writer(REPO_ROOT)
-    assert hasattr(module, "propose_bridge"), (
-        "proposal filer must load the write helper"
-    )
+    assert hasattr(module, "propose_bridge"), "proposal filer must load the write helper"
 
     for tracked in (
         REPO_ROOT / "groundtruth-kb/src/groundtruth_kb/bridge/proposal_filing.py",
-        REPO_ROOT / "groundtruth-kb/src/groundtruth_kb/modernization/workflow.py",
-        REPO_ROOT
-        / "groundtruth-kb/templates/skills/gtkb-bridge/helpers/impl_report_bridge.py",
+        REPO_ROOT / "groundtruth-kb/templates/skills/gtkb-bridge/helpers/impl_report_bridge.py",
     ):
         assert "gtkb-bridge-propose" in tracked.read_text(encoding="utf-8"), (
             f"{tracked} must reference the canonical gtkb-bridge-propose path"
@@ -94,9 +88,7 @@ def exact_author_binding(request):
 
 @pytest.fixture(autouse=True)
 def temp_bridge_writer(helper, monkeypatch):
-    def fake_write_bridge_file(
-        slug, version, content, project_root, *, require_author_metadata=True
-    ):
+    def fake_write_bridge_file(slug, version, content, project_root, *, require_author_metadata=True):
         target = project_root / "bridge" / f"{slug}-{version:03d}.md"
         if target.exists():
             raise helper.WriterBridgeConflictError(f"already exists: {target}")
@@ -143,12 +135,8 @@ def _stage_thread(
             f"{latest_status}\n\n# Loyal Opposition Review\n\nVerdict: {latest_status}\n",
             encoding="utf-8",
         )
-    (bridge_dir / "test-impl-report-extra-001.md").write_text(
-        "NEW\n\n# Extra Proposal\n", encoding="utf-8"
-    )
-    (bridge_dir / "test-impl-report-extra-002.md").write_text(
-        "GO\n\n# Extra Review\n", encoding="utf-8"
-    )
+    (bridge_dir / "test-impl-report-extra-001.md").write_text("NEW\n\n# Extra Proposal\n", encoding="utf-8")
+    (bridge_dir / "test-impl-report-extra-002.md").write_text("GO\n\n# Extra Review\n", encoding="utf-8")
     return bridge_dir
 
 
@@ -201,9 +189,7 @@ def _completed_report() -> str:
 def test_latest_go_thread_produces_dry_run_plan(helper, tmp_path):
     bridge_dir = _stage_thread(tmp_path)
 
-    plan = helper.plan_report(
-        "test-impl-report", bridge_dir=bridge_dir, draft_dir=tmp_path / "drafts"
-    )
+    plan = helper.plan_report("test-impl-report", bridge_dir=bridge_dir, draft_dir=tmp_path / "drafts")
 
     assert plan.latest_status == "GO"
     assert plan.next_version == 3
@@ -232,9 +218,7 @@ def test_latest_go_thread_produces_compact_plan_summary(helper, tmp_path):
 def test_write_mode_creates_report_without_index_mutation(helper, tmp_path):
     bridge_dir = _stage_thread(tmp_path)
 
-    live = helper.file_report(
-        "test-impl-report", content=_completed_report(), bridge_dir=bridge_dir
-    )
+    live = helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
 
     assert live == bridge_dir / "test-impl-report-003.md"
     assert live.exists()
@@ -281,9 +265,7 @@ def test_scaffold_content_is_compatible_with_report_validator(helper, tmp_path):
     bridge_dir = _stage_thread(tmp_path)
     skeleton = helper.build_report_skeleton("test-impl-report", bridge_dir=bridge_dir)
 
-    live = helper.file_report(
-        "test-impl-report", content=skeleton, bridge_dir=bridge_dir
-    )
+    live = helper.file_report("test-impl-report", content=skeleton, bridge_dir=bridge_dir)
 
     assert live.exists()
     live_text = live.read_text(encoding="utf-8")
@@ -297,9 +279,7 @@ def test_non_go_latest_status_refuses_write_mode(helper, tmp_path):
     bridge_dir = _stage_thread(tmp_path, latest_status="NO-GO")
 
     with pytest.raises(helper.BridgeLatestStatusError):
-        helper.file_report(
-            "test-impl-report", content=_completed_report(), bridge_dir=bridge_dir
-        )
+        helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
 
 
 def test_existing_target_file_causes_no_overwrite_error(helper, tmp_path):
@@ -307,9 +287,7 @@ def test_existing_target_file_causes_no_overwrite_error(helper, tmp_path):
     (bridge_dir / "test-impl-report-003.md").write_text("existing", encoding="utf-8")
 
     with pytest.raises(helper.BridgeFileAlreadyExistsError):
-        helper.file_report(
-            "test-impl-report", content=_completed_report(), bridge_dir=bridge_dir
-        )
+        helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
 
 
 def test_exact_document_matching_avoids_slug_prefix_false_positive(helper, tmp_path):
@@ -333,13 +311,9 @@ def test_credential_content_aborts_before_live_mutation(helper, tmp_path):
 
 def test_unrelated_bridge_file_does_not_block_versioned_write(helper, tmp_path):
     bridge_dir = _stage_thread(tmp_path)
-    (bridge_dir / "other-001.md").write_text(
-        "NEW\n\n# Other thread\n", encoding="utf-8"
-    )
+    (bridge_dir / "other-001.md").write_text("NEW\n\n# Other thread\n", encoding="utf-8")
 
-    helper.file_report(
-        "test-impl-report", content=_completed_report(), bridge_dir=bridge_dir
-    )
+    helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
 
     assert (bridge_dir / "test-impl-report-003.md").exists()
     assert (bridge_dir / "other-001.md").exists()
@@ -348,23 +322,17 @@ def test_unrelated_bridge_file_does_not_block_versioned_write(helper, tmp_path):
 
 def test_latest_status_change_before_write_is_detected(helper, tmp_path):
     bridge_dir = _stage_thread(tmp_path)
-    (bridge_dir / "test-impl-report-003.md").write_text(
-        "NO-GO\n\n# Later review\n", encoding="utf-8"
-    )
+    (bridge_dir / "test-impl-report-003.md").write_text("NO-GO\n\n# Later review\n", encoding="utf-8")
 
     with pytest.raises(helper.BridgeLatestStatusError):
-        helper.file_report(
-            "test-impl-report", content=_completed_report(), bridge_dir=bridge_dir
-        )
+        helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
 
 
 def test_file_mode_uses_validated_bridge_writer(helper, tmp_path, monkeypatch):
     bridge_dir = _stage_thread(tmp_path)
     calls: list[tuple[str, object]] = []
 
-    def fake_write(
-        slug, version, content, project_root, *, require_author_metadata=True
-    ):
+    def fake_write(slug, version, content, project_root, *, require_author_metadata=True):
         calls.append(
             (
                 "write",
@@ -381,9 +349,7 @@ def test_file_mode_uses_validated_bridge_writer(helper, tmp_path, monkeypatch):
 
     monkeypatch.setattr(helper, "write_bridge_file", fake_write)
 
-    helper.file_report(
-        "test-impl-report", content=_completed_report(), bridge_dir=bridge_dir
-    )
+    helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
 
     assert [call[0] for call in calls] == ["write"]
     assert calls[0][1][1] == 3
@@ -398,16 +364,12 @@ def test_file_report_preserves_content_file_mtime(helper, tmp_path):
     old_time = 1_700_000_000
     helper.os.utime(content_path, (old_time, old_time))
 
-    live = helper.file_report(
-        "test-impl-report", content_path=content_path, bridge_dir=bridge_dir
-    )
+    live = helper.file_report("test-impl-report", content_path=content_path, bridge_dir=bridge_dir)
 
     assert live.stat().st_mtime == pytest.approx(old_time, abs=1)
 
 
-def test_file_report_does_not_preserve_mtime_for_direct_content(
-    helper, tmp_path, monkeypatch
-):
+def test_file_report_does_not_preserve_mtime_for_direct_content(helper, tmp_path, monkeypatch):
     bridge_dir = _stage_thread(tmp_path)
     calls = []
 
@@ -416,9 +378,7 @@ def test_file_report_does_not_preserve_mtime_for_direct_content(
 
     monkeypatch.setattr(helper.os, "utime", fake_utime)
 
-    helper.file_report(
-        "test-impl-report", content=_completed_report(), bridge_dir=bridge_dir
-    )
+    helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
 
     assert calls == []
 
@@ -437,9 +397,7 @@ def test_proposal_spec_links_are_carried_forward_into_skeleton(helper, tmp_path)
     assert "| `GOV-FILE-BRIDGE-AUTHORITY-001` |" in skeleton
 
 
-def test_files_changed_and_recommended_commit_type_sections_are_present(
-    helper, tmp_path
-):
+def test_files_changed_and_recommended_commit_type_sections_are_present(helper, tmp_path):
     bridge_dir = _stage_thread(tmp_path)
 
     skeleton = helper.build_report_skeleton("test-impl-report", bridge_dir=bridge_dir)
@@ -464,14 +422,10 @@ def test_plan_report_scopes_dirty_files_to_approved_target_paths(helper, tmp_pat
     _git(tmp_path, "commit", "-m", "baseline")
 
     (tmp_path / "scripts" / "example.py").write_text("print('new')\n", encoding="utf-8")
-    (tmp_path / "scripts" / "staged.py").write_text(
-        "print('staged')\n", encoding="utf-8"
-    )
+    (tmp_path / "scripts" / "staged.py").write_text("print('staged')\n", encoding="utf-8")
     _git(tmp_path, "add", "scripts/staged.py")
     (tmp_path / "docs" / "approved").mkdir(parents=True)
-    (tmp_path / "docs" / "approved" / "note.md").write_text(
-        "approved\n", encoding="utf-8"
-    )
+    (tmp_path / "docs" / "approved" / "note.md").write_text("approved\n", encoding="utf-8")
     (tmp_path / "outside.py").write_text("print('outside')\n", encoding="utf-8")
 
     plan = helper.plan_report("test-impl-report", bridge_dir=bridge_dir)
@@ -491,9 +445,7 @@ def test_missing_target_paths_fails_closed(helper, tmp_path):
     bridge_dir = _stage_thread(tmp_path)
     proposal_path = bridge_dir / "test-impl-report-001.md"
     proposal_path.write_text(
-        proposal_path.read_text(encoding="utf-8").replace(
-            'target_paths: ["scripts/example.py"]\n\n', ""
-        ),
+        proposal_path.read_text(encoding="utf-8").replace('target_paths: ["scripts/example.py"]\n\n', ""),
         encoding="utf-8",
     )
 
@@ -509,9 +461,7 @@ def test_missing_target_paths_fails_closed(helper, tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_wi4468_exact_init_lo_stamps_loyal_opposition_codex_harness_a(
-    helper, tmp_path, monkeypatch
-):
+def test_wi4468_exact_init_lo_stamps_loyal_opposition_codex_harness_a(helper, tmp_path, monkeypatch):
     """WI-4468 acceptance: exact-init LO evidence stamps loyal-opposition/codex + harness A.
 
     Verifies the WI-4522 fix at the impl_report_bridge.file_report boundary.
@@ -532,9 +482,7 @@ def test_wi4468_exact_init_lo_stamps_loyal_opposition_codex_harness_a(
         issuer="test-fixture",
     )
 
-    live = helper.file_report(
-        "test-impl-report", content=_completed_report(), bridge_dir=bridge_dir
-    )
+    live = helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
 
     written = live.read_text(encoding="utf-8")
     assert "author_identity: loyal-opposition/codex" in written
@@ -563,9 +511,7 @@ def test_wi4468_absent_env_raises_before_writing(helper, tmp_path, monkeypatch):
             monkeypatch.delenv(var, raising=False)
 
     with pytest.raises(bam.BridgeAuthorMetadataError):
-        helper.file_report(
-            "test-impl-report", content=_completed_report(), bridge_dir=bridge_dir
-        )
+        helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
 
     # Bridge file must not have been written before the error was raised.
     assert not (bridge_dir / "test-impl-report-003.md").exists()

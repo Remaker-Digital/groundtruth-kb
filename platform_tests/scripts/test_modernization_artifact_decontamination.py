@@ -109,7 +109,6 @@ def _write_import_graph_fixture(
         _sot_record("history", "rules/stale.md", "archive"),
     ]
     _write_registry_generation(root, records)
-    (registry / "context-manifests.toml").write_text("items = []\n", encoding="utf-8")
     current_row = "| Current | `rules/current.md` | active | loaded |\n" if declare_current else ""
     (control / "SESSION-STARTUP-CONTROL-MAP.md").write_text(
         "| Startup service | `scripts/session_self_initialization.py` | active | loaded |\n"
@@ -364,7 +363,6 @@ def test_retired_system_interface_left_startup_visible_fails_live_repository_aud
     registry.mkdir(parents=True)
     control.mkdir(parents=True)
     _write_registry_generation(tmp_path, [_sot_record("current", "rules/current.md", "active")])
-    (registry / "context-manifests.toml").write_text("items = []\n", encoding="utf-8")
     (control / "SESSION-STARTUP-CONTROL-MAP.md").write_text(
         "| Current | `rules/current.md` | active | loaded |\n",
         encoding="utf-8",
@@ -395,7 +393,6 @@ def test_undeclared_effective_loader_fails_live_repository_audit(tmp_path: Path)
     control.mkdir(parents=True)
     scripts.mkdir(parents=True)
     _write_registry_generation(tmp_path, [_sot_record("current", "rules/current.md", "active")])
-    (registry / "context-manifests.toml").write_text("items = []\n", encoding="utf-8")
     (control / "SESSION-STARTUP-CONTROL-MAP.md").write_text(
         "| Startup service | `scripts/session_self_initialization.py` | active | loaded |\n"
         "| Current | `rules/current.md` | active | loaded |\n",

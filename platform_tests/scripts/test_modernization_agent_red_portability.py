@@ -161,7 +161,7 @@ _RUNTIME_PROBE = textwrap.dedent(
     assert package_origin.is_relative_to(expected_install), (package_origin, expected_install)
     assert groundtruth_kb.__version__ == expected_version
     assert not any(entry and denied_source(entry) for entry in sys.path)
-    candidate_module_present = importlib.util.find_spec("groundtruth_kb.modernization") is not None
+    candidate_module_present = importlib.util.find_spec("groundtruth_kb.native_authority") is not None
     assert candidate_module_present is expected_candidate_module
 
     validate_self_completion_preflight(host_root, "Agent_Red")
@@ -431,7 +431,7 @@ def _load_prior_package_fixture() -> dict[str, object]:
     assert fixture["schema_version"] == 2
     assert re.fullmatch(r"[0-9a-f]{40}", str(fixture["commit_sha"]))
     assert re.fullmatch(r"[0-9a-f]{40}", str(fixture["groundtruth_kb_tree_sha"]))
-    assert fixture["candidate_only_module"] == "groundtruth_kb.modernization"
+    assert fixture["candidate_only_module"] == "groundtruth_kb.native_authority"
     wheel_name = str(fixture["wheel_file"])
     assert Path(wheel_name).name == wheel_name
     wheel = PRIOR_PACKAGE_FIXTURE.parent / wheel_name
@@ -442,9 +442,9 @@ def _load_prior_package_fixture() -> dict[str, object]:
 
 
 def _wheel_contains_module(wheel: Path, module: str) -> bool:
-    module_root = module.replace(".", "/") + "/"
+    module_root = module.replace(".", "/")
     with zipfile.ZipFile(wheel) as archive:
-        return any(name.startswith(module_root) for name in archive.namelist())
+        return any(name in {module_root + ".py", module_root + "/__init__.py"} for name in archive.namelist())
 
 
 def _build_wheel(source_root: Path, output_dir: Path) -> Path:

@@ -11,7 +11,7 @@ import json
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -41,16 +41,6 @@ from groundtruth_kb.artifact_lifecycle.decontamination import (  # noqa: E402
     WorkerReference,
     canonical_report_bytes,
     load_repository_snapshot,
-)
-from groundtruth_kb.context.freshness import (  # noqa: E402
-    HIGH_CHURN_CLASSES,
-    LOW_CHURN_REQUIRED_FIELDS,
-    evaluate_extract,
-)
-from groundtruth_kb.context.manifest import (  # noqa: E402
-    STACK_ORDER,
-    ContextManifestError,
-    assemble_context_manifest,
 )
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 from groundtruth_kb.project.sot_registry import load_toml, sync_projection  # noqa: E402
@@ -136,7 +126,6 @@ def _write_artifact_repository(
     )
     canonical_registry = registry / "sot-artifacts.toml"
     canonical_registry.write_text(registry_payload, encoding="utf-8")
-    (registry / "context-manifests.toml").write_text("items = []\n", encoding="utf-8")
     (control / "SESSION-STARTUP-CONTROL-MAP.md").write_text(
         "| Startup service | `scripts/session_self_initialization.py` | active | loaded |\n"
         "| Current | `rules/current.md` | active | loaded |\n"
@@ -184,42 +173,6 @@ def _write_artifact_repository(
     )
 
 
-def _freshness_record(**overrides: object) -> dict[str, object]:
-    record: dict[str, object] = {
-        "source_id": "SPEC-RI06-FIXTURE",
-        "source_path": "groundtruth.db:current_specifications",
-        "authority_class": "stated",
-        "source_version_or_hash": "sha256:abc123",
-        "churn_class": "low",
-        "generated_at": NOW.isoformat(),
-        "ttl_seconds": 120,
-        "bounded_usage_context": "session:build",
-        "live_query_route": "gt spec show SPEC-RI06-FIXTURE",
-        "recovery_route": "gt spec show SPEC-RI06-FIXTURE",
-        "embedded_content": {"status": "specified"},
-    }
-    record.update(overrides)
-    return record
-
-
-def _manifest(activity: str) -> dict[str, object]:
-    return assemble_context_manifest(
-        activity=activity,
-        role="Prime Builder",
-        generated_at=NOW,
-        evaluated_at=NOW,
-        project_root=ROOT,
-    )
-
-
-def _activity_content(manifest: dict[str, object]) -> dict[str, object]:
-    result: dict[str, object] = {}
-    for item in manifest["items"]:  # type: ignore[index]
-        if item["layer"] == "activity_overlay" and isinstance(item["content"], dict):
-            result.update(item["content"])
-    return result
-
-
 # MOD-AD01
 def test_mod_ad01_inventory_covers_all_registered_classes_and_effective_worker_loads() -> None:
     index, declared = load_repository_snapshot(ROOT)
@@ -227,14 +180,12 @@ def test_mod_ad01_inventory_covers_all_registered_classes_and_effective_worker_l
     report = audit_repository(ROOT)
 
     assert {record.logical_id.split(":", 1)[0] for record in index.records} == {
-        "context",
         "interface",
         "sharding",
         "sot",
         "startup",
     }
     assert {reference.purpose for reference in declared} == {
-        "context_manifest",
         "context_sharding",
         "interface_startup",
         "startup_inventory",
@@ -458,87 +409,9 @@ def test_mod_ad12_rerun_binds_generation_and_independent_verification() -> None:
 
 
 # MOD-RI02
-def test_mod_ri02_stack_order_and_priority_precedence_are_enforced(tmp_path: Path) -> None:
-    manifest = _manifest("build")
-    items = manifest["items"]
-    assert manifest["stack_order"] == list(STACK_ORDER)
-    assert [STACK_ORDER.index(item["layer"]) for item in items] == sorted(
-        STACK_ORDER.index(item["layer"]) for item in items
-    )
-    for layer in ("session_baseline", "activity_overlay"):
-        priorities = [item["priority"] for item in items if item["layer"] == layer]
-        assert priorities == sorted(priorities, reverse=True)
-
-    registry_text = (ROOT / "config/registry/context-manifests.toml").read_text(encoding="utf-8")
-    conflicting = tmp_path / "context-manifests.toml"
-    conflicting.write_text(
-        registry_text
-        + "\n[[items]]\n"
-        + 'id = "baseline.glossary.conflict"\n'
-        + 'layer = "session_baseline"\n'
-        + 'category = "glossary"\n'
-        + 'source_id = "canonical-terms-sync"\n'
-        + 'source_path = "config/governance/canonical-terms-sync.toml"\n'
-        + 'authority_class = "competing_authority"\n'
-        + 'lifecycle = "current"\n'
-        + 'churn_class = "low"\n'
-        + 'embedding = "embedded"\n'
-        + "ttl_seconds = 120\n"
-        + 'read_route = "competing read route"\n'
-        + 'mutation_route = "none"\n'
-        + 'recovery_route = "gt canonical-terms list"\n'
-        + 'applicability = ["*"]\n'
-        + 'projection = "descriptor"\n'
-        + "token_cost = 1\n"
-        + "priority = 1\n"
-        + "essential = false\n",
-        encoding="utf-8",
-    )
-    with pytest.raises(ContextManifestError, match="conflict for canonical-terms-sync"):
-        assemble_context_manifest(
-            activity="build",
-            role="Prime Builder",
-            generated_at=NOW,
-            evaluated_at=NOW,
-            registry_path=conflicting,
-            project_root=ROOT,
-        )
 
 
 # MOD-RI03
-def test_mod_ri03_generated_session_baseline_is_deterministic_and_complete() -> None:
-    first = _manifest("build")
-    second = _manifest("build")
-    assert first == second
-    baseline = [item for item in first["items"] if item["layer"] == "session_baseline"]
-    assert {item["category"] for item in baseline} == set(first["categories_by_layer"]["session_baseline"])
-    assert all(item["freshness"]["eligible_as_current"] for item in baseline)
-
-
-@pytest.mark.xfail(
-    strict=True,
-    reason="Session envelopes do not carry or bind the generated baseline for either delivery mode.",
-)
-def test_mod_ri03_interactive_and_dispatched_envelopes_bind_delivered_baseline(tmp_path: Path) -> None:
-    _write_harness_state(tmp_path, durable_role="prime-builder")
-    interactive = open_session(
-        tmp_path,
-        harness_name="codex",
-        role="prime-builder",
-        session_id="interactive-session",
-        worker_role_source="interactive_transcript_explicit",
-    )
-    dispatched = open_session(
-        tmp_path,
-        harness_name="codex",
-        role="prime-builder",
-        session_id="dispatched-session",
-        worker_role_source="dispatcher_composition",
-        dispatch_run_id="dispatch-run-001",
-    )
-    assert interactive["context_manifest_sha256"]
-    assert dispatched["context_manifest_sha256"]
-    assert interactive["context_manifest_sha256"] == dispatched["context_manifest_sha256"]
 
 
 # MOD-RI04
@@ -574,54 +447,9 @@ def test_mod_ri04_explicit_session_role_overrides_mapping_and_survives_resume_co
 
 
 # MOD-RI05
-@pytest.mark.xfail(
-    strict=True,
-    reason="Runtime resources lack uniform availability, installation, and startup descriptors.",
-)
-def test_mod_ri05_every_runtime_resource_exposes_uniform_typed_descriptor() -> None:
-    required = {
-        "availability",
-        "authority_class",
-        "read_route",
-        "mutation_route",
-        "installation",
-        "startup",
-        "recovery_route",
-    }
-    manifest = _manifest("build")
-    assert manifest["items"]
-    for resource in manifest["items"]:
-        assert required <= set(resource)
-        assert all(resource[field] not in {None, ""} for field in required)
 
 
 # MOD-RI06
-def test_mod_ri06_ttl_embedding_expiration_and_live_query_rules_fail_closed() -> None:
-    current = evaluate_extract(_freshness_record(), now=NOW)
-    assert current["eligible_as_current"] is True
-
-    expired = evaluate_extract(
-        _freshness_record(generated_at=(NOW - timedelta(seconds=121)).isoformat()),
-        now=NOW,
-    )
-    assert expired["eligible_as_current"] is False
-    assert expired["status"] == "recovery_required"
-    assert "expired" in expired["reasons"]
-
-    for churn_class in HIGH_CHURN_CLASSES:
-        result = evaluate_extract(
-            _freshness_record(churn_class=churn_class, embedded_content={"unsafe": "snapshot"}),
-            now=NOW,
-        )
-        assert result["eligible_as_current"] is False
-        assert {"high-churn", "live-query-only"} <= set(result["reasons"])
-
-    for field in LOW_CHURN_REQUIRED_FIELDS:
-        record = _freshness_record()
-        record.pop(field)
-        result = evaluate_extract(record, now=NOW)
-        assert result["eligible_as_current"] is False
-        assert any(reason == f"missing:{field}" for reason in result["reasons"])
 
 
 # MOD-RI08
@@ -699,95 +527,4 @@ def test_mod_ri10_ops_context_uses_live_local_state_and_remains_report_only(tmp_
     assert "triage support (priority: P1)" in rendered
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Deliberation context carries prose guardrails but no executable no-implementation capability.",
-)
-def test_mod_ri11_deliberation_context_enforces_no_implementation_boundary() -> None:
-    context = _activity_content(_manifest("deliberation"))
-    assert context["implementation_allowed"] is False
-    assert context["mutation_capability"] is None
-    assert context["decision_capture_route"]
-
-
-@pytest.mark.xfail(
-    strict=True,
-    reason="Build context does not expose typed authorization, bridge, claim, branch, and mutation-route fields.",
-)
-def test_mod_ri12_build_context_is_typed_and_clause_complete() -> None:
-    context = _activity_content(_manifest("build"))
-    assert {
-        "authorization",
-        "bridge",
-        "work_intent",
-        "branch_binding",
-        "mutation_routes",
-    } <= set(context)
-    assert context["authorization"]["status"] in {"active", "denied"}
-
-
-@pytest.mark.xfail(
-    strict=True,
-    reason="Test context does not expose typed linked-spec, executable-test, environment, result, and evidence fields.",
-)
-def test_mod_ri13_test_context_is_typed_and_clause_complete() -> None:
-    context = _activity_content(_manifest("test"))
-    assert {
-        "linked_specs",
-        "executable_tests",
-        "environment",
-        "results",
-        "evidence_routes",
-    } <= set(context)
-    assert all(test["executable"] is True for test in context["executable_tests"])
-
-
-@pytest.mark.xfail(
-    strict=True,
-    reason="Spec context does not expose typed intake, confirmation, approval, authority, and testability fields.",
-)
-def test_mod_ri14_spec_context_is_typed_and_clause_complete() -> None:
-    context = _activity_content(_manifest("spec"))
-    assert {"intake", "confirmation", "approval", "authority", "testability"} <= set(context)
-    assert context["testability"]["objective_acceptance_test"]
-
-
-@pytest.mark.xfail(
-    strict=True,
-    reason="Project context does not expose typed hierarchy, authorization, backlog, dependency, branch, and CLI fields.",
-)
-def test_mod_ri15_project_context_is_typed_and_clause_complete() -> None:
-    context = _activity_content(_manifest("project"))
-    assert {
-        "hierarchy",
-        "authorization",
-        "backlog",
-        "dependencies",
-        "branch_state",
-        "project_cli",
-    } <= set(context)
-    assert context["project_cli"]["read"] and context["project_cli"]["mutation"]
-
-
 # MOD-RI16
-def test_mod_ri16_internal_runtime_contracts_cover_role_freshness_resources_degradation_and_six_activities() -> None:
-    manifests = {activity: _manifest(activity) for activity in load_activity_profiles()}
-    assert set(manifests) == {"ops", "deliberation", "build", "test", "spec", "project"}
-    assert all(manifest["role_bootstrap"]["cannot_alter_role"] is True for manifest in manifests.values())
-    assert all(manifest["stack_order"] == list(STACK_ORDER) for manifest in manifests.values())
-    assert all(
-        item["freshness"]["eligible_as_current"] for manifest in manifests.values() for item in manifest["items"]
-    )
-    assert any(item["disposition"] == "live-query-only" for item in manifests["ops"]["items"])
-
-
-@pytest.mark.xfail(
-    strict=True,
-    reason="No runtime verifier result binds non-impairment and Gate 3 to this candidate execution.",
-)
-def test_mod_ri16_candidate_bound_nonimpairment_and_gate3_verdict_exist() -> None:
-    manifest = _manifest("build")
-    verification = manifest["runtime_verification"]
-    assert verification["non_impairment"] == "PASS"
-    assert verification["gate_3"] == "PASS"
-    assert verification["candidate_head"]

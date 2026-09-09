@@ -23,6 +23,103 @@ def _load_gate_module():
     return module
 
 
+@pytest.mark.parametrize("exit_code", [0, 5])
+def test_secret_scan_report_is_private_to_each_invocation(tmp_path, monkeypatch, exit_code):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+    report_paths = []
+
+    def fake_run(command, **kwargs):
+        assert kwargs["cwd"] == tmp_path
+        report_path = Path(command[command.index("--report-json") + 1])
+        if not report_path.is_absolute():
+            report_path = tmp_path / report_path
+        report_paths.append(report_path)
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps({"mode": "tracked", "paths_scanned": 2, "finding_count": 0, "findings": []}),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, exit_code, stdout="", stderr="")
+
+    monkeypatch.setattr(gate.subprocess, "run", fake_run)
+    for _ in range(2):
+        if exit_code:
+            with pytest.raises(gate.GateFailure, match="Tracked redacted secret scan failed"):
+                gate._check_tracked_secret_scan()
+        else:
+            gate._check_tracked_secret_scan()
+        assert not report_paths[-1].exists()
+    assert report_paths[0] != report_paths[1]
+    assert not list(tmp_path.iterdir())
+
+
+def test_release_help_does_not_offer_frozen_modernization_certification(monkeypatch, capsys):
+    gate = _load_gate_module()
+    monkeypatch.setattr(sys, "argv", ["release_candidate_gate.py", "--help"])
+    with pytest.raises(SystemExit) as exc:
+        gate.main()
+    assert exc.value.code == 0
+    assert "modernization" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        "{",
+        "[]",
+        "{}",
+        '{"mode":"tracked","paths_scanned":0,"finding_count":0,"findings":[]}',
+        '{"mode":"tracked","paths_scanned":1,"finding_count":1,"findings":[]}',
+    ],
+)
+def test_scan_cannot_pass_without_a_valid_current_report(tmp_path, monkeypatch, payload):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+    reports = []
+
+    def fake_run(command, **kwargs):
+        report_path = Path(command[-1])
+        reports.append(report_path)
+        if payload is not None:
+            report_path.write_text(payload, encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="PASS", stderr="")
+
+    monkeypatch.setattr(gate.subprocess, "run", fake_run)
+    with pytest.raises(gate.GateFailure):
+        gate._check_tracked_secret_scan()
+    assert not reports[0].parent.exists()
+
+
+def test_scan_cleans_partial_report_when_the_process_times_out(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+    reports = []
+
+    def timeout(command, **kwargs):
+        report_path = Path(command[-1])
+        reports.append(report_path)
+        report_path.write_text("partial", encoding="utf-8")
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(gate.subprocess, "run", timeout)
+    with pytest.raises(subprocess.TimeoutExpired):
+        gate._check_tracked_secret_scan()
+    assert not reports[0].parent.exists()
+
+
+def test_release_scan_runs_the_real_cli_against_tracked_files(tmp_path, monkeypatch, capsys):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+    subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True, capture_output=True)
+    (tmp_path / "clean.txt").write_text("A harmless tracked fixture.\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "clean.txt"], check=True, capture_output=True)
+    gate._check_tracked_secret_scan()
+    assert "PASS tracked redacted secret scan (1 paths, 0 findings)" in capsys.readouterr().out
+    assert {p.name for p in tmp_path.iterdir()} == {".git", "clean.txt"}
+
+
 def _valid_dev_inventory_payload(gate, generated_at: str | None = None) -> dict:
     _default_max_age, _relative_path, _validate = gate._dev_inventory_helpers()
     from scripts import collect_dev_environment_inventory as collector
@@ -266,7 +363,7 @@ def test_secret_ci_workflow_presence_fails_when_path_filtered(tmp_path, monkeypa
         gate._check_secret_ci_workflow_present()
 
 
-def test_tracked_secret_scan_executes_gate_and_retains_machine_evidence(tmp_path, monkeypatch):
+def test_tracked_secret_scan_executes_gate_and_consumes_machine_evidence(tmp_path, monkeypatch):
     gate = _load_gate_module()
     monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
     commands = []
@@ -275,8 +372,8 @@ def test_tracked_secret_scan_executes_gate_and_retains_machine_evidence(tmp_path
         commands.append(command)
         assert kwargs["cwd"] == tmp_path
         assert kwargs["capture_output"] is True
-        report_path = tmp_path / gate.TRACKED_SECRET_REPORT
-        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path = Path(command[-1])
+        assert report_path.is_absolute()
         report_path.write_text(
             json.dumps({"mode": "tracked", "paths_scanned": 41, "finding_count": 0, "findings": []}),
             encoding="utf-8",
@@ -284,10 +381,9 @@ def test_tracked_secret_scan_executes_gate_and_retains_machine_evidence(tmp_path
         return subprocess.CompletedProcess(command, 0, stdout="redacted scan passed", stderr="")
 
     monkeypatch.setattr(gate.subprocess, "run", fake_run)
-
     gate._check_tracked_secret_scan()
-
-    expected = [
+    assert len(commands) == 1
+    assert commands[0][:-1] == [
         sys.executable,
         "-m",
         "groundtruth_kb",
@@ -298,49 +394,35 @@ def test_tracked_secret_scan_executes_gate_and_retains_machine_evidence(tmp_path
         "--fail-on",
         "verified-provider",
         "--report-json",
-        gate.TRACKED_SECRET_REPORT.as_posix(),
     ]
-    assert commands == [expected]
-    evidence = json.loads((tmp_path / gate.TRACKED_SECRET_REPORT).read_text(encoding="utf-8"))
-    assert evidence == {
-        "schema_version": "gtkb-release-tracked-secret-scan-v1",
-        "command": expected,
-        "fail_on": "verified-provider",
-        "exit_code": 0,
-        "scan": {"mode": "tracked", "paths_scanned": 41, "finding_count": 0, "findings": []},
-    }
+    assert not Path(commands[0][-1]).exists()
 
 
-def test_tracked_secret_scan_fails_closed_and_retains_finding_evidence(tmp_path, monkeypatch):
+def test_tracked_secret_scan_fails_on_findings_without_retaining_receipts(tmp_path, monkeypatch):
     gate = _load_gate_module()
     monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
-    finding = {
-        "provider_class": "test-provider",
-        "severity": "verified-provider",
-        "path": "tracked-fixture.txt",
-        "line": 1,
-        "fingerprint_prefix": "sha256:test",
-        "description": "verified provider credential",
-    }
+    reports = []
 
     def fake_run(command, **_kwargs):
-        report_path = tmp_path / gate.TRACKED_SECRET_REPORT
-        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path = Path(command[-1])
+        reports.append(report_path)
         report_path.write_text(
-            json.dumps({"mode": "tracked", "paths_scanned": 42, "finding_count": 1, "findings": [finding]}),
+            json.dumps(
+                {
+                    "mode": "tracked",
+                    "paths_scanned": 42,
+                    "finding_count": 1,
+                    "findings": [{"severity": "verified-provider", "path": "fixture.txt"}],
+                }
+            ),
             encoding="utf-8",
         )
         return subprocess.CompletedProcess(command, 5, stdout="redacted finding", stderr="")
 
     monkeypatch.setattr(gate.subprocess, "run", fake_run)
-
     with pytest.raises(gate.GateFailure, match=r"failed \(exit 5, 1 finding\(s\)\)"):
         gate._check_tracked_secret_scan()
-
-    retained = json.loads((tmp_path / gate.TRACKED_SECRET_REPORT).read_text(encoding="utf-8"))
-    assert retained["exit_code"] == 5
-    assert retained["fail_on"] == "verified-provider"
-    assert retained["scan"]["findings"] == [finding]
+    assert not reports[0].exists()
 
 
 def test_dev_environment_inventory_gate_passes_valid_public_inventory(tmp_path, monkeypatch):

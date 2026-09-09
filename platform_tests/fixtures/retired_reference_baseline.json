@@ -469,9 +469,6 @@
     "config/governance/hygiene-sweep-patterns.toml": {
       ".gtkb-state": 19
     },
-    "config/governance/modernization-release-candidate.json": {
-      "PAUTH": 1
-    },
     "config/governance/narrative-artifact-approval.toml": {
       "PAUTH": 1,
       "formal-artifact-approvals": 2
@@ -539,9 +536,6 @@
     },
     "config/hooks/gtkb-session-topic-envelope-router.py": {
       ".gtkb-state": 1
-    },
-    "config/registry/context-manifests.toml": {
-      "config/agent-control": 7
     },
     "config/registry/sot-artifacts.toml": {
       ".gtkb-state": 2,
@@ -656,39 +650,12 @@
     "groundtruth-kb/src/groundtruth_kb/cli_skills.py": {
       "config/agent-control": 1
     },
-    "groundtruth-kb/src/groundtruth_kb/context/freshness.py": {
-      "harness-state/": 1
-    },
-    "groundtruth-kb/src/groundtruth_kb/context/manifest.py": {
-      "config/agent-control": 2
-    },
-    "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/activity-disposition-profiles.toml": {
-      "TAFE": 4
-    },
-    "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/activity-envelope-sharding.toml": {
-      "config/agent-control": 3
-    },
-    "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/command-surface.toml": {
-      "PAUTH": 1,
-      "config/agent-control": 2
-    },
-    "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/system-interface-map.toml": {
-      ".gtkb-state": 5,
-      "DEFERRED": 5,
-      "NO-ACTION": 2,
-      "TAFE": 13,
-      "config/agent-control": 9,
-      "harness-state/": 6
-    },
     "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/registry/sot-artifacts.toml": {
       ".gtkb-state": 2,
       "DEFERRED": 1,
       "config/agent-control": 82,
       "formal-artifact-approvals": 2,
       "harness-state/": 4
-    },
-    "groundtruth-kb/src/groundtruth_kb/context/registries/v1/context-manifests.toml": {
-      "config/agent-control": 7
     },
     "groundtruth-kb/src/groundtruth_kb/context/resource_routing.py": {
       "TAFE": 3
@@ -781,10 +748,6 @@
       ".gtkb-state": 1,
       "DEFERRED": 1,
       "harness-state/": 1
-    },
-    "groundtruth-kb/src/groundtruth_kb/modernization/workflow.py": {
-      ".gtkb-state": 2,
-      "PAUTH": 2
     },
     "groundtruth-kb/src/groundtruth_kb/operating_state.py": {
       ".gtkb-state": 1,
@@ -1246,12 +1209,6 @@
       "harness-state/": 2,
       "project_authorizations": 4
     },
-    "scripts/check_modernization_release_candidate.py": {
-      ".gtkb-state": 1
-    },
-    "scripts/check_modernization_scope_semantics.py": {
-      ".gtkb-state": 1
-    },
     "scripts/check_narrative_artifact_evidence.py": {
       ".gtkb-state": 1,
       "formal-artifact-approvals": 3
@@ -1268,9 +1225,6 @@
     "scripts/check_skill_health.py": {
       ".gtkb-state": 4,
       "PAUTH": 2
-    },
-    "scripts/check_source_of_truth_freshness.py": {
-      "harness-state/": 1
     },
     "scripts/check_staged_artifact_admission.py": {
       ".gtkb-state": 1,
@@ -1306,9 +1260,6 @@
     "scripts/collect_dev_environment_inventory.py": {
       ".gtkb-state": 1,
       "harness-state/": 5
-    },
-    "scripts/collect_modernization_semantic_evidence.py": {
-      ".gtkb-state": 4
     },
     "scripts/command_surface_disposition.py": {
       "PAUTH": 3,

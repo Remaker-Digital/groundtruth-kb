@@ -14,11 +14,11 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-TRACKED_SECRET_REPORT = Path(".gtkb-state") / "modernization-release-candidate" / "release-gate-tracked-secrets.json"
 
 
 class GateFailure(RuntimeError):
@@ -167,42 +167,38 @@ def _check_secret_ci_workflow_present() -> None:
 
 
 def _check_tracked_secret_scan() -> None:
-    """Run the tracked secret gate and retain its redacted machine evidence."""
+    """Run the tracked secret gate and consume this invocation's redacted report."""
 
-    report_path = PROJECT_ROOT / TRACKED_SECRET_REPORT
-    report_path.unlink(missing_ok=True)
-    command = [
-        sys.executable,
-        "-m",
-        "groundtruth_kb",
-        "secrets",
-        "scan",
-        "--tracked",
-        "--redacted",
-        "--fail-on",
-        "verified-provider",
-        "--report-json",
-        TRACKED_SECRET_REPORT.as_posix(),
-    ]
-    result = subprocess.run(
-        command,
-        cwd=PROJECT_ROOT,
-        text=True,
-        capture_output=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=300,
-    )
-
-    if not report_path.is_file():
-        raise GateFailure(
-            "Tracked redacted secret scan did not produce machine evidence at "
-            f"{TRACKED_SECRET_REPORT.as_posix()} (exit {result.returncode})"
+    with tempfile.TemporaryDirectory(prefix="gtkb-release-scan-") as temporary:
+        report_path = Path(temporary) / "tracked-secrets.json"
+        command = [
+            sys.executable,
+            "-m",
+            "groundtruth_kb",
+            "secrets",
+            "scan",
+            "--tracked",
+            "--redacted",
+            "--fail-on",
+            "verified-provider",
+            "--report-json",
+            str(report_path),
+        ]
+        result = subprocess.run(
+            command,
+            cwd=PROJECT_ROOT,
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=300,
         )
-    try:
-        evidence = json.loads(report_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise GateFailure(f"Tracked redacted secret scan evidence is unreadable: {exc}") from exc
+        if not report_path.is_file():
+            raise GateFailure(f"Tracked redacted secret scan did not produce its report (exit {result.returncode})")
+        try:
+            evidence = json.loads(report_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise GateFailure(f"Tracked redacted secret scan evidence is unreadable: {exc}") from exc
 
     if not isinstance(evidence, dict):
         raise GateFailure("Tracked redacted secret scan evidence must be a JSON object")
@@ -221,29 +217,9 @@ def _check_tracked_secret_scan() -> None:
         or finding_count != len(findings)
     ):
         raise GateFailure("Tracked redacted secret scan evidence has inconsistent finding counts")
-
-    receipt = {
-        "schema_version": "gtkb-release-tracked-secret-scan-v1",
-        "command": command,
-        "fail_on": "verified-provider",
-        "exit_code": result.returncode,
-        "scan": evidence,
-    }
-    try:
-        report_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    except OSError as exc:
-        raise GateFailure(f"Tracked redacted secret scan receipt could not be retained: {exc}") from exc
-
     if result.returncode != 0:
-        raise GateFailure(
-            "Tracked redacted secret scan failed "
-            f"(exit {result.returncode}, {finding_count} finding(s)); evidence retained at "
-            f"{TRACKED_SECRET_REPORT.as_posix()}"
-        )
-    print(
-        "PASS tracked redacted secret scan "
-        f"({paths_scanned} paths, {finding_count} findings; {TRACKED_SECRET_REPORT.as_posix()})"
-    )
+        raise GateFailure(f"Tracked redacted secret scan failed (exit {result.returncode}, {finding_count} finding(s))")
+    print(f"PASS tracked redacted secret scan ({paths_scanned} paths, {finding_count} findings)")
 
 
 def _dev_inventory_helpers():
@@ -448,25 +424,6 @@ def _check_no_window_spawn_audit() -> None:
     _run([sys.executable, "scripts/windows_no_window_spawn_audit.py"], timeout=120)
 
 
-def _check_modernization_scope() -> None:
-    if str(PROJECT_ROOT) not in sys.path:
-        sys.path.insert(0, str(PROJECT_ROOT))
-    from scripts.check_modernization_release_candidate import (  # noqa: PLC0415
-        DEFAULT_MANIFEST,
-        load_manifest,
-        validate_manifest,
-    )
-
-    manifest = load_manifest(DEFAULT_MANIFEST)
-    errors = validate_manifest(manifest, project_root=PROJECT_ROOT, require_test_paths=True)
-    if errors:
-        raise GateFailure("Modernization acceptance scope: " + "; ".join(errors))
-    print(
-        "PASS modernization acceptance scope "
-        f"({len(manifest['capabilities'])} capabilities, {manifest['program']['expected_handle_count']} handles)"
-    )
-
-
 def _python_gates(skip_pip_audit: bool = False) -> None:
     _run(
         [
@@ -611,11 +568,6 @@ def main() -> int:
     parser.add_argument("--skip-frontend", action="store_true", help="Skip frontend widget/admin gates.")
     parser.add_argument("--include-frontend", action="store_true", help="Run frontend widget/admin gates.")
     parser.add_argument(
-        "--modernization-scope",
-        action="store_true",
-        help="Require the frozen modernization scope and every objective acceptance-test path.",
-    )
-    parser.add_argument(
         "--skip-dev-inventory", action="store_true", help="Skip the GT-KB dev-environment inventory gate."
     )
     parser.add_argument(
@@ -642,8 +594,6 @@ def main() -> int:
         _check_standing_backlog_health()
         _check_agent_red_app_root_minimization()
         _check_no_window_spawn_audit()
-        if args.modernization_scope:
-            _check_modernization_scope()
         if not args.skip_dev_inventory:
             _check_dev_environment_inventory(args.dev_inventory_max_age_hours)
         # Narrative-artifact evidence rollup runs BEFORE the inventory-drift check

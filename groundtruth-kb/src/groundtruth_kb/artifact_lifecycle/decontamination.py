@@ -407,29 +407,6 @@ def load_repository_snapshot(project_root: Path) -> tuple[ArtifactAuthorityIndex
                 )
             )
 
-    context_path = root / "config" / "registry" / "context-manifests.toml"
-    context = _load_toml(context_path)
-    for row in context.get("items", []):
-        raw_path = row.get("source_path")
-        if not isinstance(raw_path, str) or not _is_exact_repository_path(raw_path):
-            continue
-        records.append(
-            ArtifactRecord(
-                logical_id=f"context:{row.get('source_id', row.get('id', ''))}",
-                path=raw_path,
-                lifecycle=str(row.get("lifecycle", "")),
-                source=_relative_source(context_path, root),
-            )
-        )
-        references.append(
-            WorkerReference(
-                raw_path,
-                _relative_source(context_path, root),
-                "context_manifest",
-                f"context:{row.get('source_id', row.get('id', ''))}",
-            )
-        )
-
     sharding_path = root / "config" / "agent-control" / "activity-envelope-sharding.toml"
     sharding = _load_toml(sharding_path)
     classes = sharding.get("classes", {})
