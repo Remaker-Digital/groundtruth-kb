@@ -43,6 +43,7 @@ from groundtruth_kb.native_authority import (
     _require_project_dependencies,
     _required,
     _work_evidence,
+    _work_formal_sources,
     _write,
 )
 from groundtruth_kb.postgres_kernel import PostgresKernel, PostgresKernelError, PostgresTransaction, parse_json_bytes
@@ -186,8 +187,9 @@ def parse_authored_message(content: str) -> dict[str, Any]:
         _error("invalid_bridge_header", "bridge_kind must use the current canonical taxonomy")
     if status == "ADVISORY" and metadata["bridge_kind"] != BridgeKind.GOVERNANCE_ADVISORY.value:
         _error("invalid_bridge_header", "ADVISORY requires governance_advisory")
-    if {"target_role", "project_authorization", "pauth", "receiver_kind"} & metadata.keys():
-        _error("invalid_bridge_header", "The header contains a retired routing or authorization field")
+    retired = {"target_role", "project_authorization", "pauth", "receiver_kind", "spec_ids"} & metadata.keys()
+    if retired:
+        _error("invalid_bridge_header", "The header contains retired fields", fields=sorted(retired))
     try:
         version = int(metadata["version"])
         if version < 1 or not metadata["version"].isascii() or not metadata["version"].isdecimal():
@@ -220,7 +222,21 @@ def parse_authored_message(content: str) -> dict[str, Any]:
     if status in {"NEW", "REVISED"}:
         if metadata["bridge_kind"] != "implementation_proposal":
             _error("invalid_bridge_header", "NEW and REVISED require implementation_proposal")
-        for key in ("target_paths", "test_artifact_targets", "spec_ids"):
+        try:
+            observed_work_version = metadata.get("work_item_version", "")
+            result["work_item_version"] = int(observed_work_version)
+            if (
+                not observed_work_version.isascii()
+                or not observed_work_version.isdecimal()
+                or not 1 <= result["work_item_version"] < 2_147_483_647
+            ):
+                raise ValueError()
+        except ValueError:
+            _error(
+                "invalid_bridge_header",
+                "work_item_version must identify the observed positive integer work-item version",
+            )
+        for key in ("target_paths", "test_artifact_targets", "spec_versions"):
             try:
                 result[key] = parse_json_bytes(metadata.get(key, "").encode("utf-8"))
             except PostgresKernelError:
@@ -228,11 +244,19 @@ def parse_authored_message(content: str) -> dict[str, Any]:
         _paths(result["target_paths"], "target_paths")
         _paths(result["test_artifact_targets"], "test_artifact_targets")
         if (
-            not isinstance(result["spec_ids"], list)
-            or not result["spec_ids"]
-            or any(not isinstance(key, str) or not key for key in result["spec_ids"])
+            not isinstance(result["spec_versions"], dict)
+            or not result["spec_versions"]
+            or any(
+                not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}", key)
+                or type(version) is not int
+                or not 1 <= version < 2_147_483_647
+                for key, version in result["spec_versions"].items()
+            )
         ):
-            _error("invalid_bridge_header", "A proposal must identify its applicable specifications")
+            _error(
+                "invalid_bridge_header",
+                "spec_versions must map each applicable formal ID to its observed positive integer version",
+            )
     if status == "READY" and metadata["bridge_kind"] != "implementation_report":
         _error("invalid_bridge_header", "READY requires implementation_report")
     if status in {"GO", "NO-GO", "NOT-READY", "VERIFIED", "SUPERSEDED"} and metadata["bridge_kind"] != "lo_verdict":
@@ -334,9 +358,11 @@ class NativeBridgeService:
             _error("scope_changed", "Current work scope changed; reconcile this attempt before further effects")
         if _current_parent(tx, work["id"])["project_id"] != attempt["project_id"]:
             _error("scope_changed", "The work item's project changed; reconcile the attempt")
-        for key, version in attempt["spec_versions"].items():
-            current = _required(tx, "specifications", key, lock=lock)
-            if current["version"] != version or current["status"] in {"retired", "superseded"}:
+        for current in _work_formal_sources(
+            tx, work, attempt["project_id"], additional_ids=list(attempt["spec_versions"]), lock=lock
+        ):
+            key = current["id"]
+            if current["version"] != attempt["spec_versions"].get(key) or current["status"] != "active":
                 _error("scope_changed", "Applicable formal knowledge changed; reconcile the attempt", id=key)
 
     @staticmethod
@@ -842,21 +868,39 @@ class NativeBridgeService:
                 except ValueError:
                     _error("invalid_blocked_observation", "BLOCKED must identify the observed read time")
             if status in {"NEW", "REVISED"}:
+                if message["work_item_version"] != work["version"]:
+                    _error(
+                        "scope_changed",
+                        "The authored work-item version is no longer current; read the changed scope and revise the proposal",
+                        id=work["id"],
+                        authored_version=message["work_item_version"],
+                        current_version=work["version"],
+                        recovery_route=f"gt context work-item {work['id']}",
+                    )
                 _work_evidence(tx, work)
-                required_specs = {work["source_spec_id"], *(work.get("related_spec_ids_at_creation") or [])}
-                required_specs.update(
-                    link["artifact_ref"]
-                    for link in _related(tx, "project_artifact_links", project_id=project["id"], status="active")
-                    if link["artifact_type"] == "spec"
-                )
-                if not required_specs.issubset(message["spec_ids"]):
-                    _error("incomplete_formal_scope", "The proposal omits current work/project formal sources")
+                formals = _work_formal_sources(tx, work, project["id"], additional_ids=list(message["spec_versions"]))
+                missing = sorted({spec["id"] for spec in formals} - message["spec_versions"].keys())
+                if missing:
+                    _error(
+                        "incomplete_formal_scope",
+                        "The proposal omits linked formal requirements; read current task context and cited sources",
+                        ids=missing,
+                        recovery_route=f"gt context work-item {work['id']}",
+                    )
                 specs = {}
-                for key in message["spec_ids"]:
-                    spec = _required(tx, "specifications", key)
-                    if spec["status"] in {"retired", "superseded"}:
-                        _error("inactive_formal_scope", "A proposal cannot depend on retired formal authority")
-                    specs[key] = spec["version"]
+                for spec in formals:
+                    if spec["status"] != "active":
+                        _error("inactive_formal_scope", "A proposal requires active formal authority", id=spec["id"])
+                    if spec["version"] != message["spec_versions"][spec["id"]]:
+                        _error(
+                            "scope_changed",
+                            "The authored formal version is no longer current; read the changed requirement and revise the proposal",
+                            id=spec["id"],
+                            authored_version=message["spec_versions"][spec["id"]],
+                            current_version=spec["version"],
+                            recovery_route=f"gt context work-item {work['id']}",
+                        )
+                    specs[spec["id"]] = spec["version"]
                 test = _required(tx, "tests", work["source_test_id"])
                 if not test["test_file"] or test["test_file"] not in message["test_artifact_targets"]:
                     _error("test_scope_missing", "The proposal must identify the work item's executable test artifact")

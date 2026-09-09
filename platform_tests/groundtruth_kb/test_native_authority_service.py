@@ -16,6 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from threading import Event
 from uuid import uuid4
 
 import psycopg
@@ -29,6 +30,7 @@ from groundtruth_kb.postgres_kernel import (
     TABLE_SPECS,
     PostgresKernel,
     PostgresKernelError,
+    PostgresTransaction,
     canonical_json_bytes,
     parse_json_bytes,
 )
@@ -133,6 +135,31 @@ def history_count(service):
     with service.kernel.transaction(read_only=True) as tx:
         tx.cursor.execute(sql.SQL("SELECT count(*) AS n FROM {}.record_history").format(sql.Identifier(tx.schema)))
         return tx.cursor.fetchone()["n"]
+
+
+def link_project_formal(service, spec_id):
+    """Set up an existing canonical relationship, without a second test registry."""
+    row = {column: None for column in TABLE_SPECS["project_artifact_links"].columns}
+    row.update(
+        id=f"LINK-{spec_id}",
+        version=1,
+        project_id="PROJECT-1",
+        artifact_type="spec",
+        artifact_ref=spec_id,
+        relationship="governs",
+        status="active",
+        changed_at=datetime.now(UTC).isoformat(),
+        changed_by="qualification",
+        change_reason="Current project requirement",
+    )
+    service.kernel.mutate_current(
+        table="project_artifact_links",
+        identity={"id": row["id"]},
+        expected_version=0,
+        new_state=row,
+        actor="qualification",
+        reason="Current project requirement",
+    )
 
 
 def test_atomic_membership_and_program_semantics(native):
@@ -349,6 +376,161 @@ def test_fresh_task_context_uses_current_canon_and_rejects_retired_source(native
     assert refused.json()["error"]["code"] == "inactive_context_source"
 
 
+def test_task_context_loads_transitive_formals_and_current_test_instructions(native):
+    service, client, _, _ = native
+    seed(client)
+    for key in ("GOV-ROOT", "GOV-MIDDLE", "SPEC-PARENT", "SPEC-TEST", "SPEC-PROJECT"):
+        assert put(client, "specifications", key, {"title": key, "status": "active"}).status_code == 200
+    for key, fields in (
+        ("GOV-MIDDLE", {"affected_by": ["GOV-ROOT"]}),
+        ("GOV-ROOT", {"affected_by": ["GOV-MIDDLE"]}),
+        ("SPEC-1", {"affected_by": ["GOV-MIDDLE"], "parent": "SPEC-PARENT"}),
+        ("SPEC-PROJECT", {"affected_by": ["GOV-ROOT"]}),
+    ):
+        assert put(client, "specifications", key, fields, expected_version=1).status_code == 200
+    assert put(client, "tests", "TEST-1", {"spec_id": "SPEC-TEST"}, expected_version=1).status_code == 200
+    assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
+    link_project_formal(service, "SPEC-PROJECT")
+    before = history_count(service)
+
+    result = client.get("/v1/work-items/WI-1/context")
+    assert result.status_code == 200, result.text
+    context = result.json()
+    assert [row["id"] for row in context["specifications"]] == [
+        "GOV-MIDDLE",
+        "GOV-ROOT",
+        "SPEC-1",
+        "SPEC-PARENT",
+        "SPEC-PROJECT",
+        "SPEC-TEST",
+    ]
+    assert context["test"]["spec_id"] == "SPEC-TEST"
+    assert [row["id"] for row in context["test_phases"]] == ["PHASE-1"]
+    assert context["test_phases"][0]["gate_criteria"] == "Observable result"
+    assert [row["id"] for row in context["test_plans"]] == ["PLAN-1"]
+    assert history_count(service) == before
+
+    assert (
+        put(
+            client, "test-phases", "PHASE-1", {"gate_criteria": "Corrected observable result"}, expected_version=1
+        ).status_code
+        == 200
+    )
+    fresh = client.get("/v1/work-items/WI-1/context").json()
+    assert fresh["test_phases"][0]["gate_criteria"] == "Corrected observable result"
+    assert context["test_phases"][0]["gate_criteria"] == "Observable result"
+
+
+@pytest.mark.parametrize("status", ["retired", "superseded", "specified"])
+def test_task_context_refuses_inactive_transitive_requirement(native, status):
+    service, client, _, _ = native
+    seed(client)
+    assert (
+        put(client, "specifications", "GOV-1", {"title": "Required constraint", "status": "active"}).status_code == 200
+    )
+    assert put(client, "specifications", "SPEC-1", {"affected_by": ["GOV-1"]}, expected_version=1).status_code == 200
+    assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
+    assert put(client, "specifications", "GOV-1", {"status": status}, expected_version=1).status_code == 200
+    before = history_count(service)
+    result = client.get("/v1/work-items/WI-1/context")
+    assert result.status_code == 422, result.text
+    assert result.json()["error"]["code"] == "inactive_context_source"
+    assert result.json()["error"]["details"]["ids"] == ["GOV-1"]
+    assert "gt context work-item WI-1" in result.json()["error"]["details"]["recovery_route"]
+    assert history_count(service) == before
+
+
+def test_task_context_does_not_replay_prior_success_when_authority_fails(native, monkeypatch):
+    service, client, _, _ = native
+    seed(client)
+    assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
+    assert client.get("/v1/work-items/WI-1/context").status_code == 200
+
+    def unavailable():
+        raise PostgresKernelError("postgres_unavailable", "Canonical source unavailable")
+
+    monkeypatch.setattr(service.kernel, "_connect", unavailable)
+    result = client.get("/v1/work-items/WI-1/context")
+    assert result.status_code == 503
+    assert result.json()["error"]["code"] == "postgres_unavailable"
+    assert "specifications" not in result.json()
+    assert result.headers["cache-control"] == "no-store"
+
+
+def test_task_context_reads_one_snapshot_during_concurrent_canonical_changes(native, monkeypatch):
+    _, client, _, _ = native
+    seed(client)
+    assert put(client, "specifications", "GOV-1", {"title": "Constraint", "status": "active"}).status_code == 200
+    assert put(client, "specifications", "SPEC-1", {"affected_by": ["GOV-1"]}, expected_version=1).status_code == 200
+    assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
+    started, changed = Event(), Event()
+    original_get = PostgresTransaction.get
+
+    def pause_after_work_read(tx, table, identity, **kwargs):
+        row = original_get(tx, table, identity, **kwargs)
+        if table == "work_items" and identity == {"id": "WI-1"} and not started.is_set():
+            started.set()
+            assert changed.wait(15), "Concurrent canonical amendments did not complete"
+        return row
+
+    monkeypatch.setattr(PostgresTransaction, "get", pause_after_work_read)
+    with ThreadPoolExecutor(max_workers=1) as workers:
+        reading = workers.submit(client.get, "/v1/work-items/WI-1/context")
+        try:
+            assert started.wait(15), "The context did not read its canonical work item"
+            assert (
+                put(
+                    client, "specifications", "SPEC-1", {"description": "New required effect"}, expected_version=2
+                ).status_code
+                == 200
+            )
+            assert (
+                put(
+                    client, "specifications", "GOV-1", {"description": "New constraint"}, expected_version=1
+                ).status_code
+                == 200
+            )
+        finally:
+            changed.set()
+        result = reading.result(timeout=15)
+    assert result.status_code == 200, result.text
+    prior = {row["id"]: row for row in result.json()["specifications"]}
+    assert prior["SPEC-1"]["version"] == 2 and prior["GOV-1"]["version"] == 1
+    fresh = {row["id"]: row for row in client.get("/v1/work-items/WI-1/context").json()["specifications"]}
+    assert fresh["SPEC-1"]["description"] == "New required effect"
+    assert fresh["GOV-1"]["description"] == "New constraint"
+
+
+def test_task_context_reports_missing_linked_source_without_partial_context(native):
+    service, client, _, _ = native
+    seed(client)
+    assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
+    # An incomplete imported relationship must be diagnosed even though the
+    # ordinary formal writer refuses to introduce this missing reference.
+    link_project_formal(service, "SPEC-MISSING")
+    before = history_count(service)
+    result = client.get("/v1/work-items/WI-1/context")
+    assert result.status_code == 404, result.text
+    error = result.json()["error"]
+    assert error["code"] == "not_found"
+    assert error["details"]["id"] == "SPEC-MISSING"
+    assert "gt context work-item WI-1" in error["details"]["recovery_route"]
+    assert "work_item" not in result.json()
+    assert history_count(service) == before
+
+
+def test_task_context_requires_current_test_plan_instructions(native):
+    service, client, _, _ = native
+    seed(client)
+    assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
+    assert put(client, "test-plans", "PLAN-1", {"status": "retired"}, expected_version=1).status_code == 200
+    before = history_count(service)
+    result = client.get("/v1/work-items/WI-1/context")
+    assert result.status_code == 422, result.text
+    assert result.json()["error"]["code"] == "test_phase_required"
+    assert history_count(service) == before
+
+
 def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_path):
     service, client, _, service_name = native
     seed(client)
@@ -528,9 +710,19 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
             assert json.loads(work_readiness.stdout)["ready"] is False
             work_context = cli("context", "work-item", "WI-DEPENDENT", "--json")
             assert json.loads(work_context.stdout)["work_item_readiness"] == json.loads(work_readiness.stdout)
+            assert (
+                put(
+                    client,
+                    "specifications",
+                    "GOV-CLI",
+                    {"title": "Constraint loaded by each fresh context", "status": "active"},
+                ).status_code
+                == 200
+            )
             amendment = tmp_path / "fields.json"
             amendment.write_text(
-                json.dumps({"description": "Fresh context reads current canon: æ¼¢å­— cafÃ©"}), encoding="utf-8"
+                json.dumps({"description": "Fresh context reads current canon: 漢字 café", "affected_by": ["GOV-CLI"]}),
+                encoding="utf-8",
             )
             result = cli(
                 "spec",
@@ -550,7 +742,16 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
             assert result.returncode == 0, result.stderr
             result = cli("context", "work-item", "WI-1", "--json")
             assert result.returncode == 0, result.stderr
-            assert json.loads(result.stdout)["specifications"][0]["description"].endswith("æ¼¢å­— cafÃ©")
+            loaded = json.loads(result.stdout)
+            assert [row["id"] for row in loaded["specifications"]] == ["GOV-CLI", "SPEC-1"]
+            assert loaded["specifications"][1]["description"].endswith("漢字 café")
+            assert loaded["test_phases"][0]["gate_criteria"] == "Observable result"
+            readable = cli("context", "work-item", "WI-1")
+            assert readable.returncode == 0, readable.stderr
+            assert all(
+                value in readable.stdout
+                for value in ("GOV-CLI", "test_phases:", "Observable result", "test_plans:", "PLAN-1")
+            )
             # Each call starts a fresh CLI process without PostgreSQL credentials.
             for version, (role, status) in enumerate(
                 (("pb", "NEW"), ("lo", "GO"), ("pb", "READY"), ("lo", "VERIFIED")), 1
@@ -604,9 +805,10 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
                     metadata["recipient_role"] = "loyal-opposition" if receiver == "lo" else "prime-builder"
                 if status == "NEW":
                     metadata.update(
+                        work_item_version=loaded["work_item"]["version"],
                         target_paths='["code.py"]',
                         test_artifact_targets='["tests/test_effect.py"]',
-                        spec_ids='["SPEC-1"]',
+                        spec_versions=json.dumps({row["id"]: row["version"] for row in loaded["specifications"]}),
                     )
                 if status == "READY":
                     checked = cli(
@@ -718,5 +920,8 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
             process.wait(timeout=15)
     unavailable = cli("projects", "show", "PROJECT-1", "--json")
     assert unavailable.returncode != 0 and "authority_unavailable" in unavailable.stderr
+    unavailable_context = cli("context", "work-item", "WI-1", "--json")
+    assert unavailable_context.returncode != 0 and "authority_unavailable" in unavailable_context.stderr
+    assert unavailable_context.stdout == ""
     assert sentinel.read_bytes() == b"This is not a SQLite database; opening it is a test failure."
     assert service.show("specifications", "SPEC-1")["version"] == 2

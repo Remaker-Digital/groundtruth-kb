@@ -13,13 +13,13 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 from groundtruth_kb.authority_api import create_authority_app
-from groundtruth_kb.bridge.native import BindSession, NativeBridgeService
+from groundtruth_kb.bridge.native import BindSession, NativeBridgeService, parse_authored_message
 from groundtruth_kb.bridge.vocabulary import LOYAL_OPPOSITION_ACTIONABLE_STATUSES, PRIME_ACTIONABLE_STATUSES
-from groundtruth_kb.postgres_kernel import TABLE_SPECS
+from groundtruth_kb.postgres_kernel import TABLE_SPECS, PostgresKernelError
 from psycopg import sql
 
+from platform_tests.groundtruth_kb.test_native_authority_service import link_project_formal, put, seed, work_fields
 from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_authority_service import put, seed, work_fields
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 
@@ -112,9 +112,10 @@ def authored(context, document, version, status, **extra):
         fields["recipient_role"] = {"pb": "prime-builder", "lo": "loyal-opposition"}[receiver]
     if status in {"NEW", "REVISED"}:
         fields.update(
+            work_item_version=1,
             target_paths=json.dumps(["code.py"]),
             test_artifact_targets=json.dumps(["tests/test_effect.py"]),
-            spec_ids=json.dumps(["SPEC-1"]),
+            spec_versions=json.dumps({"SPEC-1": 1}),
         )
     fields.update(extra)
     return "\r\n".join(
@@ -261,7 +262,7 @@ def test_scoped_publication_preserves_local_work_and_supports_a_fresh_successor(
 
 
 @pytest.mark.parametrize("next_status", ["GO", "READY", "VERIFIED"])
-@pytest.mark.parametrize("changed_scope", ["work", "formal", "parent"])
+@pytest.mark.parametrize("changed_scope", ["work", "formal", "parent", "project_formal", "test_formal"])
 @pytest.mark.parametrize("claim_before_change", [False, True])
 def test_claim_operations_reject_changed_scope_without_consuming_the_reservation(
     bridge, next_status, changed_scope, claim_before_change
@@ -284,6 +285,15 @@ def test_claim_operations_reject_changed_scope_without_consuming_the_reservation
         changed = put(client, "work-items", "WI-1", {"description": "A different required effect"}, expected_version=1)
     elif changed_scope == "formal":
         changed = put(client, "specifications", "SPEC-1", {"description": "Changed formal intent"}, expected_version=1)
+    elif changed_scope in {"project_formal", "test_formal"}:
+        changed = put(
+            client, "specifications", "SPEC-ADDED", {"title": "Additional current requirement", "status": "active"}
+        )
+        assert changed.status_code == 200, changed.text
+        if changed_scope == "project_formal":
+            link_project_formal(service, "SPEC-ADDED")
+        else:
+            changed = put(client, "tests", "TEST-1", {"spec_id": "SPEC-ADDED"}, expected_version=1)
     else:
         assert put(client, "projects", "PROJECT-2", {"name": "Different complete outcome"}).status_code == 200
         membership = client.get("/v1/work-items/WI-1").json()["membership"]
@@ -342,9 +352,112 @@ def test_changed_scope_can_be_rejected_and_revised_without_reusing_the_old_propo
     changed = put(client, "work-items", "WI-1", {"description": "Corrected required effect"}, expected_version=1)
     assert changed.status_code == 200, changed.text
     deliver(client, contexts, "chain", "lo1", 2, "NO-GO")
-    deliver(client, contexts, "chain", "pb2", 3, "REVISED")
+    deliver(client, contexts, "chain", "pb2", 3, "REVISED", work_item_version=2)
     deliver(client, contexts, "chain", "lo2", 4, "GO")
     assert claim(client, "chain", "pb3", 4, "READY").status_code == 200
+
+
+def test_proposal_requires_transitive_formals_before_delivery_and_rechecks_them(bridge):
+    service, client, contexts, _ = bridge
+    assert (
+        put(client, "specifications", "GOV-1", {"title": "Required constraint", "status": "active"}).status_code == 200
+    )
+    assert put(client, "specifications", "SPEC-1", {"affected_by": ["GOV-1"]}, expected_version=1).status_code == 200
+    reserved = claim(client, "chain", "pb1", 0, "NEW").json()
+    fence = {"native_context_id": "pb1", "fence": reserved["fence"]}
+    missing = client.post(
+        "/v1/bridge/chain/deliver",
+        json={**fence, "content": authored(contexts["pb1"], "chain", 1, "NEW")},
+    )
+    assert missing.status_code == 422, missing.text
+    assert missing.json()["error"]["code"] == "incomplete_formal_scope"
+    assert missing.json()["error"]["details"]["ids"] == ["GOV-1"]
+    assert client.post("/v1/bridge/chain/check", json=fence).status_code == 200
+    accepted = client.post(
+        "/v1/bridge/chain/deliver",
+        json={
+            **fence,
+            "content": authored(
+                contexts["pb1"], "chain", 1, "NEW", spec_versions=json.dumps({"GOV-1": 1, "SPEC-1": 2})
+            ),
+        },
+    )
+    assert accepted.status_code == 200, accepted.text
+    assert (
+        put(client, "specifications", "GOV-1", {"description": "Changed constraint"}, expected_version=1).status_code
+        == 200
+    )
+    refused = claim(client, "chain", "lo1", 1, "GO")
+    assert refused.status_code == 422 and refused.json()["error"]["code"] == "scope_changed"
+    deliver(client, contexts, "chain", "lo1", 2, "NO-GO")
+    fresh = client.get("/v1/work-items/WI-1/context").json()
+    assert next(row for row in fresh["specifications"] if row["id"] == "GOV-1")["version"] == 2
+    deliver(
+        client,
+        contexts,
+        "chain",
+        "pb2",
+        3,
+        "REVISED",
+        spec_versions=json.dumps({row["id"]: row["version"] for row in fresh["specifications"]}),
+    )
+    deliver(client, contexts, "chain", "lo2", 4, "GO")
+    assert claim(client, "chain", "pb3", 4, "READY").status_code == 200
+
+
+@pytest.mark.parametrize("status", ["NEW", "REVISED"])
+@pytest.mark.parametrize("changed_source", ["formal", "work"])
+def test_proposal_cannot_silently_bind_newer_inputs_than_its_author_read(bridge, status, changed_source):
+    service, client, contexts, _ = bridge
+    head, author = 0, "pb1"
+    if status == "REVISED":
+        deliver(client, contexts, "chain", "pb1", 1, "NEW")
+        deliver(client, contexts, "chain", "lo1", 2, "NO-GO")
+        head, author = 2, "pb2"
+    observed = client.get("/v1/work-items/WI-1/context").json()
+    source_versions = {row["id"]: row["version"] for row in observed["specifications"]}
+    reserved = claim(client, "chain", author, head, status).json()
+    fence = {"native_context_id": author, "fence": reserved["fence"]}
+    delayed = authored(
+        contexts[author],
+        "chain",
+        head + 1,
+        status,
+        spec_versions=json.dumps(source_versions),
+        work_item_version=observed["work_item"]["version"],
+    )
+    domain, identifier = ("specifications", "SPEC-1") if changed_source == "formal" else ("work-items", "WI-1")
+    assert (
+        put(
+            client,
+            domain,
+            identifier,
+            {"description": "A materially different requirement"},
+            expected_version=1,
+        ).status_code
+        == 200
+    )
+    refused = client.post("/v1/bridge/chain/deliver", json={**fence, "content": delayed})
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["error"]["code"] == "scope_changed"
+    assert refused.json()["error"]["details"]["id"] == identifier
+    assert client.post("/v1/bridge/chain/check", json=fence).status_code == 200
+    with service.kernel.transaction(read_only=True) as tx:
+        tx.cursor.execute(
+            sql.SQL("SELECT head_version FROM {}.bridge_attempts WHERE id='chain'").format(sql.Identifier(tx.schema))
+        )
+        assert tx.cursor.fetchone()["head_version"] == head
+    fresh = client.get("/v1/work-items/WI-1/context").json()
+    corrected = authored(
+        contexts[author],
+        "chain",
+        head + 1,
+        status,
+        spec_versions=json.dumps({row["id"]: row["version"] for row in fresh["specifications"]}),
+        work_item_version=fresh["work_item"]["version"],
+    )
+    accepted = client.post("/v1/bridge/chain/deliver", json={**fence, "content": corrected})
+    assert accepted.status_code == 200, accepted.text
 
 
 def test_claim_expiry_and_different_successor_contention_are_not_thread_ownership(bridge):
@@ -507,10 +620,54 @@ def test_withdrawal_and_broken_chain_recovery_purge_payload_without_fabricating_
     )
     assert result.status_code == 200
     assert result.json()["disposition"] == "abandoned"
-    deliver(client, contexts, "replacement", "pb3", 1, "NEW")
+    current = client.get("/v1/work-items/WI-1/context").json()
+    deliver(
+        client,
+        contexts,
+        "replacement",
+        "pb3",
+        1,
+        "NEW",
+        spec_versions=json.dumps({row["id"]: row["version"] for row in current["specifications"]}),
+    )
     with service.kernel.transaction(read_only=True) as tx:
         tx.cursor.execute(sql.SQL("SELECT DISTINCT attempt_id FROM {}.bridge_items").format(sql.Identifier(tx.schema)))
         assert [row["attempt_id"] for row in tx.cursor.fetchall()] == ["replacement"]
+
+
+@pytest.mark.parametrize(
+    "versions",
+    [
+        "{}",
+        "[]",
+        '{"SPEC-1": true}',
+        '{"SPEC-1": 0}',
+        '{"SPEC-1": "1"}',
+        '{"SPEC-1": 1.0}',
+        '{"SPEC-1": 1, "SPEC-1": 2}',
+    ],
+)
+def test_proposal_requires_unambiguous_observed_integer_source_versions(versions):
+    content = authored({"session_context_id": "context"}, "chain", 1, "NEW", spec_versions=versions)
+    with pytest.raises(PostgresKernelError) as error:
+        parse_authored_message(content)
+    assert error.value.code == "invalid_bridge_header"
+
+
+def test_ids_without_observed_versions_cannot_supply_proposal_scope():
+    content = authored({"session_context_id": "context"}, "chain", 1, "NEW")
+    content = content.replace('spec_versions: {"SPEC-1": 1}', 'spec_ids: ["SPEC-1"]')
+    with pytest.raises(PostgresKernelError) as error:
+        parse_authored_message(content)
+    assert error.value.code == "invalid_bridge_header"
+
+
+@pytest.mark.parametrize("version", ["", "0", "-1", "true", "1.0", "2147483647"])
+def test_proposal_requires_an_observed_work_item_version(version):
+    content = authored({"session_context_id": "context"}, "chain", 1, "NEW", work_item_version=version)
+    with pytest.raises(PostgresKernelError) as error:
+        parse_authored_message(content)
+    assert error.value.code == "invalid_bridge_header"
 
 
 def test_verified_refuses_changed_bytes_and_preserves_unverified_work(bridge):
@@ -609,7 +766,16 @@ def test_overlapping_effect_claims_and_source_change_require_fresh_work(bridge):
     )
     assert abandoned.status_code == 200
     assert claim(client, "replacement", "pb3", 0, "READY").status_code == 422
-    deliver(client, contexts, "replacement", "pb3", 1, "NEW")
+    current = client.get("/v1/work-items/WI-1/context").json()
+    deliver(
+        client,
+        contexts,
+        "replacement",
+        "pb3",
+        1,
+        "NEW",
+        spec_versions=json.dumps({row["id"]: row["version"] for row in current["specifications"]}),
+    )
 
 
 @pytest.mark.parametrize("scope", ["shared_test", "test_is_source", "source_is_test", "independent"])

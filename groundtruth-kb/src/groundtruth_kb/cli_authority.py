@@ -33,7 +33,7 @@ def _call(ctx: click.Context, method: str, path: str, **kwargs: Any) -> Any:
         raise click.ClickException(f"{error.code}: {error}{details}") from error
 
 
-def _emit(value: Any, json_output: bool) -> None:
+def _emit(value: Any, json_output: bool, *, complete: bool = False) -> None:
     if json_output:
         click.echo(canonical_json_bytes(value).decode("utf-8"), nl=False)
         return
@@ -51,6 +51,16 @@ def _emit(value: Any, json_output: bool) -> None:
                 click.echo(f"{record['id']} v{record.get('version', '?')}: {label}")
                 if record.get("description"):
                     click.echo(record["description"])
+                if complete:
+                    details = {
+                        key: value
+                        for key, value in record.items()
+                        if key not in {"id", "version", "title", "name", "description"}
+                    }
+                    if record is not row:
+                        details.update({key: value for key, value in row.items() if value is not record})
+                    for key, value in details.items():
+                        click.echo(f"{key}: {canonical_json_bytes(value).decode('utf-8').strip()}")
                 continue
         click.echo(canonical_json_bytes(row).decode("utf-8"), nl=False)
 
@@ -76,7 +86,7 @@ def _domain_group(name: str, domain: str) -> click.Group:
     @click.pass_context
     def show(ctx: click.Context, record_id: str, json_output: bool) -> None:
         """Read the current record, including planning relationships where relevant."""
-        _emit(_call(ctx, "GET", f"/v1/{domain}/{quote(record_id, safe='')}"), json_output)
+        _emit(_call(ctx, "GET", f"/v1/{domain}/{quote(record_id, safe='')}"), json_output, complete=True)
 
     @group.command("list")
     @click.option("--limit", type=click.IntRange(1), default=200, show_default=True)
@@ -341,7 +351,7 @@ def commit_project(
 @click.option("--json", "json_output", is_flag=True)
 @click.pass_context
 def work_context(ctx: click.Context, work_item_id: str, json_output: bool) -> None:
-    """Read project, program, formal sources, test, and predecessor state together."""
+    """Read current work, linked formal requirements, test instructions and prerequisites together."""
     result = _call(ctx, "GET", f"/v1/work-items/{quote(work_item_id, safe='')}/context")
     if not json_output:
         for key in (
@@ -350,13 +360,15 @@ def work_context(ctx: click.Context, work_item_id: str, json_output: bool) -> No
             "work_item",
             "specifications",
             "test",
+            "test_phases",
+            "test_plans",
             "predecessors",
             "readiness",
             "work_item_readiness",
         ):
             if result.get(key):
                 click.echo(f"{key}:")
-                _emit(result[key], False)
+                _emit(result[key], False, complete=True)
     else:
         _emit(result, True)
 

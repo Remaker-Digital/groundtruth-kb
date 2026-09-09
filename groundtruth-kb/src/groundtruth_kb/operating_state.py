@@ -26,7 +26,6 @@ COMPONENTS = (
     "hooks",
     "resource-registry",
     "system-interface-map",
-    "startup",
 )
 
 
@@ -105,7 +104,6 @@ def collect_operating_state(
         "hooks": lambda: _probe_hooks(root),
         "resource-registry": lambda: _probe_resource_registry(root),
         "system-interface-map": lambda: _probe_system_interface_map(root),
-        "startup": lambda: _probe_startup(root),
     }
     collected = tuple(_timed_probe(name, probe_map[name]) for name in selected)
     overall = _overall_status(collected)
@@ -404,16 +402,6 @@ def _probe_system_interface_map(root: Path) -> tuple[str, str, str, dict[str, An
             "backlog_case": "ok" if backlog_ok else "incomplete",
         },
     )
-
-
-def _probe_startup(root: Path) -> tuple[str, str, str, dict[str, Any]]:
-    report = root / "docs" / "gtkb-dashboard" / "session-startup-report.md"
-    if not report.exists():
-        return "UNKNOWN", "session startup report not generated", str(report), {}
-    size = report.stat().st_size
-    if size == 0:
-        return "WARN", "session startup report is empty", str(report), {"bytes": size}
-    return "PASS", "session startup report exists", str(report), {"bytes": size}
 
 
 def _latest_bridge_statuses(index: Path) -> dict[str, str]:

@@ -215,6 +215,64 @@ def _current_parent(tx: PostgresTransaction, work_item_id: str) -> dict[str, Any
     return memberships[0]
 
 
+def _work_formal_sources(
+    tx: PostgresTransaction,
+    work: dict[str, Any],
+    project_id: str,
+    *,
+    additional_ids: list[str] | None = None,
+    lock: bool = False,
+) -> list[dict[str, Any]]:
+    """Read the declared formal closure in the caller's domain transaction.
+
+    This is the explicit relationship floor, not a claim of complete semantic
+    applicability. Context loading and bridge effects use the same facts.
+    Cyclic cross-references are visited once, without dropping their records.
+    """
+    pending = set(additional_ids or []) | set(work.get("related_spec_ids_at_creation") or [])
+    if work.get("source_spec_id"):
+        pending.add(work["source_spec_id"])
+    if work.get("source_test_id"):
+        pending.add(_required(tx, "tests", work["source_test_id"], lock=lock)["spec_id"])
+    pending.update(
+        link["artifact_ref"]
+        for link in _related(tx, "project_artifact_links", project_id=project_id, status="active")
+        if link["artifact_type"] == "spec"
+    )
+    records: dict[str, dict[str, Any]] = {}
+    while pending:
+        for key in sorted(pending):
+            record = tx.get("specifications", {"id": key}, lock=lock)
+            if record is None:
+                _error(
+                    "not_found",
+                    "A required formal source is missing; reconcile its canonical relationship",
+                    domain="specifications",
+                    id=key,
+                    recovery_route=f"gt context work-item {work['id']}",
+                )
+            records[key] = record
+        pending = {
+            reference
+            for record in records.values()
+            for reference in [record.get("parent"), record.get("provisional_until"), *(record.get("affected_by") or [])]
+            if reference and reference not in records
+        }
+    return [records[key] for key in sorted(records)]
+
+
+def _test_phases(tx: PostgresTransaction, test_id: str) -> list[dict[str, Any]]:
+    tx.cursor.execute(
+        sql.SQL(
+            "SELECT phase.id FROM {}.test_plan_phases phase JOIN {}.test_plans plan ON plan.id=phase.plan_id "
+            "WHERE phase.test_ids @> jsonb_build_array(%s::text) AND plan.status='active' "
+            "ORDER BY phase.plan_id,phase.phase_order,phase.id"
+        ).format(sql.Identifier(tx.schema), sql.Identifier(tx.schema)),
+        (test_id,),
+    )
+    return [_required(tx, "test_plan_phases", row["id"]) for row in tx.cursor.fetchall()]
+
+
 def _work_evidence(tx: PostgresTransaction, state: dict[str, Any]) -> None:
     """Recheck current executable evidence at intake and proposal publication."""
     for field, table in (("source_spec_id", "specifications"), ("source_test_id", "tests")):
@@ -225,14 +283,7 @@ def _work_evidence(tx: PostgresTransaction, state: dict[str, Any]) -> None:
             _error("inactive_evidence", "Work must refer to current evidence", id=evidence["id"])
         if table == "tests" and not evidence.get("test_file"):
             _error("executable_test_required", "The linked test must identify executable work")
-    tx.cursor.execute(
-        sql.SQL(
-            "SELECT 1 FROM {}.test_plan_phases phase JOIN {}.test_plans plan ON plan.id=phase.plan_id "
-            "WHERE phase.test_ids @> jsonb_build_array(%s::text) AND plan.status='active' LIMIT 1"
-        ).format(sql.Identifier(tx.schema), sql.Identifier(tx.schema)),
-        (state["source_test_id"],),
-    )
-    if tx.cursor.fetchone() is None:
+    if not _test_phases(tx, state["source_test_id"]):
         _error("test_phase_required", "The executable test must belong to an active test plan phase")
 
 
@@ -607,16 +658,23 @@ class AuthorityService:
             membership = _current_parent(tx, record_id)
             project = _required(tx, "projects", membership["project_id"])
             program = _required(tx, "projects", project["parent_project_id"]) if project["parent_project_id"] else None
-            links = _related(tx, "project_artifact_links", project_id=project["id"], status="active")
-            formal_ids = {link["artifact_ref"] for link in links if link["artifact_type"] == "spec"}
-            formal_ids.update(work.get("related_spec_ids_at_creation") or [])
-            if work.get("source_spec_id"):
-                formal_ids.add(work["source_spec_id"])
-            formals = [_required(tx, "specifications", key) for key in sorted(formal_ids)]
-            stale = [formal["id"] for formal in formals if formal["status"] in {"retired", "superseded"}]
+            formals = _work_formal_sources(tx, work, project["id"])
+            stale = [formal["id"] for formal in formals if formal["status"] != "active"]
             if stale:
                 _error(
-                    "inactive_context_source", "Task links require reconciliation to current formal sources", ids=stale
+                    "inactive_context_source",
+                    "Task links require reconciliation to active formal sources",
+                    ids=stale,
+                    recovery_route=f"gt context work-item {record_id}",
+                )
+            test = _required(tx, "tests", work["source_test_id"]) if work.get("source_test_id") else None
+            phases = _test_phases(tx, test["id"]) if test else []
+            if test and not phases:
+                _error(
+                    "test_phase_required",
+                    "The linked test has no active test-plan phase; reconcile current test instructions",
+                    id=test["id"],
+                    recovery_route=f"gt context work-item {record_id}",
                 )
             return {
                 "work_item": work,
@@ -624,7 +682,11 @@ class AuthorityService:
                 "project": project,
                 "program": program,
                 "specifications": formals,
-                "test": _required(tx, "tests", work["source_test_id"]) if work.get("source_test_id") else None,
+                "test": test,
+                "test_phases": phases,
+                "test_plans": [
+                    _required(tx, "test_plans", key) for key in sorted({phase["plan_id"] for phase in phases})
+                ],
                 "predecessors": [_required(tx, "work_items", key) for key in work.get("depends_on_work_items") or []],
                 "readiness": _project_dependency_readiness(tx, project["id"], "readiness"),
                 **({"work_item_readiness": predecessor_readiness(tx, record_id)} if predecessor_readiness else {}),

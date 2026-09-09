@@ -4276,7 +4276,9 @@ def summary(ctx: click.Context) -> None:
 
 @main.command("status")
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
-@click.option("--startup", is_flag=True, default=False, help="Emit compact startup-safe status.")
+@click.option(
+    "--startup", is_flag=True, default=False, help="Emit quick local diagnostics; does not load task context."
+)
 @click.option(
     "--component",
     "components",
@@ -4292,7 +4294,6 @@ def summary(ctx: click.Context) -> None:
             "hooks",
             "resource-registry",
             "system-interface-map",
-            "startup",
         ],
         case_sensitive=False,
     ),

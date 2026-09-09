@@ -191,7 +191,7 @@ def test_predecessor_formal_change_cannot_cross_a_publication_effect(bridge, mon
         == 200
     )
     dependent(client)
-    verify(client, contexts, root, 1, "code.py", spec_ids='["SPEC-1", "SPEC-PREDECESSOR"]')
+    verify(client, contexts, root, 1, "code.py", spec_versions='{"SPEC-1": 1, "SPEC-PREDECESSOR": 1}')
     deliver(client, contexts, "chain-2", "pb1", 1, "NEW", work_item_id="WI-2", target_paths='["second.py"]')
     deliver(client, contexts, "chain-2", "lo1", 2, "GO", work_item_id="WI-2")
     reservation = claim(client, "chain-2", "pb3", 2, "READY", work_item_id="WI-2").json()

@@ -187,6 +187,34 @@ active test-plan phase. A membership move updates both relationships in one
 transaction and preserves each project's authorization. Programs never receive
 work-item membership or an authorization value.
 
+`context work-item` reads one current database snapshot containing the work item,
+its actual project and program, linked formal requirements, executable test,
+active test-plan phases and plans, and prerequisite state. Formal requirements
+include the project's active specification links, the work item's source and
+related specifications, the test's specification, and their transitive `parent`,
+`affected_by` and `provisional_until` references. Cyclic references are included
+once. Missing or inactive required sources return a diagnostic and recovery
+route instead of a partial successful context. This declared relationship set
+is a starting point for applicability investigation, not proof that every
+semantically relevant requirement has been discovered.
+
+NEW and REVISED proposals must author `work_item_version` with the work-item
+version actually read, and `spec_versions` as a JSON object mapping
+each applicable formal ID to the positive integer version the author actually
+read, for example `{"SPEC-1": 2, "GOV-1": 1}`. An ID-only `spec_ids` field is
+not accepted. Include the declared closure and any additional applicable sources,
+including the references of those additional sources. The service compares
+every authored version with current canonical state; it never supplies or
+upgrades the author's source versions at filing time. A delayed proposal must
+be reconsidered against the changed requirement and reauthored before acceptance. Bridge
+claim, checkout and effect checks re-read it against the proposal's source
+versions; changed requirements cannot silently inherit an old review. A fresh
+context loads the current task through the same CLI, without a previous agent's
+report or direct harness contact. Local `gt status --startup` supplies compact
+diagnostics only; a historical startup report does not certify current context.
+Both text and JSON task-context output include complete source records and test
+instructions; the text view does not reduce gate criteria to record titles.
+
 The behavioral qualification is
 `platform_tests/groundtruth_kb/test_native_authority_service.py`. It uses unique
 schemas on an explicitly selected disposable PostgreSQL service, including

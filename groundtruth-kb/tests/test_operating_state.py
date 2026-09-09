@@ -261,6 +261,20 @@ def test_status_cli_json_and_startup_use_same_collector(project_dir: Path, runne
     assert str(project_dir.resolve()) in rendered
 
 
+@pytest.mark.parametrize("report_content", [None, "", "# Startup: PASS\nAll previous inputs were current.\n"])
+def test_startup_status_cannot_certify_context_from_a_historical_report(project_dir, runner, report_content):
+    KnowledgeDB(project_dir / "groundtruth.db").close()
+    if report_content is not None:
+        report = project_dir / "docs" / "gtkb-dashboard" / "session-startup-report.md"
+        report.parent.mkdir(parents=True)
+        report.write_text(report_content, encoding="utf-8")
+    result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "status", "--startup", "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert "startup" not in {component["name"] for component in payload["components"]}
+    assert "session-startup-report.md" not in result.output
+
+
 def test_operating_state_module_has_no_llm_or_network_dependency() -> None:
     source = inspect.getsource(operating_state)
 
