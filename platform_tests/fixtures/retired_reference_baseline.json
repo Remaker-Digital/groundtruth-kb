@@ -1221,10 +1221,6 @@
     "scripts/bridge_report_test_claim_rerun_verifier.py": {
       ".gtkb-state": 1
     },
-    "scripts/bridge_verified_backlog_reconciler.py": {
-      "DEFERRED": 1,
-      "NO-ACTION": 2
-    },
     "scripts/bridge_work_intent_registry.py": {
       ".gtkb-state": 1,
       "NO-ACTION": 4,

@@ -1,111 +1,57 @@
 ---
 name: gtkb-bridge-reconciliation
-description: Operate the GT-KB bridge/backlog reconciliation workflow in the no-index era — run the read-only assessment, classify findings, correct one triage class at a time, and present exactly one owner decision before any mutation while preserving the bridge, project-authorization, and implementation-start gates. Use when reconciling bridge thread state against the MemBase backlog, investigating bridge/backlog drift, or resolving open work items whose bridge threads are VERIFIED.
-allowed-tools: Bash, Read, AskUserQuestion
+description: Investigate discrepancies between bridge messages and canonical work or project state through the ordinary CLI. Use for missing work, mismatched completion evidence, or review and project-commit recovery.
 license: "Proprietary - Remaker Digital"
-compatibility:
-  - claude-code >= 1.0
 metadata:
   project: groundtruth-kb
   category: bridge-reconciliation
 ---
-# Bridge Reconciliation Operator Skill + Runbook
+# Bridge and work-state reconciliation
 
-Use this skill to reconcile **bridge thread state** against the **MemBase backlog**
-(`work_items`) safely. It is the no-index-era operator runbook for the bridge
-reconciliation tooling: assess read-only, classify, correct one class at a time,
-and never bulk-mutate without an explicit owner decision and the standard gates.
+Start with the exact owner- or dispatcher-selected target. Read its current work
+item, actual parent project, dependencies and operative message through the CLI:
 
-> **No-index authority.** After the 2026-06-15 TAFE/dispatcher cutover and the
-> 2026-06-16 no-index closeout, the canonical bridge state is dispatcher/TAFE
-> state plus the status-bearing versioned files under `bridge/`. Do **not** read
-> `bridge/INDEX.md` as live state, and do not reach for the retired INDEX-era
-> reconciliation commands (the old audit / index-chain / packet CLIs were
-> deleted in that closeout). This skill wraps only the surviving surface below.
-
-## Surviving reconciliation surface (read-only unless an apply flag is passed)
-
-```powershell
-# 1. Bridge dispatch eligibility / health (read-only)
-gt bridge dispatch health
-gt bridge dispatch status
-
-# 2. Session-wrap reconciliation scan (report-only; no-index adapted, WI-4238)
-python scripts/wrap_scan_reconciliation.py --json
-
-# 3. Verified-backlog reconciler — resolves open work items whose linked bridge
-#    threads are all latest VERIFIED with explicit parent evidence
-#    (DELIB-S345-BRIDGE-VERIFICATION-RETIRES-PARENT-BACKLOG-ITEM). Includes the
-#    WI-4704 umbrella auto-closure and canonical parent-evidence relaxation paths.
-python scripts/bridge_verified_backlog_reconciler.py --dry-run --json   # ASSESS (read-only)
-python scripts/bridge_verified_backlog_reconciler.py --apply --quiet     # CORRECT (mutating)
-python scripts/bridge_verified_backlog_reconciler.py --repair-overbroad --dry-run --json  # audit prior resolutions
+```text
+gt backlog show WI-NNNN --json
+gt projects show PROJECT-ID --json
+gt bridge show DOCUMENT --json
 ```
 
-Resolve the interpreter deterministically: prefer `groundtruth-kb/.venv/Scripts/python.exe`.
+Substitute the selected identifiers. Use the command's current help for any
+additional inspection or recovery operation. Read applicable active formal
+records and compare the work item's complete intended outcome with the actual
+review and integrated work product.
 
-## Operator workflow
+The database holds current scope, parent membership, review and completion facts.
+A related bridge reference, a work-item mention, a message count or a historical
+VERIFIED label does not establish completion. During the file-bridge transition,
+numbered messages support delivery and inspection; they do not replace canonical
+work state. After terminal cleanup, recovery must not require their payloads.
 
-### 1. Assess (read-only, always first)
+Independent VERIFIED records review of the exact scope and work product. It does
+not assert that a commit exists. The project completes through one commit of its
+complete independently verified work product. Its work items retain their parent;
+bridge payloads and generated projections are excluded from that commit.
 
-Run the reconciler in `--dry-run --json` and read `wrap_scan_reconciliation.py --json`.
-Treat dispatcher/TAFE state and the versioned `bridge/` files as the only
-authority; ignore cached startup reports and dashboard counts. The dry-run
-emits a candidate **inventory** with a `reason` per work item.
+If verified bytes change or a project commit fails, use the canonical
+fresh-verification and finalization recovery route. A fresh eligible context can
+continue from current state. The dispatcher selects that work and authors no
+proposal or verdict. Never turn a related message, umbrella relationship, commit
+mention or inferred permission into a replacement review or completion result.
 
-### 2. Classify findings
+When recorded completion does not cover the described outcome, retain the actual
+delivered work and historical evidence, identify the uncovered scope, and carry
+the correction in the existing appropriate work item. Do not automatically close
+or reopen work by scanning messages. Correct canonical state through its domain
+CLI, then read back the exact affected records. An owner decision changes current
+canonical state and agent direction directly; the interactive session log retains
+the conversation. No permission packet or decision ledger is required.
 
-Each candidate carries one reason. The current taxonomy:
+Use the current active versions of these formal sources:
 
-- `all_parent_links_verified` — resolvable (every linked thread VERIFIED + parent evidence).
-- `umbrella_children_all_verified` — resolvable (a GO umbrella whose children are all VERIFIED and at least one child canonically declares the WI).
-- `parent_evidence_canonical_relaxed` — resolvable (all links VERIFIED; at least one canonically declares the WI via its `Work Item:` metadata line).
-- `linked_bridge_not_verified` — NOT resolvable (a linked thread is not VERIFIED and is not a satisfied umbrella).
-- `missing_parent_evidence` — NOT resolvable (no linked VERIFIED thread carries canonical evidence for the WI).
-- `missing_bridge_document` / `no_related_bridge_threads` / `unrecognized_only` — NOT resolvable (link hygiene gaps).
-
-### 3. Select exactly one triage class
-
-Pick a single reason class to act on per correction pass. Do **not** mix classes
-or sweep everything at once. One class at a time keeps each correction auditable
-and reviewable.
-
-### 4. Present exactly one owner decision before any mutation
-
-Before any `--apply`, present the candidate inventory for the selected class as
-the **review packet** and ask the owner via **AskUserQuestion** (the only valid
-owner-decision channel) whether to apply. Exactly one decision; never a prose
-ask, never a bundled multi-class ask.
-
-### 5. Correct, preserving every gate (no bulk mutation)
-
-`--apply` (a backlog state transition) is a governed bulk operation. It proceeds
-only under:
-
-- a live **project authorization** envelope covering the work,
-- a current **implementation-start** packet (`scripts/implementation_authorization.py begin`),
-- the relevant **bridge GO**, and
-- the **formal-artifact-approval** gate where applicable.
-
-Out-of-scope findings are recorded as deferred-decision markers
-(**DECISION DEFERRED**) — file a backlog work item rather than widening the
-current correction. The skill forbids silent/unattended bulk backlog mutation.
-
-## No-bulk-mutation policy
-
-The reconciler is read-only unless `--apply` is passed. This skill never applies
-a bulk correction without (a) a read-only inventory + review packet, (b) exactly
-one owner `AskUserQuestion` approval, and (c) the live project-authorization +
-implementation-start gates above. Deferred or unrelated findings become their
-own backlog items (DECISION DEFERRED), not an expanded sweep.
-
-## Source-of-truth discipline
-
-Always derive state from fresh reads of dispatcher/TAFE state and the versioned
-`bridge/` files plus MemBase `work_items`. Never treat `bridge/INDEX.md`,
-aggregate queue artifacts, cached startup reports, or dashboard counts as
-current bridge state.
-
-## Copyright
+- DCL-STANDING-BACKLOG-DB-SCHEMA-001.
+- GOV-FILE-BRIDGE-AUTHORITY-001.
+- GOV-WORK-ITEM-TERMINAL-STATE-001.
+- GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

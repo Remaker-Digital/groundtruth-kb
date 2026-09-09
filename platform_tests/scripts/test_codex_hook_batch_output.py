@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-WRAPPER_PATH = REPO_ROOT / ".codex" / "gtkb-hooks" / "run_py_no_window.py"
+WRAPPER_PATH = REPO_ROOT / ".harness-baseline-configuration" / "gtkb-hooks" / "run_py_no_window.py"
 
 
 def _load_wrapper():
@@ -18,6 +18,24 @@ def _load_wrapper():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+@pytest.mark.parametrize("event", ["posttooluse-bash", "posttooluse-apply-patch", "stop"])
+def test_hook_events_do_not_infer_work_completion_from_bridge_links(event, monkeypatch):
+    module = _load_wrapper()
+    commands = []
+
+    def capture_child(command, payload):
+        commands.append(command)
+        return 0, b"{}", b""
+
+    monkeypatch.setattr(module, "_run_child", capture_child)
+    code, stdout, stderr = module._run_batch(event, b"{}")
+
+    assert code == 0 and not stderr
+    assert json.loads(stdout) == {}
+    assert commands
+    assert not any("bridge_verified_backlog_reconciler.py" in arg for command in commands for arg in command)
 
 
 @pytest.fixture()

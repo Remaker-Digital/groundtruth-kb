@@ -1,19 +1,10 @@
 """Report-only bridge/backlog reconciliation scanner for session wrap-up.
 
-Per bridge/gtkb-bridge-reconciliation-wrap-scan-check-002.md (GO at -002, WI-4238).
-
-This scanner makes bridge/backlog reconciliation state a routine session-wrap
-signal. The previous operator-demand detector has been retired; this scanner now
-reports lightweight bridge lifecycle counts from the status-bearing numbered
-file chain and leaves deeper reconciliation to the dispatcher/health CLI.
-
-It composes with — and does not replace — the other ``wrap_scan_*`` scanners
-(``wrap_scan_consistency``, ``wrap_scan_cross_artifact_drift``,
-``wrap_scan_hygiene``) and the on-demand
-``scripts/bridge_verified_backlog_reconciler.py --dry-run`` reconciler
-(the no-index successor to the retired ``gt bridge reconcile audit`` CLI).
-It is read-only and report-only: it never mutates bridge, MemBase, project, or
-correction-packet state, and it never writes a canonical surface.
+During the file-bridge transition, this scanner reports message counts only.
+Counts and related bridge references never establish work-item completion.
+Use the ordinary backlog and project CLI for canonical work state, independent
+review and complete-project commit results. This scanner does not mutate those
+records or perform lifecycle reconciliation.
 
 EXIT CODES:
     0  Always. Findings are informational/report-only by design.

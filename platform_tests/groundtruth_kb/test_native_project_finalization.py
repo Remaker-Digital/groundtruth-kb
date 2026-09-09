@@ -114,6 +114,34 @@ def commit_product(root):
     return git(root, "rev-parse", "HEAD").stdout.strip()
 
 
+def test_related_verified_messages_cannot_complete_an_unreviewed_member(bridge):
+    _, client, contexts, root = bridge
+    assert (
+        put(client, "work-items", "WI-2", work_fields(title="Full remaining scope"), project_id="PROJECT-1").status_code
+        == 200
+    )
+    verify(client, contexts, root, 1, "code.py")
+    before = client.get("/v1/work-items/WI-2").json()
+    assert before["work_item"]["resolution_status"] == "open"
+
+    # A completed component and legacy files mentioning the broader work item
+    # provide neither its independent review nor a canonical attempt.
+    legacy = integration(root) / "bridge"
+    legacy.mkdir()
+    (legacy / "chain-2-999.md").write_text(
+        "VERIFIED\nWork Item: WI-2\nProject: PROJECT-1\nAll related children verified.\n",
+        encoding="utf-8",
+    )
+    for role in ("pb", "lo"):
+        assert client.get("/v1/bridge/queue", params={"role": role}).status_code == 200
+    assert post(client, "prepare-commit").json()["error"]["code"] == "project_not_fully_verified"
+    assert client.get("/v1/work-items/WI-2").json() == before
+
+    # The actual second chain can start and independently verify its full scope.
+    verify(client, contexts, root, 2, "second.py")
+    assert post(client, "prepare-commit").json()["status"] == "ready_to_commit"
+
+
 def test_project_terminal_state_requires_one_complete_real_commit(bridge):
     client, _, root, parent = two_members(bridge)
     assert (
