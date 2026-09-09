@@ -138,11 +138,6 @@
         "command": "python scripts/advisory_grilling_gate_lint.py --stop-hook",
         "timeout": 10,
         "blocking": true
-      },
-      {
-        "command": "python scripts/auto_finalize_sweep.py",
-        "timeout": 15,
-        "blocking": true
       }
     ],
     "UserPromptSubmit": [

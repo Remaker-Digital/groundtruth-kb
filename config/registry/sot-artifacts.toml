@@ -2929,40 +2929,6 @@ forbidden_substitutes = []
 notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
 
 [[artifacts]]
-id = "wi5640-source-036"
-domain = "control_surface"
-lifecycle = "active"
-storage_path = ".claude/rules/auto-finalization-sweep.md"
-coverage_mode = "exact"
-authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
-mutation_api = "Governed bridge-authorized source edit"
-versioning_policy = "git_tracked"
-backup_policy = "git_tracked"
-restore_action = "git_restore"
-health_check_function = ""
-owner_role = "shared"
-depends_on = []
-forbidden_substitutes = []
-notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
-
-[[artifacts]]
-id = "wi5640-destination-036"
-domain = "control_surface"
-lifecycle = "active"
-storage_path = "config/agent-control/gtkb-auto-finalization-sweep.md"
-coverage_mode = "exact"
-authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
-mutation_api = "Governed bridge-authorized source edit"
-versioning_policy = "git_tracked"
-backup_policy = "git_tracked"
-restore_action = "git_restore"
-health_check_function = ""
-owner_role = "shared"
-depends_on = []
-forbidden_substitutes = []
-notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
-
-[[artifacts]]
 id = "wi5640-source-037"
 domain = "control_surface"
 lifecycle = "active"
@@ -17804,23 +17770,6 @@ forbidden_substitutes = []
 notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
 
 [[artifacts]]
-id = "wi5441-member-scripts-auto-finalize-sweep-py-7e38c978d4"
-domain = "control_surface"
-lifecycle = "active"
-storage_path = "scripts/auto_finalize_sweep.py"
-coverage_mode = "exact"
-authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
-mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
-versioning_policy = "git_tracked"
-backup_policy = "git_tracked"
-restore_action = "git_restore"
-health_check_function = ""
-owner_role = "shared"
-depends_on = []
-forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
-
-[[artifacts]]
 id = "wi5441-member-scripts-autonomous-dispatch-loop-health-py-8f2779cf50"
 domain = "control_surface"
 lifecycle = "active"
@@ -24574,23 +24523,6 @@ id = "baseline-rule-active-workspace"
 domain = "narrative_authority"
 lifecycle = "active"
 storage_path = ".harness-baseline-configuration/rules/active-workspace.md"
-coverage_mode = "exact"
-authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
-mutation_api = "Governed canonical writer after explicit owner approval"
-versioning_policy = "git_tracked"
-backup_policy = "git_tracked"
-restore_action = "git_restore"
-health_check_function = ""
-owner_role = "shared"
-depends_on = []
-forbidden_substitutes = []
-notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
-
-[[artifacts]]
-id = "baseline-rule-auto-finalization-sweep"
-domain = "narrative_authority"
-lifecycle = "active"
-storage_path = ".harness-baseline-configuration/rules/auto-finalization-sweep.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
 mutation_api = "Governed canonical writer after explicit owner approval"

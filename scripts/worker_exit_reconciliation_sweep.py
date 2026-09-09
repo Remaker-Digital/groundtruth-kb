@@ -1,41 +1,16 @@
 #!/usr/bin/env python
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Out-of-band reconciliation of runtime state stranded by non-wrapping workers.
+"""Legacy expiry inspection and cleanup of file-backed worker state.
 
-WI-6037 Slice 1. GT-KB releases work-intent claims, disposes implementation-start
-authorization packets, and cleans scratch drafts through in-process paths. A worker
-killed by an external timeout never reaches any of them, so every such kill strands
-state that later sessions read as live.
+This transitional script inspects obsolete work-intent files, implementation
+authorization packets and scratch drafts. Report-only invocation leaves them
+unchanged; explicit --apply cleans expired records and writes its legacy log.
+It is not the canonical artifact-claim or recovery service. Complete replacement
+and retirement of these file-state producers and consumers belongs to WI-6260.
 
-**Why this is not a ``Stop`` hook.** The existing sweeper precedent,
-``scripts/auto_finalize_sweep.py``, is registered on ``Stop``. ``Stop`` is precisely the
-event a hard-killed worker never reaches, so that shape cannot address this class.
-Reconciliation must run out-of-band from the dying process: at the next session's start,
-or from an operator invocation. Slice 1 therefore delivers a standalone invocable script;
-hook registration is deliberately deferred to Slice 2 (``.claude/settings.json`` carries
-uncommitted changes from another lane at the time of writing).
-
-**Report-only by default.** A bare invocation mutates nothing. ``--apply`` is required to
-reclaim, and even then only records whose own recorded expiry has passed are touched.
-
-Invariants (all test-encoded in
-``platform_tests/scripts/test_worker_exit_reconciliation_sweep.py``):
-
-1. Report-only by default; a bare run is side-effect free.
-2. Never reclaim live state -- a record not expired by its own recorded TTL is never
-   touched under either mode.
-3. Never touch the bridge audit trail -- no ``bridge/*.md`` file is read for mutation,
-   deleted, rewritten, moved, or staged.
-4. Never touch git -- no ``git`` subprocess is invoked.
-5. Idempotent -- a second ``--apply`` immediately after the first reclaims nothing.
-6. Audit-logged -- every reclaim and every skip is appended with a reason.
-7. Fail-soft -- an unreadable or corrupt record is skipped with a reason, never raised.
-
-Authority: WI-6037; ``bridge/gtkb-wi6037-worker-exit-reconciliation-sweep-002.md`` (GO);
-``PAUTH-PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY-WHOLE-PROJECT-20260730``.
-
-Out of scope for this slice: session-envelope closure (owned by WI-5281) and bulk storage
-reclamation (owned by WI-5855).
+A hard-killed worker cannot run a Stop hook. Recovery must therefore be
+independent of the original worker. This legacy implementation performs no Git
+operation and does not read, modify or commit bridge payloads.
 """
 
 from __future__ import annotations

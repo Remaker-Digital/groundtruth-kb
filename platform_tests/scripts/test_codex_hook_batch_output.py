@@ -21,7 +21,7 @@ def _load_wrapper():
 
 
 @pytest.mark.parametrize("event", ["posttooluse-bash", "posttooluse-apply-patch", "stop"])
-def test_hook_events_do_not_infer_work_completion_from_bridge_links(event, monkeypatch):
+def test_hook_events_do_not_finalize_work_from_bridge_files(event, monkeypatch):
     module = _load_wrapper()
     commands = []
 
@@ -36,6 +36,7 @@ def test_hook_events_do_not_infer_work_completion_from_bridge_links(event, monke
     assert json.loads(stdout) == {}
     assert commands
     assert not any("bridge_verified_backlog_reconciler.py" in arg for command in commands for arg in command)
+    assert not any("auto_finalize_sweep.py" in arg for command in commands for arg in command)
 
 
 @pytest.fixture()

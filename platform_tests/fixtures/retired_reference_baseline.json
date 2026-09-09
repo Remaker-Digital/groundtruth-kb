@@ -67,9 +67,6 @@
     ".harness-baseline-configuration/hooks/scanner-safe-writer.py": {
       ".gtkb-state": 1
     },
-    ".harness-baseline-configuration/rules/auto-finalization-sweep.md": {
-      ".gtkb-state": 1
-    },
     ".harness-baseline-configuration/rules/bridge-essential.md": {
       "config/agent-control": 2
     },
@@ -292,9 +289,6 @@
     },
     "config/agent-control/gtkb-activity-envelope-sharding.toml": {
       "config/agent-control": 3
-    },
-    "config/agent-control/gtkb-auto-finalization-sweep.md": {
-      ".gtkb-state": 1
     },
     "config/agent-control/gtkb-backlog-approval-state.md": {
       "PAUTH": 1
@@ -1134,9 +1128,6 @@
     },
     "scripts/assertion_retirement_workflow.py": {
       ".gtkb-state": 1
-    },
-    "scripts/auto_finalize_sweep.py": {
-      ".gtkb-state": 2
     },
     "scripts/autonomous_dispatch_loop_health.py": {
       "DEFERRED": 2,

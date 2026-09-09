@@ -809,8 +809,11 @@ def test_journal_truncation_and_reordering_fail_closed(tmp_path: Path) -> None:
         module.TransactionJournal.load(tmp_path, "tx-test")
 
 
-def test_nonterminal_operation_retains_lock_until_explicit_terminal_recovery(tmp_path: Path) -> None:
+def test_nonterminal_operation_retains_lock_until_explicit_terminal_recovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _load_module()
+    monkeypatch.setattr(module, "active_session_context_id", lambda: "test-session")
     journal = module.TransactionJournal.create(tmp_path, "tx-test", {"mode": "apply"})
     with pytest.raises(RuntimeError, match="crash"), module._operation_lock(tmp_path, journal):
         raise RuntimeError("crash")

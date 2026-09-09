@@ -58,7 +58,6 @@ BATCHES: dict[str, tuple[tuple[str, ...], ...]] = {
     "stop": (
         ("py", ".claude/hooks/advisory-router-scan.py"),
         ("py", "scripts/advisory_grilling_gate_lint.py", "--stop-hook"),
-        ("py", "scripts/auto_finalize_sweep.py"),
     ),
 }
 

@@ -854,12 +854,6 @@ class = "machine_compatibility"
 load_policy = "machine_only"
 
 [[rule_projections]]
-source = ".harness-baseline-configuration/rules/auto-finalization-sweep.md"
-canonical = "config/agent-control/gtkb-auto-finalization-sweep.md"
-class = "active_authority"
-load_policy = "activity:ops,build"
-
-[[rule_projections]]
 source = ".harness-baseline-configuration/rules/backlog-approval-state.md"
 canonical = "config/agent-control/gtkb-backlog-approval-state.md"
 class = "active_authority"
