@@ -9,15 +9,19 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 from groundtruth_kb.cli import main
+from groundtruth_kb.config import GTConfig
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CANONICAL_SKILL = REPO_ROOT / ".harness-baseline-configuration/skills/gtkb-bridge-reconciliation/SKILL.md"
 
 
 @pytest.mark.parametrize("native", [False, True])
-def test_reconciliation_examples_resolve_in_the_configured_cli(native, tmp_path):
+def test_reconciliation_examples_resolve_in_the_configured_cli(native, tmp_path, monkeypatch):
+    monkeypatch.delenv("GT_AUTHORITY_URL", raising=False)
     config = tmp_path / "groundtruth.toml"
-    config.write_text('authority_url = "http://127.0.0.1:1"\n' if native else "", encoding="utf-8")
+    authority = 'authority_url = "http://127.0.0.1:1"\n' if native else ""
+    config.write_text("[groundtruth]\n" + authority, encoding="utf-8")
+    assert bool(GTConfig.load(config_path=config).authority_url) is native
     commands = re.findall(r"^gt (.+)$", CANONICAL_SKILL.read_text(encoding="utf-8"), re.MULTILINE)
     assert len(commands) == 3
     runner = CliRunner()
