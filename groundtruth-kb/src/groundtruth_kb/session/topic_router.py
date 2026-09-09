@@ -276,20 +276,16 @@ def _render_activity_stance_operator_context(profile: ActivityProfile) -> str:
 
 
 def _render_startup_briefing_live_query(profile: ActivityProfile) -> str:
-    """Express the startup briefing as a named live-query route, not an inline payload.
-
-    S6: the marker render path must not import or execute the startup service.
-    The operator receives a route to the briefing; the briefing is computed on
-    demand by the packet composer's live-query mechanism.
-    """
+    """Point the assigned task to the canonical reader without selecting work or role."""
     return "\n".join(
         [
-            "### Session Startup Briefing",
+            "### Current Task Context",
             "",
-            "- delivery: live_query_descriptor",
-            "- reason: computed on demand; not inlined on the marker render path",
-            f"- activity: {profile.name}",
-            "- route: `gt session envelope packet --kind activity`",
+            f"Selected activity: {profile.name}.",
+            "For the work item assigned by the owner or dispatcher, run `gt context work-item <work-item-id>`.",
+            "Read the returned current requirements, test instructions and prerequisites before acting.",
+            "This route does not select work, establish a role or replace the received bridge instruction.",
+            "If required context is unavailable, report the specific diagnostic and recovery route.",
         ]
     )
 

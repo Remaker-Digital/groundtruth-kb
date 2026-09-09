@@ -35,10 +35,7 @@ _PRODUCER_PATHS = (
     "scripts/workstream_focus.py",
     "scripts/session_start_dispatch_core.py",
     "scripts/session_self_initialization.py",
-    "groundtruth-kb/src/groundtruth_kb/session/packet.py",
 )
-
-_PACKET_CACHE_RELATIVE = Path(".gtkb-state/session-envelope/packet-cache")
 
 
 def test_no_producer_names_the_disclosure_cache() -> None:
@@ -73,38 +70,6 @@ def test_no_producer_writes_the_packet_cache() -> None:
         if "session-envelope/packet-cache" in path.read_text(encoding="utf-8"):
             offenders.append(rel)
     assert offenders == [], f"producers still reference the packet cache: {offenders}"
-
-
-def test_packet_composition_declares_itself_uncached() -> None:
-    """compose_packet reports real-time composition rather than a cache result."""
-    from groundtruth_kb.session.packet import compose_packet
-
-    packet = compose_packet(project_root=PROJECT_ROOT)
-    assert packet["composition"] == {
-        "policy": "real_time_per_invocation",
-        "cached": False,
-    }
-    assert "cache" not in packet, "packet still carries a cache block"
-    assert "ttl" not in packet, "packet still carries a TTL validity block"
-
-
-def test_packet_composition_writes_no_cache_file(tmp_path: Path) -> None:
-    """Composing a packet creates no cache directory under the project root."""
-    from groundtruth_kb.session.packet import compose_packet
-
-    before = (
-        sorted(p.name for p in (PROJECT_ROOT / _PACKET_CACHE_RELATIVE).glob("*"))
-        if (PROJECT_ROOT / _PACKET_CACHE_RELATIVE).is_dir()
-        else []
-    )
-    compose_packet(project_root=PROJECT_ROOT)
-    compose_packet(project_root=PROJECT_ROOT)
-    after = (
-        sorted(p.name for p in (PROJECT_ROOT / _PACKET_CACHE_RELATIVE).glob("*"))
-        if (PROJECT_ROOT / _PACKET_CACHE_RELATIVE).is_dir()
-        else []
-    )
-    assert after == before, f"composing a packet wrote cache entries: {sorted(set(after) - set(before))}"
 
 
 def test_relay_renders_rather_than_reading_a_cache(monkeypatch: pytest.MonkeyPatch) -> None:

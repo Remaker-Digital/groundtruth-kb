@@ -1,30 +1,9 @@
-"""Shared SessionStart hook dispatch core (harness-neutral).
+"""Shared SessionStart transport for native hook wrappers.
 
-Single definition of the SessionStart dispatch logic shared by both harness
-wrappers (`.claude/hooks/session_start_dispatch.py` and
-`.codex/gtkb-hooks/session_start_dispatch.py`). Each wrapper imports this
-module, sets its own `HARNESS_NAME` and `OUT_DIR`, and rebinds these functions
-onto its own namespace so module-level names resolve against the wrapper. The
-logic emits a properly-shaped SessionStart `hookSpecificOutput` envelope,
-validates the canonical startup-service freshness contract, and falls back to a
-degraded-banner context when the canonical service fails or times out.
-
-Slice D of GTKB-STARTUP-REFRACTOR-001 (WI-4272;
-bridge/gtkb-startup-refractor-slice-d-sessionstart-hook-dedup-004.md, GO)
-extracted this core from the two previously byte-identical wrappers. The drift
-gate for the shared primitives lives in
-`scripts/check_codex_hook_parity.py::_resolution_table_parity_errors`, which
-asserts the primitives here (single source) plus per-wrapper delegation. This is
-a behavior-preserving refactor.
-
-IP-4 (bridge/gtkb-canonical-init-keyword-syntax-001-005.md, Codex GO at -008):
-canonical init-keyword recognition via `StartupDecision` enum +
-``_bridge_dispatch_keyword_check`` per SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001 +
-DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001. The receiver reads its own durable
-role via the registry projection (``harness-state/harness-registry.json``) and
-audits set-membership against the keyword mode. Mismatch -> prompt keyword
-authorized with an audit log entry to
-``.gtkb-state/bridge-poller/dispatch-failures.jsonl``.
+Forward the startup service's context or an explicit retrieval failure. This
+transport does not compose task packets, infer role/activity, or certify that a
+startup report contains current task requirements. Assigned work loads those
+requirements through the canonical CLI context reader.
 """
 
 from __future__ import annotations
@@ -88,16 +67,7 @@ _MODE_TO_ROLE_PROFILE = {
 # trigger's dispatch-failures path so investigators see all dispatch-related
 # failures in one location.
 DISPATCH_FAILURES_PATH = PROJECT_ROOT / ".gtkb-state" / "bridge-poller" / "dispatch-failures.jsonl"
-_SESSION_ENVELOPE_ACTIVITY_ENV = "GTKB_SESSION_ENVELOPE_ACTIVITY"
-_DISPATCH_ACTIVITY_ENV = "GTKB_DISPATCH_ACTIVITY"
-_SESSION_ENVELOPE_ROLE_ENV = "GTKB_SESSION_ENVELOPE_ROLE"
-_NATIVE_PACKET_HOOK_HARNESSES = frozenset({"claude", "codex"})
-_CANONICAL_PACKET_ACTIVITIES = frozenset({"ops", "deliberation", "build", "test", "spec", "project"})
 _WORKER_ROLES = frozenset({"prime-builder", "loyal-opposition"})
-_DISPATCH_ACTIVITY_BY_ROLE_MODE = {
-    "pb": "build",
-    "lo": "test",
-}
 
 
 class StartupDecision(Enum):
@@ -281,7 +251,6 @@ def _persistent_harness_id() -> str:
 
 
 def _fallback_context(reason: str) -> str:
-    dashboard = "file:///E:/GT-KB/docs/gtkb-dashboard/index.html"
     return "\n".join(
         [
             "# GroundTruth-KB Startup Service Degraded",
@@ -291,9 +260,8 @@ def _fallback_context(reason: str) -> str:
             "The SessionStart hook could not retrieve the programmatic startup payload.",
             f"Reason: {reason}",
             "",
-            f"Dashboard: [GroundTruth-KB Project Dashboard]({dashboard})",
-            "",
-            "Use filesystem reads and the dashboard as the live authority before acting.",
+            "For assigned work, run `gt context work-item <work-item-id>` to read current requirements and tests.",
+            "If that read fails, report its diagnostic and recovery route; do not act from a cached report or dashboard.",
         ]
     )
 
@@ -305,132 +273,6 @@ def _session_start_payload(context: str) -> dict[str, dict[str, str]]:
             "additionalContext": context,
         }
     }
-
-
-def _dispatch_role_mode_from_keyword() -> str | None:
-    keyword_match = match_canonical_init_keyword(_read_first_prompt_line() or "")
-    return keyword_match.role_mode if keyword_match is not None else None
-
-
-def _session_envelope_role(role_mode: str | None) -> str:
-    raw_role = (os.environ.get(_SESSION_ENVELOPE_ROLE_ENV) or "").strip().lower()
-    if raw_role in _WORKER_ROLES:
-        return raw_role
-    if raw_role in _MODE_TO_ROLE_PROFILE:
-        return _MODE_TO_ROLE_PROFILE[raw_role]
-    if role_mode in _MODE_TO_ROLE_PROFILE:
-        return _MODE_TO_ROLE_PROFILE[role_mode]
-    return "prime-builder"
-
-
-def _session_envelope_activity(role_mode: str | None) -> str | None:
-    raw_activity = (
-        (os.environ.get(_SESSION_ENVELOPE_ACTIVITY_ENV) or os.environ.get(_DISPATCH_ACTIVITY_ENV) or "").strip().lower()
-    )
-    if raw_activity in _CANONICAL_PACKET_ACTIVITIES:
-        return raw_activity
-    if os.environ.get(_BRIDGE_DISPATCH_RUN_ID_ENV):
-        return _DISPATCH_ACTIVITY_BY_ROLE_MODE.get(role_mode or "")
-    return None
-
-
-def _compose_session_envelope_packet(
-    *,
-    packet_kind: str,
-    role: str,
-    activity: str | None = None,
-) -> dict[str, object]:
-    from groundtruth_kb.session.packet import compose_packet
-
-    return compose_packet(
-        project_root=PROJECT_ROOT,
-        packet_kind=packet_kind,
-        role=role,
-        activity=activity,
-    )
-
-
-def _packet_pointer(packet: dict[str, object]) -> str:
-    cache = packet.get("cache")
-    if isinstance(cache, dict) and cache.get("cache_path"):
-        return str(cache["cache_path"])
-    pointers = packet.get("source_pointers")
-    if isinstance(pointers, list) and pointers:
-        first = pointers[0]
-        if isinstance(first, dict) and first.get("path"):
-            return str(first["path"])
-    return "unavailable"
-
-
-def _packet_receipt_line(label: str, packet: dict[str, object]) -> str:
-    budget = packet.get("budget") if isinstance(packet.get("budget"), dict) else {}
-    cache = packet.get("cache") if isinstance(packet.get("cache"), dict) else {}
-    status = str(packet.get("status") or "unknown")
-    parts = [
-        f"- {label}: status={status}",
-        f"estimated_tokens={budget.get('estimated_tokens', 'unknown')}",
-        f"cap={budget.get('cap_estimated_tokens', 'unknown')}",
-        f"pointer={_packet_pointer(packet)}",
-        f"cache={cache.get('status', 'unavailable')}",
-    ]
-    diagnostic = packet.get("diagnostic") if isinstance(packet.get("diagnostic"), dict) else {}
-    if diagnostic.get("pointer_only") is True:
-        parts.append("pointer_only=true")
-    return "; ".join(parts)
-
-
-def _envelope_packet_receipt(role_mode: str | None = None, activity: str | None = None) -> str:
-    role = _session_envelope_role(role_mode)
-    selected_activity = activity or _session_envelope_activity(role_mode)
-    harness_name = str(HARNESS_NAME or "").strip().lower()
-    hook_disposition = (
-        "full_sessionstart_packet_injection"
-        if harness_name in _NATIVE_PACKET_HOOK_HARNESSES
-        else "fallback_receipt_pointer"
-    )
-    lines = [
-        "# GroundTruth-KB Envelope Packet Receipt",
-        "",
-        "- packet_injection_order: before_activity_specialization",
-        f"- hook_disposition: {hook_disposition}",
-        f"- role_bootstrap: {role}",
-        "- live_state_policy: stable bootstrap packet; live bridge, claim, git, and MemBase state still require fresh canonical reads",
-    ]
-    if hook_disposition == "fallback_receipt_pointer":
-        lines.append("- fallback_is_parity: false")
-
-    try:
-        session_packet = _compose_session_envelope_packet(packet_kind="session-envelope", role=role)
-        lines.append(_packet_receipt_line("session_packet", session_packet))
-    except Exception as exc:  # noqa: BLE001 - SessionStart must remain fail-soft.
-        lines.append(f"- session_packet: status=unavailable; reason={type(exc).__name__}")
-
-    if selected_activity:
-        try:
-            activity_packet = _compose_session_envelope_packet(
-                packet_kind="activity-packet",
-                activity=selected_activity,
-                role=role,
-            )
-            lines.append(f"- activity: {selected_activity}")
-            lines.append(_packet_receipt_line("activity_packet", activity_packet))
-        except Exception as exc:  # noqa: BLE001 - SessionStart must remain fail-soft.
-            lines.append(
-                f"- activity_packet: status=unavailable; activity={selected_activity}; reason={type(exc).__name__}"
-            )
-    else:
-        lines.append("- activity_packet: status=not_requested; pointer=none")
-    return "\n".join(lines)
-
-
-def _with_envelope_packet_receipt(
-    context: str,
-    *,
-    role_mode: str | None = None,
-    activity: str | None = None,
-) -> str:
-    receipt = _envelope_packet_receipt(role_mode=role_mode, activity=activity)
-    return f"{receipt}\n\n{context}" if receipt else context
 
 
 def _bridge_auto_dispatch_context() -> str | None:
@@ -808,12 +650,7 @@ def main() -> int:
         # turn an interactive restart into a bridge worker.
         auto_dispatch_context = _bridge_auto_dispatch_context()
         if auto_dispatch_context is not None:
-            payload = _session_start_payload(
-                _with_envelope_packet_receipt(
-                    auto_dispatch_context,
-                    role_mode=_dispatch_role_mode_from_keyword(),
-                )
-            )
+            payload = _session_start_payload(auto_dispatch_context)
             serialized = _dump_payload(payload)
             stdout_path.write_text(serialized, encoding="utf-8")
             stderr_path.write_text("", encoding="utf-8")
@@ -876,45 +713,18 @@ def main() -> int:
             # WI-7318: the SessionStart path no longer writes a startup-disclosure
             # relay cache. The UserPromptSubmit init-keyword relay renders the
             # disclosure for its own turn, so there is nothing to persist here.
-            print(
-                _dump_payload(
-                    _session_start_payload(
-                        _with_envelope_packet_receipt(
-                            startup_context,
-                            role_mode=_dispatch_role_mode_from_keyword(),
-                        )
-                    )
-                )
-            )
+            print(_dump_payload(_session_start_payload(startup_context)))
             return 0
         reason = f"startup service returned exit {process.returncode}"
         if process.stderr.strip():
             reason = f"{reason}: {process.stderr.strip()[:400]}"
         elif process.returncode == 0:
             reason = "startup service freshness contract validation failed"
-        print(
-            _dump_payload(
-                _session_start_payload(
-                    _with_envelope_packet_receipt(
-                        _fallback_context(reason),
-                        role_mode=_dispatch_role_mode_from_keyword(),
-                    )
-                )
-            )
-        )
+        print(_dump_payload(_session_start_payload(_fallback_context(reason))))
     except Exception as exc:  # noqa: BLE001 - lifecycle hook must fail soft.
         try:
             stderr_path.write_text(str(exc), encoding="utf-8")
         except OSError:
             pass
-        print(
-            _dump_payload(
-                _session_start_payload(
-                    _with_envelope_packet_receipt(
-                        _fallback_context(str(exc)),
-                        role_mode=_dispatch_role_mode_from_keyword(),
-                    )
-                )
-            )
-        )
+        print(_dump_payload(_session_start_payload(_fallback_context(str(exc)))))
     return 0

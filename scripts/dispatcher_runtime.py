@@ -612,21 +612,6 @@ LEGACY_TO_NEW_STATE_KEY = {
     "prime": "prime-builder",
     "codex": "loyal-opposition",
 }
-SESSION_ENVELOPE_ROLE_ENV = "GTKB_SESSION_ENVELOPE_ROLE"
-SESSION_ENVELOPE_ACTIVITY_ENV = "GTKB_SESSION_ENVELOPE_ACTIVITY"
-NATIVE_SESSION_ENVELOPE_PACKET_HARNESSES = frozenset({"claude", "codex"})
-DISPATCH_ACTIVITY_BY_ROLE = {
-    "prime-builder": "build",
-    "loyal-opposition": "test",
-}
-
-
-def _dispatch_activity_for_role(role_label: str) -> str:
-    return DISPATCH_ACTIVITY_BY_ROLE.get(role_label, "build")
-
-
-def _uses_native_session_envelope_packet_hook(command_handle: str) -> bool:
-    return command_handle in NATIVE_SESSION_ENVELOPE_PACKET_HARNESSES
 
 
 def _role_state_carries_retry_evidence(value: dict[str, Any]) -> bool:
@@ -4121,35 +4106,6 @@ RESET_STRAGGLER_AGE_SECONDS = (
 )
 
 
-def _dispatch_prompt_envelope_packet_receipt(target: DispatchTarget) -> str:
-    """Return a model-visible fallback packet receipt for non-native hooks."""
-    if _uses_native_session_envelope_packet_hook(target.command_handle):
-        return ""
-
-    activity = _dispatch_activity_for_role(target.needed_role_label)
-    venv_gt = _repo_venv_command("gt")
-    return "\n".join(
-        [
-            "# GroundTruth-KB Envelope Packet Receipt",
-            "",
-            "- packet_injection_order: before_activity_specialization",
-            "- hook_disposition: fallback_receipt_pointer",
-            "- fallback_is_parity: false",
-            f"- role_bootstrap: role={target.needed_role_label}; activity={activity}; mode={target.canonical_mode}",
-            (
-                "- session_packet: pointer_only=true; cap=900; "
-                f"source=`{venv_gt} session envelope packet --kind session-envelope "
-                f"--role {target.needed_role_label}`"
-            ),
-            (
-                "- activity_packet: pointer_only=true; cap=500; "
-                f"source=`{venv_gt} session envelope packet --kind activity-packet "
-                f"--role {target.needed_role_label} --activity {activity}`"
-            ),
-        ]
-    )
-
-
 def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int, project_root: Path | None = None) -> str:
     """Build the dispatch prompt mirroring the smart-poller phrasing.
 
@@ -4208,11 +4164,8 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int, p
         "runtime directory grants or weakens ownership."
     )
     canonical_keyword = f"::init gtkb {target.canonical_mode}"
-    packet_receipt = _dispatch_prompt_envelope_packet_receipt(target)
 
     prompt_lines = [canonical_keyword, ""]
-    if packet_receipt:
-        prompt_lines.extend([packet_receipt, ""])
     prompt_lines.extend(
         [
             "Bridge auto-dispatch notification (dispatcher engine).",
@@ -5378,8 +5331,6 @@ def _spawn_harness(
     # is the SessionStart-time companion that the hook reads as the
     # first-line signal per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001.
     env["GTKB_BRIDGE_DISPATCH_KEYWORD"] = f"::init gtkb {target.canonical_mode}"
-    env[SESSION_ENVELOPE_ROLE_ENV] = target.needed_role_label
-    env[SESSION_ENVELOPE_ACTIVITY_ENV] = _dispatch_activity_for_role(target.needed_role_label)
     # Per Codex F2 on -008: do NOT set trigger/daemon-disable sentinels on the
     # child harness env. The signature-state file provides loop prevention
     # (unchanged signature -> no spawn); blanket env vars would also suppress

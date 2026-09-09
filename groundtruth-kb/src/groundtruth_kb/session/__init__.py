@@ -20,16 +20,13 @@ from groundtruth_kb.session.envelope import (
     open_topic,
 )
 from groundtruth_kb.session.handoff import HandoffError, generate
-from groundtruth_kb.session.packet import PacketError, compose_packet
 from groundtruth_kb.session.wrap import is_canonical_wrap_trigger, run_wrap
 
 __all__ = [
     "EnvelopeError",
     "HandoffError",
-    "PacketError",
     "close_session",
     "close_topic",
-    "compose_packet",
     "ensure_current",
     "generate",
     "is_canonical_wrap_trigger",

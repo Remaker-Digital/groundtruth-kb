@@ -94,6 +94,11 @@ def test_no_sources_staged_does_not_run_projector(tmp_path, monkeypatch):
 
 
 def test_index_failure_is_not_a_pass(tmp_path):
+    # A pytest temp directory may be inside the repository. Make this a real
+    # independent repository and corrupt its index instead of relying on Git
+    # failing to discover an ancestor checkout.
+    git(tmp_path, "init", "-q")
+    (tmp_path / ".git/index").write_bytes(b"invalid git index")
     assert GATE.main(["--staged", "--project-root", str(tmp_path)]) == 1
 
 

@@ -255,8 +255,7 @@ def test_legacy_env_without_keyword_falls_through_to_normal_startup(
     assert module.main() == 0
     emitted = json.loads(capsys.readouterr().out)
     emitted_context = emitted["hookSpecificOutput"]["additionalContext"]
-    assert emitted_context.startswith("# GroundTruth-KB Envelope Packet Receipt")
-    assert context in emitted_context
+    assert emitted_context == context
     assert "Bridge Auto-Dispatch Session" not in emitted_context
     assert "test-run-codex-env-only" not in emitted_context
 
@@ -352,60 +351,12 @@ def test_codex_hook_has_envelope_parity_constants() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_startup_relay_cache_written_with_consistent_metadata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """T4 -- the dispatcher writes a harness-scoped relay cache + consistent metadata."""
-    import hashlib
-
-    module = _load_codex_hook("relay_cache_write")
-    monkeypatch.setattr(module, "OUT_DIR", tmp_path)
-    body = "# GroundTruth-KB Fresh Session Startup\n\nrelay body line one\nrelay body line two"
-    module._write_startup_relay_cache(
-        "# GroundTruth-KB Programmatic Startup Payload\n\n## User-Visible Startup Message\n\n" + body
-    )
-
-    cache = tmp_path / "last-user-visible-startup.md"
-    meta_path = tmp_path / "last-user-visible-startup.meta.json"
-    assert cache.is_file() and meta_path.is_file()
-    cached = cache.read_text(encoding="utf-8")
-    assert cached == body, "cache holds the extracted user-visible startup message"
-    assert "Programmatic Startup Payload" not in cached
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    encoded = cached.encode("utf-8")
-    assert meta["sha256"] == hashlib.sha256(encoded).hexdigest()
-    assert meta["byte_length"] == len(encoded)
-    assert meta["harness_name"] == "codex"
-    assert "role_authority" in meta
-    assert meta["role_authority"]["interactive_resolved_role"] is None
-    assert "headless dispatch routing" in meta["role_authority"]["durable_registry_authority"]
-
-
-def test_startup_relay_cache_metadata_separates_cache_role_from_durable_role(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Relay metadata labels the cached role as pending init-keyword selection, not durable authority."""
-    module = _load_codex_hook("relay_cache_role_authority")
-    monkeypatch.setattr(module, "OUT_DIR", tmp_path)
-    monkeypatch.setattr(module, "_persistent_harness_id", lambda: "A")
-    monkeypatch.setattr(module, "_resolve_own_role_set", lambda *a, **k: frozenset({"lo"}))
-
-    body = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\n- Role being assumed: Prime Builder\n"
-    module._write_startup_relay_cache(body)
-
-    meta = json.loads((tmp_path / "last-user-visible-startup.meta.json").read_text(encoding="utf-8"))
-    assert meta["role_mode"] == "pb"
-    assert meta["role_profile"] == "prime-builder"
-    assert meta["role_authority"]["interactive_resolved_role"] == "prime-builder"
-    assert "init-keyword" in meta["role_authority"]["interactive_role_source"]
-    assert meta["role_authority"]["durable_registry_roles"] == ["loyal-opposition"]
-    assert meta["role_authority"]["authority_mode"] == "cache_only_pending_init_keyword"
-
-
-def test_normal_startup_relay_cache_uses_startup_disclosure_field(
+def test_normal_startup_does_not_persist_disclosure_field(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """New-shape startup-service payloads cache startupDisclosure, not compact context."""
+    """Forward compact context without persisting the separate disclosure field."""
     module = _load_codex_hook("relay_cache_startup_disclosure")
     monkeypatch.setattr(module, "OUT_DIR", tmp_path)
     monkeypatch.setattr(module, "_persistent_harness_id", lambda: "A")
@@ -447,10 +398,10 @@ def test_normal_startup_relay_cache_uses_startup_disclosure_field(
     assert module.main() == 0
     emitted = json.loads(capsys.readouterr().out)
     emitted_context = emitted["hookSpecificOutput"]["additionalContext"]
-    assert emitted_context.startswith("# GroundTruth-KB Envelope Packet Receipt")
-    assert context in emitted_context
+    assert emitted_context == context
     assert "full owner-visible disclosure" not in emitted_context
-    assert (tmp_path / "last-user-visible-startup.md").read_text(encoding="utf-8") == disclosure
+    assert not (tmp_path / "last-user-visible-startup.md").exists()
+    assert not (tmp_path / "last-user-visible-startup.meta.json").exists()
 
 
 def test_startup_relay_cache_not_written_by_bridge_dispatch_path(

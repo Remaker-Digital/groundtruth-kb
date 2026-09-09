@@ -15220,23 +15220,6 @@ forbidden_substitutes = []
 notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint."
 
 [[artifacts]]
-id = "wi5441-member-groundtruth-kb-src-groundtruth-kb-session-packet-bd828900de"
-domain = "control_surface"
-lifecycle = "active"
-storage_path = "groundtruth-kb/src/groundtruth_kb/session/packet.py"
-coverage_mode = "exact"
-authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
-mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
-versioning_policy = "git_tracked"
-backup_policy = "git_tracked"
-restore_action = "git_restore"
-health_check_function = ""
-owner_role = "shared"
-depends_on = []
-forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint."
-
-[[artifacts]]
 id = "wi5441-member-groundtruth-kb-src-groundtruth-kb-session-topic--76837fa421"
 domain = "control_surface"
 lifecycle = "active"

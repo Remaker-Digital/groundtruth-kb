@@ -411,6 +411,15 @@ writes. Graph validity does not assert that predecessor work has been performed.
     gt backlog readiness <work-item-id> --json
     gt context work-item <work-item-id> --json
 
+The former `gt session envelope packet` command and descriptor packet producer
+are removed. Startup forwards the service response without a role/activity
+packet receipt; failure directs the receiving context to the canonical task
+reader. The activity renderer points to that same route for the explicitly
+assigned work item and does not choose a task or claim that a pointer is loaded
+knowledge. Bootstrap directions live in the canonical baseline and must be
+mechanically projected. This retirement does not qualify the remaining legacy
+manifest/freshness machinery, all startup consumers or installed projections.
+
 The work-item readiness report identifies the required result, current status and
 specific reason for each unavailable predecessor. Task context reads the same
 report together with project readiness. These prerequisite checks do not replace

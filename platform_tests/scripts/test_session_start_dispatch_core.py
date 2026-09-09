@@ -158,75 +158,6 @@ def test_read_session_start_source_none_on_bad_json(monkeypatch) -> None:
     assert module._read_session_start_source() is None
 
 
-def _fake_packet(kind: str, *, cap: int = 900, estimated: int = 80, status: str = "ready") -> dict[str, object]:
-    packet: dict[str, object] = {
-        "packet_kind": kind,
-        "status": status,
-        "budget": {
-            "estimated_tokens": estimated,
-            "cap_estimated_tokens": cap,
-        },
-        "cache": {
-            "status": "miss",
-            "cache_path": f".gtkb-state/session-envelope/packet-cache/{kind}.json",
-        },
-        "source_pointers": [],
-    }
-    if status == "over_budget_pointer_only":
-        packet["diagnostic"] = {"pointer_only": True}
-    return packet
-
-
-def test_packet_receipt_precedes_activity_context_for_full_hook(monkeypatch) -> None:
-    module = _load_module()
-    calls: list[tuple[str, str, str | None]] = []
-
-    def _fake_compose(*, packet_kind: str, role: str, activity: str | None = None) -> dict[str, object]:
-        calls.append((packet_kind, role, activity))
-        cap = 500 if packet_kind == "activity-packet" else 900
-        return _fake_packet(packet_kind, cap=cap)
-
-    monkeypatch.setattr(module, "HARNESS_NAME", "claude")
-    monkeypatch.setattr(module, "_compose_session_envelope_packet", _fake_compose)
-
-    rendered = module._with_envelope_packet_receipt("activity specialization body", role_mode="pb", activity="build")
-
-    assert rendered.startswith("# GroundTruth-KB Envelope Packet Receipt")
-    assert rendered.index("Envelope Packet Receipt") < rendered.index("activity specialization body")
-    assert "- packet_injection_order: before_activity_specialization" in rendered
-    assert "- hook_disposition: full_sessionstart_packet_injection" in rendered
-    assert "- role_bootstrap: prime-builder" in rendered
-    assert "- activity: build" in rendered
-    assert "session_packet: status=ready; estimated_tokens=80; cap=900" in rendered
-    assert "activity_packet: status=ready; estimated_tokens=80; cap=500" in rendered
-    assert calls == [
-        ("session-envelope", "prime-builder", None),
-        ("activity-packet", "prime-builder", "build"),
-    ]
-
-
-def test_packet_receipt_marks_weak_hook_fallback_as_non_parity(monkeypatch) -> None:
-    module = _load_module()
-    monkeypatch.delenv(module._SESSION_ENVELOPE_ROLE_ENV, raising=False)
-    monkeypatch.delenv(module._SESSION_ENVELOPE_ACTIVITY_ENV, raising=False)
-    monkeypatch.delenv(module._DISPATCH_ACTIVITY_ENV, raising=False)
-
-    def _fake_compose(*, packet_kind: str, role: str, activity: str | None = None) -> dict[str, object]:
-        cap = 500 if packet_kind == "activity-packet" else 900
-        return _fake_packet(packet_kind, cap=cap, status="over_budget_pointer_only")
-
-    monkeypatch.setattr(module, "HARNESS_NAME", "cursor")
-    monkeypatch.setattr(module, "_compose_session_envelope_packet", _fake_compose)
-
-    rendered = module._with_envelope_packet_receipt("activity specialization body", role_mode="lo", activity="test")
-
-    assert "- hook_disposition: fallback_receipt_pointer" in rendered
-    assert "- fallback_is_parity: false" in rendered
-    assert "- role_bootstrap: loyal-opposition" in rendered
-    assert "- activity: test" in rendered
-    assert "pointer_only=true" in rendered
-
-
 def test_session_start_context_id_accepts_only_canonical_uuid() -> None:
     module = _load_module()
     session_id = "12a16794-f84d-457f-81b4-8e803034e4d5"
@@ -237,7 +168,9 @@ def test_session_start_context_id_accepts_only_canonical_uuid() -> None:
     assert module._session_start_context_id({}) is None
 
 
-def _run_normal_startup(module, monkeypatch, tmp_path, payload: dict[str, object]) -> dict[str, object]:
+def _run_normal_startup(
+    module, monkeypatch, tmp_path, payload: dict[str, object], *, returncode=0
+) -> dict[str, object]:
     from groundtruth_kb.mode_switch import pending
 
     captured: dict[str, object] = {}
@@ -263,7 +196,7 @@ def _run_normal_startup(module, monkeypatch, tmp_path, payload: dict[str, object
         captured["command"] = command
         captured["env"] = kwargs["env"]
         return SimpleNamespace(
-            returncode=0,
+            returncode=returncode,
             stdout=json.dumps(
                 {
                     "hookSpecificOutput": {
@@ -278,6 +211,34 @@ def _run_normal_startup(module, monkeypatch, tmp_path, payload: dict[str, object
     monkeypatch.setattr(module.subprocess, "run", _fake_run)
     assert module.main() == 0
     return captured
+
+
+@pytest.mark.parametrize("inherited_role", [None, "prime-builder", "loyal-opposition"])
+def test_startup_forwards_service_context_without_inferred_packet_context(
+    monkeypatch, tmp_path, capsys, inherited_role
+) -> None:
+    module = _load_module()
+    monkeypatch.delenv("GTKB_SESSION_ENVELOPE_ROLE", raising=False)
+    if inherited_role:
+        monkeypatch.setenv("GTKB_SESSION_ENVELOPE_ROLE", inherited_role)
+    monkeypatch.setenv("GTKB_SESSION_ENVELOPE_ACTIVITY", "test")
+
+    _run_normal_startup(module, monkeypatch, tmp_path, {"source": "startup"})
+
+    emitted = json.loads(capsys.readouterr().out)
+    assert emitted["hookSpecificOutput"]["additionalContext"] == "startup"
+
+
+def test_failed_startup_reports_current_context_recovery_without_ready_packet(monkeypatch, tmp_path, capsys) -> None:
+    module = _load_module()
+    _run_normal_startup(module, monkeypatch, tmp_path, {"source": "startup"}, returncode=1)
+
+    emitted = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["additionalContext"]
+    assert emitted.startswith("# GroundTruth-KB Startup Service Degraded")
+    assert "startup service returned exit 1" in emitted
+    assert "gt context work-item <work-item-id>" in emitted
+    assert "status=ready" not in emitted
+    assert "dashboard as the live authority" not in emitted
 
 
 def test_main_passes_valid_session_context_as_startup_guard_id(monkeypatch, tmp_path) -> None:

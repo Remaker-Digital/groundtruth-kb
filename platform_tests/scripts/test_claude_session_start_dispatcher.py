@@ -295,6 +295,11 @@ def test_dispatcher_fallback_on_broken_startup_service(
     # will raise FileNotFoundError, which the dispatcher catches and routes
     # through `_fallback_context`.
     module.STARTUP_SERVICE = tmp_path / "does_not_exist.py"
+    module.PROJECT_ROOT = tmp_path
+    module.OUT_DIR = tmp_path / "diagnostics"
+    monkeypatch.setattr(module, "_invalidate_session_role_marker", lambda: None)
+    monkeypatch.setattr(module, "_sweep_stale_per_session_role_markers", lambda **kwargs: None)
+    monkeypatch.setattr(module, "_persistent_harness_id", lambda: "fixture")
 
     rc = module.main()
     captured = capsys.readouterr()
@@ -304,7 +309,8 @@ def test_dispatcher_fallback_on_broken_startup_service(
     assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
     ctx = payload["hookSpecificOutput"]["additionalContext"]
     assert "Startup Service Degraded" in ctx
-    assert "Dashboard" in ctx
+    assert "gt context work-item <work-item-id>" in ctx
+    assert "dashboard as the live authority" not in ctx
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -569,8 +575,7 @@ def test_legacy_env_without_keyword_falls_through_to_normal_startup(
     assert module.main() == 0
     emitted = json.loads(capsys.readouterr().out)
     emitted_context = emitted["hookSpecificOutput"]["additionalContext"]
-    assert emitted_context.startswith("# GroundTruth-KB Envelope Packet Receipt")
-    assert context in emitted_context
+    assert emitted_context == context
     assert "Bridge Auto-Dispatch Session" not in emitted_context
     assert "test-run-claude-env-only" not in emitted_context
 

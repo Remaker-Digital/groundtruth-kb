@@ -509,49 +509,6 @@ def envelope_attest_author_metadata_cmd(
         click.echo(normalized_session_id)
 
 
-@envelope_group.command("packet")
-@click.option(
-    "--kind",
-    "packet_kind",
-    type=click.Choice(["session-envelope", "activity-packet", "session", "activity"]),
-    default="session-envelope",
-    show_default=True,
-    help="Packet kind to compose.",
-)
-@click.option("--activity", type=click.Choice(list(TOPIC_TYPES)), default=None, help="Required for activity-packet.")
-@click.option("--role", default="prime-builder", show_default=True, help="Role bootstrap to include.")
-@click.option("--ttl-seconds", default=300, show_default=True, type=click.IntRange(1, None))
-@click.option("--cache-dir", type=click.Path(path_type=Path), default=None)
-@click.option("--refresh", is_flag=True, default=False, help="Bypass any valid cached packet.")
-@click.pass_context
-def envelope_packet_cmd(
-    ctx: click.Context,
-    packet_kind: str,
-    activity: str | None,
-    role: str,
-    ttl_seconds: int,
-    cache_dir: Path | None,
-    refresh: bool,
-) -> None:
-    """Compose a budgeted session-envelope or activity packet as JSON."""
-    from groundtruth_kb.session.packet import PacketError, compose_packet
-
-    config = _resolve_config(ctx)
-    try:
-        packet = compose_packet(
-            project_root=Path(config.project_root),
-            packet_kind=packet_kind,
-            activity=activity,
-            role=role,
-            ttl_seconds=ttl_seconds,
-            cache_dir=cache_dir,
-            refresh=refresh,
-        )
-    except PacketError as exc:
-        raise click.ClickException(str(exc)) from exc
-    click.echo(json.dumps(packet, indent=2, sort_keys=True))
-
-
 @session_group.group("topic")
 def topic_group() -> None:
     """Open and close topic envelopes."""
