@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import fnmatch
 import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from groundtruth_kb.project.registry_control_plane import (
     RegistryControlPlaneError,
+    RegistryCoverageError,
     RegistrySnapshot,
+    _path_object_kind,
+    _record_objects,
     load_registry_snapshot,
 )
 from groundtruth_kb.project.sot_registry import InvalidSoTRecord, SoTArtifact, UnknownDomain
@@ -67,6 +69,7 @@ class ArtifactExpansion:
     files: tuple[Path, ...]
     resolved: bool
     blocking: bool
+    detail: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -79,6 +82,7 @@ class ArtifactExpansion:
             "resolved": self.resolved,
             "status": self.status,
             "storage_path": self.artifact.storage_path,
+            **({"detail": self.detail} if self.detail is not None else {}),
         }
 
 
@@ -91,119 +95,79 @@ def _load_registry(
     registry_path: Path | None = None,
     *,
     snapshot: RegistrySnapshot | None = None,
-) -> list[ArtifactRecord]:
+) -> list[SoTArtifact]:
     path = registry_path or project_root / REGISTRY_RELATIVE_PATH
     try:
-        coherent = snapshot or load_registry_snapshot(
-            project_root=project_root,
-            registry_path=path,
-            db_path=project_root / "groundtruth.db",
-        )
-        return [ArtifactRecord.from_sot(record) for record in coherent.records]
+        coherent = snapshot or load_registry_snapshot(project_root=project_root, registry_path=path)
+        return list(coherent.records)
     except (FileNotFoundError, InvalidSoTRecord, RegistryControlPlaneError, UnknownDomain, OSError) as exc:
         raise InventoryScanError(f"SoT artifact registry could not be loaded from {path}: {exc}") from exc
 
 
-def _glob_has_magic(pattern: str) -> bool:
-    return any(ch in pattern for ch in "*?[")
-
-
-_EXTERNAL_STORAGE_RE = re.compile(r"^[a-z][a-z0-9+.-]*:", re.IGNORECASE)
-
-
-def _path_class(artifact: ArtifactRecord, project_root: Path) -> str:
-    storage = artifact.storage_path.strip()
+def _path_class(artifact: SoTArtifact, project_root: Path) -> str:
+    if artifact.coverage_mode == "virtual":
+        return "membase" if artifact.storage_path.startswith("membase:") else "external"
+    if artifact.lifecycle in {"archive", "generated", "deprecated"}:
+        return artifact.lifecycle
     if artifact.coverage_mode == "opaque_container":
         return "opaque_container"
-    if storage.startswith("membase:"):
-        return "membase"
-    if _EXTERNAL_STORAGE_RE.match(storage) and not Path(storage).is_absolute():
-        return "external"
-    if artifact.lifecycle == "archive":
-        return "archive"
-    if artifact.lifecycle == "deprecated":
-        return "deprecated"
-    if artifact.lifecycle == "generated":
-        return "generated"
-    if _glob_has_magic(storage):
+    if artifact.coverage_mode == "glob":
         return "glob"
-    candidate = project_root / storage
-    if storage.endswith(("/", "\\")) or candidate.is_dir():
+    if artifact.coverage_mode == "recursive" or (project_root / artifact.storage_path).is_dir():
         return "directory"
     return "file"
 
 
-def _expand_artifact_files(
-    artifact: ArtifactRecord,
-    project_root: Path,
-) -> ArtifactExpansion:
-    storage = artifact.storage_path.strip()
-    path_class = _path_class(artifact, project_root)
-    if not storage:
-        return ArtifactExpansion(artifact, "file", "invalid_empty_path", (), False, True)
-    if path_class == "membase":
-        return ArtifactExpansion(artifact, path_class, "declared_membase", (), True, False)
-    if path_class == "external":
-        return ArtifactExpansion(artifact, path_class, "declared_external", (), True, False)
-    if Path(storage).is_absolute():
-        blocking = artifact.lifecycle == "active"
-        return ArtifactExpansion(artifact, path_class, "absolute_path_unsupported", (), False, blocking)
+def _expand_artifact_files(record: SoTArtifact, project_root: Path) -> ArtifactExpansion:
+    """Inspect the declared objects without widening coverage or following links."""
+    artifact = ArtifactRecord.from_sot(record)
+    path_class = _path_class(record, project_root)
+    if record.coverage_mode == "virtual":
+        return ArtifactExpansion(artifact, path_class, f"declared_{path_class}", (), True, False)
 
-    candidate = project_root / storage
-    if path_class == "opaque_container":
-        exists = candidate.is_dir()
-        blocking = artifact.lifecycle == "active" and not exists
-        return ArtifactExpansion(
-            artifact,
-            path_class,
-            "opaque_present" if exists else "missing_active_opaque_container" if blocking else "absent_nonactive",
-            (),
-            exists,
-            blocking,
-        )
-    if path_class == "generated":
-        exists = candidate.exists()
-        files = (candidate,) if candidate.is_file() else ()
-        status = "generated_present" if exists else "generated_absent"
-        return ArtifactExpansion(artifact, path_class, status, files, exists, False)
+    def files_under(directory: Path):
+        for path in sorted(directory.iterdir(), key=lambda item: item.name.casefold()):
+            kind = _path_object_kind(path)
+            if kind == "directory":
+                yield from files_under(path)
+            elif kind == "file":
+                yield path
 
-    if path_class == "glob":
-        matches = tuple(sorted(path for path in project_root.glob(storage) if path.is_file()))
-        resolved = bool(matches)
-        blocking = artifact.lifecycle == "active" and not resolved
-        return ArtifactExpansion(
-            artifact,
-            path_class,
-            "expanded" if resolved else "missing_active_glob" if blocking else "absent_nonactive",
-            matches,
-            resolved,
-            blocking,
-        )
-
-    if path_class == "directory":
-        exists = candidate.is_dir()
-        files = tuple(sorted(path for path in candidate.rglob("*") if path.is_file())) if exists else ()
-        blocking = artifact.lifecycle == "active" and not exists
-        return ArtifactExpansion(
-            artifact,
-            path_class,
-            "expanded" if exists else "missing_active_directory" if blocking else "absent_nonactive",
-            files,
-            exists,
-            blocking,
-        )
-
-    exists = candidate.is_file()
-    files = (candidate,) if exists else ()
-    blocking = artifact.lifecycle == "active" and not exists
-    return ArtifactExpansion(
-        artifact,
-        path_class,
-        "resolved" if exists else "missing_active_file" if blocking else "absent_nonactive",
-        files,
-        exists,
-        blocking,
-    )
+    try:
+        objects = _record_objects(project_root, record)
+        present = [path for path in objects if path.exists() or path.is_symlink()]
+        if record.lifecycle == "archive":
+            return ArtifactExpansion(
+                artifact,
+                path_class,
+                "archived_surface_present" if present else "archived_absent",
+                (),
+                not present,
+                bool(present),
+            )
+        if not present:
+            kind = {"recursive": "directory", "glob": "glob", "opaque_container": "opaque_container"}.get(
+                record.coverage_mode, "file"
+            )
+            return ArtifactExpansion(artifact, path_class, f"missing_{record.lifecycle}_{kind}", (), False, True)
+        if record.coverage_mode == "opaque_container":
+            if _path_object_kind(present[0]) not in {"file", "directory"}:
+                raise RegistryCoverageError("An opaque container must be an ordinary file or directory")
+            return ArtifactExpansion(artifact, path_class, "opaque_present", (), True, False)
+        if record.coverage_mode == "recursive":
+            if _path_object_kind(present[0]) != "directory":
+                raise RegistryCoverageError("Recursive coverage requires an ordinary directory")
+            files = tuple(files_under(present[0]))
+        else:
+            # Exact directory membership does not include descendants. A glob
+            # includes its actual matched files, never a match's descendants.
+            files = tuple(path for path in present if _path_object_kind(path) == "file")
+        status = "expanded" if record.coverage_mode in {"recursive", "glob"} else "resolved"
+        if record.lifecycle == "generated":
+            status = "generated_present"
+        return ArtifactExpansion(artifact, path_class, status, files, True, False)
+    except (OSError, RegistryCoverageError) as exc:
+        return ArtifactExpansion(artifact, path_class, "invalid_identity_or_unreadable", (), False, True, str(exc))
 
 
 def registered_artifact_inventory(
@@ -214,12 +178,14 @@ def registered_artifact_inventory(
     list[dict[str, Any]],
     list[ArtifactExpansion],
 ]:
-    artifacts = _load_registry(project_root, registry_path, snapshot=snapshot)
+    project_root = project_root.resolve()
+    records = _load_registry(project_root, registry_path, snapshot=snapshot)
+    artifacts = [ArtifactRecord.from_sot(record) for record in records]
     by_path: dict[str, list[ArtifactRecord]] = {}
     missing: list[dict[str, Any]] = []
     expansions: list[ArtifactExpansion] = []
-    for artifact in artifacts:
-        expansion = _expand_artifact_files(artifact, project_root)
+    for record, artifact in zip(records, artifacts, strict=True):
+        expansion = _expand_artifact_files(record, project_root)
         expansions.append(expansion)
         if expansion.blocking:
             missing.append(expansion.to_dict())

@@ -118,58 +118,6 @@ def test_dcl_single_harness_dispatcher_desktop_task_present() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_doctor_role_set_topology_check_recognizes_role_set_schema() -> None:
-    from groundtruth_kb.project.doctor import _check_role_set_topology_consistency
-
-    check = _check_role_set_topology_consistency(PROJECT_ROOT)
-    # The live state is currently legacy-scalar; the check must accept it
-    # (READ-accepted) and report PASS with the legacy-scalar count.
-    assert check.status in {"pass", "warning"}, f"Unexpected status: {check.status}"
-    assert "wire form valid" in check.message or "missing" in check.message
-
-
-def test_doctor_role_set_topology_flags_invalid_token(tmp_path: Path) -> None:
-    """A bogus token in the role list must be reported as a failure."""
-    from groundtruth_kb.project.doctor import _check_role_set_topology_consistency
-
-    (tmp_path / "harness-state").mkdir(parents=True)
-    (tmp_path / "harness-state" / "harness-registry.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "harnesses": [
-                    {"id": "A", "role": ["prime-builder", "bogus-role"], "status": "active"},
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-    # Identity map intentionally absent so topology-drift check skips.
-    check = _check_role_set_topology_consistency(tmp_path)
-    assert check.status == "fail"
-    assert "bogus-role" in check.message
-
-
-def test_doctor_role_set_topology_flags_duplicate_tokens(tmp_path: Path) -> None:
-    from groundtruth_kb.project.doctor import _check_role_set_topology_consistency
-
-    (tmp_path / "harness-state").mkdir(parents=True)
-    (tmp_path / "harness-state" / "harness-registry.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "harnesses": [
-                    {"id": "A", "role": ["prime-builder", "prime-builder"], "status": "active"},
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-    check = _check_role_set_topology_consistency(tmp_path)
-    assert check.status == "fail"
-    assert "duplicate" in check.message.lower()
-
-
 def test_doctor_single_harness_dispatcher_not_applicable_in_multi_harness(tmp_path: Path) -> None:
     from groundtruth_kb.project.doctor import _check_single_harness_dispatcher_when_required
 

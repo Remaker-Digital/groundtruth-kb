@@ -86,12 +86,14 @@ class GTConfig:
     authority_url: str | None = None
 
     @classmethod
-    def load(cls, config_path: Path | None = None, **overrides: object) -> GTConfig:
+    def load(cls, config_path: Path | None = None, *, discover: bool = True, **overrides: object) -> GTConfig:
         """Load config from groundtruth.toml + env vars + overrides.
 
         Args:
             config_path: Explicit path to groundtruth.toml. If None, searches
                          current directory and parent directories.
+            discover: Search the caller's directories when no file is selected.
+                      Disable for operations on an explicitly selected project.
             **overrides: Keyword arguments that override all other sources.
 
         Relative paths (db_path, project_root) are resolved against the
@@ -99,7 +101,7 @@ class GTConfig:
         ensures ``gt --config /path/to/project/groundtruth.toml summary``
         works correctly from any working directory.
         """
-        resolved_config_path = config_path if config_path is not None else _find_config()
+        resolved_config_path = config_path if config_path is not None else (_find_config() if discover else None)
         file_values = _load_toml(resolved_config_path)
         env_values = _load_env()
 
@@ -157,13 +159,12 @@ class GTConfig:
         config = cls(**{k: v for k, v in merged.items() if k in cls.__dataclass_fields__})
         if config.authority_url is not None:
             config.authority_url = validate_authority_url(config.authority_url)
-        # Only resolve paths to absolute when they came from config/overrides, not defaults
-        if "project_root" in merged and not config.project_root.is_absolute():
-            config.project_root = anchor / config.project_root
-        if "db_path" in merged and not config.db_path.is_absolute():
-            config.db_path = anchor / config.db_path
-        if "chroma_path" in merged and config.chroma_path is not None and not config.chroma_path.is_absolute():
-            config.chroma_path = anchor / config.chroma_path
+        # A selected configuration anchors its defaults as well as explicit paths.
+        # Otherwise an omitted project_root or db_path silently targets the caller's cwd.
+        for key in ("project_root", "db_path", "chroma_path"):
+            value = getattr(config, key)
+            if (resolved_config_path is not None or key in merged) and value is not None and not value.is_absolute():
+                setattr(config, key, anchor / value)
         return config
 
 

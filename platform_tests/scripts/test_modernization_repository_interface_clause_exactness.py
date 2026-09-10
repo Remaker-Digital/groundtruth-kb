@@ -42,8 +42,6 @@ from groundtruth_kb.artifact_lifecycle.decontamination import (  # noqa: E402
     canonical_report_bytes,
     load_repository_snapshot,
 )
-from groundtruth_kb.db import KnowledgeDB  # noqa: E402
-from groundtruth_kb.project.sot_registry import load_toml, sync_projection  # noqa: E402
 from groundtruth_kb.runtime_recovery import RecoveryStore  # noqa: E402
 from groundtruth_kb.session.envelope import (  # noqa: E402
     EnvelopeError,
@@ -149,28 +147,6 @@ def _write_artifact_repository(
     )
     (rules / "current.md").write_text(current_content, encoding="utf-8")
     (rules / "history.md").write_text("historical\n", encoding="utf-8")
-    packaged_registry = (
-        root
-        / "groundtruth-kb"
-        / "src"
-        / "groundtruth_kb"
-        / "context"
-        / "registries"
-        / "v1"
-        / "config"
-        / "registry"
-        / "sot-artifacts.toml"
-    )
-    packaged_registry.parent.mkdir(parents=True)
-    packaged_registry.write_text(registry_payload, encoding="utf-8")
-    db_path = root / "groundtruth.db"
-    KnowledgeDB(db_path=db_path)
-    sync_projection(
-        load_toml(canonical_registry),
-        db_path,
-        changed_by="test",
-        change_reason="fixture sync",
-    )
 
 
 # MOD-AD01

@@ -28,6 +28,7 @@ from groundtruth_kb.session.worktree import (
     is_session_context_id,
     live_session_context_ids,
     open_worktree,
+    project_worktree,
     session_branch,
     show_worktree,
     worktree_path,
@@ -165,6 +166,43 @@ def test_two_sessions_get_independent_checkouts(repo: Path, db: Path) -> None:
     states = classify_worktrees(repo, db)
     assert _find(states, a.path).tracked_dirty == 1
     assert _find(states, b.path).tracked_dirty == 0
+
+
+def test_project_refresh_preserves_ignored_local_files(repo: Path) -> None:
+    (repo / ".gitignore").write_text("local.txt\n", encoding="utf-8")
+    _git(repo, "add", ".gitignore")
+    _git(repo, "commit", "-qm", "ignore local output")
+    checkout = project_worktree(repo, "PROJECT-TEST")
+    old_head = _git(checkout, "rev-parse", "HEAD").stdout.strip()
+    local = checkout / "local.txt"
+    local.write_bytes(b"unfinished local work\n")
+    (repo / "local.txt").write_bytes(b"new canonical artifact\n")
+    _git(repo, "add", "-f", "local.txt")
+    _git(repo, "commit", "-qm", "introduce formerly ignored artifact")
+
+    with pytest.raises(SessionWorktreeError) as excinfo:
+        project_worktree(repo, "PROJECT-TEST", refresh_base=True)
+
+    assert excinfo.value.code == "project_base_reconciliation_required"
+    assert local.read_bytes() == b"unfinished local work\n"
+    assert _git(checkout, "rev-parse", "HEAD").stdout.strip() == old_head
+
+
+def test_project_refresh_fast_forwards_without_disturbing_local_work(repo: Path) -> None:
+    (repo / ".gitignore").write_text("local.txt\n", encoding="utf-8")
+    _git(repo, "add", ".gitignore")
+    _git(repo, "commit", "-qm", "ignore local output")
+    checkout = project_worktree(repo, "PROJECT-TEST")
+    (checkout / "local.txt").write_bytes(b"unfinished local work\n")
+    (repo / "new.txt").write_bytes(b"new canonical artifact\n")
+    _git(repo, "add", "new.txt")
+    _git(repo, "commit", "-qm", "add unrelated artifact")
+
+    assert project_worktree(repo, "PROJECT-TEST", refresh_base=True) == checkout
+
+    assert (checkout / "local.txt").read_bytes() == b"unfinished local work\n"
+    assert (checkout / "new.txt").read_bytes() == b"new canonical artifact\n"
+    assert _git(checkout, "rev-parse", "HEAD").stdout == _git(repo, "rev-parse", "HEAD").stdout
 
 
 # --- classification ---------------------------------------------------------

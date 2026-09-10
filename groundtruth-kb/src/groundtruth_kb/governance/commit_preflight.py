@@ -28,19 +28,6 @@ def commit_preflight_commands(python_bin: str) -> tuple[CommandSpec, ...]:
     """Return the Python checks in the same order as the Bash pre-commit hook."""
     return (
         CommandSpec("secret-scan", (python_bin, "scripts/scan_secrets.py", "--staged")),
-        CommandSpec(
-            "dev-environment-inventory-drift",
-            (
-                python_bin,
-                "scripts/check_dev_environment_inventory_drift.py",
-                "--staged",
-                "--allow-review-evidence",
-            ),
-        ),
-        CommandSpec(
-            "narrative-artifact-evidence",
-            (python_bin, "scripts/check_narrative_artifact_evidence.py", "--staged"),
-        ),
         CommandSpec("ruff-format", (python_bin, "scripts/check_ruff_format.py", "--staged")),
         CommandSpec(
             "commit-pathspec-safety",
@@ -48,8 +35,6 @@ def commit_preflight_commands(python_bin: str) -> tuple[CommandSpec, ...]:
                 python_bin,
                 "scripts/check_commit_pathspec_safety.py",
                 "--staged",
-                "--strict",
-                "--check-foreign-verdicts",
             ),
         ),
         CommandSpec(

@@ -80,22 +80,6 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
         return bool(re.fullmatch(r"(?:openrouter|ollama)-harness-[a-z]", text, re.IGNORECASE))
 
 
-try:
-    from scripts.gtkb_bridge_writer import BridgeEnvelopeError, validate_bridge_envelope_head
-except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
-
-    class BridgeEnvelopeError(RuntimeError):
-        pass
-
-    def validate_bridge_envelope_head(
-        _content: str,
-        *,
-        require_dispatchable: bool = False,
-        activity: str | None = None,
-    ) -> None:
-        return None
-
-
 WRITE_TOOLS = {"Write", "Edit"}
 PENDING_PREFLIGHT_STATUSES = {"NEW", "REVISED"}
 BRIDGE_STATUS_TOKENS = (
@@ -2148,14 +2132,23 @@ def _no_action_close_intent_deny(file_path: str, content: str) -> str | None:
 
 def _bridge_envelope_head_deny_reason(content: str) -> str | None:
     try:
-        validate_bridge_envelope_head(content, require_dispatchable=True)
-    except BridgeEnvelopeError as exc:
+        from groundtruth_kb.bridge.native import parse_authored_message
+        from groundtruth_kb.postgres_kernel import PostgresKernelError
+    except ImportError:
         return (
-            "[Governance] Bridge artifact-head envelope invalid: "
-            f"{exc}. Status-bearing dispatchable bridge files must keep the status token on line 1, "
-            "then `::init gtkb <pb|lo>` on line 2 and `::open <activity>` on line 3. "
-            "(Hard-block per ADR-BRIDGE-ARTIFACT-HEAD-ENVELOPE-001 and "
-            "DCL-BRIDGE-ENVELOPE-LINE-AUTHORING-PLACEMENT-001.)"
+            "[Governance] native_bridge_validator_unavailable: the hook interpreter cannot load "
+            "the installed native bridge contract. Repair the interpreter/package configuration "
+            "before retrying; the authored message has not been validated."
+        )
+
+    try:
+        parse_authored_message(content)
+    except PostgresKernelError as exc:
+        return (
+            "[Governance] Invalid authored bridge header: "
+            f"{exc}. Supply the complete header through the native bridge CLI. "
+            "Dispatchable status, init and activity occupy the first three nonblank lines in any order; "
+            "non-dispatchable messages omit init, activity and recipient."
         )
     return None
 

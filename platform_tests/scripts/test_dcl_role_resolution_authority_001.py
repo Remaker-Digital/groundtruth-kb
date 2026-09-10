@@ -250,31 +250,6 @@ def test_r3_dispatcher_routes_via_registry_projection() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_r4_mismatch_is_warning_surface_not_override() -> None:
-    """R4 (structural): a marker/durable (or registry) mismatch is surfaced as a
-    warning/audit, never an override or a raise.
-
-    1. The SessionStart core audits misdirected dispatch to dispatch-failures.jsonl.
-    2. The resolver never ``raise``s on a marker/durable disagreement — every
-       mismatch branch RETURNS a durable fallback with a source tag.
-    3. The doctor's role-set topology check is advisory (``required=False``) and
-       carries a WARN (``status="warning"``) path — drift is surfaced, not gated.
-    """
-    core = _read(CORE_PATH)
-    assert "_audit_log_misdirected_dispatch" in core, "core missing the misdirected-dispatch audit surface."
-    assert "dispatch-failures.jsonl" in core, "core missing the dispatch-failures.jsonl audit-log path."
-
-    resolver_body = _extract_function(_read(RESOLVER_PATH), "resolve_interactive_session_role")
-    raising_lines = [ln for ln in resolver_body.splitlines() if ln.strip().startswith("raise ")]
-    assert not raising_lines, (
-        f"resolver must not raise on a marker/durable disagreement (R4); found: {raising_lines!r}."
-    )
-
-    doctor_check = _extract_function(_read(DOCTOR_PATH), "_check_role_set_topology_consistency")
-    assert "required=False" in doctor_check, "role-topology doctor check must be advisory (non-blocking)."
-    assert 'status="warning"' in doctor_check, "role-topology doctor check must retain a WARN path (R4)."
-
-
 # ──────────────────────────────────────────────────────────────────────────
 # R5 — no gate invalidates work on a registry mismatch alone (assertion 1)
 # ──────────────────────────────────────────────────────────────────────────

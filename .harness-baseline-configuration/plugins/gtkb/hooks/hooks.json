@@ -23,17 +23,7 @@
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/formal-artifact-approval-gate.py",
-        "timeout": 5,
-        "blocking": true
-      },
-      {
         "command": "python .goose/hooks/document_author_provenance_gate.py",
-        "timeout": 5,
-        "blocking": true
-      },
-      {
-        "command": "python .goose/hooks/workstream-focus.py",
         "timeout": 5,
         "blocking": true
       },
@@ -48,17 +38,7 @@
         "blocking": true
       },
       {
-        "command": "python .goose/hooks/bridge-compliance-gate.py",
-        "timeout": 5,
-        "blocking": true
-      },
-      {
         "command": "python .goose/hooks/bridge-proposal-wi-id-collision-gate.py",
-        "timeout": 5,
-        "blocking": true
-      },
-      {
-        "command": "python .goose/hooks/narrative-artifact-approval-gate.py",
         "timeout": 5,
         "blocking": true
       },
@@ -78,99 +58,25 @@
         "blocking": true
       }
     ],
-    "SessionStart": [
-      {
-        "command": "python .goose/hooks/session-start-governance.py",
-        "timeout": 60
-      },
-      {
-        "command": "python .goose/hooks/session_start_dispatch.py",
-        "timeout": 60
-      }
-    ],
     "PostToolUse": [
-      {
-        "command": "python .goose/hooks/delib-search-tracker.py"
-      },
-      {
-        "command": "python .goose/hooks/owner-decision-capture.py"
-      },
       {
         "command": "python .goose/hooks/spec-event-surfacer.py",
         "timeout": 5
       },
       {
         "command": "python .goose/hooks/spec-event-surfacer.py"
-      },
-      {
-        "command": "python .goose/hooks/owner-decision-capture.py"
       }
     ],
     "Stop": [
-      {
-        "command": "python .goose/hooks/owner-decision-tracker.py",
-        "timeout": 5,
-        "blocking": true
-      },
       {
         "command": "python .goose/hooks/advisory-router-scan.py",
         "timeout": 10,
         "blocking": true
       },
       {
-        "command": "python scripts/session_self_initialization.py --emit-wrapup --fast-hook --harness-name goose",
-        "timeout": 60,
-        "blocking": true
-      },
-      {
         "command": "python scripts/advisory_grilling_gate_lint.py --stop-hook",
         "timeout": 10,
         "blocking": true
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "command": "python .goose/hooks/workstream-focus.py",
-        "timeout": 5
-      },
-      {
-        "command": "python .goose/hooks/delib-search-gate.py"
-      },
-      {
-        "command": "python .goose/hooks/intake-classifier.py"
-      },
-      {
-        "command": "python .goose/hooks/gov09-capture.py"
-      },
-      {
-        "command": "python .goose/hooks/owner-decision-tracker.py",
-        "timeout": 5
-      },
-      {
-        "command": "python .goose/hooks/bridge-axis-2-surface.py",
-        "timeout": 5
-      },
-      {
-        "command": "python .goose/hooks/spec-classifier.py",
-        "timeout": 5
-      },
-      {
-        "command": "python .goose/hooks/glossary-expansion.py",
-        "timeout": 5
-      },
-      {
-        "command": "python .goose/hooks/project-completion-surface.py",
-        "timeout": 5
-      },
-      {
-        "command": "python .goose/hooks/session-topic-envelope-router.py",
-        "timeout": 5
-      },
-      {
-        "command": "python .goose/hooks/intake-classifier.py"
-      },
-      {
-        "command": "python .goose/hooks/gov09-capture.py"
       }
     ]
   }

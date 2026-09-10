@@ -152,8 +152,7 @@ PAUTH_PHASE_OPERATIONS: Final[dict[str, tuple[str, ...]]] = {
     "finalization": ("protected_mutation",),
 }
 # Loyal Opposition verdicts proper: GO, NO-GO, NOT-READY, VERIFIED, SUPERSEDED.
-# ADVISORY is authored by either role and is not a verdict (same derivation as
-# PROVIDER_VERDICT_STATUSES in scripts/gtkb_bridge_writer.py).
+# ADVISORY is authored by either role and is not a verdict.
 VERDICT_CANDIDATE_STATUSES: Final[frozenset[str]] = LOYAL_OPPOSITION_AUTHORED_STATUSES - {"ADVISORY"}
 # Canon section 6: a status with no successors closes the thread.
 TERMINAL_STATUSES: Final[frozenset[str]] = frozenset(

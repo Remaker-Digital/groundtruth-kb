@@ -91,9 +91,6 @@ REBUILT_LATER_TABLES = frozenset(
     {
         "assertion_runs",
         "pipeline_events",
-        "sot_artifacts",
-        "sot_artifact_revisions",
-        "sot_registry_transaction_journal",
         "sot_quarantine_receipts",
         "work_intent_claims",
     }
@@ -139,6 +136,11 @@ RETIRED_TABLES = frozenset(
         "session_context_envelope_terminal_facts",
         "session_context_envelopes",
         "session_role_attestations",
+        # Canonical registry declarations stay in TOML; no projection or
+        # observation journal is rebuilt in PostgreSQL.
+        "sot_artifacts",
+        "sot_artifact_revisions",
+        "sot_registry_transaction_journal",
         # Retired per-effect permission and recovery receipts.
         "sot_registry_bridge_publication_capabilities",
         "sot_registry_bridge_recovery_receipts",
@@ -1372,6 +1374,18 @@ def _normalize_manifest_row(
         "agent_red_application",
     ):
         raise PostgresKernelError("invalid_manifest", f"Invalid {table_name}.application_scope")
+    if table_name == "work_items":
+        # Predecessor shape and graph diagnostics stay with their domain validator.
+        for column in spec.json_columns - {"depends_on_work_items"}:
+            value = row[column]
+            if value is not None and (
+                not isinstance(value, list)
+                or any(not isinstance(reference, str) or not reference.strip() for reference in value)
+            ):
+                raise PostgresKernelError(
+                    "invalid_manifest",
+                    f"work_items.{column} must be an array of nonempty references or null",
+                )
     if table_name == "projects":
         if row.get("kind") not in {"program", "project"}:
             raise PostgresKernelError("invalid_manifest", "Invalid projects.kind")
@@ -2850,7 +2864,11 @@ class PostgresTransaction:
             terms.append(sql.SQL('id COLLATE "C" > %s'))
             values.append(after)
         if search is not None:
-            search_columns = [c for c in ("title", "name", "description", "purpose") if c in spec.columns]
+            search_columns = [
+                c
+                for c in ("title", "name", "description", "purpose", "canonical_term", "definition")
+                if c in spec.columns
+            ]
             if not search_columns:
                 raise PostgresKernelError("invalid_query", "Search is unavailable for this domain")
             terms.append(

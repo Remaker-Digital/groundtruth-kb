@@ -71,7 +71,8 @@ def make_root(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
     (root / "groundtruth.toml").write_text("[project]\nname='test'\n", encoding="utf-8")
-    (root / ".api-harness").mkdir()
+    (root / ach.ROUTING_CONFIG_PATH.parent).mkdir(parents=True)
+    (root / ach.ROUTING_CONFIG_PATH.parent / "settings.json").write_text('{"hooks": {}}', encoding="utf-8")
     (root / ach.ROUTING_CONFIG_PATH).write_text(
         """
 schema_version = 1
@@ -103,6 +104,11 @@ default_model = "openrouter-same-model"
         + "\n",
         encoding="utf-8",
     )
+    for name in ("gtkb-bridge", "gtkb-proposal-review", "gtkb-verify"):
+        relative = Path(".harness-baseline-configuration") / "skills" / name / "SKILL.md"
+        target = root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((Path(__file__).resolve().parents[2] / relative).read_bytes())
     return root
 
 
@@ -188,21 +194,6 @@ def test_run_tool_loop_delegates_profile_and_native_hook_runner(
         "native_hook_runner": hook_runner,
         "skill": "bridge-review",
     }
-    assert captured["profile"].publish_bridge_verdict_tool is True
-    assert captured["profile"].force_anthropic_publisher_tool_choice is True
-    assert captured["profile"].disable_anthropic_publisher_recovery_thinking is True
-
-
-def test_bridge_review_prompt_requires_governed_verdict_tool(tmp_path: Path) -> None:
-    root = make_root(tmp_path)
-    route = ach.resolve_model(ach.load_routing_config(root), None)
-
-    prompt = ach.build_system_prompt("bridge-review", route)
-
-    assert prompt is not None
-    assert "PublishBridgeVerdict" in prompt
-    assert "never use Write, Edit, or Bash for a numbered bridge artifact" in prompt
-    assert ach.build_system_prompt("implementation", route) is None
 
 
 def test_alibaba_native_hook_adapter_accepts_empty_non_tool_lifecycle_output(
@@ -245,8 +236,8 @@ def test_shared_native_hook_layer_accepts_real_alibaba_empty_pretool_adapter(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     root = make_root(tmp_path)
-    settings_dir = root / ".claude"
-    settings_dir.mkdir()
+    settings_dir = root / ach.ROUTING_CONFIG_PATH.parent
+    settings_dir.mkdir(exist_ok=True)
     (settings_dir / "settings.json").write_text(
         json.dumps(
             {
@@ -287,8 +278,8 @@ def test_shared_native_hook_layer_converts_real_alibaba_pretool_timeout_to_block
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     root = make_root(tmp_path)
-    settings_dir = root / ".claude"
-    settings_dir.mkdir()
+    settings_dir = root / ach.ROUTING_CONFIG_PATH.parent
+    settings_dir.mkdir(exist_ok=True)
     (settings_dir / "settings.json").write_text(
         json.dumps(
             {
@@ -299,7 +290,7 @@ def test_shared_native_hook_layer_converts_real_alibaba_pretool_timeout_to_block
                             "hooks": [
                                 {
                                     "type": "command",
-                                    "command": "python .claude/hooks/formal-artifact-approval-gate.py --secret hidden",
+                                    "command": "python .api-harness/alibaba-cloud-studio/hooks/formal-artifact-approval-gate.py --secret hidden",
                                     "timeout": 5,
                                 }
                             ],
@@ -359,8 +350,8 @@ def test_alibaba_user_prompt_timeout_preserves_original_provider_prompt(
     tmp_path: Path,
 ) -> None:
     root = make_root(tmp_path)
-    settings_dir = root / ".claude"
-    settings_dir.mkdir()
+    settings_dir = root / ach.ROUTING_CONFIG_PATH.parent
+    settings_dir.mkdir(exist_ok=True)
     (settings_dir / "settings.json").write_text(
         json.dumps(
             {
@@ -402,8 +393,8 @@ def test_alibaba_native_full_loop_preserves_candidate_when_stop_times_out(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = make_root(tmp_path)
-    settings_dir = root / ".claude"
-    settings_dir.mkdir()
+    settings_dir = root / ach.ROUTING_CONFIG_PATH.parent
+    settings_dir.mkdir(exist_ok=True)
     (settings_dir / "settings.json").write_text(
         json.dumps(
             {
@@ -441,8 +432,8 @@ def test_alibaba_native_full_loop_preserves_candidate_when_stop_times_out(
 def test_alibaba_native_full_loop_continues_when_posttool_maintenance_times_out(tmp_path: Path) -> None:
     root = make_root(tmp_path)
     (root / "note.txt").write_text("governed evidence", encoding="utf-8")
-    settings_dir = root / ".claude"
-    settings_dir.mkdir()
+    settings_dir = root / ach.ROUTING_CONFIG_PATH.parent
+    settings_dir.mkdir(exist_ok=True)
     (settings_dir / "settings.json").write_text(
         json.dumps(
             {
@@ -495,174 +486,6 @@ def test_alibaba_native_full_loop_continues_when_posttool_maintenance_times_out(
         == "H verdict ready"
     )
     assert chat_calls == 2
-
-
-def test_alibaba_loop_inherits_publisher_only_recovery(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    root = make_root(tmp_path)
-    route = ach.resolve_model(ach.load_routing_config(root), None)
-    payloads: list[dict] = []
-
-    class Published:
-        def to_dict(self) -> dict[str, object]:
-            return {"verdict_path": "bridge/example-002.md"}
-
-    def native_hook_runner(*_args, **_kwargs) -> base.GuardExecutionResult:
-        return base.GuardExecutionResult(returncode=0, stdout="{}")
-
-    monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: lambda *_args, **_kwargs: Published())
-    for key in base.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-completion")
-
-    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
-        payloads.append(payload)
-        if len(payloads) == 1:
-            assert "tool_choice" not in payload
-            assert "thinking" not in payload
-            return {"model": route.model_id, "content": [{"type": "text", "text": "ready but unpublished"}]}
-        if len(payloads) == 2:
-            assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
-            assert payload["tool_choice"] == {"type": "any"}
-            assert payload["thinking"] == {"type": "disabled"}
-            return {
-                "model": route.model_id,
-                "content": [
-                    {
-                        "type": "tool_use",
-                        "id": "publish_h",
-                        "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
-                        "input": {"slug": "example", "verdict": "GO", "content": "GO\n"},
-                    }
-                ],
-            }
-        assert "tool_choice" not in payload
-        assert "thinking" not in payload
-        return {"model": route.model_id, "content": [{"type": "text", "text": "published"}]}
-
-    assert (
-        ach.run_tool_loop(
-            "review",
-            route,
-            "https://example.test/v1",
-            "key",
-            3,
-            root,
-            skill="bridge-review",
-            chat_func=chat,
-            native_hook_runner=native_hook_runner,
-        )
-        == "published"
-    )
-
-
-def test_alibaba_loop_rejects_mixed_publisher_recovery_turn_atomically(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root = make_root(tmp_path)
-    route = ach.resolve_model(ach.load_routing_config(root), None)
-    payloads: list[dict] = []
-    dispatched_tools: list[str] = []
-    publish_calls = 0
-
-    class Published:
-        def to_dict(self) -> dict[str, object]:
-            return {"verdict_path": "bridge/example-002.md"}
-
-    def fake_publish(*_args, **_kwargs):
-        nonlocal publish_calls
-        publish_calls += 1
-        return Published()
-
-    def native_hook_runner(*_args, **_kwargs) -> base.GuardExecutionResult:
-        return base.GuardExecutionResult(returncode=0, stdout="{}")
-
-    original_dispatch = base.dispatch_tool_call
-
-    def recording_dispatch(tool_name, *args, **kwargs):
-        dispatched_tools.append(tool_name)
-        return original_dispatch(tool_name, *args, **kwargs)
-
-    monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: fake_publish)
-    monkeypatch.setattr(base, "dispatch_tool_call", recording_dispatch)
-    for key in base.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-mixed-recovery")
-
-    def publisher_block(call_id: str) -> dict:
-        return {
-            "type": "tool_use",
-            "id": call_id,
-            "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
-            "input": {"slug": "example", "verdict": "GO", "content": "GO\n"},
-        }
-
-    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
-        payloads.append(payload)
-        if len(payloads) == 1:
-            assert "tool_choice" not in payload
-            assert "thinking" not in payload
-            return {"model": route.model_id, "content": [{"type": "text", "text": "ready but unpublished"}]}
-        if len(payloads) == 2:
-            assert payload["tool_choice"] == {"type": "any"}
-            assert payload["thinking"] == {"type": "disabled"}
-            assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
-            return {
-                "model": route.model_id,
-                "content": [
-                    publisher_block("publish_rejected"),
-                    {"type": "tool_use", "id": "read_rejected", "name": "Read", "input": {"path": "note.txt"}},
-                ],
-            }
-        if len(payloads) == 3:
-            assert payload["tool_choice"] == {"type": "any"}
-            assert payload["thinking"] == {"type": "disabled"}
-            assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
-            assert "publisher-only recovery rejected non-publisher tool call(s): Read" in str(payload["messages"])
-            return {"model": route.model_id, "content": [publisher_block("publish_valid")]}
-        assert "tool_choice" not in payload
-        assert "thinking" not in payload
-        return {"model": route.model_id, "content": [{"type": "text", "text": "published"}]}
-
-    assert (
-        ach.run_tool_loop(
-            "review",
-            route,
-            "https://example.test/v1",
-            "key",
-            4,
-            root,
-            skill="bridge-review",
-            chat_func=chat,
-            native_hook_runner=native_hook_runner,
-        )
-        == "published"
-    )
-    assert dispatched_tools == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
-    assert publish_calls == 1
-
-
-def test_bridge_review_enables_readonly_native_hook_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("LOYAL_OPPOSITION_READONLY", raising=False)
-    monkeypatch.delenv("GTKB_NO_AXIS_2_SURFACE", raising=False)
-    monkeypatch.delenv("GTKB_NO_PROJECT_COMPLETION_SURFACE", raising=False)
-
-    ach.configure_lo_readonly_environment("bridge-review")
-
-    assert ach.os.environ["LOYAL_OPPOSITION_READONLY"] == "1"
-    assert ach.os.environ["GTKB_NO_AXIS_2_SURFACE"] == "1"
-    assert ach.os.environ["GTKB_NO_PROJECT_COMPLETION_SURFACE"] == "1"
-
-
-def test_non_bridge_skill_does_not_change_readonly_native_hook_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("LOYAL_OPPOSITION_READONLY", raising=False)
-    monkeypatch.delenv("GTKB_NO_AXIS_2_SURFACE", raising=False)
-    monkeypatch.delenv("GTKB_NO_PROJECT_COMPLETION_SURFACE", raising=False)
-
-    ach.configure_lo_readonly_environment("implementation")
-
-    assert "LOYAL_OPPOSITION_READONLY" not in ach.os.environ
-    assert "GTKB_NO_AXIS_2_SURFACE" not in ach.os.environ
-    assert "GTKB_NO_PROJECT_COMPLETION_SURFACE" not in ach.os.environ
 
 
 def test_main_missing_key_reports_only_the_environment_variable_name(

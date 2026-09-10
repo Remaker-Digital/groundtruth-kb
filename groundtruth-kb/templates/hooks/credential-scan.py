@@ -10,10 +10,10 @@ SPEC-0058: All transient keys, values, URLs, and variables that change
 between builds or tenant environments MUST NOT be hardcoded.
 
 Stdin:  JSON {"tool_name": "Write"|"Edit", "tool_input": {...}, ...}
-Stdout: JSON {"decision": "block", "reason": "..."} or {}
+Stdout: native PreToolUse hookSpecificOutput deny object, or {}
 Exit:   Always 0
 
-This hook is FAIL-OPEN for parse errors (only blocks on positive match).
+Malformed effect input or an unavailable package catalog refuses the effect.
 
 WI-3142: Replaced blanket test-file exclusions with value-scoped
 suppression. Unified key detection covers quoted, assignment-form, and
@@ -243,16 +243,14 @@ def _scan_content(content: str, file_path: str) -> list[str]:
     findings = []
 
     for pattern in _FQDN_PATTERNS:
-        matches = pattern.findall(content)
-        if matches:
-            for match in matches:
-                findings.append(f"Hardcoded Azure FQDN: {match[:80]}...")
+        if pattern.search(content):
+            findings.append("Hardcoded Azure FQDN")
 
     for pattern in _AR_KEY_PATTERNS:
         for match in pattern.finditer(content):
             value = match.group("value")
             if not _is_fixture_suppressed(value, file_path):
-                findings.append(f"Hardcoded API key ({value[:20]}...)")
+                findings.append("Hardcoded API key")
 
     for pattern in _AZURE_ID_PATTERNS:
         matches = pattern.findall(content)
@@ -267,65 +265,73 @@ def _scan_content(content: str, file_path: str) -> list[str]:
     return findings
 
 
+def _deny(reason):
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }
+
+
 def main():
     try:
-        raw = sys.stdin.read()
-        data = json.loads(raw)
-    except (json.JSONDecodeError, Exception):
-        # Can't parse -- fail OPEN (don't block on parse error)
-        print(json.dumps({}))
-        sys.exit(0)
-
-    tool_name = data.get("tool_name", "")
-
-    # Only scan Write and Edit tools
-    if tool_name not in ("Write", "Edit"):
-        print(json.dumps({}))
-        sys.exit(0)
-
-    tool_input = data.get("tool_input", {})
-
-    # Get the file path
-    file_path = tool_input.get("file_path", "")
-    if not file_path or _is_excluded(file_path):
-        print(json.dumps({}))
-        sys.exit(0)
-
-    # Get content to scan
-    if tool_name == "Write":
-        content = tool_input.get("content", "")
-    elif tool_name == "Edit":
-        content = tool_input.get("new_string", "")
-    else:
-        content = ""
-
-    if not content:
-        print(json.dumps({}))
-        sys.exit(0)
-
+        if "--self-test" in sys.argv[1:]:
+            data = {"tool_name": "Bash", "tool_input": {"command": "echo " + "sk-" + "ant-api03-" + "a" * 16}}
+        else:
+            data = json.loads(sys.stdin.read())
+        if not isinstance(data, dict) or not isinstance(data.get("tool_input"), dict):
+            raise ValueError("invalid hook input")
+    except (ValueError, TypeError):
+        print(json.dumps(_deny("credential_input_invalid: Supply the native tool input object")))
+        return
+    tool = data.get("tool_name")
+    tool_input = data["tool_input"]
+    if tool not in {"Write", "Edit", "MultiEdit", "NotebookEdit", "apply_patch", "Bash", "PowerShell"}:
+        print("{}")
+        return
     try:
-        findings = _scan_content(content, file_path)
-    except Exception:
-        # Pattern matching failed -- fail OPEN
-        print(json.dumps({}))
-        sys.exit(0)
+        from groundtruth_kb.governance.credential_patterns import bash_credential_pattern_list, bash_output_pattern_list
 
-    if findings:
-        # Deduplicate findings
-        unique_findings = list(dict.fromkeys(findings))
-        reason = (
-            f"BLOCKED (SPEC-0058): Hardcoded environment-specific values "
-            f"detected in {file_path}:\n"
-            + "\n".join(f"  - {f}" for f in unique_findings[:5])
-            + "\n\nAll FQDNs, API keys, connection strings, and resource IDs "
-            "MUST come from environment variables. "
-            "Use os.environ.get() or equivalent."
-        )
-        print(json.dumps({"decision": "block", "reason": reason}))
-    else:
-        print(json.dumps({}))
-
-    sys.exit(0)
+        patterns = bash_credential_pattern_list() + bash_output_pattern_list()
+    except ImportError:
+        print(json.dumps(_deny("credential_catalog_unavailable: Restore the installed GT-KB package before retrying")))
+        return
+    try:
+        path = tool_input.get("file_path", tool_input.get("path", ""))
+        if not isinstance(path, str):
+            raise ValueError("invalid file path")
+        if tool in {"Bash", "PowerShell"}:
+            values = [tool_input.get("command", "")]
+        elif tool == "Write":
+            values = [tool_input.get("content", "")]
+        elif tool == "Edit":
+            values = [tool_input.get("new_string", tool_input.get("new_text", ""))]
+        elif tool == "MultiEdit":
+            edits = tool_input.get("edits")
+            if not isinstance(edits, list) or not all(isinstance(edit, dict) for edit in edits):
+                raise ValueError("invalid edit list")
+            values = [edit.get("new_string", "") for edit in edits]
+        elif tool == "NotebookEdit":
+            values = [tool_input.get("new_source", "")]
+        else:
+            values = [tool_input.get("patch", tool_input.get("input", ""))]
+        if not all(isinstance(value, str) for value in values):
+            raise ValueError("invalid effect content")
+        findings = []
+        for content in values:
+            for pattern, description in patterns:
+                if any(not _is_fixture_suppressed(match.group(), path) for match in pattern.finditer(content)):
+                    findings.append(description)
+            if tool not in {"Bash", "PowerShell"} and not _is_excluded(path):
+                findings.extend(_scan_content(content, path))
+        # Report descriptions only. Neither credentials nor submitted content
+        # become hook output or a second retained record.
+        result = _deny("credential_detected: " + "; ".join(dict.fromkeys(findings))) if findings else {}
+    except (ValueError, TypeError, AttributeError, re.error):
+        result = _deny("credential_input_invalid: Cannot validate the requested effect")
+    print(json.dumps(result))
 
 
 if __name__ == "__main__":

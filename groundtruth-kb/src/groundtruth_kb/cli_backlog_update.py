@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import re
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -16,13 +15,6 @@ from typing import Any, cast
 from groundtruth_kb.bridge.read_commands import threads_for_work_item
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
-
-# The attribution resolver lives under ``scripts/`` at the project root.
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
-
-from scripts.bridge_lifecycle_resolver import BridgeLifecycleResolutionError, resolve_bridge_lifecycle  # noqa: E402
 
 # Canonical authorization-token shapes for the text-edit gate.
 # Authority: bridge/gtkb-backlog-update-title-desc-cli-001-003.md REVISED-1
@@ -204,6 +196,10 @@ def _validate_terminal_reopen_live(
     related_threads: tuple[str, ...],
 ) -> int:
     """Validate current row, active PAUTH, strict authority, and reverse index."""
+    # This legacy file-bridge operation must not load repository-only tooling
+    # before the CLI can select its configured native domain service.
+    from scripts.bridge_lifecycle_resolver import BridgeLifecycleResolutionError, resolve_bridge_lifecycle
+
     policy = _TERMINAL_REOPEN_POLICIES[request.work_item_id]
     current = db.get_work_item(request.work_item_id)
     if current is None or current.get("stage") != "resolved":

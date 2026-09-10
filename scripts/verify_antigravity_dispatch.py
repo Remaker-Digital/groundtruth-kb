@@ -38,12 +38,6 @@ AGY_EXECUTABLE_NAMES = ("agy", "agy.exe", "agy.cmd", "agy.ps1")
 AGY_RESPONSE_STEP_TYPE = 15
 AGY_RECOVERY_LOOKBACK_SECONDS = 10.0
 PRINTABLE_BYTES_RE = re.compile(rb"[ -~]{4,}")
-VERDICT_ANCHOR_HELPER_PATHS = (
-    ".codex/skills/gtkb-verify/helpers/write_verdict.py",
-    ".claude/skills/gtkb-verify/helpers/write_verdict.py",
-)
-VERDICT_ANCHOR_VALIDATOR_PATH = "scripts/verdict_evidence_anchor_preflight.py"
-VERDICT_ANCHOR_GUARD_TOKENS = ("validate_verdict_evidence_anchors", "_assert_verdict_evidence_anchors")
 
 
 class VerificationError(RuntimeError):
@@ -60,15 +54,14 @@ def _module_source_path(module: ModuleType) -> Path | None:
         return None
 
 
-def resolve_loaded_project_module(
+def import_project_module(
     *,
     project_root: Path,
     expected_source_path: Path,
     import_name: str,
     required_attributes: tuple[str, ...],
 ) -> ModuleType:
-    """Reuse one exact loaded project module or import its canonical package name."""
-
+    """Import the declared package identity and validate its source; aliases confer nothing."""
     try:
         canonical_root = project_root.resolve(strict=True)
         expected_source = expected_source_path.resolve(strict=True)
@@ -77,25 +70,13 @@ def resolve_loaded_project_module(
         raise VerificationError(
             f"expected project module source is missing or outside the project root: {expected_source_path}"
         ) from exc
-
-    matches: dict[int, tuple[ModuleType, list[str]]] = {}
-    for module_name, candidate in tuple(sys.modules.items()):
-        if not isinstance(candidate, ModuleType) or _module_source_path(candidate) != expected_source:
-            continue
-        entry = matches.setdefault(id(candidate), (candidate, []))
-        entry[1].append(module_name)
-
-    if len(matches) > 1:
-        names = sorted(name for _, module_names in matches.values() for name in module_names)
-        raise VerificationError(f"multiple loaded module objects resolve to {expected_source}: {', '.join(names)}")
-
-    if matches:
-        module = next(iter(matches.values()))[0]
-    else:
+    try:
         module = importlib.import_module(import_name)
-        resolved_source = _module_source_path(module)
-        if resolved_source != expected_source:
-            raise VerificationError(f"import {import_name!r} resolved to {resolved_source}, expected {expected_source}")
+    except ImportError as exc:
+        raise VerificationError(f"Cannot import canonical project module {import_name!r}") from exc
+    resolved_source = _module_source_path(module)
+    if resolved_source != expected_source:
+        raise VerificationError(f"import {import_name!r} resolved to {resolved_source}, expected {expected_source}")
 
     missing = [name for name in required_attributes if not hasattr(module, name)]
     if missing:
@@ -105,7 +86,7 @@ def resolve_loaded_project_module(
     return module
 
 
-_dispatcher_runtime = resolve_loaded_project_module(
+_dispatcher_runtime = import_project_module(
     project_root=PROJECT_ROOT,
     expected_source_path=PROJECT_ROOT / "scripts" / "dispatcher_runtime.py",
     import_name="scripts.dispatcher_runtime",
@@ -114,7 +95,7 @@ _dispatcher_runtime = resolve_loaded_project_module(
 DispatchTarget = _dispatcher_runtime.DispatchTarget
 _harness_command = _dispatcher_runtime._harness_command
 
-_harness_projection_reader = resolve_loaded_project_module(
+_harness_projection_reader = import_project_module(
     project_root=PROJECT_ROOT,
     expected_source_path=PROJECT_ROOT / "scripts" / "harness_projection_reader.py",
     import_name="scripts.harness_projection_reader",
@@ -214,44 +195,6 @@ def _role_tokens(record: dict[str, Any]) -> set[str]:
     if isinstance(raw, list):
         return {item for item in raw if isinstance(item, str)}
     return set()
-
-
-def inspect_verdict_anchor_guard(project_root: Path) -> dict[str, Any]:
-    """Return audit evidence that hook-less verdict paths have helper guard coverage."""
-
-    validator = project_root / VERDICT_ANCHOR_VALIDATOR_PATH
-    helpers: list[dict[str, Any]] = []
-    for rel_path in VERDICT_ANCHOR_HELPER_PATHS:
-        helper = project_root / rel_path
-        try:
-            text = helper.read_text(encoding="utf-8")
-        except OSError as exc:
-            helpers.append(
-                {
-                    "path": rel_path,
-                    "exists": helper.is_file(),
-                    "guarded": False,
-                    "error": f"{type(exc).__name__}: {exc}",
-                }
-            )
-            continue
-        missing_tokens = [token for token in VERDICT_ANCHOR_GUARD_TOKENS if token not in text]
-        helpers.append(
-            {
-                "path": rel_path,
-                "exists": True,
-                "guarded": not missing_tokens,
-                "missing_tokens": missing_tokens,
-            }
-        )
-    guarded_helpers = [helper["path"] for helper in helpers if helper.get("guarded")]
-    return {
-        "ok": validator.is_file() and bool(guarded_helpers),
-        "validator": {"path": VERDICT_ANCHOR_VALIDATOR_PATH, "exists": validator.is_file()},
-        "helpers": helpers,
-        "guarded_helpers": guarded_helpers,
-        "required_tokens": list(VERDICT_ANCHOR_GUARD_TOKENS),
-    }
 
 
 def _first_failed_detail(checks: list[dict[str, Any]]) -> str:
@@ -487,7 +430,6 @@ def evaluate_readiness(
         "role": sorted(roles),
         "status": record.get("status"),
         "can_receive_dispatch": bool(record.get("can_receive_dispatch")),
-        "verdict_anchor_guard": inspect_verdict_anchor_guard(project_root),
     }
 
 
@@ -606,7 +548,6 @@ def run_verification(
         "stdout_bytes": len(stdout.encode("utf-8")),
         "substrate_ok": substrate_ok,
         "timestamp": dt.datetime.now(dt.UTC).isoformat(),
-        "verdict_anchor_guard": inspect_verdict_anchor_guard(project_root),
     }
     _write_text(evidence_dir / "argv.json", json.dumps(argv_payload, indent=2, sort_keys=True) + "\n")
     _write_text(evidence_dir / "result.json", json.dumps(result_payload, indent=2, sort_keys=True) + "\n")

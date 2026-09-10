@@ -38,24 +38,18 @@ def test_commit_preflight_runs_bash_hook_checks_in_order_without_ps1(monkeypatch
     assert evidence.status.value == "passed"
     assert [check.name for check in evidence.checks] == [
         "secret-scan",
-        "dev-environment-inventory-drift",
-        "narrative-artifact-evidence",
         "ruff-format",
         "commit-pathspec-safety",
         "projection-drift",
         "powershell-syntax",
     ]
-    assert calls[:6] == [
+    assert calls[:4] == [
         ["python", "scripts/scan_secrets.py", "--staged"],
-        ["python", "scripts/check_dev_environment_inventory_drift.py", "--staged", "--allow-review-evidence"],
-        ["python", "scripts/check_narrative_artifact_evidence.py", "--staged"],
         ["python", "scripts/check_ruff_format.py", "--staged"],
         [
             "python",
             "scripts/check_commit_pathspec_safety.py",
             "--staged",
-            "--strict",
-            "--check-foreign-verdicts",
         ],
         ["python", "scripts/check_projection_drift.py", "--staged"],
     ]
@@ -142,8 +136,6 @@ def test_windows_wrappers_delegate_to_commit_preflight_command() -> None:
     assert "commit preflight" in ps1_wrapper
     for direct_script in (
         "scan_secrets.py",
-        "check_dev_environment_inventory_drift.py",
-        "check_narrative_artifact_evidence.py",
         "check_ruff_format.py",
         "check_protected_commit_authorization.py",
         "pre-commit-ps1-parse.ps1",

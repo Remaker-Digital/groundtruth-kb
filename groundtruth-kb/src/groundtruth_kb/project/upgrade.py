@@ -1,5 +1,5 @@
-# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Project upgrade — ``gt project upgrade`` implementation.
+# Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+"""Project upgrade â€” ``gt project upgrade`` implementation.
 
 All managed artifacts (hooks, rules, skills, settings-hook-registrations,
 and gitignore-patterns) are sourced from
@@ -41,14 +41,14 @@ from groundtruth_kb.project.rollback import (
 # Upgrade policies that produce no upgrade-time action at all. Rows whose
 # ``ownership.upgrade_policy`` is in this set are filtered out of the plan
 # before each phase runs. Policy metadata is attached to every parsed
-# artifact by the managed-registry loader (GO C2 — no parallel raw-TOML
+# artifact by the managed-registry loader (GO C2 â€” no parallel raw-TOML
 # parser). All 40 current-HEAD registry rows have ``upgrade_policy`` in
 # ``{overwrite, structured-merge}`` and are unaffected by this filter.
 _NO_UPGRADE_ACTION_POLICIES: frozenset[str] = frozenset({"preserve", "transient", "adopter-opt-in"})
 
 
 # ---------------------------------------------------------------------------
-# GTKB-ISOLATION-017 Slice 4 — isolation pre-flight + auto-fixer dispatch.
+# GTKB-ISOLATION-017 Slice 4 â€” isolation pre-flight + auto-fixer dispatch.
 # Authority: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-008.md (GO).
 # Prior decisions: DELIB-S328-ISOLATION-017-SLICE4-DECISIONS-1-3-7-OWNER-DIRECTIVE
 # (mandatory_at_upgrade / one_shot_migration_at_upgrade / out_of_band_recipe_only)
@@ -57,7 +57,7 @@ _NO_UPGRADE_ACTION_POLICIES: frozenset[str] = frozenset({"preserve", "transient"
 # ---------------------------------------------------------------------------
 
 # Live-probed partition of the 9 isolation doctor checks per
-# ``run_isolation_checks()`` (see bridge -011 §"Live-probed partition + surface").
+# ``run_isolation_checks()`` (see bridge -011 Â§"Live-probed partition + surface").
 # Total: 1 + 4 + 4 = 9 = the live check universe (T11 enforces).
 # Check #5 (`isolation:hooks-point-to-wrappers`) reclassified from
 # auto-fixable to needs-adopter-input in REVISED-4 (`-011`) per Codex
@@ -123,7 +123,7 @@ _ISOLATION_FIX_PRESERVE_OVERRIDE_FILES: frozenset[str] = frozenset(
 
 @dataclass
 class IsolationPreflightResult:
-    """Output of :func:`_run_isolation_preflight` — partitioned failing checks.
+    """Output of :func:`_run_isolation_preflight` â€” partitioned failing checks.
 
     Only checks with ``status in {"fail", "warning"}`` are included; ``pass``
     and ``info`` are dropped (no work to do). The partition is exhaustive over
@@ -137,7 +137,7 @@ class IsolationPreflightResult:
 
 @dataclass
 class IsolationFixerResult:
-    """One auto-fixer's outcome — passed back from the typed dispatcher.
+    """One auto-fixer's outcome â€” passed back from the typed dispatcher.
 
     Recorded in the rollback receipt's ``isolation_migration.auto_fixed``
     list per the F2 audit-trail contract.
@@ -235,7 +235,7 @@ def _run_isolation_preflight(
     Only checks with ``status in {"fail", "warning"}`` are included in the
     returned partition. Pass + info checks are dropped (no work to do).
 
-    Per bridge ``-007`` §"Live-Probed Partition", the three partition
+    Per bridge ``-007`` Â§"Live-Probed Partition", the three partition
     constants together cover every live check name; ``T11`` enforces this
     invariant against ``run_isolation_checks()``'s actual return.
     """
@@ -330,7 +330,7 @@ def _fix_isolation_service_endpoint(target: Path) -> IsolationFixerResult:
             continue
         out.append(line)
     if not endpoint_replaced:
-        # No [service] block at all — append one.
+        # No [service] block at all â€” append one.
         out.extend(["", "[service]", placeholder])
     toml_path.write_text("\n".join(out) + "\n", encoding="utf-8")
     return IsolationFixerResult(
@@ -348,7 +348,7 @@ def _fix_isolation_work_subject(target: Path) -> IsolationFixerResult:
     Per check #3 (``isolation:work-subject``). The doctor check reads
     ``<target>/.claude/session/work-subject.json`` (canonical) or
     ``<target>/.claude/hooks/.workstream-focus-state.json`` (legacy
-    fallback) per Phase 7 §"Durable State Contract" lines 120-164. The
+    fallback) per Phase 7 Â§"Durable State Contract" lines 120-164. The
     check passes when ``current_subject == "application"``.
 
     This fixer writes the canonical JSON file. The legacy fallback is
@@ -405,7 +405,7 @@ def _fix_isolation_work_subject(target: Path) -> IsolationFixerResult:
 def _fix_isolation_remove_workstream_focus_hook(target: Path) -> IsolationFixerResult:
     """Delete the deprecated .claude/hooks/workstream-focus.py hook file if present.
 
-    Per check #6 (``isolation:workstream-focus-hook-absent``). Per Phase 9 §4
+    Per check #6 (``isolation:workstream-focus-hook-absent``). Per Phase 9 Â§4
     line 410 + ADR-ISOLATION-APPLICATION-PLACEMENT-001, the legacy hook is
     deprecated; the doctor warns if it reappears. The file is unregistered
     (out-of-matrix) so deletion is authorized without preserve-override
@@ -433,9 +433,9 @@ def _fix_isolation_remove_workstream_focus_hook(target: Path) -> IsolationFixerR
 
 
 _RELEASE_READINESS_BANNER = (
-    "# Application release-readiness — application subject\n\n"
+    "# Application release-readiness â€” application subject\n\n"
     "_This file is the application's release-readiness record. Header asserts "
-    "application subject per Phase 9 §4 lines 217–218. Do not combine GT-KB "
+    "application subject per Phase 9 Â§4 lines 217â€“218. Do not combine GT-KB "
     "(platform) status with application status._\n"
 )
 
@@ -465,7 +465,7 @@ def _fix_isolation_release_readiness_banner(target: Path) -> IsolationFixerResul
     lines = text.splitlines(keepends=False)
     # Find first non-blank line index.
     first_idx = next((i for i, ln in enumerate(lines) if ln.strip()), -1)
-    canonical_header = "# Application release-readiness — application subject"
+    canonical_header = "# Application release-readiness â€” application subject"
     if first_idx >= 0 and lines[first_idx].strip() == canonical_header:
         return IsolationFixerResult(
             check_name="isolation:release-readiness-app-subject-header",
@@ -515,7 +515,7 @@ def _run_isolation_fixers(
 
     Raises:
         RuntimeError: if a check's name has no helper in
-            :data:`_ISOLATION_FIXER_MAP` (defensive — partition contract test
+            :data:`_ISOLATION_FIXER_MAP` (defensive â€” partition contract test
             T11 + dispatcher contract test T13 ensure this never fires in
             practice).
     """
@@ -573,7 +573,7 @@ class UpgradeAction:
 
 # Action kinds that represent non-mutating pre-flight diagnostics. The CLI
 # filters these out of the action list passed to :func:`execute_upgrade` so
-# pre-flight reporting never triggers git, manifest, or file mutation —
+# pre-flight reporting never triggers git, manifest, or file mutation â€”
 # even with ``--force``. Per C1 of
 # ``bridge/gtkb-upgrade-pre-flight-checks-implementation-002.md``.
 _NON_MUTATING_ACTION_KINDS: frozenset[str] = frozenset({"warning", "informational"})
@@ -660,7 +660,7 @@ def _plan_missing_managed_files(target: Path, profile_name: str) -> list[Upgrade
                 UpgradeAction(
                     file=artifact.target_path,
                     action="add",
-                    reason="Managed file missing — will copy from template",
+                    reason="Managed file missing â€” will copy from template",
                 )
             )
     return actions
@@ -693,7 +693,7 @@ def _plan_managed_file_drift(
             UpgradeAction(
                 file=artifact.target_path,
                 action="skip",
-                reason="File differs from template (customized?) — use --force to overwrite",
+                reason="File differs from template (customized?) â€” use --force to overwrite",
             )
         )
     return actions
@@ -755,6 +755,35 @@ def _compute_target_event_list(
     managed_existing_by_marker: dict[str, object] = {}
     unmanaged: list[object] = []
     for entry in existing_entries:
+        # These exact commands were emitted by retired managed hooks.
+        # Remove only its handler, retaining a mixed group's other handlers and
+        # metadata. Customized commands and historical files remain untouched.
+        if isinstance(entry, dict) and isinstance(entry.get("hooks"), list):
+            handlers = entry["hooks"]
+            retained = [
+                handler
+                for handler in handlers
+                if not (
+                    isinstance(handler, dict)
+                    and handler.get("type", "command") == "command"
+                    and handler.get("command")
+                    in {
+                        "python .claude/hooks/delib-search-gate.py",
+                        "python .claude/hooks/delib-search-tracker.py",
+                        "python .claude/hooks/gov09-capture.py",
+                        "python .claude/hooks/formal-artifact-approval-gate.py",
+                        "python .claude/hooks/narrative-artifact-approval-gate.py",
+                        "python .claude/hooks/intake-classifier.py",
+                        "python .claude/hooks/owner-decision-capture.py",
+                        "python .claude/hooks/session-start-governance.py",
+                        "python .claude/hooks/spec-classifier.py",
+                    }
+                )
+            ]
+            if len(retained) != len(handlers):
+                if not retained:
+                    continue
+                entry = {**entry, "hooks": retained}
         matched_marker: str | None = None
         for cmd in _entry_commands(entry):
             for marker in scaffold_markers:
@@ -813,7 +842,7 @@ def _plan_settings_registration(target: Path, profile_name: str) -> list[Upgrade
             UpgradeAction(
                 file=".claude/settings.json",
                 action="skip",
-                reason="Malformed JSON — manual repair required",
+                reason="Malformed JSON â€” manual repair required",
             )
         ]
     except OSError:
@@ -834,15 +863,16 @@ def _plan_settings_registration(target: Path, profile_name: str) -> list[Upgrade
         if isinstance(artifact, SettingsHookRegistration):
             scaffold_by_event.setdefault(artifact.event, []).append(artifact)
 
-    # Outer-loop key set: every event that contains at least one
-    # upgrade-enforced record for the active profile. A merge only fires
-    # against events the registry claims ownership of.
+    # Current managed events need installation/repair. Existing events must also
+    # be inspected so retired exact managed commands are removed after the last
+    # current registration for that event disappears. Unrelated handlers remain
+    # unchanged and therefore do not produce a merge action.
     upgrade_enforced_by_event: dict[str, list[SettingsHookRegistration]] = {}
     for registration in _managed_settings_registrations(profile_name):
         upgrade_enforced_by_event.setdefault(registration.event, []).append(registration)
 
     actions: list[UpgradeAction] = []
-    for event in upgrade_enforced_by_event:
+    for event in sorted(set(upgrade_enforced_by_event) | set(hooks_dict)):
         raw_event_entries = hooks_dict.get(event)
         event_entries: list[object] = raw_event_entries if isinstance(raw_event_entries, list) else []
 
@@ -851,9 +881,9 @@ def _plan_settings_registration(target: Path, profile_name: str) -> list[Upgrade
 
         # Trigger: merge is required iff the target list apply would produce
         # differs from the existing list. This captures every mismatch shape
-        # — missing managed entries, wrong managed order, interleaved
+        # â€” missing managed entries, wrong managed order, interleaved
         # unmanaged entries, non-list existing value, and duplicate
-        # collapses — without a per-shape check.
+        # collapses â€” without a per-shape check.
         if target_event_list != event_entries:
             actions.append(
                 UpgradeAction(
@@ -873,7 +903,7 @@ def _plan_gitignore_patterns(target: Path, profile_name: str) -> list[UpgradeAct
 
     Emits ``append-gitignore`` actions for patterns NOT already present in
     ``.gitignore``. If ``.gitignore`` is absent, emits one
-    ``append-gitignore`` action per applicable pattern — the execute step
+    ``append-gitignore`` action per applicable pattern â€” the execute step
     creates the file.
     """
     gitignore = target / ".gitignore"
@@ -910,7 +940,7 @@ def _plan_gitignore_patterns(target: Path, profile_name: str) -> list[UpgradeAct
 # The resulting merge commit is what a future ``gt project rollback`` can
 # target with ``git revert -m 1 <merge_commit>``. The rollback receipt is
 # written AFTER the merge commit exists so its ``merge_commit`` field records
-# the real SHA, and — in tracked mode — the receipt lands in a SEPARATE
+# the real SHA, and â€” in tracked mode â€” the receipt lands in a SEPARATE
 # post-merge commit that is not part of the payload merge tree.
 #
 # Authorizing bridge: ``bridge/gtkb-rollback-receipts-014.md`` (Codex GO).
@@ -1002,7 +1032,7 @@ class MergeFailedError(RuntimeError):
         self.stderr = stderr
 
 
-# Path prefix → managed artifact class. Used by ``_artifact_classes_touched``
+# Path prefix â†’ managed artifact class. Used by ``_artifact_classes_touched``
 # to derive the ``artifact_classes_touched`` field of the rollback receipt
 # from the applied actions without re-reading the registry.
 _FILE_CLASS_PREFIXES: tuple[tuple[str, str], ...] = (
@@ -1150,14 +1180,14 @@ def plan_upgrade(target: Path, *, ignore_inflight_bridges: bool = False) -> list
             UpgradeAction(
                 file="groundtruth.toml",
                 action="skip",
-                reason="No [project] manifest found — run `gt project init` first",
+                reason="No [project] manifest found â€” run `gt project init` first",
             )
         ]
 
     profile = get_profile(manifest.profile)
     actions: list[UpgradeAction] = []
 
-    # Pre-flight checks (Area 5.2 + 5.6) — emit non-mutating diagnostic
+    # Pre-flight checks (Area 5.2 + 5.6) â€” emit non-mutating diagnostic
     # rows that the CLI displays but never passes to ``execute_upgrade``.
     # 5.3 halt (malformed settings) is inherited from the existing
     # ``_plan_settings_registration`` skip-action emission below + the
@@ -1186,7 +1216,7 @@ def plan_upgrade(target: Path, *, ignore_inflight_bridges: bool = False) -> list
     actions.extend(_plan_settings_registration(target, profile.name))
     actions.extend(_plan_gitignore_patterns(target, profile.name))
 
-    # Managed-file hash/customization checks are gated on version change —
+    # Managed-file hash/customization checks are gated on version change â€”
     # at the current version, files present on disk are assumed to match
     # the template (or be intentional customizations). Missing files are
     # already handled above.
@@ -1219,7 +1249,7 @@ def execute_upgrade(
        checks even when ``accept_migration=True``.
     2. Pre-flight: verify git work tree + clean tree; resolve receipt mode.
     3. Create and switch to a short-lived ``gt-upgrade-payload-<id>`` branch.
-    4. Run isolation auto-fixers (Slice 4) — only when ``accept_migration=True``
+    4. Run isolation auto-fixers (Slice 4) â€” only when ``accept_migration=True``
        AND the auto-fixable partition is non-empty. Fixer outcomes recorded
        in the rollback receipt's ``isolation_migration`` block.
     5. Apply file actions on the payload branch (existing flow).
@@ -1228,11 +1258,11 @@ def execute_upgrade(
     Args:
         target: Adopter project root.
         force: Overwrite customized files (passes through to file-action executor).
-        accept_migration: Slice 4 — explicit opt-in to one-shot isolation
+        accept_migration: Slice 4 â€” explicit opt-in to one-shot isolation
             migration. Required to run isolation auto-fixers; without it,
             isolation failures cause refusal. Per
             ``DELIB-S328-ISOLATION-017-SLICE4-DECISIONS-1-3-7-OWNER-DIRECTIVE``.
-        product_root: Slice 4 — GT-KB product root for isolation pre-flight
+        product_root: Slice 4 â€” GT-KB product root for isolation pre-flight
             (used to detect adopter-under-product-root placement violation).
             Defaults to ``Path(__file__).resolve().parents[3]`` when not set.
         update_manifest: Per bridge ``gtkb-scaffold-upgrade-tier-a-009.md``
@@ -1288,7 +1318,7 @@ def execute_upgrade(
 
     manifest = read_manifest(target / "groundtruth.toml")
     if manifest is None:
-        return ["SKIPPED — no groundtruth.toml manifest (run `gt project init` first)"]
+        return ["SKIPPED â€” no groundtruth.toml manifest (run `gt project init` first)"]
 
     from_version = manifest.scaffold_version
     target_branch = _current_branch(target)
@@ -1315,7 +1345,7 @@ def execute_upgrade(
             for fr in isolation_fixer_results:
                 tag = "FIXED" if fr.outcome == "fixed" else fr.outcome.upper()
                 # Use append rather than prepend; results list ordering is informational.
-                # Initial empty list — populated by _apply_file_actions below.
+                # Initial empty list â€” populated by _apply_file_actions below.
                 # Track in a separate buffer; merged into results after _apply.
                 pass  # noqa: PIE790
 
@@ -1324,11 +1354,11 @@ def execute_upgrade(
         # Surface isolation-fixer rows in the result log for adopter visibility.
         for fr in isolation_fixer_results:
             tag = "FIXED" if fr.outcome == "fixed" else fr.outcome.upper()
-            results.insert(0, f"[ISOLATION] {tag} {fr.file} ({fr.check_name}) — {fr.reason}")
+            results.insert(0, f"[ISOLATION] {tag} {fr.file} ({fr.check_name}) â€” {fr.reason}")
 
         payload_commit = _commit_payload(target, f"gt: upgrade payload to {__version__}")
         if payload_commit is None:
-            results.append("SKIPPED — no changes to apply")
+            results.append("SKIPPED â€” no changes to apply")
             _run_git(target, "checkout", target_branch)
             on_payload_branch = False
             return results
@@ -1399,7 +1429,7 @@ def _apply_file_actions(
     """Apply every action in *actions* on the current branch.
 
     Inner file-writing half of :func:`execute_upgrade`. Runs on the
-    short-lived payload branch only. No ``.bak`` backups are created — the
+    short-lived payload branch only. No ``.bak`` backups are created â€” the
     payload branch commit is the authoritative pre-merge snapshot.
 
     ``update_manifest`` (per bridge ``gtkb-scaffold-upgrade-tier-a-009.md``
@@ -1419,7 +1449,7 @@ def _apply_file_actions(
         # for programmatic callers.
         if action.action in _NON_MUTATING_ACTION_KINDS:
             prefix = "WARNING" if action.action == "warning" else "INFORMATIONAL"
-            results.append(f"{prefix} {action.file} — {action.reason}")
+            results.append(f"{prefix} {action.file} â€” {action.reason}")
             continue
 
         if action.action == "merge-event-hooks":
@@ -1433,16 +1463,16 @@ def _apply_file_actions(
         template_rel = _map_target_to_template(action.file)
 
         if action.action == "skip" and not force:
-            results.append(f"SKIPPED {action.file} — {action.reason}")
+            results.append(f"SKIPPED {action.file} â€” {action.reason}")
             continue
 
         if template_rel is None:
-            results.append(f"SKIPPED {action.file} — no template mapping")
+            results.append(f"SKIPPED {action.file} â€” no template mapping")
             continue
 
         template_path = templates / template_rel
         if not template_path.exists():
-            results.append(f"SKIPPED {action.file} — template not found")
+            results.append(f"SKIPPED {action.file} â€” template not found")
             continue
 
         project_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1454,7 +1484,7 @@ def _apply_file_actions(
         if manifest:
             manifest.scaffold_version = __version__
             write_manifest(target / "groundtruth.toml", manifest)
-            results.append(f"VERSION scaffold_version → {__version__}")
+            results.append(f"VERSION scaffold_version â†’ {__version__}")
 
     return results
 
@@ -1475,17 +1505,17 @@ def _execute_merge_event_hooks(target: Path, action: UpgradeAction) -> str:
 
     settings_path = target / ".claude" / "settings.json"
     if not settings_path.exists():
-        return f"SKIPPED {action.file} — settings.json not found"
+        return f"SKIPPED {action.file} â€” settings.json not found"
 
     try:
         data: object = json.loads(settings_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        return f"SKIPPED {action.file} — malformed JSON"
+        return f"SKIPPED {action.file} â€” malformed JSON"
     except OSError as exc:
-        return f"SKIPPED {action.file} — unreadable ({exc})"
+        return f"SKIPPED {action.file} â€” unreadable ({exc})"
 
     if not isinstance(data, dict):
-        return f"SKIPPED {action.file} — settings root is not a JSON object"
+        return f"SKIPPED {action.file} â€” settings root is not a JSON object"
 
     raw_hooks = data.get("hooks")
     if not isinstance(raw_hooks, dict):
@@ -1507,15 +1537,15 @@ def _execute_merge_event_hooks(target: Path, action: UpgradeAction) -> str:
     new_event_list, n_managed, n_preserved = _compute_target_event_list(existing_entries, scaffold_registrations)
 
     if new_event_list == existing_entries:
-        return f"SKIPPED {action.file} — {event} already at registry order"
+        return f"SKIPPED {action.file} â€” {event} already at registry order"
 
     hooks_dict[event] = new_event_list
     data["hooks"] = hooks_dict
     try:
         settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     except OSError as exc:
-        return f"SKIPPED {action.file} — write failed ({exc})"
-    return f"MERGED {action.file} — {event} rebuilt ({n_managed} managed, {n_preserved} preserved)"
+        return f"SKIPPED {action.file} â€” write failed ({exc})"
+    return f"MERGED {action.file} â€” {event} rebuilt ({n_managed} managed, {n_preserved} preserved)"
 
 
 def _execute_append_gitignore(target: Path, action: UpgradeAction) -> str:
@@ -1530,19 +1560,19 @@ def _execute_append_gitignore(target: Path, action: UpgradeAction) -> str:
         try:
             content = gitignore.read_text(encoding="utf-8")
         except OSError as exc:
-            return f"SKIPPED {action.file} — unreadable ({exc})"
+            return f"SKIPPED {action.file} â€” unreadable ({exc})"
         if any(line.strip() == pattern for line in content.splitlines()):
-            return f"SKIPPED {action.file} — pattern {pattern} already present"
+            return f"SKIPPED {action.file} â€” pattern {pattern} already present"
         if content and not content.endswith("\n"):
             content += "\n"
         content += f"\n# {action.reason}\n{pattern}\n"
         try:
             gitignore.write_text(content, encoding="utf-8")
         except OSError as exc:
-            return f"SKIPPED {action.file} — write failed ({exc})"
+            return f"SKIPPED {action.file} â€” write failed ({exc})"
     else:
         try:
             gitignore.write_text(f"# {action.reason}\n{pattern}\n", encoding="utf-8")
         except OSError as exc:
-            return f"SKIPPED {action.file} — write failed ({exc})"
+            return f"SKIPPED {action.file} â€” write failed ({exc})"
     return f"APPENDED {pattern} to {action.file}"

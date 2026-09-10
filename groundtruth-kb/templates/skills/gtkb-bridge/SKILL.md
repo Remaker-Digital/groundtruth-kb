@@ -1,256 +1,205 @@
 ---
 name: gtkb-bridge
-description: Operate the bridge protocol — file proposals, route actionable bridge work, write governance-compliant verdicts, file post-implementation reports, navigate lifecycle states. Use when proposing implementation work that needs Loyal Opposition review, when responding to a NEW/REVISED/NO-ACTION entry as the reviewing harness, or when checking bridge thread state. The companion skills `gtkb-bridge-propose`, `gtkb-proposal-review`, and `gtkb-send-review` cover specific subactions; use this skill when working across the protocol or when an action's fit isn't obvious.
+description: Progress explicitly dispatched GT-KB work through authored bridge messages, exact next-artifact claims, implementation, independent review and complete-project finalization using the native CLI.
 ---
 
-# /gtkb-bridge
+# Progress a bridge attempt
 
-This skill is the canonical entry point for bridge protocol operations. The bridge is GroundTruth-KB's coordination mechanism between Prime Builder and Loyal Opposition: implementation proposals, reviews, and verifications flow through dispatcher-backed bridge state plus versioned markdown audit files under `bridge/`.
+Use the configured native authority and the role bound to this context's exact
+supplied init marker. The owner or dispatcher selects the work. A queue is an
+orientation aid, not an instruction to select another target. Use only this
+context's identity and checkout; no other harness is a source of instructions,
+state, capacity or review authority.
 
-## Current Authority Note
+## Bind the supplied context
 
-After the 2026-06-15 TAFE/dispatcher cutover, the retired bridge-index file
-must not exist in current GT-KB operation. Bridge files under `bridge/` form the
-durable audit chain; dispatcher/TAFE state is the live queue surface. For
-dispatcher configuration and health, use the `bridge-config` skill and
-`gt bridge dispatch config|status|health`.
+When this native context is not already bound, use the actual native context
+identifier provided by the harness and the exact init line supplied in the task:
 
-This skill body presents **identical content** to both Claude Code and Codex agents via the cross-harness skill-adapter pipeline (per `config/agent-control/harness-capability-registry.toml` + `scripts/generate_codex_skill_adapters.py`). Operations described here behave the same way regardless of which harness invokes the skill.
-
-## Bridge protocol summary
-
-Six operations, seven lifecycle states. Operations:
-
-| Operation | Who runs it | What it produces |
-|---|---|---|
-| **Propose** | Prime Builder | New or revised proposal file `bridge/<topic>-NNN.md` through the governed dispatcher/TAFE bridge path |
-| **Scan** | Both harnesses | List of actionable items needing review or implementation |
-| **Revise** | Prime Builder | Non-dispatchable REVISED draft or completed `REVISED:` filing after a NO-GO |
-| **Respond** | Loyal Opposition | Review file with verdict GO/NO-GO/VERIFIED |
-| **Verify** | Prime Builder | Post-implementation report as the next numbered bridge file (status NEW; the post-impl report itself awaits VERIFIED) |
-| **Status** | Both harnesses | Read-only inspection of thread state without mutation |
-
-Lifecycle states (per `.claude/rules/file-bridge-protocol.md`):
-
-| State | Set by | Means |
-|---|---|---|
-| `NEW` | Prime | Fresh proposal awaiting review |
-| `REVISED` | Prime | Updated proposal after a NO-GO |
-| `GO` | Loyal Opposition | Proposal approved for implementation |
-| `NO-GO` | Loyal Opposition | Proposal requires changes before approval |
-| `NO-ACTION` | Prime | Rejects a non-compliant Loyal Opposition verdict and requires `review_no_action` |
-| `VERIFIED` | Loyal Opposition | Post-implementation verification passed |
-| (terminal) | — | A thread is "terminal" when its latest entry is VERIFIED with no further work pending |
-
-A complete thread cycle: `NEW` → (`NO-GO` → `REVISED`)* → `GO` → (implementation) → `NEW` (post-impl report) → `VERIFIED`.
-
-## Operations
-
-### Propose
-
-**Purpose**: file a NEW or REVISED proposal for review.
-
-**Action**:
-
-1. Draft proposal body containing required sections per `.claude/rules/file-bridge-protocol.md`: `Specification Links`, `Owner Decisions / Input` (when owner-approval-dependent), spec-derived test plan, acceptance criteria, risk/rollback. Per `.claude/rules/codex-review-gate.md`, every proposal must cite all relevant governing specifications; proposals without specification links MUST be NO-GO'd.
-   - **Project-linkage metadata (per `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`)**: every implementation-targeting NEW/REVISED proposal MUST include three machine-readable header lines near the top of the file:
-
-     ```text
-     Project Authorization: PAUTH-<authorization-id>
-     Project: <PROJECT-ID>
-     Work Item: <WI-NNNN | GTKB-* | WORKLIST-*>
-     ```
-
-     `bridge-compliance-gate.py` hard-blocks the Write when any line is absent. Non-implementation proposals self-declare exemption via a `bridge_kind:` header in `{spec_intake, governance_review, loyal_opposition_advisory}`; verdict files (GO/NO-GO/VERIFIED/WITHDRAWN) are exempt by status.
-2. Choose a kebab-case `topic-slug` describing the work (e.g., `gtkb-foo-bar-001`).
-3. Choose a version number: `001` for the first NEW; subsequent REVISEDs increment (`002`, `003`, ...). Versions are monotonic per thread.
-4. Run pre-filing preflights:
-   - `python scripts/bridge_applicability_preflight.py --bridge-id <topic-slug>` — must report `preflight_passed: true`, no missing required/advisory specs.
-   - `python scripts/adr_dcl_clause_preflight.py --bridge-id <topic-slug>` — must exit 0, no blocking gaps.
-5. Delegate the file write to the governed no-index helper-mediated path (`gtkb-bridge-propose` skill — see `.claude/skills/gtkb-bridge-propose/SKILL.md`) or its CLI successor. The helper performs credential scanning per `CREDENTIAL_PATTERNS + BASH_EXTRAS`, writes `bridge/<topic-slug>-<version>.md`, and publishes dispatcher/TAFE state. It must not recreate the retired bridge-index file.
-
-**Credential safety**: never bypass the helper for governance-content writes. Use `mode="abort"` on credential hits unless redaction is genuinely safe; `mode="redact"` replaces spans with `[REDACTED:<label>]` markers.
-
-### Scan
-
-**Purpose**: identify actionable bridge items for the current harness's role.
-
-**Helper**: `.claude/skills/gtkb-bridge/helpers/scan_bridge.py`
-
-**Canonical invocation** (deterministic, replaces manual grep+Read+regex):
-
-```powershell
-python .claude/skills/gtkb-bridge/helpers/scan_bridge.py --role <prime-builder|loyal-opposition> [--format json|markdown]
+```text
+gt session bind --native-context-id <context-id> --init-keyword "<exact-supplied-init-line>" --json
+gt session show --native-context-id <context-id> --json
 ```
 
-Current scans must use dispatcher/TAFE state and the status-bearing versioned
-files under `bridge/`; use `bridge-config` for dispatcher topology and health
-claims. Any helper that still requires the retired bridge-index file is
-historical or defective and must not be used for live queue authority.
+Read back the immutable identity and role. Identical retries resolve the same
+binding. Never infer an init line or role from a provider, model, skill, registry
+row or inherited environment variable. If the native identifier or supplied
+init/activity is missing, resolve that input before a state-changing operation.
+The harness transports instructions and tools; it does not create role records.
 
-**Action** (manual or via helper):
+## Read the assigned work
 
-1. Read dispatcher/TAFE bridge state and the versioned bridge file chain. Do not
-   read, recreate, or require the retired bridge-index file for live operation.
-2. Filter for actionable status given the current role:
-   - **Loyal Opposition** acts on `NEW`, `REVISED`, and `NO-ACTION` (proposals/reports awaiting a governance-compliant verdict or a verdict correction).
-   - **Prime Builder** acts only on `NO-GO` (revise) and `GO` (implement). `VERIFIED` is terminal closure for both roles, not queue work.
-3. For each actionable thread, read **the full version chain** (all prior entries) before responding. The protocol requires reading the whole thread, not just the latest version. The `Show-thread` helper below mechanizes that load.
-4. Optional: cross-check with `.gtkb-state/bridge-poller/dispatch-state.json` (or successor under `.gtkb-state/dispatcher-daemon/`) to deduplicate against already-dispatched signatures.
+Read `gt context work-item <WI-ID> --json` for the current work item, its one
+parent project, formal sources, executable test, test-plan instructions and
+prerequisites. Read `gt bridge show <document> --content --json` for the current
+attempt and its available message chain. `gt bridge queue --role <pb-or-lo>
+--json` and `gt bridge state-report --json` provide current coordination views.
 
-### Revise
+The delivered message identifies the next task; reconstruct current requirements
+from their canonical sources before acting. Bridge content is disposable and
+cannot establish durable authority or substitute for current work/project state.
+Resolve incomplete or contradictory requirements without inventing a parent,
+permission record, owner decision or completed result.
 
-**Purpose**: help Prime Builder respond to a latest `NO-GO` without filing incomplete skeletons as actionable bridge state.
+## Choose the lawful response
 
-**Helper**: `.claude/skills/gtkb-bridge/helpers/revise_bridge.py`
+| Received state | Receiving role and next authored response |
+|---|---|
+| NEW or REVISED | Loyal Opposition reviews the proposal and authors GO or NO-GO. |
+| NO-GO | Prime Builder addresses the rejection in REVISED. |
+| GO | Prime Builder implements the accepted scope and authors READY. |
+| READY | Loyal Opposition independently tests the work and authors VERIFIED or NOT-READY. |
+| NOT-READY | Prime Builder corrects the work/report and authors READY. |
+| VERDICT-REJECTED | A Loyal Opposition context independently corrects the rejected verdict using the current proposal or report phase. |
 
-**Action**:
+Prime Builder may reject a noncompliant, PB-addressed GO, NO-GO or NOT-READY
+with VERDICT-REJECTED. WITHDRAWN closes a pre-GO attempt; SUPERSEDED records
+canonical evidence that the scoped subject no longer exists. Neither substitutes
+for implementing live work. BLOCKED is the headless pre-proposal response to a
+parent that is not authorized. ADVISORY carries no execution authority.
 
-1. Read current dispatcher/TAFE bridge state and the versioned files for the exact `<topic-slug>`.
-2. Use `plan` or `scaffold` mode to compute the next version and generate a finding-by-finding draft. Scaffold drafts live under `.gtkb-state/bridge-revisions/drafts/` and are non-dispatchable.
-3. Complete the revision content manually: fill every finding response, specification link, prior-deliberation note, owner-decision section when applicable, verification plan, and risk/rollback section.
-4. Use `file` mode only for completed content. It refuses draft placeholders, runs the bridge-propose credential scan policy, runs `bridge_applicability_preflight.py --content-file`, runs `adr_dcl_clause_preflight.py --content-file`, and refuses existing live target files.
-5. After filing, the thread is Loyal Opposition-actionable because the dispatcher/TAFE bridge state and the new versioned bridge file carry `REVISED`.
+VERIFIED is completion of independent review of exact bytes. It is not a commit
+or a dispatchable message. Fresh verification after changed bytes or a failed
+project commit is selected from canonical coordination state; the dispatcher
+authors no verdict. A material formal-intent change after VERIFIED requires
+an explicit abandonment/restart through the CLI and a fresh NEW proposal,
+independent GO, implementation and verification on the same uncommitted work
+item. Preserve its membership and existing work; do not reuse the old GO or
+create a replacement work item. Resolve current claims and any possible Git
+integration before restarting. Committed work remains terminal.
 
-The helper creates drafts; it does not author the substantive correction. Prime Builder remains responsible for completing the revision before live filing.
+## Author and deliver the next message
 
-### Respond
+For NEW or REVISED, use `gtkb-bridge-propose` and its current task-context and
+observed-version requirements. Check the parent's authorization only before NEW.
+Later responses use the initiated chain; do not recreate authorization checks.
 
-**Purpose**: file the required governance-compliant verdict on a NEW, REVISED, or NO-ACTION entry. `NO-ACTION` uses the generic `review_no_action` path; do not encode an exclusive corrected-verdict status set.
+Every message is authored in full by the agent. A dispatchable head contains its
+status, the next recipient's `::init gtkb <pb-or-lo>`, and `::open <activity>` as
+the first three nonblank lines. Metadata follows before the body. Include
+`bridge_kind`, `Document`, `Version`, `Date`, `author_identity`,
+`author_harness_id`, `author_session_context_id`, and the actual `author_model`;
+placeholder model values are refused. NEW, REVISED and BLOCKED also require
+`Project` and `Work Item`. Other successors use the exact claimed attempt;
+optional repeated linkage must match it. Dispatchable messages also name
+`recipient_role` as `prime-builder` or `loyal-opposition`. Non-dispatchable
+messages omit both envelope lines and the recipient field. Advisory author
+provenance remains mandatory. Supply each key once.
+READY uses `bridge_kind: implementation_report`; verdicts use `lo_verdict`.
+The service validates the complete message without composing or repairing it.
 
-**Action**:
+Reserve the exact next artifact, using the predecessor version you read:
 
-1. Read the full thread version chain.
-2. Run the mandatory applicability preflight: `python scripts/bridge_applicability_preflight.py --bridge-id <topic-slug>`. The output's `Applicability Preflight` section must be included verbatim in the verdict file.
-3. Run the mandatory clause preflight: `python scripts/adr_dcl_clause_preflight.py --bridge-id <topic-slug>` (no `--report-only`). Treat exit 5 as a NO-GO blocker unless explicit owner-waiver lines are present per `.claude/rules/file-bridge-protocol.md` "Clause-Test Preflight (Mandatory; Slice 2)".
-4. Optionally run the advisory ADR/DCL discovery helper:
-   `python scripts/adr_dcl_applicability_discovery.py --bridge-id <topic-slug>`.
-   Its `Candidate Applicable ADR/DCLs` output is review context only. It always
-   exits 0 and must not be treated as a blocking gate; the registered clause
-   preflight remains authoritative.
-5. Run a deliberation search: `db.search_deliberations(...)` per `.claude/rules/deliberation-protocol.md`. Add a `Prior Deliberations` section to the verdict citing relevant DELIB-IDs.
-6. For implementation reviews: confirm the proposal links all relevant specifications and the proposed tests derive from those specifications. **Issue NO-GO if any relevant specification is missing or test mapping is incomplete**, per `.claude/rules/codex-review-gate.md`.
-7. For verification reviews (post-impl reports): confirm the implementation report carries forward the linked specifications, includes spec-to-test mapping, executes the tests, and reports observed results. **Issue NO-GO instead of VERIFIED for any untested linked specification** unless owner waiver is documented.
-8. Write the verdict file `bridge/<topic-slug>-<next-version>.md` with the verdict on line 1 (`GO`, `NO-GO`, or `VERIFIED`); include the applicability preflight and clause applicability sections; cite findings with severity (P0-P4), evidence source, impact, and recommended action per `.claude/rules/loyal-opposition.md` and `.claude/rules/report-depth-prime-builder-context.md`.
-9. Publish the verdict through the governed no-index bridge path. Do not recreate the retired bridge-index file.
-
-**Owner Decisions / Input section enforcement**: bridge proposals/reports that depend on owner approval (cite the AUQ-only rule, reference AskUserQuestion answers, or otherwise indicate owner-decision scope) MUST include a non-empty `## Owner Decisions / Input` section. Loyal Opposition issues NO-GO when this section is missing or contains placeholder content (`tbd`, `n/a`, `none`, etc.).
-
-### Verify
-
-**Purpose**: file a post-implementation report after a GO is implemented.
-
-**Helper**: `.claude/skills/gtkb-bridge/helpers/impl_report_bridge.py`
-
-**Action**:
-
-1. Implement the work per the GO d proposal scope. Run the spec-derived tests; capture the exact commands and observed results.
-2. Use the helper's `plan` mode or no-index CLI successor to require latest `GO`, load the approved proposal and GO verdict, compute the next version, carry forward linked specifications, capture dirty files via `git diff --name-only HEAD --`, and show the proposed `NEW` report metadata without mutation:
-   ```powershell
-   python .claude/skills/gtkb-bridge/helpers/impl_report_bridge.py plan <topic-slug>
-   ```
-3. Use `scaffold` mode when you need a non-dispatchable draft under `.gtkb-state/bridge-impl-reports/drafts/`; complete the implementation claim, command evidence, observed results, spec-to-test mapping, acceptance status, and risk/rollback before live filing.
-4. Use `file` mode only when the report content is ready for Loyal Opposition verification. The helper refuses non-`GO` latest status, exact-document mismatches, existing target files, and credential-shaped content. It writes `bridge/<topic-slug>-<next-version>.md` through the governed no-index bridge path:
-   ```powershell
-   python .claude/skills/gtkb-bridge/helpers/impl_report_bridge.py file <topic-slug> --content-file <completed-report.md>
-   ```
-5. The helper does not bypass Loyal Opposition verification. After filing, the thread is Loyal Opposition-actionable; wait for VERIFIED or NO-GO response.
-
-### Protected-file Writes
-
-**Purpose**: write protected narrative-artifact files with an immediate Layer-C universal-floor evidence verdict.
-
-**Helper**: `.claude/skills/gtkb-bridge/helpers/protected_write.py`
-
-**Canonical invocation**:
-
-```powershell
-python .claude/skills/gtkb-bridge/helpers/protected_write.py --target <path> --content-file <path> --packet <packet-path>
+```text
+gt bridge claim <document> --work-item-id <WI-ID> --native-context-id <context-id> --expected-version <head-version> --status <authored-status> --request-id <unique-request-id> --json
 ```
 
-Use this helper for protected narrative-artifact paths governed by `config/governance/narrative-artifact-approval.toml` when an approval packet already exists. The helper validates the packet against the proposed LF-normalized content, writes the target, stages only that target path, and runs `scripts/check_narrative_artifact_evidence.py --paths <target>` semantics against the staged blob. A clean exit means the same universal-floor evidence checker used by `.githooks/pre-commit` clears the staged file.
+Retain the returned fence. This expiring claim reserves one message, not the
+work item or thread. Use `gt bridge check <document> --native-context-id
+<context-id> --fence <fence> --json` before a protected effect. Save the complete
+UTF-8 message in this session's scratch directory, then deliver it:
 
-This helper is a deterministic Layer-C universal-floor evidence path. It is not a PreToolUse interception, and it does not claim to trigger or emulate any harness `Write` / `Edit` hook.
-
-### Status
-
-**Purpose**: read-only inspection without mutation.
-
-**Helper**: `.claude/skills/gtkb-bridge/helpers/show_thread_bridge.py`
-
-**Canonical invocation** (deterministic, replaces per-version grep+Read):
-
-```powershell
-python .claude/skills/gtkb-bridge/helpers/show_thread_bridge.py <topic-slug> [--format json|markdown] [--preview-lines N]
+```text
+gt bridge deliver <document> --native-context-id <context-id> --fence <fence> --content-file <message-file> --json
 ```
 
-The helper resolves all `bridge/<slug>-NNN.md` files, sorts by version, and returns `{slug, versions, found, preview_lines_cap}` plus any legacy compatibility-view diagnostics when available. Per-version content preview is bounded (default 200 lines) so the output doesn't balloon for long bodies. Public Python API: `from show_thread_bridge import show; show("gtkb-foo")`.
+Credential matches cause a refusal without disclosing the value, consuming the
+claim or rewriting the message. Correct the authored content. If acknowledgement
+is uncertain, read back the attempt and retry identical bytes and fence when
+appropriate; do not manufacture a new version. Delivery consumes the claim.
+Read back the result with `gt bridge show <document> --content --json`.
 
-**Action** (manual or via helper):
+The tool gate uses the native service through `gt bridge check-effects
+--native-context-id <context-id> --cwd <actual-tool-directory> --path <target>
+--json`; repeat `--path` for each concrete effect. It checks the current binding,
+exact live implementation claim, current inputs and registered checkout at the
+moment of the call. Scratch drafts stay in `scratchpad/<bound-session-id>`.
+This read-only check creates no permission record and does not replace the exact
+fence required by work publication or bridge delivery. If it refuses an effect,
+correct the identified scope, claim or service condition before retrying.
 
-1. Read the versioned bridge files for `<topic-slug>` and current dispatcher/TAFE state.
-2. The latest version status defines the current queue position:
-   - `VERIFIED` (terminal — no further action)
-   - `GO` (Prime: implement)
-   - `NO-GO` (Prime: revise)
-   - `NEW` / `REVISED` / `NO-ACTION` (Loyal Opposition: review)
+## Implement and report
 
-Use this when you need to know "what is the state of thread X?" without touching anything.
+After GO, the dispatched Prime Builder claims READY and opens its checkout:
 
-## Required reading
+```text
+gt bridge worktree <document> --native-context-id <context-id> --fence <fence> --json
+```
 
-Before any operation:
+Work inside the returned checkout on the accepted source and test targets. Save
+the returned `artifact_preimages` object as JSON in session scratch; it is the
+expected preimage for publishing that work, not a permission or authority record.
+Run the linked test plan and inspect the actual result against the requirements.
+Publish only this claim's artifacts:
 
-- `.claude/rules/file-bridge-protocol.md` — legacy protocol/helper contract (status table, file naming, deprecated INDEX compatibility notes, mandatory gates).
-- `.claude/rules/codex-review-gate.md` — review-gate constraints (mandatory specification-linkage gate; mandatory pre-filing preflight subsection).
-- `.claude/rules/deliberation-protocol.md` — deliberation search obligations before proposing AND before reviewing.
-- `.claude/rules/operating-model.md` — canonical vocabulary (specification, implementation proposal, implementation report, verification, etc.).
-- For Loyal Opposition: `.claude/rules/loyal-opposition.md` and `.claude/rules/report-depth-prime-builder-context.md`.
-- For Prime Builder: `.claude/rules/acting-prime-builder.md` and `.claude/rules/prime-builder-role.md`.
+```text
+gt bridge publish-work <document> --native-context-id <context-id> --fence <fence> --preimages-file <artifact-preimages-json> --json
+```
 
-## Mandatory gates
+Author READY with the actual changes, tests, results and remaining limitations.
+Do not generate NEW as an implementation report, copy another author's header,
+claim successful tests that were not run, or commit per message.
 
-The bridge protocol carries several mandatory gates. Skipping any is a NO-GO trigger:
+## Independently verify and finalize
 
-- **Mandatory project root boundary** (`.claude/rules/project-root-boundary.md`): all live GT-KB files within `E:\GT-KB`. Bridge items depending on paths outside this root are NO-GO.
-- **Mandatory specification linkage gate** (`.claude/rules/file-bridge-protocol.md`): every proposal must include `Specification Links` citing every relevant governing specification. Absence = NO-GO.
-- **Mandatory pre-filing preflight subsection** (`.claude/rules/file-bridge-protocol.md`): preflights must run before filing; results must be cited; mechanically enforced by `.claude/hooks/bridge-compliance-gate.py`.
-- **Mandatory specification-derived verification gate** (`.claude/rules/file-bridge-protocol.md`): VERIFIED requires implementation reports to include spec-to-test mapping + executed evidence.
-- **Mandatory applicability preflight gate** (`.claude/rules/file-bridge-protocol.md`): GO and VERIFIED verdicts must include the `Applicability Preflight` section with `missing_required_specs: []`.
-- **Mandatory clause-test preflight gate** (Slice 2; `.claude/rules/file-bridge-protocol.md`): exit 5 from `scripts/adr_dcl_clause_preflight.py` is a NO-GO blocker unless explicit owner waiver per blocking gap.
-- **Mandatory Owner Decisions / Input section gate** (`.claude/rules/file-bridge-protocol.md`): proposals/reports depending on owner approval must include a non-empty `## Owner Decisions / Input` section enumerating relevant AskUserQuestion evidence. Hook-enforced via `.claude/hooks/bridge-compliance-gate.py`.
+Loyal Opposition loads current requirements and work through the CLI and its
+own claimed checkout, performs the applicable review and tests, and obtains
+`gt bridge artifacts <document> --json`. This reports each path's Git mode and normalized object ID;
+it does not perform the review. VERIFIED includes `verified_artifacts` containing
+the exact reviewed JSON map, for example
+`{"code.py":{"mode":"100755","object_id":"<Git object ID>"}}`; deletion is
+represented by `null`. An executable-bit-only change invalidates the review. Changed or forbidden scope must be
+reconciled before further effects; no old claim or snapshot grants an exception.
 
-## Non-bypassable behaviors
+When the service reports that every member is independently VERIFIED, the
+verifying context reads current project state and commits the complete project:
 
-- **Bridge files are append-only.** Never delete or rewrite a prior version. The version chain forms the audit trail.
-- **The retired bridge-index file must not exist in current operation.** Do not
-  cite it, recreate it, or use it as bridge-state or dispatcher authority; use
-  dispatcher/TAFE state and the bridge-config CLI for current claims.
-- **Versioning is monotonic per thread.** Latest at top within each `Document:` block.
-- **Scoped commits only.** Bridge work commits should not bundle unrelated source changes.
+```text
+gt projects commit <project-id> --native-context-id <context-id> --expected-version <project-version> --message-file <authored-commit-message> --json
+```
 
-## Companion per-action skills
+The message cites every retiring work item as `(WI-NNNN)`. Normal hooks run;
+bridge content, generated configurations and unrelated work stay outside the
+work-product commit. The CLI prepares the reviewed cohort, commits and confirms
+the Git fact. Follow its typed failure and fresh-review results. After an
+uncertain confirmation, inspect Git and current state and use
+`gt projects confirm-commit --help` to confirm the same commit; do not create a
+second commit or reset history. Project commit establishes activation and
+terminality; producing generated configurations is a separate operational task.
 
-For specific subactions, prefer the more focused skill:
+## Interrupted or invalidated work
 
-| Action | Specific skill | Path |
-|---|---|---|
-| File a proposal | `gtkb-bridge-propose` | `.claude/skills/gtkb-bridge-propose/SKILL.md` |
-| Review a proposal | `gtkb-proposal-review` | `.claude/skills/gtkb-proposal-review/SKILL.md` |
-| Submit for review | `gtkb-send-review` | `.claude/skills/gtkb-send-review/SKILL.md` |
+Release an unfinished claim with `gt bridge release <document>
+--native-context-id <context-id> --fence <fence> --json`. A fresh context reads
+canonical work and attempt state and obtains its own next-artifact claim.
 
-This skill (`gtkb-bridge`) is the cross-cutting reference. Use it when:
+A changed predecessor, expired claim or invalid stored target requires a fresh
+read and a lawful response. Where canonical state demonstrates a broken or
+invalidated non-VERIFIED attempt and no live claim remains, use `gt bridge
+abandon --help` for the supported abandonment operation and begin a fresh NEW
+from current requirements. Do not inherit GO, claims or effects from discarded
+messages. An unavailable authority never justifies local file publication or
+hidden state. Leave subsequent dispatch to the owner or dispatcher.
 
-- The action fit with a per-action skill is not obvious.
-- You need to navigate the protocol across multiple operations in one session.
-- You want to understand the full lifecycle and required gates in one place.
+## Confirm delivery before reporting completion
 
-## Cross-harness implementation notes
+After authoring and delivering the assigned successor, verify the canonical
+result with:
 
-- The skill body is identical across Claude Code and Codex via the `scripts/generate_codex_skill_adapters.py` adapter pipeline. The Codex adapter version at `.codex/skills/bridge/SKILL.md` carries a `<!-- GTKB-CODEX-SKILL-ADAPTER -->` marker; do NOT edit the adapter directly. Edit the canonical at `.claude/skills/gtkb-bridge/SKILL.md` and regenerate.
-- Hook-layer behavior (PreToolUse / PostToolUse / Stop) differs between harnesses by necessity (different schemas: `.claude/settings.json` JSON vs `.codex/hooks.json` JSON). Hook handler scripts are shared regardless.
-- Underlying scripts and CLIs are harness-agnostic. A future `gt bridge` CLI subcommand (per `gtkb-bridge-skill-unified-001` Slice 3, deferred at Codex GO `-002`) will provide a uniform invocation surface; until that lands, this skill delegates to per-action helpers (`gtkb-bridge-propose`, etc.) and direct script invocations.
+```sh
+gt bridge check-delivery <document> --version <authored-version> --native-context-id <context-id> --json
+```
 
-## Copyright
+The check reads current canonical state and proves the exact document/version
+was delivered by this context. A held or released claim, unrelated delivery,
+final model prose or unavailable authority cannot satisfy it. It writes no
+message and changes no claim or work state. Missing proof returns typed
+`bridge_delivery_incomplete`; recover through current CLI facts, never by
+having a harness author, repair or publish the message.
 
-(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+After terminal cleanup, only the final delivery's immutable author-context
+identifier joins the minimum terminal identity. The message payload and earlier
+authors are purged. An earlier delivery that has already been purged cannot be
+proved by this readback and returns incomplete rather than inventing retained
+evidence. Headless provider launchers receive the assigned document and exact
+successor version explicitly; those values identify work, not authorization.

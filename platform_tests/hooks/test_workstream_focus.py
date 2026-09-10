@@ -5,7 +5,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -56,21 +55,6 @@ def _seed_registry(root: Path, harnesses: dict[str, tuple[str, list[str]] | tupl
             status=status,
         )
     generate_harness_projection(db, root)
-
-
-def _copy_parity_registry(root: Path) -> None:
-    """Copy the harness-capability-registry.toml into an isolated project root.
-
-    The role-toggle path renders a harness-parity message via
-    scripts.check_harness_parity.check_harness_parity, which reads
-    ``<root>/config/agent-control/harness-capability-registry.toml``. Copying
-    the canonical registry lets the parity check resolve against an isolated
-    tmp_path root.
-    """
-    src = REPO_ROOT / "config" / "agent-control" / "harness-capability-registry.toml"
-    dst = root / "config" / "agent-control" / "harness-capability-registry.toml"
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(src, dst)
 
 
 def _projection_role(root: Path, harness_id: str) -> object:
@@ -754,7 +738,6 @@ def test_prompt_hook_toggles_next_session_role_with_simple_phrase(tmp_path, monk
             "B": ("claude", ["prime-builder"], "active"),
         },
     )
-    _copy_parity_registry(tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
     monkeypatch.setenv("GTKB_HARNESS_ID", "A")
     monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
@@ -766,7 +749,7 @@ def test_prompt_hook_toggles_next_session_role_with_simple_phrase(tmp_path, monk
     response = module.handle_user_prompt("switch mode next session", tmp_path)
 
     assert "Next fresh-session operating mode set to Prime Builder" in response["systemMessage"]
-    assert "Harness parity after role change:" in response["systemMessage"]
+    assert "Harness parity after role change:" not in response["systemMessage"]
     # Role-set wire form per IP-8 of gtkb-single-harness-bridge-dispatcher-001:
     # WRITE always emits JSON list; singleton represents the multi-harness case.
     # WI-3342 IP-5: the post-write role surface is the registry projection.
@@ -788,7 +771,6 @@ def test_prompt_hook_sets_explicit_next_session_role(tmp_path, monkeypatch) -> N
             "B": ("claude", ["prime-builder"], "active"),
         },
     )
-    _copy_parity_registry(tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
     monkeypatch.setenv("GTKB_HARNESS_ID", "A")
     monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
@@ -813,7 +795,6 @@ def test_prompt_hook_uses_harness_id_role_map_when_named(tmp_path, monkeypatch) 
             "B": ("claude", ["prime-builder"], "active"),
         },
     )
-    _copy_parity_registry(tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
     monkeypatch.setenv("GTKB_HARNESS_ID", "A")
     monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))

@@ -64,7 +64,7 @@ GRANDFATHERED_PAIRS = {
 # NOT grandfathered, though each occurs on disk. These would let a reader
 # CONCLUDE that work reached the authority-bearing terminal status without a
 # GO or an implementation report. The resolver feeds `implementation_start_gate`
-# and `check_protected_commit_authorization`, so a resolution is not merely a
+# for effect checks, so a resolution is not merely a
 # description there. All affected chains are already terminal, so the exclusion
 # strands no live work.
 AUTHORITY_BEARING_EXCLUSIONS = {

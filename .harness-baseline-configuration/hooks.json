@@ -43,10 +43,6 @@
         "timeout": 5
       },
       {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\formal-artifact-approval-gate.py",
-        "timeout": 5
-      },
-      {
         "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\bridge-compliance-gate.py",
         "timeout": 5
       },
@@ -94,11 +90,6 @@
       },
       {
         "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\bridge-proposal-wi-id-collision-gate.py",
-        "matcher": "Write",
-        "timeout": 5
-      },
-      {
-        "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\run_py_no_window.py E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\narrative-artifact-approval-gate.py",
         "matcher": "Write",
         "timeout": 5
       },

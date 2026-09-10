@@ -7,6 +7,8 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from psycopg import sql
+from psycopg.types.json import Jsonb
 
 from platform_tests.groundtruth_kb.test_native_authority_service import native as native
 from platform_tests.groundtruth_kb.test_native_authority_service import put, work_fields
@@ -112,6 +114,95 @@ def commit_product(root):
     git(root, "add", "--", "code.py", "second.py", "tests/test_effect.py")
     git(root, "commit", "-m", "Complete the qualified project (WI-1) (WI-2)")
     return git(root, "rev-parse", "HEAD").stdout.strip()
+
+
+@pytest.mark.parametrize("initial,changed", [("100644", "100755"), ("100755", "100644")])
+def test_mode_only_change_invalidates_verified_and_precommit_evidence(bridge, initial, changed):
+    _, client, contexts, root = bridge
+    git(root, "config", "core.filemode", "false")
+    git(root, "update-index", "--chmod=" + ("+x" if initial == "100755" else "-x"), "--", "code.py")
+    deliver(client, contexts, "mode-review", "pb1", 1, "NEW")
+    deliver(client, contexts, "mode-review", "lo1", 2, "GO")
+    deliver(client, contexts, "mode-review", "pb2", 3, "READY")
+    reviewed = client.get("/v1/bridge/mode-review/artifacts").json()
+    assert reviewed["code.py"]["mode"] == initial
+    git(root, "update-index", "--chmod=" + ("+x" if changed == "100755" else "-x"), "--", "code.py")
+    current = client.get("/v1/bridge/mode-review/artifacts").json()
+    assert current["code.py"]["object_id"] == reviewed["code.py"]["object_id"]
+    assert current["code.py"]["mode"] == changed
+    reservation = claim(client, "mode-review", "lo2", 3, "VERIFIED").json()
+    request = {"native_context_id": "lo2", "fence": reservation["fence"]}
+    refused = client.post(
+        "/v1/bridge/mode-review/deliver",
+        json={
+            **request,
+            "content": authored(contexts["lo2"], "mode-review", 4, "VERIFIED", verified_artifacts=json.dumps(reviewed)),
+        },
+    )
+    assert refused.json()["error"]["code"] == "reviewed_bytes_changed"
+    assert client.post("/v1/bridge/mode-review/check", json=request).status_code == 200
+    accepted = client.post(
+        "/v1/bridge/mode-review/deliver",
+        json={
+            **request,
+            "content": authored(contexts["lo2"], "mode-review", 4, "VERIFIED", verified_artifacts=json.dumps(current)),
+        },
+    )
+    assert accepted.status_code == 200, accepted.text
+    prepared = post(client, "prepare-commit")
+    assert prepared.json()["status"] == "ready_to_commit", prepared.text
+    checkout = Path(prepared.json()["checkout"]["path"])
+    assert git(checkout, "ls-files", "--stage", "--", "code.py").stdout.startswith(changed)
+    git(root, "update-index", "--chmod=" + ("+x" if initial == "100755" else "-x"), "--", "code.py")
+    stale = post(client, "prepare-commit").json()
+    assert stale == {
+        "status": "fresh_verification_required",
+        "reason": "verified_bytes_changed",
+        "work_item_ids": ["WI-1"],
+    }
+
+
+def test_mode_only_candidate_change_cannot_inherit_blob_review(bridge):
+    client, _, root, parent = two_members(bridge)
+    prepared = post(client, "prepare-commit").json()
+    checkout = Path(prepared["checkout"]["path"])
+    git(checkout, "add", "--", "code.py", "second.py", "tests/test_effect.py")
+    git(checkout, "update-index", "--chmod=+x", "--", "code.py")
+    git(checkout, "commit", "-m", "Candidate with changed mode (WI-1) (WI-2)")
+    candidate = git(checkout, "rev-parse", "HEAD").stdout.strip()
+    result = post(client, "confirm-commit", commit_id=candidate, expected_parent=parent).json()
+    assert result["status"] == "fresh_verification_required"
+    assert result["reason"] == "commit_not_confirmed"
+    assert git(integration(root), "rev-parse", "HEAD").stdout.strip() == parent
+
+
+@pytest.mark.parametrize("field", ["proposal_paths", "test_targets", "verified_artifacts"])
+def test_stored_forbidden_targets_cannot_enter_a_project_commit(bridge, field):
+    service, client, contexts, root = bridge
+    verify(client, contexts, root, 1, "code.py")
+    forbidden = ".codex/hooks/generated.py"
+    value = {forbidden: "a" * 40} if field == "verified_artifacts" else [forbidden]
+    with service.kernel.transaction() as tx:
+        tx.cursor.execute(
+            sql.SQL("UPDATE {}.bridge_attempts SET {}=%s WHERE id='chain-1'").format(
+                sql.Identifier(tx.schema), sql.Identifier(field)
+            ),
+            (Jsonb(value),),
+        )
+    before_attempt = client.get("/v1/bridge/chain-1/show?include_content=true").json()
+    before_work = client.get("/v1/work-items/WI-1").json()
+    before_project = client.get("/v1/projects/PROJECT-1").json()
+    heads = base(root), base(integration(root))
+    for action in ["prepare-commit", "confirm-commit"]:
+        request = {"commit_id": heads[0], "expected_parent": heads[0]} if action == "confirm-commit" else {}
+        result = post(client, action, **request)
+        assert result.status_code == 422, result.text
+        assert result.json()["error"]["code"] == "scope_changed"
+        assert client.get("/v1/bridge/chain-1/show?include_content=true").json() == before_attempt
+        assert client.get("/v1/work-items/WI-1").json() == before_work
+        assert client.get("/v1/projects/PROJECT-1").json() == before_project
+        assert (base(root), base(integration(root))) == heads
+        assert not (integration(root) / forbidden).exists()
 
 
 def test_related_verified_messages_cannot_complete_an_unreviewed_member(bridge):

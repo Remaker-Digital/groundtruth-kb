@@ -48,6 +48,10 @@ def _write_cursor_shim(root: Path) -> None:
     scripts = root / "scripts"
     scripts.mkdir(exist_ok=True)
     (scripts / "cursor_harness.py").write_text("# fixture shim\n", encoding="utf-8")
+    for name in ("bridge", "proposal-review", "verify"):
+        path = root / ".cursor" / "skills" / name / "SKILL.md"
+        path.parent.mkdir(parents=True)
+        path.write_text("Current own-harness instruction fixture.", encoding="utf-8")
 
 
 def _auth_runner(authenticated: bool = True):
@@ -98,46 +102,37 @@ def test_readiness_can_be_ready_without_current_dispatch_enablement(tmp_path: Pa
     assert result["ready"] is True
     assert result["dispatchable_now"] is False
     assert result["can_receive_dispatch"] is False
-    assert result["role"] == ["prime-builder"]
+    assert "role" not in result
     assert result["cursor_adaptation"]["harness_id"] == "E"
     assert result["cursor_adaptation"]["raw_prompt_included"] is False
-    assert result["publication_contract"]["execution_mode"] == "ask"
-    assert result["publication_contract"]["publisher"] == "publish_lo_verdict"
+    assert "publication_contract" not in result
 
 
-def test_readiness_fails_closed_when_governed_publication_contract_drifts(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+@pytest.mark.parametrize("missing", [True, False])
+def test_readiness_refuses_missing_or_empty_own_instructions(tmp_path: Path, missing: bool) -> None:
     _write_registry(tmp_path, _cursor_record())
     _write_cursor_shim(tmp_path)
-    monkeypatch.setattr(
-        cursor_harness,
-        "governed_lo_publication_contract",
-        lambda: {
-            "schema_version": 1,
-            "execution_mode": "plan",
-            "output_format": "text",
-            "publisher": "direct_file_write",
-            "supported_verdicts": ["GO"],
-        },
-    )
-
+    own = tmp_path / ".cursor" / "skills" / "verify" / "SKILL.md"
+    if missing:
+        own.unlink()
+    else:
+        own.write_text(" \n", encoding="utf-8")
     result = evaluate_readiness(
         project_root=tmp_path,
         agent_resolver=lambda: ["C:/Tools/cursor-agent.exe"],
         auth_runner=_auth_runner(),
     )
-
     assert result["ready"] is False
-    assert result["first_failed_check"].startswith("governed read-only LO publication")
+    assert result["first_failed_check"].startswith("local review instructions")
 
 
-def test_readiness_reports_dispatchable_when_registry_is_prime_enabled(tmp_path: Path) -> None:
+@pytest.mark.parametrize("legacy_role", [None, [], ["prime-builder"], ["loyal-opposition"]])
+def test_dispatch_enablement_does_not_assign_a_context_role(tmp_path: Path, legacy_role) -> None:
     _write_registry(
         tmp_path,
         _cursor_record(
             can_receive_dispatch=True,
-            role=["prime-builder"],
+            role=legacy_role,
         ),
     )
     _write_cursor_shim(tmp_path)

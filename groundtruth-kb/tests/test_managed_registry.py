@@ -54,7 +54,9 @@ def _registry_records() -> list[ManagedArtifact]:
 
 
 def test_registry_total_matches_current_manifest() -> None:
-    """62 total = 18 hooks + 11 rules + 11 skills + 4 files + 14 settings + 4 gitignore.
+    """Current manifest totals exclude retired owner capture.
+
+    Previously: 62 total = 18 hooks + 11 rules + 11 skills + 4 files + 14 settings + 4 gitignore.
 
     Post-spec-event-surfacer (Slice A of GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY,
     bridge -006 GO): spec-event-surfacer.py is an active hook with a paired
@@ -68,7 +70,7 @@ def test_registry_total_matches_current_manifest() -> None:
     .claude/settings.local.json) promoted to upgrade-managed.
 
     Current governance-completeness contract: active governance hooks are
-    _delib_common, owner-decision-capture, gov09-capture, and related policy
+    _delib_common, gov09-capture, and related policy
     hooks. Retired dead-stub hooks are absent from hook and settings
     registration records.
 
@@ -85,27 +87,7 @@ def test_registry_total_matches_current_manifest() -> None:
     # (upgrade-rehearsal-recipe). Total: 59 + 1 = 60.
     # Follow-on policy hook: +1 hook. Tier A bridge skill: +5 skills.
     # Retired dead-stub hook cleanup removed two hooks and two settings registrations.
-    assert len(records) == 62, f"expected 62 total registry records; got {len(records)}"
-
-
-def test_registry_class_counts_match_proposal() -> None:
-    """Class counts match the approved proposal (post-C4 gtkb-settings-merge).
-
-    gitignore-pattern: 1 → 4 per C4 §2 (3 adopter-critical patterns promoted).
-    file: 0 → 2 per GTKB-ISOLATION-017 Slice 3 (README + release-readiness).
-    """
-    records = _registry_records()
-    counts: dict[str, int] = {}
-    for r in records:
-        counts[r.class_] = counts.get(r.class_, 0) + 1
-    assert counts == {
-        "hook": 17,
-        "rule": 12,  # +1: session-start-orientation (gtkb-session-start-orientation-gate)
-        "skill": 12,
-        "file": 4,  # GTKB-ISOLATION-017 Slice 3/4 records + WI-4225 template-only coverage record
-        "settings-hook-registration": 13,
-        "gitignore-pattern": 4,
-    }
+    assert len(records) == 44, f"expected 44 current registry records; got {len(records)}"
 
 
 def test_bridge_skill_records_are_managed_for_dual_agent_profiles() -> None:
@@ -113,8 +95,6 @@ def test_bridge_skill_records_are_managed_for_dual_agent_profiles() -> None:
     expected_targets = {
         ".claude/skills/gtkb-bridge/SKILL.md",
         ".claude/skills/gtkb-bridge/helpers/scan_bridge.py",
-        ".claude/skills/gtkb-bridge/helpers/revise_bridge.py",
-        ".claude/skills/gtkb-bridge/helpers/impl_report_bridge.py",
         ".claude/skills/gtkb-bridge/helpers/show_thread_bridge.py",
     }
 
@@ -255,7 +235,7 @@ def test_scaffold_local_only_copies_all_hooks_and_initial_rules() -> None:
     scaffolded = artifacts_for_scaffold("local-only")
     # 12 retained hooks
     hooks = [r for r in scaffolded if r.class_ == "hook"]
-    assert len(hooks) == 12
+    assert len(hooks) == 7
     # 5 rules (prime-builder + canonical-terminology surface + session-start-orientation)
     rules = [r for r in scaffolded if r.class_ == "rule"]
     rule_paths = {r.target_path for r in rules if isinstance(r, FileArtifact)}
@@ -290,11 +270,11 @@ def test_scaffold_dual_agent_copies_everything() -> None:
     for r in scaffolded:
         by_class[r.class_] = by_class.get(r.class_, 0) + 1
     assert by_class == {
-        "hook": 17,
+        "hook": 10,
         "rule": 12,  # +1: session-start-orientation (gtkb-session-start-orientation-gate)
-        "skill": 12,
+        "skill": 7,
         "file": 3,  # Slice 3 (README + release-readiness) + Slice 4 (upgrade-rehearsal-recipe)
-        "settings-hook-registration": 13,
+        "settings-hook-registration": 7,
         "gitignore-pattern": 4,
     }
 
@@ -316,9 +296,7 @@ def test_upgrade_local_only_manages_retained_hook() -> None:
     """
     managed = artifacts_for_upgrade("local-only")
     hooks = {r.target_path for r in managed if isinstance(r, FileArtifact) and r.class_ == "hook"}
-    assert hooks == {
-        ".claude/hooks/spec-classifier.py",
-    }
+    assert hooks == set()
     rules = {r.target_path for r in managed if isinstance(r, FileArtifact) and r.class_ == "rule"}
     assert rules == {
         ".claude/rules/prime-builder.md",
@@ -376,7 +354,7 @@ def test_doctor_hooks_local_only_matches_prior_hardcoded() -> None:
         for r in artifacts_for_doctor("local-only", class_="hook")
         if isinstance(r, FileArtifact)
     }
-    assert hook_names == {"spec-classifier.py"}
+    assert hook_names == set()
 
 
 def test_doctor_hooks_dual_agent_matches_prior_hardcoded() -> None:
@@ -394,12 +372,9 @@ def test_doctor_hooks_dual_agent_matches_prior_hardcoded() -> None:
             if isinstance(r, FileArtifact)
         }
         assert hook_names == {
-            "spec-classifier.py",
             "destructive-gate.py",
             "credential-scan.py",
             "_delib_common.py",
-            "owner-decision-capture.py",
-            "gov09-capture.py",
             "spec-event-surfacer.py",
         }, f"doctor hook set mismatch for {profile!r}: {hook_names}"
 
@@ -434,14 +409,14 @@ def test_settings_parity_exact_retained_event_matrix() -> None:
     """Registry produces the exact retained event-to-hook matrix enforced by scaffold.
 
     Current governance-completeness registrations add gov09-capture on
-    UserPromptSubmit and owner-decision-capture on PostToolUse; retired
+    UserPromptSubmit; retired
     dead-stub hook registrations remain absent.
     Post-spec-event-surfacer (Slice A of GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY,
     bridge -006 GO) adds spec-event-surfacer.py on PostToolUse.
     """
     registrations = artifacts_for_scaffold("dual-agent", class_="settings-hook-registration")
-    assert len(registrations) == 13, (
-        f"expected 13 settings-hook-registration records for dual-agent; got {len(registrations)}"
+    assert len(registrations) == 7, (
+        f"expected 7 settings-hook-registration records for dual-agent; got {len(registrations)}"
     )
     # Collect per-event sorted hook filenames
     by_event: dict[str, list[str]] = {}
@@ -452,21 +427,7 @@ def test_settings_parity_exact_retained_event_matrix() -> None:
         by_event[event].sort()
 
     expected = {
-        "SessionStart": sorted(["session-start-governance.py"]),
-        "UserPromptSubmit": sorted(
-            [
-                "delib-search-gate.py",
-                "intake-classifier.py",
-                "gov09-capture.py",
-            ]
-        ),
-        "PostToolUse": sorted(
-            [
-                "delib-search-tracker.py",
-                "owner-decision-capture.py",
-                "spec-event-surfacer.py",
-            ]
-        ),
+        "PostToolUse": ["spec-event-surfacer.py"],
         "PreToolUse": sorted(
             [
                 "spec-before-code.py",
@@ -491,20 +452,14 @@ def test_settings_upgrade_managed_set_post_c4() -> None:
     0 scaffolded .claude/settings.json registrations remain unrepairable.
     """
     managed = artifacts_for_upgrade("dual-agent", class_="settings-hook-registration")
-    assert len(managed) == 13, (
-        f"expected 13 upgrade-managed settings-hook-registrations post-spec-event-surfacer; got {len(managed)}"
+    assert len(managed) == 7, (
+        f"expected 7 upgrade-managed settings-hook-registrations post-spec-event-surfacer; got {len(managed)}"
     )
     by_filename = {r.hook_filename: r.event for r in managed if isinstance(r, SettingsHookRegistration)}
     assert by_filename == {
         # SessionStart (promoted in C4)
-        "session-start-governance.py": "SessionStart",
         # UserPromptSubmit (1 governance + 2 promoted in C4)
-        "gov09-capture.py": "UserPromptSubmit",
-        "delib-search-gate.py": "UserPromptSubmit",
-        "intake-classifier.py": "UserPromptSubmit",
         # PostToolUse (1 governance + 1 promoted in C4 + spec-event-surfacer added by Slice A)
-        "owner-decision-capture.py": "PostToolUse",
-        "delib-search-tracker.py": "PostToolUse",
         "spec-event-surfacer.py": "PostToolUse",
         # PreToolUse (1 scanner-safe-writer + 5 promoted in C4)
         "scanner-safe-writer.py": "PreToolUse",
@@ -624,9 +579,9 @@ def test_condition2_doctor_composite_uses_registry_ids(tmp_path, monkeypatch) ->
 def test_load_managed_artifacts_unions_three_axes() -> None:
     """Loader returns records touching the profile in any lifecycle axis."""
     dual_agent = load_managed_artifacts("dual-agent")
-    # dual-agent sees all 61 retained records:
-    # 17 hooks + 12 rules + 12 skills + 3 files + 13 settings + 4 gitignore.
-    assert len(dual_agent) == 61
+    # dual-agent sees all 56 retained records:
+    # 16 hooks + 12 rules + 9 skills + 3 files + 12 settings + 4 gitignore.
+    assert len(dual_agent) == 43
 
     local_only = load_managed_artifacts("local-only")
     # local-only sees all 12 retained original hooks + rule.prime-builder + 3
@@ -634,7 +589,7 @@ def test_load_managed_artifacts_unions_three_axes() -> None:
     # + 3 file-class records (Slice 3 + Slice 4 upgrade-rehearsal-recipe) = 21.
     # The 5 new governance hooks are dual-agent-only, and the 3 new gitignore rows
     # are dual-agent-only.
-    assert len(local_only) == 21
+    assert len(local_only) == 16
 
 
 def test_find_artifact_by_id_raises_on_unknown() -> None:

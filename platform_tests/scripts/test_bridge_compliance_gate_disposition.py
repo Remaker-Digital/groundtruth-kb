@@ -7,6 +7,7 @@ peer harness or requiring their projections to exist.
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 from types import ModuleType
 
@@ -15,8 +16,6 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LIVE_HOOK = REPO_ROOT / ".harness-baseline-configuration" / "hooks" / "bridge-compliance-gate.py"
 TEMPLATE_HOOK = REPO_ROOT / "groundtruth-kb" / "templates" / "hooks" / "bridge-compliance-gate.py"
-
-_DISPOSITION_MARKER = "Cross-Harness Disposition"
 
 _AUTHOR_METADATA = (
     "author_identity: prime-builder/codex/A\n"
@@ -31,17 +30,7 @@ _SPEC_LINKS = "## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
 _REQ_SUFF = "## Requirement Sufficiency\n\nExisting requirements sufficient. Rationale prose here.\n"
 _SIMPLIFICATION = "## Simplification Accounting\n\nNothing gets smaller; this is a test fixture.\n"
 
-_HARNESS_SURFACE_TARGET = 'target_paths: [".claude/hooks/bridge-compliance-gate.py"]\n'
-_OFF_SURFACE_TARGET = 'target_paths: ["scripts/example.py"]\n'
-
-_CONCRETE_DISPOSITION = (
-    "## Cross-Harness Disposition\n\n"
-    "- Universal applicability; behaves identically on claude and codex via the "
-    "canonical Python hook. No per-harness divergence; no waiver required.\n"
-)
-_PLACEHOLDER_DISPOSITION = "## Cross-Harness Disposition\n\nn/a\n"
-_BULLET_ONLY_DISPOSITION = "## Cross-Harness Disposition\n\n-\n"
-_BLANK_BULLET_DISPOSITION = "## Cross-Harness Disposition\n\n*\n"
+_HARNESS_SURFACE_TARGET = 'target_paths: [".harness-baseline-configuration/hooks/bridge-compliance-gate.py"]\n'
 
 
 def _load_gate(path: Path, module_name: str) -> ModuleType:
@@ -62,43 +51,51 @@ def gate(request: pytest.FixtureRequest) -> ModuleType:
 def _proposal(
     *,
     status: str = "NEW",
-    bridge_kind: str = "prime_proposal",
+    bridge_kind: str = "implementation_proposal",
     target_paths: str | None = _HARNESS_SURFACE_TARGET,
-    disposition: str | None = _CONCRETE_DISPOSITION,
+    disposition: str | None = None,
 ) -> str:
     parts = [
         status,
         "::init gtkb lo",
         "::open build",
-        "",
-        "# Test Proposal",
-        "",
-        _AUTHOR_METADATA,
+        "Document: test-disposition",
+        "Version: 1",
+        "Date: 2026-09-09",
+        "recipient_role: loyal-opposition",
+        _AUTHOR_METADATA.rstrip(),
         f"bridge_kind: {bridge_kind}",
-        "",
-        _PROJECT_METADATA,
+        _PROJECT_METADATA.rstrip(),
+        "work_item_version: 1",
+        'spec_versions: {"GOV-FILE-BRIDGE-AUTHORITY-001": 1}',
+        'test_artifact_targets: ["tests/test_effect.py"]',
     ]
     if target_paths is not None:
         parts.append(target_paths)
-    parts.append(_SPEC_LINKS)
+    parts.extend(["", "# Test Proposal", "", _SPEC_LINKS])
     parts.append("")
     parts.append(_REQ_SUFF)
     parts.append(_SIMPLIFICATION)
-    from groundtruth_kb.bridge.proposal_filing import build_nonimpairment_disposition, render_nonimpairment_disposition
-
+    authored_disposition = {
+        "schema_version": 1,
+        "applicability": "applicable",
+        "provenance": "Agent-authored fixture for WI-9999 in PROJECT-TEST-X",
+        "canonical_authority": "GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001",
+        "primary_route": "gt bridge deliver",
+        "before_behavior": "The declared target returns the wrong result.",
+        "after_behavior": "The declared target returns the specified result.",
+        "self_descriptive_naming": "The target and test name the corrected behavior.",
+        "obsolete_guidance_disposition": "Correct contradictory instructions at their source.",
+        "history_preservation": "Preserve Git and formal history.",
+        "baseline": {"behavior": "incorrect"},
+        "expected_result": {"behavior": "correct"},
+        "rollback": {"instructions": "Make a new forward correction and rerun the affected tests."},
+        "hard_invariants": ["One project membership", "Independent review"],
+        "fail_closed_conditions": ["Stale inputs", "Target outside the declared scope"],
+        "essential_context_preservation": "Retain current requirements, targets and executable test instructions.",
+    }
     parts.append(
-        render_nonimpairment_disposition(
-            build_nonimpairment_disposition(
-                wi_id="WI-9999",
-                project_id="PROJECT-TEST-X",
-                target_paths=("src/x.py",),
-                summary="Correct the declared target behavior",
-                description="The target has an incorrect behavior",
-                scope_lines=("Correct the declared target",),
-                acceptance_criteria=("Target behavior is correct",),
-                spec_links=["GOV-FILE-BRIDGE-AUTHORITY-001"],
-            )
-        )
+        "## Intuitiveness / Non-Impairment Disposition\n\n```json\n" + json.dumps(authored_disposition) + "\n```"
     )
     if disposition is not None:
         parts.append("")
@@ -124,9 +121,9 @@ def _deny(gate: ModuleType, content: str, cwd: Path) -> str | None:
 @pytest.mark.parametrize(
     "target",
     [
-        ".claude/hooks/local.py",
-        ".codex/gtkb-hooks/local.py",
-        ".cursor/skills/local/SKILL.md",
+        ".harness-baseline-configuration/hooks/local.py",
+        ".harness-baseline-configuration/skills/example/SKILL.md",
+        "groundtruth-kb/src/groundtruth_kb/example.py",
         "scripts/local.py",
     ],
 )

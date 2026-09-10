@@ -1,13 +1,10 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Shared bridge review-independence comparator (WI-4829).
 
-Single-sources the self-review refusal semantics that were previously inlined only
-in the headless dispatch path (``scripts/dispatcher_runtime.py``
-``_self_review_refusal_reason``; ``groundtruth_kb/tafe_dispatch_policy.py``
-``_review_independence_gate``). The same semantics now also gate verdict-write
-time (the bridge-compliance hook + the ``write_verdict`` finalization helper) and
-implementation-start authorization, per ``DELIB-20266105`` (owner defense-in-depth
-authorization) and ``GOV-DOCUMENT-AUTHOR-PROVENANCE-001``.
+The remaining file-bridge readers compare the actual context attribution of
+an author and reviewer. Native delivery enforces independence through canonical
+session bindings and current work state. Neither a harness name, file creator
+nor a retained owner-permission record establishes review independence.
 
 A bridge verdict (``GO`` / ``NO-GO`` / ``VERIFIED``) is a **self-review** when its
 ``author_session_context_id`` equals the ``author_session_context_id`` of the

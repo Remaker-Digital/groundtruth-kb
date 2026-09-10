@@ -103,8 +103,6 @@ jobs:
       # Enforces: GOV-OWNER-DECISION-SURFACING-001; GOV-REQUIREMENTS-COLLECTION-HOOK-001 v3
       # (AUQ-only invariant); GOV-FILE-BRIDGE-AUTHORITY-001 (Owner Decisions section).
       # See bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04 for approved scope.
-      - name: AUQ governance metrics gate
-        run: python scripts/release_governance_metrics.py
 
   frontend-gate:
     name: Frontend build and applications/Agent_Red/widget tests

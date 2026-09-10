@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import ast
 import json
 import os
 import re
@@ -14,16 +13,13 @@ import sys
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
 from groundtruth_kb import get_templates_dir
 from groundtruth_kb.bridge.role_state import (
     BRIDGE_AGENT_TO_RECIPIENT as _BRIDGE_AGENT_TO_RECIPIENT,
-)
-from groundtruth_kb.bridge.role_state import (
-    ROLE_STATE_KEYS,
 )
 from groundtruth_kb.project.managed_registry import (
     FileArtifact,
@@ -153,7 +149,7 @@ def _ollama_windows_autostart_finding() -> str | None:
         shutil.which("powershell.exe") or shutil.which("powershell") or shutil.which("pwsh.exe") or shutil.which("pwsh")
     )
     if not powershell:
-        return "L5: PowerShell unavailable for Ollama autostart probe"
+        return "PowerShell unavailable for Ollama autostart probe"
 
     ps_script = r"""
 $ErrorActionPreference = 'SilentlyContinue'
@@ -193,22 +189,22 @@ $services = @(Get-Service | Where-Object {
             **run_kwargs,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return f"L5: Ollama autostart probe failed: {exc}"
+        return f"Ollama autostart probe failed: {exc}"
 
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
-        return f"L5: Ollama autostart probe exited {result.returncode}: {detail}"
+        return f"Ollama autostart probe exited {result.returncode}: {detail}"
 
     try:
         payload = json.loads((result.stdout or "{}").strip() or "{}")
     except json.JSONDecodeError as exc:
-        return f"L5: Ollama autostart probe returned non-JSON output: {exc}"
+        return f"Ollama autostart probe returned non-JSON output: {exc}"
 
     scheduled_tasks = _coerce_string_list(payload.get("scheduled_tasks"))
     services = _coerce_string_list(payload.get("services"))
     if scheduled_tasks or services:
         return None
-    return "L5: Ollama autostart not detected; no matching Windows scheduled task or service"
+    return "Ollama autostart not detected; no matching Windows scheduled task or service"
 
 
 _ACTIVE_LEGACY_ROOT_GLOBS = (
@@ -925,860 +921,206 @@ def _orphan_citation_severity(target: Path) -> Literal["warning", "fail"]:
     return "fail" if severity == "fail" else "warning"
 
 
-def _check_harness_state_sot_consistency(target: Path) -> ToolCheck:
-    """WI-4327 / WI-4329: harness-state Source-of-Truth consistency check.
+def _provider_routing(target: Path, provider: str) -> tuple[ToolCheck, tuple[str, ...]]:
+    """Inspect only this provider's generated routing; this grants no role or effect authority."""
+    import tomllib
 
-    3-layer doctor check per the Phase-1 Foundation proposal §Summary:
+    from groundtruth_kb.session.worktree import SessionWorktreeError, _artifact_path
 
-    - Layer 1: the 3 SoT files parse cleanly through the canonical reader
-      entrypoints in ``groundtruth_kb.harness_projection`` (registry +
-      identities + capabilities). Parse failures raise ``HarnessStateError``
-      and surface as findings.
-    - Layer 2: grep_absent — no committed Python code outside
-      ``groundtruth_kb.harness_projection`` reads the 3 SoT surfaces
-      directly. Direct reads are doctor findings per
-      ``DCL-HARNESS-STATE-SOT-READER-CONTRACT-001``.
-    - Layer 3: grep_absent — no references to the retired role mirror path
-      outside whitelisted
-      contexts (bridge files, audit archives, formal-artifact-approval
-      packets, and ``harness_projection.py`` itself).
-
-    Initial severity is **warning** to allow rollout under the 3 sibling
-    children (rule-files, scripts-source, mirror-retirement); promotion to
-    ``fail`` happens once WI-4336 (mirror retirement) lands per the
-    proposal §Acceptance Criteria #8.
-    """
-    findings: list[str] = []
-
-    # ── Layer 1 — canonical entrypoints parse cleanly ─────────────────
+    name = f"{provider} routing configuration"
+    root = target / ".api-harness" / provider
     try:
-        from groundtruth_kb.harness_projection import (  # noqa: PLC0415
-            HarnessStateError,
-            read_capabilities,
-            read_identity,
-            read_roles,
-        )
-    except ImportError as exc:
+        path = _artifact_path(target, Path(".api-harness") / provider / "routing.toml")
+    except SessionWorktreeError:
         return ToolCheck(
-            name="harness-state SoT consistency",
+            name=name,
             required=False,
-            found=True,
-            status="warning",
-            message=f"L1: canonical reader entrypoint module unimportable: {exc}",
-        )
-
-    for label, reader in (
-        ("registry (roles)", read_roles),
-        ("identities", read_identity),
-        ("capabilities", read_capabilities),
-    ):
-        try:
-            reader(project_root=target)
-        except HarnessStateError as exc:
-            findings.append(f"L1: {label} SoT parse failed: {exc}")
-        except Exception as exc:  # intentional-catch: fail-soft per WARN severity
-            findings.append(f"L1: {label} SoT unexpected reader error: {type(exc).__name__}: {exc}")
-
-    # ── Layer 2 — grep_absent for direct SoT reads outside harness_projection ──
-    # Pattern: any committed Python file that string-matches the SoT relative
-    # paths AND calls json.load*/open(...,'r')/tomllib.load* on them counts as
-    # a direct-read finding. To avoid false-positives over reflective tests
-    # and bridge audit files, the scan is restricted to active source roots
-    # and whitelists harness_projection.py + a small fixed allowlist.
-    SOT_PATH_TOKENS = (
-        "harness-state/harness-registry.json",
-        "harness-state/harness-identities.json",
-        "harness-capability-registry.toml",
-    )
-    DIRECT_READ_TOKENS = ("json.load", "json.loads", "tomllib.load", "tomllib.loads")
-    L2_SCAN_ROOTS = (
-        target / "scripts",
-        target / "groundtruth-kb" / "src",
-    )
-    L2_WHITELIST_BASENAMES = frozenset(
-        {
-            "harness_projection.py",
-            "harness_projection_reader.py",  # DB-independent reader counterpart
-        }
-    )
-    for root in L2_SCAN_ROOTS:
-        if not root.is_dir():
-            continue
-        for py in root.rglob("*.py"):
-            if py.name in L2_WHITELIST_BASENAMES:
-                continue
-            try:
-                text = py.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                continue
-            if not any(token in text for token in SOT_PATH_TOKENS):
-                continue
-            if not any(rd in text for rd in DIRECT_READ_TOKENS):
-                continue
-            rel = py.relative_to(target).as_posix()
-            findings.append(f"L2: direct SoT read outside canonical entrypoint: {rel}")
-
-    # Layer 3 - grep_absent for the retired role mirror path.
-    RETIRED_PATH_TOKEN = "/".join(("harness-state", "-".join(("role", "assignments.json"))))
-    L3_WHITELIST_PREFIXES = (
-        "bridge/",
-        "independent-progress-assessments/",
-        "archive/",
-        ".groundtruth/formal-artifact-approvals/",
-    )
-    L3_WHITELIST_BASENAMES = frozenset({"harness_projection.py", "harness_projection_reader.py"})
-    L3_SCAN_ROOTS = (
-        target / "scripts",
-        target / "groundtruth-kb" / "src",
-        target / "config",
-        target / ".claude" / "rules",
-    )
-    for root in L3_SCAN_ROOTS:
-        if not root.is_dir():
-            continue
-        for py in root.rglob("*"):
-            if not py.is_file():
-                continue
-            if py.name in L3_WHITELIST_BASENAMES:
-                continue
-            rel = py.relative_to(target).as_posix()
-            if any(rel.startswith(prefix) for prefix in L3_WHITELIST_PREFIXES):
-                continue
-            try:
-                text = py.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                continue
-            if RETIRED_PATH_TOKEN in text:
-                findings.append(f"L3: retired path reference outside whitelist: {rel}")
-
-    if not findings:
-        return ToolCheck(
-            name="harness-state SoT consistency",
-            required=False,
-            found=True,
-            status="pass",
-            message="3-layer harness-state SoT consistency: clean (L1+L2+L3)",
-        )
-
-    # WARN severity initially per proposal §Acceptance Criteria #8.
-    head = findings[0]
-    extra = f" (+{len(findings) - 1} more)" if len(findings) > 1 else ""
-    return ToolCheck(
-        name="harness-state SoT consistency",
-        required=False,
-        found=True,
-        status="warning",
-        message=f"{len(findings)} findings; first: {head}{extra}",
-    )
-
-
-def _check_harness_metadata_freshness(target: Path) -> ToolCheck:
-    """WI-4700: fail when dispatch metadata understates cloud-backed routes."""
-    import tomllib  # noqa: PLC0415 - py3.11+; defer import
-
-    check_name = "harness metadata freshness"
-    routing_path = target / ".api-harness" / "routing.toml"
-    dispatch_path = target / "config" / "dispatcher" / "rules.toml"
-    registry_path = target / "harness-state" / "harness-registry.json"
-    canonical_paths = (
-        target / ".claude" / "rules" / "canonical-terminology.md",
-        target / "groundtruth-kb" / "docs" / "reference" / "canonical-terminology-detail.md",
-        target / ".claude" / "rules" / "operating-model.md",
-    )
-
-    warnings: list[str] = []
-    failures: list[str] = []
-
-    if not routing_path.is_file():
-        return ToolCheck(
-            name=check_name,
-            required=True,
             found=False,
-            status="warning",
-            message=".api-harness/routing.toml missing; harness metadata freshness guard unavailable",
-        )
-    if not dispatch_path.is_file():
-        return ToolCheck(
-            name=check_name,
-            required=True,
-            found=False,
-            status="warning",
-            message="config/dispatcher/rules.toml missing; dispatch-cost freshness guard unavailable",
-        )
-
-    try:
-        routing_data = tomllib.loads(_require_utf8_text(routing_path))
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        return ToolCheck(
-            name=check_name,
-            required=True,
-            found=True,
-            status="warning",
-            message=f".api-harness/routing.toml unreadable: {exc}",
-        )
-    try:
-        dispatch_data = tomllib.loads(_require_utf8_text(dispatch_path))
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        return ToolCheck(
-            name=check_name,
-            required=True,
-            found=True,
-            status="warning",
-            message=f"config/dispatcher/rules.toml unreadable: {exc}",
-        )
-
-    route_to_harness_id: dict[str, str] = {"ollama": "D", "openrouter": "F"}
-    if registry_path.is_file():
-        try:
-            registry = json.loads(_require_utf8_text(registry_path))
-        except (OSError, json.JSONDecodeError) as exc:
-            warnings.append(f"harness registry unreadable: {exc}")
-        else:
-            harnesses = registry.get("harnesses") if isinstance(registry, dict) else None
-            if isinstance(harnesses, list):
-                for entry in harnesses:
-                    if not isinstance(entry, dict):
-                        continue
-                    name = entry.get("harness_name")
-                    harness_id = entry.get("id")
-                    if isinstance(name, str) and isinstance(harness_id, str):
-                        route_to_harness_id.setdefault(name, harness_id)
-
-    models = routing_data.get("models")
-    routing = routing_data.get("routing")
-    if not isinstance(models, dict) or not models:
-        warnings.append(".api-harness/routing.toml has no [models.<key>] entries")
-        models = {}
-    if not isinstance(routing, dict) or not routing:
-        warnings.append(".api-harness/routing.toml has no [routing.<harness>] entries")
-        routing = {}
-    dispatch_harnesses = dispatch_data.get("harnesses")
-    if not isinstance(dispatch_harnesses, dict):
-        warnings.append("config/dispatcher/rules.toml has no [harnesses.<id>] entries")
-        dispatch_harnesses = {}
-
-    def _cloud_route(model: dict[str, Any]) -> bool:
-        provider = str(model.get("provider", "")).strip().lower()
-        model_id = str(model.get("model_id", "")).strip().lower()
-        return provider == "openrouter" or ":cloud" in model_id
-
-    def _stale_local_claim(text: str) -> bool:
-        lower = text.lower()
-        stale_markers = (
-            "http://localhost:11434",
-            "locally hosts open-weight",
-            "ollama-served local",
-            "local models",
-            "free local inference",
-        )
-        fresh_markers = (
-            "cloud-backed",
-            "cloud-routed",
-            "kimi-k2-7-code-cloud",
-            "current route",
-            "not serving local",
-            "not currently serving local",
-        )
-        return any(marker in lower for marker in stale_markers) and not any(marker in lower for marker in fresh_markers)
-
-    canonical_texts: dict[str, str] = {}
-    for path in canonical_paths:
-        rel = path.relative_to(target).as_posix()
-        if not path.is_file():
-            warnings.append(f"{rel} missing; narrative freshness not checked")
-            continue
-        try:
-            canonical_texts[rel] = _require_utf8_text(path)
-        except OSError as exc:
-            warnings.append(f"{rel} unreadable: {exc}")
-
-    for route_name, route_config in routing.items():
-        if not isinstance(route_config, dict):
-            continue
-        model_keys: set[str] = set()
-        default_model = route_config.get("default_model")
-        if isinstance(default_model, str) and default_model:
-            model_keys.add(default_model)
-        skills = route_config.get("skills")
-        if isinstance(skills, dict):
-            model_keys.update(value for value in skills.values() if isinstance(value, str) and value)
-
-        harness_id = route_to_harness_id.get(route_name)
-        dispatch_row = dispatch_harnesses.get(harness_id, {}) if harness_id else {}
-        dispatch_cost = dispatch_row.get("dispatch_cost") if isinstance(dispatch_row, dict) else None
-        dispatch_description = str(dispatch_row.get("description", "")) if isinstance(dispatch_row, dict) else ""
-
-        for model_key in sorted(model_keys):
-            model = models.get(model_key)
-            if not isinstance(model, dict):
-                warnings.append(f"routing.{route_name} references unknown model {model_key!r}")
-                continue
-            if not _cloud_route(model):
-                continue
-
-            model_id = str(model.get("model_id", model_key))
-            provider = str(model.get("provider", route_name))
-            try:
-                cost_value = float(dispatch_cost)
-            except (TypeError, ValueError):
-                warnings.append(f"harness {harness_id or route_name} has no numeric dispatch_cost")
-            else:
-                if cost_value <= 10:
-                    failures.append(
-                        f"harness {harness_id or route_name} routes to cloud model {model_id!r} "
-                        f"via {provider!r} but dispatch_cost={cost_value:g} (<=10)"
-                    )
-
-            if route_name == "ollama" and ":cloud" in model_id.lower():
-                if _stale_local_claim(dispatch_description):
-                    failures.append(
-                        f"harness {harness_id or route_name} dispatcher description still claims local Ollama routing"
-                    )
-                for rel, text in canonical_texts.items():
-                    if _stale_local_claim(text):
-                        failures.append(
-                            f"{rel} still claims Ollama local/localhost routing while route uses {model_id!r}"
-                        )
-
-    if failures:
-        head = failures[0]
-        extra = f" (+{len(failures) - 1} more)" if len(failures) > 1 else ""
-        return ToolCheck(
-            name=check_name,
-            required=True,
-            found=True,
             status="fail",
-            message=f"{len(failures)} freshness failures; first: {head}{extra}",
-        )
-
-    if warnings:
-        head = warnings[0]
-        extra = f" (+{len(warnings) - 1} more)" if len(warnings) > 1 else ""
+            message="Provider configuration path is redirected; configuration was not read",
+        ), ()
+    if not root.exists():
         return ToolCheck(
-            name=check_name,
-            required=True,
-            found=True,
-            status="warning",
-            message=f"{len(warnings)} freshness warnings; first: {head}{extra}",
-        )
-
-    return ToolCheck(
-        name=check_name,
-        required=True,
-        found=True,
-        status="pass",
-        message=(
-            "Harness metadata freshness clean: cloud routes have non-cheap dispatch cost and non-local descriptions"
-        ),
-    )
-
-
-_HARNESS_MODEL_PIN_CONFIRMATIONS_REL = Path("config") / "agent-control" / "harness-model-pin-confirmations.toml"
-_DEFAULT_HARNESS_MODEL_PIN_STALE_AFTER_DAYS = 90
-
-
-def _check_harness_model_pin_reconfirmation(target: Path) -> ToolCheck:
-    """Surface active dispatch harness model pins that need owner reconfirmation."""
-    import tomllib  # noqa: PLC0415 - py3.11+; defer import
-
-    from groundtruth_kb.bridge.state_report import _argv_value as _state_report_argv_value  # noqa: PLC0415
-    from groundtruth_kb.harness_projection import HarnessStateError, read_roles  # noqa: PLC0415
-
-    check_name = "Harness model pin reconfirmation"
-    try:
-        registry = read_roles(project_root=target)
-    except HarnessStateError as exc:
+            name=name, required=False, found=False, status="info", message=f"{provider} is not projected here"
+        ), ()
+    if not path.is_file():
         return ToolCheck(
-            name=check_name,
+            name=name,
             required=False,
             found=False,
             status="warning",
-            message=f"harness registry unreadable; cannot surface model pins: {exc}",
-        )
-
-    active_pins: list[dict[str, str]] = []
-    harnesses = registry.get("harnesses") if isinstance(registry, dict) else None
-    if isinstance(harnesses, list):
-        for record in harnesses:
-            if not isinstance(record, dict):
-                continue
-            status = str(record.get("status") or "").strip().lower()
-            if status != "active" or record.get("can_receive_dispatch") is not True:
-                continue
-            surfaces = record.get("invocation_surfaces")
-            headless = surfaces.get("headless") if isinstance(surfaces, dict) else None
-            argv = headless.get("argv") if isinstance(headless, dict) else None
-            argv_items = [str(item) for item in argv] if isinstance(argv, list) else []
-            model_pin = _state_report_argv_value(argv_items, "--model") or _state_report_argv_value(argv_items, "-m")
-            active_pins.append(
-                {
-                    "id": str(record.get("id") or "?"),
-                    "name": str(record.get("harness_name") or record.get("harness_type") or "?"),
-                    "model_pin": model_pin or "(unspecified)",
-                }
-            )
-
-    if not active_pins:
+            message=f"{path.relative_to(target).as_posix()} is missing",
+        ), ()
+    try:
+        data = tomllib.loads(_require_utf8_text(path))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
         return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message="no active dispatch-capable harness model pins found through canonical harness projection",
-        )
-
-    config_path = target / _HARNESS_MODEL_PIN_CONFIRMATIONS_REL
-    config: dict[str, Any] = {}
-    config_found = config_path.is_file()
-    findings: list[str] = []
-    if config_found:
-        try:
-            config = tomllib.loads(_require_utf8_text(config_path))
-        except (OSError, tomllib.TOMLDecodeError) as exc:
-            findings.append(f"{_HARNESS_MODEL_PIN_CONFIRMATIONS_REL.as_posix()} unreadable: {exc}")
-            config = {}
-    else:
-        findings.append(f"{_HARNESS_MODEL_PIN_CONFIRMATIONS_REL.as_posix()} missing")
-
-    stale_after_days = _DEFAULT_HARNESS_MODEL_PIN_STALE_AFTER_DAYS
-    configured_stale_after = config.get("stale_after_days") if isinstance(config, dict) else None
-    if isinstance(configured_stale_after, int) and configured_stale_after > 0:
-        stale_after_days = configured_stale_after
-    elif configured_stale_after is not None:
-        findings.append("stale_after_days must be a positive integer")
-
-    confirmations = config.get("confirmations") if isinstance(config, dict) else None
-    if not isinstance(confirmations, dict):
-        confirmations = {}
-
-    now = datetime.now(UTC)
-    for pin in active_pins:
-        harness_id = pin["id"]
-        label = f"{harness_id}/{pin['name']}={pin['model_pin']}"
-        confirmation = confirmations.get(harness_id)
-        if not isinstance(confirmation, dict):
-            findings.append(f"missing owner confirmation for {label}")
+            name=name, required=False, found=True, status="fail", message=f"Provider routing is unreadable: {exc}"
+        ), ()
+    models = data.get("models")
+    routing = data.get("routing")
+    findings = []
+    model_ids = []
+    if data.get("schema_version") != 1:
+        findings.append("schema_version must be 1")
+    if not isinstance(models, dict) or not models:
+        findings.append("no model rows")
+        models = {}
+    for key, row in models.items():
+        if not isinstance(row, dict) or row.get("provider") != provider:
+            findings.append(f"model {key} does not belong to this provider projection")
             continue
-
-        confirmed_pin = confirmation.get("model_pin")
-        if confirmed_pin != pin["model_pin"]:
-            findings.append(f"owner confirmation changed for {label}; last_confirmed={confirmed_pin!r}")
-            continue
-
-        confirmed_at = _parse_model_pin_confirmed_at(confirmation.get("confirmed_at"))
-        if confirmed_at is None:
-            findings.append(f"owner confirmation for {label} has no parseable confirmed_at")
-            continue
-        age_days = (now - confirmed_at).days
-        if age_days > stale_after_days:
-            findings.append(
-                f"owner confirmation stale for {label}; confirmed_at={confirmed_at.date().isoformat()} "
-                f"age_days={age_days} stale_after_days={stale_after_days}"
-            )
-
-    current = ", ".join(f"{pin['id']}/{pin['name']}={pin['model_pin']}" for pin in active_pins)
+        model_id = row.get("model_id")
+        if not isinstance(model_id, str) or not model_id.strip():
+            findings.append(f"model {key} has no model_id")
+        else:
+            model_ids.append(model_id)
+        tools = row.get("allowed_tools")
+        if row.get("tool_calling_supported") is not True:
+            findings.append(f"model {key} does not declare tool calling")
+        if (
+            not isinstance(tools, list)
+            or not tools
+            or any(tool not in ("Read", "Write", "Edit", "Grep", "Glob", "Bash") for tool in tools)
+        ):
+            findings.append(f"model {key} has an invalid tool subset")
+    selected = routing.get(provider) if isinstance(routing, dict) else None
+    if (
+        not isinstance(selected, dict)
+        or not isinstance(selected.get("default_model"), str)
+        or selected["default_model"] not in models
+    ):
+        findings.append("default_model does not resolve to a provider model")
+    elif set(routing) != {provider}:
+        findings.append("routing contains another provider's configuration")
     if findings:
-        details = "; ".join(findings)
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=config_found,
-            status="warning",
-            message=f"{len(active_pins)} active dispatch model pin(s): {current}; "
-            f"{len(findings)} warning(s): {details}",
-        )
-
+        return ToolCheck(name=name, required=False, found=True, status="fail", message="; ".join(findings)), ()
     return ToolCheck(
-        name=check_name,
+        name=name,
         required=False,
         found=True,
         status="pass",
-        message=(
-            f"{len(active_pins)} active dispatch model pin(s) owner-confirmed within {stale_after_days} days: {current}"
-        ),
-    )
+        message=f"{provider} routing references resolve; runtime and host qualification are separate",
+    ), tuple(model_ids)
 
 
-def _parse_model_pin_confirmed_at(value: Any) -> datetime | None:
-    if isinstance(value, datetime):
-        return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-    if isinstance(value, date):
-        return datetime(value.year, value.month, value.day, tzinfo=UTC)
-    if isinstance(value, str):
-        raw = value.strip()
-        if not raw:
-            return None
-        candidates = [raw]
-        if raw.endswith("Z"):
-            candidates.append(raw[:-1] + "+00:00")
-        for candidate in candidates:
-            try:
-                parsed = datetime.fromisoformat(candidate)
-            except ValueError:
-                continue
-            return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
-        with suppress(ValueError):
-            parsed_date = date.fromisoformat(raw)
-            return datetime(parsed_date.year, parsed_date.month, parsed_date.day, tzinfo=UTC)
-    return None
+def _check_provider_routing(target: Path, provider: str) -> ToolCheck:
+    return _provider_routing(target, provider)[0]
 
 
 def _check_ollama_harness(target: Path) -> ToolCheck:
-    """WI-4323: four-store Ollama harness consistency check (Phase-1 Child 3).
+    """Check the provider's own routing and the configured local Ollama host, without role mirrors."""
+    import urllib.error
+    import urllib.request
+    from urllib.parse import urlsplit
 
-    Authorized by ``bridge/gtkb-ollama-integration-phase-1-verification-006.md``
-    (GO at -006). Verifies four registry stores agree about the Ollama harness
-    being registered at id ``D`` with type ``ollama``, status ``registered``,
-    and an empty role set. The four stores are:
+    from groundtruth_kb.authority_client import AuthorityClientError
+    from groundtruth_kb.config import GTConfigError
 
-    1. ``harness-state/harness-identities.json`` — must contain ``ollama → D``.
-    2. ``harness-state/harness-registry.json`` — must contain ``id=D`` with
-       ``harness_name=ollama``, ``harness_type=ollama``, ``status=registered``,
-       ``role=[]``.
-    3. ``config/agent-control/harness-capability-registry.toml`` — must
-       contain ``[harnesses.ollama]`` with the four Phase-1 capability-floor
-       keys (``bridge_compliance_gate_respect``, ``root_boundary_respect``,
-       ``author_metadata_env_var_setting``, ``destructive_gate_delegation``).
-    4. ``.ollama/routing.toml`` — must be parseable and contain at least one
-       model whose ``tool_calling_supported`` is true.
-
-    A Layer 4 advertised-model check runs only when the local Ollama daemon
-    is reachable (``/api/tags``); models declared in routing TOML that are
-    absent from ``/api/tags`` surface as drift.
-
-    Severity is ``warning`` per the Phase-1 ``GOV-HARNESS-ONBOARDING-CONTRACT-001``
-    rollout convention: this check is diagnostic, not blocking, until role
-    promotion lands in Phase 2+.
-    """
-    import tomllib  # noqa: PLC0415 - py3.11+; defer import
-
-    from groundtruth_kb.harness_projection import (  # noqa: PLC0415
-        HarnessStateError,
-        read_capabilities,
-        read_identity,
-        read_roles,
-    )
-
-    findings: list[str] = []
-
-    # ── Layer 1 — identity store ─────────────────────────────────────
-    ollama_id: str | None = None
+    check, model_ids = _provider_routing(target, "ollama")
+    if check.status != "pass":
+        return check
+    name = "Ollama host readiness"
     try:
-        identities = read_identity(project_root=target)
-    except HarnessStateError as exc:
-        findings.append(f"L1: identities store error: {exc}")
-    else:
-        harness_block = identities.get("harnesses") if isinstance(identities, dict) else None
-        if not isinstance(harness_block, dict) or "ollama" not in harness_block:
-            findings.append("L1: identities store missing 'ollama' entry")
-        else:
-            ollama_id = harness_block["ollama"].get("id") if isinstance(harness_block["ollama"], dict) else None
-            if ollama_id != "D":
-                findings.append(f"L1: identities ollama.id={ollama_id!r}; expected 'D'")
-
-    # ── Layer 2 — registry store ─────────────────────────────────────
-    registry_entry: dict[str, Any] | None = None
-    try:
-        registry = read_roles(project_root=target)
-    except HarnessStateError as exc:
-        findings.append(f"L2: registry store error: {exc}")
-    else:
-        harnesses = registry.get("harnesses") if isinstance(registry, dict) else None
-        if isinstance(harnesses, list):
-            for entry in harnesses:
-                if isinstance(entry, dict) and entry.get("id") == "D":
-                    registry_entry = entry
-                    break
-        if registry_entry is None:
-            findings.append("L2: registry has no entry for id=D")
-        else:
-            if registry_entry.get("harness_name") != "ollama":
-                findings.append(f"L2: registry harness_name={registry_entry.get('harness_name')!r}; expected 'ollama'")
-            if registry_entry.get("harness_type") != "ollama":
-                findings.append(f"L2: registry harness_type={registry_entry.get('harness_type')!r}; expected 'ollama'")
-            if registry_entry.get("status") != "registered":
-                findings.append(f"L2: registry status={registry_entry.get('status')!r}; expected 'registered'")
-            role = registry_entry.get("role")
-            if role != []:
-                findings.append(f"L2: registry role={role!r}; expected []")
-
-    # ── Layer 3 — capability registry ────────────────────────────────
-    try:
-        cap_data = read_capabilities(project_root=target)
-    except HarnessStateError as exc:
-        findings.append(f"L3: capability registry error: {exc}")
-    else:
-        ollama_caps = cap_data.get("harnesses", {}).get("ollama") if isinstance(cap_data, dict) else None
-        if not isinstance(ollama_caps, dict):
-            findings.append("L3: capability registry missing [harnesses.ollama]")
-        else:
-            required_keys = (
-                "bridge_compliance_gate_respect",
-                "root_boundary_respect",
-                "author_metadata_env_var_setting",
-                "destructive_gate_delegation",
-            )
-            missing_keys = [k for k in required_keys if k not in ollama_caps]
-            if missing_keys:
-                findings.append(f"L3: capability registry missing keys: {missing_keys}")
-
-    # ── Layer 4 — routing TOML ──────────────────────────────────────
-    routing_path = target / ".ollama" / "routing.toml"
-    routing_models: list[str] = []
-    if not routing_path.is_file():
-        findings.append("L4: .ollama/routing.toml missing")
-    else:
-        try:
-            routing_data = tomllib.loads(_require_utf8_text(routing_path))
-        except (OSError, tomllib.TOMLDecodeError) as exc:
-            findings.append(f"L4: routing TOML unreadable: {exc}")
-        else:
-            models = routing_data.get("models") if isinstance(routing_data, dict) else None
-            if not isinstance(models, dict) or not models:
-                findings.append("L4: routing TOML has no [models.<key>] rows")
-            else:
-                any_tool_calling = False
-                for _key, row in models.items():
-                    if isinstance(row, dict):
-                        if row.get("tool_calling_supported") is True:
-                            any_tool_calling = True
-                        model_id = row.get("model_id")
-                        if isinstance(model_id, str) and model_id:
-                            routing_models.append(model_id)
-                if not any_tool_calling:
-                    findings.append("L4: routing TOML has no tool_calling_supported=true models")
-
-    # ── Cross-store consistency ──────────────────────────────────────
-    if ollama_id == "D" and registry_entry is None:
-        findings.append("Cross-store: identities has ollama→D but registry missing id=D")
-    if ollama_id is None and registry_entry is not None:
-        findings.append("Cross-store: registry has id=D but identities missing 'ollama'")
-
-    # ── Layer 4b — advertised-model verification and API reachability ──
-    # Skipped entirely when GTKB_DOCTOR_OLLAMA_SKIP_PROBE is set (used by unit tests
-    # to keep the fixture-only checks hermetic with respect to whatever the local
-    # Ollama daemon happens to advertise).
-    if routing_models and not os.environ.get("GTKB_DOCTOR_OLLAMA_SKIP_PROBE"):
-        try:
-            import urllib.error  # noqa: PLC0415
-            import urllib.request  # noqa: PLC0415
-
-            with urllib.request.urlopen(  # noqa: S310 - localhost probe
-                "http://localhost:11434/api/tags", timeout=2.0
-            ) as response:
-                body = response.read().decode("utf-8", errors="replace")
-            try:
-                advertised = json.loads(body)
-            except json.JSONDecodeError:
-                advertised = {}
-            advertised_names = {m.get("name") for m in advertised.get("models", []) if isinstance(m, dict)}
-            for model_id in routing_models:
-                if not any(name and (name == model_id or name.startswith(model_id + ":")) for name in advertised_names):
-                    findings.append(f"L4b: routing model {model_id!r} not advertised by /api/tags")
-        except (urllib.error.URLError, TimeoutError, OSError):
-            findings.append("L4b: Ollama /api/tags unreachable")
-
-    if not os.environ.get("GTKB_DOCTOR_OLLAMA_SKIP_HOST_READINESS"):
-        autostart_finding = _ollama_windows_autostart_finding()
-        if autostart_finding:
-            findings.append(autostart_finding)
-
-    if not findings:
+        installations = [row for row in _native_harness_installations(target) if row.get("harness_name") == "ollama"]
+    except (AuthorityClientError, GTConfigError) as exc:
         return ToolCheck(
-            name="Ollama harness consistency",
+            name=name,
+            required=False,
+            found=False,
+            status="warning",
+            message=f"Current installation metadata unavailable; host readiness unverified: {exc}",
+        )
+    if len(installations) != 1:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=bool(installations),
+            status="warning",
+            message="One active Ollama installation is required to identify the host to inspect",
+        )
+    surfaces = installations[0].get("invocation_surfaces")
+    headless = surfaces.get("headless") if isinstance(surfaces, dict) else None
+    argv = headless.get("argv") if isinstance(headless, dict) else None
+    if not isinstance(argv, list) or not argv or not all(isinstance(arg, str) for arg in argv):
+        return ToolCheck(
+            name=name, required=False, found=True, status="fail", message="Ollama installation argv is malformed"
+        )
+    endpoints = []
+    for index, arg in enumerate(argv):
+        if arg == "--endpoint":
+            endpoints.append(argv[index + 1] if index + 1 < len(argv) else "")
+        elif arg.startswith("--endpoint="):
+            endpoints.append(arg.partition("=")[2])
+    endpoint = endpoints[0] if endpoints else "http://localhost:11434"
+    try:
+        parsed = urlsplit(endpoint)
+        valid_endpoint = (
+            parsed.scheme in {"http", "https"}
+            and parsed.hostname
+            and not parsed.username
+            and not parsed.password
+            and not parsed.query
+            and not parsed.fragment
+            and parsed.path in {"", "/"}
+        )
+        _ = parsed.port
+    except ValueError:
+        valid_endpoint = False
+    if len(endpoints) > 1 or not valid_endpoint:
+        return ToolCheck(
+            name=name,
             required=False,
             found=True,
-            status="pass",
-            message="4-store Ollama harness consistency: clean (L1+L2+L3+L4)",
+            status="fail",
+            message="Ollama endpoint metadata is invalid; values are not echoed",
         )
-
-    head = findings[0]
-    extra = f" (+{len(findings) - 1} more)" if len(findings) > 1 else ""
-    return ToolCheck(
-        name="Ollama harness consistency",
-        required=False,
-        found=True,
-        status="warning",
-        message=f"{len(findings)} findings; first: {head}{extra}",
-    )
-
-
-def _check_alibaba_cloud_studio_harness(target: Path) -> ToolCheck:
-    """Verify the Alibaba Cloud Studio H onboarding contract without reading secrets."""
-    import tomllib  # noqa: PLC0415 - py3.11+; defer import
-
-    from groundtruth_kb.harness_projection import (  # noqa: PLC0415
-        HarnessStateError,
-        read_capabilities,
-        read_identity,
-        read_roles,
-    )
-
-    check_name = "Alibaba Cloud Studio H harness consistency"
-    canonical_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
-    findings: list[str] = []
-
-    # Layer 1: the durable installation identity is separate from the registry projection.
-    try:
-        identities = read_identity(project_root=target)
-    except HarnessStateError as exc:
-        findings.append(f"L1: identities store error: {exc}")
-    else:
-        harnesses = identities.get("harnesses") if isinstance(identities, dict) else None
-        entry = harnesses.get("alibaba-cloud-studio") if isinstance(harnesses, dict) else None
-        if not isinstance(entry, dict):
-            findings.append("L1: identities store missing 'alibaba-cloud-studio' entry")
-        elif entry.get("id") != "H":
-            findings.append(f"L1: alibaba-cloud-studio.id={entry.get('id')!r}; expected 'H'")
-
-    registry_entry: dict[str, Any] | None = None
-    goose_entry: dict[str, Any] | None = None
-    # Layer 2: H's live-smoke ordering is governed report evidence; the registry
-    # records only its current (pre- or post-proof) dispatch state.
-    try:
-        registry = read_roles(project_root=target)
-    except HarnessStateError as exc:
-        findings.append(f"L2: registry store error: {exc}")
-    else:
-        records = registry.get("harnesses") if isinstance(registry, dict) else None
-        if isinstance(records, list):
-            for entry in records:
-                if not isinstance(entry, dict):
-                    continue
-                if entry.get("id") == "H":
-                    registry_entry = entry
-                elif entry.get("id") == "G":
-                    goose_entry = entry
-        if registry_entry is None:
-            findings.append("L2: registry has no entry for id=H")
-        else:
-            expected = {
-                "harness_name": "alibaba-cloud-studio",
-                "harness_type": "claude",
-                "status": "active",
-            }
-            for key, value in expected.items():
-                if registry_entry.get(key) != value:
-                    findings.append(f"L2: registry {key}={registry_entry.get(key)!r}; expected {value!r}")
-            if registry_entry.get("role") != ["loyal-opposition"]:
-                findings.append(f"L2: registry role={registry_entry.get('role')!r}; expected ['loyal-opposition']")
-            if not isinstance(registry_entry.get("can_receive_dispatch"), bool):
-                findings.append("L2: H can_receive_dispatch must be a boolean")
-            surfaces = registry_entry.get("invocation_surfaces")
-            headless = surfaces.get("headless") if isinstance(surfaces, dict) else None
-            argv = headless.get("argv") if isinstance(headless, dict) else None
-            if not isinstance(argv, list):
-                findings.append("L2: H headless invocation argv is missing")
-            else:
-                required_argv = {
-                    "scripts/alibaba_cloud_studio_harness.py",
-                    "--prompt",
-                    "{{PROMPT}}",
-                    "--skill",
-                    "bridge-review",
-                    "--model",
-                    "alibaba-deepseek-v4-pro",
-                }
-                missing_argv = sorted(required_argv.difference(str(item) for item in argv))
-                if missing_argv:
-                    findings.append(f"L2: H headless argv missing {missing_argv}")
-        if goose_entry is None:
-            findings.append("L2: registry has no retained Goose G retirement record")
-        else:
-            if goose_entry.get("status") not in {"suspended", "retired"}:
-                findings.append(f"L2: Goose status={goose_entry.get('status')!r}; expected suspended or retired")
-            if goose_entry.get("can_receive_dispatch") is not False:
-                findings.append("L2: Goose G remains dispatchable")
-
-    # Layer 3: capability floor, provider envelope, and env-name-only metadata.
-    try:
-        capabilities = read_capabilities(project_root=target)
-    except HarnessStateError as exc:
-        findings.append(f"L3: capability registry error: {exc}")
-    else:
-        h_caps = (
-            capabilities.get("harnesses", {}).get("alibaba-cloud-studio") if isinstance(capabilities, dict) else None
-        )
-        if not isinstance(h_caps, dict):
-            findings.append("L3: capability registry missing [harnesses.alibaba-cloud-studio]")
-        else:
-            expected_caps: dict[str, Any] = {
-                "bridge_compliance_gate_respect": True,
-                "root_boundary_respect": True,
-                "author_metadata_env_var_setting": True,
-                "destructive_gate_delegation": True,
-                "advertised_tool_subset": canonical_tools,
-                "tool_guard_adapter_fail_closed": True,
-                "dialect": "anthropic-messages",
-                "hook_tier": "native-full-hooks",
-                "auth_style": "authorization-bearer",
-                "auth_env_key": "ALIBABA_API_KEY",
-                "endpoint_env_key": "ALIBABA_ANTHROPIC_COMPATIBLE_ENDPOINT",
-                "provider_routing_key": "alibaba-cloud-studio",
-                "activity_envelope_projection_mode": "compact-provider",
-                "compact_result_envelope_mode": "compact-provider",
-                "compact_session_envelope_mode": "compact-provider",
-                "full_transcript_archive_required": False,
-            }
-            for key, value in expected_caps.items():
-                if h_caps.get(key) != value:
-                    findings.append(f"L3: capability {key}={h_caps.get(key)!r}; expected {value!r}")
-
-    # Layer 4: routing and wrapper source only name the approved env keys.
-    routing_path = target / ".api-harness" / "routing.toml"
-    try:
-        routing = tomllib.loads(_require_utf8_text(routing_path))
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        findings.append(f"L4: routing TOML unreadable: {exc}")
-    else:
-        model = routing.get("models", {}).get("alibaba-deepseek-v4-pro") if isinstance(routing, dict) else None
-        route = routing.get("routing", {}).get("alibaba-cloud-studio") if isinstance(routing, dict) else None
-        if not isinstance(model, dict):
-            findings.append("L4: routing has no models.alibaba-deepseek-v4-pro row")
-        else:
-            if model.get("provider") != "alibaba-cloud-studio":
-                findings.append(f"L4: Alibaba model provider={model.get('provider')!r}")
-            if model.get("tool_calling_supported") is not True:
-                findings.append("L4: Alibaba model does not advertise tool calling")
-            if model.get("allowed_tools") != canonical_tools:
-                findings.append("L4: Alibaba model does not expose the canonical tool set")
-        if not isinstance(route, dict):
-            findings.append("L4: routing has no routing.alibaba-cloud-studio row")
-        elif route.get("default_model") != "alibaba-deepseek-v4-pro":
-            findings.append(f"L4: Alibaba default_model={route.get('default_model')!r}")
-
-    wrapper_path = target / "scripts" / "alibaba_cloud_studio_harness.py"
-    try:
-        wrapper_source = _require_utf8_text(wrapper_path)
-    except OSError as exc:
-        findings.append(f"L4: Alibaba wrapper unreadable: {exc}")
-    else:
-        for env_name in ("ALIBABA_API_KEY", "ALIBABA_ANTHROPIC_COMPATIBLE_ENDPOINT"):
-            if env_name not in wrapper_source:
-                findings.append(f"L4: wrapper does not reference {env_name}")
-            if re.search(rf"{env_name}\\s*=\\s*['\"](?!['\"])", wrapper_source):
-                findings.append(f"L4: wrapper embeds a value for {env_name}")
-
-    if not findings:
+    if parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
         return ToolCheck(
-            name=check_name,
+            name=name,
             required=False,
             found=True,
-            status="pass",
-            message=(
-                "Alibaba H onboarding clean (identity, registry, capability floor, routing, "
-                "env-name-only wrapper, Goose retirement)"
-            ),
+            status="warning",
+            message="Remote Ollama availability requires host qualification; no local probe was substituted",
         )
-
-    head = findings[0]
-    extra = f" (+{len(findings) - 1} more)" if len(findings) > 1 else ""
+    if os.environ.get("GTKB_DOCTOR_OLLAMA_SKIP_PROBE"):
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="warning",
+            message="Local model probe was skipped; host readiness is unverified",
+        )
+    findings = []
+    try:
+        with urllib.request.urlopen(endpoint.rstrip("/") + "/api/tags", timeout=2.0) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        models = body.get("models") if isinstance(body, dict) else None
+        if not isinstance(models, list) or any(
+            not isinstance(row, dict) or not isinstance(row.get("name"), str) for row in models
+        ):
+            findings.append("Ollama model inventory is malformed")
+        else:
+            advertised = [row["name"] for row in models]
+            for model_id in model_ids:
+                if not any(model_id == value or value.startswith(model_id + ":") for value in advertised):
+                    findings.append(f"Configured model {model_id!r} is not advertised")
+    except (urllib.error.URLError, TimeoutError, OSError, UnicodeError, json.JSONDecodeError):
+        findings.append("Local Ollama model inventory is unavailable or unreadable")
+    if os.environ.get("GTKB_DOCTOR_OLLAMA_SKIP_HOST_READINESS"):
+        findings.append("Host autostart inspection was skipped")
+    else:
+        autostart = _ollama_windows_autostart_finding()
+        if autostart:
+            findings.append(autostart)
     return ToolCheck(
-        name=check_name,
+        name=name,
         required=False,
         found=True,
-        status="warning",
-        message=f"{len(findings)} findings; first: {head}{extra}",
+        status="warning" if findings else "pass",
+        message="; ".join(findings)
+        if findings
+        else "Local model availability and host setup inspected; actual agent execution is unverified",
     )
 
 
@@ -2019,118 +1361,6 @@ def _check_rules(target: Path, profile_name: str) -> ToolCheck:
     )
 
 
-def _check_settings_classifiers(target: Path) -> ToolCheck:
-    """F5: Check classifier hook configuration in .claude/settings.local.json.
-
-    Bridge-profile-only. Warns when:
-      - settings file is missing
-      - settings JSON is malformed
-      - ``hooks`` key is not a dict
-      - ``UserPromptSubmit`` hooks list is missing, null, or non-list
-      - neither ``intake-classifier.py`` nor ``spec-classifier.py`` is active
-      - both classifiers are active (redundant)
-    """
-    import json
-
-    settings_path = target / ".claude" / "settings.local.json"
-    if not settings_path.exists():
-        return ToolCheck(
-            name="Classifier settings",
-            required=False,
-            found=False,
-            status="warning",
-            message=".claude/settings.local.json not found; classifiers cannot be activated",
-        )
-
-    try:
-        raw = _require_utf8_text(settings_path)
-        data = json.loads(raw)
-    except (OSError, json.JSONDecodeError) as exc:
-        return ToolCheck(
-            name="Classifier settings",
-            required=False,
-            found=True,
-            status="warning",
-            message=f"Malformed settings JSON: {exc}",
-        )
-
-    if not isinstance(data, dict):
-        return ToolCheck(
-            name="Classifier settings",
-            required=False,
-            found=True,
-            status="warning",
-            message="settings.local.json root must be a JSON object",
-        )
-
-    hooks = data.get("hooks")
-    if hooks is None:
-        return ToolCheck(
-            name="Classifier settings",
-            required=False,
-            found=True,
-            status="warning",
-            message="settings.local.json has no 'hooks' section",
-        )
-    if not isinstance(hooks, dict):
-        return ToolCheck(
-            name="Classifier settings",
-            required=False,
-            found=True,
-            status="warning",
-            message=f"'hooks' must be a JSON object, got {type(hooks).__name__}",
-        )
-
-    ups = hooks.get("UserPromptSubmit")
-    if ups is None or not isinstance(ups, list):
-        return ToolCheck(
-            name="Classifier settings",
-            required=False,
-            found=True,
-            status="warning",
-            message="'hooks.UserPromptSubmit' must be a non-null list",
-        )
-
-    active_hook_names: set[str] = set()
-    for entry in ups:
-        if not isinstance(entry, dict):
-            continue
-        cmd = entry.get("command", "") or ""
-        if "intake-classifier.py" in cmd:
-            active_hook_names.add("intake-classifier.py")
-        if "spec-classifier.py" in cmd:
-            active_hook_names.add("spec-classifier.py")
-
-    has_intake = "intake-classifier.py" in active_hook_names
-    has_spec = "spec-classifier.py" in active_hook_names
-
-    if has_intake and has_spec:
-        return ToolCheck(
-            name="Classifier settings",
-            required=False,
-            found=True,
-            status="warning",
-            message="Both intake-classifier.py and spec-classifier.py are active (redundant)",
-        )
-    if not has_intake and not has_spec:
-        return ToolCheck(
-            name="Classifier settings",
-            required=False,
-            found=True,
-            status="warning",
-            message="Neither intake-classifier.py nor spec-classifier.py is active",
-        )
-
-    active = "intake-classifier.py" if has_intake else "spec-classifier.py"
-    return ToolCheck(
-        name="Classifier settings",
-        required=False,
-        found=True,
-        status="pass",
-        message=f"{active} is active",
-    )
-
-
 def _check_active_legacy_root_references(target: Path) -> ToolCheck:
     """Hard-fail active surfaces that still treat the retired archive root as live authority."""
     findings: list[str] = []
@@ -2207,75 +1437,6 @@ def _legacy_root_reference_is_allowed(relative_path: Path, lines: list[str], lin
 # Sub-slice E doctor invariants per amended DCL-REQUIREMENTS-COLLECTION-HOOK-CONTRACT-001 v2.
 # Enforces: GOV-REQUIREMENTS-COLLECTION-HOOK-001 v2; DCL DOCTOR INVARIANTS section.
 # See bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04 for approved scope.
-
-
-def _check_spec_classifier_canonical_path(target: Path) -> ToolCheck:
-    """Verify spec-classifier.py exists at the DCL-mandated canonical path."""
-    hook_path = target / ".claude" / "hooks" / "spec-classifier.py"
-    return ToolCheck(
-        name="spec-classifier hook canonical path",
-        required=False,
-        found=hook_path.exists(),
-        status="pass" if hook_path.exists() else "warning",
-        message=(
-            f"spec-classifier.py present at {hook_path.relative_to(target)}"
-            if hook_path.exists()
-            else f"spec-classifier.py missing from canonical path {hook_path.relative_to(target)}"
-        ),
-    )
-
-
-def _check_spec_classifier_settings_registered(target: Path) -> ToolCheck:
-    """Verify spec-classifier.py is registered in tracked .claude/settings.json.
-
-    Reads tracked settings (NOT settings.local.json) per Codex -004 F1.
-    Tracked registration ensures the hook fires for fresh clones and shared
-    harness contexts, not only on the current workstation.
-    """
-    import json as _json
-
-    settings_path = target / ".claude" / "settings.json"
-    if not settings_path.exists():
-        return ToolCheck(
-            name="spec-classifier tracked settings",
-            required=False,
-            found=False,
-            status="warning",
-            message=".claude/settings.json missing (tracked project settings)",
-        )
-
-    try:
-        data = _json.loads(_require_utf8_text(settings_path))
-    except (OSError, _json.JSONDecodeError) as exc:
-        return ToolCheck(
-            name="spec-classifier tracked settings",
-            required=False,
-            found=True,
-            status="warning",
-            message=f"Malformed tracked settings JSON: {exc}",
-        )
-
-    ups = (data.get("hooks") or {}).get("UserPromptSubmit") or []
-    for group in ups:
-        if not isinstance(group, dict):
-            continue
-        for h in group.get("hooks", []):
-            if isinstance(h, dict) and "spec-classifier.py" in (h.get("command") or ""):
-                return ToolCheck(
-                    name="spec-classifier tracked settings",
-                    required=False,
-                    found=True,
-                    status="pass",
-                    message="spec-classifier.py registered under UserPromptSubmit",
-                )
-
-    return ToolCheck(
-        name="spec-classifier tracked settings",
-        required=False,
-        found=True,
-        status="warning",
-        message="spec-classifier.py NOT registered in tracked .claude/settings.json UserPromptSubmit",
-    )
 
 
 def _check_registered_hooks_tracked(target: Path) -> ToolCheck:
@@ -2602,558 +1763,47 @@ def _check_skill_rename_reference_sweep(target: Path) -> ToolCheck:
     )
 
 
-def _check_parity_discovery_diff(target: Path) -> ToolCheck:
-    """Cross-harness parity discovery-diff (Slice 3 of PROJECT-GTKB-CROSS-HARNESS-PARITY).
+def _check_harness_projection_conformance(target: Path) -> ToolCheck:
+    """Compare declared targets with the baseline and their exact engine plans."""
+    import importlib.util
 
-    Realizes ``DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001`` assertion
-    **PARITY-DIFF-WIRED**: the discovery-diff
-    (``scripts/parity_discovery_diff.py``) runs as a doctor check. Per owner
-    grill Q6, the severity is **WARN** at Slice 3 (never ``fail``); the
-    WARN→FAIL promotion and the release/CI hard gate land in Slice 6 after a
-    coverage-audit window.
-
-    Status mapping:
-      - script absent → ``info`` (Slice-3 surface, not a required dependency)
-      - run error / discovery errors → ``warning``
-      - unwaived asymmetry present → ``warning`` (lists the asymmetric keys)
-      - no unwaived asymmetry → ``pass``
-    """
-    import importlib.util as _importlib_util
-
-    name = "Cross-harness parity discovery-diff"
-    script = target / "scripts" / "parity_discovery_diff.py"
-    if not script.is_file():
+    name = "Harness projection conformance"
+    script = target / "scripts/check_harness_parity.py"
+    if not script.is_file() or script.resolve() != script:
         return ToolCheck(
             name=name,
-            required=False,
+            required=True,
             found=False,
-            status="info",
-            message="scripts/parity_discovery_diff.py not present; cross-harness parity discovery-diff not wired",
-        )
-
-    # Ensure the script's guarded sibling imports (scripts/check_harness_parity.py,
-    # scripts/harness_projection_reader.py) resolve when the doctor runs from the
-    # installed package rather than the repo root.
-    for extra in (str(target), str(target / "scripts")):
-        if extra not in sys.path:
-            sys.path.insert(0, extra)
-
-    try:
-        spec = _importlib_util.spec_from_file_location("gtkb_parity_discovery_diff", script)
-        if spec is None or spec.loader is None:
-            raise ImportError("could not build module spec for parity_discovery_diff")
-        module = _importlib_util.module_from_spec(spec)
-        # Register before exec so the module's frozen dataclasses resolve their
-        # own module via sys.modules (Python 3.12+ dataclasses._is_type lookup).
-        sys.modules[spec.name] = module
-        spec.loader.exec_module(module)
-        report = module.run_discovery_diff(target)
-    except Exception as exc:  # intentional-catch: doctor health check stays fail-soft
-        return ToolCheck(
-            name=name,
-            required=False,
-            found=True,
-            status="warning",
-            message=f"discovery-diff failed to run: {exc}",
-        )
-
-    if report.errors:
-        return ToolCheck(
-            name=name,
-            required=False,
-            found=True,
-            status="warning",
-            message="discovery-diff errors: " + "; ".join(report.errors),
-        )
-
-    if report.overall_status == "ASYMMETRY":
-        keys = ", ".join(finding.capability_key for finding in report.findings)
-        return ToolCheck(
-            name=name,
-            required=False,
-            found=True,
             status="fail",
-            message=(
-                f"{len(report.findings)} unwaived cross-harness hook asymmetry(ies) — "
-                f"resolve (registry-unify) or owner-waive each before release "
-                f"(Slice 6 WARN→FAIL promotion; PARITY-DIFF-WIRED): {keys}"
-            ),
+            message="Canonical projection checker is missing or redirected",
         )
-
-    return ToolCheck(
-        name=name,
-        required=False,
-        found=True,
-        status="pass",
-        message=f"no unwaived cross-harness hook asymmetry (population: {', '.join(report.population) or 'none'})",
-    )
-
-
-def _check_spec_classifier_codex_parity(target: Path) -> ToolCheck:
-    """Verify spec-classifier.py is registered in .codex/hooks.json (forward-compatible parity).
-
-    Per ADR-CODEX-HOOK-PARITY-FALLBACK-001 + Codex -006 F1: parity entry is
-    forward-compatible intent (currently disabled on Windows; active when
-    Codex hook parity becomes live).
-    """
-    import json as _json
-
-    codex_path = target / ".codex" / "hooks.json"
-    if not codex_path.exists():
-        return ToolCheck(
-            name="spec-classifier Codex parity",
-            required=False,
-            found=False,
-            status="warning",
-            message=".codex/hooks.json missing (Codex parity not configured)",
-        )
-
     try:
-        data = _json.loads(_require_utf8_text(codex_path))
-    except (OSError, _json.JSONDecodeError) as exc:
-        return ToolCheck(
-            name="spec-classifier Codex parity",
-            required=False,
-            found=True,
-            status="warning",
-            message=f"Malformed .codex/hooks.json: {exc}",
+        spec = importlib.util.spec_from_file_location("_gtkb_doctor_projection_check", script)
+        if spec is None or spec.loader is None:
+            raise ImportError("Cannot load canonical projection checker")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        report = module.check_harness_parity(target, harness="all")
+        failed = [name for name, result in report["harnesses"].items() if result["status"] != "pass"]
+        message = (
+            "Installed outputs match the canonical baseline and projector"
+            if report["status"] == "pass"
+            else f"Projection correction required: {', '.join(failed) or report['issues']}"
         )
-
-    ups = (data.get("hooks") or {}).get("UserPromptSubmit") or []
-    for group in ups:
-        if not isinstance(group, dict):
-            continue
-        for h in group.get("hooks", []):
-            if isinstance(h, dict) and "spec-classifier.py" in (h.get("command") or ""):
-                return ToolCheck(
-                    name="spec-classifier Codex parity",
-                    required=False,
-                    found=True,
-                    status="pass",
-                    message="spec-classifier.py parity entry present (forward-compatible)",
-                )
-
-    return ToolCheck(
-        name="spec-classifier Codex parity",
-        required=False,
-        found=True,
-        status="warning",
-        message="spec-classifier.py NOT registered in .codex/hooks.json UserPromptSubmit",
-    )
+        return ToolCheck(
+            name=name,
+            required=True,
+            found=True,
+            status=report["status"],
+            message=message + "; actual hook invocation remains separate qualification",
+        )
+    except Exception as exc:  # intentional-catch: present checker failure as a diagnostic
+        return ToolCheck(
+            name=name, required=True, found=True, status="fail", message=f"Projection check unavailable: {exc}"
+        )
 
 
 # FAB-08 (HYG-053): stale clean-adopter test-sandbox auto-prune.
-
-
-def _check_spec_classifier_test_exists(target: Path) -> ToolCheck:
-    """Verify the canonical regression test for spec-classifier exists."""
-    test_path = target / "groundtruth-kb" / "tests" / "test_spec_classifier_canonical_triggers.py"
-    return ToolCheck(
-        name="spec-classifier test module",
-        required=False,
-        found=test_path.exists(),
-        status="pass" if test_path.exists() else "warning",
-        message=(
-            f"Test module present at {test_path.relative_to(target)}"
-            if test_path.exists()
-            else f"Test module missing at canonical path {test_path.relative_to(target)}"
-        ),
-    )
-
-
-# Sub-slice F release-metric doctor invariants per umbrella -003.md:192-204.
-# Enforces: GOV-REQUIREMENTS-COLLECTION-HOOK-001 v3 (AUQ-only invariant);
-#           GOV-OWNER-DECISION-SURFACING-001;
-#           GOV-FILE-BRIDGE-AUTHORITY-001 (Owner Decisions / Input section).
-# See bridge/gtkb-gov-auq-enforcement-stack-slice-f-release-metrics-2026-05-04 for approved scope.
-
-# Cutoff for rolling-window metrics: entries asked_at before this date are
-# pre-enforcement-era and excluded from coverage calculations. Override via
-# env var GTKB_AUQ_METRICS_CUTOFF_DATE (ISO date format).
-_AUQ_METRICS_CUTOFF_DATE_DEFAULT = "2026-05-04"
-
-
-def _parse_pending_decisions_file(path: Path) -> dict[str, list[dict[str, Any]]]:
-    """Parse the pending-owner-decisions.md durable file via the canonical hook parser.
-
-    Copies to a tempfile first so the hook's corruption-rename behavior on
-    parse failure doesn't touch the live file. Per Sub-slice D pattern.
-    """
-    import importlib.util
-    import shutil
-    import sys
-    import tempfile
-
-    if not path.exists():
-        return {"pending": [], "resolved": [], "history": []}
-
-    hook_path = path.parents[1] / ".claude" / "hooks" / "owner-decision-tracker.py"
-    if not hook_path.exists():
-        return {"pending": [], "resolved": [], "history": []}
-
-    spec = importlib.util.spec_from_file_location("owner_decision_tracker_doctor", hook_path)
-    if not (spec and spec.loader):
-        return {"pending": [], "resolved": [], "history": []}
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["owner_decision_tracker_doctor"] = module
-    spec.loader.exec_module(module)
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as tf:
-        tmp_path = Path(tf.name)
-    try:
-        shutil.copy2(path, tmp_path)
-        sections = module._read_pending_file(tmp_path)
-        # Convert DecisionEntry objects to plain dicts for downstream simplicity.
-        return {
-            section: [
-                {
-                    "id": e.id,
-                    "asked_at": e.asked_at,
-                    "detected_via": getattr(e, "detected_via", ""),
-                    "status": e.status,
-                    "notes": getattr(e, "notes", ""),
-                }
-                for e in entries
-            ]
-            for section, entries in sections.items()
-        }
-    finally:
-        with suppress(OSError):
-            tmp_path.unlink(missing_ok=True)
-        for sibling in tmp_path.parent.glob(tmp_path.name + ".corrupted-*"):
-            with suppress(OSError):
-                sibling.unlink()
-
-
-def _check_untriaged_prose_decisions(target: Path) -> ToolCheck:
-    """Count `prose:*` entries in ## Pending; FAIL if > 0.
-
-    Per umbrella Sub-slice F item 1: untriaged prose-decision entries indicate
-    surfacing-transparency violations (an owner-decision-ask was detected in
-    agent prose but never converted to AskUserQuestion, leaving the candidate
-    untriaged). Pre-Sub-slice-A historical entries should already have been
-    cleaned via Sub-slice D's `--cleanup` mode; ## Pending should be empty.
-    """
-    pending_path = target / "memory" / "pending-owner-decisions.md"
-    sections = _parse_pending_decisions_file(pending_path)
-    pending = sections.get("pending", [])
-    prose_entries = [e for e in pending if (e.get("detected_via") or "").startswith("prose:")]
-
-    if not prose_entries:
-        return ToolCheck(
-            name="Untriaged prose decisions",
-            required=False,
-            found=True,
-            status="pass",
-            message=f"## Pending contains 0 prose:* entries (total pending: {len(pending)})",
-        )
-
-    sample_ids = [e["id"] for e in prose_entries[:5]]
-    suffix = "..." if len(prose_entries) > 5 else ""
-    return ToolCheck(
-        name="Untriaged prose decisions",
-        required=False,
-        found=True,
-        status="fail",
-        message=f"## Pending has {len(prose_entries)} prose:* entries: {sample_ids}{suffix}",
-    )
-
-
-def _check_auq_coverage(target: Path) -> ToolCheck:
-    """Percentage of recent owner decisions captured via detected_via=ask_user_question; FAIL if < 100%.
-
-    Rolling window: entries with asked_at >= GTKB_AUQ_METRICS_CUTOFF_DATE
-    (default 2026-05-04, the Sub-slice A -014 VERIFIED date which marked
-    detector-tightening + AUQ-only enforcement going live). Pre-cutoff
-    entries are excluded as historical; their classification reflected the
-    pre-tightening detector, not current AUQ-only contract.
-    """
-    import os
-    from datetime import datetime
-
-    cutoff_str = os.environ.get("GTKB_AUQ_METRICS_CUTOFF_DATE", _AUQ_METRICS_CUTOFF_DATE_DEFAULT)
-    try:
-        cutoff = datetime.fromisoformat(cutoff_str).replace(tzinfo=UTC)
-    except ValueError:
-        return ToolCheck(
-            name="AUQ coverage",
-            required=False,
-            found=True,
-            status="warning",
-            message=f"Invalid GTKB_AUQ_METRICS_CUTOFF_DATE: {cutoff_str!r}",
-        )
-
-    pending_path = target / "memory" / "pending-owner-decisions.md"
-    sections = _parse_pending_decisions_file(pending_path)
-    # Exclude ## History — entries explicitly archived there are accepted
-    # residuals per the proposal's "document accepted residual via ## History
-    # move" pattern. Active compliance is measured over Pending + Resolved only.
-    active_entries = []
-    for section_name in ("pending", "resolved"):
-        active_entries.extend(sections.get(section_name, []))
-
-    in_window = []
-    for e in active_entries:
-        asked = e.get("asked_at") or ""
-        if not asked:
-            continue
-        try:
-            asked_str = asked.replace("Z", "+00:00") if asked.endswith("Z") else asked
-            dt = datetime.fromisoformat(asked_str)
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=UTC)
-        except (ValueError, TypeError):
-            continue
-        if dt >= cutoff:
-            in_window.append(e)
-
-    if not in_window:
-        return ToolCheck(
-            name="AUQ coverage",
-            required=False,
-            found=True,
-            status="pass",
-            message=f"No entries in window (cutoff={cutoff.date().isoformat()})",
-        )
-
-    genuine = [e for e in in_window if not (e.get("detected_via") or "").startswith("prose:")]
-
-    if not genuine:
-        return ToolCheck(
-            name="AUQ coverage",
-            required=False,
-            found=True,
-            status="pass",
-            message=(
-                f"No genuine entries in window (cutoff={cutoff.date().isoformat()}; "
-                f"{len(in_window) - len(genuine)} prose-pattern false positives excluded)"
-            ),
-        )
-
-    auq = [e for e in genuine if e.get("detected_via") == "ask_user_question"]
-    pct = (len(auq) / len(genuine)) * 100.0
-    if len(auq) == len(genuine):
-        excluded = len(in_window) - len(genuine)
-        suffix = f" ({excluded} prose-pattern excluded)" if excluded else ""
-        return ToolCheck(
-            name="AUQ coverage",
-            required=False,
-            found=True,
-            status="pass",
-            message=f"AUQ coverage 100% over {len(genuine)} entries since {cutoff.date().isoformat()}{suffix}",
-        )
-
-    non_auq_ids = [e["id"] for e in genuine if e.get("detected_via") != "ask_user_question"][:5]
-    return ToolCheck(
-        name="AUQ coverage",
-        required=False,
-        found=True,
-        status="fail",
-        message=(
-            f"AUQ coverage {pct:.1f}% ({len(auq)}/{len(genuine)}) since {cutoff.date().isoformat()}; "
-            f"non-AUQ sample: {non_auq_ids}"
-        ),
-    )
-
-
-def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
-    """Scan VERIFIED bridges; FAIL if any cite owner approval without an Owner Decisions / Input section.
-
-    Reuses bridge-compliance-gate's helper functions (proposal_claims_owner_approval +
-    has_concrete_owner_decisions_section) via importlib so the same logic
-    that gates Write-time also gates release-time.
-
-    Cutoff: only scans VERIFIED files dated on/after GTKB_AUQ_METRICS_CUTOFF_DATE
-    (default 2026-05-04, Sub-slice C -006 VERIFIED date). Pre-cutoff VERIFIED
-    bridges predate the Owner Decisions / Input requirement landing in the
-    bridge-compliance-gate hook.
-    """
-    import importlib.util
-    import os
-    import re as _re
-    import sys
-    from datetime import datetime
-
-    cutoff_str = os.environ.get("GTKB_AUQ_METRICS_CUTOFF_DATE", _AUQ_METRICS_CUTOFF_DATE_DEFAULT)
-    try:
-        cutoff = datetime.fromisoformat(cutoff_str).replace(tzinfo=UTC)
-    except ValueError:
-        return ToolCheck(
-            name="Uncited owner-input bridges",
-            required=False,
-            found=True,
-            status="warning",
-            message=f"Invalid GTKB_AUQ_METRICS_CUTOFF_DATE: {cutoff_str!r}",
-        )
-
-    bridge_dir = target / "bridge"
-    if not bridge_dir.exists():
-        return ToolCheck(
-            name="Uncited owner-input bridges",
-            required=False,
-            found=False,
-            status="warning",
-            message="bridge directory not found",
-        )
-
-    gate_path = target / ".claude" / "hooks" / "bridge-compliance-gate.py"
-    if not gate_path.exists():
-        return ToolCheck(
-            name="Uncited owner-input bridges",
-            required=False,
-            found=True,
-            status="warning",
-            message="bridge-compliance-gate.py not found; cannot reuse helpers",
-        )
-    spec = importlib.util.spec_from_file_location("bridge_gate_doctor", gate_path)
-    if not (spec and spec.loader):
-        return ToolCheck(
-            name="Uncited owner-input bridges",
-            required=False,
-            found=True,
-            status="warning",
-            message="bridge-compliance-gate.py could not be loaded",
-        )
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["bridge_gate_doctor"] = module
-    spec.loader.exec_module(module)
-
-    # Per bridge protocol: each thread is a chain of numbered bridge files,
-    # newest version first. A latest VERIFIED file is the verdict; the Prime
-    # proposal/report carrying the Owner Decisions obligation is on NEW/REVISED
-    # versions in the same chain. The check inspects non-verdict files in each
-    # VERIFIED thread, not only the verdict file. Per Codex -004 F1.
-    threads: list[tuple[str, list[tuple[str, Path]]]] = []
-    grouped_files: dict[str, list[tuple[int, str, Path]]] = {}
-    for path in bridge_dir.glob("*.md"):
-        match = _BRIDGE_VERSION_FILE_RE.match(path.name)
-        if match is None:
-            continue
-        status = _status_from_bridge_file(path)
-        if status is None:
-            continue
-        grouped_files.setdefault(match.group(1), []).append((int(match.group(2)), status, path))
-    for doc_name, versions in sorted(grouped_files.items()):
-        files = [(status, path) for _version, status, path in sorted(versions, key=lambda item: item[0], reverse=True)]
-        if files:
-            threads.append((doc_name, files))
-
-    # Known historical offenders: bridge files filed before Sub-slice C's
-    # bridge-compliance-gate began enforcing the Owner Decisions / Input
-    # section requirement. Documented as accepted residuals per the umbrella's
-    # "document accepted residual" treatment pattern. New offenders not in
-    # this set fail the metric — the allowlist is sealed (no automatic growth).
-    known_historical_offenders: set[str] = {
-        # Sub-slice B's post-impl REPORT, filed before Sub-slice C VERIFIED
-        # introduced the Owner Decisions section gate.
-        "gtkb-gov-askuserquestion-enforcement-stack-slice-b-prime-rule-005.md",
-        # ISOLATION-018 pending-migration-waiver REPORT, filed S330 prior to
-        # the gate landing.
-        "gtkb-isolation-018-pending-migration-waiver-005.md",
-        # Historical files containing AUQ/decision keywords before the gate or without actual owner decisions:
-        "gtkb-artifact-recorder-cli-slice-1-deliberations-record-007.md",
-        "gtkb-auq-policy-gates-001-001.md",
-        "gtkb-backlog-approval-state-taxonomy-slice-1-008.md",
-        "gtkb-backlog-approval-state-taxonomy-slice-1-006.md",
-        "gtkb-backlog-approval-state-taxonomy-slice-1-005.md",
-        "gtkb-bridge-work-intent-session-id-live-env-precedence-005.md",
-        "gtkb-bridge-work-intent-session-id-live-env-precedence-003.md",
-        "gtkb-decision-tracker-cached-pending-block-exclusion-005.md",
-        "gtkb-deterministic-services-stale-status-reconciliation-011.md",
-        "gtkb-first-class-project-artifacts-001.md",
-        "gtkb-gov-askuserquestion-enforcement-stack-2026-05-04-005.md",
-        "gtkb-gov-askuserquestion-enforcement-stack-2026-05-04-001.md",
-        "gtkb-orphan-wi-backfill-per-wi-retire-exclude-service-007.md",
-        "gtkb-orphan-wi-backfill-per-wi-retire-exclude-service-005.md",
-        "gtkb-owner-decision-tracker-auto-resolve-cross-turn-003.md",
-        "gtkb-perrole-concurrency-cap-dispatch-003.md",
-        "gtkb-prime-worker-context-aware-auq-slice-2-011.md",
-        "gtkb-prime-worker-context-aware-auq-slice-2-005.md",
-        "gtkb-prime-worker-delivery-regression-slice-4-008.md",
-        "gtkb-role-resolution-r1-r5-assertion-enforcement-005.md",
-        # WI-4365 report is report-only; matches AUQ + approval via false positive on spec names/delib titles
-        "gtkb-wi4365-prompt-submit-surface-classification-003.md",
-    }
-
-    bridge_filename_date_re = _re.compile(r"(20\d{2}-\d{2}-\d{2})")
-    bridge_content_date_re = _re.compile(r"^\*\*Date:\*\*\s*(20\d{2}-\d{2}-\d{2})(?:\b|[^\d])", _re.MULTILINE)
-
-    def bridge_file_effective_datetime(path: Path, content: str | None) -> datetime | None:
-        # Fresh CI checkouts rewrite filesystem mtimes, so prefer the stable
-        # date embedded in most bridge filenames or bridge metadata before
-        # falling back to mtime.
-        filename_match = bridge_filename_date_re.search(path.name)
-        if filename_match:
-            try:
-                return datetime.fromisoformat(filename_match.group(1)).replace(tzinfo=UTC)
-            except ValueError:
-                pass
-        if content is not None:
-            content_match = bridge_content_date_re.search(content)
-            if content_match:
-                try:
-                    return datetime.fromisoformat(content_match.group(1)).replace(tzinfo=UTC)
-                except ValueError:
-                    pass
-        try:
-            return datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
-        except OSError:
-            return None
-
-    offenders: list[str] = []
-    for _doc_name, files in threads:
-        # Latest status is the first listed file in the thread (insertion is at top).
-        if not files or files[0][0] != "VERIFIED":
-            continue
-        # For VERIFIED threads, inspect every non-verdict file in the thread.
-        # Verdict files start with GO/NO-GO/VERIFIED on first non-blank line;
-        # mirrors bridge-compliance-gate.py:357 exclusion.
-        for _status, vf in files:
-            if not vf.exists():
-                continue
-            if vf.name in known_historical_offenders:
-                continue
-            try:
-                content = _require_utf8_text(vf)
-            except OSError:
-                continue
-            effective_datetime = bridge_file_effective_datetime(vf, content)
-            if effective_datetime is None:
-                continue
-            if effective_datetime < cutoff:
-                continue
-            first_line = next((ln for ln in content.splitlines() if ln.strip()), "")
-            if first_line.strip().startswith(("GO", "NO-GO", "VERIFIED")):
-                continue
-            try:
-                claims_owner = module._proposal_claims_owner_approval(content)
-                has_section = module._has_concrete_owner_decisions_section(content)
-            except AttributeError:
-                continue
-            if claims_owner and not has_section:
-                offenders.append(vf.name)
-
-    if not offenders:
-        return ToolCheck(
-            name="Uncited owner-input bridges",
-            required=False,
-            found=True,
-            status="pass",
-            message=(
-                f"No VERIFIED bridges since {cutoff.date().isoformat()} "
-                f"claim owner approval without an Owner Decisions / Input section"
-            ),
-        )
-
-    sample = offenders[:5]
-    suffix = "..." if len(offenders) > 5 else ""
-    return ToolCheck(
-        name="Uncited owner-input bridges",
-        required=False,
-        found=True,
-        status="fail",
-        message=f"{len(offenders)} VERIFIED bridge(s) missing Owner Decisions section: {sample}{suffix}",
-    )
 
 
 def _required_bridge_rule_filenames(profile_name: str) -> tuple[str, ...]:
@@ -3307,57 +1957,6 @@ def _check_safety_gate_registration(target: Path) -> ToolCheck:
         found=True,
         status="pass",
         message="destructive-gate.py and credential-scan.py registered in PreToolUse",
-    )
-
-
-def _check_capture_hook_stub_status(target: Path) -> ToolCheck:
-    """Report whether owner-decision-capture.py and gov09-capture.py are real
-    implementations or stubs.
-
-    A hook is considered a stub if it has fewer than 35 non-blank lines or
-    contains the marker text 'scaffold stub' (case-insensitive).
-    """
-    hooks_dir = target / ".claude" / "hooks"
-    capture_hooks = ["owner-decision-capture.py", "gov09-capture.py"]
-    stubbed: list[str] = []
-    missing: list[str] = []
-
-    for hook_name in capture_hooks:
-        hook_path = hooks_dir / hook_name
-        if not hook_path.exists():
-            missing.append(hook_name)
-            continue
-        try:
-            content = _require_utf8_text(hook_path)
-        except OSError:
-            missing.append(hook_name)
-            continue
-        non_blank = [ln for ln in content.splitlines() if ln.strip()]
-        if len(non_blank) < 35 or "scaffold stub" in content.lower():
-            stubbed.append(hook_name)
-
-    if missing:
-        return ToolCheck(
-            name="capture-hook-stub-status",
-            required=True,
-            found=False,
-            status="warning",
-            message=f"capture hook(s) missing: {', '.join(missing)}",
-        )
-    if stubbed:
-        return ToolCheck(
-            name="capture-hook-stub-status",
-            required=True,
-            found=True,
-            status="warning",
-            message=f"capture hook(s) stubbed: {', '.join(stubbed)}",
-        )
-    return ToolCheck(
-        name="capture-hook-stub-status",
-        required=True,
-        found=True,
-        status="pass",
-        message="owner-decision-capture.py and gov09-capture.py are real implementations",
     )
 
 
@@ -3566,15 +2165,10 @@ def _check_managed_artifact_drift(target: Path, profile_name: str) -> ToolCheck:
 def _check_sot_registry_completeness(target: Path) -> ToolCheck:
     """Validate the platform SoT artifact registry (GOV-PLATFORM-SOT-REGISTRY-001).
 
-    Two sub-checks per DCL-SOT-REGISTRY-PROJECTION-PARITY-001 and the umbrella
-    WI-5441 control-plane scope:
-
-    1. **Coherence/identity** — canonical TOML, packaged mirror, MemBase
-       projection, and active identity locators must agree.
-    2. **Membership** — the shared five-observer reconciliation must classify
-       every load-bearing object as a registered member.
-    3. **Audit freshness** — stale or missing content observations are visible
-       as repair-forward warnings; they do not disable otherwise-valid work.
+    Read the canonical declaration and check its current identity locators and
+    load-bearing membership through the five inventory observers. A failed
+    observer makes inventory incomplete; historical revision audits and
+    packaged copies do not determine whether current state is valid.
 
     Authority, identity, and membership defects fail closed. A missing registry
     remains an informational skip for adopters that have not enabled the
@@ -3617,7 +2211,6 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
         )
 
     failures: list[str] = []
-    audit_notes: list[str] = []
 
     if not authority_report.get("coherent"):
         failures.append(f"registry generation is not coherent: {authority_report.get('error')}")
@@ -3629,6 +2222,8 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
                 f"{len(identity['object_kind_mismatches'])} object-kind mismatches"
             )
         membership = authority_report["membership_reconciliation"]
+        for failure in membership.get("observer_failures", []):
+            failures.append(f"{failure['observer_class']} inventory failed: " + "; ".join(failure["diagnostics"]))
         if not membership["membership_complete"]:
             counts = membership["counts"]
             failures.append(
@@ -3636,30 +2231,14 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
                 f"{counts['unregistered_load_bearing']} load-bearing gaps, "
                 f"{counts['invalid_unknown']} invalid unknowns"
             )
-        currentness = authority_report["currentness"]
-        if not currentness["current"]:
-            audit_notes.append(
-                f"registry audit incomplete: {len(currentness['missing_revisions'])} missing revisions, "
-                f"{len(currentness['stale'])} stale records"
-            )
 
     if failures:
-        suffix = "" if len(failures) <= 3 else f"; +{len(failures) - 3} more"
         return ToolCheck(
             name=check_name,
             required=True,
             found=True,
             status="fail",
-            message=f"{len(toml_records)} SoT records — " + "; ".join(failures[:3]) + suffix,
-        )
-
-    if audit_notes:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=f"{len(toml_records)} SoT records — " + "; ".join(audit_notes),
+            message=f"{len(toml_records)} SoT records — " + "; ".join(failures),
         )
 
     return ToolCheck(
@@ -3667,7 +2246,7 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
         required=False,
         found=True,
         status="pass",
-        message=f"{len(toml_records)} SoT records registered; parity, identity, and membership complete",
+        message=f"{len(toml_records)} SoT records registered; identity and membership complete",
     )
 
 
@@ -3944,55 +2523,6 @@ def _check_settings_hook_registration_drift(
     )
 
 
-def _check_skill_present(target: Path, profile_name: str) -> ToolCheck:
-    """Check that the ``decision-capture`` skill files are present.
-
-    Bridge-profile-only check. Warning-level (not fail) because a missing
-    skill degrades workflow quality but does not render the project
-    non-functional. Remediation: ``gt project upgrade --apply`` (the
-    missing-file repair path is unconditional — works at any scaffold
-    version).
-    """
-    profile = get_profile(profile_name)
-    if not profile.includes_bridge:
-        return ToolCheck(
-            name="skill:decision-capture",
-            required=False,
-            found=True,
-            status="pass",
-            message="not applicable to base profile",
-        )
-
-    skill_md = target / ".claude" / "skills" / "gtkb-decision-capture" / "SKILL.md"
-    helper_py = target / ".claude" / "skills" / "gtkb-decision-capture" / "helpers" / "record_decision.py"
-
-    missing: list[str] = []
-    if not skill_md.exists():
-        missing.append("SKILL.md")
-    if not helper_py.exists():
-        missing.append("helpers/record_decision.py")
-
-    if missing:
-        return ToolCheck(
-            name="skill:decision-capture",
-            required=False,
-            found=False,
-            status="warning",
-            message=(
-                f".claude/skills/gtkb-decision-capture/ missing: {', '.join(missing)}. "
-                f"Run `gt project upgrade --apply` to restore."
-            ),
-        )
-
-    return ToolCheck(
-        name="skill:decision-capture",
-        required=False,
-        found=True,
-        status="pass",
-        message="decision-capture skill present",
-    )
-
-
 def _check_bridge_propose_skill_present(target: Path, profile_name: str) -> ToolCheck:
     """Check that the ``bridge-propose`` skill files are present.
 
@@ -4000,8 +2530,7 @@ def _check_bridge_propose_skill_present(target: Path, profile_name: str) -> Tool
     missing skill degrades workflow quality but does not render the
     project non-functional. Remediation: ``gt project upgrade
     --apply`` (the missing-file repair path is unconditional — works
-    at any scaffold version). Parallel in shape to
-    :func:`_check_skill_present`.
+    at any scaffold version).
     """
     profile = get_profile(profile_name)
     if not profile.includes_bridge:
@@ -4014,13 +2543,10 @@ def _check_bridge_propose_skill_present(target: Path, profile_name: str) -> Tool
         )
 
     skill_md = target / ".claude" / "skills" / "gtkb-bridge-propose" / "SKILL.md"
-    helper_py = target / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py"
 
     missing: list[str] = []
     if not skill_md.exists():
         missing.append("SKILL.md")
-    if not helper_py.exists():
-        missing.append("helpers/write_bridge.py")
 
     if missing:
         return ToolCheck(
@@ -4051,7 +2577,6 @@ def _check_spec_intake_skill_present(target: Path, profile_name: str) -> ToolChe
     project non-functional. Remediation: ``gt project upgrade
     --apply`` (the missing-file repair path is unconditional — works
     at any scaffold version). Parallel in shape to
-    :func:`_check_skill_present` and
     :func:`_check_bridge_propose_skill_present`.
     """
     profile = get_profile(profile_name)
@@ -5384,80 +3909,62 @@ def _check_dispatcher_only_bridge_automation(target: Path) -> ToolCheck:
 
 
 def _normalize_harness_argv_head(head: str, project_root: Path) -> str:
-    """Resolve a registry argv head to a launchable form.
-
-    Mirror of the dispatcher runtime's argv-head normalization (the doctor
-    package must not import from ``scripts/``, which is not on the package
-    path). HYG-001 (FAB-01): a forward-slash-relative path or a bare ``PATHEXT``
-    command fails ``CreateProcess`` with ``WinError 2`` unless normalized
-    (``os.path.normpath``), resolved against ``project_root`` when relative with
-    a directory component, and run through ``PATHEXT``-aware ``shutil.which``.
-    Additive: returns the normalized head when no resolution succeeds.
-    """
+    """Resolve installation argv without launching a harness or using the caller's CWD."""
     if not head:
         return head
-    normalized = os.path.normpath(head)
+    normalized = os.path.normpath(head.replace("{{PROJECT_ROOT}}", str(project_root)))
     candidate = normalized
     if (os.sep in normalized or (os.altsep and os.altsep in normalized)) and not os.path.isabs(normalized):
         candidate = os.path.normpath(str(project_root / normalized))
     resolved = shutil.which(candidate)
     if resolved:
         return resolved
-    if candidate != normalized:
-        resolved = shutil.which(normalized)
-        if resolved:
-            return resolved
-    return normalized
+    return candidate
+
+
+def _native_harness_installations(target: Path) -> list[dict[str, Any]]:
+    """Read current installation metadata without a file or SQLite fallback."""
+    from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
+    from groundtruth_kb.config import GTConfig
+
+    harnesses: list[dict[str, Any]] = []
+    config = GTConfig.load(config_path=target / "groundtruth.toml")
+    if not config.authority_url:
+        raise AuthorityClientError("authority_not_configured", "No authority_url is configured")
+    client = AuthorityClient(config.authority_url)
+    after = None
+    while True:
+        result = client.request("GET", "/v1/harnesses", query={"status": "active", "limit": 1000, "after": after})
+        records = result.get("records") if isinstance(result, dict) else None
+        next_after = result.get("next_after") if isinstance(result, dict) else None
+        if not isinstance(records, list) or any(not isinstance(record, dict) for record in records):
+            raise AuthorityClientError("invalid_response", "Harness installation records are malformed")
+        if next_after is not None and (
+            not isinstance(next_after, str) or not next_after or (after and next_after <= after)
+        ):
+            raise AuthorityClientError("invalid_response", "Harness installation pagination did not advance")
+        harnesses.extend(records)
+        if next_after is None:
+            break
+        after = next_after
+    return harnesses
 
 
 def _check_harness_launchability(target: Path) -> ToolCheck:
-    """FAB-01 / HYG-001: verify each active dispatch target's argv head launches.
+    """Inspect current installation argv via the native service; never infer session roles."""
+    from groundtruth_kb.authority_client import AuthorityClientError
+    from groundtruth_kb.config import GTConfigError
 
-    The dispatcher daemon launches a recipient harness from its
-    ``invocation_surfaces.headless.argv``. On Windows a forward-slash-relative
-    path (e.g. ``groundtruth-kb/.venv/Scripts/python.exe``) or a bare ``PATHEXT``
-    command (e.g. ``gemini`` resolving to ``gemini.cmd``) fails ``CreateProcess``
-    with ``WinError 2`` unless normalized/resolved. The dispatcher runtime
-    normalizes the head at launch (``_normalize_argv_head``); this check exercises that same
-    resolution so a launch regression surfaces here instead of silently
-    degrading to an exit-127 in the dispatch logs (the masking failure mode of
-    HYG-001).
-
-    For every harness that is ``status == active`` AND ``can_receive_dispatch``
-    (a real dispatch target) AND carries a ``headless.argv``, the normalized head
-    must resolve to a launchable executable. ``shutil.which`` models the
-    ``CreateProcess`` executable lookup (``PATHEXT``-aware) that produces
-    ``WinError 2``; resolution failure IS the launch failure. Resolution is used
-    rather than launching ``<head> --version`` so the doctor run does not spawn
-    live harness CLIs (a nested Claude session, a yolo-mode agent) as a side
-    effect.
-
-    Status:
-      - all active dispatch targets resolve → ``pass``
-      - any active dispatch target unresolvable (would-be ``WinError 2``) → ``fail``
-      - no active dispatch targets with a headless argv to check → ``warning``
-    """
-    check_name = "Harness dispatch launchability"
-    from groundtruth_kb.harness_projection import HarnessStateError, read_roles  # noqa: PLC0415
-
+    check_name = "Harness installation launchability"
     try:
-        registry = read_roles(project_root=target)
-    except HarnessStateError as exc:
+        harnesses = _native_harness_installations(target)
+    except (AuthorityClientError, GTConfigError) as exc:
         return ToolCheck(
             name=check_name,
             required=False,
             found=False,
             status="warning",
-            message=f"harness registry unreadable; cannot check launchability: {exc}",
-        )
-    harnesses = registry.get("harnesses") if isinstance(registry, dict) else None
-    if not isinstance(harnesses, list):
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message="harness registry has no 'harnesses' list; cannot check launchability",
+            message=f"Current installation metadata unavailable; launchability is unverified: {exc}",
         )
 
     checked: list[tuple[str, str, str, bool]] = []
@@ -5467,24 +3974,21 @@ def _check_harness_launchability(target: Path) -> ToolCheck:
         status = rec.get("status")
         if not (isinstance(status, str) and status.strip().lower() == "active"):
             continue
-        # Dispatch-target axis (FAB-01): can_receive_dispatch, with back-compat
-        # fallback to the deprecated event_driven_hooks alias for legacy records.
-        is_target = rec.get("can_receive_dispatch") is True or (
-            "can_receive_dispatch" not in rec and rec.get("event_driven_hooks") is True
-        )
-        if not is_target:
-            continue
         surfaces = rec.get("invocation_surfaces")
         headless = surfaces.get("headless") if isinstance(surfaces, dict) else None
+        if headless is None:
+            continue
         argv = headless.get("argv") if isinstance(headless, dict) else None
-        if not isinstance(argv, list) or not argv or not isinstance(argv[0], str):
+        name = str(rec.get("harness_name") or rec.get("id") or "?")
+        if not isinstance(argv, list) or not argv or not all(isinstance(arg, str) and arg for arg in argv):
+            checked.append((name, "<invalid argv>", "<invalid argv>", False))
             continue
         head = argv[0]
-        if head in ("{{PROMPT}}", "{{PROJECT_ROOT}}"):
+        if head == "{{PROMPT}}":
+            checked.append((name, head, head, False))
             continue
         resolved = _normalize_harness_argv_head(head, target)
-        launchable = bool(shutil.which(resolved)) or os.path.isfile(resolved)
-        name = str(rec.get("harness_name") or rec.get("id") or "?")
+        launchable = bool(shutil.which(resolved))
         checked.append((name, head, resolved, launchable))
 
     if not checked:
@@ -5492,8 +3996,8 @@ def _check_harness_launchability(target: Path) -> ToolCheck:
             name=check_name,
             required=False,
             found=True,
-            status="warning",
-            message="no active dispatch targets with a headless argv to check",
+            status="info",
+            message="No active headless installation to check; dispatcher readiness is not asserted",
         )
 
     failures = [c for c in checked if not c[3]]
@@ -5506,11 +4010,7 @@ def _check_harness_launchability(target: Path) -> ToolCheck:
             required=False,
             found=True,
             status="fail",
-            message=(
-                f"{len(failures)}/{len(checked)} active dispatch target(s) have a WinError-2-class "
-                f"unlaunchable argv head: {detail}. See HYG-001 / FAB-01 and "
-                f"{_BRIDGE_DISPATCH_DOC}."
-            ),
+            message=(f"{len(failures)}/{len(checked)} active installation(s) have an unlaunchable argv head: {detail}"),
         )
     names = ", ".join(c[0] for c in checked)
     return ToolCheck(
@@ -5518,7 +4018,7 @@ def _check_harness_launchability(target: Path) -> ToolCheck:
         required=False,
         found=True,
         status="pass",
-        message=f"all {len(checked)} active dispatch target(s) launchable after argv-head normalization ({names})",
+        message=f"Executables resolve for {len(checked)} active installation(s) ({names}); actual launch is unverified",
     )
 
 
@@ -5908,276 +4408,6 @@ def _rel_to_target(path: Path, target: Path) -> str:
         return path.as_posix()
 
 
-_HARNESS_EXEC_SCAN_TARGETS = (
-    Path("scripts") / "dispatcher_runtime.py",
-    Path("scripts") / "verify_antigravity_dispatch.py",
-)
-_HARNESS_EXEC_INROOT_TOOLCHAIN = frozenset({"python", "python3"})
-_HARNESS_EXEC_SUBPROCESS_METHODS = frozenset({"run", "Popen", "call", "check_output", "check_call"})
-
-
-def _extract_literal_command(node: ast.Call) -> str | None:
-    """Return the literal command name from a subprocess.* or shutil.which() call.
-
-    Detects:
-      - ``shutil.which(<literal>)``
-      - ``subprocess.{run,Popen,call,check_output,check_call}(<literal>, ...)``
-      - ``subprocess.{run,Popen,call,check_output,check_call}([<literal>, ...], ...)``
-
-    Returns ``None`` for parametrized calls (the canonical safe pattern: command
-    list built from the harness registry projection at runtime).
-    """
-    func = node.func
-    if not isinstance(func, ast.Attribute) or not isinstance(func.value, ast.Name):
-        return None
-    if not node.args:
-        return None
-    module = func.value.id
-    method = func.attr
-    first = node.args[0]
-    if module == "shutil" and method == "which":
-        if isinstance(first, ast.Constant) and isinstance(first.value, str):
-            return first.value
-        return None
-    if module == "subprocess" and method in _HARNESS_EXEC_SUBPROCESS_METHODS:
-        if isinstance(first, ast.Constant) and isinstance(first.value, str):
-            return first.value
-        if isinstance(first, ast.List) and first.elts:
-            head = first.elts[0]
-            if isinstance(head, ast.Constant) and isinstance(head.value, str):
-                return head.value
-        return None
-    return None
-
-
-def _check_external_harness_exec_boundary(target: Path) -> ToolCheck:
-    """Bound cross-harness exec resolution to registry-enumerated harness commands.
-
-    Implements the deterministic bound for the External Harness Executable
-    Resolution Exception in ``.claude/rules/project-root-boundary.md`` per
-    ``DELIB-S366-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXCEPTION`` and bridge
-    ``gtkb-root-boundary-external-harness-exec-exception`` (GO at -006).
-
-    Loads ``harness-state/harness-registry.json``; collects the set of
-    ``invocation_surfaces.*.argv[0]`` command names. AST-scans
-    ``scripts/dispatcher_runtime.py`` and
-    ``scripts/verify_antigravity_dispatch.py`` for literal ``shutil.which`` /
-    ``subprocess.{run,Popen,call,check_output,check_call}`` invocations.
-    Classifies each literal command name against the allowed set, the
-    in-root Python toolchain, and in-root absolute paths.
-
-    Status:
-      - ``pass``: every literal exec resolution targets a registry-enumerated
-        harness command, an in-root Python interpreter, or an in-root absolute
-        path; or no literal resolutions exist (the canonical pattern: parametrized
-        command lists built from the registry projection).
-      - ``warning``: the harness registry is missing or empty (exception is
-        vacuous), or a scan-target surface is missing.
-      - ``fail``: a literal subprocess/shutil.which call routes a non-harness
-        command name out-of-root (violates the bound).
-    """
-    check_name = "External harness exec boundary"
-
-    registry_path = target / "harness-state" / "harness-registry.json"
-    if not registry_path.is_file():
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=False,
-            status="warning",
-            message=(
-                "harness-state/harness-registry.json missing; the External Harness "
-                "Executable Resolution Exception cannot be enforced without an "
-                "enumerated harness registry"
-            ),
-        )
-    try:
-        registry = json.loads(_require_utf8_text(registry_path))
-    except (OSError, json.JSONDecodeError) as exc:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=f"harness-state/harness-registry.json unreadable: {exc}",
-        )
-
-    allowed_commands: set[str] = set()
-    harnesses = registry.get("harnesses", []) if isinstance(registry, dict) else []
-    if isinstance(harnesses, list):
-        for h in harnesses:
-            if not isinstance(h, dict):
-                continue
-            surfaces = h.get("invocation_surfaces", {})
-            if not isinstance(surfaces, dict):
-                continue
-            for surface in surfaces.values():
-                if not isinstance(surface, dict):
-                    continue
-                argv = surface.get("argv")
-                if isinstance(argv, list) and argv and isinstance(argv[0], str):
-                    allowed_commands.add(argv[0])
-
-    if not allowed_commands:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                "harness registry enumerates no invocation_surfaces.*.argv[0] commands; "
-                "the External Harness Executable Resolution Exception is vacuous and "
-                "cross-harness dispatch has no allowed out-of-root targets"
-            ),
-        )
-
-    scan_paths = [target / p for p in _HARNESS_EXEC_SCAN_TARGETS]
-    missing = [p.relative_to(target).as_posix() for p in scan_paths if not p.is_file()]
-    if missing:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                f"cross-harness exec resolution surface(s) missing: {', '.join(missing)}; "
-                f"the External Harness Executable Resolution Exception bound cannot be "
-                f"fully verified"
-            ),
-        )
-
-    target_resolved = target.resolve()
-    violations: list[str] = []
-    for path in scan_paths:
-        try:
-            tree = ast.parse(_require_utf8_text(path))
-        except (OSError, SyntaxError) as exc:
-            return ToolCheck(
-                name=check_name,
-                required=False,
-                found=True,
-                status="fail",
-                message=(f"could not parse {path.relative_to(target).as_posix()}: {exc}"),
-            )
-        rel = path.relative_to(target).as_posix()
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            literal_cmd = _extract_literal_command(node)
-            if literal_cmd is None:
-                continue
-            if literal_cmd in allowed_commands:
-                continue
-            if literal_cmd in _HARNESS_EXEC_INROOT_TOOLCHAIN:
-                continue
-            try:
-                cmd_path = Path(literal_cmd)
-                if cmd_path.is_absolute():
-                    cmd_resolved = cmd_path.resolve()
-                    if str(cmd_resolved).startswith(str(target_resolved)):
-                        continue
-            except (OSError, ValueError):
-                pass
-            violations.append(f"{rel}: literal command {literal_cmd!r} (not a registry-enumerated harness command)")
-
-    if violations:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=(
-                "non-harness out-of-root executable resolution detected in cross-harness "
-                "surface(s); violates the External Harness Executable Resolution Exception "
-                "bound (.claude/rules/project-root-boundary.md): " + "; ".join(violations)
-            ),
-        )
-
-    return ToolCheck(
-        name=check_name,
-        required=False,
-        found=True,
-        status="pass",
-        message=(
-            f"cross-harness exec resolution bounded to registry-enumerated harness "
-            f"commands ({len(allowed_commands)} enumerated: {sorted(allowed_commands)}); "
-            f"no literal non-harness commands in scanned surface(s)"
-        ),
-    )
-
-
-# Slice 7 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE
-# (bridge/gtkb-interactive-session-role-override-slice-7-doctor-marker-checks-001.md,
-# Codex GO at -002). The ephemeral session-state role marker is written by the
-# UserPromptSubmit init-keyword path (Slice 2) and invalidated at SessionStart
-# (Slice 3). These two read-only checks surface marker problems.
-#
-# The marker path and the session-id env fallback set are DUPLICATED here (with
-# a parity test against scripts.session_role_resolution) rather than imported,
-# to keep the packaged groundtruth_kb doctor's import surface out of the
-# repo-root scripts/ tree (Codex Review Ask 2 confirmed).
-_SESSION_ROLE_MARKER_NAME = "active-session-role.json"
-_SESSION_ROLE_VALID_ROLES = frozenset(ROLE_STATE_KEYS)
-# MUST equal scripts.gtkb_session_id.MARKER_CONTINUITY_ORDER -- the single
-# session-id membership authority that scripts.workstream_focus._SESSION_ID_ENV_FALLBACKS
-# also delegates to (WI-4270 shared resolver unification). Kept as a verbatim
-# copy here (NOT imported) so the packaged groundtruth_kb doctor's import surface
-# stays out of the repo-root scripts/ tree (Codex Review Ask 2). Locked by the
-# platform_tests/scripts/test_doctor_session_role_marker.py parity tests.
-_SESSION_ID_ENV_FALLBACKS = (
-    "GTKB_SESSION_ID",
-    "CODEX_SESSION_ID",
-    "CODEX_THREAD_ID",
-    "CLAUDE_SESSION_ID",
-    "CLAUDE_CODE_SESSION_ID",
-)
-
-
-def _session_role_marker_path(target: Path) -> Path:
-    return target / ".claude" / "session" / _SESSION_ROLE_MARKER_NAME
-
-
-def _read_session_role_marker(target: Path) -> tuple[dict[str, Any] | None, str | None]:
-    """Return (marker_dict, error). error is set on unreadable/malformed/absent.
-
-    (None, None) -> no marker file (a normal, non-warning state).
-    (None, "<reason>") -> marker present but unreadable or not a JSON object.
-    (dict, None) -> marker parsed.
-    """
-    marker_path = _session_role_marker_path(target)
-    if not marker_path.is_file():
-        return None, None
-    try:
-        body = json.loads(_require_utf8_text(marker_path))
-    except (OSError, json.JSONDecodeError) as exc:
-        return None, f"unreadable or malformed JSON: {exc}"
-    if not isinstance(body, dict):
-        return None, "marker is not a JSON object"
-    return body, None
-
-
-def _session_role_marker_structurally_valid(body: dict[str, Any]) -> bool:
-    """True iff a parsed marker satisfies DCL-SESSION-ROLE-RESOLUTION-001
-    assertion 6 (non-empty string ``session_id``) AND assertion 7 (``role`` in
-    the role set). The alignment check consults this so it defers to the
-    validity check for ANY structural invalidity (no double-WARN), including an
-    invalid role paired with a present-but-stale session id.
-    """
-    session_id = body.get("session_id")
-    if not (isinstance(session_id, str) and session_id.strip()):
-        return False
-    return body.get("role") in _SESSION_ROLE_VALID_ROLES
-
-
-def _resolve_env_session_id() -> str | None:
-    """Best-effort current session id from the resolver's env fallback chain."""
-    for env_name in _SESSION_ID_ENV_FALLBACKS:
-        value = os.environ.get(env_name)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    return None
-
-
 def _check_session_wrap_had_orient(target: Path) -> ToolCheck:
     """Validate that the prior session ended with a well-formed ORIENT block.
 
@@ -6199,242 +4429,6 @@ def _check_session_wrap_had_orient(target: Path) -> ToolCheck:
     )
 
 
-def _check_session_role_marker_validity(target: Path) -> ToolCheck:
-    """Structural validity of the ephemeral session-state role marker.
-
-    DCL-SESSION-ROLE-RESOLUTION-001 assertion 6 (non-null session id) and
-    assertion 7 (role in {prime-builder, loyal-opposition}). Read-only.
-    """
-    check_name = "Session-role marker validity"
-    body, error = _read_session_role_marker(target)
-    if body is None and error is None:
-        return ToolCheck(
-            name=check_name, required=False, found=False, status="pass", message="no active session-role marker"
-        )
-    if error is not None:
-        return ToolCheck(
-            name=check_name, required=False, found=True, status="warning", message=f"session-role marker {error}"
-        )
-    assert body is not None
-    session_id = body.get("session_id")
-    if not (isinstance(session_id, str) and session_id.strip()):
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message="session-role marker missing or empty 'session_id' (DCL-SESSION-ROLE-RESOLUTION-001 assertion 6)",
-        )
-    role = body.get("role")
-    if role not in _SESSION_ROLE_VALID_ROLES:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=f"session-role marker 'role' {role!r} not in {{prime-builder, loyal-opposition}} (assertion 7)",
-        )
-    return ToolCheck(
-        name=check_name, required=False, found=True, status="pass", message=f"valid session-role marker: role={role}"
-    )
-
-
-def _check_session_role_marker_session_id_alignment(target: Path) -> ToolCheck:
-    """Best-effort staleness: marker session id vs the current session id.
-
-    The doctor has no UserPromptSubmit payload session id, so 'current' is
-    resolved best-effort from the resolver's env fallback set. INFO when no
-    session-id env var is available (e.g. a manual CLI run outside a session).
-    When the marker is structurally invalid, the validity check owns the
-    warning and this check passes (no double-WARN). Read-only.
-    """
-    check_name = "Session-role marker session alignment"
-    body, error = _read_session_role_marker(target)
-    if body is None:
-        # No marker, or invalid marker (validity check owns that warning).
-        detail = "no marker to align" if error is None else "marker invalid (see validity check)"
-        return ToolCheck(name=check_name, required=False, found=body is not None, status="pass", message=detail)
-    if not _session_role_marker_structurally_valid(body):
-        # Any structural invalidity (missing/empty session_id OR invalid role)
-        # is owned by the validity check; alignment passes to avoid double-WARN.
-        return ToolCheck(
-            name=check_name, required=False, found=True, status="pass", message="marker invalid (see validity check)"
-        )
-    session_id = str(body.get("session_id")).strip()
-    current = _resolve_env_session_id()
-    if current is None:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="info",
-            message="alignment indeterminate; no session-id env var set (run inside a session to check staleness)",
-        )
-    if session_id != current:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                f"stale session-role marker: session_id {session_id!r} != current {current!r}; "
-                "SessionStart invalidation (Slice 3) may have failed"
-            ),
-        )
-    return ToolCheck(
-        name=check_name,
-        required=False,
-        found=True,
-        status="pass",
-        message="marker session id aligns with current session",
-    )
-
-
-def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
-    """Check role-set wire form, valid tokens, no duplicates, topology consistency.
-
-    Per IP-6 of bridge/gtkb-single-harness-bridge-dispatcher-001-013.md (Codex
-    GO at -014). WI-3342 IP-4 migrated this check from the legacy
-    the retired role mirror + ``harness-state/harness-identities.json``
-    pair to the DB-backed registry projection
-    (``harness-state/harness-registry.json``). Validates:
-
-    - ``harness-state/harness-registry.json`` exists and parses as JSON.
-    - Each harness record's ``role`` field is either a list (canonical wire
-      form), a string (legacy scalar; READ-accepted), or absent.
-    - Every list element is a token in ``{prime-builder, loyal-opposition,
-      acting-prime-builder}`` (READ vocabulary; the legacy
-      ``acting-prime-builder`` token is READ-accepted per the
-      Compatibility/Provenance Classification).
-    - No duplicates within a single record's role-set.
-    - Identity/role topology consistency: in the projection, each harness
-      record carries its ``id`` and ``role`` in a single unified row, so the
-      pre-migration cross-check (every role-map ID must also appear in the
-      identity map) is intrinsically satisfied — a record with a ``role`` and
-      no ``id`` is the only residual drift case, and that is flagged here.
-    """
-    check_name = "Role-set topology consistency"
-    # WI-3342 IP-4: resolve the registry projection path via the package
-    # generator module. Function-local import keeps the doctor module's
-    # top-level import surface unchanged.
-    from groundtruth_kb.harness_projection import harness_registry_path
-
-    registry_path = harness_registry_path(target)
-
-    if not registry_path.is_file():
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=False,
-            status="warning",
-            message=(
-                "harness-state/harness-registry.json missing; doctor cannot validate "
-                "role-set schema until the harness registry projection is generated."
-            ),
-        )
-
-    try:
-        registry_doc = json.loads(_require_utf8_text(registry_path))
-    except (OSError, json.JSONDecodeError) as exc:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=f"harness-state/harness-registry.json unreadable: {exc}",
-        )
-
-    valid_read_tokens = frozenset((*ROLE_STATE_KEYS, "acting-prime-builder"))
-    harnesses = registry_doc.get("harnesses", []) if isinstance(registry_doc, dict) else []
-    issues: list[str] = []
-    legacy_scalar_count = 0
-    list_form_count = 0
-
-    if isinstance(harnesses, list):
-        for record in harnesses:
-            if not isinstance(record, dict):
-                issues.append("harness registry record is not a JSON object")
-                continue
-            harness_id = record.get("id")
-            harness_label = harness_id if isinstance(harness_id, str) and harness_id else "<unknown>"
-            raw_role = record.get("role")
-            if raw_role is None:
-                # Missing role is permitted (bootstrap state); doctor flags via
-                # the broader self-correction path, not here.
-                continue
-            if isinstance(raw_role, str):
-                legacy_scalar_count += 1
-                if raw_role.strip().lower() not in valid_read_tokens:
-                    issues.append(
-                        f"harness {harness_label!r}: legacy scalar role {raw_role!r} not in valid READ vocabulary"
-                    )
-            elif isinstance(raw_role, list):
-                list_form_count += 1
-                seen: set[str] = set()
-                for token in raw_role:
-                    if not isinstance(token, str):
-                        issues.append(f"harness {harness_label!r}: role-set contains non-string token {token!r}")
-                        continue
-                    canonical = token.strip().lower()
-                    if canonical not in valid_read_tokens:
-                        issues.append(
-                            f"harness {harness_label!r}: role-set contains unknown token "
-                            f"{token!r} (valid: {sorted(valid_read_tokens)})"
-                        )
-                    if canonical in seen:
-                        issues.append(f"harness {harness_label!r}: role-set contains duplicate token {token!r}")
-                    seen.add(canonical)
-            else:
-                issues.append(
-                    f"harness {harness_label!r}: role field has unsupported type "
-                    f"{type(raw_role).__name__} (expected list or string)"
-                )
-            # Topology consistency: in the unified registry projection, identity
-            # (``id``/``harness_name``) and role live in the same row, so the
-            # pre-migration "role-map ID also in identity-map" cross-check is
-            # intrinsically satisfied. The only residual drift is a row that
-            # carries a role but no ``id``.
-            if not (isinstance(harness_id, str) and harness_id):
-                issues.append("harness registry record carries a role but no 'id' (identity/role topology drift)")
-    else:
-        issues.append("harness-registry.json 'harnesses' field is not a JSON list")
-
-    if issues:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message="role-set topology issues: " + "; ".join(issues),
-        )
-
-    summary = (
-        f"role-set wire form valid "
-        f"({list_form_count} list-form, {legacy_scalar_count} legacy-scalar — "
-        f"legacy will upgrade on next WRITE)"
-    )
-    return ToolCheck(
-        name=check_name,
-        required=False,
-        found=True,
-        status="pass",
-        message=summary,
-    )
-
-
-_ROLE_AUTHORITY_BOUNDARY_SCAN_PATHS = (
-    Path("CLAUDE.md"),
-    Path("AGENTS.md"),
-    Path(".claude") / "rules" / "canonical-terminology.md",
-    Path(".claude") / "rules" / "operating-role.md",
-    Path("config") / "agent-control" / "SESSION-STARTUP-INDEX.md",
-    Path("scripts") / "session_role_resolution.py",
-    Path("scripts") / "session_self_initialization.py",
-    Path("scripts") / "bridge_work_intent_registry.py",
-    Path("scripts") / "bridge_claim_cli.py",
-    Path("scripts") / "_kb_attribution.py",
-    Path("groundtruth-kb") / "src" / "groundtruth_kb" / "mcp_surface" / "roles.py",
-)
 _ROLE_AUTHORITY_FORBIDDEN_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\bdurable\s+map\s+wins\b", re.IGNORECASE),
     re.compile(
@@ -6459,75 +4453,6 @@ _ROLE_AUTHORITY_FORBIDDEN_PATTERNS: tuple[re.Pattern[str], ...] = (
     ),
     re.compile(r"\brole\s+authority:\s+resolve\b.*\bharness-state/harness-registry\.json\b", re.IGNORECASE),
 )
-_ROLE_AUTHORITY_QUALIFIERS = (
-    "headless dispatch",
-    "dispatch routing",
-    "dispatcher-routing",
-    "dispatcher daemon",
-    "dispatcher role set",
-    "dispatcher/default role metadata",
-    "fallback",
-    "registry fallback",
-    "routing labels only",
-    "resolved session role",
-    "session role",
-    "session-stated role",
-    "interactive surfaces only",
-    "not authority",
-    "not behavior",
-    "display",
-    "labelling",
-    "labeling",
-    "metadata",
-    "schema",
-    "topology",
-    "provenance",
-)
-
-
-def _line_has_role_authority_boundary_violation(line: str) -> bool:
-    lowered = line.lower()
-    if any(qualifier in lowered for qualifier in _ROLE_AUTHORITY_QUALIFIERS):
-        return False
-    return any(pattern.search(line) for pattern in _ROLE_AUTHORITY_FORBIDDEN_PATTERNS)
-
-
-def _check_role_authority_boundary(target: Path) -> ToolCheck:
-    """Fail when non-dispatcher surfaces treat durable registry role as behavior authority."""
-
-    findings: list[str] = []
-    scanned = 0
-    for rel_path in _ROLE_AUTHORITY_BOUNDARY_SCAN_PATHS:
-        path = target / rel_path
-        if not path.is_file():
-            continue
-        scanned += 1
-        try:
-            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-        except OSError as exc:
-            findings.append(f"{rel_path.as_posix()}: unreadable: {exc}")
-            continue
-        for line_number, line in enumerate(lines, start=1):
-            if _line_has_role_authority_boundary_violation(line):
-                findings.append(f"{rel_path.as_posix()}:{line_number}: {line.strip()[:160]}")
-
-    if findings:
-        first = findings[0]
-        extra = f" (+{len(findings) - 1} more)" if len(findings) > 1 else ""
-        return ToolCheck(
-            name="Role-authority boundary",
-            required=True,
-            found=True,
-            status="fail",
-            message=f"{len(findings)} registry-authority boundary findings; first: {first}{extra}",
-        )
-    return ToolCheck(
-        name="Role-authority boundary",
-        required=True,
-        found=scanned > 0,
-        status="pass",
-        message=f"role-authority boundary clean across {scanned} surfaces",
-    )
 
 
 def _check_da_harvest_coverage(target: Path) -> ToolCheck:
@@ -7283,22 +5208,12 @@ def run_doctor(
     if p.includes_bridge:
         checks.append(_check_file_bridge_setup(target))
         checks.append(_check_file_bridge_state_parse(target))
-        checks.append(_check_settings_classifiers(target))
         checks.append(_check_active_legacy_root_references(target))
-        checks.append(_check_spec_classifier_canonical_path(target))
-        checks.append(_check_spec_classifier_settings_registered(target))
         checks.append(_check_registered_hooks_tracked(target))
         checks.append(_check_raw_written_close_intent_no_action(target))
         checks.append(_check_skill_rename_reference_sweep(target))
-        checks.append(_check_spec_classifier_codex_parity(target))
-        checks.append(_check_spec_classifier_test_exists(target))
-        checks.append(_check_untriaged_prose_decisions(target))
-        checks.append(_check_auq_coverage(target))
-        checks.append(_check_uncited_owner_input_bridges(target))
         checks.append(_check_scanner_safe_writer_drift(target, profile))
         checks.append(_check_safety_gate_registration(target))
-        checks.append(_check_capture_hook_stub_status(target))
-        checks.append(_check_skill_present(target, profile))
         checks.append(_check_bridge_propose_skill_present(target, profile))
         checks.append(_check_spec_intake_skill_present(target, profile))
         checks.append(_check_codex_skill_load_health(target))
@@ -7316,7 +5231,7 @@ def run_doctor(
         # harness hook surfaces (DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001 assertion
         # PARITY-DIFF-WIRED). WARN-only at Slice 3 per Q6; FAIL ramp + CI gate land
         # in Slice 6 after a coverage audit.
-        checks.append(_check_parity_discovery_diff(target))
+        checks.append(_check_harness_projection_conformance(target))
         checks.append(_check_dispatcher_daemon_substrate_readiness(target))
         dispatcher_complex_health = _dispatcher_complex_health_reader(target)
         checks.append(_check_dispatcher_daemon_supervisor_task(target, dispatcher_complex_health))
@@ -7334,45 +5249,15 @@ def run_doctor(
         checks.append(_check_harness_launchability(target))
         checks.append(_check_harness_local_scratchpad_boundary(target))
         checks.append(_check_canonical_authority_drift(target))
-        checks.append(_check_external_harness_exec_boundary(target))
-        checks.append(_check_role_set_topology_consistency(target))
-        checks.append(_check_role_authority_boundary(target))
-        # Slice 7 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE: read-only
-        # session-state role marker diagnostics (validity + best-effort staleness).
-        checks.append(_check_session_role_marker_validity(target))
-        checks.append(_check_session_role_marker_session_id_alignment(target))
         checks.append(_check_session_wrap_had_orient(target))
         checks.append(_check_da_harvest_coverage(target))
         checks.append(_check_standing_backlog_health(target))
         checks.append(_check_orphan_citations(target))
         checks.append(_check_tafe_schema(target))
         checks.append(_check_tafe_flow_definitions(target))
-        # WI-4327 / WI-4329: harness-state SoT consistency. 3-layer check:
-        # (L1) 3 SoT files parse cleanly through the canonical reader entrypoints;
-        # (L2) grep_absent — no committed code outside groundtruth_kb.harness_projection
-        # reads harness-state/*.json or the harness-capability-registry.toml directly;
-        # (L3) grep_absent — no references to retired role-assignments path outside
-        # whitelisted contexts (bridge files, audit archives, formal-artifact-approval
-        # packets, and harness_projection.py itself). Severity WARN initially per
-        # the proposal §Acceptance Criteria #8 — promoted to FAIL after WI-4336
-        # (mirror retirement) lands.
-        checks.append(_check_harness_state_sot_consistency(target))
-        # WI-4700: harness metadata freshness. Fails when cloud-backed API-harness
-        # routes are still advertised as cheap/local in dispatcher or canonical
-        # narrative surfaces.
-        checks.append(_check_harness_metadata_freshness(target))
-        # WI-4999: owner-facing reconfirmation surface for active dispatch
-        # harness model pins. WARN-only because vendor-default introspection is
-        # intentionally out of scope; owner confirmation metadata is the durable
-        # evidence.
-        checks.append(_check_harness_model_pin_reconfirmation(target))
-        # WI-4323: Ollama harness 4-store consistency. Verifies identities + registry +
-        # capability registry + routing TOML agree about ollama→D / status=registered /
-        # role=[] / tool_calling models. Authorized by
-        # bridge/gtkb-ollama-integration-phase-1-verification-006.md (GO at -006).
-        # Severity WARN per Phase-1 GOV-HARNESS-ONBOARDING-CONTRACT-001 rollout convention.
         checks.append(_check_ollama_harness(target))
-        checks.append(_check_alibaba_cloud_studio_harness(target))
+        checks.append(_check_provider_routing(target, "alibaba-cloud-studio"))
+        checks.append(_check_provider_routing(target, "openrouter"))
         # WI-4778: Cursor headless dispatch readiness stays diagnostic until
         # the external Cursor Agent CLI is present and activation is deliberate.
         checks.append(_check_cursor_dispatch_readiness(target))

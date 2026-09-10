@@ -3,8 +3,8 @@
 """Shared helper module for Deliberation Archive (DA) governance hooks.
 
 Provides DB resolution, source-ref normalization, and DA insertion for
-hooks that need to write to the Deliberation Archive (owner-decision-capture,
-gov09-capture, and future DA governance hooks).
+the remaining gov09-capture hook. Conversational owner answers are not
+automatically archived as decision or permission records.
 
 This module is NOT a hook itself — it is a helper imported by hooks in
 this directory.
@@ -15,7 +15,6 @@ from __future__ import annotations
 import hashlib
 import os
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 
 

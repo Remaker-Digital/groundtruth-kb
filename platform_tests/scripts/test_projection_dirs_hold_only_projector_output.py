@@ -34,6 +34,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "harness_projection"))
 
@@ -98,24 +100,24 @@ def test_bytecode_under_a_projection_root_is_planned_for_removal() -> None:
     )
 
 
-def test_every_rendered_hook_command_suppresses_bytecode() -> None:
+@pytest.mark.parametrize(("harness", "_config_dir"), _rostered_harnesses())
+def test_every_rendered_hook_command_suppresses_bytecode(harness: str, _config_dir: str) -> None:
     """Prevention, asserted per rendered command rather than per code path.
 
     A future registration site that forgets the flag would otherwise reintroduce
     the defect silently for one harness only.
     """
     missing: list[str] = []
-    for harness, _config_dir in _rostered_harnesses():
-        plan = project_harness.build_plan(harness)
-        for rel, content in plan.writes.items():
-            if not rel.endswith((".json", ".toml")):
+    plan = project_harness.build_plan(harness)
+    for rel, content in plan.writes.items():
+        if not rel.endswith((".json", ".toml")):
+            continue
+        for line in content.splitlines():
+            stripped = line.strip()
+            if ".venv" not in stripped or "python" not in stripped.lower():
                 continue
-            for line in content.splitlines():
-                stripped = line.strip()
-                if ".venv" not in stripped or "python" not in stripped.lower():
-                    continue
-                if NO_BYTECODE_FLAG not in stripped:
-                    missing.append(f"{harness}:{rel}: {stripped[:90]}")
+            if NO_BYTECODE_FLAG not in stripped:
+                missing.append(f"{harness}:{rel}: {stripped[:90]}")
 
     assert not missing, f"rendered hook commands without {NO_BYTECODE_FLAG}: {missing}"
 

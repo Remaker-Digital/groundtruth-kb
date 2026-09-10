@@ -49,22 +49,6 @@ script = "document_author_provenance_gate.py"
 blocking = true
 timeout_seconds = 5
 
-# DISABLED 2026-08-27 per Compact Operating Guidance section 14 (defective gate).
-# This pre_tool_use registration emits GTKB-WORK-SUBJECT and denied a read-only
-# `git status --porcelain -- config/` on the grounds that it "targets application
-# product artifacts", classifying on the presence of the literal string "config/"
-# in the command text rather than on the resolved operation. A read is not a
-# change, and config/ is GT-KB platform scope, not application product.
-# Carriers: WI-6454, WI-6879, WI-6760, WI-6556.
-# The non-pre_tool_use workstream-focus registration below is unaffected.
-#
-# [[hook]]
-# event = "pre_tool_use"
-# intents = ["file_write", "shell_exec"]
-# script = "workstream-focus.py"
-# blocking = true
-# timeout_seconds = 5
-
 [[hook]]
 event = "pre_tool_use"
 intents = ["file_write", "shell_exec"]
@@ -72,27 +56,21 @@ script = "lo-file-safety-gate.py"
 blocking = true
 timeout_seconds = 5
 
-# Session write isolation. Self-migrating: a session with no checkout keeps
-# working and is told how to open one; enforcement begins when the checkout
-# does. An actor with no init binding, the owner included, is never gated.
+# Session write isolation uses the shared native effect gate. The CLI resolves
+# the current binding, registered checkout, exact artifact claim and scratch
+# scope; missing identity or unavailable authority cannot imply permission.
 [[hook]]
 event = "pre_tool_use"
-intents = ["file_write"]
-script = "worktree-scope-gate.py"
+intents = ["file_write", "shell_exec"]
+script = "implementation_start_gate.py"
+script_root = "project_scripts"
 blocking = true
-timeout_seconds = 5
+timeout_seconds = 15
 
 [[hook]]
 event = "pre_tool_use"
 intents = ["file_write", "shell_exec"]
 script = "directive-enforcement-adapter.py"
-blocking = true
-timeout_seconds = 5
-
-[[hook]]
-event = "pre_tool_use"
-intents = ["file_write", "shell_exec"]
-script = "bridge-compliance-gate.py"
 blocking = true
 timeout_seconds = 5
 
@@ -118,32 +96,6 @@ blocking = true
 timeout_seconds = 5
 
 [[hook]]
-event = "session_start"
-intents = ["all"]
-script = "session-start-governance.py"
-blocking = false
-timeout_seconds = 60
-
-[[hook]]
-event = "session_start"
-intents = ["all"]
-script = "session_start_dispatch.py"
-blocking = false
-timeout_seconds = 60
-
-[[hook]]
-event = "post_tool_use"
-intents = ["all"]
-script = "delib-search-tracker.py"
-blocking = false
-
-[[hook]]
-event = "post_tool_use"
-intents = ["all"]
-script = "owner-decision-capture.py"
-blocking = false
-
-[[hook]]
 event = "post_tool_use"
 intents = ["all"]
 script = "spec-event-surfacer.py"
@@ -153,96 +105,9 @@ timeout_seconds = 5
 [[hook]]
 event = "turn_end"
 intents = ["all"]
-script = "owner-decision-tracker.py"
-args = ["--mode", "stop"]
-blocking = true
-timeout_seconds = 5
-
-[[hook]]
-event = "turn_end"
-intents = ["all"]
 script = "advisory-router-scan.py"
 blocking = true
 timeout_seconds = 10
-
-# Must run first among prompt_submit hooks: it writes the session-init binding
-# that later gates (work-intent claim, verdict filing) resolve. Hook transport
-# is non-blocking, but neither a recognized
-# exact init that cannot bind nor a near-canonical init that binds nothing
-# reports success: both emit a visible message, so a session never proceeds
-# believing it declared a role it does not hold
-# (WI-6499 / owner-authorized emergency repair 2026-08-16).
-[[hook]]
-event = "prompt_submit"
-intents = ["all"]
-script = "session-init-binding.py"
-blocking = false
-timeout_seconds = 5
-
-[[hook]]
-event = "prompt_submit"
-intents = ["all"]
-script = "workstream-focus.py"
-blocking = false
-timeout_seconds = 5
-
-[[hook]]
-event = "prompt_submit"
-intents = ["all"]
-script = "delib-search-gate.py"
-blocking = false
-
-[[hook]]
-event = "prompt_submit"
-intents = ["all"]
-script = "intake-classifier.py"
-blocking = false
-
-[[hook]]
-event = "prompt_submit"
-intents = ["all"]
-script = "gov09-capture.py"
-blocking = false
-
-[[hook]]
-event = "prompt_submit"
-intents = ["all"]
-script = "bridge-axis-2-surface.py"
-blocking = false
-timeout_seconds = 5
-
-[[hook]]
-event = "prompt_submit"
-intents = ["all"]
-script = "spec-classifier.py"
-blocking = false
-timeout_seconds = 5
-
-[[hook]]
-event = "prompt_submit"
-intents = ["all"]
-script = "glossary-expansion.py"
-blocking = false
-timeout_seconds = 5
-
-[[hook]]
-event = "prompt_submit"
-intents = ["all"]
-script = "project-completion-surface.py"
-blocking = false
-timeout_seconds = 5
-
-[[hook]]
-event = "prompt_submit"
-intents = ["all"]
-script = "session-topic-envelope-router.py"
-blocking = false
-timeout_seconds = 5
-
-# Project-script hooks: scripts that live at the project scripts/ tree rather
-# than the baseline hooks/ directory. The projector renders the interpreter
-# and project-dir variable natively per harness; args are harness-neutral
-# except where the projector substitutes {{HARNESS_NAME}}.
 
 [[hook]]
 event = "pre_tool_use"
@@ -251,15 +116,6 @@ script = "dispatch_blackbox_gate.py"
 script_root = "project_scripts"
 blocking = true
 timeout_seconds = 5
-
-[[hook]]
-event = "turn_end"
-intents = ["all"]
-script = "session_self_initialization.py"
-script_root = "project_scripts"
-args = ["--emit-wrapup", "--fast-hook", "--harness-name", "{{HARNESS_NAME}}"]
-blocking = true
-timeout_seconds = 60
 
 [[hook]]
 event = "turn_end"

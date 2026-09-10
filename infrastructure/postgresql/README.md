@@ -136,7 +136,7 @@ Initialization compares the actual stored subject and role; its digest is not
 a substitute role predicate or a legacy-format translation requirement.
 
 All 67 tables present in the reviewed SQLite source are accounted for: 21
-migrate, 7 contain runtime/derived data to rebuild when needed, and 39 are
+migrate, 4 contain omitted runtime/derived data, and 42 are
 retired storage. The latter includes obsolete dispatcher metrics and lane
 projections, mutable session envelopes/role attestations, bootstrap permission
 bundles, publication capabilities and mutation receipts. Required current work,

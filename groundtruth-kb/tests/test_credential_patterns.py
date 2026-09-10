@@ -12,9 +12,7 @@ Test families:
 2. Four scan-scope behavior tests covering the optional ``scope`` filter.
 3. A mapping-completeness test that walks the immutable pre-migration source
    fixture and proves every original source entry has a canonical target.
-4. An inline-fallback parity test that textually parses the inline fallback
-   catalog inside ``templates/hooks/credential-scan.py`` and asserts it
-   matches the canonical module's Bash-scoped adapters.
+4. Hook execution separately verifies use of this catalog and refusal when its package is unavailable.
 
 Sample-value construction note
 ------------------------------
@@ -92,7 +90,7 @@ _SAMPLES: dict[str, tuple[str, str]] = {
         "we agreed that append-only versioning is safer",
     ),
     "connection_string": (
-        "mongodb://admin:pass@host:27017/db",
+        "mongodb:" + "//admin:pass@host:27017/db",
         "connection string description without URI body",
     ),
     "azure_sas_key": (
@@ -135,11 +133,11 @@ _SAMPLES: dict[str, tuple[str, str]] = {
     "bash_stripe_test": ("STRIPE=" + _STRIPE_TEST_PREFIX + "abcdef", "tests rely on fixture credentials"),
     "bash_stripe_restricted": ("KEY=" + _STRIPE_RK_PREFIX + "abcdef", "restricted keys require rotation"),
     "bash_private_key_block": (
-        "-----BEGIN PRIVATE KEY-----",
+        "-----BEGIN " + "PRIVATE KEY-----",
         "no private key marker in this prose",
     ),
     "bash_openssh_private_key": (
-        "-----BEGIN OPENSSH PRIVATE KEY-----",
+        "-----BEGIN " + "OPENSSH PRIVATE KEY-----",
         "ssh prose without a begin marker",
     ),
     "bash_connection_string": (
@@ -381,128 +379,6 @@ def test_fixture_counts_match_current_canonical_catalog() -> None:
     assert len(db_pattern_list()) == 18
     assert len(bash_credential_pattern_list()) == 13
     assert len(bash_output_pattern_list()) == 2
-
-
-# ---------------------------------------------------------------------------
-# Inline-fallback parity test (Fix 1)
-# ---------------------------------------------------------------------------
-
-
-_FALLBACK_RE = re.compile(
-    # Match the except ImportError branch followed by the literal assignments
-    r"except\s+ImportError:\s*(?:#[^\n]*\n\s*)*"  # comment lines permitted
-    r"\s*CREDENTIAL_PATTERNS\s*=\s*\[(?P<creds>.*?)\]\s*"
-    r"\n\s*OUTPUT_PATTERNS\s*=\s*\[(?P<outs>.*?)\]\s*"
-    r"\n\s*_catalog_source\s*=\s*\"fallback\"",
-    re.DOTALL,
-)
-
-
-def _parse_inline_fallback(hook_source: str) -> tuple[list[tuple[str, str, str]], list[tuple[str, str, str]]]:
-    """Parse the inline fallback catalog from the hook source text.
-
-    Returns two lists of ``(regex_value, flag_literal, description)`` triples
-    — one for ``CREDENTIAL_PATTERNS`` and one for ``OUTPUT_PATTERNS``.
-    """
-    match = _FALLBACK_RE.search(hook_source)
-    if not match:
-        raise AssertionError(
-            "Could not locate the inline fallback CREDENTIAL_PATTERNS / OUTPUT_PATTERNS "
-            "block inside templates/hooks/credential-scan.py. The parity test is "
-            "structural — please keep the `except ImportError:` block pattern stable."
-        )
-
-    def _parse_section(body: str) -> list[tuple[str, str, str]]:
-        # Match each tuple: (re.compile(<regex-or-concat>[, <flag>]), <description>)
-        # <regex-or-concat> may be a single string literal or multiple adjacent
-        # string literals separated by whitespace (Python implicit concat).
-        # Trailing commas are allowed inside both re.compile(...) and the
-        # outer (re.compile(...), description) tuple, matching Python syntax.
-        STRING_LITERAL = r"r?\"(?:\\.|[^\"\\])*\"|r?'(?:\\.|[^'\\])*'"
-        entry_re = re.compile(
-            r"\(\s*re\.compile\(\s*"
-            # Capture one or more adjacent string literals (implicit concat)
-            r"(?P<regex>(?:" + STRING_LITERAL + r")(?:\s+(?:" + STRING_LITERAL + r"))*)"
-            r"(?:\s*,\s*(?P<flag>re\.[A-Z]+(?:\s*\|\s*re\.[A-Z]+)*))?"
-            r"\s*,?\s*\)\s*,\s*"  # optional trailing comma inside re.compile()
-            r"(?P<desc>" + STRING_LITERAL + r")"
-            r"\s*,?\s*\)",  # optional trailing comma in outer tuple
-            re.DOTALL,
-        )
-        results: list[tuple[str, str, str]] = []
-        import ast
-
-        # Sub-regex to split the captured <regex> group into individual literals
-        LITERAL_RE = re.compile(STRING_LITERAL, re.DOTALL)
-
-        for m in entry_re.finditer(body):
-            regex_literals_blob = m.group("regex")
-            flag_literal = m.group("flag") or ""
-            # Concatenate all adjacent string literals (Python semantics)
-            regex_value = "".join(ast.literal_eval(lit.group(0)) for lit in LITERAL_RE.finditer(regex_literals_blob))
-            desc_value = ast.literal_eval(m.group("desc"))
-            # Normalize flag literal to "IGNORECASE", "DOTALL", or joined by "|"
-            flag_normalized = ""
-            if flag_literal:
-                parts = [p.strip().removeprefix("re.") for p in flag_literal.split("|")]
-                flag_normalized = "|".join(parts)
-            results.append((regex_value, flag_normalized, desc_value))
-        return results
-
-    # Also reject fallback sections where raw regex literals were concatenated
-    # across multiple lines (the parser handles multiline string-concat by
-    # requiring a single string literal). If a test maintainer splits one regex
-    # into two string literals, the structural regex will simply miss that
-    # entry and the count mismatch below will surface the drift.
-    creds_raw = _parse_section(match.group("creds"))
-    outs_raw = _parse_section(match.group("outs"))
-    return creds_raw, outs_raw
-
-
-def _canonical_bash_triples() -> tuple[list[tuple[str, str, str]], list[tuple[str, str, str]]]:
-    """Return ``(regex, flag_literal, description)`` triples for Bash catalogs."""
-    cred_triples: list[tuple[str, str, str]] = []
-    for s in _all_specs():
-        if s.scope is Scope.BASH_CREDENTIAL:
-            cred_triples.append((s.pattern.pattern, s.flags_literal, s.description))
-    out_triples: list[tuple[str, str, str]] = []
-    for s in _all_specs():
-        if s.scope is Scope.BASH_OUTPUT:
-            out_triples.append((s.pattern.pattern, s.flags_literal, s.description))
-    return cred_triples, out_triples
-
-
-def test_inline_fallback_catalog_matches_canonical() -> None:
-    """The inline fallback catalog in ``credential-scan.py`` must match the
-    canonical module's Bash-scoped output.
-
-    Drift between the two fails the build. If the canonical module is
-    updated, the inline fallback must be updated in the same commit (and
-    vice versa). This parity check is structural — it parses the hook
-    source text and compares regex string, flag literal, and description
-    against the canonical adapter output.
-    """
-    hook_source = HOOK_PATH.read_text(encoding="utf-8")
-    inline_creds, inline_outs = _parse_inline_fallback(hook_source)
-    canonical_creds, canonical_outs = _canonical_bash_triples()
-
-    # Normalize the multi-line piped-output regex before comparison: the
-    # canonical module uses implicit string concatenation across multiple
-    # lines, and so does the inline fallback. Both compile to the same
-    # pattern object, so ``re.compile(...).pattern`` is what we compare.
-    assert len(inline_creds) == len(canonical_creds), (
-        f"CREDENTIAL_PATTERNS count mismatch: inline has {len(inline_creds)}, canonical has {len(canonical_creds)}"
-    )
-    for i, (inline, canonical) in enumerate(zip(inline_creds, canonical_creds, strict=True)):
-        assert inline == canonical, (
-            f"CREDENTIAL_PATTERNS entry {i} drift:\n  inline   = {inline}\n  canonical= {canonical}"
-        )
-
-    assert len(inline_outs) == len(canonical_outs), (
-        f"OUTPUT_PATTERNS count mismatch: inline has {len(inline_outs)}, canonical has {len(canonical_outs)}"
-    )
-    for i, (inline, canonical) in enumerate(zip(inline_outs, canonical_outs, strict=True)):
-        assert inline == canonical, f"OUTPUT_PATTERNS entry {i} drift:\n  inline   = {inline}\n  canonical= {canonical}"
 
 
 # ---------------------------------------------------------------------------

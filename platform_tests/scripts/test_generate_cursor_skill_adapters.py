@@ -1,190 +1,166 @@
+"""Cursor skills derive directly from the neutral baseline, independently of peers."""
+
 from __future__ import annotations
 
-import importlib.util
+import ast
+import copy
 import json
 import sys
 from pathlib import Path
 
+import pytest
+import yaml
+
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "scripts" / "generate_cursor_skill_adapters.py"
+sys.path.insert(0, str(ROOT / "scripts" / "harness_projection"))
+import project_harness  # noqa: E402
 
 
-def _load_module():
-    spec = importlib.util.spec_from_file_location("test_cursor_adapter_generator", SCRIPT)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+@pytest.fixture
+def cursor_profiles(monkeypatch):
+    profiles = copy.deepcopy(project_harness.load_profiles())
+    profile = profiles["harnesses"]["cursor"]
+    profiles["harnesses"] = {"cursor": profile}
+    monkeypatch.setattr(project_harness, "load_profiles", lambda: profiles)
+    return profiles
 
 
-def _fixture(root: Path, names: tuple[str, ...] = ("alpha", "beta")) -> None:
-    registry = root / "config/agent-control/gtkb-harness-capability-registry.toml"
-    registry.parent.mkdir(parents=True)
-    rows: list[str] = []
+def _fixture(root: Path, names=("alpha", "beta")):
     for name in names:
-        rows.extend(
-            [
-                "[[capabilities]]",
-                f'id = "skill.{name}"',
-                'kind = "skill"',
-                f'canonical_name = "{name}"',
-                f'canonical_source = ".claude/skills/{name}/SKILL.md"',
-                "[capabilities.cursor]",
-                f'surface = ".cursor/skills/{name}/SKILL.md"',
-                'status = "fallback"',
-                "",
-            ]
+        directory = root / ".harness-baseline-configuration/skills" / name
+        directory.mkdir(parents=True)
+        (directory / "SKILL.md").write_bytes(
+            (
+                f"---\nname: {name}\ndescription: {name} skill\n---\n\n"
+                f"Run {{{{HARNESS_SKILLS_DIR}}}}/{name}/helpers/run.py and read "
+                f"[notes]({{{{HARNESS_SKILLS_DIR}}}}/{name}/references/notes.md).\n"
+            ).encode()
         )
-        skill = root / ".claude" / "skills" / name / "SKILL.md"
-        skill.parent.mkdir(parents=True)
-        skill.write_text(
-            f"---\nname: {name}\ndescription: {name} skill\n---\n\n"
-            f"Run `.claude/skills/{name}/helpers/run.py` and read "
-            f"[notes](.claude/skills/{name}/references/notes.md).\n",
-            encoding="utf-8",
-        )
-        helper = skill.parent / "helpers/run.py"
-        helper.parent.mkdir()
-        helper.write_bytes(b"print('ok')\r\n")
-        reference = skill.parent / "references/notes.md"
-        reference.parent.mkdir()
-        reference.write_text("notes\n", encoding="utf-8")
-    registry.write_text("\n".join(rows), encoding="utf-8")
+        (directory / "helpers").mkdir()
+        (directory / "helpers/run.py").write_bytes(b"print('ok')\r\n")
+        (directory / "references").mkdir()
+        (directory / "references/notes.md").write_bytes(b"Neutral notes.\n")
 
 
-def test_registry_drives_exact_cursor_surface_set_and_manifest(tmp_path: Path) -> None:
-    module = _load_module()
+def _bytes(root: Path):
+    return {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+
+
+def test_cursor_plan_uses_only_neutral_sources_and_does_not_write(tmp_path, monkeypatch, cursor_profiles):
     _fixture(tmp_path)
-    changed, adapters, orphans = module.generate(tmp_path)
-    assert adapters == [".cursor/skills/alpha/SKILL.md", ".cursor/skills/beta/SKILL.md"]
-    assert not orphans
-    assert ".cursor/skills/MANIFEST.json" in changed
-    manifest = json.loads((tmp_path / ".cursor/skills/MANIFEST.json").read_text(encoding="utf-8"))
-    assert [row["adapter_relative_path"] for row in manifest["adapters"]] == adapters
+    forbidden = [
+        "config/agent-control",
+        ".claude",
+        ".codex",
+        ".antigravity",
+        "harness-state",
+        ".gtkb-state",
+        "groundtruth.db",
+    ]
+    for name in forbidden:
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"Unparseable foreign bytes; no reads or mutations permitted.")
+    before = _bytes(tmp_path)
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    original_open = Path.open
+
+    def guarded_open(path, *args, **kwargs):
+        assert not any(path == tmp_path / name or tmp_path / name in path.parents for name in forbidden)
+        return original_open(path, *args, **kwargs)
+
+    with monkeypatch.context() as guard:
+        guard.setattr(Path, "open", guarded_open)
+        plan = project_harness.build_plan("cursor")
+    assert not plan.gaps
+    assert {path for path in plan.writes if path.endswith("/SKILL.md")} == {
+        ".cursor/skills/alpha/SKILL.md",
+        ".cursor/skills/beta/SKILL.md",
+    }
+    owned = json.loads(plan.writes[".cursor/.projection-manifest.json"])["paths"]
+    assert set(owned) == set(plan.writes)
+    assert _bytes(tmp_path) == before
+    assert not (tmp_path / ".cursor").exists()
 
 
-def test_cursor_output_has_native_marker_rewrites_resources_and_is_lf(tmp_path: Path) -> None:
-    module = _load_module()
+def test_cursor_frontmatter_resources_and_own_paths(tmp_path, monkeypatch, cursor_profiles):
     _fixture(tmp_path, ("alpha",))
-    module.generate(tmp_path)
-    target = tmp_path / ".cursor/skills/alpha/SKILL.md"
-    raw = target.read_bytes()
-    text = raw.decode("utf-8")
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    assert project_harness.run("cursor", "write") == 0
+    raw = (tmp_path / ".cursor/skills/alpha/SKILL.md").read_bytes()
     assert raw.startswith(b"---\n") and b"\r" not in raw
-    assert "GTKB-CURSOR-SKILL-ADAPTER" in text
-    assert "Generated at:" in text
-    assert "Generated by: scripts/generate_cursor_skill_adapters.py" in text
+    text = raw.decode()
+    assert yaml.safe_load(text.split("---", 2)[1]) == {"name": "alpha", "description": "alpha skill"}
     assert ".cursor/skills/alpha/helpers/run.py" in text
     assert ".cursor/skills/alpha/references/notes.md" in text
-    assert (tmp_path / ".cursor/skills/alpha/helpers/run.py").read_bytes() == b"print('ok')\r\n"
+    assert "scripts/harness_projection/project_harness.py" in text
+    helper = (tmp_path / ".cursor/skills/alpha/helpers/run.py").read_bytes()
+    assert b"\r" not in helper
+    assert ast.dump(ast.parse(helper)) == ast.dump(ast.parse("print('ok')"))
+    assert "Neutral notes." in (tmp_path / ".cursor/skills/alpha/references/notes.md").read_text(encoding="utf-8")
+    for peer in (".claude/", ".codex/", ".agents/", ".antigravity/", "config/agent-control"):
+        assert peer not in text
 
 
-def test_check_detects_crlf_without_writing(tmp_path: Path) -> None:
-    module = _load_module()
+def test_cursor_check_detects_crlf_without_writes(tmp_path, monkeypatch, cursor_profiles):
     _fixture(tmp_path, ("alpha",))
-    module.generate(tmp_path)
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    assert project_harness.run("cursor", "write") == 0
     target = tmp_path / ".cursor/skills/alpha/SKILL.md"
     target.write_bytes(target.read_bytes().replace(b"\n", b"\r\n"))
-    before = target.read_bytes()
-    changed, _, _ = module.generate(tmp_path, check=True)
-    assert ".cursor/skills/alpha/SKILL.md" in changed
-    assert target.read_bytes() == before
+    before = _bytes(tmp_path)
+    assert project_harness.run("cursor", "check") == 1
+    assert _bytes(tmp_path) == before
 
 
-def test_render_outputs_is_side_effect_free_and_uses_source_overrides(tmp_path: Path) -> None:
-    module = _load_module()
+def test_cursor_fresh_roots_and_second_run_are_deterministic(tmp_path, monkeypatch, cursor_profiles):
+    results = []
+    for name in ("left", "right"):
+        root = tmp_path / name
+        _fixture(root)
+        monkeypatch.setattr(project_harness, "PROJECT_ROOT", root)
+        assert project_harness.run("cursor", "write") == 0
+        before = _bytes(root)
+        assert project_harness.run("cursor", "check") == 0
+        assert project_harness.run("cursor", "write") == 0
+        assert _bytes(root) == before
+        results.append(before)
+    assert results[0] == results[1]
+
+
+def test_cursor_refresh_preserves_unlisted_work_and_removes_retired_outputs(tmp_path, monkeypatch, cursor_profiles):
     _fixture(tmp_path, ("alpha",))
-    source = ".claude/skills/alpha/SKILL.md"
-    resource = ".claude/skills/alpha/helpers/run.py"
-    before = sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*"))
-    outputs, adapters, orphans = module.render_outputs(
-        tmp_path,
-        source_overrides={
-            source: b"---\nname: alpha\ndescription: replacement\n---\n\nReplacement.\n",
-            resource: b"print('planned')\n",
-        },
-    )
-    after = sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*"))
-    assert len(adapters) == 1
-    assert not orphans
-    assert b"description: replacement" in outputs[".cursor/skills/alpha/SKILL.md"]
-    assert outputs[".cursor/skills/alpha/helpers/run.py"] == b"print('planned')\n"
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    assert project_harness.run("cursor", "write") == 0
+    foreign = tmp_path / ".cursor/skills/local/SKILL.md"
+    foreign.parent.mkdir(parents=True)
+    foreign.write_bytes(b"Locally authored work.\n")
+    old = tmp_path / ".cursor/skills/MANIFEST.json"
+    old.write_bytes(b"Old generated manifest.\n")
+    manifest = tmp_path / ".cursor/.projection-manifest.json"
+    value = json.loads(manifest.read_text(encoding="utf-8"))
+    value["paths"].append(".cursor/skills/MANIFEST.json")
+    manifest.write_text(json.dumps(value), encoding="utf-8")
+    plan = project_harness.build_plan("cursor")
+    assert not plan.gaps
+    assert ".cursor/skills/MANIFEST.json" in plan.removes
+    assert ".cursor/skills/local/SKILL.md" not in plan.removes
+    assert project_harness.run("cursor", "write") == 0
+    assert not old.exists()
+    assert foreign.read_bytes() == b"Locally authored work.\n"
+    assert project_harness.run("cursor", "check") == 0
+
+
+@pytest.mark.parametrize("defect", ["unknown-token", "unknown-artifact"])
+def test_cursor_source_gaps_refuse_all_projection_writes(tmp_path, monkeypatch, cursor_profiles, defect):
+    _fixture(tmp_path, ("alpha",))
+    source = tmp_path / ".harness-baseline-configuration/skills/alpha"
+    if defect == "unknown-token":
+        (source / "SKILL.md").write_text("{{UNKNOWN_CONTROL}}\n", encoding="utf-8")
+    else:
+        (source / "unclassified.bin").write_bytes(b"Unclassified bytes")
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    before = _bytes(tmp_path)
+    assert project_harness.run("cursor", "write") == 2
     assert not (tmp_path / ".cursor").exists()
-    assert before == after
-
-
-def test_owned_orphan_is_reported_but_never_deleted(tmp_path: Path) -> None:
-    module = _load_module()
-    _fixture(tmp_path, ("alpha",))
-    orphan = tmp_path / ".cursor/skills/orphan/SKILL.md"
-    orphan.parent.mkdir(parents=True)
-    orphan.write_text("<!-- GTKB-CURSOR-SKILL-ADAPTER -->\n", encoding="utf-8")
-    _, _, orphans = module.generate(tmp_path)
-    assert orphans == [".cursor/skills/orphan/SKILL.md"]
-    assert orphan.is_file()
-
-
-def test_fresh_roots_and_second_run_are_byte_deterministic(tmp_path: Path) -> None:
-    module = _load_module()
-    first = tmp_path / "first"
-    second = tmp_path / "second"
-    _fixture(first, ("alpha",))
-    _fixture(second, ("alpha",))
-    module.generate(first)
-    module.generate(second)
-    left = (first / ".cursor/skills/alpha/SKILL.md").read_bytes()
-    right = (second / ".cursor/skills/alpha/SKILL.md").read_bytes()
-    assert left == right
-    changed, _, orphans = module.generate(first)
-    assert changed == [] and orphans == []
-
-
-def test_generator_does_not_touch_harness_or_database_state(tmp_path: Path) -> None:
-    module = _load_module()
-    _fixture(tmp_path, ("alpha",))
-    db = tmp_path / "groundtruth.db"
-    state = tmp_path / "harness-state/identity.json"
-    state.parent.mkdir()
-    db.write_bytes(b"sentinel-db")
-    state.write_bytes(b"sentinel-state")
-    module.generate(tmp_path)
-    assert db.read_bytes() == b"sentinel-db"
-    assert state.read_bytes() == b"sentinel-state"
-
-
-def test_baseline_skill_not_in_registry_is_unioned(tmp_path: Path) -> None:
-    module = _load_module()
-    _fixture(tmp_path, ("alpha",))
-    skill = tmp_path / ".harness-baseline-configuration/skills/gamma/SKILL.md"
-    skill.parent.mkdir(parents=True)
-    skill.write_text("---\nname: gamma\ndescription: gamma skill\n---\n\nGamma body.\n", encoding="utf-8")
-    _, adapters, orphans = module.generate(tmp_path)
-    assert ".cursor/skills/alpha/SKILL.md" in adapters
-    assert ".cursor/skills/gamma/SKILL.md" in adapters
-    assert not orphans
-    assert (tmp_path / ".cursor/skills/gamma/SKILL.md").is_file()
-
-
-def test_unsupported_registry_skill_is_not_unioned_from_baseline(tmp_path: Path) -> None:
-    module = _load_module()
-    _fixture(tmp_path, ("alpha",))
-    registry = tmp_path / "config/agent-control/gtkb-harness-capability-registry.toml"
-    extra = (
-        "\n[[capabilities]]\n"
-        'id = "skill.delta"\n'
-        'kind = "skill"\n'
-        'canonical_name = "delta"\n'
-        'canonical_source = ".harness-baseline-configuration/skills/delta/SKILL.md"\n'
-        "[capabilities.cursor]\n"
-        'surface = ".cursor/skills/delta/SKILL.md"\n'
-        'status = "unsupported"\n'
-    )
-    registry.write_text(registry.read_text(encoding="utf-8") + extra, encoding="utf-8")
-    skill = tmp_path / ".harness-baseline-configuration/skills/delta/SKILL.md"
-    skill.parent.mkdir(parents=True)
-    skill.write_text("---\nname: delta\ndescription: delta skill\n---\n\nDelta body.\n", encoding="utf-8")
-    _, adapters, orphans = module.generate(tmp_path)
-    assert ".cursor/skills/alpha/SKILL.md" in adapters
-    assert ".cursor/skills/delta/SKILL.md" not in adapters
-    assert not orphans
+    assert _bytes(tmp_path) == before

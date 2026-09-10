@@ -1,278 +1,126 @@
-"""Resolve owner-facing GT-KB system/interface terms against the governed map."""
+"""Resolve current canonical terminology without a file-backed authority map."""
 
 from __future__ import annotations
 
-import tomllib
+from collections import defaultdict
+from collections.abc import Iterable
 from difflib import get_close_matches
-from pathlib import Path
 from typing import Any
-
-DEFAULT_MAP_RELATIVE_PATH = Path("config") / "agent-control" / "system-interface-map.toml"
-REQUIRED_SYSTEM_FIELDS = (
-    "id",
-    "canonical_name",
-    "accepted_aliases",
-    "discouraged_aliases",
-    "forbidden_aliases",
-    "concept_vs_artifact",
-    "authoritative_source",
-    "generated_or_authoritative",
-    "read_method",
-    "mutation_method",
-    "role_permissions",
-    "startup_visibility",
-    "dashboard_visibility",
-    "harness_caveats",
-    "verification_method",
-    "lifecycle_state",
-    "related_specs",
-    "related_deliberations",
-)
-REQUIRED_SEED_IDS = {
-    "backlog",
-    "work-item",
-    "membase",
-    "deliberation-archive",
-    "memory-md",
-    "canonical-glossary",
-    "operating-model",
-    "file-bridge",
-    "bridge-queue",
-    "bridge-status",
-    "parked-draft",
-    "bridge-dispatch",
-    "monitor-gt-kb-bridge-codex-thread",
-    "gt-kb-bridge-monitor-codex-thread",
-    "smart-poller",
-    "retired-os-poller",
-    "dashboard",
-    "release-readiness",
-    "release-gate",
-    "doctor-check",
-    "startup-disclosure",
-    "session-focus",
-    "work-subject",
-    "project-root",
-    "role-assignment-record",
-    "harness-identity-record",
-    "skill",
-    "hook",
-    "plugin-app-capability",
-    "mcp-server",
-    "resource-alias-registry",
-}
-BACKLOG_REQUIRED_TOKENS = ("current_work_items", "work_items", "versioned bridge", "dashboard")
 
 
 class AuthorityResolutionError(ValueError):
-    """Raised when the authority map cannot be loaded or validated."""
+    """Current terminology cannot be interpreted without guessing."""
 
 
-def load_map(path: Path) -> dict[str, Any]:
-    """Load the governed system/interface TOML map."""
-    try:
-        with path.open("rb") as handle:
-            data = tomllib.load(handle)
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        raise AuthorityResolutionError(str(exc)) from exc
-    if not isinstance(data, dict):
-        raise AuthorityResolutionError("system map root must be a TOML table")
-    return data
+def _normalize(value: str) -> str:
+    return " ".join(value.split()).casefold()
 
 
-def system_rows(system_map: dict[str, Any]) -> list[dict[str, Any]]:
-    """Return normalized ``[[systems]]`` rows from the map."""
-    rows = system_map.get("systems", [])
-    if not isinstance(rows, list):
-        return []
-    return [row for row in rows if isinstance(row, dict)]
+def _match_keys(record: dict[str, Any]) -> set[str]:
+    aliases = record.get("accepted_synonyms")
+    if aliases is None:
+        aliases = []
+    if not isinstance(aliases, list):
+        raise AuthorityResolutionError(f"{record['id']}: accepted_synonyms must be a string list")
+    values = [record.get("id"), record.get("canonical_term"), *aliases]
+    if any(not isinstance(value, str) or not _normalize(value) for value in values):
+        raise AuthorityResolutionError(f"{record['id']}: names and accepted synonyms must be nonempty strings")
+    return {_normalize(value) for value in values}
 
 
-def validate_map(system_map: dict[str, Any], *, project_root: Path) -> list[str]:
-    """Validate schema, seed coverage, alias uniqueness, and the backlog row."""
-    errors: list[str] = []
-    if system_map.get("schema_version") != 1:
-        errors.append("schema_version must be 1")
-    rows = system_rows(system_map)
-    if not rows:
-        errors.append("at least one [[systems]] row is required")
-        return errors
-
-    seen_ids: set[str] = set()
-    alias_owner: dict[str, str] = {}
-    for index, row in enumerate(rows, start=1):
-        row_id = str(row.get("id") or f"row-{index}")
-        if row_id in seen_ids:
-            errors.append(f"{row_id}: duplicate system id")
-        seen_ids.add(row_id)
-        for field in REQUIRED_SYSTEM_FIELDS:
-            if field not in row:
-                errors.append(f"{row_id}: missing required field {field}")
-        aliases = row.get("accepted_aliases")
-        if not isinstance(aliases, list) or not aliases or not all(isinstance(alias, str) for alias in aliases):
-            errors.append(f"{row_id}: accepted_aliases must be a non-empty string list")
-        else:
-            for alias in aliases:
-                normalized = _normalize(alias)
-                previous = alias_owner.setdefault(normalized, row_id)
-                if previous != row_id:
-                    errors.append(f"alias {alias!r} maps to both {previous} and {row_id}")
-        for list_field in ("discouraged_aliases", "forbidden_aliases", "related_specs", "related_deliberations"):
-            if list_field in row and not isinstance(row[list_field], list):
-                errors.append(f"{row_id}: {list_field} must be a list")
-        source = str(row.get("authoritative_source") or "")
-        if _looks_like_project_path(source) and not (project_root / source).exists():
-            errors.append(f"{row_id}: authoritative_source does not exist: {source}")
-
-    missing_seed_ids = sorted(REQUIRED_SEED_IDS - seen_ids)
-    if missing_seed_ids:
-        errors.append("missing required seed systems: " + ", ".join(missing_seed_ids))
-
-    backlog = next((row for row in rows if row.get("id") == "backlog"), None)
-    if backlog is None:
-        errors.append("backlog reconciliation row is missing")
-    else:
-        combined = " ".join(str(backlog.get(field) or "") for field in REQUIRED_SYSTEM_FIELDS)
-        for token in BACKLOG_REQUIRED_TOKENS:
-            if token not in combined:
-                errors.append(f"backlog row must mention {token}")
-    return errors
+def _active(records: Iterable[dict[str, Any]], scope: str | None) -> list[dict[str, Any]]:
+    return sorted(
+        (row for row in records if row["lifecycle_status"] == "active" and (scope is None or row["scope"] == scope)),
+        key=lambda row: row["id"],
+    )
 
 
-def resolve_term(term: str, *, system_map: dict[str, Any]) -> dict[str, Any]:
-    """Resolve one owner-facing term to a public system-map row."""
-    normalized = _normalize(term)
-    matches = [row for row in system_rows(system_map) if normalized in _match_keys(row)]
+def resolve_term(term: str, *, records: Iterable[dict[str, Any]], scope: str | None = None) -> dict[str, Any]:
+    """Match current IDs, names or accepted synonyms; never select an ambiguous match."""
+    if not _normalize(term):
+        raise AuthorityResolutionError("A nonempty term is required")
+    active = _active(records, scope)
+    keys = {}
+    query = _normalize(term)
+    for row in active:
+        try:
+            keys[row["id"]] = _match_keys(row)
+        except AuthorityResolutionError:
+            # Refuse a malformed entry's recognizable names without disabling
+            # unrelated subjects during reconciliation.
+            aliases = row.get("accepted_synonyms")
+            values = [row.get("id"), row.get("canonical_term")]
+            if isinstance(aliases, list):
+                values.extend(aliases)
+            if any(isinstance(value, str) and _normalize(value) == query for value in values):
+                raise
+    matches = [row for row in active if query in keys.get(row["id"], set())]
     if not matches:
-        known_terms = sorted({key for row in system_rows(system_map) for key in _match_keys(row)})
-        candidates = get_close_matches(normalized, known_terms, n=5, cutoff=0.55)
+        known = sorted({key for values in keys.values() for key in values})
         return {
             "status": "not_found",
             "term": term,
-            "message": "No system map row matched.",
-            "candidates": candidates,
+            "message": "No current canonical term matched.",
+            "candidates": get_close_matches(_normalize(term), known, n=5, cutoff=0.55),
         }
-    if len(matches) > 1:
+    if len(matches) != 1:
         return {
             "status": "ambiguous",
             "term": term,
-            "message": "Term matched multiple system map rows.",
-            "candidates": [_public_row(row) for row in matches],
+            "message": "Multiple current terms matched; select a scope or read an exact record ID.",
+            "candidates": [{key: row[key] for key in ("id", "canonical_term", "scope")} for row in matches],
         }
-    return {"status": "resolved", "term": term, "message": "Term resolved.", "system": _public_row(matches[0])}
+    return {"status": "resolved", "term": term, "message": "Current canonical term resolved.", "record": matches[0]}
 
 
-def resolve_subject(subject: str, *, project_root: Path, map_path: Path | None = None) -> dict[str, Any]:
-    """Load, validate, and resolve a subject against ``system-interface-map.toml``."""
-    resolved_map_path = map_path or project_root / DEFAULT_MAP_RELATIVE_PATH
-    system_map = load_map(resolved_map_path)
-    errors = validate_map(system_map, project_root=project_root)
-    if errors:
-        return {"status": "invalid_map", "term": subject, "message": "System map validation failed.", "errors": errors}
-    return resolve_term(subject, system_map=system_map)
-
-
-def compact_status(*, project_root: Path, map_path: Path | None = None) -> dict[str, Any]:
-    """Return startup/dashboard-safe map status."""
-    resolved_map_path = map_path or project_root / DEFAULT_MAP_RELATIVE_PATH
-    system_map = load_map(resolved_map_path)
-    errors = validate_map(system_map, project_root=project_root)
-    rows = system_rows(system_map)
-    companion = project_root / str(system_map.get("human_companion") or "")
-    backlog = next((row for row in rows if row.get("id") == "backlog"), {})
+def compact_status(*, records: Iterable[dict[str, Any]], scope: str | None = None) -> dict[str, Any]:
+    """Report interpretation conflicts in the current corpus, independent of installed files."""
+    selected = [row for row in records if scope is None or row["scope"] == scope]
+    active = _active(selected, scope)
+    owners: dict[tuple[str, str], set[str]] = defaultdict(set)
+    issues = []
+    for row in active:
+        try:
+            keys = _match_keys(row)
+        except AuthorityResolutionError as error:
+            issues.append({"id": row["id"], "message": str(error)})
+            continue
+        for key in keys:
+            owners[row["scope"], key].add(row["id"])
+    ambiguous = [
+        {"scope": key[0], "term": key[1], "ids": sorted(ids)} for key, ids in sorted(owners.items()) if len(ids) > 1
+    ]
     return {
-        "status": "pass" if not errors else "fail",
-        "schema_version": system_map.get("schema_version"),
-        "systems": len(rows),
-        "human_companion": str(companion),
-        "human_companion_exists": companion.exists(),
-        "first_reconciliation_case": "backlog",
-        "backlog_authoritative_source": backlog.get("authoritative_source"),
-        "errors": errors,
+        "status": "pass" if active and not ambiguous and not issues else "fail",
+        "source": "canonical_terms",
+        "records": len(selected),
+        "active_records": len(active),
+        "inactive_records": len(selected) - len(active),
+        "ambiguities": ambiguous,
+        "validation_issues": issues,
     }
 
 
 def format_resolution(result: dict[str, Any]) -> str:
-    """Format an authority resolution for humans."""
-    lines = [f"{result.get('status')}: {result.get('message', '')}"]
-    if "system" in result:
-        system = result["system"]
-        lines.append(f"  {system.get('id')} -> {system.get('authoritative_source')}")
-        lines.append(f"  class: {system.get('concept_vs_artifact')}")
-        lines.append(f"  read: {system.get('read_method')}")
-        lines.append(f"  mutate: {system.get('mutation_method')}")
-        lines.append(f"  permissions: {system.get('role_permissions')}")
-        related_specs = system.get("related_specs") or []
-        if related_specs:
-            lines.append(f"  specs: {', '.join(str(spec) for spec in related_specs)}")
-        caveats = system.get("harness_caveats")
-        if caveats:
-            lines.append(f"  caveats: {caveats}")
-    if result.get("candidates") and "system" not in result:
-        lines.append("  candidates: " + ", ".join(str(candidate) for candidate in result["candidates"]))
+    """Render canonical definitions and actionable ambiguity or failure diagnostics."""
+    lines = [f"{result.get('status')}: {result.get('message', '')}".rstrip()]
+    row = result.get("record")
+    if row:
+        lines.extend([f"{row['id']} v{row['version']}: {row['canonical_term']}", row["definition"]])
+        lines.append(f"Source: {row['source_authority']}")
+        lines.extend(f"Service: {value}" for value in row.get("linked_services") or [])
     for candidate in result.get("candidates", []):
-        if isinstance(candidate, dict):
-            lines.append(f"  candidate: {candidate.get('id')} -> {candidate.get('authoritative_source')}")
-    for error in result.get("errors", []):
-        lines.append(f"  error: {error}")
-    return "\n".join(lines)
-
-
-def _public_row(row: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "id": row.get("id"),
-        "canonical_name": row.get("canonical_name"),
-        "concept_vs_artifact": row.get("concept_vs_artifact"),
-        "authoritative_source": row.get("authoritative_source"),
-        "generated_or_authoritative": row.get("generated_or_authoritative"),
-        "read_method": row.get("read_method"),
-        "mutation_method": row.get("mutation_method"),
-        "role_permissions": row.get("role_permissions"),
-        "startup_visibility": row.get("startup_visibility"),
-        "dashboard_visibility": row.get("dashboard_visibility"),
-        "harness_caveats": row.get("harness_caveats"),
-        "related_specs": row.get("related_specs", []),
-        "related_deliberations": row.get("related_deliberations", []),
-        "lifecycle_state": row.get("lifecycle_state"),
-    }
-
-
-def _match_keys(row: dict[str, Any]) -> set[str]:
-    keys = {_normalize(str(row.get("id") or "")), _normalize(str(row.get("canonical_name") or ""))}
-    keys.update(_normalize(alias) for alias in row.get("accepted_aliases", []) if isinstance(alias, str))
-    keys.discard("")
-    return keys
-
-
-def _looks_like_project_path(source: str) -> bool:
-    if (
-        not source
-        or ":" in source
-        or " and " in source
-        or source.startswith("session ")
-        or source.startswith("AGENTS.md and")
-    ):
-        return False
-    return (
-        any(
-            source.startswith(prefix)
-            for prefix in (
-                ".claude/",
-                ".codex/",
-                ".githooks/",
-                "bridge/",
-                "config/",
-                "docs/",
-                "groundtruth-kb/",
-                "harness-state/",
-                "independent-progress-assessments/",
-                "memory/",
-                "scripts/",
-            )
+        lines.append(
+            f"Candidate: {candidate['id']} ({candidate['scope']})"
+            if isinstance(candidate, dict)
+            else f"Candidate: {candidate}"
         )
-        or source == "groundtruth.db"
-    )
-
-
-def _normalize(value: str) -> str:
-    return " ".join(value.strip().lower().split())
+    if "active_records" in result:
+        lines.append(f"{result['active_records']} active / {result['records']} current records")
+    for ambiguity in result.get("ambiguities", []):
+        lines.append(f"Ambiguous: {ambiguity['term']} ({ambiguity['scope']}): {', '.join(ambiguity['ids'])}")
+    for issue in result.get("source_issues", []):
+        lines.append(f"Source requires correction: {issue['id']} -> {issue['source_authority']} ({issue['status']})")
+    for issue in result.get("validation_issues", []):
+        lines.append(f"Term requires correction: {issue['id']}: {issue['message']}")
+    return "\n".join(lines)

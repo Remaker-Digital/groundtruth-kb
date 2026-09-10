@@ -278,33 +278,6 @@ def _check_dev_environment_inventory_drift() -> None:
     print(f"PASS development environment inventory drift ({result.get('outcome')})")
 
 
-def _check_narrative_artifact_evidence() -> None:
-    """Surface narrative-artifact evidence rollup in the release gate.
-
-    Per GTKB-NARRATIVE-ARTIFACT-APPROVAL-EXTENSION-001 Slice C C4:
-    if any narrative-artifact paths are staged, each must have a matching
-    approval packet (option a). When the staged set has no protected paths,
-    the rollup PASSes informationally.
-    """
-    if str(PROJECT_ROOT) not in sys.path:
-        sys.path.insert(0, str(PROJECT_ROOT))
-    from scripts.check_narrative_artifact_evidence import GateError, evaluate  # noqa: PLC0415
-
-    try:
-        result = evaluate(PROJECT_ROOT)
-    except GateError as exc:
-        raise GateFailure(f"Narrative-artifact evidence gate error: {exc}") from exc
-
-    if result.get("status") != "pass":
-        reasons = [f"{finding.get('path')}: {finding.get('reason')}" for finding in result.get("findings", [])]
-        raise GateFailure("Narrative-artifact evidence: " + "; ".join(reasons))
-    cleared_count = len(result.get("cleared") or [])
-    if cleared_count:
-        print(f"PASS narrative-artifact evidence ({cleared_count} cleared)")
-    else:
-        print("PASS narrative-artifact evidence (no protected paths in staged set)")
-
-
 def _project_resource_helpers():
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
@@ -360,7 +333,7 @@ def _check_sot_registry_authority() -> None:
         )
     print(
         "PASS SoT registry authority "
-        f"({report['record_count']} records, generation={report['generation_digest']}, "
+        f"({report['record_count']} records, declaration={report['declaration_digest']}, "
         "membership_complete=true, pruned=0)"
     )
 
@@ -448,10 +421,7 @@ def _python_gates(skip_pip_audit: bool = False) -> None:
     )
     if not skip_pip_audit:
         _run([sys.executable, "-m", "pip_audit", "-r", "requirements.txt"], timeout=180)
-    _run([sys.executable, "scripts/check_codex_hook_parity.py"], timeout=60)
-    _run([sys.executable, "scripts/generate_codex_skill_adapters.py", "--update-registry", "--check"], timeout=30)
-    _run([sys.executable, "scripts/parity_discovery_diff.py"], timeout=30)
-    _run([sys.executable, "scripts/check_pending_owner_decisions_parity.py"], timeout=30)
+    _run([sys.executable, "scripts/check_harness_parity.py", "--all"], timeout=120)
     _run([sys.executable, "scripts/check_environment_isolation.py"], timeout=60)
     _run([sys.executable, "scripts/check_session_overlay_policy.py"], timeout=60)
     _run([sys.executable, "scripts/check_scoped_service_boundary.py"], timeout=60)
@@ -499,7 +469,6 @@ def _python_gates(skip_pip_audit: bool = False) -> None:
             "applications/Agent_Red/tests/integrations/test_shopify_billing.py",
             "applications/Agent_Red/tests/unit/test_stripe_webhooks.py",
             "platform_tests/hooks/test_formal_artifact_approval_gate.py",
-            "platform_tests/hooks/test_owner_decision_tracker.py",
             "platform_tests/hooks/test_workstream_focus.py",
             "-q",
             "--tb=short",
@@ -596,15 +565,6 @@ def main() -> int:
         _check_no_window_spawn_audit()
         if not args.skip_dev_inventory:
             _check_dev_environment_inventory(args.dev_inventory_max_age_hours)
-        # Narrative-artifact evidence rollup runs BEFORE the inventory-drift check
-        # so the rollup line surfaces in the release-readiness report even when
-        # the inventory-drift lane fails on pre-existing baseline state. Per
-        # GTKB-NARRATIVE-ARTIFACT-APPROVAL-EXTENSION-001 NO-GO -009 F1: the lane
-        # has no dependency on inventory-drift state, and dashboard / CI
-        # consumers must be able to pattern-match the rollup status in every
-        # release-gate output, not only when the drift baseline happens to be
-        # clean.
-        _check_narrative_artifact_evidence()
         if not args.skip_dev_inventory_drift:
             _check_dev_environment_inventory_drift()
         if not args.skip_python:

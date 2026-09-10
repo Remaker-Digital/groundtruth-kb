@@ -50,6 +50,23 @@ def test_defaults():
     assert cfg.backup.include_chroma is False
 
 
+@pytest.mark.parametrize("discover", [False, True])
+def test_config_anchors_default_paths_to_selected_file(tmp_path, monkeypatch, discover):
+    for name in ("GT_PROJECT_ROOT", "GT_DB_PATH", "GT_CHROMA_PATH"):
+        monkeypatch.delenv(name, raising=False)
+    config = tmp_path / "groundtruth.toml"
+    config.write_text('[groundtruth]\napp_title = "Selected project"\n', encoding="utf-8")
+    caller = tmp_path / "nested"
+    caller.mkdir()
+    monkeypatch.chdir(caller)
+
+    cfg = GTConfig.load() if discover else GTConfig.load(config_path=config)
+
+    assert cfg.project_root == tmp_path
+    assert cfg.db_path == tmp_path / "groundtruth.db"
+    assert not cfg.db_path.exists()
+
+
 def test_load_from_toml(tmp_path):
     """Config loads values from groundtruth.toml, resolving relative paths against config dir."""
     toml_file = tmp_path / "groundtruth.toml"
@@ -120,9 +137,9 @@ def test_auto_discovery_no_match_uses_defaults(tmp_path, monkeypatch):
     """When no explicit path is provided and auto-discovery finds nothing,
     GTConfig returns defaults. Phase 4B.1 preserves this contract for the
     auto-discovery path even though explicit missing paths now raise."""
-    # Create an isolated deep directory tree so _find_config's 10-level parent
-    # walk has no chance of encountering an unrelated groundtruth.toml.
-    deep = tmp_path / "a" / "b" / "c" / "d" / "e"
+    # Exceed _find_config's 10-level walk even when pytest's temporary root is
+    # inside a repository that contains groundtruth.toml.
+    deep = tmp_path.joinpath(*(["x"] * 12))
     deep.mkdir(parents=True)
     monkeypatch.chdir(deep)
     cfg = GTConfig.load()  # no config_path → auto-discovery

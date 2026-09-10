@@ -350,12 +350,10 @@ def test_tp_integ_1_scaffold_emits_phase9_section1_enumeration(in_root_sandbox: 
     assert "Application-subject release readiness only" in banner_normalized
     assert "GT-KB product readiness is not tracked here" in banner_normalized
 
-    # TP8: .codex/hooks.json forward-compat intent
-    codex_hooks = (in_root_sandbox / ".codex" / "hooks.json").read_text(encoding="utf-8")
-    assert "ADR-CODEX-HOOK-PARITY-FALLBACK-001" in codex_hooks
-
-    # TP9: .groundtruth/formal-artifact-approvals/.gitkeep
-    assert (in_root_sandbox / ".groundtruth" / "formal-artifact-approvals" / ".gitkeep").exists()
+    # Native configuration is derived by its projector. Scaffolding must not
+    # emit a pretend hook adapter or a retired permission directory.
+    assert not (in_root_sandbox / ".codex" / "hooks.json").exists()
+    assert not (in_root_sandbox / ".groundtruth" / "formal-artifact-approvals").exists()
 
     # TP10: docs/gtkb-dashboard/ NOT pre-populated
     assert not (in_root_sandbox / "docs" / "gtkb-dashboard").exists()
@@ -418,8 +416,6 @@ def test_tp16_enumerate_outputs_lists_new_scaffold_files() -> None:
     expected_new = {
         "README.md",
         "memory/release-readiness.md",
-        ".codex/hooks.json",
-        ".groundtruth/formal-artifact-approvals/.gitkeep",
     }
     missing = expected_new - paths
     assert not missing, f"Missing from enumerate_scaffold_outputs: {sorted(missing)}"
@@ -465,13 +461,13 @@ def _list_fixture_files(profile: str) -> set[Path]:
 
 
 def _assert_starting_session_sequence(text: str) -> None:
-    section = text.split("### Starting a New Session", 1)[1].split("### Session Wrap-Up", 1)[0]
-    fences = re.findall(r"```text\r?\n(.*?)\r?\n```", section, flags=re.DOTALL)
-    assert len(fences) >= 3
-    assert fences[0].strip() == "::init gtkb pb"
-    assert fences[1].strip() == "::open project"
-    assert "Continue work on" in fences[2]
-    assert all("Continue work on" not in fence for fence in fences[:2])
+    from groundtruth_kb import get_templates_dir
+
+    # Scaffold must deliver the current neutral session instructions. A fixed
+    # PB role or project activity cannot be inferred from the chosen harness.
+    canonical = (get_templates_dir() / "project/AGENTS.md").read_text(encoding="utf-8")
+    body = canonical.split("# GT-KB session instructions", 1)[1].strip()
+    assert body in text
 
 
 def _force_rmtree(path: Path) -> None:

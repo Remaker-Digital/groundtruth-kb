@@ -11,11 +11,9 @@ Licensed under AGPL-3.0-or-later.
 from __future__ import annotations
 
 import contextlib
-import hashlib
 import importlib
 import json
 import os
-import re
 import subprocess
 import sys
 import warnings
@@ -104,11 +102,8 @@ from groundtruth_kb.project.registry_control_plane import (
     amend_artifact,
     inspect_registry,
     load_registry_snapshot,
-    preview_registry_registration,
-    recover_registry,
     register_artifacts,
-    transition_apply,
-    transition_request,
+    transition_artifact,
 )
 from groundtruth_kb.project.registry_control_plane import (
     validate_registry as validate_registry_control_plane,
@@ -225,35 +220,58 @@ class _NoWindowsExpandGroup(click.Group):
     """
 
     @staticmethod
-    def _uses_authority(ctx: click.Context, *, defer_config_error: bool = False) -> bool:
-        path = ctx.params.get("config_path") or (ctx.obj or {}).get("config")
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", UserWarning)
-                return GTConfig.load(config_path=Path(path) if path else None).authority_url is not None
-        except (GTConfigError, FileNotFoundError) as error:
-            if defer_config_error:
-                # The administrative database commands have their own canonical
-                # JSON configuration-error renderer. They still fail before I/O.
-                return False
-            raise click.ClickException(str(error)) from error
+    def _commands() -> dict[str, click.Command]:
+        """Knowledge commands always use native authority; local tools need no database."""
+        from groundtruth_kb.cli_authority import NATIVE_COMMANDS
+
+        return {
+            **NATIVE_COMMANDS,
+            "authority": authority_group,
+            "service": service_group,
+            "secrets": secrets,
+            "env": env_cmd,
+            "config": config,
+            "commit": click.Group(
+                "commit",
+                help="Inspect local staged changes without database access.",
+                commands={"preflight": commit_preflight_cmd},
+            ),
+            "scaffold": click.Group(
+                "scaffold",
+                help="Generate adopter-owned infrastructure files without database access.",
+                commands={"iac": scaffold_iac_cmd, "cicd": scaffold_cicd_cmd},
+            ),
+            "db": click.Group(
+                "db", help="Explicit PostgreSQL administration and migration.", commands={"postgres": db_postgres_cmd}
+            ),
+            "hygiene": click.Group(
+                "hygiene", help="Inspect local Git checkouts.", commands={"worktrees": hygiene_worktrees_cmd}
+            ),
+            "registry": click.Group(
+                "registry",
+                help="Read and update the canonical declaration using current authority facts.",
+                commands={
+                    name: registry_cmd.commands[name]
+                    for name in ("list", "show", "inspect", "validate", "reconcile", "register", "amend", "transition")
+                },
+            ),
+            "harness": click.Group(
+                "harness",
+                help="Read installation metadata or derive configuration from the canonical baseline.",
+                commands={**NATIVE_COMMANDS["harness"].commands, "project": harness_project_cmd},
+            ),
+        }
 
     def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
-        if self._uses_authority(ctx, defer_config_error=cmd_name == "db") and cmd_name != "service":
-            from groundtruth_kb.cli_authority import NATIVE_COMMANDS
-
-            command = NATIVE_COMMANDS.get(cmd_name)
-            if command is None:
-                raise click.ClickException(f"'{cmd_name}' has no native authority route. SQLite fallback is disabled.")
-            return command
-        return super().get_command(ctx, cmd_name)
+        command = self._commands().get(cmd_name)
+        if command is None:
+            raise click.ClickException(
+                f"'{cmd_name}' has no native authority route. SQLite fallback is disabled. See 'gt --help'."
+            )
+        return command
 
     def list_commands(self, ctx: click.Context) -> list[str]:
-        if self._uses_authority(ctx):
-            from groundtruth_kb.cli_authority import NATIVE_COMMANDS
-
-            return sorted([*NATIVE_COMMANDS, "service"])
-        return super().list_commands(ctx)
+        return sorted(self._commands())
 
     def main(
         self,
@@ -908,17 +926,10 @@ def bridge_health_cmd(ctx: click.Context, json_output: bool) -> None:
 @click.option("--markdown", "markdown_output", is_flag=True, help="Emit owner-standard Markdown tables.")
 @click.pass_context
 def bridge_state_report_cmd(ctx: click.Context, json_output: bool, markdown_output: bool) -> None:
-    """Report deterministic bridge, dispatcher, and harness state."""
-    from groundtruth_kb.bridge.state_report import build_state_report, render_markdown
+    """Report canonical bridge state through the configured native authority."""
+    from groundtruth_kb.cli_authority import bridge_state_report
 
-    if json_output and markdown_output:
-        raise click.ClickException("Choose only one output mode: --json or --markdown.")
-    config = _resolve_config(ctx)
-    report = build_state_report(config.project_root)
-    if json_output:
-        click.echo(json.dumps(report, indent=2, sort_keys=True))
-        return
-    click.echo(render_markdown(report), nl=False)
+    ctx.invoke(bridge_state_report, json_output=json_output, markdown_output=markdown_output)
 
 
 @bridge_group.command("show")
@@ -3260,46 +3271,36 @@ def design_import_cmd(
 
 @main.group("authority")
 def authority_group() -> None:
-    """Resolve GT-KB authority/source-of-truth terms."""
+    """Resolve current canonical terminology through the authority service."""
 
 
 @authority_group.command("resolve")
 @click.argument("subject")
+@click.option("--scope", default=None, help="Restrict resolution to the canonical term scope.")
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
 @click.pass_context
-def authority_resolve_cmd(ctx: click.Context, subject: str, json_output: bool) -> None:
-    """Resolve an owner-facing term against the governed system-interface map."""
-    from groundtruth_kb.authority import AuthorityResolutionError, format_resolution, resolve_subject
+def authority_resolve_cmd(ctx: click.Context, subject: str, scope: str | None, json_output: bool) -> None:
+    """Resolve an exact current name, ID or accepted synonym without a static map."""
+    from groundtruth_kb.authority import format_resolution
+    from groundtruth_kb.cli_authority import _call
 
-    config = _resolve_config(ctx)
-    try:
-        result = resolve_subject(subject, project_root=Path(config.project_root))
-    except AuthorityResolutionError as exc:
-        result = {"status": "error", "term": subject, "message": str(exc)}
-    if json_output:
-        click.echo(json.dumps(result, indent=2, sort_keys=True))
-    else:
-        click.echo(format_resolution(result))
+    result = _call(ctx, "GET", "/v1/authority/resolve", query={"subject": subject, "scope": scope})
+    click.echo(json.dumps(result, indent=2, sort_keys=True) if json_output else format_resolution(result))
     if result.get("status") != "resolved":
         raise SystemExit(1)
 
 
 @authority_group.command("status")
+@click.option("--scope", default=None, help="Restrict the corpus check to one scope.")
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
 @click.pass_context
-def authority_status_cmd(ctx: click.Context, json_output: bool) -> None:
-    """Report compact system-interface map health."""
-    from groundtruth_kb.authority import AuthorityResolutionError, compact_status, format_resolution
+def authority_status_cmd(ctx: click.Context, scope: str | None, json_output: bool) -> None:
+    """Check current terminology interpretation and formal-source references."""
+    from groundtruth_kb.authority import format_resolution
+    from groundtruth_kb.cli_authority import _call
 
-    config = _resolve_config(ctx)
-    try:
-        result = compact_status(project_root=Path(config.project_root))
-    except AuthorityResolutionError as exc:
-        result = {"status": "error", "message": str(exc), "errors": [str(exc)]}
-    if json_output:
-        click.echo(json.dumps(result, indent=2, sort_keys=True))
-    else:
-        click.echo(format_resolution(result))
+    result = _call(ctx, "GET", "/v1/authority/status", query={"scope": scope})
+    click.echo(json.dumps(result, indent=2, sort_keys=True) if json_output else format_resolution(result))
     if result.get("status") != "pass":
         raise SystemExit(1)
 
@@ -5469,7 +5470,7 @@ def _registry_paths(ctx: click.Context) -> tuple[Path, Path]:
 
 def _registry_control_kwargs(ctx: click.Context) -> dict[str, Path]:
     config = _resolve_config(ctx)
-    return {"project_root": Path(config.project_root), "db_path": Path(config.db_path)}
+    return {"project_root": Path(config.project_root)}
 
 
 def _record_to_dict(rec: Any) -> dict[str, Any]:
@@ -5498,7 +5499,7 @@ def _record_to_dict(rec: Any) -> dict[str, Any]:
 @click.option("--lifecycle", default=None, help="Filter by lifecycle value.")
 @click.pass_context
 def registry_list(ctx: click.Context, json_output: bool, domain: str | None, lifecycle: str | None) -> None:
-    """List all SoT artifact records from one coherent generation."""
+    """List artifact records from the current canonical declaration."""
     try:
         records = list(load_registry_snapshot(**_registry_control_kwargs(ctx)).records)
     except (RegistryControlPlaneError, InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
@@ -5539,8 +5540,8 @@ def registry_show(ctx: click.Context, entry_id: str, json_output: bool) -> None:
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.pass_context
 def registry_validate(ctx: click.Context, json_output: bool) -> None:
-    """Validate coherent schema, parity, currentness, journal, and reverse coverage."""
-    result = validate_registry_control_plane(**_registry_control_kwargs(ctx))
+    """Validate declaration schema, actual identity and current path coverage."""
+    result = validate_registry_control_plane(config=_resolve_config(ctx), **_registry_control_kwargs(ctx))
     if json_output:
         click.echo(json.dumps(result, indent=2, sort_keys=True))
     else:
@@ -5557,8 +5558,10 @@ def registry_validate(ctx: click.Context, json_output: bool) -> None:
 @click.option("--no-census", is_flag=True, help="Skip the deterministic whole-root census.")
 @click.pass_context
 def registry_inspect(ctx: click.Context, json_output: bool, no_census: bool) -> None:
-    """Inspect coherent declaration, projection, journal, currentness, and coverage state."""
-    result = inspect_registry(include_census=not no_census, **_registry_control_kwargs(ctx))
+    """Inspect the canonical declaration, actual identity and current coverage."""
+    result = inspect_registry(
+        config=_resolve_config(ctx), include_census=not no_census, **_registry_control_kwargs(ctx)
+    )
     if json_output:
         click.echo(json.dumps(result, indent=2, sort_keys=True))
     else:
@@ -5572,19 +5575,17 @@ def registry_inspect(ctx: click.Context, json_output: bool, no_census: bool) -> 
 @registry_cmd.command("reconcile")
 @click.option("--json", "json_output", is_flag=True, help="Emit the complete machine-readable report.")
 @click.option("--deep", is_flag=True, help="Inspect disposable descendants instead of emitting pruned envelopes.")
-@click.option("--audit", is_flag=True, help="Perform the periodic deep content-observation audit.")
 @click.option(
     "--batch-output",
     type=click.Path(dir_okay=False, path_type=Path),
     default=None,
-    help="Write the exact additive batch plan inside the project root.",
+    help="Write explicit additive declarations to a new JSON file inside the project root.",
 )
 @click.pass_context
 def registry_reconcile(
     ctx: click.Context,
     json_output: bool,
     deep: bool,
-    audit: bool,
     batch_output: Path | None,
 ) -> None:
     """Reconcile registry membership through all five typed observers."""
@@ -5599,27 +5600,21 @@ def registry_reconcile(
         report = reconcile_artifact_membership(
             root,
             db_path=Path(config.db_path),
+            config=config,
             deep=deep,
-            audit=audit,
         )
         if batch_output is not None:
             output = batch_output if batch_output.is_absolute() else root / batch_output
             output = output.resolve()
             output.relative_to(root)
-            plan = {
-                "schema_version": 1,
-                "starting_registry_generation_digest": report["registry_generation_digest"],
-                "candidate_manifest_sha256": report["candidate_manifest_sha256"],
-                "observer_input_digests": report["observer_input_digests"],
-                "reconciliation_evidence_digest": report["reconciliation_evidence_digest"],
-                "admission_candidates": report["admission_candidates"],
-                "records": report["batch_records"],
-            }
-            plan_bytes = json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8") + b"\n"
+            plan_bytes = (
+                json.dumps(report["batch_records"], ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
+                + b"\n"
+            )
             output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_bytes(plan_bytes)
+            with output.open("xb") as handle:
+                handle.write(plan_bytes)
             report["batch_output"] = output.relative_to(root).as_posix()
-            report["batch_plan_sha256"] = "sha256:" + hashlib.sha256(plan_bytes).hexdigest()
     except (OSError, RegistryControlPlaneError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -5635,44 +5630,26 @@ def registry_reconcile(
         f"pruned={report['pruned_envelope_count']}"
     )
     if batch_output is not None:
-        click.echo(f"Batch plan: {report['batch_output']} ({report['batch_plan_sha256']})")
-
-
-@registry_cmd.command("recover")
-@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
-@click.pass_context
-def registry_recover(ctx: click.Context, json_output: bool) -> None:
-    """Run locked deterministic recovery for the latest incomplete transaction."""
-    try:
-        receipt = recover_registry(**_registry_control_kwargs(ctx))
-    except RegistryControlPlaneError as exc:
-        raise click.ClickException(str(exc)) from exc
-    result = vars(receipt) if receipt is not None else {"recovered": False, "state": "old_generation_intact"}
-    if json_output:
-        click.echo(json.dumps(result, indent=2, sort_keys=True))
-    else:
-        click.echo(f"Registry recovery: {result}")
+        click.echo(f"Batch declarations: {report['batch_output']}")
 
 
 def _artifact_from_payload(payload: dict[str, Any]) -> SoTArtifact:
-    normalized = dict(payload)
-    normalized["depends_on"] = tuple(normalized.get("depends_on") or ())
-    normalized["forbidden_substitutes"] = tuple(normalized.get("forbidden_substitutes") or ())
-    return SoTArtifact(**normalized)
+    from groundtruth_kb.project.sot_registry import _parse_record
+
+    if not isinstance(payload, dict):
+        raise ValueError("A registry record must be a JSON object")
+    return _parse_record(payload)
 
 
-def _registry_authority_options(function: Any) -> Any:
-    options = [
-        click.option("--bridge-id", required=True),
-        click.option("--session-id", required=True),
-        click.option("--start-packet-hash", required=True),
-        click.option("--pauth-id", required=True),
-        click.option("--changed-by", required=True),
-        click.option("--change-reason", required=True),
-    ]
-    for option in reversed(options):
-        function = option(function)
-    return function
+def _registry_write_options(function: Any) -> Any:
+    function = click.option(
+        "--dry-run", is_flag=True, help="Validate the current source and intended result without writing."
+    )(function)
+    return click.option(
+        "--expected-declaration-digest",
+        default=None,
+        help="Refuse if the canonical declaration changed since this read.",
+    )(function)
 
 
 @registry_cmd.command("register")
@@ -5681,277 +5658,96 @@ def _registry_authority_options(function: Any) -> Any:
     "--batch-file",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,
-    help="In-root JSON array of exact declarations.",
+    help="JSON array of explicit declarations.",
 )
-@click.option("--dry-run", is_flag=True, help="Validate and bind the batch without mutating the registry.")
-@click.option("--dry-run-receipt", default=None, help="Exact receipt emitted by the preceding batch dry-run.")
-@_registry_authority_options
+@_registry_write_options
 @click.pass_context
-def registry_register(
-    ctx: click.Context,
-    record_json: str | None,
-    bridge_id: str,
-    batch_file: Path | None,
-    dry_run: bool,
-    dry_run_receipt: str | None,
-    session_id: str,
-    start_packet_hash: str,
-    pauth_id: str,
-    changed_by: str,
-    change_reason: str,
-) -> None:
-    """Register one declaration or an exact in-root batch transactionally."""
+def registry_register(ctx: click.Context, record_json: str | None, batch_file: Path | None, **options: Any) -> None:
+    """Register current artifact membership in the canonical declaration."""
     if (record_json is None) == (batch_file is None):
-        raise click.ClickException("provide exactly one of --record-json or --batch-file")
+        raise click.ClickException("Provide exactly one of --record-json or --batch-file")
     config = _resolve_config(ctx)
-    root = Path(config.project_root).resolve()
     try:
-        batch_metadata: dict[str, Any] = {}
         if batch_file is not None:
-            resolved = batch_file.resolve()
-            resolved.relative_to(root)
-            loaded = json.loads(resolved.read_text(encoding="utf-8"))
-            if isinstance(loaded, dict):
-                from groundtruth_kb.project.artifact_membership_reconciliation import (
-                    REQUIRED_OBSERVER_CLASSES,
-                )
-
-                batch_metadata = loaded
-                raw = loaded.get("records")
-                candidates = loaded.get("admission_candidates")
-                if not isinstance(candidates, list):
-                    raise ValueError("reconciliation plan must contain admission_candidates")
-                candidate_digest = (
-                    "sha256:"
-                    + hashlib.sha256(
-                        json.dumps(
-                            candidates,
-                            ensure_ascii=False,
-                            sort_keys=True,
-                            separators=(",", ":"),
-                        ).encode("utf-8")
-                    ).hexdigest()
-                )
-                if candidate_digest != loaded.get("candidate_manifest_sha256"):
-                    raise ValueError("reconciliation candidate manifest digest mismatch")
-                if [item.get("record") for item in candidates if isinstance(item, dict)] != raw:
-                    raise ValueError("reconciliation records do not match the exact candidate manifest")
-                observer_digests = loaded.get("observer_input_digests")
-                if not isinstance(observer_digests, dict) or set(observer_digests) != set(REQUIRED_OBSERVER_CLASSES):
-                    raise ValueError("reconciliation plan must bind all five observer input digests")
-                if not all(
-                    isinstance(value, str) and re.fullmatch(r"sha256:[0-9a-f]{64}", value)
-                    for value in observer_digests.values()
-                ):
-                    raise ValueError("reconciliation observer input digest is malformed")
-                evidence_digest = loaded.get("reconciliation_evidence_digest")
-                if (
-                    not isinstance(evidence_digest, str)
-                    or re.fullmatch(r"sha256:[0-9a-f]{64}", evidence_digest) is None
-                ):
-                    raise ValueError("reconciliation evidence digest is malformed")
-            else:
-                raw = loaded
+            selected = batch_file if batch_file.is_absolute() else Path(config.project_root) / batch_file
+            raw = json.loads(selected.read_text(encoding="utf-8"))
             if not isinstance(raw, list):
-                raise ValueError("batch file must contain a JSON array or a reconciliation plan with records")
+                raise ValueError("A registration batch must be a JSON array of declarations")
         else:
             raw = [json.loads(record_json or "")]
-        records = [_artifact_from_payload(item) for item in raw]
-        candidate_manifest_sha256 = str(batch_metadata.get("candidate_manifest_sha256") or "") or None
-        expected_generation = str(batch_metadata.get("starting_registry_generation_digest") or "") or None
-        observer_input_digests = batch_metadata.get("observer_input_digests") or None
-        reconciliation_evidence_digest = str(batch_metadata.get("reconciliation_evidence_digest") or "") or None
-        if dry_run:
-            preview = preview_registry_registration(
-                records,
-                actor_session=session_id,
-                start_packet_hash=start_packet_hash,
-                pauth_id=pauth_id,
-                bridge_id=bridge_id,
-                candidate_manifest_sha256=candidate_manifest_sha256,
-                observer_input_digests=observer_input_digests,
-                reconciliation_evidence_digest=reconciliation_evidence_digest,
-                **_registry_control_kwargs(ctx),
-            )
-            if expected_generation is not None and expected_generation != preview.starting_generation_digest:
-                raise ValueError("batch plan was built from a different registry generation")
-            click.echo(json.dumps(vars(preview), indent=2, sort_keys=True))
-            return
-        if batch_file is not None and (expected_generation is None or not dry_run_receipt):
-            raise ValueError("batch apply requires a reconciliation generation and --dry-run-receipt")
-        receipt = register_artifacts(
-            records,
-            actor_session=session_id,
-            changed_by=changed_by,
-            change_reason=change_reason,
-            start_packet_hash=start_packet_hash,
-            pauth_id=pauth_id,
-            bridge_id=bridge_id,
-            expected_generation_digest=expected_generation,
-            candidate_manifest_sha256=candidate_manifest_sha256,
-            observer_input_digests=observer_input_digests,
-            reconciliation_evidence_digest=reconciliation_evidence_digest,
-            dry_run_receipt=dry_run_receipt,
-            **_registry_control_kwargs(ctx),
+        result = register_artifacts(
+            [_artifact_from_payload(item) for item in raw], config=config, **_registry_control_kwargs(ctx), **options
         )
-    except (RegistryControlPlaneError, OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+    except (RegistryControlPlaneError, OSError, TypeError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
-    click.echo(json.dumps(vars(receipt), indent=2, sort_keys=True))
+    click.echo(json.dumps(result, indent=2, sort_keys=True))
 
 
 @registry_cmd.command("amend")
 @click.argument("entry_id")
 @click.option("--changes-json", required=True, help="Non-identity field changes as JSON.")
-@_registry_authority_options
+@_registry_write_options
 @click.pass_context
-def registry_amend(
-    ctx: click.Context,
-    entry_id: str,
-    bridge_id: str,
-    changes_json: str,
-    session_id: str,
-    start_packet_hash: str,
-    pauth_id: str,
-    changed_by: str,
-    change_reason: str,
-) -> None:
-    """Amend non-identity declaration fields through one journalled generation."""
+def registry_amend(ctx: click.Context, entry_id: str, changes_json: str, **options: Any) -> None:
+    """Amend metadata without concealing a locator or lifecycle change."""
     try:
         changes = json.loads(changes_json)
         if not isinstance(changes, dict):
             raise ValueError("--changes-json must be a JSON object")
-        receipt = amend_artifact(
-            entry_id,
-            changes,
-            actor_session=session_id,
-            changed_by=changed_by,
-            change_reason=change_reason,
-            start_packet_hash=start_packet_hash,
-            pauth_id=pauth_id,
-            bridge_id=bridge_id,
-            **_registry_control_kwargs(ctx),
+        result = amend_artifact(
+            entry_id, changes, config=_resolve_config(ctx), **_registry_control_kwargs(ctx), **options
         )
-    except (RegistryControlPlaneError, TypeError, ValueError, json.JSONDecodeError) as exc:
+    except (RegistryControlPlaneError, OSError, TypeError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
-    click.echo(json.dumps(vars(receipt), indent=2, sort_keys=True))
+    click.echo(json.dumps(result, indent=2, sort_keys=True))
 
 
-@registry_cmd.group("transition")
-def registry_transition() -> None:
-    """Registry identity-transition surface (DCL-ARTIFACT-REGISTRY-MUTATION-AUTHORIZATION-001; WI-5928 Slice 1)."""
-
-
-@registry_transition.command("request")
+@registry_cmd.command("transition")
 @click.argument("entry_id")
+@click.option("--changes-json", default=None, help="Locator, coverage, lifecycle or metadata postimage fields.")
 @click.option(
-    "--operation",
-    required=True,
-    help="Transition operation: membership_set, coverage_mode, or coverage_and_membership.",
+    "--remove", is_flag=True, help="Remove membership only when existing content retains coverage or is absent."
 )
+@click.option("--removal", "removals", multiple=True, help="Remove a related declaration in the same atomic change.")
 @click.option(
-    "--owner-evidence-json",
-    required=True,
-    help="Owner-authorization evidence as a JSON object (bridge/pauth/owner-decision).",
+    "--removals-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="UTF-8 JSON array of related IDs to remove in the same atomic change.",
 )
-@click.option("--coverage-changes-json", default=None, help="JSON object mapping registry id to target coverage_mode.")
-@click.option("--removal", "removals", multiple=True, help="Registry id to remove (repeatable).")
-@click.option("--destination-json", default=None, help="Optional JSON object summarizing the transition destination.")
-@click.option("--expiry-seconds", type=int, default=900, show_default=True, help="Request time-to-live in seconds.")
-@_registry_authority_options
+@_registry_write_options
 @click.pass_context
-def registry_transition_request(
+def registry_transition(
     ctx: click.Context,
     entry_id: str,
-    operation: str,
-    owner_evidence_json: str,
-    coverage_changes_json: str | None,
+    changes_json: str | None,
+    remove: bool,
     removals: tuple[str, ...],
-    destination_json: str | None,
-    expiry_seconds: int,
-    bridge_id: str,
-    session_id: str,
-    start_packet_hash: str,
-    pauth_id: str,
-    changed_by: str,
-    change_reason: str,
+    removals_file: Path | None,
+    **options: Any,
 ) -> None:
-    """Record a digest-bound registry identity-transition request."""
+    """Reconcile the declaration to the actual artifact result; this does not move or delete files."""
     try:
-        owner_evidence = json.loads(owner_evidence_json)
-        if not isinstance(owner_evidence, dict):
-            raise ValueError("--owner-evidence-json must be a JSON object")
-        coverage_changes = json.loads(coverage_changes_json) if coverage_changes_json else None
-        if coverage_changes is not None and not isinstance(coverage_changes, dict):
-            raise ValueError("--coverage-changes-json must be a JSON object")
-        destination = json.loads(destination_json) if destination_json else None
-        if destination is not None and not isinstance(destination, dict):
-            raise ValueError("--destination-json must be a JSON object")
-        handle = transition_request(
-            entry_id=entry_id,
-            operation=operation,
-            owner_evidence=owner_evidence,
-            coverage_changes=coverage_changes,
-            removals=list(removals),
-            destination=destination,
-            expiry_seconds=expiry_seconds,
-            actor_session=session_id,
-            changed_by=changed_by,
-            change_reason=change_reason,
-            start_packet_hash=start_packet_hash,
-            pauth_id=pauth_id,
-            bridge_id=bridge_id,
+        changes = json.loads(changes_json) if changes_json is not None else None
+        if changes is not None and not isinstance(changes, dict):
+            raise ValueError("--changes-json must be a JSON object")
+        related = list(removals)
+        if removals_file is not None:
+            file_ids = json.loads(removals_file.read_text(encoding="utf-8"))
+            if not isinstance(file_ids, list):
+                raise ValueError("--removals-file must contain a JSON array of IDs")
+            related.extend(file_ids)
+        result = transition_artifact(
+            entry_id,
+            changes,
+            remove=remove,
+            removals=related,
+            config=_resolve_config(ctx),
             **_registry_control_kwargs(ctx),
+            **options,
         )
-    except (RegistryControlPlaneError, TypeError, ValueError, json.JSONDecodeError) as exc:
+    except (RegistryControlPlaneError, OSError, TypeError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
-    click.echo(json.dumps(handle, indent=2, sort_keys=True))
-
-
-@registry_transition.command("apply")
-@click.argument("request_id")
-@click.option("--ops-envelope-json", required=True, help="OPS envelope evidence as a JSON object.")
-@click.option(
-    "--apply-authorization-json",
-    required=True,
-    help="Independent apply-GO evidence as a JSON object (status/bridge_id/author_session_context_id).",
-)
-@_registry_authority_options
-@click.pass_context
-def registry_transition_apply(
-    ctx: click.Context,
-    request_id: str,
-    ops_envelope_json: str,
-    apply_authorization_json: str,
-    bridge_id: str,
-    session_id: str,
-    start_packet_hash: str,
-    pauth_id: str,
-    changed_by: str,
-    change_reason: str,
-) -> None:
-    """Consume an active transition request and commit the identity transition."""
-    try:
-        ops_envelope = json.loads(ops_envelope_json)
-        if not isinstance(ops_envelope, dict):
-            raise ValueError("--ops-envelope-json must be a JSON object")
-        apply_authorization = json.loads(apply_authorization_json)
-        if not isinstance(apply_authorization, dict):
-            raise ValueError("--apply-authorization-json must be a JSON object")
-        receipt = transition_apply(
-            request_id=request_id,
-            ops_envelope=ops_envelope,
-            apply_authorization=apply_authorization,
-            actor_session=session_id,
-            changed_by=changed_by,
-            change_reason=change_reason,
-            start_packet_hash=start_packet_hash,
-            pauth_id=pauth_id,
-            bridge_id=bridge_id,
-            **_registry_control_kwargs(ctx),
-        )
-    except (RegistryControlPlaneError, TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise click.ClickException(str(exc)) from exc
-    click.echo(json.dumps(vars(receipt), indent=2, sort_keys=True))
+    click.echo(json.dumps(result, indent=2, sort_keys=True))
 
 
 @registry_cmd.command("sync")
@@ -7774,31 +7570,9 @@ def db_postgres_readback_current_cmd(ctx: click.Context, output: Path) -> None:
 def config(ctx: click.Context) -> None:
     """Show resolved configuration."""
     cfg = _resolve_config(ctx)
-    click.echo(f"\n{'=' * 50}")
-    click.echo("  GroundTruth KB — Resolved Config")
-    click.echo(f"{'=' * 50}")
-    click.echo(f"  db_path:           {cfg.db_path}")
-    click.echo(f"  project_root:      {cfg.project_root}")
-    click.echo(f"  app_title:         {cfg.app_title}")
-    click.echo(f"  brand_mark:        {cfg.brand_mark}")
-    click.echo(f"  brand_color:       {cfg.brand_color}")
-    click.echo(f"  logo_url:          {cfg.logo_url}")
-    click.echo(f"  legal_footer:      {cfg.legal_footer or '(none)'}")
-    if cfg.chroma_path is not None:
-        click.echo(f"  chroma_path:       {cfg.chroma_path}")
-    else:
-        try:
-            import chromadb as _chromadb  # noqa: F401
-
-            fallback = cfg.db_path.parent / ".groundtruth-chroma"
-            click.echo(f"  chroma_path:       (unset — runtime fallback: {fallback})")
-        except ImportError:
-            click.echo("  chroma_path:       (unset — chromadb not installed)")
-    click.echo(f"  governance_gates:  {cfg.governance_gates or '(builtins only)'}")
-    click.echo(f"  backup_output_dir: {cfg.backup.snapshot_output_dir or '(default)'}")
-    click.echo(f"  backup_staging_dir:{cfg.backup.snapshot_staging_dir or '(default)'}")
-    click.echo(f"  backup_retain:     {cfg.backup.retain_recent} recent, {cfg.backup.retain_daily_days} daily days")
-    click.echo(f"{'=' * 50}\n")
+    click.echo(f"Project root: {cfg.project_root}")
+    click.echo(f"Authority URL: {cfg.authority_url or '(missing; configure before knowledge operations)'}")
+    click.echo(f"PostgreSQL service: {cfg.postgresql.service or '(not configured)'}")
 
 
 # ---------------------------------------------------------------------------
@@ -10623,13 +10397,46 @@ def _strip_dispatch_fields(data: Any) -> Any:
 
 @main.group("harness")
 def harness_group() -> None:
-    """Harness registry: registration, lifecycle, role, and precedence (FR3).
+    """Harness configuration and local projection operations."""
 
-    WI-4327 Phase-1 Foundation also exposes the 3 canonical reader subcommands
-    `roles`, `identity`, and `capabilities` under this same group. They
-    delegate to `groundtruth_kb.harness_projection.{read_roles, read_identity,
-    read_capabilities}` per DCL-HARNESS-STATE-SOT-READER-CONTRACT-001.
-    """
+
+@harness_group.command("project")
+@click.argument("harness")
+@click.option("--validate", is_flag=True, help="Validate derivation without refreshing installed output.")
+@click.option("--check", is_flag=True, help="Report drift without refreshing installed output.")
+@click.option("--dry-run", is_flag=True, help="Show the proposed output paths without writing.")
+@click.pass_context
+def harness_project_cmd(ctx: click.Context, harness: str, validate: bool, check: bool, dry_run: bool) -> None:
+    """Derive one harness configuration from the selected project's canonical baseline."""
+    if sum((validate, check, dry_run)) > 1:
+        raise click.UsageError("Choose at most one of --validate, --check and --dry-run.")
+    config = _resolve_config(ctx)
+    root = Path(config.project_root).resolve()
+    script = root / "scripts" / "harness_projection" / "project_harness.py"
+    if not script.is_file() or script.resolve() != script:
+        raise click.ClickException("The harness projector is missing or redirected in the selected project.")
+    command = [sys.executable, str(script), "--harness", harness]
+    if validate:
+        command.append("--validate")
+    elif check:
+        command.append("--check")
+    elif dry_run:
+        command.append("--dry-run")
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=root,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            **_no_window_subprocess_kwargs(),
+        )
+    except OSError as exc:
+        raise click.ClickException(f"Could not run the selected project's harness projector: {exc}") from exc
+    click.echo(completed.stdout, nl=False)
+    click.echo(completed.stderr, nl=False, err=True)
+    ctx.exit(completed.returncode)
 
 
 @harness_group.command("roles")
@@ -10656,21 +10463,6 @@ def harness_identity_cmd(ctx: click.Context) -> None:
     config = _resolve_config(ctx)
     try:
         data = read_identity(project_root=Path(config.project_root))
-    except HarnessStateError as exc:
-        click.echo(json.dumps({"status": "error", "message": str(exc)}, indent=2, sort_keys=True))
-        raise SystemExit(1) from exc
-    click.echo(json.dumps(data, indent=2, sort_keys=True))
-
-
-@harness_group.command("capabilities")
-@click.pass_context
-def harness_capabilities_cmd(ctx: click.Context) -> None:
-    """Print the harness-state ``harness-capability-registry.toml`` as JSON (WI-4327)."""
-    from groundtruth_kb.harness_projection import HarnessStateError, read_capabilities  # noqa: PLC0415
-
-    config = _resolve_config(ctx)
-    try:
-        data = read_capabilities(project_root=Path(config.project_root))
     except HarnessStateError as exc:
         click.echo(json.dumps({"status": "error", "message": str(exc)}, indent=2, sort_keys=True))
         raise SystemExit(1) from exc

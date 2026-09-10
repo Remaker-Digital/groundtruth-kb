@@ -1158,38 +1158,6 @@ def test_thread_file_reader_preserves_lowercase_leniency(tmp_path: Path) -> None
     assert thread_status(path) == "VERIFIED"
 
 
-def test_cursor_harness_head_status_returns_bare_token(tmp_path: Path) -> None:
-    """The harness compares the head to a verdict string with ``!=``.
-
-    Returning the whole line made that equality test fail whenever the status
-    line carried trailing text; it must return the bare token.
-    """
-
-    from scripts.cursor_harness import _artifact_head_status
-
-    assert _artifact_head_status("::init gtkb lo\n::open build\nGO\n") == "GO"
-    assert _artifact_head_status("VERIFIED - commit abc123\n") == "VERIFIED"
-    assert _artifact_head_status("::init gtkb lo\n") == ""
-
-
-def test_lo_batch_publish_reads_marker_first_via_packaged_accessor(
-    tmp_path: Path,
-) -> None:
-    """The remaining line-0 reader must be gone; marker-first NEW is actionable."""
-
-    import inspect
-
-    from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
-
-    import scripts.lo_batch_publish as lo_batch_publish
-
-    path = _write_header(tmp_path, "batch-marker-001.md", "::init gtkb lo\n::open build\nNEW\n")
-    assert status_from_bridge_file(path) == "NEW"
-    source = inspect.getsource(lo_batch_publish.publish_one)
-    assert "status_from_bridge_file" in source
-    assert "splitlines()[0]" not in source
-
-
 # --- WI-6706: initial-status rule applies only to chains that start at 001 ---
 #
 # Under the WI-6530 ephemerality policy a thread legitimately loses early

@@ -34,9 +34,8 @@ from groundtruth_kb.artifact_lifecycle.decontamination import (  # noqa: E402
     normalize_repository_path,
     parse_startup_inventory,
 )
-from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 from groundtruth_kb.project.registry_control_plane import serialize_registry  # noqa: E402
-from groundtruth_kb.project.sot_registry import SoTArtifact, sync_projection  # noqa: E402
+from groundtruth_kb.project.sot_registry import SoTArtifact  # noqa: E402
 
 CHECKER = ROOT / "scripts" / "check_artifact_decontamination.py"
 EXPECTED = {f"MOD-AD-{index:02d}" for index in range(1, 13)}
@@ -67,26 +66,8 @@ def _sot_record(
 
 def _write_registry_generation(root: Path, records: list[SoTArtifact]) -> None:
     registry = root / "config" / "registry" / "sot-artifacts.toml"
-    packaged = (
-        root
-        / "groundtruth-kb"
-        / "src"
-        / "groundtruth_kb"
-        / "context"
-        / "registries"
-        / "v1"
-        / "config"
-        / "registry"
-        / "sot-artifacts.toml"
-    )
     registry.parent.mkdir(parents=True, exist_ok=True)
-    packaged.parent.mkdir(parents=True, exist_ok=True)
-    payload = serialize_registry(records)
-    registry.write_bytes(payload)
-    packaged.write_bytes(payload)
-    db_path = root / "groundtruth.db"
-    KnowledgeDB(db_path=db_path)
-    sync_projection(records, db_path, changed_by="test", change_reason="fixture")
+    registry.write_bytes(serialize_registry(records))
 
 
 def _write_import_graph_fixture(

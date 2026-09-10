@@ -9,15 +9,15 @@ fail-closed guard-adapter enforcement (generalizing the ``DCL-OLLAMA-TOOL-PARITY
 enforcement mechanism), author-metadata injection, and the framework-free tool-call loop.
 Adopters supply only the varying axes via an :class:`AdopterProfile`:
 
-* ``endpoint`` — the direct-cloud base URL (no local-service bridge).
-* ``auth_env_key`` — token auth via an Authorization header keyed on an env var NAME
+* ``endpoint`` â€” the direct-cloud base URL (no local-service bridge).
+* ``auth_env_key`` â€” token auth via an Authorization header keyed on an env var NAME
   (``GOV-ENV-LOCAL-AUTHORITY-001``); the token value is never embedded in source.
-* ``dialect`` — ``openai-chat`` (slice 2) and ``anthropic-messages`` (slice 3) are
+* ``dialect`` â€” ``openai-chat`` (slice 2) and ``anthropic-messages`` (slice 3) are
   implemented concretely; ``ollama-native`` is the remaining seam point (implemented with
   the Ollama re-base in slice 4) and raises :class:`NotImplementedError` if selected.
-* ``model`` routing — the adopter's ``.api-harness/routing.toml`` provider key.
-* ``hook_tier`` — ``guard-adapter-floor`` (the enforced mechanism) or ``native-full-hooks``
-  (the Claude-style hook lifecycle from ``.claude/settings.json``; the floor is still
+* ``model`` routing â€” the adopter's generated routing configuration.
+* ``hook_tier`` â€” ``guard-adapter-floor`` (the enforced mechanism) or ``native-full-hooks``
+  (the native hook lifecycle from the adopter configuration; the floor is still
   enforced for this tier).
 
 The dialect abstraction (slice 3) makes ``run_tool_loop`` dialect-agnostic: each dialect
@@ -27,7 +27,7 @@ OpenRouter (openai-chat) re-bases onto this module as the first-adopter proof; A
 Studio and Ollama (anthropic-messages / ollama-native) adopt in slice 4.
 
 Framework-free: standard library (``urllib``/``ssl``/``json``/``subprocess``) plus existing
-GT-KB helpers only — no heavyweight agent framework, per ``ADR-OLLAMA-HARNESS-ADOPTION-001``.
+GT-KB helpers only â€” no heavyweight agent framework, per ``ADR-OLLAMA-HARNESS-ADOPTION-001``.
 """
 
 from __future__ import annotations
@@ -51,16 +51,22 @@ from dataclasses import dataclass, field
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 try:
-    from gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+    from sdk_bridge_bash_guard import (
+        BridgeDeliveryIncomplete,
+        bridge_bash_mutation_reason,
+        bridge_completion_target,
+        verify_bridge_completion,
+    )
 except ModuleNotFoundError:  # pragma: no cover
-    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
-
-try:
-    from sdk_bridge_bash_guard import bridge_bash_mutation_reason
-except ModuleNotFoundError:  # pragma: no cover
-    from scripts.sdk_bridge_bash_guard import bridge_bash_mutation_reason
+    from scripts.sdk_bridge_bash_guard import (
+        BridgeDeliveryIncomplete,
+        bridge_bash_mutation_reason,
+        bridge_completion_target,
+        verify_bridge_completion,
+    )
 
 try:
     from windows_subprocess import no_window_subprocess_kwargs
@@ -101,20 +107,11 @@ BLANK_FINAL_RECOVERY_PROMPT = (
     "Your previous assistant response contained no text and no tool call. Continue the task. "
     "Use the available tools if work remains, or return a nonblank final response when complete."
 )
-BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT = (
-    "This bridge-review or verification route is not complete until PublishBridgeVerdict "
-    "successfully advances the selected numbered bridge document. Reason: {reason}. "
-    "Use only PublishBridgeVerdict next, with the complete GO, NO-GO, or VERIFIED body "
-    "and required metadata. Do not return prose as the final answer until publication succeeds."
-)
 MAX_TOOL_OUTPUT_CHARS = 6000
 MAX_GREP_RESULTS = 50
 MAX_GLOB_RESULTS = 100
 MAX_FILE_SCAN_ENTRIES = 5000
 MAX_REPEATED_TOOL_SIGNATURE_TURNS = 4
-MAX_BRIDGE_VERDICT_RECOVERY_TURNS = 3
-MAX_BRIDGE_VERDICT_RECOVERY_REASON_CHARS = 500
-PROVIDER_VERDICT_STATUS_MISMATCH_CODE = "GTKB_PROVIDER_VERDICT_STATUS_MISMATCH"
 MAX_HTTP_ERROR_BODY_BYTES = 8192
 MAX_HTTP_ERROR_DIAGNOSTIC_CHARS = 500
 HTTP_ERROR_FIELD_CHAR_LIMITS = {
@@ -142,26 +139,10 @@ SKIPPED_SCAN_DIR_NAMES = frozenset(
     }
 )
 LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
-PUBLISH_BRIDGE_VERDICT_TOOL = "PublishBridgeVerdict"
 
 
-def _provider_verdict_enum() -> list[str]:
-    """Verdicts a provider-backed Loyal Opposition may publish: the writer's contract, from the vocabulary."""
-    try:
-        from groundtruth_kb.bridge.vocabulary import LOYAL_OPPOSITION_AUTHORED_STATUSES
-
-        return sorted(LOYAL_OPPOSITION_AUTHORED_STATUSES - {"ADVISORY"})
-    except Exception:  # pragma: no cover - partial installs keep the same contract by value
-        return ["GO", "NO-GO", "NOT-READY", "SUPERSEDED", "VERIFIED"]
-
-
-PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT = "provider_verdict_claim_peer_stand_down"
-CANONICAL_TOOLS = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash", PUBLISH_BRIDGE_VERDICT_TOOL})
+CANONICAL_TOOLS = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
 MUTATING_TOOLS = frozenset({"Write", "Edit", "Bash"})
-DISPATCH_KEYWORD_ROLES = {
-    "::init gtkb lo": "loyal-opposition",
-    "::init gtkb pb": "prime-builder",
-}
 
 # --- Dialect seam (slice 2: openai-chat; slice 3: + anthropic-messages; slice 4: + ollama-native) ---
 DIALECT_OPENAI_CHAT = "openai-chat"
@@ -183,7 +164,6 @@ SUPPORTED_AUTH_STYLES = frozenset({AUTH_STYLE_AUTHORIZATION_BEARER, AUTH_STYLE_X
 HOOK_TIER_GUARD_ADAPTER_FLOOR = "guard-adapter-floor"
 HOOK_TIER_NATIVE_FULL = "native-full-hooks"
 SUPPORTED_HOOK_TIERS = frozenset({HOOK_TIER_GUARD_ADAPTER_FLOOR, HOOK_TIER_NATIVE_FULL})
-NATIVE_HOOK_SETTINGS_PATH = Path(".claude/settings.json")
 NATIVE_HOOK_SESSION_START = "SessionStart"
 NATIVE_HOOK_USER_PROMPT_SUBMIT = "UserPromptSubmit"
 NATIVE_HOOK_PRE_TOOL_USE = "PreToolUse"
@@ -204,28 +184,22 @@ DEFAULT_ANTHROPIC_MAX_TOKENS = 4096
 
 # Generic GT-KB guard-adapter sequences (shared across adopters; not adopter-specific).
 BRIDGE_WRITE_GUARDS = (
-    Path(".claude/hooks/credential-scan.py"),
-    Path(".claude/hooks/scanner-safe-writer.py"),
-    Path(".claude/hooks/bridge-compliance-gate.py"),
-    Path(".claude/hooks/narrative-artifact-approval-gate.py"),
+    Path("hooks/credential-scan.py"),
+    Path("hooks/scanner-safe-writer.py"),
     Path("scripts/implementation_start_gate.py"),
 )
 BRIDGE_EDIT_GUARDS = (
-    Path(".claude/hooks/credential-scan.py"),
-    Path(".claude/hooks/scanner-safe-writer.py"),
-    Path(".claude/hooks/bridge-compliance-gate.py"),
-    Path(".claude/hooks/narrative-artifact-approval-gate.py"),
+    Path("hooks/credential-scan.py"),
+    Path("hooks/scanner-safe-writer.py"),
     Path("scripts/implementation_start_gate.py"),
 )
 WRITE_EDIT_GUARDS = (
-    Path(".claude/hooks/credential-scan.py"),
-    Path(".claude/hooks/scanner-safe-writer.py"),
-    Path(".claude/hooks/narrative-artifact-approval-gate.py"),
+    Path("hooks/credential-scan.py"),
+    Path("hooks/scanner-safe-writer.py"),
     Path("scripts/implementation_start_gate.py"),
 )
 BASH_GUARDS = (
-    Path(".claude/hooks/destructive-gate.py"),
-    Path(".claude/hooks/formal-artifact-approval-gate.py"),
+    Path("hooks/destructive-gate.py"),
     Path("scripts/implementation_start_gate.py"),
 )
 
@@ -234,27 +208,8 @@ class CloudHarnessError(RuntimeError):
     """Raised for fail-closed cloud-harness errors."""
 
 
-class BridgeVerdictClaimStandDown(CloudHarnessError):
-    """Neutral LO verdict publication stand-down for peer-held claim races."""
-
-    def __init__(
-        self,
-        *,
-        slug: str,
-        session_id: str,
-        holder: Mapping[str, Any] | None,
-        detail: str,
-    ) -> None:
-        self.payload = {
-            "status": "neutral_stand_down",
-            "reason": PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT,
-            "slug": slug,
-            "session_id": session_id,
-            "holder_session_id": str((holder or {}).get("session_id") or ""),
-            "holder_ttl_expires_at": (holder or {}).get("ttl_expires_at"),
-            "detail": _bounded_bridge_verdict_recovery_reason(detail),
-        }
-        super().__init__(json.dumps(self.payload, sort_keys=True))
+class CloudHarnessIncomplete(CloudHarnessError):
+    code = "bridge_delivery_incomplete"
 
 
 class FileScanLimitExceeded(CloudHarnessError):
@@ -305,6 +260,7 @@ class ModelMetadata:
     route_key: str
     model_configuration: str | None = None
     requested_model_id: str | None = None
+    native_context_id: str = field(default_factory=lambda: str(uuid4()))
 
 
 @dataclass(frozen=True)
@@ -313,6 +269,19 @@ class GuardExecutionResult:
     stdout: str
     stderr: str = ""
     timed_out: bool = False
+
+
+@dataclass(frozen=True)
+class NativeHookProfile:
+    """Local event configuration, independent of any provider transport/authentication."""
+
+    display_name: str
+    author_identity: str
+    author_harness_id: str
+    default_endpoint: str
+    routing_config_path: Path
+    dialect: str
+    hook_tier: str = HOOK_TIER_NATIVE_FULL
 
 
 @dataclass(frozen=True)
@@ -333,9 +302,6 @@ class AdopterProfile:
     auth_style: str = AUTH_STYLE_AUTHORIZATION_BEARER
     anthropic_version: str = DEFAULT_ANTHROPIC_VERSION
     max_tokens: int = DEFAULT_ANTHROPIC_MAX_TOKENS
-    publish_bridge_verdict_tool: bool = False
-    force_anthropic_publisher_tool_choice: bool = True
-    disable_anthropic_publisher_recovery_thinking: bool = False
 
     def __post_init__(self) -> None:
         if self.dialect not in SUPPORTED_DIALECTS:
@@ -348,10 +314,6 @@ class AdopterProfile:
             raise CloudHarnessError(
                 f"unknown auth_style {self.auth_style!r}; expected one of {sorted(SUPPORTED_AUTH_STYLES)}"
             )
-        if type(self.force_anthropic_publisher_tool_choice) is not bool:
-            raise CloudHarnessError("force_anthropic_publisher_tool_choice must be a bool")
-        if type(self.disable_anthropic_publisher_recovery_thinking) is not bool:
-            raise CloudHarnessError("disable_anthropic_publisher_recovery_thinking must be a bool")
         # Slice 2 direct-cloud invariant (SPEC-INTAKE-9ec893): an adopter must declare a
         # direct-cloud endpoint; the base has no local-service bridge path.
         if not self.default_endpoint or not str(self.default_endpoint).strip():
@@ -579,9 +541,18 @@ def _parse_skill_routes(routing: Mapping[str, Any], models: Mapping[str, ModelRo
     return skill_routes
 
 
+def resolve_configuration_path(project_root: Path, relative: Path) -> Path:
+    if relative.anchor or ".." in relative.parts:
+        raise CloudHarnessError("configuration path must be relative to the selected project")
+    candidate = project_root.resolve() / relative
+    if candidate.resolve() != candidate:
+        raise CloudHarnessError(f"configuration path is redirected: {relative.as_posix()}")
+    return candidate
+
+
 def load_routing_config(project_root: Path, *, provider_key: str, config_path: Path) -> RoutingConfig:
-    """Load ``.api-harness/routing.toml`` for one provider (cross-provider rows are ignored)."""
-    resolved_config_path = project_root / config_path
+    """Load the selected provider's generated routing configuration."""
+    resolved_config_path = resolve_configuration_path(project_root, config_path)
     try:
         raw = tomllib.loads(resolved_config_path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -676,12 +647,7 @@ def resolve_runtime_limits(
     return operation_timeout, session_timeout, max_turns
 
 
-def resolve_harness_session_id(environ: Mapping[str, str] | None = None) -> str:
-    """Resolve the bridge work-intent session id used by guarded tools."""
-    return resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=environ)
-
-
-def _default_config_label(profile: AdopterProfile, endpoint: str) -> str:
+def _default_config_label(profile: AdopterProfile | NativeHookProfile, endpoint: str) -> str:
     return f"{profile.display_name} endpoint={endpoint}; routing=static {profile.routing_config_path.as_posix()}"
 
 
@@ -724,6 +690,7 @@ def metadata_from_response(
         route_key=metadata.route_key,
         model_configuration=metadata_configuration(metadata, profile, response_model_id=response_model_id),
         requested_model_id=metadata.requested_model_id or metadata.model_id,
+        native_context_id=metadata.native_context_id,
     )
 
 
@@ -785,43 +752,12 @@ def build_tool_schemas(allowed_tools: Iterable[str]) -> list[dict[str, Any]]:
             {"command": {"type": "string"}, "timeout_seconds": {"type": "number", "minimum": 1}},
             ["command"],
         ),
-        PUBLISH_BRIDGE_VERDICT_TOOL: _schema(
-            PUBLISH_BRIDGE_VERDICT_TOOL,
-            (
-                "Publish a governed Loyal Opposition verdict: GO or NO-GO on a proposal, "
-                "NOT-READY or VERIFIED on an implementation report, SUPERSEDED to close a chain. "
-                "The runtime computes the next bridge path/version. VERIFIED also requires "
-                "include_paths and commit_message; hunk_patch_paths is optional."
-            ),
-            {
-                "slug": {"type": "string"},
-                "verdict": {"type": "string", "enum": _provider_verdict_enum()},
-                "content": {"type": "string"},
-                "include_paths": {"type": "array", "items": {"type": "string"}},
-                "hunk_patch_paths": {"type": "array", "items": {"type": "string"}},
-                "commit_message": {"type": "string"},
-            },
-            ["slug", "verdict", "content"],
-        ),
     }
     allowed = tuple(allowed_tools)
     unknown = sorted(set(allowed) - CANONICAL_TOOLS)
     if unknown:
         raise CloudHarnessError(f"unknown allowed tools: {unknown}")
     return [schemas[name] for name in allowed]
-
-
-def allowed_tools_for_skill(
-    allowed_tools: Iterable[str],
-    skill: str | None,
-    *,
-    publish_bridge_verdict_tool: bool = False,
-) -> tuple[str, ...]:
-    allowed = tuple(allowed_tools)
-    without_verdict = tuple(name for name in allowed if name != PUBLISH_BRIDGE_VERDICT_TOOL)
-    if publish_bridge_verdict_tool and skill in LOYAL_OPPOSITION_BRIDGE_SKILLS:
-        return (*without_verdict, PUBLISH_BRIDGE_VERDICT_TOOL)
-    return without_verdict
 
 
 def _call_with_wall_clock_bound(
@@ -1052,7 +988,7 @@ def _anthropic_build_payload(
 ) -> dict[str, Any]:
     """Translate the internal (openai-shaped) message history into an Anthropic Messages payload.
 
-    system → top-level ``system``; assistant ``tool_calls`` → ``tool_use`` blocks; ``tool``
+    system â†’ top-level ``system``; assistant ``tool_calls`` â†’ ``tool_use`` blocks; ``tool``
     results are coalesced into a following user message of ``tool_result`` blocks.
     """
     system_text: str | None = None
@@ -1252,67 +1188,31 @@ def _first_nonblank_line(content: str) -> str:
     return ""
 
 
-def _content_status_token(content: str) -> str:
-    parts = _first_nonblank_line(content).split(maxsplit=1)
-    return parts[0].upper() if parts else ""
-
-
-def normalize_bridge_author_model_metadata(
-    content: str,
-    model_metadata: ModelMetadata,
-    project_root: Path,
-    path: Path,
-    profile: AdopterProfile,
-) -> str:
-    if not _is_bridge_markdown_path(project_root, path):
-        return content
-    if _content_status_token(content) not in {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"}:
-        return content
-
-    replacements = {
-        "author_model": model_metadata.model_id,
-        "author_model_version": model_metadata.model_version,
-        "author_model_configuration": metadata_configuration(model_metadata, profile),
-    }
-    lines = content.splitlines()
-    changed = False
-    for index, line in enumerate(lines):
-        key, separator, _value = line.partition(":")
-        normalized_key = key.strip().lower()
-        if separator and normalized_key in replacements:
-            lines[index] = f"{normalized_key}: {replacements[normalized_key]}"
-            changed = True
-    if not changed:
-        return content
-    normalized = "\n".join(lines)
-    if content.endswith("\n"):
-        normalized += "\n"
-    return normalized
-
-
 def set_author_metadata_env(
     env: Mapping[str, str],
     model_id: str,
     model_version: str,
-    profile: AdopterProfile,
+    profile: AdopterProfile | NativeHookProfile,
     endpoint: str | None = None,
     model_configuration: str | None = None,
+    *,
+    native_context_id: str,
 ) -> dict[str, str]:
     updated = dict(env)
     effective_endpoint = endpoint or profile.default_endpoint
-    session_id = resolve_harness_session_id(env)
+    # A native runtime identity is not the canonical binding returned by the CLI.
+    updated.pop("GTKB_AUTHOR_SESSION_CONTEXT_ID", None)
     updated.update(
         {
             "GTKB_AUTHOR_IDENTITY": profile.author_identity,
             "GTKB_AUTHOR_HARNESS_ID": profile.author_harness_id,
+            "GTKB_NATIVE_CONTEXT_ID": native_context_id,
             "GTKB_AUTHOR_MODEL": model_id,
             "GTKB_AUTHOR_MODEL_VERSION": model_version,
             "GTKB_AUTHOR_MODEL_CONFIGURATION": model_configuration
             or _default_config_label(profile, effective_endpoint),
         }
     )
-    if session_id:
-        updated["GTKB_AUTHOR_SESSION_CONTEXT_ID"] = session_id
     return updated
 
 
@@ -1341,7 +1241,7 @@ def _default_guard_runner(
 
 def _expand_native_hook_command(command: str, env: Mapping[str, str]) -> str:
     expanded = command
-    for key in ("CLAUDE_PROJECT_DIR", "GTKB_PROJECT_ROOT"):
+    for key in ("GTKB_PROJECT_ROOT",):
         if key in env:
             expanded = expanded.replace(f"${{{key}}}", env[key])
             expanded = expanded.replace(f"${key}", env[key])
@@ -1425,21 +1325,20 @@ def _native_pretool_timeout_reason(tool_name: str | None, command: str, hook_tim
     )
 
 
-def _load_native_hook_settings(project_root: Path) -> Mapping[str, Any]:
-    settings_path = project_root / NATIVE_HOOK_SETTINGS_PATH
+def _load_native_hook_settings(project_root: Path, profile: AdopterProfile | NativeHookProfile) -> Mapping[str, Any]:
+    relative = profile.routing_config_path.parent / "settings.json"
+    settings_path = resolve_configuration_path(project_root, relative)
     if not settings_path.is_file():
-        return {}
+        raise CloudHarnessError(f"native hook settings are missing: {relative.as_posix()}")
     try:
         data = json.loads(settings_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise CloudHarnessError(f"native hook settings malformed JSON: {NATIVE_HOOK_SETTINGS_PATH.as_posix()}") from exc
+        raise CloudHarnessError(f"native hook settings malformed JSON: {relative.as_posix()}") from exc
     if not isinstance(data, dict):
-        raise CloudHarnessError(f"native hook settings must be a JSON object: {NATIVE_HOOK_SETTINGS_PATH.as_posix()}")
+        raise CloudHarnessError(f"native hook settings must be a JSON object: {relative.as_posix()}")
     hooks = data.get("hooks") or {}
     if not isinstance(hooks, dict):
-        raise CloudHarnessError(
-            f"native hook settings hooks must be a JSON object: {NATIVE_HOOK_SETTINGS_PATH.as_posix()}"
-        )
+        raise CloudHarnessError(f"native hook settings hooks must be a JSON object: {relative.as_posix()}")
     return hooks
 
 
@@ -1501,7 +1400,7 @@ def _iter_native_hook_commands(
 def _native_hook_env(
     model_metadata: ModelMetadata,
     project_root: Path,
-    profile: AdopterProfile,
+    profile: AdopterProfile | NativeHookProfile,
 ) -> dict[str, str]:
     env = set_author_metadata_env(
         os.environ,
@@ -1510,8 +1409,8 @@ def _native_hook_env(
         profile,
         model_metadata.endpoint,
         model_metadata.model_configuration,
+        native_context_id=model_metadata.native_context_id,
     )
-    env["CLAUDE_PROJECT_DIR"] = str(project_root)
     env["GTKB_PROJECT_ROOT"] = str(project_root)
     return env
 
@@ -1520,7 +1419,7 @@ def _native_hook_payload(
     event_name: str,
     model_metadata: ModelMetadata,
     project_root: Path,
-    profile: AdopterProfile,
+    profile: AdopterProfile | NativeHookProfile,
     *,
     prompt: str | None = None,
     tool_name: str | None = None,
@@ -1531,7 +1430,7 @@ def _native_hook_payload(
         "hook_event_name": event_name,
         "cwd": str(project_root),
         "project_root": str(project_root),
-        "session_id": resolve_harness_session_id(os.environ),
+        "session_id": model_metadata.native_context_id,
         "transcript_path": "",
         "profile": {
             "display_name": profile.display_name,
@@ -1564,7 +1463,7 @@ def invoke_native_hooks(
     event_name: str,
     model_metadata: ModelMetadata,
     project_root: Path,
-    profile: AdopterProfile,
+    profile: AdopterProfile | NativeHookProfile,
     *,
     prompt: str | None = None,
     tool_name: str | None = None,
@@ -1577,7 +1476,7 @@ def invoke_native_hooks(
     if event_name not in NATIVE_HOOK_EVENTS:
         raise CloudHarnessError(f"unsupported native hook event: {event_name}")
 
-    hooks = _load_native_hook_settings(project_root)
+    hooks = _load_native_hook_settings(project_root, profile)
     env = _native_hook_env(model_metadata, project_root, profile)
     payload = _native_hook_payload(
         event_name,
@@ -1639,7 +1538,7 @@ def invoke_native_hooks(
 def _invoke_native_stop_hooks_nonmasking(
     model_metadata: ModelMetadata,
     project_root: Path,
-    profile: AdopterProfile,
+    profile: AdopterProfile | NativeHookProfile,
     native_hook_runner: NativeHookRunner | None,
 ) -> str | None:
     """Run fail-soft Stop lifecycle hooks and return only an explicit block reason."""
@@ -1691,6 +1590,10 @@ def _guard_paths_for(tool_name: str, tool_input: Mapping[str, Any], project_root
     raise CloudHarnessError(f"unsupported guarded tool: {tool_name}")
 
 
+def projected_guard_paths(paths: Sequence[Path], config_path: Path) -> tuple[Path, ...]:
+    return tuple(config_path.parent / path if path.parts[0] == "hooks" else path for path in paths)
+
+
 def invoke_guard_adapter(
     tool_name: str,
     arguments: Mapping[str, Any],
@@ -1710,7 +1613,11 @@ def invoke_guard_adapter(
     if tool_name not in MUTATING_TOOLS:
         return
     tool_input = _guard_tool_input(tool_name, arguments, project_root)
-    paths = tuple(guard_paths) if guard_paths is not None else _guard_paths_for(tool_name, tool_input, project_root)
+    paths = (
+        tuple(guard_paths)
+        if guard_paths is not None
+        else projected_guard_paths(_guard_paths_for(tool_name, tool_input, project_root), profile.routing_config_path)
+    )
     runner = guard_runner or _default_guard_runner
     env = set_author_metadata_env(
         os.environ,
@@ -1719,16 +1626,22 @@ def invoke_guard_adapter(
         profile,
         model_metadata.endpoint,
         model_metadata.model_configuration,
+        native_context_id=model_metadata.native_context_id,
     )
     payload = {
         "tool_name": tool_name,
         "tool_input": tool_input,
         "cwd": str(project_root),
         "project_root": str(project_root),
-        "session_id": resolve_harness_session_id(os.environ),
+        "session_id": model_metadata.native_context_id,
     }
+    env["GTKB_PROJECT_ROOT"] = str(project_root)
     for relative_guard_path in paths:
-        guard_path = relative_guard_path if relative_guard_path.is_absolute() else project_root / relative_guard_path
+        guard_path = (
+            relative_guard_path
+            if relative_guard_path.is_absolute()
+            else resolve_configuration_path(project_root, relative_guard_path)
+        )
         if not guard_path.is_file():
             raise CloudHarnessError(f"guard script is missing: {relative_guard_path.as_posix()}")
         result = runner(guard_path, payload, env, timeout)
@@ -1831,83 +1744,6 @@ def _string_list_argument(arguments: Mapping[str, Any], name: str) -> tuple[str,
     return tuple(item.strip() for item in value)
 
 
-def _load_provider_verdict_publisher(project_root: Path) -> Callable[..., Any]:
-    root_text = str(project_root.resolve())
-    if root_text not in sys.path:
-        sys.path.insert(0, root_text)
-    try:
-        from scripts.gtkb_bridge_writer import publish_lo_verdict
-    except ModuleNotFoundError as exc:
-        raise CloudHarnessError(
-            f"governed bridge verdict publisher is unavailable from project root {root_text}: {exc}"
-        ) from exc
-    return publish_lo_verdict
-
-
-def _provider_verdict_claim_holder(project_root: Path, slug: str) -> Mapping[str, Any] | None:
-    try:
-        from scripts.bridge_work_intent_registry import current_holder
-    except ModuleNotFoundError:  # pragma: no cover
-        from bridge_work_intent_registry import current_holder  # type: ignore[no-redef]
-
-    return current_holder(slug, project_root=project_root)
-
-
-def _ensure_provider_verdict_claim(project_root: Path, slug: str, session_id: str) -> None:
-    try:
-        from scripts.bridge_work_intent_registry import acquire
-    except ModuleNotFoundError:  # pragma: no cover
-        from bridge_work_intent_registry import acquire  # type: ignore[no-redef]
-
-    try:
-        acquired = acquire(slug, session_id, project_root=project_root)
-    except Exception as exc:
-        detail = str(exc)
-        if "held by another session" in detail:
-            raise BridgeVerdictClaimStandDown(
-                slug=slug,
-                session_id=session_id,
-                holder=_provider_verdict_claim_holder(project_root, slug),
-                detail=detail,
-            ) from exc
-        raise
-    if acquired:
-        return
-    raise BridgeVerdictClaimStandDown(
-        slug=slug,
-        session_id=session_id,
-        holder=_provider_verdict_claim_holder(project_root, slug),
-        detail=f"provider verdict claim for {slug!r} is held by another session",
-    )
-
-
-def ensure_dispatch_worker_role_document(project_root: Path, profile: AdopterProfile) -> None:
-    keyword = os.environ.get("GTKB_BRIDGE_DISPATCH_KEYWORD", "").strip().lower()
-    if not keyword:
-        return
-    role = DISPATCH_KEYWORD_ROLES.get(keyword)
-    if role is None:
-        raise CloudHarnessError(f"unsupported dispatcher init keyword for worker role authority: {keyword!r}")
-    session_id = resolve_harness_session_id(os.environ)
-    if not session_id:
-        raise CloudHarnessError("dispatcher worker role authority requires a concrete dispatch session id")
-    try:
-        from groundtruth_kb.session.envelope import ensure_worker_session
-
-        ensure_worker_session(
-            project_root,
-            harness_name=profile.provider_routing_key,
-            harness_id=profile.author_harness_id,
-            session_id=session_id,
-            role=role,
-            role_source="dispatcher_composition",
-            init_keyword=keyword,
-            dispatch_run_id=session_id,
-        )
-    except (ImportError, OSError, ValueError) as exc:
-        raise CloudHarnessError(f"could not establish dispatcher worker role authority: {exc}") from exc
-
-
 def _dispatch_read(arguments: Mapping[str, Any], project_root: Path) -> str:
     path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=True)
     offset = _nonnegative_int_argument(arguments, "offset", 0)
@@ -1929,7 +1765,6 @@ def _dispatch_write(
 ) -> str:
     path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=True)
     content = str(arguments.get("content", ""))
-    content = normalize_bridge_author_model_metadata(content, model_metadata, project_root, path, profile)
     invoke_guard_adapter(
         "Write",
         {"path": str(path), "content": content},
@@ -1939,67 +1774,8 @@ def _dispatch_write(
         guard_runner=guard_runner,
     )
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    path.write_text(content, encoding="utf-8", newline="")
     return f"wrote {_relative_path(project_root, path)}"
-
-
-def _dispatch_publish_bridge_verdict(
-    arguments: Mapping[str, Any],
-    model_metadata: ModelMetadata,
-    project_root: Path,
-    profile: AdopterProfile,
-    *,
-    skill: str | None,
-) -> str:
-    if not profile.publish_bridge_verdict_tool:
-        raise CloudHarnessError("PublishBridgeVerdict is not enabled for this provider profile")
-    if skill not in LOYAL_OPPOSITION_BRIDGE_SKILLS:
-        raise CloudHarnessError("PublishBridgeVerdict is available only for bridge-review/verification skills")
-    session_id = resolve_harness_session_id(os.environ)
-    if not session_id:
-        raise CloudHarnessError("PublishBridgeVerdict requires a concrete dispatcher session id")
-    slug = _require_string(arguments, "slug")
-    verdict = _require_string(arguments, "verdict")
-    content = _require_string(arguments, "content")
-    include_paths = _string_list_argument(arguments, "include_paths")
-    hunk_patch_paths = _string_list_argument(arguments, "hunk_patch_paths")
-    commit_message = str(arguments.get("commit_message") or "")
-
-    try:
-        _ensure_provider_verdict_claim(project_root, slug, session_id)
-        publish_lo_verdict = _load_provider_verdict_publisher(project_root)
-        published = publish_lo_verdict(
-            slug,
-            verdict,
-            content,
-            project_root,
-            session_id=session_id,
-            harness_name=profile.provider_routing_key,
-            author_metadata={
-                "author_identity": profile.author_identity,
-                "author_harness_id": profile.author_harness_id,
-                "author_session_context_id": session_id,
-                "author_model": model_metadata.model_id,
-                "author_model_version": model_metadata.model_version,
-                "author_model_configuration": model_metadata.model_configuration
-                or _default_config_label(profile, model_metadata.endpoint),
-            },
-            include_paths=include_paths,
-            hunk_patch_paths=hunk_patch_paths,
-            commit_message=commit_message,
-        )
-    except BridgeVerdictClaimStandDown:
-        raise
-    except Exception as exc:
-        if "provider verdict claim" in str(exc) and "held by another session" in str(exc):
-            raise BridgeVerdictClaimStandDown(
-                slug=slug,
-                session_id=session_id,
-                holder=_provider_verdict_claim_holder(project_root, slug),
-                detail=str(exc),
-            ) from exc
-        raise CloudHarnessError(f"governed bridge verdict publication failed: {exc}") from exc
-    return json.dumps(published.to_dict(), sort_keys=True)
 
 
 def _dispatch_edit(
@@ -2031,7 +1807,7 @@ def _dispatch_edit(
         raise CloudHarnessError(f"old_string not found in {_relative_path(project_root, path)}")
 
     try:
-        path.write_text(content.replace(old_string, new_string, 1), encoding="utf-8")
+        path.write_text(content.replace(old_string, new_string, 1), encoding="utf-8", newline="")
     except OSError as exc:
         raise CloudHarnessError(f"failed to write file {_relative_path(project_root, path)}: {exc}") from exc
     return f"edited {_relative_path(project_root, path)}"
@@ -2157,6 +1933,7 @@ def _dispatch_bash(
         profile,
         model_metadata.endpoint,
         model_metadata.model_configuration,
+        native_context_id=model_metadata.native_context_id,
     )
     runner = command_runner or _default_command_runner
     try:
@@ -2210,14 +1987,6 @@ def dispatch_tool_call(
         )
     if tool_name == "Bash":
         return _dispatch_bash(arguments, model_metadata, project_root, profile, guard_runner, command_runner)
-    if tool_name == PUBLISH_BRIDGE_VERDICT_TOOL:
-        return _dispatch_publish_bridge_verdict(
-            arguments,
-            model_metadata,
-            project_root,
-            profile,
-            skill=skill,
-        )
     raise CloudHarnessError(f"unsupported tool: {tool_name}")
 
 
@@ -2279,29 +2048,6 @@ def _final_text_from_message(message: Mapping[str, Any]) -> str:
     return content
 
 
-def _publish_bridge_verdict_succeeded(result: str) -> bool:
-    try:
-        parsed = json.loads(result)
-    except json.JSONDecodeError:
-        return False
-    return (
-        isinstance(parsed, dict)
-        and isinstance(parsed.get("verdict_path"), str)
-        and bool(parsed["verdict_path"].strip())
-    )
-
-
-def _bounded_bridge_verdict_recovery_reason(reason: str) -> str:
-    normalized = " ".join(str(reason).split())
-    if not normalized:
-        normalized = "no publisher diagnostic was returned"
-    return normalized[:MAX_BRIDGE_VERDICT_RECOVERY_REASON_CHARS]
-
-
-def _is_provider_verdict_status_mismatch(result: str) -> bool:
-    return f"{PROVIDER_VERDICT_STATUS_MISMATCH_CODE}:" in result
-
-
 def run_tool_loop(
     prompt: str,
     model_route: ModelRoute,
@@ -2312,6 +2058,8 @@ def run_tool_loop(
     profile: AdopterProfile,
     *,
     skill: str | None = None,
+    bridge_document: str | None = None,
+    bridge_version: int | None = None,
     system_prompt: str | None = None,
     chat_func: ChatFunc | None = None,
     guard_runner: GuardRunner | None = None,
@@ -2328,17 +2076,16 @@ def run_tool_loop(
     only the transport (used by tests). The loop's control flow, tool dispatch, guard
     enforcement, no-progress dedup, and session-timeout are shared across dialects.
     """
+    try:
+        completion_target = bridge_completion_target(prompt, skill, bridge_document, bridge_version)
+    except BridgeDeliveryIncomplete as exc:
+        raise CloudHarnessIncomplete(str(exc)) from exc
     if max_turns < 1:
         raise CloudHarnessError("max_turns must be at least 1")
     if session_timeout <= 0:
         raise CloudHarnessError("session_timeout must be positive")
-    ensure_dispatch_worker_role_document(project_root, profile)
     strategy = resolve_dialect_strategy(profile)
-    allowed_tools = allowed_tools_for_skill(
-        model_route.allowed_tools,
-        skill,
-        publish_bridge_verdict_tool=profile.publish_bridge_verdict_tool,
-    )
+    allowed_tools = tuple(model_route.allowed_tools)
     chat = chat_func or strategy.chat
     metadata = ModelMetadata(
         model_route.model_id,
@@ -2374,9 +2121,14 @@ def run_tool_loop(
         )
         native_hooks_started = True
 
-    messages: list[dict[str, Any]] = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
+    identity = (
+        f"Native context identifier: {metadata.native_context_id}. "
+        "Bind only the exact init marker supplied in the task through gt session bind. "
+        "Use its returned canonical session binding for authored provenance."
+    )
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": "\n\n".join(part for part in (identity, system_prompt) if part)}
+    ]
     if profile.hook_tier == HOOK_TIER_NATIVE_FULL:
         invoke_native_hooks(
             NATIVE_HOOK_USER_PROMPT_SUBMIT,
@@ -2392,33 +2144,12 @@ def run_tool_loop(
     repeated_tool_signature_turns = 0
     native_stop_blocks = 0
     native_stop_completed = False
-    bridge_verdict_required = skill in LOYAL_OPPOSITION_BRIDGE_SKILLS and profile.publish_bridge_verdict_tool
-    bridge_verdict_published = False
-    bridge_recovery_turns = 0
-    publisher_recovery_failures = 0
-    publisher_status_mismatches = 0
-    last_publisher_failure: str | None = None
 
     stop_reason = "process_error"
     try:
         for _turn in range(max_turns):
-            publisher_only_recovery = bool(
-                bridge_verdict_required and bridge_recovery_turns and not bridge_verdict_published
-            )
-            active_tools = (PUBLISH_BRIDGE_VERDICT_TOOL,) if publisher_only_recovery else allowed_tools
-            schemas = strategy.build_tool_schemas(active_tools)
+            schemas = strategy.build_tool_schemas(allowed_tools)
             payload = strategy.build_payload(messages, model_route, schemas)
-            if publisher_only_recovery and active_tools == (PUBLISH_BRIDGE_VERDICT_TOOL,):
-                if profile.dialect == DIALECT_ANTHROPIC_MESSAGES:
-                    if profile.disable_anthropic_publisher_recovery_thinking:
-                        payload["thinking"] = {"type": "disabled"}
-                    if profile.force_anthropic_publisher_tool_choice:
-                        payload["tool_choice"] = {"type": "any"}
-                elif profile.dialect == DIALECT_OPENAI_CHAT:
-                    payload["tool_choice"] = {
-                        "type": "function",
-                        "function": {"name": PUBLISH_BRIDGE_VERDICT_TOOL},
-                    }
 
             operation_timeout = min(
                 timeout,
@@ -2453,22 +2184,6 @@ def run_tool_loop(
             if not tool_calls:
                 content = message.get("content")
                 if isinstance(content, str) and content.strip():
-                    if bridge_verdict_required and not bridge_verdict_published:
-                        bridge_recovery_turns += 1
-                        if bridge_recovery_turns > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
-                            raise CloudHarnessError(
-                                "bridge verdict publication did not advance before final assistant text"
-                            )
-                        messages.append({"role": "assistant", "content": content})
-                        messages.append(
-                            {
-                                "role": "user",
-                                "content": BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.format(
-                                    reason="assistant returned final prose before publishing a governed verdict"
-                                ),
-                            }
-                        )
-                        continue
                     block_reason = None
                     if native_hooks_started:
                         block_reason = _invoke_native_stop_hooks_nonmasking(
@@ -2493,80 +2208,24 @@ def run_tool_loop(
                         )
                         continue
                     native_stop_completed = native_hooks_started
+                    try:
+                        verify_bridge_completion(
+                            completion_target,
+                            metadata.native_context_id,
+                            project_root,
+                            session_deadline - time.monotonic(),
+                            command_runner,
+                        )
+                    except BridgeDeliveryIncomplete as exc:
+                        stop_reason = "bridge_delivery_incomplete"
+                        raise CloudHarnessIncomplete(str(exc)) from exc
                     stop_reason = "final_response"
                     return content
-                if bridge_verdict_required and not bridge_verdict_published:
-                    bridge_recovery_turns += 1
-                    if bridge_recovery_turns > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
-                        raise CloudHarnessError("bridge verdict publication did not advance after blank response")
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.format(
-                                reason="assistant returned a blank response without a tool call"
-                            ),
-                        }
-                    )
-                    continue
                 messages.append({"role": "user", "content": BLANK_FINAL_RECOVERY_PROMPT})
                 continue
 
             if not isinstance(tool_calls, list):
                 raise CloudHarnessError("tool_calls must be a list")
-            if publisher_only_recovery:
-                recovery_tool_names = []
-                for call in tool_calls:
-                    function = call.get("function") if isinstance(call, dict) else None
-                    name = function.get("name") if isinstance(function, dict) else None
-                    recovery_tool_names.append(name)
-                rejected_names = [
-                    str(name) if name else "<missing>"
-                    for name in recovery_tool_names
-                    if name != PUBLISH_BRIDGE_VERDICT_TOOL
-                ]
-                if rejected_names:
-                    publisher_recovery_failures += 1
-                    rejected_summary = _bounded_bridge_verdict_recovery_reason(", ".join(dict.fromkeys(rejected_names)))
-                    last_publisher_failure = _bounded_bridge_verdict_recovery_reason(
-                        f"publisher-only recovery rejected non-publisher tool call(s): {rejected_summary}"
-                    )
-                    if publisher_recovery_failures > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
-                        raise CloudHarnessError(
-                            "bridge verdict publisher recovery exhausted after "
-                            f"{publisher_recovery_failures} attempts; last failure: {last_publisher_failure}"
-                        )
-                    messages.append(
-                        {
-                            "role": "assistant",
-                            "content": "",
-                            "tool_calls": tool_calls,
-                        }
-                    )
-                    rejection_result = (
-                        "ERROR: entire publisher-only recovery turn rejected atomically because it included "
-                        f"non-publisher tool call(s): {rejected_summary}"
-                    )
-                    for index, call in enumerate(tool_calls):
-                        call_id = (
-                            str(call.get("id") or f"tool_call_{index}")
-                            if isinstance(call, dict)
-                            else f"tool_call_{index}"
-                        )
-                        messages.append(
-                            {
-                                "role": "tool",
-                                "name": recovery_tool_names[index] or "<missing>",
-                                "tool_call_id": call_id,
-                                "content": rejection_result,
-                            }
-                        )
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.format(reason=last_publisher_failure),
-                        }
-                    )
-                    continue
 
             tool_signature = json.dumps(tool_calls, sort_keys=True, default=str)
             if tool_signature == previous_tool_signature:
@@ -2601,7 +2260,6 @@ def run_tool_loop(
                         }
                     )
                     continue
-                publisher_recovery_reason = None
                 if tool_name == "Bash":
                     arguments = dict(arguments)
                     requested_timeout = float(arguments.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
@@ -2633,45 +2291,8 @@ def run_tool_loop(
                             command_runner=command_runner,
                             skill=skill,
                         )
-                    except BridgeVerdictClaimStandDown:
-                        raise
                     except CloudHarnessError as tool_err:
                         result = f"ERROR: {tool_err}"
-                if (
-                    bridge_verdict_required
-                    and tool_name in ("Write", "Edit", "Bash")
-                    and result.startswith("ERROR:")
-                    and "bridge/"
-                    in str(arguments.get("command") or arguments.get("path") or arguments.get("file_path") or "")
-                ):
-                    bridge_recovery_turns = max(bridge_recovery_turns, 1)
-                if bridge_verdict_required and tool_name == PUBLISH_BRIDGE_VERDICT_TOOL:
-                    if not _publish_bridge_verdict_succeeded(result):
-                        last_publisher_failure = _bounded_bridge_verdict_recovery_reason(
-                            f"PublishBridgeVerdict did not return a verdict_path: {result}"
-                        )
-                        if _is_provider_verdict_status_mismatch(result):
-                            publisher_status_mismatches += 1
-                            if publisher_status_mismatches > 1:
-                                raise CloudHarnessError(
-                                    f"{PROVIDER_VERDICT_STATUS_MISMATCH_CODE}: publication stopped after "
-                                    f"{publisher_status_mismatches} mismatches; last failure: {last_publisher_failure}"
-                                )
-                        else:
-                            publisher_recovery_failures += 1
-                            if publisher_recovery_failures > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
-                                raise CloudHarnessError(
-                                    "bridge verdict publisher recovery exhausted after "
-                                    f"{publisher_recovery_failures} attempts; last failure: {last_publisher_failure}"
-                                )
-                        bridge_recovery_turns = max(bridge_recovery_turns, 1)
-                        publisher_recovery_reason = last_publisher_failure
-                    else:
-                        bridge_verdict_published = True
-                        bridge_recovery_turns = 0
-                        publisher_recovery_failures = 0
-                        publisher_status_mismatches = 0
-                        last_publisher_failure = None
                 invoke_native_hooks(
                     NATIVE_HOOK_POST_TOOL_USE,
                     metadata,
@@ -2690,25 +2311,15 @@ def run_tool_loop(
                         "content": result[:MAX_TOOL_OUTPUT_CHARS],
                     }
                 )
-                if publisher_recovery_reason is not None:
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.format(
-                                reason=publisher_recovery_reason
-                            ),
-                        }
-                    )
         stop_reason = "max_turn_exhaustion"
         raise CloudHarnessError("max-turn exhaustion before final assistant text")
-    except BridgeVerdictClaimStandDown as exc:
-        stop_reason = PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT
-        return json.dumps(exc.payload, sort_keys=True)
     except CloudHarnessError as exc:
         message = str(exc).lower()
-        if "max-turn" in message:
+        if isinstance(exc, CloudHarnessIncomplete):
+            stop_reason = exc.code
+        elif "max-turn" in message:
             stop_reason = "max_turn_exhaustion"
-        elif "repeated no-progress" in message or "bridge verdict" in message:
+        elif "repeated no-progress" in message:
             stop_reason = "no_progress_loop"
         elif "session timeout" in message:
             stop_reason = "session_timeout"

@@ -19,6 +19,7 @@ from pathlib import Path
 from threading import Event
 from uuid import uuid4
 
+import groundtruth_kb
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
@@ -46,6 +47,9 @@ def native(monkeypatch):
     service_name = os.environ.get("GTKB_TEST_POSTGRES_SERVICE")
     if not service_name:
         pytest.fail("GTKB_TEST_POSTGRES_SERVICE is required")
+    # Every CLI/service child must use the same package as the parent test.
+    # This also preserves installed-package isolation in a separate checkout.
+    monkeypatch.setenv("PYTHONPATH", str(Path(groundtruth_kb.__file__).resolve().parent.parent))
     schema = f"gtkb_test_{uuid4().hex}"
     with psycopg.connect(service=service_name, autocommit=True) as connection:
         connection.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
@@ -74,6 +78,32 @@ def put(client, domain, record_id, fields, *, expected_version=0, **extra):
             **extra,
         },
     )
+
+
+@pytest.mark.parametrize("column", ["formal_roots", "terminal_author_session_context_id"])
+def test_an_older_v1_bridge_catalog_cannot_start_or_serve_as_current(native, column):
+    service, _, schema, service_name = native
+    with psycopg.connect(service=service_name) as connection:
+        connection.execute(
+            sql.SQL("ALTER TABLE {}.bridge_attempts DROP COLUMN {}").format(
+                sql.Identifier(schema), sql.Identifier(column)
+            )
+        )
+    with pytest.raises(PostgresKernelError) as startup:
+        service.kernel.initialize()
+    assert startup.value.code == "schema_drift"
+    with pytest.raises(PostgresKernelError) as serving, service.kernel.transaction(read_only=True):
+        pytest.fail("An older schema must not serve current operations")
+    assert serving.value.code == "schema_drift"
+    with psycopg.connect(service=service_name) as connection:
+        columns = [
+            row[0]
+            for row in connection.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_schema=%s AND table_name='bridge_attempts'",
+                (schema,),
+            )
+        ]
+        assert column not in columns  # No guessed backfill or silent schema upgrade.
 
 
 def seed(client):
@@ -135,6 +165,206 @@ def history_count(service):
     with service.kernel.transaction(read_only=True) as tx:
         tx.cursor.execute(sql.SQL("SELECT count(*) AS n FROM {}.record_history").format(sql.Identifier(tx.schema)))
         return tx.cursor.fetchone()["n"]
+
+
+def test_harness_installation_reads_current_metadata_without_role_or_history_writes(native, monkeypatch):
+    service, client, _, _ = native
+    for harness_id, status in [("A", "active"), ("B", "active"), ("C", "suspended")]:
+        row = {column: None for column in TABLE_SPECS["harnesses"].columns}
+        row.update(
+            id=harness_id,
+            version=1,
+            harness_name=f"installation-{harness_id}",
+            harness_type="qualification",
+            status=status,
+            invocation_surfaces={"headless": {"argv": [sys.executable]}},
+            changed_at=datetime.now(UTC).isoformat(),
+            changed_by="qualification",
+            change_reason="Isolated metadata",
+        )
+        service.kernel.mutate_current(
+            table="harnesses",
+            identity={"id": harness_id},
+            expected_version=0,
+            new_state=row,
+            actor="qualification",
+            reason="Isolated metadata",
+        )
+    before = history_count(service)
+
+    def no_sqlite(*args, **kwargs):
+        pytest.fail("Native harness reads must not use SQLite")
+
+    monkeypatch.setattr("sqlite3.connect", no_sqlite)
+    first = client.get("/v1/harnesses", params={"status": "active", "limit": 1})
+    assert first.status_code == 200, first.text
+    assert [row["id"] for row in first.json()["records"]] == ["A"]
+    second = client.get("/v1/harnesses", params={"status": "active", "after": first.json()["next_after"]})
+    assert second.status_code == 200 and [row["id"] for row in second.json()["records"]] == ["B"]
+    assert second.json()["next_after"] is None
+    current = client.get("/v1/harnesses/A")
+    assert current.status_code == 200 and current.json()["harness_name"] == "installation-A"
+    assert not {"role", "reviewer_precedence", "can_receive_dispatch", "event_driven_hooks"} & current.json().keys()
+    assert client.get("/v1/harnesses", params={"role": "lo"}).status_code == 422
+    assert client.get("/v1/harnesses/missing").status_code == 404
+    assert client.put("/v1/harnesses/A", json={"role": "lo"}).status_code == 405
+    assert history_count(service) == before
+
+
+def test_registry_path_inventory_reads_typed_current_fields_without_history_writes(native):
+    service, client, _schema, _service_name = native
+    seed(client)
+    updated = put(
+        client,
+        "specifications",
+        "SPEC-1",
+        {
+            "source_paths": ["src/current.py", "src/current.py"],
+            "description": "Narrative mention of src/not-an-inventory-path.py",
+        },
+        expected_version=1,
+    )
+    assert updated.status_code == 200, updated.text
+    for table, fields in (
+        (
+            "documents",
+            {
+                "id": "DOC-1",
+                "title": "Reference",
+                "category": "reference",
+                "status": "active",
+                "source_path": "docs/reference.md",
+            },
+        ),
+        (
+            "project_artifact_links",
+            {
+                "id": "LINK-1",
+                "project_id": "PROJECT-1",
+                "artifact_type": "file",
+                "artifact_ref": "src/linked.py",
+                "relationship": "implements",
+                "status": "active",
+            },
+        ),
+        (
+            "project_artifact_links",
+            {
+                "id": "LINK-2",
+                "project_id": "PROJECT-1",
+                "artifact_type": "file",
+                "artifact_ref": "src/obsolete.py",
+                "relationship": "implements",
+                "status": "retired",
+            },
+        ),
+    ):
+        row = {column: None for column in TABLE_SPECS[table].columns}
+        row.update(
+            fields,
+            version=1,
+            changed_at=datetime.now(UTC).isoformat(),
+            changed_by="qualification",
+            change_reason="Typed inventory fixture",
+        )
+        service.kernel.mutate_current(
+            table=table,
+            identity={"id": row["id"]},
+            expected_version=0,
+            new_state=row,
+            actor="qualification",
+            reason="Typed inventory fixture",
+        )
+    before = history_count(service)
+
+    response = client.get("/v1/registry/path-observations")
+
+    assert response.status_code == 200, response.text
+    rows = response.json()
+    assert {row["path"] for row in rows} == {
+        "src/current.py",
+        "tests/test_effect.py",
+        "docs/reference.md",
+        "src/linked.py",
+    }
+    assert len(rows) == 4
+    assert all(set(row) == {"path", "source_kind", "source_id", "field"} for row in rows)
+    assert history_count(service) == before
+
+
+def test_registry_path_inventory_does_not_truncate_at_one_domain_page(native):
+    service, client, _schema, _service_name = native
+    with service.kernel.transaction() as tx:
+        for index in range(1001):
+            row = {column: None for column in TABLE_SPECS["documents"].columns}
+            row.update(
+                id=f"DOC-{index:04}",
+                version=1,
+                title="Reference",
+                category="reference",
+                status="active",
+                source_path=f"docs/{index:04}.md",
+                changed_at=datetime.now(UTC).isoformat(),
+                changed_by="qualification",
+                change_reason="Complete inventory fixture",
+            )
+            tx.mutate(
+                table="documents",
+                identity={"id": row["id"]},
+                expected_version=0,
+                new_state=row,
+                actor="qualification",
+                reason="Complete inventory fixture",
+            )
+    before = history_count(service)
+    response = client.get("/v1/registry/path-observations")
+    assert response.status_code == 200, response.text
+    rows = response.json()
+    assert len(rows) == 1001
+    assert rows[-1]["path"] == "docs/1000.md"
+    assert history_count(service) == before
+
+
+def test_registry_path_inventory_reads_one_snapshot_during_concurrent_changes(native, monkeypatch):
+    service, client, _schema, _service_name = native
+    seed(client)
+    assert (
+        put(client, "specifications", "SPEC-1", {"source_paths": ["src/old.py"]}, expected_version=1).status_code == 200
+    )
+    started, changed = Event(), Event()
+    original_list = PostgresTransaction.list
+
+    def pause_after_specifications(tx, table, **kwargs):
+        rows = original_list(tx, table, **kwargs)
+        if table == "specifications" and not started.is_set():
+            started.set()
+            assert changed.wait(15), "Concurrent path changes did not finish"
+        return rows
+
+    monkeypatch.setattr(PostgresTransaction, "list", pause_after_specifications)
+    with ThreadPoolExecutor(max_workers=1) as workers:
+        reading = workers.submit(client.get, "/v1/registry/path-observations")
+        try:
+            assert started.wait(15)
+            assert (
+                put(
+                    client, "specifications", "SPEC-1", {"source_paths": ["src/new.py"]}, expected_version=2
+                ).status_code
+                == 200
+            )
+            assert (
+                put(client, "tests", "TEST-1", {"test_file": "tests/test_new.py"}, expected_version=1).status_code
+                == 200
+            )
+        finally:
+            changed.set()
+        response = reading.result(timeout=15)
+    assert response.status_code == 200, response.text
+    assert {row["path"] for row in response.json()} == {"src/old.py", "tests/test_effect.py"}
+    before = history_count(service)
+    fresh = client.get("/v1/registry/path-observations")
+    assert {row["path"] for row in fresh.json()} == {"src/new.py", "tests/test_new.py"}
+    assert history_count(service) == before
 
 
 def link_project_formal(service, spec_id):
@@ -547,6 +777,16 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
         ["commit", "-qm", "Isolated CLI preimage"],
     ):
         subprocess.run(["git", "-C", str(tmp_path), *arguments], check=True, capture_output=True)
+    # Install the same native callback as the real checkout. Full baseline
+    # policy-hook qualification is separate from this HTTP/no-SQLite workflow.
+    hooks = tmp_path / ".githooks"
+    hooks.mkdir()
+    reference_hook = hooks / "reference-transaction"
+    reference_hook.write_bytes((Path(__file__).resolve().parents[2] / ".githooks/reference-transaction").read_bytes())
+    reference_hook.chmod(0o755)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "config", "core.hooksPath", ".githooks"], check=True, capture_output=True
+    )
     harness = {column: None for column in TABLE_SPECS["harnesses"].columns}
     harness.update(
         id="HARNESS-CLI",
@@ -584,8 +824,26 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
     base_env.pop("GT_AUTHORITY_URL", None)
     base_env["GT_DB_PATH"] = str(sentinel)
     base_env["GT_PROJECT_ROOT"] = str(tmp_path)
+    # An isolated parent interpreter's sys.path is not inherited by children.
+    # Bind subprocesses to the package under test, including editable-source runs.
+    import groundtruth_kb
+
+    package_file = Path(groundtruth_kb.__file__).resolve()
+    base_env["PYTHONPATH"] = str(package_file.parent.parent)
     client_env = {key: value for key, value in base_env.items() if not key.startswith(("PG", "GT_POSTGRES_"))}
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    package_probe = subprocess.run(
+        [sys.executable, "-c", "import groundtruth_kb; print(groundtruth_kb.__file__)"],
+        cwd=tmp_path,
+        env=client_env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        creationflags=flags,
+    )
+    assert package_probe.returncode == 0, package_probe.stderr
+    assert Path(package_probe.stdout.strip()).resolve() == package_file
 
     def cli(*arguments):
         return subprocess.run(
@@ -634,6 +892,84 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
                 "status": "active",
                 "assertions": [{"type": "file_exists", "file": "code.py"}],
             }
+            declaration = tmp_path / "config/registry/sot-artifacts.toml"
+            declaration.parent.mkdir(parents=True)
+            declaration.write_text("artifacts = []\n", encoding="utf-8")
+            before_inventory = history_count(service)
+            listed = cli("registry", "list", "--json")
+            assert listed.returncode == 0 and json.loads(listed.stdout) == []
+            inventory = cli("registry", "reconcile", "--json")
+            inventory_report = json.loads(inventory.stdout)
+            governed = next(
+                item for item in inventory_report["observers"] if item["observer_class"] == "governed_knowledge"
+            )
+            assert governed["succeeded"] is True, governed
+            assert "tests/test_effect.py" in {item["relative_path"] for item in governed["observations"]}
+            assert history_count(service) == before_inventory
+            assert declaration.read_text(encoding="utf-8") == "artifacts = []\n"
+            assert (
+                put(
+                    client, "specifications", "GOV-REGISTRY", {"title": "Registry contract", "status": "active"}
+                ).status_code
+                == 200
+            )
+            registry_record = {
+                "id": "registry",
+                "domain": "control_surface",
+                "lifecycle": "active",
+                "storage_path": "config/registry/sot-artifacts.toml",
+                "coverage_mode": "exact",
+                "authority_spec_id": "GOV-REGISTRY",
+                "mutation_api": "gt registry amend",
+                "versioning_policy": "git_tracked",
+                "backup_policy": "git_tracked",
+                "health_check_function": "",
+                "owner_role": "shared",
+                "restore_action": "git_restore",
+            }
+            before_registry_mutation = history_count(service)
+            registered = cli("registry", "register", "--record-json", json.dumps(registry_record))
+            assert registered.returncode == 0, registered.stderr
+            assert json.loads(registered.stdout)["changed"] is True
+            amended = cli("registry", "amend", "registry", "--changes-json", '{"notes":"current native authority"}')
+            assert amended.returncode == 0, amended.stderr
+            assert history_count(service) == before_registry_mutation
+            shown = cli("registry", "show", "registry", "--json")
+            assert json.loads(shown.stdout)["notes"] == "current native authority"
+            assert not (tmp_path / ".gtkb-state").exists()
+            term_file = tmp_path / "term.json"
+            term_file.write_text(json.dumps(term_fields()), encoding="utf-8")
+            term_record = cli(
+                "terms",
+                "record",
+                "--id",
+                "PROJECT",
+                "--fields-file",
+                str(term_file),
+                "--expected-version",
+                "0",
+                "--actor",
+                "qualification",
+                "--change-reason",
+                "Current canonical terminology",
+                "--json",
+            )
+            assert term_record.returncode == 0, term_record.stderr
+            assert json.loads(term_record.stdout)["version"] == 1
+            term_before = history_count(service)
+            term_show = cli("terms", "show", "PROJECT", "--json")
+            assert term_show.returncode == 0
+            assert json.loads(term_show.stdout)["source_authority"] == "SPEC-1"
+            term_list = cli("terms", "list", "--status", "active", "--scope", "platform", "--json")
+            assert term_list.returncode == 0
+            assert [r["id"] for r in json.loads(term_list.stdout)] == ["PROJECT"]
+            resolved = cli("authority", "resolve", "Work Group", "--scope", "platform", "--json")
+            assert resolved.returncode == 0 and json.loads(resolved.stdout)["record"]["id"] == "PROJECT"
+            unknown = cli("authority", "resolve", "absent term", "--json")
+            assert unknown.returncode == 1 and json.loads(unknown.stdout)["status"] == "not_found"
+            term_status = cli("authority", "status", "--json")
+            assert term_status.returncode == 0 and json.loads(term_status.stdout)["status"] == "pass"
+            assert history_count(service) == term_before
             for version, expected_result in ((0, "PASS"), (1, "PARTIAL")):
                 if version:
                     observation_fields["constraints"] = {"behavioral_validation_required": True}
@@ -884,6 +1220,12 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
                     "--json",
                 )
                 assert delivered.returncode == 0, delivered.stderr
+                report_result = cli("bridge", "state-report", "--json")
+                assert report_result.returncode == 0, report_result.stderr
+                report = json.loads(report_result.stdout)
+                assert report["active_status_mix"] == [{"status": status, "count": 1}]
+                assert report["active_claim_count"] == 0
+                assert not {"harnesses", "registry_publication"} & report.keys()
                 if status == "VERIFIED":
                     assert json.loads(delivered.stdout)["project_ready_for_commit"] is True
             message = tmp_path / "project-commit.txt"
@@ -913,7 +1255,7 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
             work_readiness = cli("backlog", "readiness", "WI-DEPENDENT", "--json")
             assert work_readiness.returncode == 0, work_readiness.stderr
             assert json.loads(work_readiness.stdout)["ready"] is True
-            disabled = cli("db", "postgres", "status")
+            disabled = cli("seed")
             assert disabled.returncode != 0 and "fallback is disabled" in disabled.stderr
         finally:
             process.terminate()
@@ -923,5 +1265,125 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
     unavailable_context = cli("context", "work-item", "WI-1", "--json")
     assert unavailable_context.returncode != 0 and "authority_unavailable" in unavailable_context.stderr
     assert unavailable_context.stdout == ""
+    unavailable_inventory = cli("registry", "reconcile", "--json")
+    inventory_report = json.loads(unavailable_inventory.stdout)
+    governed = next(item for item in inventory_report["observers"] if item["observer_class"] == "governed_knowledge")
+    assert governed["succeeded"] is False
+    assert any("configured authority is unavailable" in item for item in governed["diagnostics"])
+    assert inventory_report["sweep_eligible"] is False
+    before_failed_mutation = declaration.read_bytes()
+    unavailable_mutation = cli("registry", "amend", "registry", "--changes-json", '{"notes":"must not write"}')
+    assert unavailable_mutation.returncode != 0 and "authority_unavailable" in unavailable_mutation.stderr
+    assert declaration.read_bytes() == before_failed_mutation
     assert sentinel.read_bytes() == b"This is not a SQLite database; opening it is a test failure."
     assert service.show("specifications", "SPEC-1")["version"] == 2
+
+
+def term_fields(**extra):
+    return dict(
+        canonical_term="project",
+        definition="A complete interdependent outcome.",
+        scope="platform",
+        authority_level="platform_core",
+        lifecycle_status="active",
+        source_authority="SPEC-1",
+        accepted_synonyms=["work group"],
+        **extra,
+    )
+
+
+def test_native_terms_resolve_current_source_and_retire_without_historical_fallback(
+    native,
+):
+    service, client, *_ = native
+    seed(client)
+    created = put(client, "terms", "PROJECT", term_fields())
+    assert created.status_code == 200, created.text
+    assert created.json()["version"] == 1
+    resolved = client.get("/v1/authority/resolve", params={"subject": "Work Group", "scope": "platform"})
+    assert resolved.status_code == 200, resolved.text
+    assert resolved.json()["record"]["id"] == "PROJECT"
+    assert client.get("/v1/authority/status").json()["status"] == "pass"
+    before = history_count(service)
+    stale = put(client, "terms", "PROJECT", {"definition": "Must not land"})
+    assert stale.status_code == 409 and history_count(service) == before
+    retired = put(client, "terms", "PROJECT", {"lifecycle_status": "retired"}, expected_version=1)
+    assert retired.status_code == 200
+    assert client.get("/v1/authority/resolve", params={"subject": "project"}).json()["status"] == "not_found"
+    assert client.get("/v1/terms/PROJECT").json()["version"] == 2
+
+
+@pytest.mark.parametrize("source_status", ["retired", "superseded"])
+def test_retired_source_blocks_only_its_term_and_status_stays_available(native, source_status):
+    service, client, *_ = native
+    seed(client)
+    assert put(client, "terms", "PROJECT", term_fields()).status_code == 200
+    assert (
+        put(
+            client,
+            "specifications",
+            "SPEC-2",
+            {"title": "Other meaning", "status": "active"},
+        ).status_code
+        == 200
+    )
+    other = term_fields()
+    other.update(canonical_term="other", accepted_synonyms=[], source_authority="SPEC-2")
+    assert put(client, "terms", "OTHER", other).status_code == 200
+    assert (
+        put(
+            client,
+            "specifications",
+            "SPEC-2",
+            {"status": source_status},
+            expected_version=1,
+        ).status_code
+        == 200
+    )
+    before = history_count(service)
+    assert client.get("/v1/authority/resolve", params={"subject": "project"}).json()["status"] == "resolved"
+    refused = client.get("/v1/authority/resolve", params={"subject": "other"})
+    assert refused.status_code == 422 and refused.json()["error"]["code"] == "invalid_term_source"
+    status = client.get("/v1/authority/status")
+    assert status.status_code == 200
+    assert status.json()["source_issues"] == [{"id": "OTHER", "source_authority": "SPEC-2", "status": source_status}]
+    assert history_count(service) == before
+
+
+@pytest.mark.parametrize("change", [{"source_authority": "MISSING"}, {"accepted_synonyms": [" "]}])
+def test_invalid_term_mutation_rolls_back_record_and_history(native, change):
+    service, client, *_ = native
+    seed(client)
+    value = term_fields()
+    value.update(change)
+    before = history_count(service)
+    refused = put(client, "terms", "BAD", value)
+    assert refused.status_code == 422, refused.text
+    assert client.get("/v1/terms/BAD").status_code == 404
+    assert history_count(service) == before
+
+
+def test_a_malformed_imported_entry_does_not_break_valid_lookup_or_status(native):
+    from psycopg import sql
+
+    service, client, *_ = native
+    seed(client)
+    assert put(client, "terms", "PROJECT", term_fields()).status_code == 200
+    other = term_fields()
+    other.update(canonical_term="other", accepted_synonyms=[])
+    assert put(client, "terms", "OTHER", other).status_code == 200
+    # Corrupt only the disposable fixture: model an older/imported bad record.
+    with service.kernel.transaction() as tx:
+        tx.cursor.execute(
+            sql.SQL("UPDATE {}.canonical_terms SET accepted_synonyms='{{}}'::jsonb WHERE id='OTHER'").format(
+                sql.Identifier(tx.schema)
+            )
+        )
+    before = history_count(service)
+    assert client.get("/v1/authority/resolve", params={"subject": "project"}).json()["status"] == "resolved"
+    refused = client.get("/v1/authority/resolve", params={"subject": "other"})
+    assert refused.status_code == 422 and refused.json()["error"]["code"] == "invalid_terminology"
+    status = client.get("/v1/authority/status")
+    assert status.status_code == 200 and status.json()["status"] == "fail"
+    assert [r["id"] for r in status.json()["validation_issues"]] == ["OTHER"]
+    assert history_count(service) == before

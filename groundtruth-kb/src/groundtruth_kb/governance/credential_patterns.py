@@ -24,9 +24,8 @@ Design notes
   ``bridge/gtkb-credential-patterns-canonical-004.md``). Pattern applicability
   and scan-filter are kept as separate concepts — ``scan(scope=None)`` scans
   everything while an explicit ``scope`` narrows the view.
-- The Bash hook inline fallback in ``templates/hooks/credential-scan.py`` is
-  a mirrored copy kept in sync by the ``test_inline_fallback_catalog_matches_canonical``
-  parity test in ``tests/test_credential_patterns.py``.
+- Shell/file hooks import this package catalog. Missing runtime refuses the
+  requested effect; a copied fallback is not a second pattern source.
 
 See ``bridge/gtkb-credential-patterns-canonical-007.md`` for the approved
 proposal and ``-008`` for the Codex GO with the six implementation conditions

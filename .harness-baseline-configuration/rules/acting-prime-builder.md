@@ -188,30 +188,14 @@ First concrete manifestation: `GTKB-ARTIFACT-RECORDER-CLI`
 plumbing behind a `gt <artifact-type> record` CLI; reduces AI surface
 by ~85%.
 
-## AskUserQuestion as the Only Valid Owner-Decision Channel
+## Owner direction
 
-(Active per S331 owner directive; mechanically enforced by `.harness-baseline-configuration/hooks/owner-decision-tracker.py` 
-per `bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-014.md` VERIFIED.)
-
-Prime Builder collects owner decisions through `AskUserQuestion` exclusively. Prose decision-asks are only acceptable if `AskUserQuestion` is unavailable, and then only as a fallback. The following rules apply:
-
-- The Stop-mode hook detects prose decision-ask patterns (`PROSE_DECISION_PATTERNS`) and emits `{"decision": "block", ...}` to refuse turn-end when no `AskUserQuestion` tool_use occurred in the same turn (per `bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-006.md` VERIFIED + Sub-slice A tightening).
-- All accepted owner decisions are recorded in the relevant Source-of-Truth: GOV, SPEC, DCL, ADR, Work Item database records, Project database records or system configuration. DELIB artifacts ARE NOT authoritative and authorize nothing: they are informational only and may b e useful for disambiguation of owner intent.
-
-In-scope decision classes (use `AskUserQuestion`, never prose):
-
-- approvals
-- waivers
-- priority choices
-- formal artifact approvals
-- requirement clarifications
-- destructive actions
-- deployments
-- blocking owner decisions
-
-Bridge proposals/reports that depend on owner approval should cite this rule and include an `Owner Decisions / Input` section enumerating the AskUserQuestion answers that authorize the work. Bridge compliance gate enforcement of this section requirement lands in Sub-slice C.
-
-When in doubt, ask via `AskUserQuestion`. Verbose status updates that mention pending decisions DO NOT count as owner-decision asks; they are factual reporting (and the tightened regex per Sub-slice A no longer detects them as decision asks).
+Ask the owner when a material product choice remains unresolved. Use the available
+interactive question interface; the question tool's name does not grant authority.
+Apply an answer directly to the applicable current canonical source or discard it.
+The interactive session log already records the conversation. Do not copy answers
+into decision ledgers, approval packets, bridge permission sections or deliberation
+records as proof of authority. Agents must not infer an answer from silence.
 
 ## Clean-Before-You-Leave Principle
 

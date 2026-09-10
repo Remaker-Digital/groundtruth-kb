@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
+from itertools import permutations
 from pathlib import Path
 from threading import Barrier
 from uuid import uuid4
@@ -119,7 +122,13 @@ def authored(context, document, version, status, **extra):
         )
     fields.update(extra)
     return "\r\n".join(
-        [*lines, *(f"{key}: {value}" for key, value in fields.items()), "", "Authored content: café 漢字.", ""]
+        [
+            *lines,
+            *(f"{key}: {value}" for key, value in fields.items()),
+            "",
+            "Authored content: cafÃƒÂ© Ã¦Â¼Â¢Ã¥Â­â€”.",
+            "",
+        ]
     )
 
 
@@ -144,6 +153,264 @@ def deliver(client, contexts, document, context, version, status, *, work_item_i
     result = client.post(f"/v1/bridge/{document}/deliver", json=request)
     assert result.status_code == 200, result.text
     return result, request
+
+
+def test_native_delivery_readback_requires_the_exact_context_and_slot(bridge):
+    _service, client, contexts, _root = bridge
+    document = "delivery-readback"
+
+    def read(version, context="lo1", name=document):
+        return client.get(f"/v1/bridge/{name}/delivery", params={"version": version, "native_context_id": context})
+
+    assert read(1).json()["error"]["code"] == "bridge_delivery_incomplete"
+    assert read(1, "unbound").json()["error"]["code"] == "no_session_binding"
+    deliver(client, contexts, document, "pb1", 1, "NEW")
+    reservation = claim(client, document, "lo1", 1, "GO").json()
+    fence = {"native_context_id": "lo1", "fence": reservation["fence"]}
+    before = client.get(f"/v1/bridge/{document}/show?include_content=true").json()
+    assert read(2).json()["error"]["code"] == "bridge_delivery_incomplete"
+    assert client.post(f"/v1/bridge/{document}/check", json=fence).status_code == 200
+    assert client.post(f"/v1/bridge/{document}/release", json=fence).status_code == 200
+    assert read(2).json()["error"]["code"] == "bridge_delivery_incomplete"
+    assert client.get(f"/v1/bridge/{document}/show?include_content=true").json() == before
+
+    deliver(client, contexts, document, "lo1", 2, "GO")
+    expected = {
+        "status": "delivered",
+        "document": document,
+        "version": 2,
+        "bridge_status": "GO",
+        "native_context_id": "lo1",
+        "author_session_context_id": contexts["lo1"]["session_context_id"],
+    }
+    assert read(2).json() == expected
+    for version, context, name in [
+        (1, "lo1", document),
+        (2, "lo2", document),
+        (3, "lo1", document),
+        (2, "lo1", "other"),
+    ]:
+        assert read(version, context, name).json()["error"]["code"] == "bridge_delivery_incomplete"
+    deliver(client, contexts, document, "pb2", 3, "READY")
+    assert read(2).json() == expected
+
+
+def test_native_effect_check_uses_live_claim_checkout_and_current_scope(bridge):
+    service, client, contexts, work_root = bridge
+    root = work_root.parents[2]
+    document = "effect-check"
+    deliver(client, contexts, document, "pb1", 1, "NEW")
+    deliver(client, contexts, document, "lo1", 2, "GO")
+    reserved = claim(client, document, "pb2", 2, "READY").json()
+    fence = {"native_context_id": "pb2", "fence": reserved["fence"]}
+    opened = client.post(f"/v1/bridge/{document}/worktree", json=fence)
+    assert opened.status_code == 200, opened.text
+    checkout = Path(opened.json()["path"])
+
+    def check(paths, *, context="pb2", cwd=checkout):
+        return client.post(
+            "/v1/bridge/check-effects",
+            json={"native_context_id": context, "cwd": str(cwd), "paths": paths},
+        )
+
+    before = client.get(f"/v1/bridge/{document}/show", params={"include_content": True}).json()
+    accepted = check(["code.py", "tests/test_effect.py"])
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["document"] == document
+    assert accepted.json()["fence"] == reserved["fence"]
+    assert accepted.json()["scope"] == "implementation"
+    assert check(["test_effect.py"], cwd=checkout / "tests").status_code == 200
+    for paths, cwd, context in (
+        (["second.py"], checkout, "pb2"),
+        (["code.py"], root, "pb2"),
+        ([str(checkout / "code.py")], checkout, "lo1"),
+        ([".git"], checkout, "pb2"),
+        (["bridge/message-001.md"], root, "pb2"),
+        (["code.py", "second.py"], checkout, "pb2"),
+        (["tests"], checkout, "pb2"),
+    ):
+        refused = check(paths, cwd=cwd, context=context)
+        assert refused.status_code == 422, refused.text
+    assert client.get(f"/v1/bridge/{document}/show", params={"include_content": True}).json() == before
+    assert client.post(f"/v1/bridge/{document}/check", json=fence).status_code == 200
+
+    with service.kernel.transaction() as tx:
+        tx.cursor.execute(
+            sql.SQL(
+                "UPDATE {}.work_intent_claims SET expires_at=clock_timestamp()-interval '1 second' WHERE attempt_id=%s"
+            ).format(sql.Identifier(tx.schema)),
+            (document,),
+        )
+    assert check(["code.py"]).json()["error"]["code"] == "implementation_claim_required"
+    successor = claim(client, document, "pb3", 2, "READY").json()
+    successor_fence = {"native_context_id": "pb3", "fence": successor["fence"]}
+    successor_checkout = Path(client.post(f"/v1/bridge/{document}/worktree", json=successor_fence).json()["path"])
+    assert check(["code.py"], context="pb3", cwd=successor_checkout).status_code == 200
+    assert check(["code.py"]).status_code == 422
+
+    # A service mutation changes the observed formal input without altering the
+    # reservation. The next actual tool check must reject the stale proposal.
+    assert (
+        put(
+            client,
+            "specifications",
+            "SPEC-1",
+            {"title": "Required effect", "description": "Changed governing intent", "status": "active"},
+            expected_version=1,
+        ).status_code
+        == 200
+    )
+    refused = check(["code.py"], context="pb3", cwd=successor_checkout)
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["error"]["code"] == "scope_changed"
+
+
+def test_native_effect_check_confines_scratch_to_exact_bound_context(bridge):
+    _service, client, contexts, work_root = bridge
+    root = work_root.parents[2]
+    own = root / "scratchpad" / contexts["pb1"]["session_context_id"]
+    other = root / "scratchpad" / contexts["lo1"]["session_context_id"]
+    request = {"native_context_id": "pb1", "cwd": str(root), "paths": [str(own / "draft.md")]}
+    accepted = client.post("/v1/bridge/check-effects", json=request)
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["scope"] == "scratch"
+    assert not own.exists()
+    for path in (other / "draft.md", root / "code.py", own / ".." / "escape.md"):
+        refused = client.post("/v1/bridge/check-effects", json={**request, "paths": [str(path)]})
+        assert refused.status_code == 422, refused.text
+    assert client.post("/v1/bridge/check-effects", json={**request, "native_context_id": "unbound"}).status_code == 422
+    assert client.post("/v1/bridge/check-effects", json={**request, "paths": []}).status_code == 422
+
+
+def test_native_effect_check_refuses_unregistered_checkout_and_redirected_targets(bridge):
+    _service, client, contexts, work_root = bridge
+    root = work_root.parents[2]
+    document = "effect-containment"
+    deliver(client, contexts, document, "pb1", 1, "NEW")
+    deliver(client, contexts, document, "lo1", 2, "GO")
+    reserved = claim(client, document, "pb2", 2, "READY").json()
+    fence = {"native_context_id": "pb2", "fence": reserved["fence"]}
+    checkout = root / ".worktrees" / contexts["pb2"]["session_context_id"]
+    request = {"native_context_id": "pb2", "cwd": str(root), "paths": [str(checkout / "code.py")]}
+    refused = client.post("/v1/bridge/check-effects", json=request)
+    assert refused.json()["error"]["code"] == "checkout_not_registered"
+    opened = client.post(f"/v1/bridge/{document}/worktree", json=fence)
+    assert opened.status_code == 200, opened.text
+    assert client.post("/v1/bridge/check-effects", json=request).status_code == 200
+    tests = checkout / "tests"
+    preserved = checkout / "preserved-tests"
+    tests.rename(preserved)
+    import os
+
+    if os.name == "nt":
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(tests), str(preserved)], check=True, capture_output=True)
+    else:
+        tests.symlink_to(preserved, target_is_directory=True)
+    original = (preserved / "test_effect.py").read_bytes()
+    refused = client.post("/v1/bridge/check-effects", json={**request, "paths": [str(tests / "test_effect.py")]})
+    assert refused.json()["error"]["code"] == "effect_path_redirected"
+    assert (preserved / "test_effect.py").read_bytes() == original
+    assert client.post(f"/v1/bridge/{document}/check", json=fence).status_code == 200
+
+
+def test_native_effect_gate_refuses_unavailable_authority_without_sqlite(tmp_path):
+    import os
+    import socket
+    import sys
+
+    sentinel = tmp_path / "must-not-open.db"
+    sentinel.write_bytes(b"No SQLite fallback is permitted.")
+    env = {key: value for key, value in os.environ.items() if not key.startswith(("PG", "GT_POSTGRES_"))}
+    env.update(
+        GTKB_NATIVE_CONTEXT_ID="current-native-context",
+        GTKB_PROJECT_ROOT=str(tmp_path),
+        GT_PROJECT_ROOT=str(tmp_path),
+        GT_DB_PATH=str(sentinel),
+        PYTHONIOENCODING="utf-8",
+    )
+    payload = {
+        "session_id": "current-native-context",
+        "cwd": str(tmp_path),
+        "project_root": str(tmp_path),
+        "tool_name": "Write",
+        "tool_input": {"path": "code.py", "content": "must not be written"},
+    }
+    with socket.socket() as unavailable:
+        unavailable.bind(("127.0.0.1", 0))
+        env["GT_AUTHORITY_URL"] = f"http://127.0.0.1:{unavailable.getsockname()[1]}"
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve().parents[2] / "scripts/implementation_start_gate.py")],
+            input=json.dumps(payload),
+            cwd=tmp_path,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=20,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    assert result.returncode == 0, result.stderr
+    refusal = json.loads(result.stdout)["hookSpecificOutput"]
+    assert refusal["hookEventName"] == "PreToolUse"
+    assert refusal["permissionDecision"] == "deny"
+    assert "authority_unavailable" in refusal["permissionDecisionReason"]
+    assert sentinel.read_bytes() == b"No SQLite fallback is permitted."
+    assert not (tmp_path / "code.py").exists()
+
+
+def test_native_binding_rejects_role_aliases_and_ambiguous_init_without_mutation(bridge):
+    _service, client, contexts, _root = bridge
+    invalid = (
+        "::init gtkb admin",
+        "::init gtkb prime-builder",
+        "::init gtkb loyal-opposition",
+        "::init gtkb PB",
+        "::init gtkb LO",
+        "::init gtkb",
+        "::init codex pb",
+        "init gtkb pb",
+        " ::init gtkb pb",
+        "::init gtkb pb ",
+        "::init\tgtkb pb",
+        "::init  gtkb pb",
+        "::init gtkb pb --force",
+        "::init gtkb pb\n::init gtkb lo",
+    )
+    for index, marker in enumerate(invalid):
+        native_id = f"invalid-init-{index}"
+        result = client.post("/v1/sessions/bind", json={"native_context_id": native_id, "init_command": marker})
+        assert result.status_code == 422, (marker, result.text)
+        assert result.json()["error"]["code"] == "invalid_init_command"
+        read = client.get("/v1/sessions/binding", params={"native_context_id": native_id})
+        assert read.json()["error"]["code"] == "no_session_binding"
+    for native_id, existing in contexts.items():
+        assert client.get("/v1/sessions/binding", params={"native_context_id": native_id}).json() == existing
+
+
+@pytest.mark.parametrize("identity", [{}, {"native_context_id": ""}, {"native_context_id": None}])
+def test_native_binding_requires_actual_context_identity_without_creating_state(bridge, identity):
+    service, client, contexts, root = bridge
+    with service.kernel.transaction(read_only=True) as tx:
+        tx.cursor.execute(
+            sql.SQL("SELECT * FROM {}.session_init_bindings ORDER BY native_context_id").format(
+                sql.Identifier(tx.schema)
+            )
+        )
+        before = tx.cursor.fetchall()
+    result = client.post("/v1/sessions/bind", json={**identity, "init_command": "::init gtkb lo"})
+    assert result.status_code == 422
+    assert result.json()["code"] == "invalid_request"
+    assert any(field["location"] == ["body", "native_context_id"] for field in result.json()["fields"])
+    with service.kernel.transaction(read_only=True) as tx:
+        tx.cursor.execute(
+            sql.SQL("SELECT * FROM {}.session_init_bindings ORDER BY native_context_id").format(
+                sql.Identifier(tx.schema)
+            )
+        )
+        assert tx.cursor.fetchall() == before
+    for native_id, binding in contexts.items():
+        assert client.get("/v1/sessions/binding", params={"native_context_id": native_id}).json() == binding
+    assert not (root / "groundtruth.db").exists()
 
 
 def test_binding_is_immutable_exact_and_retry_idempotent(bridge):
@@ -262,17 +529,39 @@ def test_scoped_publication_preserves_local_work_and_supports_a_fresh_successor(
 
 
 @pytest.mark.parametrize("next_status", ["GO", "READY", "VERIFIED"])
-@pytest.mark.parametrize("changed_scope", ["work", "formal", "parent", "project_formal", "test_formal"])
+@pytest.mark.parametrize(
+    "changed_scope",
+    [
+        "work",
+        "formal",
+        "parent",
+        "project_formal",
+        "test_formal",
+        "project_formal_removed",
+        "project_formal_overlap_removed",
+        "test_formal_cited",
+    ],
+)
 @pytest.mark.parametrize("claim_before_change", [False, True])
 def test_claim_operations_reject_changed_scope_without_consuming_the_reservation(
     bridge, next_status, changed_scope, claim_before_change
 ):
     service, client, contexts, root = bridge
+    source_versions = {"SPEC-1": 1}
+    if changed_scope in {"project_formal_removed", "test_formal_cited"}:
+        added = put(client, "specifications", "SPEC-ADDED", {"title": "Cited requirement", "status": "active"})
+        assert added.status_code == 200, added.text
+        source_versions["SPEC-ADDED"] = 1
+        if changed_scope == "project_formal_removed":
+            link_project_formal(service, "SPEC-ADDED")
+    elif changed_scope == "project_formal_overlap_removed":
+        link_project_formal(service, "SPEC-1")
     chain = [("pb1", "NEW"), ("lo1", "GO"), ("pb2", "READY"), ("lo2", "VERIFIED")]
     for version, (context, status) in enumerate(chain, 1):
         if status == next_status:
             break
-        deliver(client, contexts, "chain", context, version, status)
+        extra = {"spec_versions": json.dumps(source_versions)} if status == "NEW" else {}
+        deliver(client, contexts, "chain", context, version, status, **extra)
     head_version = version - 1
     request_id = str(uuid4())
     reserved = None
@@ -285,6 +574,23 @@ def test_claim_operations_reject_changed_scope_without_consuming_the_reservation
         changed = put(client, "work-items", "WI-1", {"description": "A different required effect"}, expected_version=1)
     elif changed_scope == "formal":
         changed = put(client, "specifications", "SPEC-1", {"description": "Changed formal intent"}, expected_version=1)
+    elif changed_scope in {"project_formal_removed", "project_formal_overlap_removed"}:
+        spec_id = "SPEC-ADDED" if changed_scope == "project_formal_removed" else "SPEC-1"
+        with service.kernel.transaction(read_only=True) as tx:
+            link = tx.get("project_artifact_links", {"id": f"LINK-{spec_id}"})
+        link.update(version=2, status="retired", changed_at=datetime.now(UTC).isoformat())
+        service.kernel.mutate_current(
+            table="project_artifact_links",
+            identity={"id": link["id"]},
+            expected_version=1,
+            new_state=link,
+            actor="qualification",
+            reason="Remove the canonical formal relationship",
+        )
+        changed = client.get("/v1/work-items/WI-1/context")
+        assert {row["id"] for row in changed.json()["specifications"]} == {"SPEC-1"}
+    elif changed_scope == "test_formal_cited":
+        changed = put(client, "tests", "TEST-1", {"spec_id": "SPEC-ADDED"}, expected_version=1)
     elif changed_scope in {"project_formal", "test_formal"}:
         changed = put(
             client, "specifications", "SPEC-ADDED", {"title": "Additional current requirement", "status": "active"}
@@ -344,6 +650,24 @@ def test_claim_operations_reject_changed_scope_without_consuming_the_reservation
         released = client.post("/v1/bridge/chain/release", json=fence)
         assert released.status_code == 200 and released.json()["status"] == "released"
         assert claim(client, "chain", context, head_version, next_status).json()["error"]["code"] == "scope_changed"
+    if next_status == "GO" and changed_scope in {
+        "project_formal_removed",
+        "project_formal_overlap_removed",
+        "test_formal_cited",
+    }:
+        deliver(client, contexts, "chain", "lo3", 2, "NO-GO")
+        current = client.get("/v1/work-items/WI-1/context").json()
+        deliver(
+            client,
+            contexts,
+            "chain",
+            "pb3",
+            3,
+            "REVISED",
+            spec_versions=json.dumps({row["id"]: row["version"] for row in current["specifications"]}),
+        )
+        deliver(client, contexts, "chain", "lo2", 4, "GO")
+        assert claim(client, "chain", "pb2", 4, "READY").status_code == 200
 
 
 def test_changed_scope_can_be_rejected_and_revised_without_reusing_the_old_proposal(bridge):
@@ -534,6 +858,297 @@ def test_header_and_role_errors_have_no_delivery_effect(bridge):
     assert collision.status_code == 422
 
 
+@pytest.mark.parametrize("order", list(permutations(range(3))))
+def test_every_dispatchable_head_order_delivers_exact_authored_chain(bridge, order):
+    _, client, contexts, root = bridge
+    document = "head-order"
+    previous = None
+    for version, (context, status) in enumerate((("pb1", "NEW"), ("lo1", "GO"), ("pb2", "READY")), 1):
+        reserved = claim(client, document, context, version - 1, status)
+        assert reserved.status_code == 200, reserved.text
+        if previous is not None:
+            assert reserved.json()["predecessor"]["content"] == previous
+        if status == "READY":
+            (root / "code.py").write_bytes(b"value = 2\n")
+        lines = authored(contexts[context], document, version, status).splitlines()
+        content = "\r\n".join([*(lines[i] for i in order), *lines[3:]]) + "\r\n"
+        request = {"native_context_id": context, "fence": reserved.json()["fence"], "content": content}
+        result = client.post(f"/v1/bridge/{document}/deliver", json=request)
+        assert result.status_code == 200, result.text
+        retry = client.post(f"/v1/bridge/{document}/deliver", json=request)
+        assert retry.status_code == 200 and retry.json()["status"] == "already_delivered"
+        previous = content
+    reviewer = claim(client, document, "lo2", 3, "VERIFIED")
+    assert reviewer.status_code == 200, reviewer.text
+    assert reviewer.json()["predecessor"]["content"] == previous
+    artifacts = client.get(f"/v1/bridge/{document}/artifacts").json()
+    verified = authored(contexts["lo2"], document, 4, "VERIFIED", verified_artifacts=json.dumps(artifacts))
+    assert "::init" not in verified and "::open" not in verified
+    result = client.post(
+        f"/v1/bridge/{document}/deliver",
+        json={"native_context_id": "lo2", "fence": reviewer.json()["fence"], "content": verified},
+    )
+    assert result.status_code == 200, result.text
+    assert result.json()["project_ready_for_commit"] is True
+
+
+@pytest.mark.parametrize(
+    "defect", ["status", "version", "context", "recipient", "missing_model", "duplicate_model", "placeholder_model"]
+)
+def test_verdict_delivery_rejects_changed_authorship_without_rewriting_or_consuming_claim(bridge, defect):
+    _, client, contexts, _ = bridge
+    document = "authored-verdict"
+    deliver(client, contexts, document, "pb1", 1, "NEW")
+    reservation = claim(client, document, "lo1", 1, "GO").json()
+    original = authored(
+        contexts["lo1"],
+        document,
+        2,
+        "GO",
+        author_model="agent-selected-model",
+        author_model_version="agent-observed-version",
+        author_model_configuration="agent-authored-configuration",
+    )
+    invalid = {
+        "status": original.replace("GO\r\n", "NO-GO\r\n", 1),
+        "version": original.replace("Version: 2", "Version: 3"),
+        "context": original.replace(contexts["lo1"]["session_context_id"], contexts["lo2"]["session_context_id"]),
+        "recipient": original.replace("::init gtkb pb", "::init gtkb lo"),
+        "missing_model": original.replace("author_model: agent-selected-model\r\n", ""),
+        "placeholder_model": original.replace("author_model: agent-selected-model", "author_model: unknown"),
+        "duplicate_model": original.replace(
+            "author_model: agent-selected-model",
+            "author_model: agent-selected-model\r\nauthor_model: substituted-model",
+        ),
+    }[defect]
+    request = {"native_context_id": "lo1", "fence": reservation["fence"], "content": invalid}
+    response = client.post(f"/v1/bridge/{document}/deliver", json=request)
+    assert response.status_code == 422, response.text
+    if defect == "placeholder_model":
+        assert "author_model" in response.json()["error"]["message"]
+    state = client.get(f"/v1/bridge/{document}/show", params={"include_content": True}).json()
+    assert state["attempt"]["head_version"] == 1
+    assert len(state["messages"]) == 1
+    assert (
+        client.post(
+            f"/v1/bridge/{document}/check", json={"native_context_id": "lo1", "fence": reservation["fence"]}
+        ).status_code
+        == 200
+    )
+    response = client.post(f"/v1/bridge/{document}/deliver", json={**request, "content": original})
+    assert response.status_code == 200, response.text
+    state = client.get(f"/v1/bridge/{document}/show", params={"include_content": True}).json()
+    assert state["messages"][-1]["content"] == original
+    assert (
+        client.post(
+            f"/v1/bridge/{document}/check", json={"native_context_id": "lo1", "fence": reservation["fence"]}
+        ).status_code
+        == 422
+    )
+
+
+@pytest.mark.parametrize("status", ["NEW", "REVISED"])
+@pytest.mark.parametrize("defect", ["project", "work_item", "both", "bold"])
+def test_proposals_require_plain_canonical_linkage_without_consuming_claim(bridge, status, defect):
+    _, client, contexts, _ = bridge
+    document = "proposal-linkage"
+    version = 1
+    if status == "REVISED":
+        deliver(client, contexts, document, "pb1", 1, "NEW")
+        deliver(client, contexts, document, "lo1", 2, "NO-GO")
+        version = 3
+    reserved = claim(client, document, "pb1", version - 1, status).json()
+    fence = {"native_context_id": "pb1", "fence": reserved["fence"]}
+    original = authored(contexts["pb1"], document, version, status)
+    invalid = original
+    if defect in {"project", "both"}:
+        invalid = invalid.replace("Project: PROJECT-1\r\n", "")
+    if defect in {"work_item", "both"}:
+        invalid = invalid.replace("Work Item: WI-1\r\n", "")
+    if defect == "bold":
+        invalid = invalid.replace("Project:", "**Project:**").replace("Work Item:", "**Work Item:**")
+    before = client.get(f"/v1/bridge/{document}/show?include_content=true").json()
+    response = client.post(f"/v1/bridge/{document}/deliver", json={**fence, "content": invalid})
+    assert response.status_code == 422, response.text
+    error = response.json()["error"]
+    assert error["code"] == "invalid_bridge_header"
+    expected = {"project", "work_item"} if defect in {"both", "bold"} else {defect}
+    assert expected <= set(error["details"]["fields"])
+    assert "Project: <canonical project ID>" in error["message"]
+    assert "Work Item: <canonical work-item ID>" in error["message"]
+    assert "PAUTH" not in response.text and "Authorization:" not in response.text
+    assert client.get(f"/v1/bridge/{document}/show?include_content=true").json() == before
+    assert client.post(f"/v1/bridge/{document}/check", json=fence).status_code == 200
+    accepted = client.post(f"/v1/bridge/{document}/deliver", json={**fence, "content": original})
+    assert accepted.status_code == 200, accepted.text
+    assert client.get(f"/v1/bridge/{document}/show?include_content=true").json()["messages"][-1]["content"] == original
+
+
+@pytest.mark.parametrize("field", ["author_identity", "author_harness_id", "author_session_context_id", "author_model"])
+def test_advisory_requires_complete_author_provenance_without_proposal_linkage(bridge, field):
+    _, client, contexts, _ = bridge
+    document = "advisory-provenance"
+    reserved = claim(client, document, "pb1", 0, "ADVISORY", work_item_id=None).json()
+    fence = {"native_context_id": "pb1", "fence": reserved["fence"]}
+    original = authored(contexts["pb1"], document, 1, "ADVISORY")
+    original = original.replace("Project: PROJECT-1\r\n", "").replace("Work Item: WI-1\r\n", "")
+    invalid = "\r\n".join(line for line in original.split("\r\n") if not line.startswith(field + ":"))
+    response = client.post(f"/v1/bridge/{document}/deliver", json={**fence, "content": invalid})
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["details"]["fields"] == [field]
+    assert client.get(f"/v1/bridge/{document}/show?include_content=true").json()["messages"] == []
+    assert client.post(f"/v1/bridge/{document}/check", json=fence).status_code == 200
+    accepted = client.post(f"/v1/bridge/{document}/deliver", json={**fence, "content": original})
+    assert accepted.status_code == 200, accepted.text
+    state = client.get(f"/v1/bridge/{document}/show?include_content=true").json()
+    assert state["attempt"]["work_item_id"] is None
+    assert state["messages"][0]["content"] == original
+
+
+@pytest.mark.parametrize("status", ["GO", "NO-GO", "VERIFIED", "WITHDRAWN"])
+def test_successor_uses_exact_claim_linkage_without_reauthoring_proposal_fields(bridge, status):
+    _, client, contexts, _ = bridge
+    document = "claimed-linkage"
+    deliver(client, contexts, document, "pb1", 1, "NEW")
+    version, context = 2, "lo1"
+    extra = {}
+    if status == "VERIFIED":
+        deliver(client, contexts, document, "lo1", 2, "GO")
+        deliver(client, contexts, document, "pb2", 3, "READY")
+        version, context = 4, "lo2"
+        extra["verified_artifacts"] = json.dumps(client.get(f"/v1/bridge/{document}/artifacts").json())
+    elif status == "WITHDRAWN":
+        context = "pb2"
+    reserved = claim(client, document, context, version - 1, status)
+    assert reserved.status_code == 200, reserved.text
+    fence = {"native_context_id": context, "fence": reserved.json()["fence"]}
+    content = authored(contexts[context], document, version, status, **extra)
+    content = content.replace("Project: PROJECT-1\r\n", "").replace("Work Item: WI-1\r\n", "")
+    response = client.post(f"/v1/bridge/{document}/deliver", json={**fence, "content": content})
+    assert response.status_code == 200, response.text
+    state = client.get(f"/v1/bridge/{document}/show?include_content=true").json()
+    assert state["attempt"]["work_item_id"] == "WI-1"
+    assert state["attempt"]["project_id"] == "PROJECT-1"
+    assert state["attempt"]["head_status"] == status
+    if status == "WITHDRAWN":
+        assert state["attempt"]["disposition"] == "withdrawn"
+    else:
+        assert state["messages"][-1]["content"] == content
+    assert client.post(f"/v1/bridge/{document}/check", json=fence).status_code == 422
+
+
+@pytest.mark.parametrize("status", ["NEW", "GO"])
+@pytest.mark.parametrize("field,value", [("Project", "PROJECT-OTHER"), ("Work Item", "WI-OTHER")])
+def test_authored_linkage_cannot_redirect_the_claimed_work(bridge, status, field, value):
+    _, client, contexts, _ = bridge
+    document = "foreign-linkage"
+    version, context = 1, "pb1"
+    if status == "GO":
+        deliver(client, contexts, document, "pb1", 1, "NEW")
+        version, context = 2, "lo1"
+    reserved = claim(client, document, context, version - 1, status).json()
+    fence = {"native_context_id": context, "fence": reserved["fence"]}
+    before = client.get(f"/v1/bridge/{document}/show?include_content=true").json()
+    invalid = authored(contexts[context], document, version, status, **{field: value})
+    response = client.post(f"/v1/bridge/{document}/deliver", json={**fence, "content": invalid})
+    assert response.status_code == 422 and response.json()["error"]["code"] == "invalid_bridge_header"
+    assert client.get(f"/v1/bridge/{document}/show?include_content=true").json() == before
+    assert client.post(f"/v1/bridge/{document}/check", json=fence).status_code == 200
+    original = authored(contexts[context], document, version, status)
+    assert client.post(f"/v1/bridge/{document}/deliver", json={**fence, "content": original}).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "work_item_id",
+    ["WI-9999", "WI-AUTO-SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001", "GTKB-SOME-THING-001", "WORKLIST-A-B-C"],
+)
+def test_canonical_work_item_identifiers_preserve_membership_and_exact_authored_bytes(bridge, work_item_id):
+    _, client, contexts, _ = bridge
+    assert put(client, "work-items", work_item_id, work_fields(), project_id="PROJECT-1").status_code == 200
+    document = "canonical-identifier"
+    original = authored(contexts["pb1"], document, 1, "NEW", **{"Work Item": work_item_id})
+    assert parse_authored_message(original)["metadata"]["work_item"] == work_item_id
+    reserved = claim(client, document, "pb1", 0, "NEW", work_item_id=work_item_id)
+    assert reserved.status_code == 200, reserved.text
+    response = client.post(
+        f"/v1/bridge/{document}/deliver",
+        json={"native_context_id": "pb1", "fence": reserved.json()["fence"], "content": original},
+    )
+    assert response.status_code == 200, response.text
+    state = client.get(f"/v1/bridge/{document}/show?include_content=true").json()
+    assert state["attempt"]["work_item_id"] == work_item_id
+    assert state["attempt"]["project_id"] == "PROJECT-1"
+    assert state["messages"][0]["content"] == original
+
+
+@pytest.mark.parametrize("work_item_id", ["WI-1", "WI-AUTO-SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001"])
+@pytest.mark.parametrize("membership_state", ["missing", "inactive"])
+@pytest.mark.parametrize("boundary", ["claim", "delivery"])
+def test_proposal_rejects_missing_current_parent_for_every_identifier(bridge, work_item_id, membership_state, boundary):
+    service, client, contexts, _ = bridge
+    if work_item_id != "WI-1":
+        assert put(client, "work-items", work_item_id, work_fields(), project_id="PROJECT-1").status_code == 200
+    document = "missing-parent"
+    reserved = None
+    if boundary == "delivery":
+        reserved = claim(client, document, "pb1", 0, "NEW", work_item_id=work_item_id).json()
+    before = client.get(f"/v1/bridge/{document}/show?include_content=true").json()
+    content = authored(contexts["pb1"], document, 1, "NEW", **{"Work Item": work_item_id})
+    # Simulate damaged current relationship state, including loss after claim.
+    # The supported writer never manufactures an unparented work item.
+    with service.kernel.transaction() as tx:
+        tx.cursor.execute(
+            sql.SQL("SELECT * FROM {}.project_work_item_memberships WHERE work_item_id=%s").format(
+                sql.Identifier(tx.schema)
+            ),
+            (work_item_id,),
+        )
+        membership = dict(tx.cursor.fetchone())
+        mutation = (
+            "DELETE FROM {}.project_work_item_memberships WHERE work_item_id=%s"
+            if membership_state == "missing"
+            else "UPDATE {}.project_work_item_memberships SET status='inactive' WHERE work_item_id=%s"
+        )
+        tx.cursor.execute(sql.SQL(mutation).format(sql.Identifier(tx.schema)), (work_item_id,))
+    if boundary == "claim":
+        response = claim(client, document, "pb1", 0, "NEW", work_item_id=work_item_id)
+    else:
+        response = client.post(
+            f"/v1/bridge/{document}/deliver",
+            json={"native_context_id": "pb1", "fence": reserved["fence"], "content": content},
+        )
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "invalid_membership"
+    assert response.json()["error"]["details"]["work_item_id"] == work_item_id
+    assert client.get(f"/v1/bridge/{document}/show?include_content=true").json() == before
+    with service.kernel.transaction() as tx:
+        if membership_state == "missing":
+            tx.cursor.execute(
+                sql.SQL("INSERT INTO {}.project_work_item_memberships ({}) VALUES ({})").format(
+                    sql.Identifier(tx.schema),
+                    sql.SQL(",").join(map(sql.Identifier, membership)),
+                    sql.SQL(",").join(sql.Placeholder() for _ in membership),
+                ),
+                tuple(membership.values()),
+            )
+        else:
+            tx.cursor.execute(
+                sql.SQL("UPDATE {}.project_work_item_memberships SET status='active' WHERE work_item_id=%s").format(
+                    sql.Identifier(tx.schema)
+                ),
+                (work_item_id,),
+            )
+    if reserved is None:
+        response = claim(client, document, "pb1", 0, "NEW", work_item_id=work_item_id)
+        assert response.status_code == 200, response.text
+        reserved = response.json()
+    accepted = client.post(
+        f"/v1/bridge/{document}/deliver",
+        json={"native_context_id": "pb1", "fence": reserved["fence"], "content": content},
+    )
+    assert accepted.status_code == 200, accepted.text
+
+
 def test_proposal_rechecks_executable_evidence_after_claim(bridge):
     _, client, contexts, _ = bridge
     reserved = claim(client, "chain", "pb1", 0, "NEW").json()
@@ -609,6 +1224,13 @@ def test_withdrawal_and_broken_chain_recovery_purge_payload_without_fabricating_
     deliver(client, contexts, "withdrawn", "pb2", 2, "WITHDRAWN")
     state = client.get("/v1/bridge/withdrawn/show", params={"include_content": True}).json()
     assert state["attempt"]["disposition"] == "withdrawn" and "messages" not in state
+    assert state["attempt"]["formal_roots"] is None
+    assert state["attempt"]["terminal_author_session_context_id"] == contexts["pb2"]["session_context_id"]
+    proof = client.get("/v1/bridge/withdrawn/delivery", params={"version": 2, "native_context_id": "pb2"})
+    assert proof.status_code == 200 and proof.json()["bridge_status"] == "WITHDRAWN"
+    for version, context in [(2, "pb1"), (1, "pb1")]:
+        missing = client.get("/v1/bridge/withdrawn/delivery", params={"version": version, "native_context_id": context})
+        assert missing.json()["error"]["code"] == "bridge_delivery_incomplete"
     deliver(client, contexts, "broken", "pb2", 1, "NEW")
     with service.kernel.transaction() as tx:
         tx.cursor.execute(
@@ -888,3 +1510,297 @@ def test_simultaneous_test_artifact_claims_leave_one_live_reservation(bridge, mo
     document, context, work = [("first", "pb2", "WI-1"), ("second", "pb3", "WI-2")][loser]
     retry = claim(client, document, context, 2, "READY", work_item_id=work)
     assert retry.status_code == 422 and retry.json()["error"]["code"] == "artifact_effect_conflict"
+
+
+def test_state_report_uses_canonical_queues_and_does_not_change_claims(bridge):
+    service, client, contexts, root = bridge
+    deliver(client, contexts, "report-chain", "pb1", 1, "NEW")
+    before = client.get("/v1/bridge/report-chain/show", params={"include_content": True}).json()
+    result = client.get("/v1/bridge/state-report")
+    assert result.status_code == 200, result.text
+    report = result.json()
+    assert report["attempt_counts"] == {"active": 1}
+    assert report["active_status_mix"] == [{"status": "NEW", "count": 1}]
+    assert report["active_claim_count"] == 0
+    assert [row["id"] for row in report["queues"]["lo"]["eligible"]] == ["report-chain"]
+    assert not report["queues"]["pb"]["eligible"]
+    assert not {"harnesses", "registry_publication"} & report.keys()
+    assert client.get("/v1/bridge/report-chain/show", params={"include_content": True}).json() == before
+    held = claim(client, "report-chain", "lo1", 1, "GO")
+    assert held.status_code == 200, held.text
+    claimed = client.get("/v1/bridge/state-report").json()
+    assert claimed["active_claim_count"] == 1
+    assert not claimed["queues"]["lo"]["eligible"]
+    fence = {"native_context_id": "lo1", "fence": held.json()["fence"]}
+    assert client.post("/v1/bridge/report-chain/check", json=fence).status_code == 200
+    assert client.post("/v1/bridge/report-chain/release", json=fence).status_code == 200
+    assert client.get("/v1/bridge/state-report").json() == report
+
+
+def test_state_report_counts_and_queues_share_one_snapshot(bridge, monkeypatch):
+    service, client, contexts, root = bridge
+    deliver(client, contexts, "report-chain", "pb1", 1, "NEW")
+    original = NativeBridgeService._queue
+    changed = False
+
+    def change_after_first_queue(self, tx, role):
+        nonlocal changed
+        result = original(self, tx, role)
+        if not changed:
+            changed = True
+            with ThreadPoolExecutor(max_workers=1) as worker:
+                worker.submit(deliver, client, contexts, "report-chain", "lo1", 2, "GO").result(timeout=20)
+        return result
+
+    monkeypatch.setattr(NativeBridgeService, "_queue", change_after_first_queue)
+    result = client.get("/v1/bridge/state-report")
+    assert result.status_code == 200, result.text
+    report = result.json()
+    assert report["active_status_mix"] == [{"status": "NEW", "count": 1}]
+    assert not report["queues"]["pb"]["eligible"]
+    assert [row["id"] for row in report["queues"]["lo"]["eligible"]] == ["report-chain"]
+    current = client.get("/v1/bridge/state-report").json()
+    assert current["active_status_mix"] == [{"status": "GO", "count": 1}]
+    assert [row["id"] for row in current["queues"]["pb"]["eligible"]] == ["report-chain"]
+    assert not current["queues"]["lo"]["eligible"]
+
+
+@pytest.mark.parametrize("status", ["NEW", "GO", "ADVISORY"])
+def test_bridge_credentials_are_refused_without_consuming_a_claim(bridge, status):
+    _, client, contexts, root = bridge
+    document = "credential-refusal"
+    context, version = "pb1", 1
+    if status == "GO":
+        deliver(client, contexts, document, "pb1", 1, "NEW")
+        context, version = "lo1", 2
+    work_item_id = None if status == "ADVISORY" else "WI-1"
+    reservation = claim(client, document, context, version - 1, status, work_item_id=work_item_id)
+    assert reservation.status_code == 200, reservation.text
+    fence = reservation.json()["fence"]
+    before = client.get(f"/v1/bridge/{document}/show?include_content=true").json()
+    clean = authored(contexts[context], document, version, status)
+    credential = "AKIA" + "A" * 16
+    request = {"native_context_id": context, "fence": fence, "content": clean + credential}
+    refused = client.post(f"/v1/bridge/{document}/deliver", json=request)
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["error"]["code"] == "bridge_credential_detected"
+    assert credential not in refused.text
+    assert client.get(f"/v1/bridge/{document}/show?include_content=true").json() == before
+    assert (
+        client.post(
+            f"/v1/bridge/{document}/check",
+            json={
+                "native_context_id": context,
+                "fence": fence,
+            },
+        ).status_code
+        == 200
+    )
+    request["content"] = clean
+    accepted = client.post(f"/v1/bridge/{document}/deliver", json=request)
+    assert accepted.status_code == 200, accepted.text
+    replay = client.post(f"/v1/bridge/{document}/deliver", json=request)
+    assert replay.status_code == 200 and replay.json()["status"] == "already_delivered"
+    assert not (root / "bridge").exists()
+
+
+@pytest.mark.parametrize("foreign_path", [None, "code.py", "tests/test_effect.py", "changed_intent", "abandoned"])
+def test_killed_publication_resumes_exact_mixture_or_refuses_all_foreign_changes(bridge, foreign_path):
+    _service, client, contexts, root = bridge
+    project_root = root.parents[2]
+    document = "killed-publication"
+    deliver(client, contexts, document, "pb1", 1, "NEW")
+    deliver(client, contexts, document, "lo1", 2, "GO")
+    reserved = claim(client, document, "pb2", 2, "READY").json()
+    fence = {"native_context_id": "pb2", "fence": reserved["fence"]}
+    opened = client.post(f"/v1/bridge/{document}/worktree", json=fence)
+    assert opened.status_code == 200, opened.text
+    checkout = Path(opened.json()["path"])
+    (checkout / "code.py").write_text("value = 2\n", encoding="utf-8")
+    (checkout / "tests/test_effect.py").write_text("assert 2 == 2\n", encoding="utf-8")
+    original_test = (root / "tests/test_effect.py").read_bytes()
+    unrelated = root / "foreign_tracked.txt"
+    unrelated.write_bytes(b"Preserve unrelated work\r\n")
+    foreign_index = subprocess.check_output(["git", "-C", str(root), "ls-files", "--stage", "--", unrelated.name])
+    payload = {**fence, "expected_artifacts": opened.json()["artifact_preimages"]}
+    checkpoint = project_root / "publication-interrupted"
+    child = r"""
+import json,os,sys,time
+from pathlib import Path
+from groundtruth_kb.bridge.native import NativeBridgeService, PublishWorkRequest
+from groundtruth_kb.config import PostgreSQLConfig
+from groundtruth_kb.postgres_kernel import PostgresKernel
+replace = os.replace
+target = Path(sys.argv[3]).resolve()
+def pause_after_first(source, destination):
+    replace(source, destination)
+    if Path(destination).resolve() == target:
+        Path(sys.argv[4]).write_text("first path replaced", encoding="utf-8")
+        while True:
+            time.sleep(1)
+os.replace = pause_after_first
+service = NativeBridgeService(PostgresKernel(PostgreSQLConfig(service=os.environ["GTKB_TEST_POSTGRES_SERVICE"])), Path(sys.argv[1]))
+service.publish_work("killed-publication", PublishWorkRequest(**json.loads(sys.argv[2])))
+"""
+    process = subprocess.Popen(
+        [sys.executable, "-c", child, str(project_root), json.dumps(payload), str(root / "code.py"), str(checkpoint)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    try:
+        deadline = time.monotonic() + 25
+        while not checkpoint.exists() and process.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert checkpoint.exists(), "Child never reached the first completed replacement"
+    finally:
+        if process.poll() is None:
+            process.kill()
+        stdout, stderr = process.communicate(timeout=10)
+    assert process.returncode != 0, (stdout, stderr)
+    assert (root / "code.py").read_bytes() == (checkout / "code.py").read_bytes()
+    assert (root / "tests/test_effect.py").read_bytes() == original_test
+    expected_error = None
+    if foreign_path in {"changed_intent", "abandoned"}:
+        assert (
+            put(
+                client,
+                "specifications",
+                "SPEC-1",
+                {"description": "Materially changed intent after interrupted publication"},
+                expected_version=1,
+            ).status_code
+            == 200
+        )
+        expected_error = "scope_changed"
+        if foreign_path == "abandoned":
+            assert client.post(f"/v1/bridge/{document}/release", json=fence).status_code == 200
+            abandoned = client.post(
+                f"/v1/bridge/{document}/abandon",
+                json={"native_context_id": "lo2", "expected_version": 2, "reason": "Material intent changed"},
+            )
+            assert abandoned.status_code == 200, abandoned.text
+            expected_error = "stale_bridge_head"
+    elif foreign_path:
+        (root / foreign_path).write_bytes(b"Foreign mutation must survive\n")
+        expected_error = "artifact_preimage_changed"
+    before = {name: (root / name).read_bytes() for name in ["code.py", "tests/test_effect.py", unrelated.name]}
+    if foreign_path not in {"changed_intent", "abandoned"}:
+        assert client.post(f"/v1/bridge/{document}/check", json=fence).status_code == 200
+    state = client.get(f"/v1/bridge/{document}/show?include_content=true").json()
+    result = client.post(f"/v1/bridge/{document}/publish-work", json=payload)
+    if expected_error:
+        assert result.status_code == 422
+        assert result.json()["error"]["code"] == expected_error
+        assert {name: (root / name).read_bytes() for name in before} == before
+        assert client.get(f"/v1/bridge/{document}/show?include_content=true").json() == state
+    else:
+        assert result.status_code == 200, result.text
+        for name in ["code.py", "tests/test_effect.py"]:
+            assert (root / name).read_bytes() == (checkout / name).read_bytes()
+        assert client.post(f"/v1/bridge/{document}/publish-work", json=payload).json() == result.json()
+    assert unrelated.read_bytes() == before[unrelated.name]
+    assert (
+        subprocess.check_output(["git", "-C", str(root), "ls-files", "--stage", "--", unrelated.name]) == foreign_index
+    )
+
+
+@pytest.mark.parametrize("stage", ["GO", "READY", "VERIFIED"])
+@pytest.mark.parametrize("roots", [None, {"work": ["FABRICATED"], "test": {}, "project": {}}])
+def test_unproven_formal_roots_require_explicit_restart_without_inherited_authority(bridge, stage, roots):
+    service, client, contexts, root = bridge
+    deliver(client, contexts, "old-attempt", "pb1", 1, "NEW")
+    deliver(client, contexts, "old-attempt", "lo1", 2, "GO")
+    version = 2
+    if stage in {"READY", "VERIFIED"}:
+        deliver(client, contexts, "old-attempt", "pb2", 3, "READY")
+        version = 3
+    if stage == "VERIFIED":
+        artifacts = client.get("/v1/bridge/old-attempt/artifacts").json()
+        deliver(client, contexts, "old-attempt", "lo2", 4, "VERIFIED", verified_artifacts=json.dumps(artifacts))
+        version = 4
+    original = (root / "code.py").read_bytes()
+    membership = client.get("/v1/work-items/WI-1").json()["membership"]
+    with service.kernel.transaction() as tx:
+        from psycopg.types.json import Jsonb
+
+        tx.cursor.execute(
+            sql.SQL("UPDATE {}.bridge_attempts SET formal_roots=%s WHERE id='old-attempt'").format(
+                sql.Identifier(tx.schema)
+            ),
+            (Jsonb(roots) if roots is not None else None,),
+        )
+    intended = "READY" if stage == "GO" else "VERIFIED"
+    refusal = claim(client, "old-attempt", "pb3" if intended == "READY" else "lo3", version, intended)
+    assert refusal.json()["error"]["code"] == "scope_changed"
+    before = client.get("/v1/bridge/old-attempt/show?include_content=true").json()
+    restarted = client.post(
+        "/v1/bridge/old-attempt/abandon",
+        json={
+            "native_context_id": "lo3",
+            "expected_version": version,
+            "reason": "Original formal roots cannot be proved; restart from current canonical scope",
+        },
+    )
+    assert restarted.status_code == 200, restarted.text
+    closed = client.get("/v1/bridge/old-attempt/show?include_content=true").json()
+    assert closed["attempt"]["disposition"] == "abandoned" and "messages" not in closed
+    assert closed["attempt"]["head_status"] == before["attempt"]["head_status"]
+    assert closed["attempt"]["go_context_id"] is None and closed["attempt"]["verified_artifacts"] is None
+    assert claim(client, "replacement", "pb3", 0, "READY").status_code == 422
+    current = client.get("/v1/work-items/WI-1/context").json()
+    assert current["membership"] == membership
+    assert current["work_item"]["resolution_status"] == "open"
+    deliver(client, contexts, "replacement", "pb3", 1, "NEW", work_item_version=current["work_item"]["version"])
+    attempt = client.get("/v1/bridge/replacement/show").json()["attempt"]
+    assert attempt["formal_roots"] == {"work": ["SPEC-1"], "test": {"TEST-1": "SPEC-1"}, "project": {}}
+    assert attempt["go_context_id"] is None
+    assert (root / "code.py").read_bytes() == original
+
+
+def test_material_formal_change_after_verified_restarts_same_uncommitted_work(bridge):
+    _, client, contexts, root = bridge
+    deliver(client, contexts, "reviewed", "pb1", 1, "NEW")
+    deliver(client, contexts, "reviewed", "lo1", 2, "GO")
+    deliver(client, contexts, "reviewed", "pb2", 3, "READY")
+    artifacts = client.get("/v1/bridge/reviewed/artifacts").json()
+    deliver(client, contexts, "reviewed", "lo2", 4, "VERIFIED", verified_artifacts=json.dumps(artifacts))
+    request = {"native_context_id": "lo3", "expected_version": 4, "reason": "Reconcile formal intent"}
+    assert client.post("/v1/bridge/reviewed/abandon", json=request).json()["error"]["code"] == "attempt_still_valid"
+    original = (root / "code.py").read_bytes()
+    (root / "code.py").write_bytes(original + b"# ordinary byte change\n")
+    assert client.post("/v1/bridge/reviewed/abandon", json=request).json()["error"]["code"] == "attempt_still_valid"
+    before = client.get("/v1/work-items/WI-1").json()
+    changed = put(
+        client,
+        "specifications",
+        "SPEC-1",
+        {"description": "New required result after independent verification"},
+        expected_version=1,
+    )
+    assert changed.status_code == 200, changed.text
+    assert client.post("/v1/bridge/reviewed/abandon", json=request).status_code == 200
+    current = client.get("/v1/work-items/WI-1/context").json()
+    assert current["work_item"]["id"] == "WI-1" and current["membership"] == before["membership"]
+    assert current["work_item"]["resolution_status"] == "open"
+    assert (root / "code.py").read_bytes() == original + b"# ordinary byte change\n"
+    deliver(
+        client,
+        contexts,
+        "new-intent",
+        "pb3",
+        1,
+        "NEW",
+        work_item_version=current["work_item"]["version"],
+        spec_versions=json.dumps({"SPEC-1": 2}),
+    )
+    assert claim(client, "new-intent", "pb2", 1, "READY").status_code == 422
+    deliver(client, contexts, "new-intent", "lo3", 2, "GO")
+    for name in ["pb4", "lo4"]:
+        contexts[name] = client.post(
+            "/v1/sessions/bind", json={"native_context_id": name, "init_command": f"::init gtkb {name[:2]}"}
+        ).json()
+    deliver(client, contexts, "new-intent", "pb4", 3, "READY")
+    fresh = client.get("/v1/bridge/new-intent/artifacts").json()
+    deliver(client, contexts, "new-intent", "lo4", 4, "VERIFIED", verified_artifacts=json.dumps(fresh))
+    assert client.get("/v1/work-items/WI-1").json()["work_item"]["resolution_status"] == "verified"

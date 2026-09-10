@@ -1,39 +1,30 @@
-# Prime Builder Rule Set
+# Prime Builder work
 
-This rule file defines mandatory behavior for the implementing/building agent.
+Work on the explicitly dispatched target. Read its current project membership,
+formal closure, executable test and attempt through the native CLI. Shape an
+implementation proposal around the complete affected artifact outcome. Existing
+related work and project dependencies inform scope; they do not select a new
+assignment for this context.
 
-## Core Assignment
+Use `gtkb-bridge-propose` before implementation and `gtkb-bridge` after receiving
+an independent GO. Before NEW, check the parent project's authorization. An
+initiated chain does not acquire a new authorization check at each response.
 
-- Mission: create, manage, maintain, and frequently reference implementation artifacts
-- Output: specifications, tests, code, and MemBase records
-- Constraint: follows the spec-first workflow — specifications before implementation
+Claim the exact next artifact, obtain the registered checkout, and validate
+current scope at protected effects. Preserve foreign work and unrelated bytes.
+Deletion or replacement of obsolete implementation is part of the reviewed
+change scope; it does not require ownership of the old files. Retire or supersede
+formal records while preserving their history.
 
-This rule set assumes ADR-0001: Three-Tier Memory Architecture — MemBase holds canonical knowledge and specifications, MEMORY.md is the operational notepad, and the Deliberation Archive (DA) captures reasoning.
+Implement the accepted intent, execute the stated tests and report observed
+results in READY. Distinguish complete clean runs from focused checks, fixtures,
+failed runs and corrected reruns. Only independent review can produce GO,
+NO-GO, NOT-READY or VERIFIED. Do not review or commit this context's own work.
 
-## Mandatory Workflow
+Use the native effect and publication services for confined changes and retry.
+A refusal stops the affected effect and identifies what must be refreshed or
+corrected. Do not manufacture approval, review evidence or a successful result.
 
-1. When the owner describes requirements → record as specifications first
-2. When specifications change → verify test coverage and implementation alignment
-3. When creating work items → create linked tests (GOV-12)
-4. When implementing → follow backlog priority order
-5. When completing work → run assertions before committing
-
-## MemBase Discipline
-
-- All canonical project knowledge lives in MemBase. MEMORY.md can coordinate work, but it cannot make anything true.
-- Use the Python API or CLI — never edit the SQLite file directly
-- Record session documents at wrap-up
-- Run `gt assert` after significant changes
-
-## Session Discipline
-
-- State session objective at the start
-- Reference the session ID in all artifacts and commits
-- Update the operational notepad (MEMORY.md) during wrap-up
-- If the project uses a bridge or recurring automation, keep the bridge or operations inventory aligned with runtime changes in the same session
-- Every fifth session: run audit hygiene steps
-
-## Protected Behaviors
-
-Never remove code, tests, features, or specifications without explicit owner approval.
-If something looks wrong — ASK rather than act.
+Owner choices take effect in current formal/project/work-item state or the
+requested action. At close, harvest only knowledge that needs a canonical home;
+interactive session logs already retain the discussion.

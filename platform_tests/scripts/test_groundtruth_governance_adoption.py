@@ -117,7 +117,7 @@ def test_groundtruth_governance_artifacts_are_present_and_not_ignored() -> None:
         "applications/Agent_Red/.claude/skills/deploy/SKILL.md",
         "applications/Agent_Red/.claude/skills/run-tests/SKILL.md",
         "applications/Agent_Red/.claude/skills/seed-tenant/SKILL.md",
-        "scripts/check_codex_hook_parity.py",
+        "scripts/check_harness_parity.py",
         "scripts/session_self_initialization.py",
         "scripts/workstream_focus.py",
         "docs/gtkb-dashboard/index.html",
@@ -239,7 +239,7 @@ def test_release_candidate_gate_runs_governance_adoption_tests() -> None:
     assert "tests/scripts/test_standing_backlog_harvest.py" in gate
     assert "tests/hooks/test_formal_artifact_approval_gate.py" in gate
     assert "tests/hooks/test_workstream_focus.py" in gate
-    assert "scripts/check_codex_hook_parity.py" in gate
+    assert "scripts/check_harness_parity.py" in gate
 
 
 def test_release_candidate_gate_workflow_has_python_and_frontend_lanes() -> None:

@@ -1,214 +1,91 @@
-"""Tests for the GT-KB system/interface terminology map."""
+"""Surviving terminology-resolution obligations after static map retirement."""
 
 from __future__ import annotations
 
-import importlib.util
-import json
-import subprocess
-import sys
-from pathlib import Path
+from copy import deepcopy
 
-SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "resolve_system_interface.py"
-REPO_ROOT = Path(__file__).resolve().parents[2]
-
-STARTUP_CONTROL_TERMS = {
-    "startup index": ("startup-index", "config/agent-control/SESSION-STARTUP-INDEX.md"),
-    "startup control map": ("startup-control-map", "config/agent-control/SESSION-STARTUP-CONTROL-MAP.md"),
-    "role overlay": ("startup-role-overlay", "config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md"),
-    "hot-path projection": ("harness-registry-hot-path-projection", "harness-state/harness-registry.json"),
-    "repo-local adapter": ("repo-local-adapter", "config/agent-control/harness-capability-registry.toml"),
-}
+import pytest
+from groundtruth_kb.authority import AuthorityResolutionError, compact_status, resolve_term
 
 
-def _load_module():
-    spec = importlib.util.spec_from_file_location("resolve_system_interface", SCRIPT_PATH)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["resolve_system_interface"] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-def test_system_interface_map_is_valid_and_seeded() -> None:
-    module = _load_module()
-
-    system_map = module.load_map()
-
-    assert module.validate_map(system_map) == []
-    row_ids = {row["id"] for row in module.system_rows(system_map)}
-    assert row_ids >= module.REQUIRED_SEED_IDS
-
-
-def test_backlog_row_points_to_unified_work_items_authority() -> None:
-    module = _load_module()
-    system_map = module.load_map()
-    backlog = next(row for row in module.system_rows(system_map) if row["id"] == "backlog")
-    combined = " ".join(str(backlog[field]) for field in backlog)
-
-    assert backlog["authoritative_source"] == "MemBase table: current_work_items"
-    assert "current_work_items" in combined
-    assert "work_items" in combined
-    assert "versioned bridge file chain" in combined
-    assert "dashboard/startup rows are summaries" in combined
-
-
-def test_bridge_queue_permissions_include_no_action_review() -> None:
-    module = _load_module()
-    system_map = module.load_map()
-    file_bridge = next(row for row in module.system_rows(system_map) if row["id"] == "file-bridge")
-    bridge_queue = next(row for row in module.system_rows(system_map) if row["id"] == "bridge-queue")
-
-    assert "Loyal Opposition acts on latest NEW/REVISED/NO-ACTION" in file_bridge["role_permissions"]
-    assert "NO-ACTION" in bridge_queue["role_permissions"]
-
-
-def test_memory_working_records_are_non_authoritative() -> None:
-    module = _load_module()
-    system_map = module.load_map()
-    expected_rows = {
-        "memory-md": ("memory/MEMORY.md", "non_authoritative_operational_notepad"),
-        "release-readiness": ("memory/release-readiness.md", "non_authoritative_release_working_record"),
+def term(identifier="PROJECT", *, scope="platform", status="active", aliases=None):
+    return {
+        "id": identifier,
+        "canonical_term": "project",
+        "scope": scope,
+        "lifecycle_status": status,
+        "accepted_synonyms": aliases,
+        "discouraged_synonyms": ["bucket"],
     }
 
-    for system_id, (expected_source, expected_state) in expected_rows.items():
-        row = next(row for row in module.system_rows(system_map) if row["id"] == system_id)
-        assert row["authoritative_source"] == expected_source
-        assert row["generated_or_authoritative"] == expected_state
-        assert "non-authoritative" in row["read_method"]
+
+@pytest.mark.parametrize("query", ["PROJECT", "project", " Work Group ", "work\tgroup"])
+def test_exact_current_names_and_authored_synonyms_resolve_without_files(query):
+    record = term(aliases=["Work Group"])
+    original = deepcopy(record)
+    result = resolve_term(query, records=[record])
+    assert result["status"] == "resolved" and result["record"] == record
+    assert record == original
 
 
-def test_common_owner_terms_resolve_to_expected_systems() -> None:
-    module = _load_module()
-
-    assert module.resolve_term("backlog")["system"]["id"] == "backlog"
-    assert module.resolve_term("bridge queue")["system"]["id"] == "bridge-queue"
-    assert module.resolve_term("resource registry")["system"]["id"] == "resource-alias-registry"
-    assert module.resolve_term("release gate")["system"]["id"] == "release-gate"
+@pytest.mark.parametrize("status", ["candidate", "deprecated", "retired"])
+def test_noncurrent_terms_never_resolve_as_current_authority(status):
+    result = resolve_term("project", records=[term(status=status)])
+    assert result["status"] == "not_found"
+    assert compact_status(records=[term(status=status)])["active_records"] == 0
 
 
-def test_startup_control_owner_terms_resolve_to_authoritative_sources() -> None:
-    module = _load_module()
-
-    for term, (expected_id, expected_source) in STARTUP_CONTROL_TERMS.items():
-        result = module.resolve_term(term)
-        assert result["status"] == "resolved"
-        assert result["system"]["id"] == expected_id
-        assert expected_source in result["system"]["authoritative_source"]
+def test_discouraged_synonyms_are_not_silent_aliases():
+    assert resolve_term("bucket", records=[term()])["status"] == "not_found"
 
 
-def test_ambiguous_owner_term_fails_closed() -> None:
-    module = _load_module()
-    system_map = {
-        "schema_version": 1,
-        "systems": [
-            {"id": "first", "canonical_name": "first", "accepted_aliases": ["shared"]},
-            {"id": "second", "canonical_name": "second", "accepted_aliases": ["shared"]},
-        ],
-    }
-
-    result = module.resolve_term("shared", system_map=system_map)
-
-    assert result["status"] == "ambiguous"
-    assert {candidate["id"] for candidate in result["candidates"]} == {"first", "second"}
+def test_ambiguous_names_require_scope_or_exact_record_id():
+    records = [term("PROJECT-A", scope="a"), term("PROJECT-B", scope="b")]
+    assert resolve_term("project", records=records)["status"] == "ambiguous"
+    assert resolve_term("project", records=records, scope="b")["record"]["id"] == "PROJECT-B"
+    assert resolve_term("PROJECT-A", records=records)["record"]["id"] == "PROJECT-A"
+    assert compact_status(records=records)["status"] == "pass"
+    records[1]["scope"] = "a"
+    status = compact_status(records=records)
+    assert status["status"] == "fail"
+    assert status["ambiguities"] == [{"scope": "a", "term": "project", "ids": ["PROJECT-A", "PROJECT-B"]}]
 
 
-def test_human_companion_declares_map_is_not_authority() -> None:
-    companion = REPO_ROOT / "docs" / "gtkb-systems-and-tools.md"
-    text = companion.read_text(encoding="utf-8")
-
-    assert "config/agent-control/system-interface-map.toml" in text
-    assert "not a replacement authority" in text
-    assert "Retired bridge-index artifacts" in text
+@pytest.mark.parametrize("aliases", [{}, "", [None], [" "], 17])
+def test_malformed_current_names_refuse_instead_of_being_normalized(aliases):
+    with pytest.raises(AuthorityResolutionError):
+        resolve_term("project", records=[term(aliases=aliases)])
 
 
-def test_human_companion_path_declared_in_map_exists_in_root() -> None:
-    """Displacement guard (WI-3487).
-
-    The ``human_companion`` path declared in
-    ``config/agent-control/system-interface-map.toml`` must resolve to an
-    existing file under the repo root. This is a named, self-documenting check
-    so that a future relocation of the platform doc out of its in-root home
-    (as happened in isolation-018 Slice 18.C, which renamed it into
-    ``applications/Agent_Red/docs/``) fails here explicitly, rather than only
-    surfacing as a ``FileNotFoundError`` in the not-an-authority assertion or a
-    ``human_companion_exists: False`` in the operating-state probe. The correct
-    fix for a failure is to restore the doc in-root, NOT to repoint the map at
-    an ``applications/`` copy (ADR-ISOLATION-APPLICATION-PLACEMENT-001).
-    """
-    module = _load_module()
-    system_map = module.load_map()
-    declared = system_map["human_companion"]
-
-    assert declared == "docs/gtkb-systems-and-tools.md"
-    companion = REPO_ROOT / declared
-    assert companion.is_file(), (
-        f"human_companion declared in system-interface-map.toml ({declared}) is "
-        f"missing from its in-root platform home. Restore the doc in-root; do not "
-        f"repoint the map at an applications/ copy."
-    )
+def test_unknown_term_suggests_current_names_only():
+    result = resolve_term("projec", records=[term(), term("OLD", status="retired", aliases=["projec"])])
+    assert result["status"] == "not_found" and "project" in result["candidates"]
+    assert "old" not in result["candidates"]
 
 
-def test_compact_status_is_startup_safe() -> None:
-    module = _load_module()
-
-    status = module.compact_status()
-
-    assert status["status"] == "pass"
-    assert status["systems"] >= len(module.REQUIRED_SEED_IDS)
-    assert status["human_companion_exists"] is True
-    assert status["first_reconciliation_case"] == "backlog"
-    assert status["backlog_authoritative_source"] == "MemBase table: current_work_items"
-
-
-def test_cli_resolves_json_term() -> None:
-    result = subprocess.run(
-        [sys.executable, str(SCRIPT_PATH), "backlog", "--json"],
-        cwd=REPO_ROOT,
-        text=True,
-        capture_output=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
-
-    assert result.returncode == 0, result.stderr
-    payload = json.loads(result.stdout)
-    assert payload["status"] == "resolved"
-    assert payload["system"]["id"] == "backlog"
-    assert payload["system"]["authoritative_source"] == "MemBase table: current_work_items"
+@pytest.mark.parametrize("aliases", [{}, "", [None], [" "], 17])
+def test_unrelated_malformed_entry_does_not_disable_valid_resolution_or_status(aliases):
+    valid = term()
+    broken = {**term("BROKEN", aliases=aliases), "canonical_term": "broken definition"}
+    before = deepcopy([valid, broken])
+    records = [valid, broken]
+    assert resolve_term("project", records=records)["record"] == valid
+    assert resolve_term("not present", records=records)["status"] == "not_found"
+    status = compact_status(records=records)
+    assert status["status"] == "fail"
+    assert status["active_records"] == 2
+    assert [r["id"] for r in status["validation_issues"]] == ["BROKEN"]
+    with pytest.raises(AuthorityResolutionError, match="BROKEN"):
+        resolve_term("BROKEN", records=records)
+    assert records == before
 
 
-def test_cli_status_reports_compact_payload() -> None:
-    result = subprocess.run(
-        [sys.executable, str(SCRIPT_PATH), "--status", "--json"],
-        cwd=REPO_ROOT,
-        text=True,
-        capture_output=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
-
-    assert result.returncode == 0, result.stderr
-    payload = json.loads(result.stdout)
-    assert payload["status"] == "pass"
-    assert payload["first_reconciliation_case"] == "backlog"
+def test_a_malformed_entry_sharing_the_requested_name_cannot_be_ignored():
+    with pytest.raises(AuthorityResolutionError):
+        resolve_term("project", records=[term(), term("BROKEN", aliases=[None])])
 
 
-def test_cli_resolves_startup_control_terms() -> None:
-    for term, (expected_id, expected_source) in STARTUP_CONTROL_TERMS.items():
-        result = subprocess.run(
-            [sys.executable, str(SCRIPT_PATH), term, "--json"],
-            cwd=REPO_ROOT,
-            text=True,
-            capture_output=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-
-        assert result.returncode == 0, result.stderr
-        payload = json.loads(result.stdout)
-        assert payload["status"] == "resolved"
-        assert payload["system"]["id"] == expected_id
-        assert expected_source in payload["system"]["authoritative_source"]
+def test_malformed_entries_outside_the_requested_scope_do_not_participate():
+    records = [term(), term("BROKEN", scope="other", aliases=[None])]
+    assert resolve_term("project", records=records, scope="platform")["status"] == "resolved"
+    assert compact_status(records=records, scope="platform")["status"] == "pass"

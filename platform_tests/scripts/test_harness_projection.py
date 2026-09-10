@@ -3,8 +3,7 @@
 Landed by bridge/gtkb-baseline-correction-and-goose-projector-slice-1 (GO at
 -004). Maps to GOV-HARNESS-NEUTRAL-BASELINE-001:
 
-- obligation 3 via ``test_baseline_token_census`` (ratchet: seeded at the
-  measured value, may only decrease);
+- obligations 3 and 4 via actual projected output without peer-harness paths;
 - obligation 2/verification bullet 2 via ``test_projection_idempotent``
   (byte-reproducible plan);
 - obligation 5 via ``test_projected_markdown_stamped_after_frontmatter``;
@@ -14,7 +13,6 @@ Landed by bridge/gtkb-baseline-correction-and-goose-projector-slice-1 (GO at
 from __future__ import annotations
 
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -29,54 +27,29 @@ import project_harness  # noqa: E402
 
 BASELINE = PROJECT_ROOT / ".harness-baseline-configuration"
 
-HARNESS_TOKENS = [
-    "codex",
-    "claude",
-    "cursor",
-    "goose",
-    "antigravity",
-    "ollama",
-    "openrouter",
-    "alibaba",
-    "api-harness",
-]
 
-# Ratchet cap seeded from the census measured at landing time (Phase A
-# increment 3 state; method: case-insensitive matched lines per token over
-# *.md,*.py,*.toml,*.json,*.yaml,*.txt). The number may ONLY decrease as
-# Phase A relocations and Phase D formal-artifact edits land. Raising it
-# requires an owner-approved bridge revision.
-CENSUS_CAP = 210
-
-
-def measure_census() -> int:
-    total = 0
-    for token in HARNESS_TOKENS:
-        pattern = re.compile(re.escape(token), re.I)
-        for path in BASELINE.rglob("*"):
-            if not path.is_file() or path.suffix.lower() not in {
-                ".md",
-                ".py",
-                ".toml",
-                ".json",
-                ".yaml",
-                ".txt",
-            }:
-                continue
-            text = path.read_text(encoding="utf-8", errors="surrogateescape")
-            total += sum(1 for line in text.splitlines() if pattern.search(line))
-    return total
-
-
-def test_baseline_token_census():
-    measured = measure_census()
-    assert measured <= CENSUS_CAP, (
-        f"baseline harness-token census regressed: {measured} > cap {CENSUS_CAP}. "
-        "New harness references entered the neutral baseline "
-        "(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 3). Remove them or, if a "
-        "legitimate decrease landed, lower the cap - never raise it without an "
-        "owner-approved bridge revision."
-    )
+@pytest.mark.parametrize(
+    "harness",
+    [
+        name
+        for name, profile in project_harness.load_profiles()["harnesses"].items()
+        if profile.get("status") != "profile_pending"
+    ],
+)
+def test_projection_contains_no_peer_harness_paths(harness):
+    """Inspect actual generated directions, not vendor words in unrelated source files."""
+    profiles = project_harness.load_profiles()["harnesses"]
+    own_root = profiles[harness]["config_dir"]
+    foreign_roots = {profile["config_dir"] for profile in profiles.values()} - {own_root}
+    plan = project_harness.build_plan(harness)
+    assert not plan.gaps, plan.gaps
+    offenders = []
+    for path, content in plan.writes.items():
+        normalized = content.replace("\\", "/")
+        for foreign in foreign_roots:
+            if foreign + "/" in normalized:
+                offenders.append((path, foreign))
+    assert not offenders, f"Projected configuration refers to another harness: {offenders}"
 
 
 def test_projection_idempotent():
@@ -95,24 +68,18 @@ def test_fresh_projection_does_not_launch_automatic_assertion_or_handoff_consume
     assert registrations
     assert not any("assertion-check.py" in text for text in registrations.values())
     plugin = json.loads((BASELINE / "plugins/gtkb/hooks/hooks.json").read_text(encoding="utf-8"))
-    assert not any("assertion-check.py" in hook["command"] for hook in plugin["hooks"]["SessionStart"])
+    assert not any("assertion-check.py" in hook["command"] for hook in plugin["hooks"].get("SessionStart", []))
 
 
 def test_api_harness_projection_idempotent_and_clean() -> None:
-    """WI-5960 Slice 2: the shared .api-harness surface renders (TEST-11985, TEST-12488).
-
-    Three registered identities share this config_dir; only openrouter is active,
-    so it is the sole renderer. Before activation the surface was a mis-projected
-    Claude tree whose ownership manifest declared the wrong harness and claimed
-    __pycache__ paths as managed configuration.
-    """
+    """The provider projection is reproducible and refers only to its own output."""
     plan_a = project_harness.build_plan("openrouter")
     plan_b = project_harness.build_plan("openrouter")
     assert plan_a.writes, "openrouter plan rendered no files"
     assert not plan_a.gaps, f"projector gaps present: {plan_a.gaps}"
     assert plan_a.writes == plan_b.writes, "api-harness projection is not byte-idempotent"
 
-    manifest = json.loads(plan_a.writes[".api-harness/.projection-manifest.json"])
+    manifest = json.loads(plan_a.writes[".api-harness/openrouter/.projection-manifest.json"])
     assert manifest["harness"] == "openrouter", (
         "the ownership manifest does not declare the rendering identity; it previously "
         "declared a harness that does not use this surface"
@@ -122,13 +89,13 @@ def test_api_harness_projection_idempotent_and_clean() -> None:
         "residue as legitimate projector output (WI-6895)"
     )
 
-    bridge_rule = plan_a.writes.get(".api-harness/rules/bridge-essential.md")
+    bridge_rule = plan_a.writes.get(".api-harness/openrouter/rules/bridge-essential.md")
     assert bridge_rule is not None, "api-harness bridge rule not rendered"
     for token in ("{{HARNESS_RULES_DIR}}", "{{HARNESS_CONFIG_DIR}}"):
         assert token not in bridge_rule, (
             f"{token} survived substitution in the api-harness bridge rule (ADR-RULE-PROJECTION-FLOW-INVERSION-001)"
         )
-    assert ".api-harness/rules/" in bridge_rule, (
+    assert ".api-harness/openrouter/rules/" in bridge_rule, (
         "api-harness bridge rule is not self-referential (ADR-ISOLATION-APPLICATION-PLACEMENT-001)"
     )
     assert ".claude/" not in bridge_rule, (
@@ -136,28 +103,14 @@ def test_api_harness_projection_idempotent_and_clean() -> None:
     )
 
 
-def test_only_one_identity_renders_the_shared_api_harness_surface() -> None:
-    """Sibling identities on a shared config_dir must not both render.
-
-    ollama, openrouter and alibaba-cloud-studio all declare config_dir
-    ".api-harness". Each would substitute its own project_dir_var and
-    session_id_var into the same files and overwrite the others' ownership
-    manifest, whose path the engine derives from config_dir. Only the active
-    identity is activated; the rest must still fail closed.
-    """
+def test_provider_projection_roots_are_distinct() -> None:
     profiles = project_harness.load_profiles()["harnesses"]
-    sharing = [n for n, p in profiles.items() if p.get("config_dir") == ".api-harness"]
-    assert len(sharing) > 1, "expected multiple identities to share the api-harness surface"
-    rendering = [n for n in sharing if profiles[n].get("status") != "profile_pending"]
-    assert len(rendering) == 1, (
-        f"exactly one identity may render a shared surface; {rendering} would collide "
-        "on token substitution and on the ownership manifest path"
-    )
-    for name in sharing:
-        if name in rendering:
-            continue
-        with pytest.raises(project_harness.ProjectionError):
-            project_harness.build_plan(name)
+    roots = [profiles[name]["config_dir"] for name in ("ollama", "openrouter", "alibaba-cloud-studio")]
+    assert len(set(roots)) == 3
+    for left in roots:
+        for right in roots:
+            if left != right:
+                assert not Path(left).is_relative_to(Path(right))
 
 
 def test_codex_projection_idempotent_and_clean() -> None:
@@ -191,15 +144,9 @@ def test_codex_projection_idempotent_and_clean() -> None:
         "references only its own config surface (ADR-CROSS-HARNESS-PARITY-001)"
     )
 
-    # The slice's substantive payload: .codex predated WI-6530 and lacked the
-    # git check-ignore chain-integrity bypass, so a Codex-run VERIFIED
-    # finalization failed closed where a Claude-run one succeeded.
-    helper = plan_a.writes.get(".codex/skills/gtkb-verify/helpers/write_verdict.py")
-    assert helper is not None, "codex verify helper not rendered"
-    assert "check-ignore" in helper, (
-        "the projected codex verify helper lacks the WI-6530 chain-integrity "
-        "logic; terminal VERIFIED remains unreachable for multi-version threads"
-    )
+    skill = plan_a.writes[".codex/skills/gtkb-verify/SKILL.md"]
+    assert "gt bridge deliver" in skill and "gt bridge artifacts" in skill
+    assert ".codex/skills/gtkb-verify/helpers/write_verdict.py" not in plan_a.writes
 
 
 def test_antigravity_projection_idempotent_and_clean() -> None:
@@ -258,14 +205,12 @@ def test_unresolved_token_is_projector_gap(tmp_path, monkeypatch):
     assert plan.gaps and "unresolved token" in plan.gaps[0]
 
 
-def test_pending_profile_fails_closed():
-    # Subject repointed from "codex" to "ollama" by WI-5960 Slice 1: activating the
-    # codex profile necessarily invalidated it as an example of a pending profile.
-    # The invariant under test is unchanged - a profile carrying
-    # status = "profile_pending" must fail closed rather than render silently -
-    # and ollama remains pending, as do openrouter and alibaba-cloud-studio.
+def test_pending_profile_fails_closed(monkeypatch):
+    profiles = project_harness.load_profiles()
+    profiles["harnesses"]["fixture-pending"] = {"config_dir": ".fixture-pending", "status": "profile_pending"}
+    monkeypatch.setattr(project_harness, "load_profiles", lambda: profiles)
     with pytest.raises(project_harness.ProjectionError):
-        project_harness.build_plan("ollama")
+        project_harness.build_plan("fixture-pending")
 
 
 def test_normalize_planned_rel_strips_dot_slash_without_lstripping_baseline_dot():
@@ -322,8 +267,8 @@ def test_cursor_plan_maps_native_events_and_wraps_adapters() -> None:
     assert "preToolUse" in events
     assert "postToolUse" in events
     assert "stop" in events
-    assert "beforeSubmitPrompt" in events
-    assert "sessionStart" in events
+    assert "beforeSubmitPrompt" not in events
+    assert "sessionStart" not in events
     assert "sessionStop" not in events
     commands = [entry["command"] for entries in hooks["hooks"].values() for entry in entries]
     assert commands

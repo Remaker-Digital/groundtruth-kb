@@ -11,7 +11,6 @@ Authority: DELIB-FAB07-REMEDIATION-20260610.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -116,138 +115,16 @@ _NARRATIVE_FILES = [
 ]
 
 
-def test_narrative_files_cite_examples_dir() -> None:
-    """The three narrative files reference groundtruth-kb/examples/, not 'four demo applications'."""
-    for rel in _NARRATIVE_FILES:
-        text = _read(rel)
-        assert "groundtruth-kb/examples/" in text, f"{rel} missing 'groundtruth-kb/examples/'"
-        assert "four small demo applications" not in text, (
-            f"{rel} still contains obsolete 'four small demo applications'"
-        )
-
-
 def test_project_root_boundary_examples_carveout() -> None:
     """project-root-boundary.md has the examples/ carve-out."""
-    text = _read(".claude/rules/project-root-boundary.md")
+    text = _read(".harness-baseline-configuration/rules/project-root-boundary.md")
     assert "groundtruth-kb/examples/" in text
     assert "exempt" in text.lower() or "EXCEPTION" in text
-
-
-def test_narrative_approval_packets_exist() -> None:
-    """Each protected narrative edit has a matching approval packet."""
-    approvals_dir = _ROOT / ".groundtruth" / "formal-artifact-approvals"
-    packets = list(approvals_dir.glob("2026-06-12-fab07-*.json"))
-    assert len(packets) >= 4, f"Expected >=4 fab07 approval packets, found {len(packets)}"
-
-    targets_found: set[str] = set()
-    for p in packets:
-        data = json.loads(p.read_text(encoding="utf-8"))
-        assert data.get("artifact_type") == "narrative_artifact"
-        assert data.get("presented_to_user") is True
-        assert data.get("transcript_captured") is True
-        tp = data.get("target_path", "")
-        if tp:
-            targets_found.add(tp)
-
-    for rel in _NARRATIVE_FILES + [".claude/rules/project-root-boundary.md"]:
-        assert rel in targets_found, f"No approval packet found targeting {rel}"
 
 
 # ---------------------------------------------------------------------------
 # HYG-067: AUQ-coverage prose-pattern exclusion
 # ---------------------------------------------------------------------------
-
-
-def test_auq_coverage_excludes_prose_false_positives(tmp_path: Path, monkeypatch: Any) -> None:
-    """Prose-pattern entries (detected_via='prose:...') are excluded from the AUQ metric."""
-    from groundtruth_kb.project import doctor
-
-    fake_sections = {
-        "pending": [],
-        "resolved": [
-            {
-                "id": "d1",
-                "asked_at": "2026-06-01T10:00:00Z",
-                "detected_via": "ask_user_question",
-                "status": "resolved",
-                "notes": "",
-            },
-            {
-                "id": "d2",
-                "asked_at": "2026-06-01T11:00:00Z",
-                "detected_via": "prose: pattern match",
-                "status": "resolved",
-                "notes": "",
-            },
-        ],
-        "history": [],
-    }
-    monkeypatch.setattr(doctor, "_parse_pending_decisions_file", lambda _path: fake_sections)
-
-    result = doctor._check_auq_coverage(tmp_path)
-    assert result.status == "pass", f"Expected pass, got {result.status}: {result.message}"
-    assert "prose-pattern" in result.message.lower() or "excluded" in result.message.lower()
-
-
-def test_auq_coverage_all_prose_returns_pass(tmp_path: Path, monkeypatch: Any) -> None:
-    """When ALL entries are prose-pattern false positives, result is pass (no genuine entries)."""
-    from groundtruth_kb.project import doctor
-
-    fake_sections = {
-        "pending": [],
-        "resolved": [
-            {
-                "id": "d1",
-                "asked_at": "2026-06-01T10:00:00Z",
-                "detected_via": "prose: Should we",
-                "status": "resolved",
-                "notes": "",
-            },
-            {
-                "id": "d2",
-                "asked_at": "2026-06-01T11:00:00Z",
-                "detected_via": "prose: Do you want",
-                "status": "resolved",
-                "notes": "",
-            },
-        ],
-        "history": [],
-    }
-    monkeypatch.setattr(doctor, "_parse_pending_decisions_file", lambda _path: fake_sections)
-
-    result = doctor._check_auq_coverage(tmp_path)
-    assert result.status == "pass", f"Expected pass, got {result.status}: {result.message}"
-    assert "prose-pattern" in result.message.lower()
-
-
-def test_auq_coverage_genuine_missing_still_fails(tmp_path: Path, monkeypatch: Any) -> None:
-    """A genuinely non-AUQ entry (not prose-pattern) still causes failure."""
-    from groundtruth_kb.project import doctor
-
-    fake_sections = {
-        "pending": [],
-        "resolved": [
-            {
-                "id": "d1",
-                "asked_at": "2026-06-01T10:00:00Z",
-                "detected_via": "ask_user_question",
-                "status": "resolved",
-                "notes": "",
-            },
-            {
-                "id": "d2",
-                "asked_at": "2026-06-01T11:00:00Z",
-                "detected_via": "manual_entry",
-                "status": "resolved",
-                "notes": "",
-            },
-        ],
-        "history": [],
-    }
-    monkeypatch.setattr(doctor, "_parse_pending_decisions_file", lambda _path: fake_sections)
-
-    result = doctor._check_auq_coverage(tmp_path)
-    assert result.status == "fail", f"Expected fail, got {result.status}: {result.message}"
 
 
 # ---------------------------------------------------------------------------

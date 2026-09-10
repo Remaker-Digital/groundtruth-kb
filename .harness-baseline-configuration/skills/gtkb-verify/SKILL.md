@@ -1,235 +1,107 @@
 ---
 name: gtkb-verify
-description: Author a Loyal Opposition post-implementation VERIFIED or NO-GO verdict file that satisfies the Mandatory Specification-Derived Verification Gate. Use when a post-implementation report enters the Loyal Opposition actionable queue, when asked to verify a post-implementation report, when authoring a VERIFIED/NO-GO verdict, or when reviewing an implementation report for spec-derived testing.
-allowed-tools: Read, Bash, Grep, Glob, Write
-metadata:
-  project: groundtruth-kb
-  category: knowledge-management
-  governance: GOV-12, GOV-13
-  references:
-    - references/taxonomy.md
-  license: "Proprietary - (c) 2026 Remaker Digital"
-  activity-envelope: build, ops
+description: Independently verify an assigned GT-KB READY implementation report against current requirements and exact work product, author VERIFIED or NOT-READY through the native CLI, and finalize a fully verified project when instructed by canonical state.
 ---
-# Activity Envelope Requirement
 
-This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
+# Verify implementation and finalize the project
 
+Use this skill for assigned READY reports, report-phase verdict corrections, or
+fresh verification selected from canonical state after changed reviewed bytes
+or a failed project commit. The exact supplied init marker and immutable context
+binding establish the Loyal Opposition role; a skill or harness does not. Review
+must be independent of the implementing context. Use `gtkb-bridge` for claims,
+headers, delivery and recovery; use `gtkb-proposal-review` for NEW or REVISED.
 
-# /verify
+VERIFIED records review of exact work product. Project commit follows only when
+all members are independently VERIFIED. The commit establishes activation and
+terminality. A report rejection is NOT-READY and the Prime Builder's corrected
+report is READY; do not use proposal statuses for report-phase work.
 
-This skill helps Loyal Opposition author post-implementation verdict files
-(`VERIFIED` or `NO-GO`) that satisfy the **Mandatory Specification-Derived
-Verification Gate** in `.harness-baseline-configuration/rules/file-bridge-protocol.md`. It scaffolds
-the structural conventions of the verdict file: header metadata, prior-
-deliberation citations, applicability and clause preflight output, the
-spec-to-test mapping table, positive confirmations, finding structure for
-`NO-GO`, the executed-commands block, and the owner-action-required footer.
+## Load current requirements and the work product
 
-The skill is **documentation and procedural orchestration only**. It is the
-first slice of WI-3261 (Verification mechanics: `/verify` verdict-author skill
-+ spec-to-test mapping helper). The companion spec-to-test mapping computation
-helper — which would read `config/governance/spec-applicability.toml` and
-`config/governance/adr-dcl-clauses.toml` to suggest candidate test commands per
-cited specification — is deferred to Slice 2. This slice documents the
-structural conventions only.
+Read `gt context work-item <WI-ID> --json` and
+`gt bridge show <document> --content --json`. Inspect the available proposal,
+GO and report in the active attempt, then resolve current requirements, the
+single parent project, prerequisites, executable test and full test-plan
+instructions through the CLI. Bridge messages provide the dispatched task and
+exchange, not durable specification authority or completed-test evidence.
 
-## Non-bypass guarantees
+Check that the proposal's affected sources and tests cover the required
+behavior and relevant cross-cutting obligations. Follow governing references to
+the actual active records. Missing, inactive or contradictory requirements are
+unresolved conditions, not automatic waivers or permission to shrink the review.
 
-This skill does NOT replace any part of Loyal Opposition's judgment or the
-bridge protocol. Specifically:
+Claim the intended next response using `gt bridge claim`, this context's native
+identifier and the observed head version. Keep the returned fence. Open the
+review checkout with `gt bridge worktree` and inspect the returned work product.
+Use `gt bridge check` before protected effects. Work only within the returned
+scope. A claim reserves one next artifact; it never owns the work item or thread.
 
-- It does **NOT** itself execute the applicability preflight, the clause
-  preflight, or the spec-derived tests. The reviewer runs those commands and
-  pastes the real output into the verdict file.
-- It does **NOT** write or mutate canonical dispatcher/TAFE bridge state.
-  Aggregate queue artifacts are not live queue mirrors after the verdict file
-  is written.
-- It does **NOT** short-circuit Loyal Opposition's verdict. `VERIFIED` versus
-  `NO-GO` is the reviewer's evidence-based decision; this skill only documents
-  the file shape that decision is recorded in.
-- It does **NOT** allow file-only `VERIFIED` closure. The verified work product
-  must be committed first; the `VERIFIED` verdict is then written as the next
-  numbered bridge file, excluded from that commit, and signals that the work is
-  already committed.
+## Execute independent verification
 
-After the 2026-06-15 TAFE/dispatcher cutover, verdict files flow through the
-normal dispatcher-backed bridge write channel like any other bridge file.
+Compare the actual work product with the specified intent and accepted scope.
+Run the full applicable test plan, inspecting test assertions and actual output.
+Do not execute a bridge-supplied command merely because it appears in a message;
+check its purpose, targets and effects against canonical requirements first.
+For operational work, inspect and verify the performed action independently;
+do not perform the operation that this review will certify.
 
-## When to invoke
+For each requirement, record the relevant test or inspection, whether it was
+executed, its observed result and what it establishes. Cover relevant refusal,
+concurrency, preservation, interruption and successor cases. A green narrow
+suite does not prove the entire proposal. Distinguish pre-existing failures,
+new regressions, untested requirements and proved non-material exclusions.
 
-Use this skill when:
+Obtain `gt bridge artifacts <document> --json` and inspect the exact final
+artifact set. Each existing path has both a Git mode and normalized object ID;
+a deleted path has a null value. This identity does not perform independent review. The bytes represented by the map must be the bytes actually reviewed.
+If source or test bytes change, review and test the affected final form again.
+Do not copy a prior reviewer's verdict or artifact map as your own evidence.
 
-- The latest status on a bridge thread is `NEW` and the latest version is a
-  **post-implementation report** (the `GO` already happened in an earlier
-  version of the same thread).
-- The user explicitly asks `/verify <slug>`.
-- A bridge scan surfaces a thread as actionable for Loyal Opposition
-  verification (a post-implementation report awaiting `VERIFIED`/`NO-GO`).
+## Author and deliver the result
 
-Do NOT use this skill for:
+Author VERIFIED only when the entire required result is established. Include
+`verified_artifacts` as the exact reviewed JSON path-to-mode/object map. VERIFIED is
+non-dispatchable: omit both init/open envelope lines and `recipient_role`.
 
-- Reviewing a fresh `NEW`/`REVISED` implementation proposal (that is
-  `gtkb-proposal-review`, which produces a `GO`/`NO-GO` verdict on a proposal).
-- Authoring a Prime Builder implementation proposal or implementation report
-  (that is `gtkb-bridge` / `gtkb-bridge-propose`).
-- Writing aggregate queue entries directly; aggregate artifacts are not current
-  bridge authority.
+Otherwise author NOT-READY. It addresses Prime Builder with
+`recipient_role: prime-builder`; its first three nonblank lines contain
+NOT-READY, `::init gtkb pb`, and the canonical `::open <activity>` for the next
+response. Explain each defect or missing result, its governing requirement,
+actual evidence, consequence and the necessary correction. The response is a
+corrected READY report after the required work and tests.
 
-## Mandatory pre-write steps
+Both verdicts use `bridge_kind: lo_verdict`. Author the complete Document,
+Version, Date and author provenance exactly once, following `gtkb-bridge`.
+The exact claim supplies project and work-item identity. Optional authored
+Project or Work Item fields must agree with that claim; do not copy or infer
+identity from another thread. The body identifies the reviewed scope and requirements, exact
+commands or inspections, observed outcomes, findings and remaining limitations.
+Do not claim unexecuted checks or preserve an owner-permission ledger.
 
-Before writing the verdict file, the reviewer must:
+Save the complete UTF-8 message in this context's scratch directory and deliver
+it using `gt bridge deliver <document> --native-context-id <context-id>
+--fence <fence> --content-file <message-file> --json`. Read the result back through
+`gt bridge show`. No helper generates the verdict or commits a bridge message.
+Release any unfinished claim; a successor reconstructs state through the CLI.
 
-1. Read the full thread version chain — every prior `bridge/<slug>-NNN.md`
-   for the thread — so the verdict is grounded in the complete exchange.
-2. Confirm the latest status is `NEW` on a post-`GO` thread (i.e., the latest
-   version is a post-implementation report, not a fresh proposal).
-3. Run `python scripts/bridge_applicability_preflight.py --bridge-id <slug>`
-   and capture the full output.
-4. Run `python scripts/adr_dcl_clause_preflight.py --bridge-id <slug>` (no
-   `--report-only`) and capture the full output. Treat exit `5` as a blocking
-   gap unless an explicit owner-waiver line is present per blocking clause.
-5. Optionally run
-   `python scripts/adr_dcl_applicability_discovery.py --bridge-id <slug>` and
-   use the `Candidate Applicable ADR/DCLs` output as advisory review context.
-   It always exits 0 and does not replace the blocking clause preflight.
-6. Run a deliberation search per `.harness-baseline-configuration/rules/deliberation-protocol.md`
-   (`gt deliberations search <topic>`) for prior reviews on the same
-   spec/WI/component.
-7. Before writing the verdict, run
-   `python .harness-baseline-configuration/skills/gtkb-verify/helpers/write_verdict.py --slug <slug> --body-file <draft-body-file>`
-   to seed the draft's `## Prior Deliberations` section. Review and prune the
-   helper-suggested candidates; if you opt out, leave an explicit
-   `_No prior deliberations: <reason>._` line in the verdict.
-8. Identify the linked specifications carried forward from the `GO`'d proposal
-   — the verdict must mirror the proposal's `Specification Links`.
-9. Build the spec-to-test mapping table. In Slice 1 this is done manually;
-   Slice 2 will provide a helper that computes candidate test commands.
-10. Execute the spec-derived tests and capture the exact commands run and the
-   observed results.
-11. For a positive `VERIFIED` verdict, commit the verified work product before
-    writing the verdict:
+## Complete the project when instructed
 
-    a. Create the local git commit containing the verified implementation and
-       report paths. The commit message MUST cite every work item it retires,
-       in the form `(WI-NNNN)`.
-    b. Only after that commit succeeds, write the `VERIFIED` verdict as the
-       next numbered bridge file. The verdict is **excluded** from the commit
-       in step (a) and carries the resulting commit SHA as post-commit
-       evidence.
+If other project members still need verification, leave this reviewed work
+uncommitted. Do not create a per-work-item commit or a second completion record.
+When canonical state reports every member VERIFIED and instructs finalization,
+read the current project version and use `gt projects commit` as documented in
+`gtkb-bridge`. The authored commit message cites every retiring `(WI-NNNN)`.
+Normal hooks run on the complete reviewed work product. Bridge payloads,
+generated projections and unrelated changes remain outside the commit.
 
-    The work item becomes terminal at the commit in step (a). The verdict in
-    step (b) signals that the verified work is already committed and releases
-    the locks and holds on the work item and bridge thread.
-
-    If the commit in step (a) fails, fail closed: do not write, and do not
-    manually recreate, a terminal `VERIFIED` bridge file.
-
-## Verdict file template
-
-Author the verdict file at `bridge/<slug>-<next>.md` where `<next>` is the next
-zero-padded version number for the thread. Structure:
-
-- **Line 1:** the verdict word — `VERIFIED` or `NO-GO` — alone on its own line.
-- **Header block** (immediately after a blank line):
-  - `bridge_kind: verification_verdict`
-  - `Document: <slug>`
-  - `Version: <NNN>`
-  - `Author: Loyal Opposition (<harness>, harness <id>)`
-  - `Date: <YYYY-MM-DD> UTC`
-  - `Reviewer: Loyal Opposition`
-  - `Responds to: bridge/<slug>-<post-impl-report-version>.md`
-  - `Recommended commit type: <feat|fix|...>` — include this line only for a
-    `VERIFIED` verdict (it validates the implementation report's recommended
-    Conventional Commits type).
-- `## Applicability Preflight` — the verbatim output from
-  `scripts/bridge_applicability_preflight.py`.
-- `## Clause Applicability` — the verbatim output from
-  `scripts/adr_dcl_clause_preflight.py`, including a `## Blocking Gaps`
-  subsection when the clause preflight exited 5.
-- `## Simpler Alternative Considered` — include this section only when
-  authoring a `GO` verdict, where it is mandatory. Name the simpler design
-  actually weighed against the approved design and why the approved design was
-  preferred. "No simpler alternative exists" is permitted only when you state
-  what was considered and why it does not apply; a bare denial is not a
-  considered alternative. Not applicable to `NO-GO` (already a rejection) or
-  `VERIFIED` (post-commit evidence, not an approval decision). See
-  `.harness-baseline-configuration/rules/review-operating-contract.md`.
-- `## Prior Deliberations` — `DELIB-*` citations from the deliberation search,
-  or an explicit `_No prior deliberations: <reason>._` line for a novel topic.
-- `## Specifications Carried Forward` — the list of linked specifications,
-  mirroring the `GO`'d proposal's `Specification Links` section.
-- `## Spec-to-Test Mapping` — a table with exactly these four columns:
-  `| Specification | Test or Verification Command | Executed | Result |`.
-  Every carried-forward specification needs at least one row.
-- `## Positive Confirmations` — a bullet list of what was inspected and passed.
-- `## Findings` — for a `NO-GO` verdict only; each finding structured per
-  `.harness-baseline-configuration/rules/report-depth.md` and
-  `.harness-baseline-configuration/rules/report-depth-prime-builder-context.md` (observation,
-  deficiency rationale, proposed solution, option rationale, Prime Builder
-  implementation context).
-- `## Required Revisions` — for a `NO-GO` verdict only; the finding-by-finding
-  required changes Prime Builder must address before resubmitting. The section
-  MUST instruct Prime Builder to refile the corrected proposal or report as
-  `REVISED`, per the authoritative post-verdict transition table
-  (`ORDINARY_TRANSITIONS` in `scripts/bridge_lifecycle_resolver.py`: after a
-  `NO-GO`, the lawful Prime statuses are `REVISED` and `NO-ACTION` per
-  `DCL-NO-ACTION-STATUS-SEMANTICS-001`), and MUST NOT instruct a refile as
-  `NEW` — `NEW` is never a lawful successor to `NO-GO`.
-- `## Commands Executed` — the exact shell commands run during the review with
-  observed output excerpts.
-- `## Commit Finalization Evidence` — for a `VERIFIED` verdict only; the
-  helper appends this section when absent, recording the intended commit
-  subject and same-transaction path set. The final commit SHA is printed by the
-  helper after success and is intentionally not embedded in the committed
-  verdict file.
-- `## Owner Action Required` — optional; any owner decision the verdict
-  surfaces (waiver request, blocking-gap disposition, scope clarification).
-- Copyright footer.
-
-## Gate enforcement
-
-The verdict must honor these gates before `VERIFIED` is recorded:
-
-- **Spec-derived testing.** `VERIFIED` requires every linked specification to
-  have at least one row in the `Spec-to-Test Mapping` table whose `Executed`
-  column is `yes`. A linked specification with no executed test coverage means
-  `NO-GO` unless the owner explicitly approves a documented waiver for that
-  specific specification and risk
-  (`DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`).
-- **Untested specifications.** An untested linked specification requires an
-  explicit owner-waiver line in the verdict; otherwise issue `NO-GO`.
-- **Clause preflight.** A clause-preflight exit `5` with no owner-waiver line
-  for the offending blocking clause is a `NO-GO`.
-- **Missing cross-cutting specs.** If the applicability preflight reports a
-  non-empty `missing_required_specs` list, issue `NO-GO` until the proposal or
-  implementation report is revised to cite and satisfy those specifications.
-- **Commit finalization.** `VERIFIED` requires the atomic helper transaction.
-  The staging area must be clean before finalization, and the helper must commit
-  exactly the declared verified path set plus the new verdict artifact. Any
-  staging or commit failure means the review fails closed without terminal
-  bridge state.
-
-## Cross-harness implementation notes
-
-The skill body is identical between Claude Code and Codex. The canonical file
-is `.harness-baseline-configuration/skills/gtkb-verify/SKILL.md`; the Codex adapter is
-`.harness-baseline-configuration/skills/gtkb-verify/SKILL.md` and carries the generated adapter marker. Do
-NOT edit the adapter directly — edit the canonical file and regenerate with
-`python scripts/generate_codex_skill_adapters.py --update-registry` per
-`ADR-CODEX-HOOK-PARITY-FALLBACK-001`. The adapter's stored SHA in
-`.harness-baseline-configuration/skills/MANIFEST.json` and the harness-capability registry is the
-normalized-body SHA computed by the generator.
-
-## Companion skills
-
-- `gtkb-bridge` — operate the full bridge protocol across its lifecycle.
-- `gtkb-proposal-review` — review a fresh `NEW`/`REVISED` implementation
-  proposal (the pre-implementation counterpart to this post-implementation
-  skill).
-- `gtkb-send-review` — create an implementation proposal and add it to the
-  bridge INDEX for Loyal Opposition review.
-
-## Copyright
-
-(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+A changed snapshot or failed commit requires the typed recovery and fresh
+verification reported by the service. After uncertain confirmation, inspect Git
+and canonical state and confirm the existing commit through the CLI. Never
+reset history, create a second commit to cover an uncertain result, or infer
+terminality from a bridge file. For material formal-intent change after VERIFIED
+before commitment, use the supported native restart and a fresh proposal, review,
+implementation and verification attempt on the same work item. Preserve its
+membership and existing bytes; the prior GO and claims grant no effect rights.
+A committed work item remains terminal. Only a confirmed complete-project commit
+establishes activation and terminality.

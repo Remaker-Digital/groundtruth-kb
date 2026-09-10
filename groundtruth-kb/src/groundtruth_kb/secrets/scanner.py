@@ -264,20 +264,61 @@ def scan_staged(
     patterns: tuple[PatternEntry, ...] = PRODUCTION_PATTERNS,
     allowlist: Allowlist | None = None,
 ) -> ScanResult:
-    """Scan staged ACM blobs from the git index."""
+    """Scan the exact changed index blobs, including renamed and unusual paths.
+
+    A staged file is explicitly selected work; generic filesystem-walk exclusions
+    do not apply. Preserve GIT_INDEX_FILE for native project commit candidates.
+    """
     repo_root = repo_root.resolve()
     allowlist = allowlist or Allowlist.empty()
     result = ScanResult(mode="staged")
-    paths = _git_lines(repo_root, ["diff", "--cached", "--name-only", "--diff-filter=ACM"])
-    for relative_posix in paths:
-        if _should_skip_relative_path(relative_posix):
+
+    def git_bytes(args: list[str]) -> bytes:
+        try:
+            completed = subprocess.run(
+                ["git", "--no-optional-locks", "--no-replace-objects", *args],
+                cwd=repo_root,
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise GitScanError("staged_scan_unavailable: Git could not read the index or blob") from error
+        if completed.returncode:
+            # Git diagnostics may contain filenames or values. Never echo them.
+            raise GitScanError("staged_scan_unavailable: Git refused the index or blob read")
+        return completed.stdout
+
+    raw = git_bytes(["diff", "--cached", "--raw", "--no-abbrev", "--no-renames", "-z"])
+    tokens = raw.split(b"\0")
+    if tokens.pop() != b"" or len(tokens) % 2:
+        raise GitScanError("staged_scan_invalid: malformed index changes")
+    for offset in range(0, len(tokens), 2):
+        try:
+            fields = tokens[offset].decode("ascii").split()
+            relative_posix = tokens[offset + 1].decode("utf-8")
+        except UnicodeError as error:
+            raise GitScanError("staged_scan_invalid: index identities cannot be read exactly") from error
+        if len(fields) != 5 or not fields[0].startswith(":") or fields[4] not in {"A", "M", "D", "T"}:
+            raise GitScanError("staged_scan_invalid: unsupported or unmerged index changes")
+        _old_mode, mode, _old_oid, object_id, status = fields
+        if status == "D":
+            if mode != "000000":
+                raise GitScanError("staged_scan_invalid: deletion retains a postimage")
             continue
-        blob = _run_git(repo_root, ["show", f":{relative_posix}"])
-        if blob.returncode != 0:
-            continue
+        if mode not in {"100644", "100755", "120000"}:
+            raise GitScanError("staged_scan_invalid: unsupported index mode")
+        if len(object_id) not in {40, 64} or any(c not in "0123456789abcdef" for c in object_id):
+            raise GitScanError("staged_scan_invalid: invalid object identity")
+        content = git_bytes(["cat-file", "blob", object_id])
         result.paths_scanned += 1
         result.findings.extend(
-            _scan_text(blob.stdout, relative_posix=relative_posix, patterns=patterns, allowlist=allowlist)
+            _scan_text(
+                content.decode("utf-8", errors="replace"),
+                relative_posix=relative_posix,
+                patterns=patterns,
+                allowlist=allowlist,
+            )
         )
     return result
 

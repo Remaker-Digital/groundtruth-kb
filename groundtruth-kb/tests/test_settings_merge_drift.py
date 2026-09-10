@@ -1,12 +1,12 @@
-# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+# Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Drift-repair regression tests for gtkb-settings-merge (C4).
 
 Covers binding conditions from bridge/gtkb-settings-merge-004.md GO:
 
-- §3.1 (10 tests): each of the 10 C4-promoted settings-hook-registrations
+- Â§3.1 (10 tests): each of the 10 C4-promoted settings-hook-registrations
   triggers a ``merge-event-hooks`` action when missing, and execute_upgrade
   restores it to the canonical event list.
-- §3.2 (3 tests): each of the 3 C4-promoted gitignore-pattern rows triggers
+- Â§3.2 (3 tests): each of the 3 C4-promoted gitignore-pattern rows triggers
   an ``append-gitignore`` action when missing, and execute_upgrade restores
   it to ``.gitignore``.
 
@@ -78,15 +78,9 @@ def _setup_git_for_upgrade(target: Path) -> None:
 
 
 # Full canonical settings.json shape for dual-agent profile post-C4. Used as
-# the baseline; each §3.1 test deletes exactly one registration by hook_filename.
+# the baseline; each Â§3.1 test deletes exactly one registration by hook_filename.
 _FULL_SETTINGS_BY_EVENT: dict[str, list[str]] = {
-    "SessionStart": ["session-start-governance.py", "assertion-check.py"],
-    "UserPromptSubmit": [
-        "gov09-capture.py",
-        "delib-search-gate.py",
-        "intake-classifier.py",
-    ],
-    "PostToolUse": ["owner-decision-capture.py", "delib-search-tracker.py"],
+    "PostToolUse": ["spec-event-surfacer.py"],
     "PreToolUse": [
         "scanner-safe-writer.py",
         "spec-before-code.py",
@@ -136,16 +130,11 @@ def _read_event_commands(settings_path: Path, event: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# §3.1 — Settings-hook drift repair (one test per C4-promoted registration)
+# Â§3.1 â€” Settings-hook drift repair (one test per C4-promoted registration)
 # ---------------------------------------------------------------------------
 
 # (hook_filename, expected_event) for each of the 10 promoted registrations.
 _PROMOTED_SETTINGS_REGISTRATIONS: list[tuple[str, str]] = [
-    ("session-start-governance.py", "SessionStart"),
-    ("assertion-check.py", "SessionStart"),
-    ("delib-search-gate.py", "UserPromptSubmit"),
-    ("intake-classifier.py", "UserPromptSubmit"),
-    ("delib-search-tracker.py", "PostToolUse"),
     ("spec-before-code.py", "PreToolUse"),
     ("bridge-compliance-gate.py", "PreToolUse"),
     ("kb-not-markdown.py", "PreToolUse"),
@@ -156,7 +145,7 @@ _PROMOTED_SETTINGS_REGISTRATIONS: list[tuple[str, str]] = [
 
 @pytest.mark.parametrize(("hook_filename", "expected_event"), _PROMOTED_SETTINGS_REGISTRATIONS)
 def test_c4_settings_drift_repair(tmp_path: Path, hook_filename: str, expected_event: str) -> None:
-    """C4 §3.1: removing a promoted registration triggers merge-event-hooks
+    """C4 Â§3.1: removing a promoted registration triggers merge-event-hooks
     and execute_upgrade restores it in canonical event list.
     """
     _write_minimal_toml(tmp_path, profile="dual-agent")
@@ -189,7 +178,7 @@ def test_c4_settings_drift_repair(tmp_path: Path, hook_filename: str, expected_e
 
 
 # ---------------------------------------------------------------------------
-# §3.2 — Gitignore drift repair (one test per C4-promoted pattern)
+# Â§3.2 â€” Gitignore drift repair (one test per C4-promoted pattern)
 # ---------------------------------------------------------------------------
 
 # Patterns promoted to upgrade-managed in C4.
@@ -202,7 +191,7 @@ _PROMOTED_GITIGNORE_PATTERNS: list[str] = [
 
 @pytest.mark.parametrize("pattern", _PROMOTED_GITIGNORE_PATTERNS)
 def test_c4_gitignore_drift_repair(tmp_path: Path, pattern: str) -> None:
-    """C4 §3.2: removing a promoted gitignore pattern triggers append-gitignore
+    """C4 Â§3.2: removing a promoted gitignore pattern triggers append-gitignore
     and execute_upgrade restores it to .gitignore.
     """
     _write_minimal_toml(tmp_path, profile="dual-agent")
@@ -230,6 +219,6 @@ def test_c4_gitignore_drift_repair(tmp_path: Path, pattern: str) -> None:
     assert pattern in gitignore_lines, (
         f"expected {pattern!r} restored in .gitignore after execute_upgrade; got lines: {sorted(gitignore_lines)}"
     )
-    # The kept patterns are still present — no data loss.
+    # The kept patterns are still present â€” no data loss.
     for kept_pattern in kept:
         assert kept_pattern in gitignore_lines, f"{kept_pattern!r} disappeared after restore"

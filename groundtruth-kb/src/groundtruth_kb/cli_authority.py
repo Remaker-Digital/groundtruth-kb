@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -25,9 +24,12 @@ def _client(ctx: click.Context) -> AuthorityClient:
     return AuthorityClient(config.authority_url)
 
 
-def _call(ctx: click.Context, method: str, path: str, **kwargs: Any) -> Any:
+def _call(ctx: click.Context, method: str, path: str, *, timeout: float | None = None, **kwargs: Any) -> Any:
     try:
-        return _client(ctx).request(method, path, **kwargs)
+        client = _client(ctx)
+        if timeout is not None:
+            client.timeout = timeout
+        return client.request(method, path, **kwargs)
     except AuthorityClientError as error:
         details = "\n" + canonical_json_bytes(error.details).decode("utf-8").strip() if error.details else ""
         raise click.ClickException(f"{error.code}: {error}{details}") from error
@@ -41,7 +43,7 @@ def _emit(value: Any, json_output: bool, *, complete: bool = False) -> None:
     for row in rows:
         if isinstance(row, dict):
             record = row.get("project", row.get("work_item", row))
-            label = record.get("title", record.get("name", ""))
+            label = record.get("title", record.get("name", record.get("canonical_term", "")))
             if "dependent_project_id" in record:
                 label = (
                     f"{record['dependent_project_id']} requires {record['prerequisite_project_id']} "
@@ -49,13 +51,14 @@ def _emit(value: Any, json_output: bool, *, complete: bool = False) -> None:
                 )
             if "id" in record:
                 click.echo(f"{record['id']} v{record.get('version', '?')}: {label}")
-                if record.get("description"):
-                    click.echo(record["description"])
+                description = record.get("description", record.get("definition"))
+                if description:
+                    click.echo(description)
                 if complete:
                     details = {
                         key: value
                         for key, value in record.items()
-                        if key not in {"id", "version", "title", "name", "description"}
+                        if key not in {"id", "version", "title", "name", "description", "canonical_term", "definition"}
                     }
                     if record is not row:
                         details.update({key: value for key, value in row.items() if value is not record})
@@ -75,7 +78,7 @@ def _fields(path: Path) -> dict[str, Any]:
     return value
 
 
-def _domain_group(name: str, domain: str) -> click.Group:
+def _domain_group(name: str, domain: str, *, read_only: bool = False) -> click.Group:
     @click.group(name)
     def group() -> None:
         """Read or amend current canonical records through the authority service."""
@@ -97,6 +100,8 @@ def _domain_group(name: str, domain: str) -> click.Group:
     @click.option("--priority", default=None)
     @click.option("--spec-id", default=None)
     @click.option("--plan-id", default=None)
+    @click.option("--scope", default=None, hidden=domain != "terms")
+    @click.option("--authority-level", default=None, hidden=domain != "terms")
     @click.option("--dependent-project", "dependent_project_id", default=None, hidden=domain != "project-dependencies")
     @click.option(
         "--prerequisite-project", "prerequisite_project_id", default=None, hidden=domain != "project-dependencies"
@@ -111,8 +116,9 @@ def _domain_group(name: str, domain: str) -> click.Group:
     @click.pass_context
     def list_records(ctx: click.Context, limit: int, after: str | None, json_output: bool, **filters: Any) -> None:
         """List a bounded set of current records in deterministic ID order."""
-        if domain == "work-items" and filters.get("status") is not None:
-            filters["resolution_status"] = filters.pop("status")
+        if domain in {"work-items", "terms"} and filters.get("status") is not None:
+            key = "resolution_status" if domain == "work-items" else "lifecycle_status"
+            filters[key] = filters.pop("status")
         records = []
         while len(records) < limit:
             result = _call(
@@ -123,6 +129,10 @@ def _domain_group(name: str, domain: str) -> click.Group:
             if not after:
                 break
         _emit(records, json_output)
+
+    if read_only:
+        group.help = "Read current installation metadata; roles belong to session bindings."
+        return group
 
     @group.command("record")
     @click.option("--id", "record_id", required=True)
@@ -162,6 +172,8 @@ def _domain_group(name: str, domain: str) -> click.Group:
 
 
 NATIVE_COMMANDS = {
+    "harness": _domain_group("harness", "harnesses", read_only=True),
+    "terms": _domain_group("terms", "terms"),
     "spec": _domain_group("spec", "specifications"),
     "tests": _domain_group("tests", "tests"),
     "projects": _domain_group("projects", "projects"),
@@ -251,13 +263,18 @@ def context_group() -> None:
 
 def _finalization_command(name: str) -> None:
     def action(ctx: click.Context, project_id: str, json_output: bool, **body: Any) -> None:
-        _emit(_call(ctx, "POST", f"/v1/projects/{quote(project_id, safe='')}/{name}", body=body), json_output)
+        result = _call(ctx, "POST", f"/v1/projects/{quote(project_id, safe='')}/{name}", body=body)
+        _emit(result, json_output)
+        if name != "commit-failed" and result.get("status") == "fresh_verification_required":
+            raise click.exceptions.Exit(1)
 
     action = click.pass_context(action)
     action = click.option("--json", "json_output", is_flag=True)(action)
-    if name == "confirm-commit":
+    if name in {"confirm-commit", "check-commit"}:
         action = click.option("--commit-id", required=True)(action)
         action = click.option("--expected-parent", required=True)(action)
+    if name == "check-commit":
+        action = click.option("--index-tree", required=True)(action)
     if name == "commit-failed":
         action = click.option("--reason", type=click.Choice(["commit_not_confirmed"]), required=True)(action)
         action = click.option("--evidence", required=True)(action)
@@ -269,7 +286,7 @@ def _finalization_command(name: str) -> None:
     )(action)
 
 
-for _finalization_operation in ("prepare-commit", "confirm-commit", "commit-failed"):
+for _finalization_operation in ("prepare-commit", "check-commit", "confirm-commit", "commit-failed"):
     _finalization_command(_finalization_operation)
 
 
@@ -288,62 +305,21 @@ def commit_project(
     message_file: Path,
     json_output: bool,
 ) -> None:
-    """Commit the complete verified project in this context's own checkout using normal hooks."""
-    endpoint = f"/v1/projects/{quote(project_id, safe='')}"
-    body = {"native_context_id": native_context_id, "expected_version": expected_version}
-    prepared = _call(ctx, "POST", endpoint + "/prepare-commit", body=body)
-    if prepared["status"] != "ready_to_commit":
-        _emit(prepared, json_output)
-        return
-    checkout = Path(prepared["checkout"]["path"])
-    message_file = message_file.resolve()
+    """Commit the complete reviewed project through the native service and normal hooks."""
     try:
         message = message_file.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as error:
         raise click.ClickException("The commit message must be a readable UTF-8 file") from error
-    if any(citation not in message for citation in prepared["required_citations"]):
-        raise click.ClickException("The authored commit message must cite every project work item")
-
-    def git(*args: str) -> bytes:
-        result = subprocess.run(
-            ["git", "--literal-pathspecs", "-C", str(checkout), *args], capture_output=True, timeout=120
-        )
-        if result.returncode:
-            raise click.ClickException(result.stderr.decode("utf-8", errors="replace").strip() or "Git command failed")
-        return result.stdout
-
-    try:
-        artifacts = prepared["reviewed_artifacts"]
-        staged = {path.decode("utf-8") for path in git("diff", "--cached", "--name-only", "-z").split(b"\0") if path}
-        if staged - artifacts.keys():
-            raise click.ClickException(
-                "The context index contains unrelated staged work; preserve it before committing this project"
-            )
-        tracked = {path.decode("utf-8") for path in git("ls-files", "-z").split(b"\0") if path}
-        paths = sorted(path for path, blob in artifacts.items() if blob is not None or path in tracked)
-        git("add", "--", *paths)
-        git("commit", "--file", str(message_file))
-        commit_id = git("rev-parse", "HEAD").decode("ascii").strip()
-    except (click.ClickException, OSError, subprocess.TimeoutExpired) as error:
-        result = _call(
-            ctx,
-            "POST",
-            endpoint + "/commit-failed",
-            body={**body, "reason": "commit_not_confirmed", "evidence": str(error)},
-        )
-        _emit(result, json_output)
-        raise click.ClickException(f"Project commit did not complete: {error}") from error
-    # An uncertain acknowledgement is retried with this same commit through
-    # confirm-commit, never by making another commit or inventing a verdict.
-    _emit(
-        _call(
-            ctx,
-            "POST",
-            endpoint + "/confirm-commit",
-            body={**body, "commit_id": commit_id, "expected_parent": prepared["expected_parent"]},
-        ),
-        json_output,
+    result = _call(
+        ctx,
+        "POST",
+        f"/v1/projects/{quote(project_id, safe='')}/commit",
+        timeout=180,
+        body={"native_context_id": native_context_id, "expected_version": expected_version, "message": message},
     )
+    _emit(result, json_output)
+    if result["status"] not in {"confirmed", "already_confirmed"}:
+        raise click.exceptions.Exit(1)
 
 
 @context_group.command("work-item")
@@ -442,6 +418,23 @@ def bridge_queue(ctx: click.Context, role: str, json_output: bool) -> None:
     _emit(_call(ctx, "GET", "/v1/bridge/queue", query={"role": role}), json_output)
 
 
+@native_bridge_group.command("state-report")
+@click.option("--json", "json_output", is_flag=True)
+@click.option("--markdown", "markdown_output", is_flag=True)
+@click.pass_context
+def bridge_state_report(ctx: click.Context, json_output: bool, markdown_output: bool) -> None:
+    """Report canonical attempts, exact claims and role queues without harness configuration."""
+    from groundtruth_kb.bridge.state_report import render_markdown
+
+    if json_output and markdown_output:
+        raise click.ClickException("Choose only one output mode: --json or --markdown.")
+    report = _call(ctx, "GET", "/v1/bridge/state-report")
+    if json_output:
+        _emit(report, True)
+    else:
+        click.echo(render_markdown(report), nl=False)
+
+
 @native_bridge_group.command("show")
 @click.argument("document")
 @click.option("--content", is_flag=True, help="Include disposable messages for the active attempt.")
@@ -452,6 +445,39 @@ def bridge_show(ctx: click.Context, document: str, content: bool, json_output: b
     _emit(
         _call(
             ctx, "GET", f"/v1/bridge/{quote(document, safe='')}/show", query={"include_content": str(content).lower()}
+        ),
+        json_output,
+    )
+
+
+@native_bridge_group.command("check-effects")
+@click.option("--native-context-id", required=True)
+@click.option("--cwd", required=True, help="Actual absolute working directory of the tool.")
+@click.option("--path", "paths", multiple=True, required=True, help="Concrete tool target; repeat for each target.")
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def bridge_check_effects(ctx: click.Context, json_output: bool, **body: Any) -> None:
+    """Check current scratch/implementation scope without granting or recording permission."""
+    body["paths"] = list(body["paths"])
+    _emit(_call(ctx, "POST", "/v1/bridge/check-effects", body=body), json_output)
+
+
+@native_bridge_group.command("check-delivery")
+@click.argument("document")
+@click.option("--version", type=click.IntRange(1), required=True)
+@click.option("--native-context-id", required=True)
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def bridge_check_delivery(
+    ctx: click.Context, document: str, version: int, native_context_id: str, json_output: bool
+) -> None:
+    """Verify this context's exact assigned delivery, including the purged terminal head."""
+    _emit(
+        _call(
+            ctx,
+            "GET",
+            f"/v1/bridge/{quote(document, safe='')}/delivery",
+            query={"version": version, "native_context_id": native_context_id},
         ),
         json_output,
     )

@@ -17,11 +17,9 @@ from groundtruth_kb.project.doctor import (
     _check_deliberation_search_backend,
     _check_git,
     _check_groundtruth_toml,
-    _check_harness_metadata_freshness,
     _check_hooks,
     _check_python,
     _check_rules,
-    _check_settings_classifiers,
     _check_settings_hook_registration_drift,
     _derive_paired_hook_id,
     run_doctor,
@@ -30,79 +28,6 @@ from groundtruth_kb.project.managed_registry import (
     SettingsHookRegistration,
     find_artifact_by_id,
 )
-
-
-def _write_harness_metadata_freshness_fixture(
-    root: Path,
-    *,
-    dispatch_cost: int = 20,
-    include_routing: bool = True,
-    stale_local_text: bool = False,
-) -> None:
-    """Create a minimal API-harness routing + dispatcher metadata fixture."""
-    if include_routing:
-        (root / ".api-harness").mkdir(parents=True, exist_ok=True)
-        (root / ".api-harness" / "routing.toml").write_text(
-            "schema_version = 1\n"
-            "\n"
-            "[models.kimi-k2-7-code-cloud]\n"
-            'model_id = "kimi-k2.7-code:cloud"\n'
-            'provider = "ollama"\n'
-            "tool_calling_supported = true\n"
-            'allowed_tools = ["Read", "Write"]\n'
-            "\n"
-            "[routing.ollama]\n"
-            'default_model = "kimi-k2-7-code-cloud"\n'
-            "timeout_seconds = 180\n",
-            encoding="utf-8",
-        )
-
-    (root / "config" / "dispatcher").mkdir(parents=True, exist_ok=True)
-    (root / "config" / "dispatcher" / "rules.toml").write_text(
-        "schema_version = 1\n"
-        "\n"
-        "[harnesses.D]\n"
-        'description = "Ollama-shim: cloud-routed LO dispatch target '
-        '(current route: kimi-k2-7-code-cloud via cloud API)."\n'
-        "can_receive_dispatch = true\n"
-        f"dispatch_cost = {dispatch_cost}\n"
-        "dispatch_quality = 62\n"
-        "dispatch_availability = 95\n",
-        encoding="utf-8",
-    )
-
-    (root / "harness-state").mkdir(parents=True, exist_ok=True)
-    (root / "harness-state" / "harness-registry.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "harnesses": [
-                    {
-                        "id": "D",
-                        "harness_name": "ollama",
-                        "harness_type": "ollama",
-                        "status": "suspended",
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    if stale_local_text:
-        canonical_text = "### ollama\n\n**Definition:** Locally hosts open-weight models via http://localhost:11434.\n"
-    else:
-        canonical_text = (
-            "### ollama\n\n"
-            "**Definition:** The GT-KB Ollama harness route is currently cloud-backed via "
-            "`kimi-k2-7-code-cloud`; it is not serving local models.\n"
-        )
-    (root / ".claude" / "rules").mkdir(parents=True, exist_ok=True)
-    (root / ".claude" / "rules" / "canonical-terminology.md").write_text(canonical_text, encoding="utf-8")
-    (root / ".claude" / "rules" / "operating-model.md").write_text(canonical_text, encoding="utf-8")
-    detail = root / "groundtruth-kb" / "docs" / "reference"
-    detail.mkdir(parents=True, exist_ok=True)
-    (detail / "canonical-terminology-detail.md").write_text(canonical_text, encoding="utf-8")
 
 
 def _write_deliberation_db(root: Path, *ids: str) -> None:
@@ -169,31 +94,6 @@ def test_check_python_passes() -> None:
 # ---------------------------------------------------------------------------
 # _check_harness_metadata_freshness
 # ---------------------------------------------------------------------------
-
-
-def test_harness_metadata_freshness_clean_cloud_route_passes(tmp_path: Path) -> None:
-    """Cloud-backed API-harness route with cost >= 20 and fresh text -> PASS."""
-    _write_harness_metadata_freshness_fixture(tmp_path)
-    result = _check_harness_metadata_freshness(tmp_path)
-    assert result.status == "pass", result.message
-    assert "cloud routes" in result.message
-
-
-def test_harness_metadata_freshness_cloud_route_low_cost_fails(tmp_path: Path) -> None:
-    """Cloud-backed API-harness route with stale cheap dispatch cost -> FAIL."""
-    _write_harness_metadata_freshness_fixture(tmp_path, dispatch_cost=5)
-    result = _check_harness_metadata_freshness(tmp_path)
-    assert result.status == "fail"
-    assert result.required is True
-    assert "dispatch_cost=5" in result.message
-
-
-def test_harness_metadata_freshness_missing_routing_warns(tmp_path: Path) -> None:
-    """Missing routing.toml is diagnostic, not a false clean pass."""
-    _write_harness_metadata_freshness_fixture(tmp_path, include_routing=False)
-    result = _check_harness_metadata_freshness(tmp_path)
-    assert result.status == "warning"
-    assert ".api-harness/routing.toml missing" in result.message
 
 
 # ---------------------------------------------------------------------------
@@ -394,50 +294,6 @@ def test_check_rules_empty_dir_is_warning(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # _check_settings_classifiers
 # ---------------------------------------------------------------------------
-
-
-def test_check_settings_classifiers_no_file(tmp_path: Path) -> None:
-    """Missing settings.local.json → warning."""
-    result = _check_settings_classifiers(tmp_path)
-    assert result.status == "warning"
-    assert result.found is False
-
-
-def test_check_settings_classifiers_valid_intake(tmp_path: Path) -> None:
-    """Valid settings with intake-classifier.py active → pass."""
-    settings_dir = tmp_path / ".claude"
-    settings_dir.mkdir(parents=True, exist_ok=True)
-    settings = {"hooks": {"UserPromptSubmit": [{"command": "python .claude/hooks/intake-classifier.py"}]}}
-    (settings_dir / "settings.local.json").write_text(json.dumps(settings), encoding="utf-8")
-    result = _check_settings_classifiers(tmp_path)
-    assert result.status == "pass"
-
-
-def test_check_settings_classifiers_both_active_warning(tmp_path: Path) -> None:
-    """Both classifiers active → warning."""
-    settings_dir = tmp_path / ".claude"
-    settings_dir.mkdir(parents=True, exist_ok=True)
-    settings = {
-        "hooks": {
-            "UserPromptSubmit": [
-                {"command": "python .claude/hooks/intake-classifier.py"},
-                {"command": "python .claude/hooks/spec-classifier.py"},
-            ]
-        }
-    }
-    (settings_dir / "settings.local.json").write_text(json.dumps(settings), encoding="utf-8")
-    result = _check_settings_classifiers(tmp_path)
-    assert result.status == "warning"
-
-
-def test_check_settings_classifiers_neither_active_warning(tmp_path: Path) -> None:
-    """Neither classifier active → warning."""
-    settings_dir = tmp_path / ".claude"
-    settings_dir.mkdir(parents=True, exist_ok=True)
-    settings = {"hooks": {"UserPromptSubmit": [{"command": "python .claude/hooks/other.py"}]}}
-    (settings_dir / "settings.local.json").write_text(json.dumps(settings), encoding="utf-8")
-    result = _check_settings_classifiers(tmp_path)
-    assert result.status == "warning"
 
 
 # ---------------------------------------------------------------------------
@@ -681,8 +537,8 @@ def test_derive_paired_hook_id_strips_prefix_and_event_suffix() -> None:
         == "hook.gov09-capture"
     )
     assert (
-        _derive_paired_hook_id("settings.hook.owner-decision-capture.posttooluse", "posttooluse")
-        == "hook.owner-decision-capture"
+        _derive_paired_hook_id("settings.hook.spec-event-surfacer.posttooluse", "posttooluse")
+        == "hook.spec-event-surfacer"
     )
 
 
@@ -713,7 +569,7 @@ def test_settings_hook_registration_owner_decision_present_and_registered_is_pas
     tmp_path: Path,
 ) -> None:
     """§B.4 case 3: PostToolUse record: file present, registered in correct event → ``pass``."""
-    reg = _get_registration("settings.hook.owner-decision-capture.posttooluse")
+    reg = _get_registration("settings.hook.spec-event-surfacer.posttooluse")
     _touch_hook_file(tmp_path, reg.hook_filename)
     _write_settings_hooks(tmp_path, {"PostToolUse": [_hook_entry(reg.hook_filename)]})
     result = _check_settings_hook_registration_drift(tmp_path, "dual-agent", reg)

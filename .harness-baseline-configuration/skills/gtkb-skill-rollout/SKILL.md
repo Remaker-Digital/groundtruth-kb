@@ -1,46 +1,37 @@
 ---
 name: gtkb-skill-rollout
-description: Playbook for renaming or adding canonical skills, including rename-map update, adapter regeneration, and stale-dir cleanup.
-argument-hint: "[rename|add|cleanup]"
+description: Add, rename or retire neutral GT-KB skills and qualify their deterministic projections.
 ---
 
-# gtkb-skill-rollout
+# Skill rollout
 
-Playbook for renaming or adding canonical skills in the GT-KB platform.
+The authored source is .harness-baseline-configuration/skills/<name>/SKILL.md
+with its helpers and references. The name is a lowercase slug matching the
+directory; YAML frontmatter contains a nonempty name and description.
+Keep instructions neutral, use declared harness tokens for local paths, and
+retain links to current formal sources. A harness loads its own projection.
 
-## Rename Playbook
+For an addition, author the complete source and tests for its actual behavior.
+For a rename, change the source directory and name together and correct every
+active caller, link, template and test. For removal, remove its live consumers
+or move surviving behavior to the appropriate current skill first.
 
-When renaming a canonical skill directory:
+Validate source and all affected target derivations:
 
-1. **Rename the canonical skill directory** under `.harness-baseline-configuration/skills/`
-2. **Update `config/agent-control/skill-rename-map.toml`** — add/update the `[[skills]]` entry with the new `dir` and `canonical_name`; set `registry_old_name` if the old name is still referenced
-3. **Fix `canonical_source`/`surface` paths** in the renamed SKILL.md frontmatter
-4. **Fix frontmatter** — update `name:` to match the new canonical name
-5. **Regenerate adapters** — run `python scripts/generate_codex_skill_adapters.py --update-registry`
-6. **Clear stale on-disk dirs** — remove any old adapter directories that match the previous name
-7. **Run parity** — run `python scripts/check_harness_parity.py` to verify no EXTRA/MISSING
-8. **Run strict-on-rename** — run `python scripts/check_harness_parity.py --strict-on-rename`
+    python scripts/harness_projection/project_harness.py --harness <name> --validate
+    python scripts/check_harness_parity.py --all --validate
 
-## Add Playbook
+Read current help before supplying optional arguments. Exercise the skill's real
+CLI/helper behavior, refusals and fresh-context use; projection bytes alone do
+not establish host loading.
 
-When adding a new canonical skill:
+The baseline and projector are the committed work product. Mechanical
+projection is an operational refresh using the selected target:
 
-1. **Create the skill directory** under `.harness-baseline-configuration/skills/<name>/`
-2. **Write SKILL.md** with correct frontmatter (`name:`, `description:`, etc.)
-3. **Update `config/agent-control/skill-rename-map.toml`** — add a new `[[skills]]` entry
-4. **Regenerate adapters** — run `python scripts/generate_codex_skill_adapters.py --update-registry`
-5. **Run parity** — verify no EXTRA/MISSING
+    python scripts/harness_projection/project_harness.py --harness <name>
+    python scripts/harness_projection/project_harness.py --harness <name> --check
 
-## Cleanup Playbook
-
-When removing stale skill directories:
-
-1. **Identify stale dirs** — run `python scripts/check_harness_parity.py` to find EXTRA dirs
-2. **Remove stale dirs** — delete directories that no longer have a canonical source
-3. **Update `skill-rename-map.toml`** — remove entries for deleted skills
-4. **Regenerate adapters** — run `python scripts/generate_codex_skill_adapters.py --update-registry`
-5. **Run parity** — verify clean
-
----
-
-*(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
+The projector manages its recorded output paths. Preserve unlisted local work;
+do not manually delete a directory because its name looks stale. Use the current
+project/work-item and Bridge lifecycle, including independent review. No rename
+map, peer configuration, permission packet or generated manifest is authority.

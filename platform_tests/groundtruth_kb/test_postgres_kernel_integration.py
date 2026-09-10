@@ -24,7 +24,8 @@ import psycopg
 import pytest
 from click.testing import CliRunner
 from groundtruth_kb.cli import main
-from groundtruth_kb.config import PostgreSQLConfig
+from groundtruth_kb.config import GTConfig, PostgreSQLConfig
+from groundtruth_kb.db_snapshot import create_snapshot
 from groundtruth_kb.postgres_kernel import (
     ALL_TABLES,
     COORDINATION_TABLES,
@@ -84,13 +85,13 @@ EXPECTED_CURRENT_SOURCE = EXPECTED_TABLES - {"record_history", *COORDINATION_TAB
 EXPECTED_REBUILT_SOURCE = {
     "assertion_runs",
     "pipeline_events",
-    "sot_artifact_revisions",
-    "sot_artifacts",
     "sot_quarantine_receipts",
-    "sot_registry_transaction_journal",
     "work_intent_claims",
 }
 EXPECTED_RETIRED_SOURCE = {
+    "sot_artifact_revisions",
+    "sot_artifacts",
+    "sot_registry_transaction_journal",
     "dispatch_default_metric_events",
     "dispatch_default_metrics_snapshots",
     "dispatch_lane_matrix",
@@ -895,26 +896,17 @@ def test_snapshot_wal_export_authorization_dependency_and_immutable_boundaries(
     output_dir.mkdir()
     staging_dir.mkdir()
     try:
-        snapshot_result = CliRunner().invoke(
-            main,
-            [
-                "--config",
-                str(config),
-                "db",
-                "snapshot",
-                "--json",
-                "--output-dir",
-                str(output_dir),
-                "--staging-dir",
-                str(staging_dir),
-                "--retain",
-                "1",
-                "--daily-days",
-                "0",
-            ],
+        # Migration owns this explicit SQLite source snapshot; ordinary domain
+        # CLI operations no longer expose SQLite backup/fallback routes.
+        snapshot_result = create_snapshot(
+            GTConfig(db_path=source, project_root=tmp_path),
+            output_dir=output_dir,
+            staging_dir=staging_dir,
+            retain_recent=1,
+            retain_daily_days=0,
+            include_chroma=False,
         )
-        assert snapshot_result.exit_code == 0, snapshot_result.output
-        snapshot_payload = json.loads(snapshot_result.output)
+        snapshot_payload = snapshot_result.to_json_dict()
         assert snapshot_payload["status"] == "ok"
         assert snapshot_payload["method"] == "vacuum"
         assert snapshot_payload["integrity_result"] == "ok"

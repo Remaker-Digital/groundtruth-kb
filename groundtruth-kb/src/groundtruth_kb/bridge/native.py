@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import re
 import subprocess
+import unicodedata
 from datetime import UTC, date, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
@@ -30,6 +31,7 @@ from groundtruth_kb.bridge.vocabulary import (
     THREAD_START_STATUSES,
     TRANSITIONS,
 )
+from groundtruth_kb.governance.credential_patterns import BASH_EXTRAS, CREDENTIAL_PATTERNS
 from groundtruth_kb.native_authority import (
     Identifier,
     Mutation,
@@ -43,12 +45,16 @@ from groundtruth_kb.native_authority import (
     _require_project_dependencies,
     _required,
     _work_evidence,
+    _work_formal_roots,
     _work_formal_sources,
     _write,
 )
 from groundtruth_kb.postgres_kernel import PostgresKernel, PostgresKernelError, PostgresTransaction, parse_json_bytes
 from groundtruth_kb.session.worktree import (
     SessionWorktreeError,
+    _artifact_modes,
+    _artifact_path,
+    _registered_context_checkout,
     materialize_context_worktree,
     project_worktree,
     publish_context_work,
@@ -80,13 +86,18 @@ class FenceRequest(SessionRequest):
     fence: int = Field(ge=1)
 
 
+class EffectCheckRequest(SessionRequest):
+    cwd: Text
+    paths: list[Text] = Field(min_length=1, max_length=256)
+
+
 class DeliverRequest(FenceRequest):
     content: Text
     mode: Literal["interactive", "headless"] = "interactive"
 
 
 class PublishWorkRequest(FenceRequest):
-    expected_artifacts: dict[str, str | None]
+    expected_artifacts: dict[str, dict[str, str] | None]
 
 
 class AbandonRequest(SessionRequest):
@@ -104,15 +115,26 @@ def _public(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _paths(value: Any, label: str) -> list[str]:
+def _paths(value: Any, label: str, *, error_code: str = "invalid_bridge_header") -> list[str]:
     if not isinstance(value, list) or not value or any(not isinstance(item, str) for item in value):
-        _error("invalid_bridge_header", f"{label} must be a nonempty JSON list of relative artifact paths")
+        _error(error_code, f"{label} must be a nonempty JSON list of relative artifact paths")
     normalized = []
     for path in value:
         parts = PurePosixPath(path)
         if (
             not path
+            or path != path.strip()
             or not parts.parts
+            or any(character in path for character in '<>"|?*')
+            or any(
+                part != part.strip()
+                or part.endswith(".")
+                or re.fullmatch(
+                    r"(?i)(?:CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³]|CONIN\$|CONOUT\$)",
+                    part.partition(".")[0].rstrip(" "),
+                )
+                for part in parts.parts
+            )
             or any(ord(character) < 32 for character in path)
             or "\\" in path
             or ":" in path
@@ -120,16 +142,34 @@ def _paths(value: Any, label: str) -> list[str]:
             or ".." in parts.parts
             or path != parts.as_posix()
             or any(
-                part.casefold() in {".git", ".gtkb-state", "harness-state", "scratchpad", ".worktrees"}
+                part.casefold()
+                in {
+                    ".git",
+                    ".gtkb-state",
+                    "harness-state",
+                    "scratchpad",
+                    ".worktrees",
+                    ".agent",
+                    ".agents",
+                    ".antigravity",
+                    ".api-harness",
+                    ".claude",
+                    ".codex",
+                    ".cursor",
+                    ".goose",
+                }
                 for part in parts.parts
             )
             or parts.parts[0].casefold() == "bridge"
-            or path.casefold().startswith(".groundtruth/formal-artifact-approvals/")
+            or any(
+                path.casefold() == prefix or path.casefold().startswith(prefix + "/")
+                for prefix in (".groundtruth/formal-artifact-approvals", "config/agent-control")
+            )
         ):
-            _error("invalid_bridge_header", f"{label} contains an invalid or forbidden artifact path")
-        normalized.append(path.casefold())
+            _error(error_code, f"{label} contains an invalid or forbidden artifact path")
+        normalized.append(unicodedata.normalize("NFC", path).casefold())
     if len(set(normalized)) != len(normalized):
-        _error("invalid_bridge_header", f"{label} contains duplicate artifact paths")
+        _error(error_code, f"{label} contains duplicate artifact paths")
     return value
 
 
@@ -176,13 +216,19 @@ def parse_authored_message(content: str) -> dict[str, Any]:
         "author_harness_id",
         "author_session_context_id",
         "author_model",
-        "project",
-        "work_item",
     }
-    if status == "ADVISORY":
-        required -= {"project", "work_item"}
-    if any(not metadata.get(key) for key in required):
-        _error("invalid_bridge_header", "The authored header is missing required provenance or work linkage")
+    if status in {"NEW", "REVISED", "BLOCKED"}:
+        required |= {"project", "work_item"}
+    missing = sorted(key for key in required if not metadata.get(key))
+    if missing:
+        _error(
+            "invalid_bridge_header",
+            "Missing required header fields; use plain 'Field: value' lines, including "
+            "'Project: <canonical project ID>' and 'Work Item: <canonical work-item ID>' for proposals",
+            fields=missing,
+        )
+    if metadata["author_model"].casefold() in {"unknown", "<unknown>", "[unknown]", "tbd", "todo", "n/a", "none"}:
+        _error("invalid_bridge_header", "author_model must identify the actual model, not a placeholder")
     if metadata["bridge_kind"] not in {kind.value for kind in BridgeKind}:
         _error("invalid_bridge_header", "bridge_kind must use the current canonical taxonomy")
     if status == "ADVISORY" and metadata["bridge_kind"] != BridgeKind.GOVERNANCE_ADVISORY.value:
@@ -243,6 +289,10 @@ def parse_authored_message(content: str) -> dict[str, Any]:
                 _error("invalid_bridge_header", f"{key} must be authored as JSON")
         _paths(result["target_paths"], "target_paths")
         _paths(result["test_artifact_targets"], "test_artifact_targets")
+        _paths(
+            list(dict.fromkeys(result["target_paths"] + result["test_artifact_targets"])),
+            "Combined proposal and test scope",
+        )
         if (
             not isinstance(result["spec_versions"], dict)
             or not result["spec_versions"]
@@ -353,11 +403,24 @@ class NativeBridgeService:
 
     @staticmethod
     def _scope(tx: PostgresTransaction, attempt: dict[str, Any], *, lock: bool = False) -> None:
+        _paths(attempt["proposal_paths"], "Stored proposal targets", error_code="scope_changed")
+        _paths(attempt["test_targets"], "Stored test targets", error_code="scope_changed")
+        _paths(
+            list(dict.fromkeys(attempt["proposal_paths"] + attempt["test_targets"])),
+            "Stored combined scope",
+            error_code="scope_changed",
+        )
         work = _required(tx, "work_items", attempt["work_item_id"], lock=lock)
         if attempt["work_item_version"] is not None and work["version"] != attempt["work_item_version"]:
             _error("scope_changed", "Current work scope changed; reconcile this attempt before further effects")
         if _current_parent(tx, work["id"])["project_id"] != attempt["project_id"]:
             _error("scope_changed", "The work item's project changed; reconcile the attempt")
+        NativeBridgeService._formal_scope(tx, attempt, work, lock=lock)
+
+    @staticmethod
+    def _formal_scope(tx, attempt, work, *, lock=False):
+        if _work_formal_roots(tx, work, attempt["project_id"], lock=lock) != attempt["formal_roots"]:
+            _error("scope_changed", "Canonical formal relationships changed; reconcile the attempt")
         for current in _work_formal_sources(
             tx, work, attempt["project_id"], additional_ids=list(attempt["spec_versions"]), lock=lock
         ):
@@ -652,6 +715,66 @@ class NativeBridgeService:
                 else [],
             }
 
+    def check_effects(self, request: EffectCheckRequest) -> dict[str, Any]:
+        """Check concrete tool targets against current claims without retaining observations.
+
+        This is a pre-tool check, not a transferable permission. Publication
+        still rechecks the exact fence and current scope at its effect boundary.
+        """
+        cwd = Path(request.cwd)
+        if not cwd.is_absolute() or not cwd.is_dir():
+            _error("invalid_effect_path", "The tool working directory must be an existing absolute directory")
+        paths = []
+        for value in request.paths:
+            path = Path(value)
+            if path.drive and not path.is_absolute():
+                _error("invalid_effect_path", "Drive-relative tool targets are not concrete")
+            path = path if path.is_absolute() else cwd / path
+            if any(part.casefold() in {"..", ".git"} for part in path.parts) or any(ord(c) < 32 for c in value):
+                _error("invalid_effect_path", "Tool targets must be concrete paths outside Git metadata")
+            if any(part.is_symlink() or part.is_junction() for part in (path, *path.parents)):
+                _error("effect_path_redirected", "A tool target or its directory is redirected")
+            paths.append(path.resolve())
+        with self.kernel.transaction() as tx:
+            binding = self._binding(tx, request.native_context_id)
+            scratch = self.project_root.resolve() / "scratchpad" / binding["session_context_id"]
+            implementation_paths = [path for path in paths if not path.is_relative_to(scratch) or path == scratch]
+            if not implementation_paths:
+                return {"status": "current", "scope": "scratch"}
+            tx.cursor.execute(
+                sql.SQL(
+                    "SELECT attempt_id,fence FROM {}.work_intent_claims "
+                    "WHERE claimant_session_context_id=%s AND intended_status='READY' "
+                    "AND expires_at>clock_timestamp() ORDER BY attempt_id"
+                ).format(sql.Identifier(tx.schema)),
+                (binding["session_context_id"],),
+            )
+            reservations = list(tx.cursor.fetchall())
+            if not reservations:
+                _error("implementation_claim_required", "Tool work edits require a live implementation-report claim")
+            try:
+                checkout = _registered_context_checkout(self.project_root, binding["session_context_id"])
+            except SessionWorktreeError as error:
+                raise PostgresKernelError(error.code, str(error)) from error
+            if any(not path.is_relative_to(checkout.resolve()) for path in implementation_paths):
+                _error("effect_outside_checkout", "Work edits must stay in the bound context's registered checkout")
+            if any(path.is_dir() for path in implementation_paths):
+                _error("invalid_effect_path", "Implementation targets must be concrete files, not directories")
+            relative = [path.relative_to(checkout.resolve()).as_posix() for path in implementation_paths]
+            _paths(relative, "Tool targets", error_code="invalid_effect_path")
+            matches = []
+            for reservation in reservations:
+                fence = FenceRequest(native_context_id=request.native_context_id, fence=reservation["fence"])
+                _, attempt, claim = self._fenced(tx, reservation["attempt_id"], fence)
+                targets = {path.casefold() for path in attempt["proposal_paths"] + attempt["test_targets"]}
+                if all(path.casefold() in targets for path in relative):
+                    self._claim_readiness(tx, attempt, claim["intended_status"])
+                    matches.append((reservation["attempt_id"], reservation["fence"]))
+            if len(matches) != 1:
+                _error("effect_outside_claim", "Every work target must belong to one exact current artifact claim")
+            document, fence = matches[0]
+            return {"status": "current", "scope": "implementation", "document": document, "fence": fence}
+
     def release(self, document: str, request: FenceRequest) -> dict[str, Any]:
         with self.kernel.transaction() as tx:
             self._fenced(tx, document, request)
@@ -744,14 +867,21 @@ class NativeBridgeService:
             paths = sorted(set(attempt["proposal_paths"] + attempt["test_targets"]))
             return self._snapshot(paths, root=self.work_root(attempt["project_id"])) if paths else {}
 
-    def _snapshot(self, paths: list[str], *, root: Path | None = None) -> dict[str, str | None]:
-        """Hash the actual Git-normalized bytes, including explicit deletions."""
-        root = (root or self.project_root).resolve()
+    def _snapshot(self, paths: list[str], *, root: Path | None = None) -> dict[str, dict[str, str] | None]:
+        """Identify Git mode and normalized blob, including explicit deletions."""
+        if paths:
+            _paths(paths, "Artifact snapshot targets", error_code="scope_changed")
         result = {}
+        try:
+            root = _artifact_path(root or self.project_root, ".").resolve()
+            modes = _artifact_modes(root, paths)
+        except SessionWorktreeError as error:
+            raise PostgresKernelError(error.code, str(error)) from error
         for relative in paths:
-            path = root / relative
-            if path.is_symlink() or not path.resolve().is_relative_to(root):
-                _error("artifact_outside_root", "A reviewed artifact escapes the configured project root")
+            try:
+                path = _artifact_path(root, relative)
+            except SessionWorktreeError as error:
+                raise PostgresKernelError(error.code, str(error)) from error
             if not path.exists():
                 result[relative] = None
                 continue
@@ -766,11 +896,20 @@ class NativeBridgeService:
             )
             if command.returncode or not re.fullmatch(r"[0-9a-f]{40}(?:[0-9a-f]{24})?", command.stdout.strip()):
                 _error("artifact_snapshot_failed", "Git could not identify the current artifact bytes")
-            result[relative] = command.stdout.strip()
+            result[relative] = {"mode": modes[relative], "object_id": command.stdout.strip()}
         return result
 
     @staticmethod
     def _purge(tx: PostgresTransaction, document: str) -> None:
+        # Keep only the final author's immutable identifier for exact delivery
+        # readback after payload purge. Earlier authors/content are discarded.
+        tx.cursor.execute(
+            sql.SQL(
+                "UPDATE {}.bridge_attempts a SET terminal_author_session_context_id=i.author_session_context_id "
+                "FROM {}.bridge_items i WHERE a.id=%s AND i.attempt_id=a.id AND i.version=a.head_version"
+            ).format(sql.Identifier(tx.schema), sql.Identifier(tx.schema)),
+            (document,),
+        )
         tx.cursor.execute(
             sql.SQL("DELETE FROM {}.work_intent_claims WHERE attempt_id=%s").format(sql.Identifier(tx.schema)),
             (document,),
@@ -781,7 +920,7 @@ class NativeBridgeService:
         tx.cursor.execute(
             sql.SQL(
                 "UPDATE {}.bridge_attempts SET work_item_version=NULL,proposal_paths='[]',test_targets='[]',"
-                "spec_versions='{{}}',proposal_context_id=NULL,go_context_id=NULL,report_context_id=NULL,"
+                "spec_versions='{{}}',formal_roots=NULL,proposal_context_id=NULL,go_context_id=NULL,report_context_id=NULL,"
                 "verified_artifacts=NULL,finalization_failure=NULL,closed_at=clock_timestamp() WHERE id=%s"
             ).format(sql.Identifier(tx.schema)),
             (document,),
@@ -789,6 +928,15 @@ class NativeBridgeService:
 
     def deliver(self, document: str, request: DeliverRequest) -> dict[str, Any]:
         message = parse_authored_message(request.content)
+        credential_patterns = sorted(
+            {spec.name for spec in (*CREDENTIAL_PATTERNS, *BASH_EXTRAS) if spec.pattern.search(request.content)}
+        )
+        if credential_patterns:
+            _error(
+                "bridge_credential_detected",
+                "Remove credential values from the authored message and retry the same live claim",
+                patterns=credential_patterns,
+            )
         metadata = message["metadata"]
         if metadata["document"] != document:
             _error("invalid_bridge_header", "Document must match the claimed canonical attempt")
@@ -801,8 +949,9 @@ class NativeBridgeService:
             attempt = self._attempt(tx, document, lock=True)
             if attempt is None or attempt["disposition"] != "active":
                 _error("attempt_closed", "The attempt is absent or terminal; inspect current work state")
-            if status != "ADVISORY" and (
-                metadata["work_item"] != attempt["work_item_id"] or metadata["project"] != attempt["project_id"]
+            if status != "ADVISORY" and any(
+                key in metadata and metadata[key] != attempt[column]
+                for key, column in (("work_item", "work_item_id"), ("project", "project_id"))
             ):
                 _error("invalid_bridge_header", "Authored project and work item must match the canonical attempt")
             # A lost acknowledgement is resolved from the exact delivered bytes
@@ -909,6 +1058,7 @@ class NativeBridgeService:
                     proposal_paths=Jsonb(message["target_paths"]),
                     test_targets=Jsonb(message["test_artifact_targets"]),
                     spec_versions=Jsonb(specs),
+                    formal_roots=Jsonb(_work_formal_roots(tx, work, project["id"])),
                     proposal_context_id=binding["session_context_id"],
                     go_context_id=None,
                     report_context_id=None,
@@ -933,7 +1083,9 @@ class NativeBridgeService:
                 try:
                     reviewed = parse_json_bytes(metadata.get("verified_artifacts", "").encode("utf-8"))
                 except PostgresKernelError:
-                    _error("reviewed_artifacts_required", "VERIFIED must identify the exact reviewed Git blob map")
+                    _error(
+                        "reviewed_artifacts_required", "VERIFIED must identify the exact reviewed Git mode/object map"
+                    )
                 actual = self._snapshot(
                     sorted(set(attempt["proposal_paths"] + attempt["test_targets"])),
                     root=self.work_root(attempt["project_id"]),
@@ -1037,48 +1189,139 @@ class NativeBridgeService:
                 result["messages"] = [_public(dict(row)) for row in tx.cursor.fetchall()]
             return result
 
+    def check_delivery(self, document: str, version: int, native_context_id: str) -> dict[str, Any]:
+        """Read the exact assigned delivery without claims, payloads or writes."""
+        with self.kernel.transaction(read_only=True) as tx:
+            binding = self._binding(tx, native_context_id)
+            attempt = self._attempt(tx, document)
+            tx.cursor.execute(
+                sql.SQL(
+                    "SELECT status,author_session_context_id FROM {}.bridge_items WHERE attempt_id=%s AND version=%s"
+                ).format(sql.Identifier(tx.schema)),
+                (document, version),
+            )
+            delivery = tx.cursor.fetchone()
+            if (
+                delivery is None
+                and attempt
+                and attempt["disposition"] != "active"
+                and attempt["head_version"] == version
+            ):
+                delivery = {
+                    "status": attempt["head_status"],
+                    "author_session_context_id": attempt["terminal_author_session_context_id"],
+                }
+            if delivery is None or delivery["author_session_context_id"] != binding["session_context_id"]:
+                _error(
+                    "bridge_delivery_incomplete",
+                    "No retained canonical delivery by this context proves the assigned successor; final prose is insufficient",
+                    document=document,
+                    version=version,
+                    observed_head_version=attempt["head_version"] if attempt else None,
+                )
+            return {
+                "status": "delivered",
+                "document": document,
+                "version": version,
+                "bridge_status": delivery["status"],
+                "native_context_id": native_context_id,
+                "author_session_context_id": binding["session_context_id"],
+            }
+
     def queue(self, role: Literal["pb", "lo"]) -> dict[str, Any]:
         """Report eligible work; selection remains the owner's or dispatcher's act."""
+        with self.kernel.transaction(read_only=True) as tx:
+            return self._queue(tx, role)
+
+    def _queue(self, tx: PostgresTransaction, role: Literal["pb", "lo"]) -> dict[str, Any]:
         eligible, blocked = [], []
+        tx.cursor.execute(
+            sql.SQL(
+                "SELECT a.*,w.priority,h.created_at AS action_created_at FROM {}.bridge_attempts a "
+                "JOIN {}.work_items w ON w.id=a.work_item_id "
+                "JOIN {}.projects p ON p.id=a.project_id LEFT JOIN {}.work_intent_claims c "
+                "ON c.attempt_id=a.id AND c.expires_at>transaction_timestamp() "
+                "LEFT JOIN {}.bridge_items h ON h.attempt_id=a.id AND h.version=a.head_version "
+                "WHERE a.disposition='active' AND c.attempt_id IS NULL "
+                'ORDER BY w.priority COLLATE "C" NULLS LAST,h.created_at,a.id'
+            ).format(*(sql.Identifier(tx.schema) for _ in range(5)))
+        )
+        for raw in tx.cursor.fetchall():
+            row = dict(raw)
+            ordinary = row["head_status"] in (
+                PRIME_ACTIONABLE_STATUSES if role == "pb" else LOYAL_OPPOSITION_ACTIONABLE_STATUSES
+            )
+            fresh_verification = role == "lo" and row["head_status"] == "VERIFIED" and row["finalization_failure"]
+            if ordinary or fresh_verification:
+                queued_at = row["action_created_at"]
+                if fresh_verification:
+                    try:
+                        failure = parse_json_bytes(row["finalization_failure"].encode("utf-8"))
+                        queued_at = datetime.fromisoformat(failure["requested_at"])
+                        if queued_at.tzinfo is None:
+                            raise ValueError("Naive request time")
+                    except (PostgresKernelError, TypeError, ValueError, KeyError):
+                        queued_at = None
+                if queued_at is None:
+                    blocked.append({**_public(row), "reason": "queue_action_time_unavailable"})
+                    continue
+                row["action_created_at"] = queued_at
+                readiness = _project_dependency_readiness(tx, row["project_id"], "readiness")
+                work_readiness = self._dependency_readiness(tx, row["work_item_id"], attempt=row)
+                if readiness["ready"] and work_readiness["ready"]:
+                    eligible.append(_public(row))
+                else:
+                    blocked.append({**_public(row), "readiness": readiness, "work_item_readiness": work_readiness})
+        eligible.sort(
+            key=lambda row: (
+                row["priority"] or "~",
+                datetime.fromisoformat(row["action_created_at"]).astimezone(UTC),
+                row["id"],
+            )
+        )
+        return {"role": role, "eligible": eligible, "blocked": blocked}
+
+    def state_report(self) -> dict[str, Any]:
+        """Read canonical attempts and both role queues from one consistent snapshot."""
         with self.kernel.transaction(read_only=True) as tx:
             tx.cursor.execute(
                 sql.SQL(
-                    "SELECT a.*,w.priority FROM {}.bridge_attempts a JOIN {}.work_items w ON w.id=a.work_item_id "
-                    "JOIN {}.projects p ON p.id=a.project_id LEFT JOIN {}.work_intent_claims c "
-                    "ON c.attempt_id=a.id AND c.expires_at>clock_timestamp() "
-                    "WHERE a.disposition='active' AND c.attempt_id IS NULL "
-                    'ORDER BY w.priority COLLATE "C" NULLS LAST,a.created_at,a.id'
-                ).format(*(sql.Identifier(tx.schema) for _ in range(4)))
+                    "SELECT disposition,head_status,count(*) AS count FROM {}.bridge_attempts "
+                    "GROUP BY disposition,head_status"
+                ).format(sql.Identifier(tx.schema))
             )
-            for raw in tx.cursor.fetchall():
-                row = dict(raw)
-                ordinary = row["head_status"] in (
-                    PRIME_ACTIONABLE_STATUSES if role == "pb" else LOYAL_OPPOSITION_ACTIONABLE_STATUSES
-                )
-                fresh_verification = role == "lo" and row["head_status"] == "VERIFIED" and row["finalization_failure"]
-                if ordinary or fresh_verification:
-                    readiness = _project_dependency_readiness(tx, row["project_id"], "readiness")
-                    work_readiness = self._dependency_readiness(tx, row["work_item_id"], attempt=row)
-                    if readiness["ready"] and work_readiness["ready"]:
-                        eligible.append(_public(row))
+            attempts, statuses, unfiled = {}, {}, 0
+            for row in tx.cursor.fetchall():
+                disposition, status, count = row["disposition"], row["head_status"], row["count"]
+                attempts[disposition] = attempts.get(disposition, 0) + count
+                if disposition == "active":
+                    if status is None:
+                        unfiled += count
                     else:
-                        blocked.append({**_public(row), "readiness": readiness, "work_item_readiness": work_readiness})
-            return {"role": role, "eligible": eligible, "blocked": blocked}
+                        statuses[status] = statuses.get(status, 0) + count
+            tx.cursor.execute(
+                sql.SQL(
+                    "SELECT count(*) AS count FROM {}.work_intent_claims c "
+                    "JOIN {}.bridge_attempts a ON a.id=c.attempt_id "
+                    "WHERE a.disposition='active' AND c.expires_at>transaction_timestamp()"
+                ).format(sql.Identifier(tx.schema), sql.Identifier(tx.schema))
+            )
+            active_claims = tx.cursor.fetchone()["count"]
+            return {
+                "attempt_counts": dict(sorted(attempts.items())),
+                "unfiled_attempt_count": unfiled,
+                "active_status_mix": [{"status": status, "count": count} for status, count in sorted(statuses.items())],
+                "active_claim_count": active_claims,
+                "queues": {role: self._queue(tx, role) for role in ("pb", "lo")},
+            }
 
     def abandon(self, document: str, request: AbandonRequest) -> dict[str, Any]:
         """Close an unusable attempt from canonical evidence, without a false verdict."""
         with self.kernel.transaction() as tx:
-            self._binding(tx, request.native_context_id)
+            binding = self._binding(tx, request.native_context_id)
             attempt = self._attempt(tx, document, lock=True)
-            if (
-                not attempt
-                or attempt["disposition"] != "active"
-                or attempt["head_version"] != request.expected_version
-                or attempt["head_status"] == "VERIFIED"
-            ):
-                _error(
-                    "attempt_not_abandonable", "Read current state; a verified or terminal attempt cannot be abandoned"
-                )
+            if not attempt or attempt["disposition"] != "active" or attempt["head_version"] != request.expected_version:
+                _error("attempt_not_abandonable", "Read current state; a terminal attempt cannot be abandoned")
             tx.cursor.execute(
                 sql.SQL(
                     "SELECT 1 FROM {}.work_intent_claims WHERE attempt_id=%s AND expires_at>clock_timestamp()"
@@ -1087,10 +1330,22 @@ class NativeBridgeService:
             )
             if tx.cursor.fetchone():
                 _error("live_artifact_claim", "An attempt with a live artifact claim cannot be abandoned")
+            work = _required(tx, "work_items", attempt["work_item_id"], lock=True)
+            project = _required(tx, "projects", attempt["project_id"], lock=True)
+            if (
+                project["status"] == "verified"
+                or _project_commit(tx, project["id"])
+                or (work.get("completion_evidence") or "").startswith("git:")
+            ):
+                _error("attempt_not_abandonable", "Committed work is terminal; preserve the Git result")
+            verified = attempt["head_status"] == "VERIFIED"
             invalid = False
             try:
-                self._head(tx, attempt)
-                self._scope(tx, attempt)
+                if verified:
+                    self._formal_scope(tx, attempt, work, lock=True)
+                else:
+                    self._head(tx, attempt)
+                    self._scope(tx, attempt, lock=True)
             except PostgresKernelError as error:
                 if error.code not in {"broken_bridge_chain", "scope_changed", "not_found", "invalid_membership"}:
                     raise
@@ -1098,7 +1353,65 @@ class NativeBridgeService:
             if not invalid:
                 _error(
                     "attempt_still_valid",
-                    "Continue the lawful chain; canonical state does not demonstrate an unusable attempt",
+                    "Continue the lawful chain; VERIFIED restart requires changed or unprovable formal intent",
+                )
+            if verified:
+                # A process can die after Git commits but before PostgreSQL
+                # records completion. Changed intent cannot erase that Git fact.
+                from groundtruth_kb.project.native_commit import ProjectCommitError, reviewed_git_candidates
+
+                try:
+                    existing = reviewed_git_candidates(
+                        self.project_root, [work["id"]], attempt["verified_artifacts"] or {}
+                    )
+                except ProjectCommitError as error:
+                    raise PostgresKernelError("git_reconciliation_required", str(error)) from error
+                if existing:
+                    _error(
+                        "git_reconciliation_required",
+                        "Preserve an existing reviewed Git commit and reconcile it before restarting",
+                        commit_ids=existing,
+                    )
+                source = self.work_root(project["id"], create=False)
+                base = subprocess.run(
+                    ["git", "-C", str(source), "rev-parse", "HEAD"], capture_output=True, text=True, timeout=30
+                )
+                changed = (
+                    subprocess.run(
+                        [
+                            "git",
+                            "-C",
+                            str(self.project_root),
+                            "diff",
+                            "--name-only",
+                            base.stdout.strip(),
+                            "HEAD",
+                            "--",
+                            *attempt["proposal_paths"],
+                            *attempt["test_targets"],
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                    )
+                    if base.returncode == 0
+                    else None
+                )
+                if changed is None or changed.returncode or changed.stdout.strip():
+                    _error(
+                        "git_reconciliation_required",
+                        "Preserve possible integrated work and reconcile its Git result before restarting",
+                    )
+                _write(
+                    tx,
+                    "work_items",
+                    work["id"],
+                    {"resolution_status": "open"},
+                    Mutation(
+                        expected_version=work["version"],
+                        actor=binding["session_context_id"],
+                        reason="Restart uncommitted work after changed or unprovable formal intent",
+                    ),
                 )
             tx.cursor.execute(
                 sql.SQL("UPDATE {}.bridge_attempts SET disposition='abandoned' WHERE id=%s").format(

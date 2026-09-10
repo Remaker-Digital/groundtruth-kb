@@ -45,7 +45,8 @@ def test_read_max_chars_accepts_positive_integral_forms(tmp_path: Path, value: A
 
     result = oh.dispatch_tool_call("Read", numeric_args("Read", value), metadata(), root)
 
-    assert result == "abc"
+    assert result.split("\n\n", 1)[0] == "abc"
+    assert "Continue with offset=3" in result
 
 
 @pytest.mark.parametrize(

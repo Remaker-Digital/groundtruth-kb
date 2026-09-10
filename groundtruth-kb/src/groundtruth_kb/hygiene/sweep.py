@@ -267,7 +267,7 @@ def run_sweep(
     membership_complete: bool | None = None
     pruned_envelopes: int | None = None
     destructive_eligible = False
-    if (root / "config" / "registry" / "sot-artifacts.toml").is_file() and (root / "groundtruth.db").is_file():
+    if (root / "config" / "registry" / "sot-artifacts.toml").is_file():
         from groundtruth_kb.project.artifact_membership_reconciliation import (
             reconcile_artifact_membership,
         )

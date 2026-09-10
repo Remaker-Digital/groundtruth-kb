@@ -1,303 +1,120 @@
-# Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Specification-derived tests for WI-5977 thread-scoped compensation."""
+"""Native publication fencing and lost-acknowledgement recovery.
+
+The retired raw-file compensation receipts have no current API. Surviving
+obligations are exact next-artifact fencing, preservation of unrelated work,
+refusal of changed predecessors and idempotent delivery through the authority.
+"""
 
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
-
 import pytest
-from groundtruth_kb.db import KnowledgeDB
-from groundtruth_kb.project import registry_control_plane
-from groundtruth_kb.project.registry_control_plane import (
-    RegistryRecoveryRequired,
-    apply_registry_transaction,
-    compensate_bridge_publication,
-    consume_bridge_publication_capability,
-    load_registry_snapshot,
-    mint_bridge_publication_capability,
-    registry_currentness,
-    serialize_registry,
-)
-from groundtruth_kb.project.sot_registry import SoTArtifact, sync_projection
+from psycopg import sql
 
-from scripts.bridge_work_intent_registry import acquire
+from platform_tests.groundtruth_kb.test_native_authority_service import native as native
+from platform_tests.groundtruth_kb.test_native_authority_service import put, work_fields
+from platform_tests.groundtruth_kb.test_native_bridge import authored, claim, deliver
+from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
+
+pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 
 
-def _record() -> SoTArtifact:
-    return SoTArtifact(
-        id="bridge-versioned-files",
-        domain="control_surface",
-        lifecycle="active",
-        storage_path="bridge/*-[0-9][0-9][0-9].md",
-        authority_spec_id="GOV-FILE-BRIDGE-AUTHORITY-001",
-        mutation_api="gt registry register",
-        versioning_policy="git_tracked",
-        backup_policy="git_tracked",
-        health_check_function="",
-        owner_role="shared",
-        restore_action="git_restore",
-        coverage_mode="glob",
-    )
+def _state(client, document):
+    response = client.get(f"/v1/bridge/{document}/show", params={"include_content": True})
+    assert response.status_code == 200, response.text
+    return response.json()
 
 
-def _fixture(tmp_path: Path) -> tuple[str, dict[str, object]]:
-    session_id = "publication-session"
-    (tmp_path / "bridge").mkdir()
-    registry = tmp_path / "config" / "registry" / "sot-artifacts.toml"
-    packaged = (
-        tmp_path
-        / "groundtruth-kb"
-        / "src"
-        / "groundtruth_kb"
-        / "context"
-        / "registries"
-        / "v1"
-        / "config"
-        / "registry"
-        / "sot-artifacts.toml"
-    )
-    registry.parent.mkdir(parents=True)
-    packaged.parent.mkdir(parents=True)
-    records = [_record()]
-    payload = serialize_registry(records)
-    registry.write_bytes(payload)
-    packaged.write_bytes(payload)
-    db_path = tmp_path / "groundtruth.db"
-    KnowledgeDB(db_path=db_path)
-    sync_projection(records, db_path, changed_by="test", change_reason="fixture")
-    apply_registry_transaction(
-        records,
-        operation="legacy_bootstrap",
-        actor_session="test-session",
-        changed_by="test/prime-builder",
-        change_reason="WI-5977 fixture transaction",
-        start_packet_hash="sha256:test-start",
-        pauth_id="PAUTH-WI5977-TEST",
-        bridge_id="gtkb-w0p-finalization-machinery-repair",
-        project_root=tmp_path,
-        registry_path=registry,
-        packaged_registry_path=packaged,
-        db_path=db_path,
-    )
-    return session_id, {
-        "project_root": tmp_path,
-        "registry_path": registry,
-        "packaged_registry_path": packaged,
-        "db_path": db_path,
+def _go_claim(client, contexts):
+    deliver(client, contexts, "target", "pb1", 1, "NEW")
+    reserved = claim(client, "target", "lo1", 1, "GO")
+    assert reserved.status_code == 200, reserved.text
+    request = {
+        "native_context_id": "lo1",
+        "fence": reserved.json()["fence"],
+        "content": authored(contexts["lo1"], "target", 2, "GO"),
     }
+    return request
 
 
-def _content(
-    slug: str,
-    session_id: str,
-    *,
-    version: int = 1,
-    status: str = "NEW",
-) -> bytes:
-    role = "lo" if status in {"GO", "NO-GO", "VERIFIED"} else "pb"
-    identity = "loyal-opposition/test" if role == "lo" else "prime-builder/test"
-    lines = [
-        status,
-        f"::init gtkb {role}",
-        "::open test" if role == "lo" else "::open build",
-        "",
-        f"author_identity: {identity}",
-        "author_harness_id: test",
-        f"author_session_context_id: {session_id}",
-        "author_model: fixture",
-        "author_model_version: fixture",
-        "author_model_configuration: unit-test",
-        "author_metadata_source: unit-test",
-        "",
-        f"Document: {slug}",
-        f"Version: {version:03d}",
-    ]
-    if version > 1:
-        lines.append(f"Responds to: bridge/{slug}-{version - 1:03d}.md")
-    lines.extend(("", f"# {slug} v{version}", ""))
-    return "\n".join(lines).encode()
+def test_unrelated_thread_append_does_not_invalidate_exact_delivery(bridge):
+    _, client, contexts, _ = bridge
+    request = _go_claim(client, contexts)
+    assert put(client, "work-items", "WI-2", work_fields(), project_id="PROJECT-1").status_code == 200
+    deliver(client, contexts, "unrelated", "pb2", 1, "NEW", work_item_id="WI-2")
+    foreign = _state(client, "unrelated")
+    response = client.post("/v1/bridge/target/deliver", json=request)
+    assert response.status_code == 200, response.text
+    assert _state(client, "unrelated") == foreign
+    assert _state(client, "target")["messages"][-1]["content"] == request["content"]
 
 
-def _publish(
-    slug: str,
-    session_id: str,
-    kwargs: dict[str, object],
-    *,
-    version: int = 1,
-    status: str = "NEW",
-) -> tuple[dict[str, object], Path, bytes]:
-    assert acquire(slug, session_id, project_root=kwargs["project_root"])
-    target = Path(kwargs["project_root"]) / "bridge" / f"{slug}-{version:03d}.md"
-    content = _content(slug, session_id, version=version, status=status)
-    minted = mint_bridge_publication_capability(
-        document_name=slug,
-        version=version,
-        status=status,
-        target_path=target,
-        content=content,
-        session_id=session_id,
-        compliance_digest=f"sha256:test-compliance-{slug}-{version}",
-        **kwargs,
-    )
-    target.write_bytes(content)
-    consume_bridge_publication_capability(
-        capability=minted["capability"],
-        target_path=target,
-        content=content,
-        session_id=session_id,
-        changed_by="test",
-        change_reason=f"publish {slug} v{version}",
-        **kwargs,
-    )
-    return minted, target, content
+def test_lost_acknowledgement_retry_preserves_successor_and_its_claim(bridge):
+    _, client, contexts, _ = bridge
+    _, original = deliver(client, contexts, "target", "pb1", 1, "NEW")
+    deliver(client, contexts, "target", "lo1", 2, "GO")
+    reserved = claim(client, "target", "pb2", 2, "READY")
+    assert reserved.status_code == 200, reserved.text
+    fence = {"native_context_id": "pb2", "fence": reserved.json()["fence"]}
+    before = _state(client, "target")
+    response = client.post("/v1/bridge/target/deliver", json=original)
+    assert response.status_code == 200 and response.json()["status"] == "already_delivered"
+    assert _state(client, "target") == before
+    assert client.post("/v1/bridge/target/check", json=fence).status_code == 200
 
 
-def _capability_row(kwargs: dict[str, object], capability_hash: str) -> sqlite3.Row:
-    with sqlite3.connect(str(kwargs["db_path"])) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT * FROM sot_registry_bridge_publication_capabilities WHERE capability_hash = ?",
-            (capability_hash,),
-        ).fetchone()
-    assert row is not None
-    return row
+@pytest.mark.parametrize("changed", ["content", "fence"])
+def test_retry_mismatch_cannot_replace_the_delivered_artifact(bridge, changed):
+    _, client, contexts, _ = bridge
+    _, request = deliver(client, contexts, "target", "pb1", 1, "NEW")
+    before = _state(client, "target")
+    request = dict(request)
+    request[changed] += "Changed body." if changed == "content" else 1
+    response = client.post("/v1/bridge/target/deliver", json=request)
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "bridge_version_collision"
+    assert _state(client, "target") == before
 
 
-def test_unrelated_thread_append_is_not_a_compensation_veto(tmp_path: Path) -> None:
-    session_id, kwargs = _fixture(tmp_path)
-    first, first_target, _ = _publish("publication-a", session_id, kwargs)
-    _, unrelated_target, _ = _publish("publication-b", session_id, kwargs)
-
-    receipt = compensate_bridge_publication(
-        capability=first["capability"],
-        target_path=first_target,
-        session_id=session_id,
-        reason="downstream failure after unrelated publication",
-        changed_by="test",
-        **kwargs,
-    )
-
-    assert receipt.capability_state == "compensated"
-    assert not first_target.exists()
-    assert unrelated_target.is_file()
-    assert receipt.aggregate_digest != first["aggregate_preimage_digest"]
-    assert _capability_row(kwargs, first["capability_hash"])["capability_state"] == "compensated"
-    snapshot = load_registry_snapshot(**kwargs)
-    assert registry_currentness(
-        snapshot,
-        project_root=tmp_path,
-        db_path=kwargs["db_path"],
-        record_ids={"bridge-versioned-files"},
-    )["current"]
-
-
-def test_same_thread_successor_still_fails_closed(tmp_path: Path) -> None:
-    session_id, kwargs = _fixture(tmp_path)
-    first, first_target, _ = _publish("publication-a", session_id, kwargs)
-    _, successor_target, _ = _publish(
-        "publication-a",
-        session_id,
-        kwargs,
-        version=2,
-        status="GO",
-    )
-
-    with pytest.raises(RegistryRecoveryRequired, match="thread preimage"):
-        compensate_bridge_publication(
-            capability=first["capability"],
-            target_path=first_target,
-            session_id=session_id,
-            reason="must not cross a same-thread successor",
-            changed_by="test",
-            **kwargs,
+def test_changed_predecessor_refuses_without_consuming_claim_or_rewriting_content(bridge):
+    service, client, contexts, _ = bridge
+    request = _go_claim(client, contexts)
+    with service.kernel.transaction() as tx:
+        tx.cursor.execute(
+            sql.SQL("UPDATE {}.bridge_items SET content=content || 'changed' WHERE attempt_id='target'").format(
+                sql.Identifier(tx.schema)
+            )
         )
-
-    assert first_target.is_file()
-    assert successor_target.is_file()
-    assert _capability_row(kwargs, first["capability_hash"])["capability_state"] == "recovery_required"
-
-
-def test_target_content_mismatch_still_fails_closed(tmp_path: Path) -> None:
-    session_id, kwargs = _fixture(tmp_path)
-    minted, target, content = _publish("publication-a", session_id, kwargs)
-    target.write_bytes(content + b"tampered")
-
-    with pytest.raises(RegistryRecoveryRequired, match="target bytes changed"):
-        compensate_bridge_publication(
-            capability=minted["capability"],
-            target_path=target,
-            session_id=session_id,
-            reason="must retain unknown target bytes",
-            changed_by="test",
-            **kwargs,
+    before = _state(client, "target")
+    response = client.post("/v1/bridge/target/deliver", json=request)
+    assert response.status_code == 422 and response.json()["error"]["code"] == "stale_bridge_head"
+    assert _state(client, "target") == before
+    with service.kernel.transaction(read_only=True) as tx:
+        tx.cursor.execute(
+            sql.SQL("SELECT fence FROM {}.work_intent_claims WHERE attempt_id='target'").format(
+                sql.Identifier(tx.schema)
+            )
         )
-
-    assert target.read_bytes() == content + b"tampered"
-    assert _capability_row(kwargs, minted["capability_hash"])["capability_state"] == "recovery_required"
+        assert tx.cursor.fetchone()["fence"] == request["fence"]
 
 
-def test_predecessor_body_drift_preserves_target_and_requires_recovery(tmp_path: Path) -> None:
-    session_id, kwargs = _fixture(tmp_path)
-    _, predecessor, predecessor_content = _publish("publication-a", session_id, kwargs)
-    minted, target, target_content = _publish(
-        "publication-a",
-        session_id,
-        kwargs,
-        version=2,
-        status="GO",
-    )
-    predecessor.write_bytes(predecessor_content + b"\nbody drift without metadata drift\n")
-
-    with pytest.raises(RegistryRecoveryRequired, match="thread preimage changed"):
-        compensate_bridge_publication(
-            capability=minted["capability"],
-            target_path=target,
-            session_id=session_id,
-            reason="must bind exact predecessor bytes",
-            changed_by="test",
-            **kwargs,
+def test_expired_claim_cannot_consume_replacement_contexts_artifact_slot(bridge):
+    service, client, contexts, _ = bridge
+    request = _go_claim(client, contexts)
+    with service.kernel.transaction() as tx:
+        tx.cursor.execute(
+            sql.SQL(
+                "UPDATE {}.work_intent_claims SET expires_at=clock_timestamp()-interval '1 second' WHERE attempt_id='target'"
+            ).format(sql.Identifier(tx.schema))
         )
-
-    assert predecessor.read_bytes() == predecessor_content + b"\nbody drift without metadata drift\n"
-    assert target.read_bytes() == target_content
-    assert _capability_row(kwargs, minted["capability_hash"])["capability_state"] == "recovery_required"
-
-
-def test_thread_and_aggregate_audit_evidence_remains_bound(tmp_path: Path) -> None:
-    session_id, kwargs = _fixture(tmp_path)
-    minted, target, content = _publish("publication-a", session_id, kwargs)
-
-    receipt = compensate_bridge_publication(
-        capability=minted["capability"],
-        target_path=target,
-        session_id=session_id,
-        reason="audit evidence fixture",
-        changed_by="test",
-        **kwargs,
-    )
-
-    row = _capability_row(kwargs, minted["capability_hash"])
-    assert row["aggregate_preimage_digest"] == minted["aggregate_preimage_digest"]
-    assert row["transition_digest"] == minted["transition_digest"]
-    assert row["compensation_revision_id"] == receipt.revision_id
-    assert row["compensation_digest"] == registry_control_plane._json_digest(
-        {
-            "target_path": "bridge/publication-a-001.md",
-            "aggregate_preimage_digest": minted["aggregate_preimage_digest"],
-            "observed_aggregate_digest": receipt.aggregate_digest,
-            "thread_transition_digest": minted["transition_digest"],
-            "reason": "audit evidence fixture",
-            "compensation_revision_id": receipt.revision_id,
-        }
-    )
+    successor = claim(client, "target", "lo2", 1, "GO")
+    assert successor.status_code == 200, successor.text
+    before = _state(client, "target")
+    response = client.post("/v1/bridge/target/deliver", json=request)
+    assert response.status_code == 422 and response.json()["error"]["code"] == "stale_artifact_fence"
+    assert _state(client, "target") == before
     assert (
-        registry_control_plane._bridge_publication_transition_digest(
-            tmp_path,
-            document_name="publication-a",
-            version=1,
-            status="NEW",
-            content=content,
-        )
-        == minted["transition_digest"]
+        client.post(
+            "/v1/bridge/target/check", json={"native_context_id": "lo2", "fence": successor.json()["fence"]}
+        ).status_code
+        == 200
     )

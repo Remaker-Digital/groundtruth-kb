@@ -8,7 +8,7 @@
 [tool.pytest.ini_options]
 testpaths = ["platform_tests"]
 norecursedirs = [".*", "pytest-tmp-*"]
-pythonpath = [".", "applications/Agent_Red"]
+pythonpath = [".", "groundtruth-kb/src", "applications/Agent_Red"]
 asyncio_mode = "auto"
 python_files = ["test_*.py"]
 python_classes = ["Test*"]

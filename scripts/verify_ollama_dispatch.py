@@ -44,6 +44,7 @@ from scripts.harness_projection_reader import load_harness_projection  # noqa: E
 from scripts.ollama_harness import (  # noqa: E402
     DEFAULT_ENDPOINT,
     DEFAULT_TIMEOUT_SECONDS,
+    ROUTING_CONFIG_PATH,
     ModelMetadata,
     ModelRoute,
     OllamaHarnessError,
@@ -424,24 +425,27 @@ def _check_tool_loop_round_trip(
                         {
                             "function": {
                                 "name": "Read",
-                                "arguments": {"file_path": str(project_root / ".api-harness" / "routing.toml")},
+                                "arguments": {"path": str(project_root / ROUTING_CONFIG_PATH), "limit": 256},
                             },
                             "id": "call_read_1",
                         }
                     ],
                 }
             }
-        # Second call: model returns final text incorporating the selected route key.
+        # Return the actual tool result, including a failure if the Read failed.
+        tool_result = next(
+            (message["content"] for message in reversed(payload["messages"]) if message.get("role") == "tool"), ""
+        )
         return {
             "message": {
                 "role": "assistant",
-                "content": f"File content: {model_route.key} routing confirmed.",
+                "content": tool_result,
             }
         }
 
     try:
         result = run_tool_loop(
-            prompt="Read the file .api-harness/routing.toml and return its content verbatim.",
+            prompt=f"Read the first 256 characters of {ROUTING_CONFIG_PATH.as_posix()} and return the tool result.",
             model_route=model_route,
             endpoint=endpoint,
             max_turns=3,
@@ -449,7 +453,8 @@ def _check_tool_loop_round_trip(
             chat_func=_mock_chat,
         )
         # Verify the result contains evidence of successful round-trip
-        content_match = model_route.key in result
+        expected = (project_root / ROUTING_CONFIG_PATH).read_text(encoding="utf-8")[:256]
+        content_match = bool(expected) and result.startswith(expected)
         ok = content_match and call_count == 2
         # Verify tool schemas were sent in the payload
         schemas_present = bool(captured_payload.get("tools"))

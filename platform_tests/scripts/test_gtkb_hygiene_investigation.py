@@ -22,7 +22,6 @@ import ast
 import importlib.util
 import json
 import sys
-import tomllib
 from pathlib import Path
 
 import pytest
@@ -32,9 +31,7 @@ HYGIENE_DIR = REPO_ROOT / "scripts" / "hygiene"
 BASELINE_MODULE_PATH = HYGIENE_DIR / "hygiene_baseline.py"
 REPORT_MODULE_PATH = HYGIENE_DIR / "hygiene_report.py"
 REGISTRY_PATH = REPO_ROOT / "config" / "governance" / "hygiene-baseline-registry.toml"
-SKILL_PATH = REPO_ROOT / ".claude" / "skills" / "gtkb-hygiene-investigation" / "SKILL.md"
-CODEX_ADAPTER_PATH = REPO_ROOT / ".codex" / "skills" / "gtkb-hygiene-investigation" / "SKILL.md"
-CAPABILITY_REGISTRY_PATH = REPO_ROOT / "config" / "agent-control" / "harness-capability-registry.toml"
+SKILL_PATH = REPO_ROOT / ".harness-baseline-configuration" / "skills" / "gtkb-hygiene-investigation" / "SKILL.md"
 
 EXPECTED_IDS = [f"HYG-{n:03d}" for n in range(1, 69)]
 VALID_CLASSES = {"defect", "debt", "decision-needed", "drift"}
@@ -248,108 +245,3 @@ def test_skill_frontmatter(skill_text: str) -> None:
     assert skill_text.lstrip().startswith("---")
     assert "name: gtkb-hygiene-investigation" in skill_text
     assert "description:" in skill_text
-
-
-def test_skill_documents_structured_findings_schema(skill_text: str) -> None:
-    for field_name in ("finding_class", "locations", "verification", "owner_touchpoint_required"):
-        assert field_name in skill_text, field_name
-
-
-def test_skill_documents_four_round_workflow(skill_text: str) -> None:
-    compact = _compact(skill_text)
-    assert "parallel focus-area probe" in compact
-    assert "gap probe" in compact
-    assert "completeness critic" in compact
-    assert "adversarial skeptic" in compact
-
-
-def test_skill_documents_loop_until_dry_with_decay_disclosure(skill_text: str) -> None:
-    compact = _compact(skill_text)
-    assert "loop-until-dry" in compact
-    assert "decay disclosure" in compact
-
-
-def test_skill_defers_delta_mode(skill_text: str) -> None:
-    compact = _compact(skill_text)
-    assert "deferred follow-on" in compact
-    assert "delta mode" in compact
-    assert "does not implement" in compact
-
-
-def test_frontmatter_does_not_overclaim_while_body_defers_delta_mode(skill_text: str) -> None:
-    """Regression for Codex NO-GO@-006 P1 (FAB-20).
-
-    The skill body retains a 'Deferred follow-on' section that scopes
-    delta/diff/evidence-pack mode out of this slice. While that is true, the
-    YAML frontmatter description MUST NOT advertise those capabilities as
-    active behavior. Every clause of the description that uses an
-    active-capability token (``diffs against``, ``delta mode``,
-    ``evidence pack``, ``the differ``) must also contain a ``deferred``,
-    ``follow-on``, or ``future`` qualifier.
-    """
-    import re
-
-    # Precondition: this regression only applies while the body still defers.
-    if "deferred follow-on" not in _compact(skill_text):
-        pytest.skip("body no longer defers delta mode; frontmatter regression scope retired")
-
-    # Extract the frontmatter 'description:' value (may span multiple lines).
-    lines = skill_text.splitlines()
-    assert lines[0].strip() == "---", "frontmatter delimiter missing"
-    closing = next(i for i, line in enumerate(lines[1:], start=1) if line.strip() == "---")
-
-    description = ""
-    in_description = False
-    for line in lines[1:closing]:
-        if line.startswith("description:"):
-            in_description = True
-            description = line.split(":", 1)[1].strip()
-        elif in_description:
-            first_token = line.split(" ", 1)[0] if line else ""
-            if line and not line.startswith(" ") and ":" in first_token:
-                break  # Next top-level frontmatter key.
-            description += " " + line.strip()
-    description = description.lower()
-    assert description, "frontmatter description is empty"
-
-    active_tokens = ("diffs against", "delta mode", "evidence pack", "the differ")
-    qualifiers = ("deferred", "follow-on", "future")
-    clauses = re.split(r"[.;!?]+", description)
-    for clause in clauses:
-        for token in active_tokens:
-            if token in clause and not any(qual in clause for qual in qualifiers):
-                pytest.fail(
-                    f"frontmatter overclaim regression: clause '{clause.strip()}' "
-                    f"contains active-capability token {token!r} without a "
-                    f"'deferred'/'follow-on'/'future' qualifier while the body "
-                    f"still has a 'Deferred follow-on' section"
-                )
-
-
-def test_skill_uses_canonical_role_registry_not_retired_mirror(skill_text: str) -> None:
-    assert "harness_projection" in skill_text
-    # The retired role-assignments.json mirror must not be referenced.
-    assert "role-assignments.json" not in skill_text
-
-
-def test_codex_adapter_generated_with_marker(skill_text: str) -> None:
-    assert CODEX_ADAPTER_PATH.is_file()
-    adapter = CODEX_ADAPTER_PATH.read_text(encoding="utf-8")
-    assert "GTKB-CODEX-SKILL-ADAPTER" in adapter
-    assert "Canonical source: .claude/skills/gtkb-hygiene-investigation/SKILL.md" in adapter
-
-
-def test_capability_registry_entry_and_codex_parity() -> None:
-    data = tomllib.loads(CAPABILITY_REGISTRY_PATH.read_text(encoding="utf-8"))
-    entry = next(
-        (cap for cap in data.get("capabilities", []) if cap.get("id") == "skill.gtkb-hygiene-investigation"),
-        None,
-    )
-    assert entry is not None, "capability registry entry missing"
-    assert entry["canonical_source"] == ".claude/skills/gtkb-hygiene-investigation/SKILL.md"
-    assert "prime-builder" in entry["required_for_roles"]
-    codex = entry["codex"]
-    assert codex["adapter_source"] == ".claude/skills/gtkb-hygiene-investigation/SKILL.md"
-    sha = codex["source_sha256"]
-    assert sha != "pending-generation"
-    assert len(sha) == 64 and all(c in "0123456789abcdef" for c in sha)

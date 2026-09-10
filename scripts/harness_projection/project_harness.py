@@ -20,12 +20,13 @@ Modes:
               drift and leftover files that still exist; exit 1 on any
               difference, 0 when clean
 
-The engine renders four surface classes from the baseline:
+The engine renders these surface classes from the baseline:
     skills/   full SKILL.md bodies (plus reference files), token-substituted,
               stamped after frontmatter
     rules/    all baseline rules, token-substituted, stamped
     hooks/    hook scripts token-substituted + the harness-native hook
               registration rendered from hooks/manifest.toml
+    routing   the selected provider's models and routes from routing.toml
     ownership .projection-manifest.json listing every produced path, so
               cleanup and --check can distinguish managed from unmanaged files
 
@@ -37,16 +38,19 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib.util
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+
+import tomlkit
+import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROFILES_PATH = Path(__file__).resolve().parent / "profiles.toml"
@@ -100,67 +104,6 @@ class Plan:
     gaps: list[str] = field(default_factory=list)
 
 
-def adapter_skill_outputs(profile: dict, gaps: list[str]) -> dict[str, str]:
-    """Render an adapter-script harness's skill surface without writing it.
-
-    A profile declaring ``skill_body = "adapter_script"`` opts out of the
-    full-body skill projection above and supplies its own generator in
-    ``adapter_generator``. Before WI-7682 the opt-out existed and the branch
-    that replaces it did not, so ``adapter_generator`` was declared in
-    profiles.toml and referenced nowhere: the harness simply received no
-    skills, silently, and the shortfall did not register as drift because the
-    absent files were never managed.
-
-    The generator is required to expose ``render_outputs(project_root)``
-    returning ``(outputs, adapters, orphans)`` where ``outputs`` maps a
-    repo-relative path to its bytes. That contract is what lets the projector
-    stay the only writer: outputs are merged into the plan and written by the
-    ordinary path, so they are recorded in the ownership manifest and
-    participate in ``--check`` drift detection exactly like every other
-    projected file. A generator that writes the tree itself would produce files
-    the projector does not own and cannot verify.
-    """
-    generator_rel = profile.get("adapter_generator")
-    harness = profile.get("name")
-    if not generator_rel:
-        gaps.append(
-            f"harness {harness!r} declares skill_body='adapter_script' but no adapter_generator; "
-            "the full-body skill path is disabled for it and nothing replaces it"
-        )
-        return {}
-    generator_path = PROJECT_ROOT / generator_rel
-    if not generator_path.is_file():
-        gaps.append(f"harness {harness!r} declares adapter_generator {generator_rel!r}; that file does not exist")
-        return {}
-
-    spec = importlib.util.spec_from_file_location(f"_gtkb_adapter_generator_{harness}", generator_path)
-    if spec is None or spec.loader is None:
-        gaps.append(f"harness {harness!r} adapter_generator {generator_rel!r} is not importable")
-        return {}
-    module = importlib.util.module_from_spec(spec)
-    # Registering before exec is load-bearing, not hygiene: a generator that
-    # defines a dataclass makes dataclasses resolve its class __module__ through
-    # sys.modules, which raises AttributeError on None when the module was built
-    # by module_from_spec and never registered.
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-
-    render_outputs = getattr(module, "render_outputs", None)
-    if render_outputs is None:
-        gaps.append(
-            f"harness {harness!r} adapter_generator {generator_rel!r} exposes no render_outputs(project_root); "
-            "the projector will not write outputs it cannot render itself"
-        )
-        return {}
-
-    outputs, _adapters, orphans = render_outputs(PROJECT_ROOT)
-    for orphan in orphans:
-        gaps.append(
-            f"harness {harness!r} adapter generator reports an owned orphan requiring governed cleanup: {orphan}"
-        )
-    return {rel: content.decode("utf-8", errors="surrogateescape") for rel, content in outputs.items()}
-
-
 def load_profiles() -> dict:
     return tomllib.loads(PROFILES_PATH.read_text(encoding="utf-8"))
 
@@ -187,9 +130,6 @@ def substitute(text: str, tokens: dict[str, str], rel: str, gaps: list[str]) -> 
         return match.group(0)
 
     return TOKEN_RE.sub(repl, text)
-
-
-_RUFF_CMD: list[str] | None = None
 
 
 VENV_INTERPRETER_DIR = "groundtruth-kb/.venv/Scripts"
@@ -379,6 +319,44 @@ def apply_leftover_removes(plan: Plan, profile: dict) -> None:
     config_dir = str(profile.get("config_dir") or "").strip()
     if config_dir:
         projection_root = PROJECT_ROOT / config_dir
+        manifest_path = projection_root / ".projection-manifest.json"
+        if manifest_path.exists():
+            try:
+                if projection_root.is_symlink() or getattr(projection_root, "is_junction", lambda: False)():
+                    raise ValueError("projection directory is linked; cleanup requires a local output directory")
+                if manifest_path.is_symlink() or not manifest_path.resolve().is_relative_to(PROJECT_ROOT.resolve()):
+                    raise ValueError("projection manifest is linked or outside the project root")
+                previous = json.loads(manifest_path.read_text(encoding="utf-8"))
+                if (
+                    not isinstance(previous, dict)
+                    or previous.get("engine") != "scripts/harness_projection/project_harness.py"
+                    or previous.get("harness") != profile.get("name")
+                    or previous.get("baseline_root") != BASELINE_ROOT_NAME
+                    or not isinstance(previous.get("paths"), list)
+                ):
+                    raise ValueError("projection manifest does not describe this harness's generated outputs")
+                for rel in previous["paths"]:
+                    if (
+                        not isinstance(rel, str)
+                        or "\\" in rel
+                        or ":" in rel
+                        or ".." in PurePosixPath(rel).parts
+                        or rel != PurePosixPath(rel).as_posix()
+                        or not rel.startswith(config_dir + "/")
+                    ):
+                        raise ValueError("projection manifest contains a path outside this harness's output directory")
+                    if rel in owned or rel in seen:
+                        continue
+                    target = PROJECT_ROOT / rel
+                    if target.is_symlink() or not target.resolve().is_relative_to(projection_root.resolve()):
+                        raise ValueError("retired output is linked or escapes this harness's output directory")
+                    if target.exists() and not target.is_file():
+                        raise ValueError("a retired output is not a file; directory cleanup requires explicit scope")
+                    if target.is_file():
+                        seen.add(rel)
+                        plan.removes.append(rel)
+            except (OSError, UnicodeError, ValueError) as error:
+                plan.gaps.append(f"Cannot reconcile retired outputs for {profile.get('name')!r}: {error}")
         if projection_root.is_dir():
             stale = list(projection_root.rglob("__pycache__")) + list(projection_root.rglob("*.pyc"))
             for path in sorted(stale):
@@ -402,17 +380,12 @@ def remove_planned_path(target: Path) -> bool:
 
 
 def _get_ruff_cmd() -> list[str]:
-    global _RUFF_CMD
-    if _RUFF_CMD is not None:
-        return _RUFF_CMD
     venv_ruff = PROJECT_ROOT / "groundtruth-kb" / ".venv" / "Scripts" / "ruff.exe"
     if venv_ruff.is_file():
-        _RUFF_CMD = [str(venv_ruff)]
-    elif shutil.which("ruff"):
-        _RUFF_CMD = ["ruff"]
-    else:
-        _RUFF_CMD = [sys.executable, "-m", "ruff"]
-    return _RUFF_CMD
+        return [str(venv_ruff)]
+    if shutil.which("ruff"):
+        return ["ruff"]
+    return [sys.executable, "-m", "ruff"]
 
 
 def ruff_format(text: str, rel: str, gaps: list[str]) -> str:
@@ -443,8 +416,40 @@ def stamp_for(rel: str, stamp_text: str) -> str | None:
     return None
 
 
+def skill_fields(text: str) -> dict[str, str]:
+    """Check required scalar identity fields without inferring a skill name."""
+    lines = text.removeprefix("\ufeff").splitlines()
+    if not lines or lines[0] != "---":
+        raise ValueError("Missing opening skill frontmatter")
+    try:
+        end = lines.index("---", 1)
+    except ValueError as error:
+        raise ValueError("Missing closing skill frontmatter") from error
+    try:
+        parsed = yaml.safe_load("\n".join(lines[1:end]))
+    except yaml.YAMLError as error:
+        raise ValueError("Invalid YAML skill frontmatter") from error
+    if not isinstance(parsed, dict):
+        raise ValueError("Skill frontmatter must be a mapping")
+    if not all(isinstance(parsed.get(key), str) and parsed[key].strip() for key in ("name", "description")):
+        raise ValueError("Skill name and description must be nonempty strings")
+    fields = {}
+    for line in lines[1:end]:
+        if not line or line.startswith((" ", "\t", "#")):
+            continue
+        key, separator, value = line.partition(":")
+        if not separator or key in fields:
+            raise ValueError("Malformed or duplicate skill frontmatter field")
+        fields[key] = value.strip().strip("\"'")
+    if not all(fields.get(key) for key in ("name", "description")):
+        raise ValueError("Skill name and description are required")
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", fields["name"]):
+        raise ValueError("Skill name must be an exact lowercase slug")
+    return fields
+
+
 def adapter_metadata_block(harness: str, source_rel: str, source_text: str) -> str:
-    """Parity-consumable metadata (check_harness_parity._adapter_metadata).
+    """Descriptive generation metadata; conformance compares the complete plan.
 
     ``Generated at`` is content-addressed rather than a wall-clock timestamp:
     re-projection is byte-idempotent by contract, and a timestamp would break
@@ -483,11 +488,63 @@ def apply_stamp(rel: str, content: str, stamp_text: str) -> str:
     return block + content
 
 
+# A Windows native hook may receive cwd only on stdin. Resolve the common Git
+# installation at runtime so clone-independent output needs no invented host
+# environment variables or embedded checkout path. Hidden ProcessStartInfo
+# preserves UTF-8 pipes; pythonw through a PowerShell pipeline loses stdout.
+_NATIVE_CWD_BOOTSTRAP = "& { param([string]$adapterRel, [string]$hook, [string]$event, [int]$timeout) $ErrorActionPreference = 'Stop'; [Console]::InputEncoding = [Text.UTF8Encoding]::new($false); [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); $process = $null; try { $raw = [Console]::In.ReadToEnd(); $native = ConvertFrom-Json -InputObject $raw; if (-not [IO.Path]::IsPathRooted($native.cwd)) { throw 'Missing native working directory' }; $common = & git -C $native.cwd rev-parse --path-format=absolute --git-common-dir 2>$null; if ($LASTEXITCODE -ne 0 -or @($common).Count -ne 1) { throw 'Cannot resolve GT-KB installation' }; $root = Split-Path -Parent $common; $python = Join-Path $root 'groundtruth-kb/.venv/Scripts/python.exe'; $adapter = Join-Path $root $adapterRel; if (-not (Test-Path -LiteralPath $python -PathType Leaf) -or -not (Test-Path -LiteralPath $adapter -PathType Leaf)) { throw 'GT-KB hook runtime is unavailable' }; $psi = [Diagnostics.ProcessStartInfo]::new(); $psi.FileName = $python; $psi.WorkingDirectory = $root; $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true; $psi.RedirectStandardInput = $true; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true; $psi.StandardOutputEncoding = [Text.UTF8Encoding]::new($false); $psi.StandardErrorEncoding = [Text.UTF8Encoding]::new($false); $q = [char]34; $psi.Arguments = '-B '+$q+$adapter+$q+' --event '+$event+' --timeout '+($timeout - 1)+' '+$q+$hook+$q; foreach ($arg in $args) { if ($arg.Contains($q) -or $arg.EndsWith('\\')) { throw 'Unsupported hook argument quoting' }; $psi.Arguments += ' '+$q+$arg+$q }; $psi.EnvironmentVariables['PYTHONIOENCODING'] = 'utf-8'; $process = [Diagnostics.Process]::new(); $process.StartInfo = $psi; $null = $process.Start(); $stdout = $process.StandardOutput.ReadToEndAsync(); $stderr = $process.StandardError.ReadToEndAsync(); $process.StandardInput.Write($raw); $process.StandardInput.Close(); if (-not $process.WaitForExit($timeout * 1000)) { $process.Kill(); throw 'GT-KB hook adapter timed out' }; $text = $stdout.GetAwaiter().GetResult(); if ($process.ExitCode -ne 0 -or -not $text) { throw 'GT-KB hook adapter did not complete' }; $null = ConvertFrom-Json -InputObject $text; [Console]::Out.WriteLine($text) } catch { $reason = 'GT-KB native hook unavailable: ' + $_.Exception.Message; if ($event -eq 'PreToolUse') { @{hookSpecificOutput=@{hookEventName='PreToolUse'; permissionDecision='deny'; permissionDecisionReason=$reason}} | ConvertTo-Json -Compress } elseif ($event -eq 'Stop') { @{decision='block'; reason=$reason} | ConvertTo-Json -Compress } else { @{systemMessage=$reason} | ConvertTo-Json -Compress } } finally { if ($null -ne $process) { $process.Dispose() } } }"
+
+
+def _native_cwd_hook_command(profile: dict, hook: dict, event: str, timeout: int, tokens: dict, gaps: list[str]) -> str:
+    target = (
+        f"scripts/{hook['script']}"
+        if hook.get("script_root") == "project_scripts"
+        else f"{profile['hooks_dir']}/{hook['script']}"
+    )
+    arguments = [profile["stdin_adapter"], target, event, str(max(2, timeout - 2))]
+    arguments.extend(substitute(arg, tokens, "hooks/manifest.toml", gaps) for arg in hook.get("args", []))
+    # Arguments cross cmd.exe quoting and then PowerShell's -Command parser.
+    # Double quotes protect shell metacharacters; inner single-quoted literals
+    # prevent PowerShell from interpreting them as expressions.
+    if any('"' in arg or arg.endswith("\\") for arg in arguments):
+        gaps.append("unsupported_native_hook_argument: embedded quote or trailing backslash")
+        return ""
+    quoted = ['"' + "'" + arg.replace("'", "''") + "'" + '"' for arg in arguments]
+    return 'powershell.exe -NoProfile -NonInteractive -Command "' + _NATIVE_CWD_BOOTSTRAP + '" ' + " ".join(quoted)
+
+
 def render_hooks_registration(
     profile: dict, manifest: dict, tokens: dict[str, str], gaps: list[str]
 ) -> tuple[str, str] | None:
     """Render the harness-native hook registration from the neutral manifest."""
     mode = profile.get("hooks_projection")
+    if mode == "antigravity_hooks_json":
+        adapter = str(profile["stdin_adapter"])
+        adapter_path = PROJECT_ROOT / adapter
+        if not adapter_path.is_file() or adapter_path.resolve() != adapter_path:
+            gaps.append(f"Missing or redirected native hook adapter: {adapter}")
+            return None
+        events_out: dict[str, list[dict]] = {}
+        for hook in manifest.get("hook", []):
+            native_event = profile.get("hook_events", {}).get(hook["event"])
+            if native_event is None:
+                gaps.append(f"hook {hook['script']}: no native event for {hook['event']}")
+                continue
+            target = (
+                f"scripts/{hook['script']}"
+                if hook.get("script_root") == "project_scripts"
+                else f"{profile['hooks_dir']}/{hook['script']}"
+            )
+            timeout = _projected_timeout(profile, hook) or 30
+            interpreter = projected_interpreter(windowless=True)
+            command = f'"{interpreter}" -B {adapter} --event {native_event} --timeout {max(1, timeout - 2)} {target}'
+            for arg in hook.get("args", []):
+                command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
+            entry = {"type": "command", "command": command, "timeout": timeout}
+            if native_event in {"PreToolUse", "PostToolUse"}:
+                entry = {"matcher": _intent_matcher(profile, hook), "hooks": [entry]}
+            events_out.setdefault(native_event, []).append(entry)
+        return profile["hooks_json_path"], json.dumps({"gtkb": events_out}, indent=2) + "\n"
     if mode == "plugin_hooks_json":
         events: dict[str, list[dict]] = {}
         blocking_ok = set(profile.get("blocking_events", {}).get("supported", []))
@@ -515,7 +572,12 @@ def render_hooks_registration(
             "hooks": events,
         }
         return profile["hooks_json_path"], json.dumps(payload, indent=2) + "\n"
-    if mode == "settings_json":
+    if mode in {"settings_json", "native_cwd_hooks_json"}:
+        if mode == "native_cwd_hooks_json":
+            adapter_path = PROJECT_ROOT / profile["stdin_adapter"]
+            if not adapter_path.is_file() or adapter_path.resolve() != adapter_path:
+                gaps.append(f"Missing or redirected native hook adapter: {profile['stdin_adapter']}")
+                return None
         matchers = profile.get("intent_matchers", {})
         events_out: dict[str, list[dict]] = {}
         for hook in manifest.get("hook", []):
@@ -533,6 +595,10 @@ def render_hooks_registration(
             command = f'"{interpreter}" -B "{script_path}"'
             for arg in hook.get("args", []):
                 command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
+            if mode == "native_cwd_hooks_json":
+                command = _native_cwd_hook_command(
+                    profile, hook, native_event, _projected_timeout(profile, hook) or 30, tokens, gaps
+                )
             entry = {"type": "command", "command": command}
             timeout = _projected_timeout(profile, hook)
             if timeout is not None:
@@ -581,6 +647,32 @@ def render_hooks_registration(
     return None
 
 
+def render_provider_routing(profile: dict, baseline: Path) -> str:
+    """Derive only the selected provider's models and routes from the baseline."""
+    provider = profile["name"]
+    source = baseline / "routing.toml"
+    try:
+        data = tomllib.loads(source.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
+        raise ProjectionError("canonical provider routing source is missing or unreadable") from exc
+    models = data.get("models")
+    routing = data.get("routing")
+    if data.get("schema_version") != 1 or not isinstance(models, dict) or not isinstance(routing, dict):
+        raise ProjectionError("canonical provider routing must contain schema 1, models and routing tables")
+    selected = {key: row for key, row in models.items() if isinstance(row, dict) and row.get("provider") == provider}
+    own = routing.get(provider)
+    if not selected or not isinstance(own, dict):
+        raise ProjectionError(f"canonical provider routing is incomplete for {provider}")
+    skills = own.get("skills", {})
+    if not isinstance(skills, dict) or any(not isinstance(value, str) for value in skills.values()):
+        raise ProjectionError(f"canonical provider skill routing is invalid for {provider}")
+    if any(not isinstance(key, str) or key not in selected for key in [own.get("default_model"), *skills.values()]):
+        raise ProjectionError(f"canonical provider routing references an unconfigured {provider} model")
+    return "# Generated from the canonical harness baseline; edit the source and re-project.\n" + tomlkit.dumps(
+        {"schema_version": 1, "models": selected, "routing": {provider: own}}
+    )
+
+
 def build_plan(harness: str) -> Plan:
     profiles = load_profiles()
     baseline_cfg = profiles["baseline"]
@@ -602,7 +694,7 @@ def build_plan(harness: str) -> Plan:
     plan = Plan()
 
     surfaces = {}
-    if profile.get("skill_body") != "adapter_script" and profile.get("skills_dir"):
+    if profile.get("skills_dir"):
         surfaces["skills"] = profile["skills_dir"]
     if profile.get("rules_projection") and profile.get("rules_dir"):
         surfaces["rules"] = profile["rules_dir"]
@@ -631,6 +723,15 @@ def build_plan(harness: str) -> Plan:
             if path.suffix.lower() in TEXT_SUFFIXES:
                 source_text = path.read_text(encoding="utf-8", errors="surrogateescape")
                 text = substitute(source_text, tokens, rel_out, plan.gaps)
+                if src_name == "skills" and rel_in_surface.endswith("SKILL.md"):
+                    text = text.removeprefix("\ufeff")
+                    try:
+                        fields = skill_fields(text)
+                        if fields["name"] != path.parent.name:
+                            raise ValueError("Skill name differs from its directory")
+                    except ValueError as error:
+                        plan.gaps.append(f"{rel_out}: {error}")
+                        continue
                 text = apply_stamp(rel_out, text, stamp_text)
                 if src_name == "skills" and rel_in_surface.endswith("SKILL.md"):
                     source_rel = f"{baseline_cfg['root']}/{src_name}/{rel_in_surface}"
@@ -660,19 +761,40 @@ def build_plan(harness: str) -> Plan:
                 )
                 continue
 
+    if profile.get("routing_projection"):
+        try:
+            plan.writes[f"{profile['config_dir']}/routing.toml"] = render_provider_routing(profile, base)
+        except ProjectionError as exc:
+            plan.gaps.append(str(exc))
+
     manifest_path = base / baseline_cfg["hook_manifest"]
     if manifest_path.is_file():
         manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
-        rendered = render_hooks_registration(profile, manifest, tokens, plan.gaps)
+        valid_hooks = []
+        for hook in manifest.get("hook", []):
+            script = hook.get("script")
+            relative = PurePosixPath(script) if isinstance(script, str) else PurePosixPath(".")
+            if (
+                not isinstance(script, str)
+                or not script
+                or str(relative) == "."
+                or relative.is_absolute()
+                or ".." in relative.parts
+                or ":" in script
+                or "\\" in script
+                or hook.get("script_root") not in {None, "project_scripts"}
+            ):
+                plan.gaps.append(f"invalid_hook_source: {script!r}")
+                continue
+            source_root = PROJECT_ROOT / "scripts" if hook.get("script_root") == "project_scripts" else base / "hooks"
+            source = source_root / str(relative)
+            if not source.is_file() or source.resolve() != source:
+                plan.gaps.append(f"missing_hook_source: {source.relative_to(PROJECT_ROOT).as_posix()}")
+                continue
+            valid_hooks.append(hook)
+        rendered = render_hooks_registration(profile, {**manifest, "hook": valid_hooks}, tokens, plan.gaps)
         if rendered is not None:
             plan.writes[rendered[0]] = rendered[1]
-
-    if profile.get("skill_body") == "adapter_script" and profile.get("skills_dir"):
-        # The counterpart of the guard above: adapter-script harnesses opt out
-        # of the full-body skill projection and are served here instead. Merged
-        # before the ownership manifest is built, so these outputs are managed
-        # and drift-detected like every other projected file.
-        plan.writes.update(adapter_skill_outputs(profile, plan.gaps))
 
     ownership = sorted(plan.writes) + [f"{profile['config_dir']}/.projection-manifest.json"]
     plan.writes[f"{profile['config_dir']}/.projection-manifest.json"] = (
@@ -713,6 +835,15 @@ def run(harness: str, mode: str) -> int:
         for rel in plan.removes:
             print("  remove", rel)
         return 0
+    for rel in [*plan.writes, *plan.removes]:
+        relative = PurePosixPath(rel)
+        if relative.is_absolute() or ".." in relative.parts or ":" in rel:
+            print(f"FAIL: projection output is outside the selected project: {rel}")
+            return 2
+        target = PROJECT_ROOT.resolve() / rel
+        if target.resolve() != target:
+            print(f"FAIL: projection output is redirected: {rel}")
+            return 2
     if mode == "check":
         drift: list[str] = []
         for rel, content in plan.writes.items():
@@ -738,9 +869,14 @@ def run(harness: str, mode: str) -> int:
         target = PROJECT_ROOT / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         encoded = content.encode("utf-8", errors="surrogateescape")
-        tmp_target = target.with_name(f".{target.name}.tmp")
-        tmp_target.write_bytes(encoded)
-        os.replace(tmp_target, target)
+        descriptor, temporary = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=target.parent)
+        tmp_target = Path(temporary)
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(encoded)
+            os.replace(tmp_target, target)
+        finally:
+            tmp_target.unlink(missing_ok=True)
     removed = 0
     for rel in plan.removes:
         if remove_planned_path(PROJECT_ROOT / rel):

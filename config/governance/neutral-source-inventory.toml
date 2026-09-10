@@ -146,14 +146,6 @@ reason = "Packaged copy of the source-of-truth registry above; identical functio
 path = "scripts/harness_projection/profiles.toml"
 reason = "The projector profile table maps neutral source to each harness target; the target names are the projector's required input."
 
-[[declared_references.declarations]]
-path = "scripts/harness_parity_phase2.py"
-reason = "Cross-harness parity tooling names the harnesses under comparison; a parity check cannot compare targets it may not name."
-
-[[declared_references.declarations]]
-path = "scripts/check_codex_hook_parity.py"
-reason = "Hook-parity tooling names the harnesses under comparison; same justification as the parity phase-2 surface."
-
 # --- Declared families, seeded from the measured population on 2026-09-03. ---
 # A RATCHET: entries may be removed as sanitation lands and must not be added
 # without an owner-approved bridge revision. Before seeding, certification

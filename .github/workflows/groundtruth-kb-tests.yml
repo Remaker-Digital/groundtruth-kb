@@ -5,23 +5,18 @@ on:
     paths:
       - "groundtruth-kb/**"
       - ".github/workflows/groundtruth-kb-tests.yml"
-      # Cross-harness parity hard gate (Slice 6): trigger on harness-surface changes.
-      - "config/agent-control/harness-capability-registry.toml"
-      - "scripts/parity_discovery_diff.py"
+      - ".harness-baseline-configuration/**"
+      - "scripts/harness_projection/**"
       - "scripts/check_harness_parity.py"
-      - ".claude/settings.json"
-      - ".codex/hooks.json"
       - "platform_tests/scripts/test_parity_*.py"
   push:
     branches: [main, develop, "hotfix/**"]
     paths:
       - "groundtruth-kb/**"
       - ".github/workflows/groundtruth-kb-tests.yml"
-      - "config/agent-control/harness-capability-registry.toml"
-      - "scripts/parity_discovery_diff.py"
+      - ".harness-baseline-configuration/**"
+      - "scripts/harness_projection/**"
       - "scripts/check_harness_parity.py"
-      - ".claude/settings.json"
-      - ".codex/hooks.json"
       - "platform_tests/scripts/test_parity_*.py"
   workflow_dispatch:
 
@@ -48,9 +43,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install "./groundtruth-kb[dev,search,web]"
 
-      - name: Cross-harness parity discovery-diff hard gate
+      - name: Canonical harness derivation
         run: |
-          python scripts/parity_discovery_diff.py
+          python scripts/check_harness_parity.py --all --validate
 
       - name: Run GroundTruth KB platform tests
         working-directory: groundtruth-kb

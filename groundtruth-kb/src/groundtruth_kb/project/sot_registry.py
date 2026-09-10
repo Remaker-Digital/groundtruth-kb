@@ -1,36 +1,67 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""SoT (Source-of-Truth) artifact registry — single platform-wide inventory.
+"""Typed current declarations for the platform artifact registry.
 
-Implements DCL-SOT-REGISTRY-PROJECTION-PARITY-001 (TOML/MemBase parity) and
-DCL-SOT-REGISTRY-RECORD-SCHEMA-001 (per-record schema), in service of
-GOV-PLATFORM-SOT-REGISTRY-001 (every SoT class MUST be registered).
-
-The registry lives at ``config/registry/sot-artifacts.toml`` and is parsed
-into typed dataclasses. The registry projection in MemBase
-(``sot_artifacts`` table) is regenerated from TOML via :func:`sync_projection`.
-
-Loader-enforced invariants (:class:`InvalidSoTRecord` on violation):
-
-- All 10 required fields present.
-- ``domain``, ``lifecycle``, ``versioning_policy``, ``backup_policy``,
-  ``restore_action``,
-  ``owner_role`` values are in their respective enums.
-- ``lifecycle='generated'`` rows have a non-trivial ``mutation_api`` (acts as
-  generator pointer).
-- ``id`` is unique across the file.
-
-This module is a pure reader/projector — it does not mutate the filesystem
-or MemBase except through explicit :func:`sync_projection` calls.
-
-Reference precedent: ``groundtruth_kb.project.managed_registry``.
+The canonical source is ``config/registry/sot-artifacts.toml``. Public reads
+validate record fields, explicit lifecycle/coverage, locators and ambiguity.
+Read-only historical projection diagnostics remain for migration inspection;
+projections never supply current membership or gate a canonical read.
 """
 
 from __future__ import annotations
 
+import json
 import tomllib
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
+
+
+def registry_path_observations(
+    *,
+    specifications: Iterable[Mapping[str, Any]],
+    tests: Iterable[Mapping[str, Any]],
+    documents: Iterable[Mapping[str, Any]],
+    project_artifact_links: Iterable[Mapping[str, Any]],
+) -> list[dict[str, str]]:
+    """Extract typed current path fields, without interpreting narrative prose."""
+    observations: dict[tuple[str, str, str, str], dict[str, str]] = {}
+
+    def append(source_kind: str, source_id: Any, field: str, value: Any) -> None:
+        if value is None:
+            return
+        if not isinstance(value, str):
+            raise ValueError(f"{source_kind}:{source_id}:{field} must contain a path string")
+        path = value.strip().split("::", 1)[0]
+        if path:
+            row = {"path": path, "source_kind": source_kind, "source_id": str(source_id), "field": field}
+            observations[(path.casefold(), source_kind, str(source_id), field)] = row
+
+    for spec in specifications:
+        values = spec.get("source_paths")
+        if values is None:
+            continue
+        if isinstance(values, str):
+            try:
+                values = json.loads(values)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"specification:{spec['id']}:source_paths is not valid JSON") from exc
+        if not isinstance(values, (list, tuple)):
+            raise ValueError(f"specification:{spec['id']}:source_paths must be a list of paths")
+        for value in values:
+            if not isinstance(value, str):
+                raise ValueError(f"specification:{spec['id']}:source_paths must be a list of paths")
+            append("specification", spec["id"], "source_paths", value)
+    for test in tests:
+        append("test", test["id"], "test_file", test.get("test_file"))
+    for document in documents:
+        append("document", document["id"], "source_path", document.get("source_path"))
+    path_types = {"configuration", "document", "file", "path", "source_file", "test"}
+    for link in project_artifact_links:
+        if link.get("status") == "active" and str(link.get("artifact_type") or "").casefold() in path_types:
+            append("project_artifact_link", link["id"], "artifact_ref", link.get("artifact_ref"))
+    return [observations[key] for key in sorted(observations)]
+
 
 # ---------------------------------------------------------------------------
 # Enum types
@@ -216,15 +247,6 @@ class ParityReport:
     field_divergences: tuple[tuple[str, str], ...]  # (id, field_name) pairs
 
 
-@dataclass(frozen=True)
-class SyncReport:
-    """Result of regenerating MemBase projection from TOML."""
-
-    inserted: tuple[str, ...]
-    updated: tuple[str, ...]
-    unchanged: tuple[str, ...]
-
-
 # ---------------------------------------------------------------------------
 # Loader
 # ---------------------------------------------------------------------------
@@ -274,6 +296,11 @@ def _parse_record(record: dict[str, Any], *, allow_missing_coverage: bool = Fals
         record = {**record, "coverage_mode": None}
     else:
         _validate_required(record, record_id)
+    for field in (_REQUIRED_FIELDS | {"restore_action", "notes"}) - {"health_check_function", "coverage_mode"}:
+        if field in record and not isinstance(record[field], str):
+            raise InvalidSoTRecord(f"record {record_id!r}: {field} must be a string")
+    if record.get("coverage_mode") is not None and not isinstance(record["coverage_mode"], str):
+        raise InvalidSoTRecord(f"record {record_id!r}: coverage_mode must be a string")
     _validate_enum(record, "domain", _VALID_DOMAINS, record_id)
     _validate_enum(record, "lifecycle", _VALID_LIFECYCLES, record_id)
     _validate_enum(record, "versioning_policy", _VALID_VERSIONING, record_id)
@@ -328,7 +355,10 @@ def _parse_record(record: dict[str, Any], *, allow_missing_coverage: bool = Fals
 def _load_toml_bytes(payload: bytes, *, allow_missing_coverage: bool = False) -> list[SoTArtifact]:
     """Parse one exact TOML byte payload into validated registry records."""
 
-    data = tomllib.loads(payload.decode("utf-8"))
+    try:
+        data = tomllib.loads(payload.decode("utf-8"))
+    except (UnicodeError, tomllib.TOMLDecodeError) as exc:
+        raise InvalidSoTRecord(f"Invalid registry TOML: {exc}") from exc
     raw_records = data.get("artifacts", [])
     if not isinstance(raw_records, list):
         raise InvalidSoTRecord(f"top-level 'artifacts' must be a list of tables, got {type(raw_records).__name__}")
@@ -361,23 +391,15 @@ def _load_toml_unlocked(path: Path, *, allow_missing_coverage: bool = False) -> 
 
 
 def load_toml(path: Path) -> list[SoTArtifact]:
-    """Load one coherent declaration generation through the registry barrier."""
+    """Read the canonical TOML declaration without consulting or changing replicas."""
+    from groundtruth_kb.project.registry_control_plane import RegistryCoverageError, RegistryResolver
 
-    from groundtruth_kb.project.registry_control_plane import (
-        _exclusive_registry_read_barrier,
-        _RegistryOptimisticConflict,
-        registry_read_barrier,
-    )
-
+    records = _load_toml_unlocked(path)
     try:
-        with registry_read_barrier(registry_path=path) as lease:
-            payload = path.read_bytes()
-            records = _load_toml_bytes(payload)
-            lease.bind_toml(payload, records)
-            return records
-    except _RegistryOptimisticConflict:
-        with _exclusive_registry_read_barrier(registry_path=path):
-            return _load_toml_unlocked(path)
+        RegistryResolver(records)
+    except RegistryCoverageError as exc:
+        raise InvalidSoTRecord(str(exc)) from exc
+    return records
 
 
 # ---------------------------------------------------------------------------
@@ -548,147 +570,9 @@ def _load_projection_from_connection(
     return records
 
 
-def _load_projection_unlocked(
-    db_path: Path | str,
-    *,
-    allow_missing_coverage: bool = False,
-) -> list[SoTArtifact]:
-    """Load all ``current_sot_artifacts`` rows from MemBase as SoTArtifact records.
-
-    Returns an empty list if the table or view doesn't exist yet (fresh DB).
-    """
-    import sqlite3
-
-    conn = sqlite3.connect(str(db_path))
-    try:
-        return _load_projection_from_connection(conn, allow_missing_coverage=allow_missing_coverage)
-    finally:
-        conn.close()
-
-
 def load_projection(db_path: Path | str) -> list[SoTArtifact]:
-    """Load one coherent projection generation through the registry barrier."""
+    """Inspect a historical SQLite projection without granting membership authority."""
+    from groundtruth_kb.project.registry_control_plane import _open_registry_read_only_connection
 
-    from groundtruth_kb.project.registry_control_plane import (
-        _exclusive_registry_read_barrier,
-        _open_registry_read_only_connection,
-        _RegistryOptimisticConflict,
-        registry_read_barrier,
-    )
-
-    try:
-        with registry_read_barrier(db_path=Path(db_path)) as lease:
-            with _open_registry_read_only_connection(Path(db_path)) as conn:
-                records = _load_projection_from_connection(conn)
-            lease.bind_projection(records)
-            return records
-    except _RegistryOptimisticConflict:
-        with _exclusive_registry_read_barrier(db_path=Path(db_path)):
-            return _load_projection_unlocked(db_path)
-
-
-def _ensure_restore_action_column(cur: Any) -> None:
-    cur.execute("PRAGMA table_info(sot_artifacts)")
-    columns = {row[1] for row in cur.fetchall()}
-    if "restore_action" not in columns:
-        cur.execute(
-            f"ALTER TABLE sot_artifacts ADD COLUMN restore_action TEXT NOT NULL DEFAULT '{_DEFAULT_RESTORE_ACTION}'"
-        )
-
-
-def _ensure_coverage_mode_column(cur: Any) -> None:
-    cur.execute("PRAGMA table_info(sot_artifacts)")
-    columns = {row[1] for row in cur.fetchall()}
-    if "coverage_mode" not in columns:
-        cur.execute("ALTER TABLE sot_artifacts ADD COLUMN coverage_mode TEXT")
-
-
-def sync_projection(
-    toml_records: list[SoTArtifact],
-    db_path: Path | str,
-    *,
-    changed_by: str = "gt-registry-sync",
-    change_reason: str = "gt registry sync",
-) -> SyncReport:
-    """Regenerate the ``sot_artifacts`` projection from TOML records.
-
-    Inserts a new version row for each TOML record whose declared fields differ
-    from the latest projection row (or whose ID has no projection row yet).
-    Returns a :class:`SyncReport` enumerating inserted / updated / unchanged IDs.
-    """
-    import json
-    import sqlite3
-    from datetime import UTC, datetime
-
-    inserted: list[str] = []
-    updated: list[str] = []
-    unchanged: list[str] = []
-    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    conn = sqlite3.connect(str(db_path))
-    try:
-        cur = conn.cursor()
-        _ensure_restore_action_column(cur)
-        _ensure_coverage_mode_column(cur)
-        conn.commit()
-        proj_by_id = {r.id: r for r in _load_projection_unlocked(db_path, allow_missing_coverage=True)}
-        for rec in toml_records:
-            existing = proj_by_id.get(rec.id)
-            if existing is not None:
-                # Compare all schema fields.
-                same = all(getattr(existing, f) == getattr(rec, f) for f in (_REQUIRED_FIELDS | _OPTIONAL_FIELDS))
-                if same:
-                    unchanged.append(rec.id)
-                    continue
-            cur.execute(
-                "SELECT COALESCE(MAX(version), 0) FROM sot_artifacts WHERE id = ?",
-                (rec.id,),
-            )
-            current_version = cur.fetchone()[0]
-            next_version = current_version + 1
-            cur.execute(
-                """
-                INSERT INTO sot_artifacts (
-                    id, version, domain, lifecycle, storage_path,
-                    authority_spec_id, mutation_api, versioning_policy,
-                    backup_policy, health_check_function, owner_role,
-                    restore_action,
-                    depends_on, forbidden_substitutes, notes, coverage_mode,
-                    changed_by, changed_at, change_reason
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    rec.id,
-                    next_version,
-                    rec.domain,
-                    rec.lifecycle,
-                    rec.storage_path,
-                    rec.authority_spec_id,
-                    rec.mutation_api,
-                    rec.versioning_policy,
-                    rec.backup_policy,
-                    rec.health_check_function,
-                    rec.owner_role,
-                    rec.restore_action,
-                    json.dumps(list(rec.depends_on)) if rec.depends_on else None,
-                    json.dumps(list(rec.forbidden_substitutes)) if rec.forbidden_substitutes else None,
-                    rec.notes or None,
-                    rec.coverage_mode,
-                    changed_by,
-                    now,
-                    change_reason,
-                ),
-            )
-            if existing is None:
-                inserted.append(rec.id)
-            else:
-                updated.append(rec.id)
-        conn.commit()
-    finally:
-        conn.close()
-
-    return SyncReport(
-        inserted=tuple(inserted),
-        updated=tuple(updated),
-        unchanged=tuple(unchanged),
-    )
+    with _open_registry_read_only_connection(Path(db_path)) as conn:
+        return _load_projection_from_connection(conn)

@@ -1,6 +1,6 @@
-# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+# Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 #
-# Managed Artifact Registry — single source of truth for scaffold, upgrade, and doctor.
+# Managed Artifact Registry â€” single source of truth for scaffold, upgrade, and doctor.
 #
 # 62 records = 17 hooks + 12 rules + 12 skills + 4 files + 13 settings-hook-registrations + 4 gitignore-patterns.
 #
@@ -13,8 +13,8 @@
 #                                (empty = not required, or enforced via composite check)
 #
 # Loader invariants (InvalidArtifactRecord on violation):
-#   - managed_profiles ⊆ initial_profiles
-#   - doctor_required_profiles ⊆ initial_profiles
+#   - managed_profiles âŠ† initial_profiles
+#   - doctor_required_profiles âŠ† initial_profiles
 #
 # Profile groups:
 #   ALL     = ["local-only", "dual-agent", "dual-agent-webapp"]
@@ -25,32 +25,6 @@
 # HOOKS (19 records: 14 original plus active governance and follow-on policy
 # hooks after retired dead-stub hooks were removed)
 # =========================================================================
-
-[[artifacts]]
-class = "hook"
-id = "hook.spec-classifier"
-template_path = "hooks/spec-classifier.py"
-target_path = ".claude/hooks/spec-classifier.py"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "UserPromptSubmit spec-language prompt classifier; product-managed framework policy."
-
-[[artifacts]]
-class = "hook"
-id = "hook.intake-classifier"
-template_path = "hooks/intake-classifier.py"
-target_path = ".claude/hooks/intake-classifier.py"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "UserPromptSubmit owner-input intake classifier; product-managed because intake taxonomy is framework policy."
 
 [[artifacts]]
 class = "hook"
@@ -105,32 +79,6 @@ adopter_divergence_policy = "warn"
 notes = "PreToolUse Write/Edit gate enforcing bridge-protocol compliance; product-managed because protocol contracts are framework policy."
 
 [[artifacts]]
-class = "hook"
-id = "hook.delib-search-gate"
-template_path = "hooks/delib-search-gate.py"
-target_path = ".claude/hooks/delib-search-gate.py"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = []
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "UserPromptSubmit deliberation-search policy gate; product-managed framework policy."
-
-[[artifacts]]
-class = "hook"
-id = "hook.delib-search-tracker"
-template_path = "hooks/delib-search-tracker.py"
-target_path = ".claude/hooks/delib-search-tracker.py"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = []
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "PostToolUse deliberation-search-invocation tracker; product-managed framework observability policy."
-
-[[artifacts]]
 # Per bridge gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29 GO at -006.
 # Lifecycle axes match the paired settings-hook-registration below to satisfy
 # F1 fix from -004 NO-GO (avoid inert-hook risk where upgrade delivers
@@ -175,19 +123,6 @@ notes = "Session-health monitoring hook; product-managed framework policy."
 
 [[artifacts]]
 class = "hook"
-id = "hook.session-start-governance"
-template_path = "hooks/session-start-governance.py"
-target_path = ".claude/hooks/session-start-governance.py"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = []
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "SessionStart governance dispatcher; product-managed framework policy."
-
-[[artifacts]]
-class = "hook"
 id = "hook.spec-before-code"
 template_path = "hooks/spec-before-code.py"
 target_path = ".claude/hooks/spec-before-code.py"
@@ -198,8 +133,8 @@ ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
 
-# Governance hooks (5 records — per gtkb-da-governance-completeness-implementation-015
-# §5.5-§5.9). Dual-agent-only. _delib_common is a shared helper module (no
+# Governance hooks (5 records â€” per gtkb-da-governance-completeness-implementation-015
+# Â§5.5-Â§5.9). Dual-agent-only. _delib_common is a shared helper module (no
 # settings-hook-registration). The other four are event hooks with matching
 # settings-hook-registration entries below.
 notes = "PreToolUse GOV-01 spec-first enforcement gate; product-managed framework governance policy."
@@ -229,36 +164,6 @@ ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
 notes = "Shared helper module for deliberation hooks; product-managed because the helper API is framework-defined."
-
-[[artifacts]]
-class = "hook"
-id = "hook.owner-decision-capture"
-template_path = "hooks/owner-decision-capture.py"
-target_path = ".claude/hooks/owner-decision-capture.py"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "PostToolUse owner-decision archiver to Deliberation Archive; product-managed framework policy."
-
-[[artifacts]]
-class = "hook"
-id = "hook.gov09-capture"
-template_path = "hooks/gov09-capture.py"
-target_path = ".claude/hooks/gov09-capture.py"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-
-# =========================================================================
-# RULES (10 records)
-# =========================================================================
-notes = "UserPromptSubmit GOV-09 specification-language classifier; product-managed framework governance policy."
 
 [[artifacts]]
 class = "rule"
@@ -431,32 +336,6 @@ notes = "Mandatory session-start ORIENT block format, live-source rules, structu
 
 [[artifacts]]
 class = "skill"
-id = "skill.decision-capture.skill-md"
-template_path = "skills/gtkb-decision-capture/SKILL.md"
-target_path = ".claude/skills/gtkb-decision-capture/SKILL.md"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "decision-capture SKILL.md manifest; product-managed because skill contract is framework-defined."
-
-[[artifacts]]
-class = "skill"
-id = "skill.decision-capture.helper"
-template_path = "skills/gtkb-decision-capture/helpers/record_decision.py"
-target_path = ".claude/skills/gtkb-decision-capture/helpers/record_decision.py"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "decision-capture helper module; product-managed because Deliberation Archive write contracts are framework-defined."
-
-[[artifacts]]
-class = "skill"
 id = "skill.baseline-audit.skill-md"
 template_path = "skills/gtkb-baseline-audit/SKILL.md"
 target_path = ".claude/skills/gtkb-baseline-audit/SKILL.md"
@@ -480,19 +359,6 @@ ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
 notes = "bridge-propose SKILL.md manifest; product-managed because skill contract is framework-defined."
-
-[[artifacts]]
-class = "skill"
-id = "skill.bridge-propose.helper"
-template_path = "skills/gtkb-bridge-propose/helpers/write_bridge.py"
-target_path = ".claude/skills/gtkb-bridge-propose/helpers/write_bridge.py"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "bridge-propose write_bridge.py helper; product-managed because bridge-creation contracts are framework-defined."
 
 [[artifacts]]
 class = "skill"
@@ -548,32 +414,6 @@ notes = "bridge scan helper; product-managed because bridge queue classification
 
 [[artifacts]]
 class = "skill"
-id = "skill.bridge.revise-helper"
-template_path = "skills/gtkb-bridge/helpers/revise_bridge.py"
-target_path = ".claude/skills/gtkb-bridge/helpers/revise_bridge.py"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "bridge revision helper; product-managed because NO-GO revision workflow is framework-defined."
-
-[[artifacts]]
-class = "skill"
-id = "skill.bridge.impl-report-helper"
-template_path = "skills/gtkb-bridge/helpers/impl_report_bridge.py"
-target_path = ".claude/skills/gtkb-bridge/helpers/impl_report_bridge.py"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "bridge implementation-report helper; product-managed because verification handoff workflow is framework-defined."
-
-[[artifacts]]
-class = "skill"
 id = "skill.bridge.show-thread-helper"
 template_path = "skills/gtkb-bridge/helpers/show_thread_bridge.py"
 target_path = ".claude/skills/gtkb-bridge/helpers/show_thread_bridge.py"
@@ -589,62 +429,6 @@ notes = "bridge show-thread helper; product-managed because bridge thread status
 # SETTINGS-HOOK-REGISTRATION (14 records: 11 original plus active governance
 # and recovery hook registrations after retired dead-stub hooks were removed)
 # =========================================================================
-
-[[artifacts]]
-class = "settings-hook-registration"
-id = "settings.hook.session-start-governance.sessionstart"
-event = "SessionStart"
-hook_filename = "session-start-governance.py"
-target_settings_path = ".claude/settings.json"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "structured-merge"
-adopter_divergence_policy = "warn"
-notes = "Registers session-start-governance on SessionStart; product-managed framework registration."
-
-[[artifacts]]
-class = "settings-hook-registration"
-id = "settings.hook.delib-search-gate.userpromptsubmit"
-event = "UserPromptSubmit"
-hook_filename = "delib-search-gate.py"
-target_settings_path = ".claude/settings.json"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "structured-merge"
-adopter_divergence_policy = "warn"
-notes = "Registers delib-search-gate on UserPromptSubmit; product-managed framework registration."
-
-[[artifacts]]
-class = "settings-hook-registration"
-id = "settings.hook.intake-classifier.userpromptsubmit"
-event = "UserPromptSubmit"
-hook_filename = "intake-classifier.py"
-target_settings_path = ".claude/settings.json"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "structured-merge"
-adopter_divergence_policy = "warn"
-notes = "Registers intake-classifier on UserPromptSubmit; product-managed framework registration."
-
-[[artifacts]]
-class = "settings-hook-registration"
-id = "settings.hook.delib-search-tracker.posttooluse"
-event = "PostToolUse"
-hook_filename = "delib-search-tracker.py"
-target_settings_path = ".claude/settings.json"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "structured-merge"
-adopter_divergence_policy = "warn"
-notes = "Registers delib-search-tracker on PostToolUse; product-managed framework registration."
 
 [[artifacts]]
 # Per bridge gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29 GO at -006.
@@ -746,44 +530,11 @@ ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
 
-# Governance hook settings registrations (4 records — per
-# gtkb-da-governance-completeness-implementation-015 §A). First rows to opt
+# Governance hook settings registrations (4 records â€” per
+# gtkb-da-governance-completeness-implementation-015 Â§A). First rows to opt
 # in to BOTH upgrade enforcement AND doctor enforcement. Registry order
 # below is the authoritative target order for the structured-merge.
 notes = "Registers scanner-safe-writer on PreToolUse; product-managed framework registration."
-
-[[artifacts]]
-class = "settings-hook-registration"
-id = "settings.hook.gov09-capture.userpromptsubmit"
-event = "UserPromptSubmit"
-hook_filename = "gov09-capture.py"
-target_settings_path = ".claude/settings.json"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "structured-merge"
-adopter_divergence_policy = "warn"
-notes = "Registers gov09-capture on UserPromptSubmit; product-managed framework registration."
-
-[[artifacts]]
-class = "settings-hook-registration"
-id = "settings.hook.owner-decision-capture.posttooluse"
-event = "PostToolUse"
-hook_filename = "owner-decision-capture.py"
-target_settings_path = ".claude/settings.json"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "structured-merge"
-adopter_divergence_policy = "warn"
-
-# =========================================================================
-# GITIGNORE-PATTERN (4 records — 1 original + 3 adopter-critical per
-# gtkb-settings-merge C4)
-# =========================================================================
-notes = "Registers owner-decision-capture on PostToolUse; product-managed framework registration."
 
 [[artifacts]]
 class = "gitignore-pattern"
@@ -881,15 +632,3 @@ doctor_required_profiles = []
 ownership = "gt-kb-scaffolded"
 upgrade_policy = "preserve"
 notes = "Adopter-facing isolation-migration rehearsal recipe per GTKB-ISOLATION-017 Slice 4 (bridge -008 GO). Documents the out-of-band rehearsal recipe per DELIB-S328 decision 7 (out_of_band_recipe_only). Scaffolded once at init; adopter may customize after; upgrade does not overwrite."
-
-[[artifacts]]
-class = "file"
-id = "file.narrative-artifact-approval-gate-template"
-template_path = "hooks/narrative-artifact-approval-gate.py"
-target_path = ".claude/hooks/narrative-artifact-approval-gate.py"
-initial_profiles = []
-managed_profiles = []
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "transient"
-notes = "Template-only narrative-artifact approval gate coverage record per WI-4225; not scaffolded, upgrade-managed, or doctor-required until a separate bridge approval assigns lifecycle profiles."

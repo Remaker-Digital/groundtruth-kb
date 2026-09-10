@@ -19,7 +19,7 @@ from pathlib import Path
 from groundtruth_kb.project import doctor
 from groundtruth_kb.project.doctor import (
     _check_harness_local_scratchpad_boundary,
-    _check_harness_metadata_freshness,
+    _check_provider_routing,
     _read_text_for_check,
 )
 
@@ -129,21 +129,11 @@ def test_boundary_check_passes_on_valid_input(tmp_path: Path) -> None:
 
 
 def test_metadata_freshness_check_fails_rather_than_aborting(tmp_path: Path) -> None:
-    """A non-boundary remaining site also converts decode failure into a named FAIL.
+    """Preserve strict UTF-8 diagnostics through the current provider-local reader."""
+    (tmp_path / ".api-harness" / "alibaba-cloud-studio").mkdir(parents=True)
+    (tmp_path / ".api-harness" / "alibaba-cloud-studio" / "routing.toml").write_bytes(INVALID_UTF8)
 
-    ``_check_harness_metadata_freshness`` previously called unguarded
-    ``read_text(encoding="utf-8")`` and caught only ``OSError`` /
-    ``TOMLDecodeError``, so ``UnicodeDecodeError`` aborted the doctor run.
-    """
-    (tmp_path / ".api-harness").mkdir()
-    (tmp_path / "config" / "dispatcher").mkdir(parents=True)
-    (tmp_path / ".api-harness" / "routing.toml").write_bytes(INVALID_UTF8)
-    (tmp_path / "config" / "dispatcher" / "rules.toml").write_text(
-        "[harnesses]\n",
-        encoding="utf-8",
-    )
-
-    result = _check_harness_metadata_freshness(tmp_path)
+    result = _check_provider_routing(tmp_path, "alibaba-cloud-studio")
 
     assert result.status == "fail"
     assert "not valid UTF-8" in result.message

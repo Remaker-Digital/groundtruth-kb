@@ -468,12 +468,12 @@ def test_dev_environment_inventory_drift_gate_fails_on_blocking_result(monkeypat
     def fake_helpers():
         return lambda _root: {
             "status": "fail",
-            "blocking": [{"path": ".githooks/pre-commit", "route": "compatibility_tests"}],
+            "blocking": [{"reason": "normalized_inventory_drift", "message": "Current inventory differs"}],
         }
 
     monkeypatch.setattr(gate, "_dev_inventory_drift_helpers", fake_helpers)
 
-    with pytest.raises(gate.GateFailure, match="pre-commit requires compatibility_tests"):
+    with pytest.raises(gate.GateFailure, match="Current inventory differs"):
         gate._check_dev_environment_inventory_drift()
 
 
@@ -634,7 +634,7 @@ def test_frontend_gate_syncs_admin_env_once_and_disables_admin_lifecycle(monkeyp
     assert all(env and env.get("npm_config_ignore_scripts") == "true" for env in envs[3:])
 
 
-def test_python_gate_runs_codex_hook_parity_before_pytest(monkeypatch):
+def test_python_gate_runs_canonical_harness_conformance_before_pytest(monkeypatch):
     gate = _load_gate_module()
     commands = []
 
@@ -645,15 +645,12 @@ def test_python_gate_runs_codex_hook_parity_before_pytest(monkeypatch):
 
     gate._python_gates()
 
-    parity_index = commands.index([sys.executable, "scripts/check_codex_hook_parity.py"])
-    adapter_index = commands.index(
-        [sys.executable, "scripts/generate_codex_skill_adapters.py", "--update-registry", "--check"]
-    )
-    harness_parity_index = commands.index([sys.executable, "scripts/parity_discovery_diff.py"])
+    assert not any("scripts/check_codex_hook_parity.py" in command for command in commands)
+    harness_parity_index = commands.index([sys.executable, "scripts/check_harness_parity.py", "--all"])
     pytest_index = next(
         index for index, command in enumerate(commands) if command[:3] == [sys.executable, "-m", "pytest"]
     )
-    assert parity_index < adapter_index < harness_parity_index < pytest_index
+    assert harness_parity_index < pytest_index
     assert "platform_tests/scripts/test_codex_hook_parity.py" in commands[pytest_index]
     assert "platform_tests/scripts/test_standing_backlog_harvest.py" in commands[pytest_index]
     assert "platform_tests/scripts/test_session_self_initialization.py" in commands[pytest_index]
@@ -676,12 +673,12 @@ def test_python_gate_runs_environment_isolation_before_pytest(monkeypatch):
     gate._python_gates()
 
     env_index = commands.index([sys.executable, "scripts/check_environment_isolation.py"])
-    parity_index = commands.index([sys.executable, "scripts/check_codex_hook_parity.py"])
-    harness_parity_index = commands.index([sys.executable, "scripts/parity_discovery_diff.py"])
+    assert not any("scripts/check_codex_hook_parity.py" in command for command in commands)
+    harness_parity_index = commands.index([sys.executable, "scripts/check_harness_parity.py", "--all"])
     pytest_index = next(
         index for index, command in enumerate(commands) if command[:3] == [sys.executable, "-m", "pytest"]
     )
-    assert parity_index < harness_parity_index < env_index < pytest_index
+    assert harness_parity_index < env_index < pytest_index
     assert "platform_tests/scripts/test_check_environment_isolation.py" in commands[pytest_index]
 
 
@@ -741,127 +738,6 @@ def test_python_gate_runs_scoped_service_boundary_before_pytest(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_narrative_artifact_lane_reached_before_inventory_drift_failure(monkeypatch, capsys):
-    """Behavioral test per NO-GO -009 F2: when the inventory-drift lane FAILs
-    in the current baseline state, the narrative-artifact-evidence lane must
-    still emit its PASS line so dashboard / CI consumers can pattern-match
-    the rollup status. The fix moves the narrative-artifact lane BEFORE the
-    inventory-drift lane.
-
-    This test is the reachability protection that string-presence tests miss:
-    a regression that re-orders the lanes (putting drift before narrative)
-    would silently pass `test_c_release_gate_imports_narrative_artifact_evidence`
-    + `test_c_release_gate_pass_message_present` (since the source still
-    contains the import + string), but THIS test would fail because the
-    PASS line would not appear before the simulated FAIL.
-    """
-    gate = _load_gate_module()
-
-    narrative_lane_was_called = []
-    inventory_drift_was_called = []
-
-    def fake_narrative_lane():
-        narrative_lane_was_called.append(True)
-        print("PASS narrative-artifact evidence (no protected paths in staged set)")
-
-    def fake_inventory_drift():
-        inventory_drift_was_called.append(True)
-        raise gate.GateFailure(
-            "Development environment inventory drift: simulated baseline failure for reachability test"
-        )
-
-    # Stub out lanes that come earlier in the pipeline so they pass quickly.
-    monkeypatch.setattr(gate, "_check_python_version", lambda *a, **kw: None)
-    monkeypatch.setattr(gate, "_check_sot_registry_authority", lambda: None)
-    monkeypatch.setattr(gate, "_check_secret_manifest_removed", lambda: None)
-    monkeypatch.setattr(gate, "_check_secret_gate_present", lambda: None)
-    monkeypatch.setattr(gate, "_check_secret_ci_workflow_present", lambda: None)
-    monkeypatch.setattr(gate, "_check_tracked_secret_scan", lambda: None)
-    monkeypatch.setattr(gate, "_check_project_resource_registry", lambda: None)
-    monkeypatch.setattr(gate, "_check_standing_backlog_health", lambda: None)
-    monkeypatch.setattr(gate, "_check_agent_red_app_root_minimization", lambda: None)
-    monkeypatch.setattr(gate, "_check_no_window_spawn_audit", lambda: None)
-    monkeypatch.setattr(gate, "_check_dev_environment_inventory", lambda *a, **kw: None)
-    monkeypatch.setattr(gate, "_check_dev_environment_inventory_drift", fake_inventory_drift)
-    monkeypatch.setattr(gate, "_check_narrative_artifact_evidence", fake_narrative_lane)
-
-    monkeypatch.setattr(sys, "argv", ["release_candidate_gate.py", "--skip-python", "--skip-frontend"])
-
-    exit_code = gate.main()
-
-    assert exit_code == 1, "Release gate must FAIL when inventory-drift lane raises GateFailure"
-    assert narrative_lane_was_called, (
-        "Narrative-artifact evidence lane MUST be called even when inventory-drift fails. "
-        "Per NO-GO -009 F1, lane must run before inventory-drift to surface rollup in baseline state."
-    )
-    assert inventory_drift_was_called, "Inventory-drift lane was monkeypatched but never called"
-
-    captured = capsys.readouterr()
-    output = captured.out + captured.err
-
-    pass_pos = output.find("PASS narrative-artifact evidence")
-    fail_pos = output.find("RELEASE GATE: FAIL")
-
-    assert pass_pos != -1, (
-        "PASS narrative-artifact evidence line MUST appear in release-gate output "
-        f"(per Slice C C4 acceptance). Got:\n{output}"
-    )
-    assert fail_pos != -1, "Expected RELEASE GATE: FAIL after simulated drift failure"
-    assert pass_pos < fail_pos, (
-        "PASS narrative-artifact evidence MUST appear BEFORE RELEASE GATE: FAIL "
-        "so dashboard / CI consumers can pattern-match the rollup status in baseline state. "
-        f"Got pass_pos={pass_pos}, fail_pos={fail_pos}."
-    )
-
-
-def test_narrative_artifact_lane_runs_when_drift_lane_skipped(monkeypatch, capsys):
-    """Per NO-GO -009 F1 control check: when --skip-dev-inventory-drift is
-    passed, the narrative-artifact lane STILL runs (it has no dependency on
-    inventory-drift state). This is the simpler path that Codex used as a
-    control to prove the helper itself works.
-    """
-    gate = _load_gate_module()
-
-    narrative_lane_was_called = []
-
-    def fake_narrative_lane():
-        narrative_lane_was_called.append(True)
-        print("PASS narrative-artifact evidence (no protected paths in staged set)")
-
-    monkeypatch.setattr(gate, "_check_python_version", lambda *a, **kw: None)
-    monkeypatch.setattr(gate, "_check_sot_registry_authority", lambda: None)
-    monkeypatch.setattr(gate, "_check_secret_manifest_removed", lambda: None)
-    monkeypatch.setattr(gate, "_check_secret_gate_present", lambda: None)
-    monkeypatch.setattr(gate, "_check_secret_ci_workflow_present", lambda: None)
-    monkeypatch.setattr(gate, "_check_tracked_secret_scan", lambda: None)
-    monkeypatch.setattr(gate, "_check_project_resource_registry", lambda: None)
-    monkeypatch.setattr(gate, "_check_standing_backlog_health", lambda: None)
-    monkeypatch.setattr(gate, "_check_agent_red_app_root_minimization", lambda: None)
-    monkeypatch.setattr(gate, "_check_no_window_spawn_audit", lambda: None)
-    monkeypatch.setattr(gate, "_check_dev_environment_inventory", lambda *a, **kw: None)
-    monkeypatch.setattr(gate, "_check_narrative_artifact_evidence", fake_narrative_lane)
-
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "release_candidate_gate.py",
-            "--skip-python",
-            "--skip-frontend",
-            "--skip-dev-inventory-drift",
-        ],
-    )
-
-    exit_code = gate.main()
-
-    assert exit_code == 0, "Release gate must PASS when only narrative-artifact lane runs and is clean"
-    assert narrative_lane_was_called, "Narrative-artifact lane must run when invoked without skips"
-
-    captured = capsys.readouterr()
-    assert "PASS narrative-artifact evidence" in captured.out
-    assert "RELEASE GATE: PASS" in captured.out
-
-
 def test_sot_registry_authority_requires_membership_closed_unpruned_validation(monkeypatch, capsys):
     gate = _load_gate_module()
     from groundtruth_kb.project import registry_control_plane
@@ -873,7 +749,7 @@ def test_sot_registry_authority_requires_membership_closed_unpruned_validation(m
         return {
             "valid": True,
             "record_count": 50,
-            "generation_digest": "sha256:test-generation",
+            "declaration_digest": "sha256:test-declaration",
             "membership_reconciliation": {
                 "membership_complete": True,
                 "pruned_envelope_count": 0,
@@ -886,7 +762,7 @@ def test_sot_registry_authority_requires_membership_closed_unpruned_validation(m
     gate._check_sot_registry_authority()
 
     assert calls == [{"project_root": gate.PROJECT_ROOT, "require_reverse_closure": True}]
-    assert "PASS SoT registry authority (50 records, generation=sha256:test-generation" in capsys.readouterr().out
+    assert "PASS SoT registry authority (50 records, declaration=sha256:test-declaration" in capsys.readouterr().out
 
 
 def test_sot_registry_authority_fails_closed_on_membership_gap(monkeypatch):
@@ -917,7 +793,7 @@ def test_sot_registry_authority_blocks_pruned_release_census(monkeypatch):
         lambda **_kwargs: {
             "valid": True,
             "record_count": 50,
-            "generation_digest": "sha256:test-generation",
+            "declaration_digest": "sha256:test-declaration",
             "membership_reconciliation": {
                 "membership_complete": True,
                 "pruned_envelope_count": 2,

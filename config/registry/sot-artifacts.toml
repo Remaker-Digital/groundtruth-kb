@@ -381,19 +381,19 @@ notes = "Bridge dispatch substrate selection. forbidden_substitutes per DELIB-20
 [[artifacts]]
 id = "harness-capability-registry"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "config/agent-control/harness-capability-registry.toml"
 coverage_mode = "exact"
 authority_spec_id = "GOV-ARTIFACT-APPROVAL-001"
 mutation_api = "Bridge proposal + manual TOML edit; SHA-256 pinned per adapter"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "Capability parity across Claude/Codex/Antigravity harnesses; SHA-pinned adapters."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "session-startup-control-map"
@@ -755,7 +755,7 @@ notes = ""
 [[artifacts]]
 id = "pending-owner-decisions"
 domain = "runtime_state"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "memory/pending-owner-decisions.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -1146,7 +1146,7 @@ notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact 
 [[artifacts]]
 id = "wi5441-groundtruth-kb-src-groundtruth-kb-bridge-proposal-filing-py"
 domain = "bridge_protocol"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "groundtruth-kb/src/groundtruth_kb/bridge/proposal_filing.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
@@ -1299,7 +1299,7 @@ notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact 
 [[artifacts]]
 id = "wi5441-groundtruth-kb-templates-skills-bridge-propose-helpers-write-bridge-py"
 domain = "bridge_protocol"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "groundtruth-kb/templates/skills/bridge-propose/helpers/write_bridge.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
@@ -1316,7 +1316,7 @@ notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact 
 [[artifacts]]
 id = "wi5441-groundtruth-kb-templates-skills-gtkb-bridge-propose-helpers-write-bridge-py"
 domain = "bridge_protocol"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "groundtruth-kb/templates/skills/gtkb-bridge-propose/helpers/write_bridge.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
@@ -1333,7 +1333,7 @@ notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact 
 [[artifacts]]
 id = "wi5441-groundtruth-kb-templates-skills-gtkb-bridge-helpers-impl-report-bridge-py"
 domain = "bridge_protocol"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "groundtruth-kb/templates/skills/gtkb-bridge/helpers/impl_report_bridge.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
@@ -1350,7 +1350,7 @@ notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact 
 [[artifacts]]
 id = "wi5441-groundtruth-kb-templates-skills-gtkb-bridge-helpers-revise-bridge-py"
 domain = "bridge_protocol"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "groundtruth-kb/templates/skills/gtkb-bridge/helpers/revise_bridge.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
@@ -1367,7 +1367,7 @@ notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact 
 [[artifacts]]
 id = "wi5441-scripts-check-protected-commit-authorization-py"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/check_protected_commit_authorization.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -1418,7 +1418,7 @@ notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact 
 [[artifacts]]
 id = "wi5441-scripts-gtkb-bridge-writer-py"
 domain = "bridge_protocol"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/gtkb_bridge_writer.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
@@ -1430,24 +1430,24 @@ health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+notes = "Retired raw file writer. Native bridge services validate and atomically record complete agent-authored deliveries."
 
 [[artifacts]]
 id = "wi5441-scripts-gtkb-file-reference-migration-py"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/gtkb_file_reference_migration.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Governed bridge-authorized source edit"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "wi5441-scripts-implementation-start-gate-py"
@@ -1741,36 +1741,36 @@ notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact
 [[artifacts]]
 id = "wi5441-config-agent-control-gtkb-harness-capability-registry-toml"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "config/agent-control/gtkb-harness-capability-registry.toml"
 coverage_mode = "exact"
 authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
 mutation_api = "Governed bridge-authorized source edit"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "WI-5441 load-bearing control or enforcement artifact; exact registration required before mutation."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "wi5441-config-agent-control-skill-rename-map-toml"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "config/agent-control/skill-rename-map.toml"
 coverage_mode = "exact"
 authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
 mutation_api = "Governed bridge-authorized source edit"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "WI-5441 load-bearing control or enforcement artifact; exact registration required before mutation."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "wi5640-source-001"
@@ -2438,7 +2438,7 @@ notes = "WI-5640 canonical destination; exact registration required before consu
 [[artifacts]]
 id = "wi5640-source-022"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = ".claude/hooks/owner-decision-capture.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -2455,7 +2455,7 @@ notes = "WI-5640 retained obsolete source; exact registration required during re
 [[artifacts]]
 id = "wi5640-destination-022"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "config/hooks/gtkb-owner-decision-capture.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -2472,7 +2472,7 @@ notes = "WI-5640 canonical destination; exact registration required before consu
 [[artifacts]]
 id = "wi5640-source-023"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = ".claude/hooks/owner-decision-tracker.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -2489,7 +2489,7 @@ notes = "WI-5640 retained obsolete source; exact registration required during re
 [[artifacts]]
 id = "wi5640-destination-023"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "config/hooks/gtkb-owner-decision-tracker.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -3066,37 +3066,37 @@ notes = "WI-5640 canonical destination; exact registration required before consu
 
 [[artifacts]]
 id = "wi5640-source-044"
-domain = "control_surface"
-lifecycle = "active"
+domain = "retired"
+lifecycle = "archive"
 storage_path = ".claude/rules/codex-decision-ledger.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
-mutation_api = "Governed bridge-authorized source edit"
+mutation_api = ""
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+notes = "Owner direction is applied to current canonical state or action; the interactive session retains the conversation. This former ledger is not an active source or restore target."
 
 [[artifacts]]
 id = "wi5640-destination-044"
-domain = "control_surface"
-lifecycle = "active"
+domain = "retired"
+lifecycle = "archive"
 storage_path = "config/agent-control/gtkb-decision-ledger.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
-mutation_api = "Governed bridge-authorized source edit"
+mutation_api = ""
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+notes = "Owner direction is applied to current canonical state or action; the interactive session retains the conversation. This former ledger is not an active source or restore target."
 
 [[artifacts]]
 id = "wi5640-source-045"
@@ -4087,36 +4087,36 @@ notes = "WI-5640 canonical destination; exact registration required before consu
 [[artifacts]]
 id = "wi5640-source-075"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "config/agent-control/command-surface.toml"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Governed bridge-authorized source edit"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "wi5640-destination-075"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "config/agent-control/gtkb-command-surface.toml"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Governed bridge-authorized source edit"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "wi5640-source-076"
@@ -4189,7 +4189,7 @@ notes = "WI-5640 canonical destination; exact registration required before consu
 [[artifacts]]
 id = "wi5640-source-079"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "config/agent-control/harness-model-pin-confirmations.toml"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -4206,7 +4206,7 @@ notes = "WI-5640 retained obsolete source; exact registration required during re
 [[artifacts]]
 id = "wi5640-destination-079"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "config/agent-control/gtkb-harness-model-pin-confirmations.toml"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -4461,19 +4461,19 @@ notes = "WI-5640 canonical destination; exact registration required before consu
 [[artifacts]]
 id = "wi5640-destination-088"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "config/agent-control/gtkb-skill-rename-map.toml"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Governed bridge-authorized source edit"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "wi5640-source-089"
@@ -4546,19 +4546,19 @@ notes = "WI-5640 canonical destination; exact registration required before consu
 [[artifacts]]
 id = "wi5640-config-file-reference-migration-wi5640-toml"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "config/file-reference-migration/wi5640.toml"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Governed bridge-authorized source edit"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "WI-5640 load-bearing deterministic migration policy; exact registration required because DEFAULT_POLICY loads this file for analyze, preflight, recover, and plan generation."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "wi5441-member-agent-skills-gtkb-adr-skill-md-5228f23782"
@@ -4835,7 +4835,7 @@ notes = "Deterministically admitted by WI-5441 observers: capability_inventory, 
 [[artifacts]]
 id = "wi5441-member-agent-skills-gtkb-decision-capture-skill-md-fdd2263dfa"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = ".agent/skills/gtkb-decision-capture/SKILL.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -5600,7 +5600,7 @@ notes = "Deterministically admitted by WI-5441 observers: capability_inventory, 
 [[artifacts]]
 id = "wi5441-member-api-harness-skills-gtkb-decision-capture-skill-m-afda5514d6"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = ".api-harness/skills/gtkb-decision-capture/SKILL.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -6382,7 +6382,7 @@ notes = "Deterministically admitted by WI-5441 observers: capability_inventory, 
 [[artifacts]]
 id = "wi5441-member-claude-skills-gtkb-decision-capture-helpers-reco-59938c8877"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = ".claude/skills/gtkb-decision-capture/helpers/record_decision.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -6399,7 +6399,7 @@ notes = "Deterministically admitted by WI-5441 observers: registered_dependency_
 [[artifacts]]
 id = "wi5441-member-claude-skills-gtkb-decision-capture-skill-md-6ebeec8b21"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = ".claude/skills/gtkb-decision-capture/SKILL.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -7589,7 +7589,7 @@ notes = "Deterministically admitted by WI-5441 observers: capability_inventory, 
 [[artifacts]]
 id = "wi5441-member-codex-skills-gtkb-decision-capture-skill-md-71a30701d9"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = ".codex/skills/gtkb-decision-capture/SKILL.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -8881,7 +8881,7 @@ notes = "Deterministically admitted by WI-5441 observers: capability_inventory, 
 [[artifacts]]
 id = "wi5441-member-goose-skills-gtkb-decision-capture-skill-md-dc71b57aa3"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = ".goose/skills/gtkb-decision-capture/SKILL.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -12247,7 +12247,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-src-groundtruth-kb-bridge-proposa-035f8a3a6f"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "groundtruth-kb/src/groundtruth_kb/bridge/proposal_autoload.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -14270,7 +14270,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-src-groundtruth-kb-owner-decision-468d9ea1e1"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "groundtruth-kb/src/groundtruth_kb/owner_decision/__init__.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -14287,7 +14287,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-src-groundtruth-kb-owner-decision-30431174b2"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "groundtruth-kb/src/groundtruth_kb/owner_decision/auto_archive.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -14304,7 +14304,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-src-groundtruth-kb-owner-decision-1f3131a9f3"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "groundtruth-kb/src/groundtruth_kb/owner_decision/resolution_signals.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -15766,7 +15766,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-templates-hooks-delib-search-gate-0bbb3e64f0"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "groundtruth-kb/templates/hooks/delib-search-gate.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -15783,7 +15783,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-templates-hooks-delib-search-trac-0ddbe45b4f"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "groundtruth-kb/templates/hooks/delib-search-tracker.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -15817,7 +15817,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-templates-hooks-gov09-capture-py-5952e31b23"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "groundtruth-kb/templates/hooks/gov09-capture.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -15834,7 +15834,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-templates-hooks-intake-classifier-9ec8f30bf0"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "groundtruth-kb/templates/hooks/intake-classifier.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -15885,7 +15885,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-templates-hooks-owner-decision-ca-94065e4e31"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "groundtruth-kb/templates/hooks/owner-decision-capture.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -15936,7 +15936,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-templates-hooks-session-start-gov-b76bce9cc8"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "groundtruth-kb/templates/hooks/session-start-governance.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -15970,7 +15970,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-templates-hooks-spec-classifier-p-a944b0e5f6"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "groundtruth-kb/templates/hooks/spec-classifier.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -16514,7 +16514,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-templates-skills-bridge-propose-s-83caa9f0ae"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "groundtruth-kb/templates/skills/bridge-propose/SKILL.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -16531,7 +16531,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-templates-skills-decision-capture-be1f86e070"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "groundtruth-kb/templates/skills/decision-capture/helpers/record_decision.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -16548,7 +16548,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-templates-skills-decision-capture-cf09acb00d"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "groundtruth-kb/templates/skills/decision-capture/SKILL.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -16633,7 +16633,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-templates-skills-gtkb-decision-ca-2e124c8c3a"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "groundtruth-kb/templates/skills/gtkb-decision-capture/helpers/record_decision.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -16650,7 +16650,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-templates-skills-gtkb-decision-ca-b379533a46"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "groundtruth-kb/templates/skills/gtkb-decision-capture/SKILL.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -17517,7 +17517,7 @@ notes = "Deterministically admitted by WI-5441 observers: registered_dependency_
 [[artifacts]]
 id = "wi5441-member-scripts-batch-archive-terminal-verdicts-py-cb654bd100"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/batch_archive_terminal_verdicts.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -18078,7 +18078,7 @@ notes = "Deterministically admitted by WI-5441 observers: governed_knowledge, re
 [[artifacts]]
 id = "wi5441-member-scripts-check-codex-hook-parity-py-c1ba8eaf0e"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "scripts/check_codex_hook_parity.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -18090,7 +18090,7 @@ health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: governed_knowledge, registered_dependency_closure."
+notes = "Retired duplicate peer-harness and role-alias parity mechanism. Use scripts/check_harness_parity.py against the canonical baseline and selected projector; native execution qualification remains separate."
 
 [[artifacts]]
 id = "wi5441-member-scripts-check-commit-pathspec-safety-py-1f60740967"
@@ -18316,7 +18316,7 @@ notes = "Deterministically admitted by WI-5441 observers: registered_dependency_
 [[artifacts]]
 id = "wi5441-member-scripts-check-pending-owner-decisions-parity-py-8871ddf6bb"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "scripts/check_pending_owner_decisions_parity.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -19370,36 +19370,36 @@ notes = "Deterministically admitted by WI-5441 observers: registered_dependency_
 [[artifacts]]
 id = "wi5441-member-scripts-generate-antigravity-skill-adapters-py-b8d838e7db"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/generate_antigravity_skill_adapters.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "wi5441-member-scripts-generate-api-skill-adapters-py-a3c4bbf5e5"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/generate_api_skill_adapters.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: capability_inventory, registered_dependency_closure."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "wi5441-member-scripts-generate-assessment-docx-py-e3b925e4db"
@@ -19421,53 +19421,53 @@ notes = "Deterministically admitted by WI-5441 observers: registered_dependency_
 [[artifacts]]
 id = "wi5441-member-scripts-generate-codex-skill-adapters-py-a9a3a81c42"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/generate_codex_skill_adapters.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "wi5441-member-scripts-generate-cursor-skill-adapters-py-f1bd4ee999"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/generate_cursor_skill_adapters.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "wi5441-member-scripts-generate-goose-manifest-py-554ec8428b"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/generate_goose_manifest.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "wi5441-member-scripts-generate-key-benefit-slides-py-80025cda58"
@@ -19540,14 +19540,14 @@ notes = "Deterministically admitted by WI-5441 observers: registered_dependency_
 [[artifacts]]
 id = "wi5441-member-scripts-generate-rule-compatibility-projections--4816276154"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/generate_rule_compatibility_projections.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
@@ -19846,19 +19846,19 @@ notes = "Deterministically admitted by WI-5441 observers: registered_dependency_
 [[artifacts]]
 id = "wi5441-member-scripts-harness-parity-phase2-py-1910337cfe"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/harness_parity_phase2.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "wi5441-member-scripts-harness-projection-reader-py-685bf4047c"
@@ -20695,20 +20695,20 @@ notes = "Deterministically admitted by WI-5441 observers: registered_dependency_
 
 [[artifacts]]
 id = "wi5441-member-scripts-parity-discovery-diff-py-29da6ffb9d"
-domain = "control_surface"
-lifecycle = "active"
+domain = "retired"
+lifecycle = "archive"
 storage_path = "scripts/parity_discovery_diff.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
-mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+mutation_api = ""
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+notes = "Retired separate parity discovery and waiver plane. Current conformance uses the canonical baseline and projector through scripts/check_harness_parity.py; this historical source is not restored."
 
 [[artifacts]]
 id = "wi5441-member-scripts-poll-run-py-a698acaa68"
@@ -20849,19 +20849,19 @@ notes = "Deterministically admitted by WI-5441 observers: governed_knowledge, re
 [[artifacts]]
 id = "wi5441-member-scripts-proposal-target-paths-coverage-preflight-b077c6f71b"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/proposal_target_paths_coverage_preflight.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "wi5441-member-scripts-protected-mutation-guard-py-25f79f7d06"
@@ -21036,7 +21036,7 @@ notes = "Deterministically admitted by WI-5441 observers: registered_dependency_
 [[artifacts]]
 id = "wi5441-member-scripts-release-governance-metrics-py-2679cc2b41"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = "scripts/release_governance_metrics.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -23178,7 +23178,7 @@ notes = "Deterministically admitted by WI-5441 observers: registered_dependency_
 [[artifacts]]
 id = "wi5441-member-cursor-skills-gtkb-decision-capture-skill-md-2a4f7a57dc"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archived"
 storage_path = ".cursor/skills/gtkb-decision-capture/SKILL.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -23637,7 +23637,7 @@ notes = "Deterministically admitted by WI-5441 observers: registered_dependency_
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-src-groundtruth-kb-bridge-verdict-aec77dd418"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "groundtruth-kb/src/groundtruth_kb/bridge/verdict_filing.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -23807,7 +23807,7 @@ notes = "Deterministically admitted by WI-5441 observers: registered_dependency_
 [[artifacts]]
 id = "wi5441-member-scripts-dispatch-wi5307-018-verdict-py-ab73f35493"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/_dispatch_wi5307_018_verdict.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -23892,19 +23892,19 @@ notes = "Deterministically admitted by WI-5441 observers: registered_dependency_
 [[artifacts]]
 id = "wi5441-member-scripts-harness-envelope-equivalence-py-d5f35b3b62"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/harness_envelope_equivalence.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+notes = "Obsolete competing registry, adapter, report or alias-migration source removed by platform realignment. Current derivation uses the neutral baseline and projector."
 
 [[artifacts]]
 id = "wi5441-member-scripts-ops-codex-snapshot-window-hider-py-fda6b6b48b"
@@ -23977,7 +23977,7 @@ notes = "Deterministically admitted by WI-5441 observers: registered_dependency_
 [[artifacts]]
 id = "wi5441-member-scripts-per-thread-finalization-repair-py-b0a4480425"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/per_thread_finalization_repair.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -24079,7 +24079,7 @@ notes = "Deterministically admitted by WI-5441 observers: registered_dependency_
 [[artifacts]]
 id = "wi5441-member-groundtruth-kb-src-groundtruth-kb-project-regist-6038d4298f"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "groundtruth-kb/src/groundtruth_kb/project/registry_publication_diagnostics.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -24096,7 +24096,7 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 [[artifacts]]
 id = "wi5441-member-scripts-batch-finalize-verified-py-e706bcfa32"
 domain = "control_surface"
-lifecycle = "active"
+lifecycle = "archive"
 storage_path = "scripts/batch_finalize_verified.py"
 coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
@@ -24265,20 +24265,20 @@ notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS
 
 [[artifacts]]
 id = "baseline-rule-decision-ledger"
-domain = "narrative_authority"
-lifecycle = "active"
+domain = "retired"
+lifecycle = "archive"
 storage_path = ".harness-baseline-configuration/rules/decision-ledger.md"
 coverage_mode = "exact"
 authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
-mutation_api = "Governed canonical writer after explicit owner approval"
+mutation_api = ""
 versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
-restore_action = "git_restore"
+restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
-notes = "Harness-neutral baseline rule; sole authoring authority per GOV-HARNESS-NEUTRAL-BASELINE-001. Projected copies under harness directories are derived output (WI-7523)."
+notes = "Owner direction is applied to current canonical state or action; the interactive session retains the conversation. This former ledger is not an active source or restore target."
 
 [[artifacts]]
 id = "baseline-rule-deliberation-protocol"

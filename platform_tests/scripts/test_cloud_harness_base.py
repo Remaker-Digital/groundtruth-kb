@@ -21,8 +21,6 @@ import http.client
 import io
 import json
 import re
-import subprocess
-import sys
 import threading
 from pathlib import Path
 
@@ -30,7 +28,7 @@ import pytest
 
 from scripts import cloud_harness_base as base
 
-CFG_PATH = Path(".api-harness") / "routing.toml"
+CFG_PATH = Path(".api-harness") / "testcloud" / "routing.toml"
 READ_TRUNCATION_MARKER_RE = re.compile(
     r"\n\n\[Read truncated: returned characters \[(\d+), (\d+)\) of (\d+)\. "
     r"Continue with offset=(\d+)\.\]$"
@@ -73,7 +71,6 @@ def _profile(**overrides) -> base.AdopterProfile:
         routing_config_path=CFG_PATH,
         dialect=base.DIALECT_OPENAI_CHAT,
         hook_tier=base.HOOK_TIER_GUARD_ADAPTER_FLOOR,
-        publish_bridge_verdict_tool=True,
         extra_headers={},
     )
     kwargs.update(overrides)
@@ -89,27 +86,18 @@ def _meta() -> base.ModelMetadata:
     )
 
 
-def _allow_provider_verdict_claim(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, object]]:
-    calls: list[dict[str, object]] = []
-
-    def fake_ensure(project_root: Path, slug: str, session_id: str) -> None:
-        calls.append({"project_root": project_root, "slug": slug, "session_id": session_id})
-
-    monkeypatch.setattr(base, "_ensure_provider_verdict_claim", fake_ensure)
-    return calls
-
-
 def _root(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
     (root / "groundtruth.toml").write_text("[project]\nname='test'\n", encoding="utf-8")
-    (root / ".api-harness").mkdir()
+    (root / CFG_PATH.parent).mkdir(parents=True)
+    (root / CFG_PATH.parent / "settings.json").write_text('{"hooks": {}}', encoding="utf-8")
     (root / CFG_PATH).write_text(ROUTING_TOML.strip() + "\n", encoding="utf-8")
     return root
 
 
 def _write_native_hook_settings(root: Path, hooks: dict) -> None:
-    settings_dir = root / ".claude"
+    settings_dir = root / CFG_PATH.parent
     settings_dir.mkdir(exist_ok=True)
     (settings_dir / "settings.json").write_text(json.dumps({"hooks": hooks}), encoding="utf-8")
 
@@ -293,7 +281,9 @@ def test_read_marker_survives_small_and_oversized_page_requests(tmp_path: Path) 
 
 
 def test_author_metadata_env_uses_profile_identity() -> None:
-    env = base.set_author_metadata_env({}, "testvendor/tc-model", "tc-model", _profile())
+    env = base.set_author_metadata_env(
+        {}, "testvendor/tc-model", "tc-model", _profile(), native_context_id="test-context"
+    )
     assert env["GTKB_AUTHOR_IDENTITY"] == "TestCloud H"
     assert env["GTKB_AUTHOR_HARNESS_ID"] == "H"
     assert env["GTKB_AUTHOR_MODEL"] == "testvendor/tc-model"
@@ -780,523 +770,6 @@ def test_run_tool_loop_repeated_blank_finals_fail_closed_at_overall_turn_budget(
     assert calls == 5
 
 
-def test_bridge_review_requires_publish_before_final_text(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    root = _root(tmp_path)
-    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
-    payloads: list[dict] = []
-    published: list[dict] = []
-
-    class Published:
-        def to_dict(self) -> dict[str, object]:
-            return {"verdict_path": "bridge/example-002.md"}
-
-    def fake_publish(slug, verdict, content, project_root, **kwargs):
-        published.append(
-            {
-                "slug": slug,
-                "verdict": verdict,
-                "content": content,
-                "project_root": project_root,
-                **kwargs,
-            }
-        )
-        return Published()
-
-    monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: fake_publish)
-    claim_calls = _allow_provider_verdict_claim(monkeypatch)
-    for key in base.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-completion")
-
-    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
-        payloads.append(payload)
-        if len(payloads) == 1:
-            assert "tool_choice" not in payload
-            return {"choices": [{"message": {"content": "GO is ready"}}]}
-        if len(payloads) == 2:
-            assert (
-                base.BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.split("{reason}")[0]
-                in payload["messages"][-1]["content"]
-            )
-            assert [tool["function"]["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
-            assert payload["tool_choice"] == {
-                "type": "function",
-                "function": {"name": base.PUBLISH_BRIDGE_VERDICT_TOOL},
-            }
-            return {
-                "choices": [
-                    {
-                        "message": {
-                            "content": "",
-                            "tool_calls": [
-                                {
-                                    "id": "publish_1",
-                                    "function": {
-                                        "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
-                                        "arguments": {
-                                            "slug": "example",
-                                            "verdict": "GO",
-                                            "content": "GO\n\nResponds to: bridge/example-001.md\n",
-                                        },
-                                    },
-                                }
-                            ],
-                        }
-                    }
-                ]
-            }
-        assert "tool_choice" not in payload
-        assert "bridge/example-002.md" in payload["messages"][-1]["content"]
-        return {"choices": [{"message": {"content": "published"}}]}
-
-    assert (
-        base.run_tool_loop(
-            "review",
-            route,
-            "https://test.cloud/api/v1",
-            "key",
-            4,
-            root,
-            _profile(),
-            skill="bridge-review",
-            chat_func=chat,
-        )
-        == "published"
-    )
-    assert len(published) == 1
-    assert published[0]["session_id"] == "dispatch-H-completion"
-    assert claim_calls == [{"project_root": root, "slug": "example", "session_id": "dispatch-H-completion"}]
-
-
-def test_bridge_review_recovers_from_denied_raw_bridge_mutation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """WI-5216: a denied raw Bash bridge-mutation attempt narrows the next turn
-    to PublishBridgeVerdict instead of letting the model keep probing raw
-    mutation paths for the full turn budget (the observed 611-tool-call,
-    63M-token denial loop)."""
-    root = _root(tmp_path)
-    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
-    payloads: list[dict] = []
-
-    class Published:
-        def to_dict(self) -> dict[str, object]:
-            return {"verdict_path": "bridge/example-002.md"}
-
-    def fake_publish(slug, verdict, content, project_root, **kwargs):
-        return Published()
-
-    monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: fake_publish)
-    _allow_provider_verdict_claim(monkeypatch)
-    for key in base.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-denial-loop")
-
-    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
-        payloads.append(payload)
-        if len(payloads) == 1:
-            assert "tool_choice" not in payload
-            return {
-                "choices": [
-                    {
-                        "message": {
-                            "content": "",
-                            "tool_calls": [
-                                {
-                                    "id": "raw_rm_1",
-                                    "function": {
-                                        "name": "Bash",
-                                        "arguments": {"command": "rm bridge/gtkb-example-001.md"},
-                                    },
-                                }
-                            ],
-                        }
-                    }
-                ]
-            }
-        if len(payloads) == 2:
-            # The denied raw mutation must remain visible, and the very next
-            # turn must be narrowed to the governed publisher only.
-            tool_result = payload["messages"][-1]
-            assert tool_result["role"] == "tool"
-            assert tool_result["content"].startswith("ERROR:")
-            assert [tool["function"]["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
-            assert payload["tool_choice"] == {
-                "type": "function",
-                "function": {"name": base.PUBLISH_BRIDGE_VERDICT_TOOL},
-            }
-            return {
-                "choices": [
-                    {
-                        "message": {
-                            "content": "",
-                            "tool_calls": [
-                                {
-                                    "id": "publish_1",
-                                    "function": {
-                                        "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
-                                        "arguments": {
-                                            "slug": "example",
-                                            "verdict": "GO",
-                                            "content": "GO\n\nResponds to: bridge/example-001.md\n",
-                                        },
-                                    },
-                                }
-                            ],
-                        }
-                    }
-                ]
-            }
-        return {"choices": [{"message": {"content": "published"}}]}
-
-    result = base.run_tool_loop(
-        "review", route, "https://test.cloud/api/v1", "key", 4, root, _profile(), skill="bridge-review", chat_func=chat
-    )
-    assert result == "published"
-    assert len(payloads) == 3
-
-
-def test_bridge_review_recovers_publisher_result_without_verdict_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root = _root(tmp_path)
-    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
-    payloads: list[dict] = []
-    publish_calls = 0
-
-    class MissingPath:
-        def to_dict(self) -> dict[str, object]:
-            return {"status": "ok"}
-
-    class Published:
-        def to_dict(self) -> dict[str, object]:
-            return {"verdict_path": "bridge/example-002.md"}
-
-    def fake_publish(*_args, **_kwargs):
-        nonlocal publish_calls
-        publish_calls += 1
-        return MissingPath() if publish_calls == 1 else Published()
-
-    monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: fake_publish)
-    _allow_provider_verdict_claim(monkeypatch)
-    for key in base.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-missing-path")
-
-    def publish_tool_call(call_id: str) -> dict:
-        return {
-            "id": call_id,
-            "function": {
-                "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
-                "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
-            },
-        }
-
-    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
-        payloads.append(payload)
-        if len(payloads) == 2:
-            assert '"status": "ok"' in payload["messages"][-1]["content"]
-        if len(payloads) in (1, 2):
-            return {
-                "choices": [{"message": {"content": "", "tool_calls": [publish_tool_call(f"publish_{len(payloads)}")]}}]
-            }
-        return {"choices": [{"message": {"content": "done"}}]}
-
-    assert (
-        base.run_tool_loop(
-            "review",
-            route,
-            "https://test.cloud/api/v1",
-            "key",
-            3,
-            root,
-            _profile(),
-            skill="bridge-review",
-            chat_func=chat,
-        )
-        == "done"
-    )
-    assert [tool["function"]["name"] for tool in payloads[1]["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
-    assert "verdict_path" in payloads[1]["messages"][-1]["content"]
-    assert publish_calls == 2
-
-
-def test_bridge_review_peer_held_publish_claim_stands_down_neutrally(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root = _root(tmp_path)
-    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
-    calls = 0
-    publisher_loaded = False
-
-    def peer_claim(_project_root: Path, slug: str, session_id: str) -> None:
-        raise base.BridgeVerdictClaimStandDown(
-            slug=slug,
-            session_id=session_id,
-            holder={"session_id": "peer-session", "ttl_expires_at": "2999-01-01T00:00:00Z"},
-            detail="provider verdict claim for 'example' is held by another session",
-        )
-
-    def load_publisher(_root: Path):
-        nonlocal publisher_loaded
-        publisher_loaded = True
-        raise AssertionError("peer-held claim must stand down before loading the publisher")
-
-    monkeypatch.setattr(base, "_ensure_provider_verdict_claim", peer_claim)
-    monkeypatch.setattr(base, "_load_provider_verdict_publisher", load_publisher)
-    for key in base.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-peer-held")
-
-    def chat(_endpoint: str, _api_key: str, _payload: dict, _timeout: float) -> dict:
-        nonlocal calls
-        calls += 1
-        return {
-            "choices": [
-                {
-                    "message": {
-                        "content": "",
-                        "tool_calls": [
-                            {
-                                "id": "publish_peer_held",
-                                "function": {
-                                    "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
-                                    "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
-                                },
-                            }
-                        ],
-                    }
-                }
-            ]
-        }
-
-    result = base.run_tool_loop(
-        "review",
-        route,
-        "https://test.cloud/api/v1",
-        "key",
-        10,
-        root,
-        _profile(),
-        skill="bridge-review",
-        chat_func=chat,
-    )
-
-    payload = json.loads(result)
-    assert payload["status"] == "neutral_stand_down"
-    assert payload["reason"] == base.PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT
-    assert payload["holder_session_id"] == "peer-session"
-    assert calls == 1
-    assert publisher_loaded is False
-
-
-def test_bridge_review_fails_closed_after_repeated_publisher_failures(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root = _root(tmp_path)
-    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
-    calls = 0
-
-    def fail_publish(*_args, **_kwargs):
-        raise RuntimeError("claim\n contention\t")
-
-    monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: fail_publish)
-    _allow_provider_verdict_claim(monkeypatch)
-    for key in base.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-failure")
-
-    def chat(_endpoint: str, _api_key: str, _payload: dict, _timeout: float) -> dict:
-        nonlocal calls
-        calls += 1
-        return {
-            "choices": [
-                {
-                    "message": {
-                        "content": "",
-                        "tool_calls": [
-                            {
-                                "id": f"publish_{calls}",
-                                "function": {
-                                    "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
-                                    "arguments": {
-                                        "slug": "example",
-                                        "verdict": "GO",
-                                        "content": f"GO\n\nAttempt {calls}\n",
-                                    },
-                                },
-                            }
-                        ],
-                    }
-                }
-            ]
-        }
-
-    with pytest.raises(base.CloudHarnessError, match="bridge verdict publisher recovery exhausted") as exc_info:
-        base.run_tool_loop(
-            "review",
-            route,
-            "https://test.cloud/api/v1",
-            "key",
-            10,
-            root,
-            _profile(),
-            skill="bridge-review",
-            chat_func=chat,
-        )
-    assert calls == base.MAX_BRIDGE_VERDICT_RECOVERY_TURNS + 1
-    assert f"{calls} attempts" in str(exc_info.value)
-    assert "claim contention" in str(exc_info.value)
-    assert "\n" not in str(exc_info.value)
-
-
-def test_bridge_verdict_recovery_reason_is_normalized_and_bounded() -> None:
-    reason = "claim\n contention\t" + ("x" * (base.MAX_BRIDGE_VERDICT_RECOVERY_REASON_CHARS + 100))
-
-    bounded = base._bounded_bridge_verdict_recovery_reason(reason)
-
-    assert bounded.startswith("claim contention ")
-    assert "\n" not in bounded and "\t" not in bounded
-    assert len(bounded) == base.MAX_BRIDGE_VERDICT_RECOVERY_REASON_CHARS
-
-
-def test_bridge_review_rejects_mixed_publisher_recovery_turn_atomically(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root = _root(tmp_path)
-    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
-    payloads: list[dict] = []
-    dispatched_tools: list[str] = []
-    publish_calls = 0
-
-    class Published:
-        def to_dict(self) -> dict[str, object]:
-            return {"verdict_path": "bridge/example-002.md"}
-
-    def fake_publish(*_args, **_kwargs):
-        nonlocal publish_calls
-        publish_calls += 1
-        return Published()
-
-    original_dispatch = base.dispatch_tool_call
-
-    def recording_dispatch(tool_name, *args, **kwargs):
-        dispatched_tools.append(tool_name)
-        return original_dispatch(tool_name, *args, **kwargs)
-
-    monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: fake_publish)
-    monkeypatch.setattr(base, "dispatch_tool_call", recording_dispatch)
-    _allow_provider_verdict_claim(monkeypatch)
-    for key in base.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-mixed-recovery")
-
-    def publish_tool_call(call_id: str) -> dict:
-        return {
-            "id": call_id,
-            "function": {
-                "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
-                "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
-            },
-        }
-
-    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
-        payloads.append(payload)
-        if len(payloads) == 1:
-            return {"choices": [{"message": {"content": "ready but unpublished"}}]}
-        if len(payloads) == 2:
-            assert [tool["function"]["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
-            return {
-                "choices": [
-                    {
-                        "message": {
-                            "content": "",
-                            "tool_calls": [
-                                publish_tool_call("publish_rejected"),
-                                {
-                                    "id": "read_rejected",
-                                    "function": {"name": "Read", "arguments": {"path": "groundtruth.toml"}},
-                                },
-                            ],
-                        }
-                    }
-                ]
-            }
-        if len(payloads) == 3:
-            assert "publisher-only recovery rejected non-publisher tool call(s): Read" in str(payload["messages"])
-            return {"choices": [{"message": {"content": "", "tool_calls": [publish_tool_call("publish_valid")]}}]}
-        return {"choices": [{"message": {"content": "published"}}]}
-
-    assert (
-        base.run_tool_loop(
-            "review",
-            route,
-            "https://test.cloud/api/v1",
-            "key",
-            4,
-            root,
-            _profile(),
-            skill="bridge-review",
-            chat_func=chat,
-        )
-        == "published"
-    )
-    assert dispatched_tools == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
-    assert publish_calls == 1
-
-
-def test_bridge_review_bounds_repeated_malformed_publisher_recovery_turns(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root = _root(tmp_path)
-    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
-    calls = 0
-
-    def reject_dispatch(*_args, **_kwargs):
-        raise AssertionError("malformed publisher-only recovery turn must not dispatch any tool")
-
-    monkeypatch.setattr(base, "dispatch_tool_call", reject_dispatch)
-
-    def chat(_endpoint: str, _api_key: str, _payload: dict, _timeout: float) -> dict:
-        nonlocal calls
-        calls += 1
-        if calls == 1:
-            return {"choices": [{"message": {"content": "ready but unpublished"}}]}
-        return {
-            "choices": [
-                {
-                    "message": {
-                        "content": "",
-                        "tool_calls": [
-                            {
-                                "id": f"read_rejected_{calls}",
-                                "function": {"name": "Read", "arguments": {"path": "groundtruth.toml"}},
-                            }
-                        ],
-                    }
-                }
-            ]
-        }
-
-    expected_attempts = base.MAX_BRIDGE_VERDICT_RECOVERY_TURNS + 1
-    with pytest.raises(
-        base.CloudHarnessError,
-        match=rf"publisher recovery exhausted after {expected_attempts} attempts.*non-publisher tool call\(s\): Read",
-    ):
-        base.run_tool_loop(
-            "review",
-            route,
-            "https://test.cloud/api/v1",
-            "key",
-            10,
-            root,
-            _profile(),
-            skill="bridge-review",
-            chat_func=chat,
-        )
-    assert calls == expected_attempts + 1
-
-
 # --- Slice 3: hook-tier + auth-style validation (native-hook seam is a flag; floor stays enforced) ---
 
 
@@ -1312,134 +785,6 @@ def test_profile_rejects_unknown_hook_tier() -> None:
 def test_profile_rejects_unknown_auth_style() -> None:
     with pytest.raises(base.CloudHarnessError, match="unknown auth_style"):
         _profile(auth_style="oauth2")
-
-
-@pytest.mark.parametrize("value", [0, 1, "false", None])
-def test_profile_rejects_non_boolean_anthropic_publisher_tool_choice(value: object) -> None:
-    with pytest.raises(base.CloudHarnessError, match="force_anthropic_publisher_tool_choice must be a bool"):
-        _profile(force_anthropic_publisher_tool_choice=value)
-
-
-@pytest.mark.parametrize("value", [0, 1, "false", None])
-def test_profile_rejects_non_boolean_anthropic_recovery_thinking_capability(value: object) -> None:
-    with pytest.raises(base.CloudHarnessError, match="disable_anthropic_publisher_recovery_thinking must be a bool"):
-        _profile(disable_anthropic_publisher_recovery_thinking=value)
-
-
-def test_anthropic_publisher_only_recovery_forces_tool_choice_by_default(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root = _root(tmp_path)
-    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
-    payloads: list[dict] = []
-
-    class Published:
-        def to_dict(self) -> dict[str, object]:
-            return {"verdict_path": "bridge/example-002.md"}
-
-    monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: lambda *_args, **_kwargs: Published())
-    _allow_provider_verdict_claim(monkeypatch)
-    for key in base.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-anthropic-default")
-
-    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
-        payloads.append(payload)
-        if len(payloads) == 1:
-            assert "tool_choice" not in payload
-            assert "thinking" not in payload
-            return {"model": route.model_id, "content": [{"type": "text", "text": "ready but unpublished"}]}
-        if len(payloads) == 2:
-            assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
-            assert payload["tool_choice"] == {"type": "any"}
-            assert "thinking" not in payload
-            return {
-                "model": route.model_id,
-                "content": [
-                    {
-                        "type": "tool_use",
-                        "id": "publish_default",
-                        "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
-                        "input": {"slug": "example", "verdict": "GO", "content": "GO\n"},
-                    }
-                ],
-            }
-        assert "tool_choice" not in payload
-        assert "thinking" not in payload
-        return {"model": route.model_id, "content": [{"type": "text", "text": "published"}]}
-
-    assert (
-        base.run_tool_loop(
-            "review",
-            route,
-            "https://test.cloud/api/v1",
-            "key",
-            3,
-            root,
-            _anthropic_profile(),
-            skill="bridge-review",
-            chat_func=chat,
-        )
-        == "published"
-    )
-
-
-def test_anthropic_publisher_recovery_can_disable_thinking_without_changing_ordinary_payloads(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root = _root(tmp_path)
-    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
-    payloads: list[dict] = []
-
-    class Published:
-        def to_dict(self) -> dict[str, object]:
-            return {"verdict_path": "bridge/example-002.md"}
-
-    monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: lambda *_args, **_kwargs: Published())
-    _allow_provider_verdict_claim(monkeypatch)
-    for key in base.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-anthropic-nonthinking")
-
-    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
-        payloads.append(payload)
-        if len(payloads) == 1:
-            assert "thinking" not in payload
-            assert "tool_choice" not in payload
-            return {"model": route.model_id, "content": [{"type": "text", "text": "ready but unpublished"}]}
-        if len(payloads) == 2:
-            assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
-            assert payload["thinking"] == {"type": "disabled"}
-            assert payload["tool_choice"] == {"type": "any"}
-            return {
-                "model": route.model_id,
-                "content": [
-                    {
-                        "type": "tool_use",
-                        "id": "publish_nonthinking",
-                        "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
-                        "input": {"slug": "example", "verdict": "GO", "content": "GO\n"},
-                    }
-                ],
-            }
-        assert "thinking" not in payload
-        assert "tool_choice" not in payload
-        return {"model": route.model_id, "content": [{"type": "text", "text": "published"}]}
-
-    assert (
-        base.run_tool_loop(
-            "review",
-            route,
-            "https://test.cloud/api/v1",
-            "key",
-            3,
-            root,
-            _anthropic_profile(disable_anthropic_publisher_recovery_thinking=True),
-            skill="bridge-review",
-            chat_func=chat,
-        )
-        == "published"
-    )
 
 
 def test_profile_accepts_native_full_hooks_tier() -> None:
@@ -1540,7 +885,7 @@ def test_native_full_hooks_lifecycle_runs_in_order(tmp_path: Path) -> None:
     assert pre_payload["tool_name"] == "Read"
     assert pre_payload["tool_input"] == {"path": "note.txt"}
     assert post_payload["tool_response"] == "file body"
-    assert hook_events[0][2]["CLAUDE_PROJECT_DIR"] == str(root)
+    assert hook_events[0][2]["GTKB_PROJECT_ROOT"] == str(root)
 
 
 @pytest.mark.parametrize(
@@ -1702,7 +1047,7 @@ def test_native_pretool_timeout_returns_bounded_block_and_stops_hook_chain(tmp_p
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "python .claude/hooks/formal-artifact-approval-gate.py --token command-secret",
+                            "command": "python .api-harness/testcloud/hooks/formal-artifact-approval-gate.py --token command-secret",
                             "timeout": 5,
                         },
                         {"type": "command", "command": "later hook.py"},
@@ -1731,7 +1076,7 @@ def test_native_pretool_timeout_returns_bounded_block_and_stops_hook_chain(tmp_p
         "decision": "block",
         "reason": ("timeout event=PreToolUse; tool=Read; hook=formal-artifact-approval-gate.py; timeout_seconds=5"),
     }
-    assert commands == ["python .claude/hooks/formal-artifact-approval-gate.py --token command-secret"]
+    assert commands == ["python .api-harness/testcloud/hooks/formal-artifact-approval-gate.py --token command-secret"]
     assert "tool-input-secret" not in result["reason"]
     assert "command-secret" not in result["reason"]
 
@@ -2194,8 +1539,8 @@ def test_repeated_identical_pretool_timeouts_hit_existing_no_progress_bound(
 
 def test_native_full_hooks_run_tool_loop_still_enforces_guard_floor(tmp_path: Path) -> None:
     root = _root(tmp_path)
-    (root / ".claude" / "hooks").mkdir(parents=True)
-    (root / ".claude" / "hooks" / "credential-scan.py").write_text("print('{}')\n", encoding="utf-8")
+    (root / CFG_PATH.parent / "hooks").mkdir(parents=True)
+    (root / CFG_PATH.parent / "hooks" / "credential-scan.py").write_text("print('{}')\n", encoding="utf-8")
     route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Write",))
     turns: list[dict] = []
 
@@ -2417,179 +1762,3 @@ def test_cloud_template_inherits_local_diagnostic_contract(tmp_path: Path, monke
 
     assert result["schema_id"] == "gtkb.harness_diagnostic.v1"
     assert captured == {"project_root": root, "harness_id": "H"}
-
-
-def test_publish_bridge_verdict_schema_has_no_path_or_version_authority() -> None:
-    schemas = base.build_tool_schemas([base.PUBLISH_BRIDGE_VERDICT_TOOL])
-
-    schema = schemas[0]["function"]
-    properties = schema["parameters"]["properties"]
-    assert schema["name"] == "PublishBridgeVerdict"
-    assert set(schema["parameters"]["required"]) == {"slug", "verdict", "content"}
-    assert "path" not in properties
-    assert "file_path" not in properties
-    assert "version" not in properties
-    # Every Loyal-Opposition-authored verdict is publishable: NOT-READY is the
-    # only lawful rejection of an implementation report, SUPERSEDED closes a chain.
-    assert properties["verdict"]["enum"] == ["GO", "NO-GO", "NOT-READY", "SUPERSEDED", "VERIFIED"]
-
-
-def test_provider_verdict_publisher_bootstraps_project_root_under_safe_path() -> None:
-    project_root = Path(__file__).resolve().parents[2]
-    code = f"""
-import sys
-from pathlib import Path
-
-project_root = Path({str(project_root)!r})
-sys.path.insert(0, str(project_root / "scripts"))
-import cloud_harness_base as base
-sys.path = [entry for entry in sys.path if Path(entry or ".").resolve() != project_root.resolve()]
-publisher = base._load_provider_verdict_publisher(project_root)
-assert publisher.__module__ == "scripts.gtkb_bridge_writer"
-assert str(project_root.resolve()) in sys.path
-"""
-
-    result = subprocess.run(
-        [sys.executable, "-I", "-S", "-c", code],
-        cwd=project_root,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=30,
-        check=False,
-    )
-
-    assert result.returncode == 0, result.stderr or result.stdout
-
-
-def test_dispatch_worker_role_document_uses_canonical_keyword(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from groundtruth_kb.session import envelope
-
-    root = _root(tmp_path)
-    captured: dict[str, object] = {}
-    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
-    for key in base.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-envelope")
-    monkeypatch.setattr(
-        envelope,
-        "ensure_worker_session",
-        lambda project_root, **kwargs: captured.update(project_root=project_root, **kwargs),
-    )
-
-    base.ensure_dispatch_worker_role_document(root, _profile())
-
-    assert captured == {
-        "project_root": root,
-        "harness_name": "testcloud",
-        "harness_id": "H",
-        "session_id": "dispatch-H-envelope",
-        "role": "loyal-opposition",
-        "role_source": "dispatcher_composition",
-        "init_keyword": "::init gtkb lo",
-        "dispatch_run_id": "dispatch-H-envelope",
-    }
-
-
-def test_dispatch_worker_role_document_rejects_unknown_keyword(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb maybe")
-
-    with pytest.raises(base.CloudHarnessError, match="unsupported dispatcher init keyword"):
-        base.ensure_dispatch_worker_role_document(_root(tmp_path), _profile())
-
-
-def test_publish_bridge_verdict_is_filtered_outside_lo_skills() -> None:
-    allowed = ("Read", base.PUBLISH_BRIDGE_VERDICT_TOOL)
-
-    assert base.allowed_tools_for_skill(allowed, "bridge-review", publish_bridge_verdict_tool=True) == allowed
-    assert base.allowed_tools_for_skill(allowed, "verification", publish_bridge_verdict_tool=True) == allowed
-    assert base.allowed_tools_for_skill(allowed, "implementation") == ("Read",)
-    assert base.allowed_tools_for_skill(allowed, None) == ("Read",)
-
-
-def test_dispatch_publish_bridge_verdict_uses_trusted_runtime_metadata(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from scripts import gtkb_bridge_writer as writer
-
-    root = _root(tmp_path)
-    captured: dict[str, object] = {}
-
-    class _Published:
-        def to_dict(self) -> dict[str, object]:
-            return {"verdict_path": "bridge/example-002.md", "claim_released": True}
-
-    def fake_publish(slug, verdict, content, project_root, **kwargs):
-        captured.update(
-            slug=slug,
-            verdict=verdict,
-            content=content,
-            project_root=project_root,
-            **kwargs,
-        )
-        return _Published()
-
-    monkeypatch.setattr(writer, "publish_lo_verdict", fake_publish)
-    claim_calls = _allow_provider_verdict_claim(monkeypatch)
-    for key in base.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-1")
-
-    result = base.dispatch_tool_call(
-        base.PUBLISH_BRIDGE_VERDICT_TOOL,
-        {
-            "slug": "example",
-            "verdict": "GO",
-            "content": "GO\n\nResponds to: bridge/example-001.md\n",
-        },
-        _meta(),
-        root,
-        _profile(),
-        skill="bridge-review",
-    )
-
-    assert json.loads(result)["verdict_path"] == "bridge/example-002.md"
-    assert captured["session_id"] == "dispatch-H-1"
-    assert captured["harness_name"] == "testcloud"
-    metadata = captured["author_metadata"]
-    assert isinstance(metadata, dict)
-    assert metadata["author_harness_id"] == "H"
-    assert metadata["author_model"] == "testvendor/tc-model"
-    assert claim_calls == [{"project_root": root, "slug": "example", "session_id": "dispatch-H-1"}]
-
-
-def test_dispatch_publish_bridge_verdict_denies_non_lo_skill(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    root = _root(tmp_path)
-    for key in base.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-1")
-
-    with pytest.raises(base.CloudHarnessError, match="bridge-review/verification"):
-        base.dispatch_tool_call(
-            base.PUBLISH_BRIDGE_VERDICT_TOOL,
-            {"slug": "example", "verdict": "GO", "content": "GO\n"},
-            _meta(),
-            root,
-            _profile(),
-            skill="implementation",
-        )
-
-
-def test_dispatch_publish_bridge_verdict_denies_profile_without_capability(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root = _root(tmp_path)
-    for key in base.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-F-1")
-
-    with pytest.raises(base.CloudHarnessError, match="not enabled for this provider profile"):
-        base.dispatch_tool_call(
-            base.PUBLISH_BRIDGE_VERDICT_TOOL,
-            {"slug": "example", "verdict": "GO", "content": "GO\n"},
-            _meta(),
-            root,
-            _profile(publish_bridge_verdict_tool=False, author_harness_id="F"),
-            skill="bridge-review",
-        )

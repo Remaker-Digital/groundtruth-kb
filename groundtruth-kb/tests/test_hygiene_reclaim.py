@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import sqlite3
 import stat
 import subprocess
 from datetime import UTC, datetime, timedelta
@@ -20,7 +19,6 @@ from groundtruth_kb.hygiene.reclaim import (
     restore_reclaim,
     trash_reclaim,
 )
-from groundtruth_kb.project.sot_registry import load_toml, sync_projection
 
 NOW = datetime(2026, 7, 16, 4, 0, tzinfo=UTC)
 
@@ -39,61 +37,7 @@ def _git(root: Path, *args: str, input_text: str | None = None) -> str:
     return result.stdout.strip()
 
 
-def _init_projection(root: Path) -> None:
-    db_path = root / "groundtruth.db"
-    if db_path.exists():
-        return
-    with sqlite3.connect(db_path) as connection:
-        connection.executescript(
-            """
-            CREATE TABLE sot_artifacts (
-                id TEXT NOT NULL,
-                version INTEGER NOT NULL,
-                domain TEXT NOT NULL,
-                lifecycle TEXT NOT NULL,
-                storage_path TEXT NOT NULL,
-                authority_spec_id TEXT NOT NULL,
-                mutation_api TEXT NOT NULL,
-                versioning_policy TEXT NOT NULL,
-                backup_policy TEXT NOT NULL,
-                health_check_function TEXT,
-                owner_role TEXT NOT NULL,
-                depends_on TEXT,
-                forbidden_substitutes TEXT,
-                notes TEXT,
-                changed_by TEXT NOT NULL,
-                changed_at TEXT NOT NULL,
-                change_reason TEXT NOT NULL,
-                PRIMARY KEY (id, version)
-            );
-            CREATE VIEW current_sot_artifacts AS
-            SELECT artifact.* FROM sot_artifacts artifact
-            INNER JOIN (
-                SELECT id, MAX(version) AS max_version FROM sot_artifacts GROUP BY id
-            ) current
-            ON artifact.id = current.id AND artifact.version = current.max_version;
-            """
-        )
-
-
-def _write_registry_mirror(root: Path, registry: Path) -> None:
-    packaged = (
-        root
-        / "groundtruth-kb"
-        / "src"
-        / "groundtruth_kb"
-        / "context"
-        / "registries"
-        / "v1"
-        / "config"
-        / "registry"
-        / "sot-artifacts.toml"
-    )
-    packaged.parent.mkdir(parents=True, exist_ok=True)
-    packaged.write_bytes(registry.read_bytes())
-
-
-def _write_registry(root: Path, storage_path: str | None = None, *, sync: bool = True) -> None:
+def _write_registry(root: Path, storage_path: str | None = None) -> None:
     registry = root / "config" / "registry" / "sot-artifacts.toml"
     registry.parent.mkdir(parents=True, exist_ok=True)
     if storage_path is None:
@@ -120,10 +64,6 @@ def _write_registry(root: Path, storage_path: str | None = None, *, sync: bool =
             ),
             encoding="utf-8",
         )
-    _write_registry_mirror(root, registry)
-    _init_projection(root)
-    if sync:
-        sync_projection(load_toml(registry), root / "groundtruth.db", changed_by="test", change_reason="fixture")
 
 
 def _write_generated_state_registry(root: Path) -> None:
@@ -163,8 +103,6 @@ def _write_generated_state_registry(root: Path) -> None:
         ),
         encoding="utf-8",
     )
-    _write_registry_mirror(root, registry)
-    sync_projection(load_toml(registry), root / "groundtruth.db", changed_by="test", change_reason="fixture")
 
 
 @pytest.fixture
@@ -734,7 +672,7 @@ def test_history_detects_partial_event_log(repo: Path) -> None:
     assert "events_truncated_final_line" in history["integrity"]["errors"]
 
 
-def test_projection_drift_blocks_execution_but_preserves_candidates(repo: Path) -> None:
+def test_current_declaration_needs_no_mirror_or_sqlite_projection(repo: Path) -> None:
     _old_scratch(repo)
     _write_registry(repo, "config/registry/sot-artifacts.toml")
     registry = repo / "config" / "registry" / "sot-artifacts.toml"
@@ -742,12 +680,12 @@ def test_projection_drift_blocks_execution_but_preserves_candidates(repo: Path) 
         registry.read_text(encoding="utf-8").replace('mutation_api = "fixture"', 'mutation_api = "changed"'),
         encoding="utf-8",
     )
-    _write_registry_mirror(repo, registry)
 
     plan, _item_id = _single_plan(repo)
 
-    assert plan["executable"] is False
-    assert "registry_projection_out_of_sync" in plan["blockers"]
+    assert plan["executable"] is True
+    assert not (repo / "groundtruth.db").exists()
+    assert not (repo / "groundtruth-kb").exists()
 
 
 def test_history_detects_summary_tampering(repo: Path) -> None:

@@ -488,13 +488,12 @@ _LEGACY_JSON_FILENAMES = ("role-assignments.json", "harness-identities.json")
 # Exclusion allowlist (paths relative to the repo root, POSIX form):
 #   * scripts/seed_harness_registry.py — the seed source legitimately reads the
 #     legacy JSON until the gated physical-deletion follow-on.
-#   * scripts/check_codex_hook_parity.py and scripts/rehearse/_dashboard_regen.py
+#   * scripts/rehearse/_dashboard_regen.py
 #     reference the legacy filenames only as static, non-executing string
 #     constants; they are allowlisted per the IP-6 named-allowlist contract.
 _SCAN_ALLOWLIST = frozenset(
     {
         "scripts/seed_harness_registry.py",
-        "scripts/check_codex_hook_parity.py",
         "scripts/rehearse/_dashboard_regen.py",
     }
 )

@@ -83,28 +83,9 @@ def test_settings_json_exact_event_placement(tmp_project):
                     names.append(cmd.rsplit("/", 1)[-1])
         return sorted(names)
 
-    # Retained SessionStart governance hook; no automatic assertion producer
-    assert _hook_names_for_event("SessionStart") == ["session-start-governance.py"]
-
-    # UserPromptSubmit hooks: delib-search-gate + intake-classifier + 1
-    # governance-completeness hook (gov09-capture) per gtkb-da-governance-completeness-implementation-016.
-    assert _hook_names_for_event("UserPromptSubmit") == sorted(
-        [
-            "delib-search-gate.py",
-            "intake-classifier.py",
-            "gov09-capture.py",
-        ]
-    )
-
-    # PostToolUse hooks: tracker + owner-decision-capture (governance-completeness)
-    # + spec-event-surfacer (Slice A of GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY).
-    assert _hook_names_for_event("PostToolUse") == sorted(
-        [
-            "delib-search-tracker.py",
-            "owner-decision-capture.py",
-            "spec-event-surfacer.py",
-        ]
-    )
+    assert _hook_names_for_event("SessionStart") == []
+    assert _hook_names_for_event("UserPromptSubmit") == []
+    assert _hook_names_for_event("PostToolUse") == ["spec-event-surfacer.py"]
 
     # PreToolUse hooks
     pretooluse = _hook_names_for_event("PreToolUse")

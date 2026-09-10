@@ -25,7 +25,6 @@ from typing import Any
 from groundtruth_kb.inventory import InventoryScanError, build_refresh_report
 from groundtruth_kb.project.registry_control_plane import (
     RegistryControlPlaneError,
-    RegistryProjectionMismatch,
     load_registry_snapshot,
 )
 from groundtruth_kb.project.sot_registry import SoTArtifact, default_registry_path
@@ -650,9 +649,7 @@ def _collect_registry(root: Path) -> dict[str, Any]:
     try:
         snapshot = load_registry_snapshot(project_root=root)
         records = list(snapshot.records)
-    except RegistryProjectionMismatch as exc:
-        defects.append({"code": "registry_projection_out_of_sync", "detail": str(exc)})
-    except (FileNotFoundError, RegistryControlPlaneError, OSError) as exc:
+    except (RegistryControlPlaneError, OSError, ValueError) as exc:
         defects.append({"code": "registry_load_failed", "detail": str(exc)})
     else:
         parity = {

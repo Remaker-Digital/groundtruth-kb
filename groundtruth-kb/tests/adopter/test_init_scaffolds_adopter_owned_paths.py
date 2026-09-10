@@ -79,8 +79,6 @@ def test_clean_adopter_scaffold_count_is_nonzero(
         "MEMORY.md",
         "README.md",
         "memory/release-readiness.md",
-        ".codex/hooks.json",
-        ".groundtruth/formal-artifact-approvals/.gitkeep",
     ],
 )
 def test_clean_adopter_phase9_section1_artifacts_present(clean_adopter: tuple[Path, Path], rel_path: str) -> None:

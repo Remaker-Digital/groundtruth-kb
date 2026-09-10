@@ -297,6 +297,9 @@ stripe
 # is intentionally NOT tracked here. The blanket .claude/* ignore covers it
 # without needing a separate name-specific rule. Each workstation regenerates
 # its own settings.local.json; do not migrate it across machines.
+# Provider configurations are generated independently; never commit their output.
+/.api-harness/
+
 # Harness projection roots are rendered from .harness-baseline-configuration by
 # scripts/harness_projection/project_harness.py (one run per profile in
 # scripts/harness_projection/profiles.toml). The renders stay tracked until a

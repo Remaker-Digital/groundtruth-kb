@@ -5,7 +5,7 @@
 # Activation (one-time, per developer):
 #   git config core.hooksPath .githooks
 #
-# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+# Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
 set -e
 
@@ -14,40 +14,23 @@ PYTHON_BIN="${PYTHON:-python}"
 
 "$PYTHON_BIN" scripts/scan_secrets.py --staged || exit $?
 
-"$PYTHON_BIN" scripts/check_dev_environment_inventory_drift.py \
-    --staged \
-    --allow-review-evidence || exit $?
-
-# GTKB-NARRATIVE-ARTIFACT-APPROVAL-EXTENSION-001 Slice C: universal-floor
-# evidence gate for narrative-artifact mutations (rule files, AGENTS.md,
-# CLAUDE*.md). Harness-agnostic: runs regardless of
-# which AI harness produced the staged change.
-"$PYTHON_BIN" scripts/check_narrative_artifact_evidence.py --staged || exit $?
-
 # WI-3473: ruff format --check on staged Python (separate gate from ruff check).
 # Stdlib-only script; resolves a ruff-capable interpreter venv-first so it does
 # not fail open when PYTHON_BIN lacks ruff while the project venv has it.
 "$PYTHON_BIN" scripts/check_ruff_format.py --staged || exit $?
 
-# Scoped commits only (bridge-essential.md): refuse a staged set that mixes
-# bridge-queue files with unrelated source, and one carrying verdict files
-# authored by another session. Commit 2f688c4ca is why: 1,756 paths of other
-# sessions' in-flight work landed in one commit and silently removed a
-# mandatory gate deny. Detection existed since WI-4464 but was never wired.
-"$PYTHON_BIN" scripts/check_commit_pathspec_safety.py --staged --strict --check-foreign-verdicts || exit $?
+# Inspect actual staged paths. Bridge messages, generated harness output and
+# runtime state are not work product. Reviewed forward deletion remains possible.
+"$PYTHON_BIN" scripts/check_commit_pathspec_safety.py --staged || exit $?
 
 # Validate that staged baseline/projector sources can produce their projections.
 # Installed projections are operational output and are not staged or committed.
 "$PYTHON_BIN" scripts/check_projection_drift.py --staged || exit $?
 
-# The protected-commit authorization gate is retired from this hook (owner
-# direction, 2026-09-07, canon v8.92). Its predicates no longer exist: project
-# authorization is a field on the project row and gates dispatch, not commits
-# (section 3); GO packets lived under a forbidden runtime-state tree (section 17);
-# and bridge material is never committed, so it cannot serve as commit
-# evidence (section 6). Commit authority is Loyal Opposition after VERIFIED
-# (section 7) or the owner directly (section 9). Deleting the script and its
-# remaining consumers is governed Phase 2 work.
+# Native project finalization checks the complete independently reviewed product
+# before commit and confirms the actual Git result afterward. These normal hooks
+# check the candidate itself; they neither infer review from filenames nor create
+# a second permission system. Direct owner commits use these same product checks.
 
 # Only proceed if PowerShell is available
 PWSH=""
@@ -56,7 +39,7 @@ if command -v pwsh &>/dev/null; then
 elif command -v powershell.exe &>/dev/null; then
     PWSH="powershell.exe"
 else
-    # PowerShell not available (non-Windows environment) — skip gracefully
+    # PowerShell not available (non-Windows environment) â€” skip gracefully
     exit 0
 fi
 

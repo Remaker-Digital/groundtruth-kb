@@ -20,11 +20,10 @@ from pathlib import Path
 import pytest
 
 _ROOT = Path(__file__).resolve().parents[2]
-_SETTINGS_PATH = _ROOT / ".claude" / "settings.json"
+
 
 # Retained duplicate-prone commands; automatic assertion startup was retired.
 _DEDUPED_REGISTRATIONS = (
-    ("PostToolUse", "owner-decision-capture.py"),
     ("PostToolUse", "spec-event-surfacer.py"),
     ("UserPromptSubmit", "intake-classifier.py"),
     ("UserPromptSubmit", "gov09-capture.py"),
@@ -32,7 +31,11 @@ _DEDUPED_REGISTRATIONS = (
 
 
 def _settings_document() -> dict:
-    return json.loads(_SETTINGS_PATH.read_text(encoding="utf-8"))
+    from scripts.check_harness_parity import _load_projector
+
+    plan = _load_projector(_ROOT).build_plan("claude")
+    assert not plan.gaps, plan.gaps
+    return json.loads(plan.writes[".claude/settings.json"])
 
 
 def _commands_for_event(event: str) -> list[str]:

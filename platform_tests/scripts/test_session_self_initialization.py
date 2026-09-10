@@ -10,6 +10,7 @@ import sqlite3
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -2375,18 +2376,32 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
         assert guard_state["suppress_next_wrapup"] is True
 
 
-def test_harness_parity_status_uses_resolved_non_codex_harness_scope() -> None:
+def test_harness_parity_status_uses_only_current_harness_cli(monkeypatch) -> None:
     module = _load_module()
+    calls = []
 
+    def run(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return SimpleNamespace(returncode=1, stdout="Current projection differs", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", run)
     status = module._harness_parity_status(REPO_ROOT, harness_name="cursor", role_profile="prime-builder")
-
     assert status["harness_scope"] == "cursor"
     assert status["scope_kind"] == "assigned_harness"
-    assert status["evidence_type"] == "phase-1 catalog parity"
-    assert "phase-2 readiness" in status["operational_readiness"]
-    assert "--harness cursor --role prime-builder" in status["verification_command"]
-    assert status["phase2_command"] == "python scripts/harness_parity_phase2.py --project-root . --format markdown"
-    assert status["discovery_diff_command"] == "python scripts/parity_discovery_diff.py --project-root . --markdown"
+    assert status["status"] == "fail"
+    assert status["evidence_type"] == "installed projection conformance"
+    assert status["operational_readiness"] == "not evaluated"
+    assert status["verification_command"] == "gt harness project cursor --check"
+    assert len(calls) == 1
+    assert calls[0][0][1:] == ["-m", "groundtruth_kb.cli", "harness", "project", "cursor", "--check"]
+    assert "role_scope" not in status
+
+
+def test_missing_harness_does_not_fall_back_to_fleet_inspection(monkeypatch) -> None:
+    module = _load_module()
+    monkeypatch.setattr(module.subprocess, "run", lambda *a, **k: pytest.fail("Peer inspection"))
+    status = module._harness_parity_status(REPO_ROOT, harness_name=None, role_profile="prime-builder")
+    assert status["status"] == "unavailable"
 
 
 def test_emit_wrapup_uses_session_start_hook_context_json(tmp_path, capsys, monkeypatch) -> None:
@@ -3026,136 +3041,11 @@ def test_arm_startup_interaction_guard_persists_current_subject_live_path(tmp_pa
 # ---------------------------------------------------------------------------
 
 
-def test_pending_owner_decisions_loaded_from_durable_file(tmp_path) -> None:
-    """T5a equivalent: _load_pending_owner_decisions parses the durable file's
-    ## Pending section into a list of decision dicts."""
-    memory = tmp_path / "memory"
-    memory.mkdir()
-    (memory / "pending-owner-decisions.md").write_text(
-        """\
-# Pending Owner Decisions
----
-## Pending
-
-- id: DECISION-0042
-  asked_at: 2026-04-25T09:00:00Z
-  thread_ref: bridge/example-001.md
-  question: "Phase 8 rehearsal target child root path"
-  options:
-    - "Sibling under E:\\\\Claude-Playground\\\\"
-    - "Fresh top-level workspace"
-  detected_via: ask_user_question
-  status: pending
-
-## Resolved
-
-(none)
-
-## History
-
-(none)
-""",
-        encoding="utf-8",
-    )
-    module = _load_module()
-    decisions = module._load_pending_owner_decisions(tmp_path)
-    assert len(decisions) == 1
-    assert decisions[0]["id"] == "DECISION-0042"
-    assert decisions[0]["question"] == "Phase 8 rehearsal target child root path"
-    # Options collapse to "; " joined string for downstream consumers.
-    assert "Sibling under" in decisions[0]["options"]
-    assert "Fresh top-level workspace" in decisions[0]["options"]
-
-
-def test_pending_owner_decisions_empty_when_section_missing_or_empty(tmp_path) -> None:
-    """T5b equivalent: empty list when file missing or ## Pending says (none)."""
-    module = _load_module()
-    # File missing: empty list, no raise.
-    assert module._load_pending_owner_decisions(tmp_path) == []
-    # File present but ## Pending section says (none).
-    memory = tmp_path / "memory"
-    memory.mkdir()
-    (memory / "pending-owner-decisions.md").write_text(
-        "# Pending Owner Decisions\n\n## Pending\n\n(none)\n\n## Resolved\n\n(none)\n",
-        encoding="utf-8",
-    )
-    assert module._load_pending_owner_decisions(tmp_path) == []
-
-
-def test_render_pending_decisions_block_omits_section_when_empty() -> None:
-    """T5b additional: renderer returns empty string for empty list."""
-    module = _load_module()
-    assert module._render_pending_decisions_block([]) == ""
-
-
-def test_render_pending_decisions_block_includes_id_question_options() -> None:
-    """T5a additional: renderer markdown includes id, question, options."""
-    module = _load_module()
-    decisions = [
-        {
-            "id": "DECISION-0001",
-            "question": "Test?",
-            "options": "Yes; No",
-            "asked_at": "2026-04-25T09:00:00Z",
-            "thread_ref": "bridge/foo-001.md",
-        }
-    ]
-    block = module._render_pending_decisions_block(decisions)
-    assert "**DECISION-0001**" in block
-    assert "Test?" in block
-    assert "Yes; No" in block
-    assert "bridge/foo-001.md" in block
-
-
 # =====================================================================
 # WI-3332 -- Stop-safe pending-decision rendering
 # Authority: bridge/gtkb-owner-decision-tracker-startup-relay-known-
 # match-suppression-003.md (Prime REVISED); Codex GO at -004.
 # =====================================================================
-
-
-def _load_owner_decision_tracker_module():
-    """Import the owner-decision-tracker hook module for cross-module checks."""
-    hook_path = REPO_ROOT / ".claude" / "hooks" / "owner-decision-tracker.py"
-    spec = importlib.util.spec_from_file_location("_odt_xcheck", hook_path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["_odt_xcheck"] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-def test_wi3332_t4_pending_decisions_block_renders_question_stop_safe() -> None:
-    """T4 (WI-3332): the renderer emits the question as a column-0 blockquote
-    so a verbatim relay is classified as documentation -- not a fresh
-    owner-decision-ask -- by the owner-decision-tracker Stop hook's
-    structural-context check."""
-    module = _load_module()
-    trigger_question = "Should I land this slice now, or hold for the next review?"
-    decisions = [
-        {
-            "id": "DECISION-0001",
-            "question": trigger_question,
-            "options": "Land it; Hold",
-            "asked_at": "2026-05-15T09:00:00Z",
-            "thread_ref": "",
-        }
-    ]
-    block = module._render_pending_decisions_block(decisions)
-    # The question renders on its own column-0 "> " blockquote line.
-    assert f"> {trigger_question}" in block, "the question must render as a column-0 blockquote line"
-    # The decision id and options remain visible to the owner.
-    assert "**DECISION-0001**" in block
-    assert "Land it; Hold" in block
-    # Cross-check the Part A <-> Part B contract: the owner-decision-tracker
-    # Stop hook's structural-context detector treats the rendered question's
-    # position as a relay/documentation context, so a verbatim relay of this
-    # block does not register as a fresh owner-decision-ask.
-    hook = _load_owner_decision_tracker_module()
-    q_offset = block.index(trigger_question)
-    assert hook._is_inside_structural_context(block, q_offset), (
-        "rendered question must fall inside a structural context the Stop hook recognizes (a line starting with '> ')"
-    )
 
 
 # =====================================================================

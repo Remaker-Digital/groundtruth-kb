@@ -67,14 +67,12 @@ session_id_var = "GOOSE_SESSION_ID"
 # Full native skill bodies per owner decision (Option A,
 # DELIB-20260813-BASELINE-CLEANSE-AND-PROJECTOR-ARCHITECTURE): Goose loads
 # SKILL.md directly with progressive disclosure.
-skill_body = "full"
 rules_projection = true
 hooks_projection = "plugin_hooks_json"
 # Goose-native hook registration: shell commands consuming JSON on stdin,
 # registered at plugins/gtkb/hooks/hooks.json. Only PreToolUse and Stop can
 # block; other events are registered non-blocking.
 hooks_json_path = ".goose/plugins/gtkb/hooks/hooks.json"
-manifest_generator = "scripts/generate_goose_manifest.py"
 # Projected copy of the retired implementation-start gate wrapper (owner ruling
 # 2026-09-07, canon v8.92); the baseline source is gone, so the render no longer
 # owns it and the engine removes it here.
@@ -97,7 +95,6 @@ rules_dir = ".claude/rules"
 hooks_dir = ".claude/hooks"
 project_dir_var = "CLAUDE_PROJECT_DIR"
 session_id_var = "CLAUDE_SESSION_ID"
-skill_body = "full"
 rules_projection = true
 hooks_projection = "settings_json"
 hooks_json_path = ".claude/settings.json"
@@ -150,19 +147,27 @@ hooks_dir = ".codex/hooks"
 project_dir_var = "CODEX_PROJECT_DIR"
 session_id_var = "CODEX_SESSION_ID"
 # Full native skill bodies, as for Antigravity and Goose.
-skill_body = "full"
 rules_projection = true
+hooks_projection = "native_cwd_hooks_json"
+hooks_json_path = ".codex/hooks.json"
+stdin_adapter = "scripts/codex_hook_adapter.py"
 # The only declared leftover is the projected copy of the retired
 # implementation-start gate wrapper (owner ruling 2026-09-07, canon v8.92).
 leftover_paths = [".codex/hooks/implementation-start-gate.py"]
-# No other leftover_paths / leftover_trees are declared by this slice (WI-5960 Slice 1).
-# .codex carries superseded residue -- hooks.json, routing.toml, config.toml,
-# settings.json.rolegate-bak, commands/registry.json, plugins/, gtkb-hooks/ -- and
-# also .codex/session/, which is LIVE runtime state of an active role-holding
-# harness. Retiring residue is a deletion class that deserves its own evidence and
-# owner visibility, exactly as WI-7112 kept baseline cleanup separate from the
-# exclusion filter. Activation does not require it: the render is correct without
-# deleting anything. Residue retirement belongs in its own governed change.
+# Unknown older output is preserved for classified cleanup at integration.
+[harnesses.codex.hook_events]
+pre_tool_use = "PreToolUse"
+post_tool_use = "PostToolUse"
+prompt_submit = "UserPromptSubmit"
+session_start = "SessionStart"
+turn_end = "Stop"
+[harnesses.codex.intent_matchers]
+# Native apply_patch is also matched by the host's Edit/Write aliases. Register
+# its actual tool name once, with Bash for the native unified exec path.
+file_write = "apply_patch"
+shell_exec = "Bash"
+read_access = "Read|Grep|Glob"
+all = ""
 [harnesses.cursor]
 config_dir = ".cursor"
 skills_dir = ".cursor/skills"
@@ -170,11 +175,9 @@ rules_dir = ".cursor/rules"
 hooks_dir = ".cursor/hooks"
 project_dir_var = "CURSOR_PROJECT_DIR"
 session_id_var = "CURSOR_SESSION_ID"
-skill_body = "adapter_script"
 rules_projection = true
 hooks_projection = "hooks_json"
 hooks_json_path = ".cursor/hooks.json"
-adapter_generator = "scripts/generate_cursor_skill_adapters.py"
 stdin_adapter = "scripts/cursor_hook_adapter.py"
 windowless_hooks = false
 hook_timeout_floor_seconds = 30
@@ -210,33 +213,97 @@ hooks_dir = ".agent/hooks"
 project_dir_var = "ANTIGRAVITY_PROJECT_DIR"
 session_id_var = "ANTIGRAVITY_SESSION_ID"
 # Full native skill bodies, as for Goose: Antigravity loads SKILL.md directly.
-skill_body = "full"
 rules_projection = true
+hooks_projection = "antigravity_hooks_json"
+hooks_json_path = ".agent/hooks.json"
+stdin_adapter = "scripts/antigravity_hook_adapter.py"
+windowless_hooks = true
 # Projected copy of the retired implementation-start gate wrapper (owner ruling
 # 2026-09-07, canon v8.92).
 leftover_paths = [".agent/hooks/implementation-start-gate.py"]
+[harnesses.antigravity.hook_events]
+pre_tool_use = "PreToolUse"
+post_tool_use = "PostToolUse"
+turn_end = "Stop"
+# Native invocation events are not session-start or user-prompt events.
+# Unmapped baseline obligations remain projector gaps until reconciled.
+[harnesses.antigravity.intent_matchers]
+file_write = "write_to_file|replace_file_content|multi_replace_file_content"
+shell_exec = "run_command"
+read_access = "view_file|list_dir|find_by_name|grep_search"
+all = ""
+# Each provider has an independent generated configuration.
 [harnesses.ollama]
-config_dir = ".api-harness"
-status = "profile_pending"
-[harnesses.openrouter]
-# WI-5960 Slice 2. Three registered identities -- ollama (D, suspended), openrouter
-# (F, active), alibaba-cloud-studio (H, suspended) -- share this one projection
-# surface. Only openrouter is active, so it is the renderer: activating more than
-# one would collide, because each would substitute its own project_dir_var and
-# session_id_var into the same files and overwrite the others' ownership manifest,
-# whose path the engine derives from config_dir. Restoring H is tracked separately
-# as WI-5231. Apart from the projected copy of the retired implementation-start
-# gate wrapper (owner ruling 2026-09-07, canon v8.92), leftovers are deliberately
-# not declared; see the codex slice for the same reasoning.
-config_dir = ".api-harness"
-skills_dir = ".api-harness/skills"
-rules_dir = ".api-harness/rules"
-hooks_dir = ".api-harness/hooks"
-project_dir_var = "OPENROUTER_PROJECT_DIR"
-session_id_var = "OPENROUTER_SESSION_ID"
-skill_body = "full"
+config_dir = ".api-harness/ollama"
+skills_dir = ".api-harness/ollama/skills"
+rules_dir = ".api-harness/ollama/rules"
+hooks_dir = ".api-harness/ollama/hooks"
+project_dir_var = "GTKB_PROJECT_ROOT"
+session_id_var = "GTKB_NATIVE_CONTEXT_ID"
 rules_projection = true
-leftover_paths = [".api-harness/hooks/implementation-start-gate.py"]
+routing_projection = true
+hooks_projection = "settings_json"
+hooks_json_path = ".api-harness/ollama/settings.json"
+
+[harnesses.ollama.hook_events]
+pre_tool_use = "PreToolUse"
+post_tool_use = "PostToolUse"
+prompt_submit = "UserPromptSubmit"
+session_start = "SessionStart"
+turn_end = "Stop"
+
+[harnesses.ollama.intent_matchers]
+file_write = "Write|Edit"
+shell_exec = "Bash"
+read_access = "Read|Grep|Glob"
+all = ""
+
+[harnesses.openrouter]
+config_dir = ".api-harness/openrouter"
+skills_dir = ".api-harness/openrouter/skills"
+rules_dir = ".api-harness/openrouter/rules"
+hooks_dir = ".api-harness/openrouter/hooks"
+project_dir_var = "GTKB_PROJECT_ROOT"
+session_id_var = "GTKB_NATIVE_CONTEXT_ID"
+rules_projection = true
+routing_projection = true
+hooks_projection = "settings_json"
+hooks_json_path = ".api-harness/openrouter/settings.json"
+
+[harnesses.openrouter.hook_events]
+pre_tool_use = "PreToolUse"
+post_tool_use = "PostToolUse"
+prompt_submit = "UserPromptSubmit"
+session_start = "SessionStart"
+turn_end = "Stop"
+
+[harnesses.openrouter.intent_matchers]
+file_write = "Write|Edit"
+shell_exec = "Bash"
+read_access = "Read|Grep|Glob"
+all = ""
+
 [harnesses.alibaba-cloud-studio]
-config_dir = ".api-harness"
-status = "profile_pending"
+config_dir = ".api-harness/alibaba-cloud-studio"
+skills_dir = ".api-harness/alibaba-cloud-studio/skills"
+rules_dir = ".api-harness/alibaba-cloud-studio/rules"
+hooks_dir = ".api-harness/alibaba-cloud-studio/hooks"
+project_dir_var = "GTKB_PROJECT_ROOT"
+session_id_var = "GTKB_NATIVE_CONTEXT_ID"
+rules_projection = true
+routing_projection = true
+hooks_projection = "settings_json"
+hooks_json_path = ".api-harness/alibaba-cloud-studio/settings.json"
+
+[harnesses.alibaba-cloud-studio.hook_events]
+pre_tool_use = "PreToolUse"
+post_tool_use = "PostToolUse"
+prompt_submit = "UserPromptSubmit"
+session_start = "SessionStart"
+turn_end = "Stop"
+
+[harnesses.alibaba-cloud-studio.intent_matchers]
+file_write = "Write|Edit"
+shell_exec = "Bash"
+read_access = "Read|Grep|Glob"
+all = ""

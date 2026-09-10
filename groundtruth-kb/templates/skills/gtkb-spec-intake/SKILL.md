@@ -66,8 +66,8 @@ Do NOT use for:
 
 - Direct spec creation with owner pre-approval (use
   ``KnowledgeDB.insert_spec()`` or ``/kb-spec`` instead).
-- Decision capture of yes/no/tradeoff choices (use
-  ``/gtkb-decision-capture``).
+- Owner choices already clear enough to apply: update the affected canonical
+  source or perform the requested action. Conversation history stays in session logs.
 - Bulk backfill of existing specs (out of scope for this skill).
 
 ## How it works

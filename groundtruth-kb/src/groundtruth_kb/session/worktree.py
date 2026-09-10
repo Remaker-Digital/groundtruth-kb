@@ -111,7 +111,7 @@ def session_branch(session_context_id: str) -> str:
 def _git(project_root: Path | str, *args: str, check: bool = False) -> subprocess.CompletedProcess[str]:
     """Run one git command. ``--no-optional-locks`` keeps reads off the index lock."""
     return subprocess.run(
-        ["git", "--no-optional-locks", *args],
+        ["git", "--no-optional-locks", "--literal-pathspecs", *args],
         cwd=str(project_root),
         capture_output=True,
         text=True,
@@ -460,9 +460,20 @@ def close_worktree(
     return state
 
 
+def _artifact_path(root: Path, relative: str | Path) -> Path:
+    """Keep lexical artifact identity; no file or ancestor may redirect it."""
+    path = root / relative
+    if any(part.is_symlink() or part.is_junction() for part in (path, *path.parents)):
+        raise SessionWorktreeError("artifact_path_redirected", "An artifact or its directory is redirected")
+    if not path.resolve().is_relative_to(root.resolve()):
+        raise SessionWorktreeError("artifact_outside_root", "An artifact escapes its checkout")
+    return path
+
+
 def _registered_context_checkout(project_root: Path, session_context_id: str) -> Path:
     """Resolve only the caller's checkout, without reading peer work products."""
     path = worktree_path(project_root, session_context_id)
+    _artifact_path(path, ".")
     if not path.resolve().is_relative_to(project_root.resolve() / WORKTREES_DIRNAME):
         raise SessionWorktreeError("checkout_outside_root", "The context checkout escapes the worktree root")
     records = _parse_worktree_list(_git(project_root, "worktree", "list", "--porcelain").stdout)
@@ -480,15 +491,80 @@ def _registered_context_checkout(project_root: Path, session_context_id: str) ->
 def _artifact_bytes(root: Path, paths: list[str]) -> dict[str, bytes | None]:
     """Read a prevalidated concrete scope without following links outside it."""
     result = {}
-    root = root.resolve()
     for relative in paths:
-        path = root / relative
-        if path.is_symlink() or not path.resolve().is_relative_to(root):
-            raise SessionWorktreeError("artifact_outside_root", "An artifact escapes its checkout")
+        path = _artifact_path(root, relative)
         if path.exists() and not path.is_file():
             raise SessionWorktreeError("artifact_not_file", "Work-product transfer requires concrete file paths")
         result[relative] = path.read_bytes() if path.exists() else None
     return result
+
+
+def _artifact_modes(root: Path, paths: list[str]) -> dict[str, str]:
+    """Use Git's executable-bit semantics, including an index-only chmod."""
+    import stat
+
+    if not paths:
+        return {}
+    for relative in paths:
+        _artifact_path(root, relative)
+    entries = _git(root, "ls-files", "--stage", "-z", "--", *paths)
+    if entries.returncode:
+        raise SessionWorktreeError("artifact_mode_unavailable", "Cannot read scoped Git modes")
+    indexed = {}
+    for entry in entries.stdout.split("\0"):
+        if not entry:
+            continue
+        metadata, relative = entry.split("\t", 1)
+        mode, _object_id, stage = metadata.split()
+        if stage != "0" or relative in indexed or mode not in {"100644", "100755"}:
+            raise SessionWorktreeError("artifact_mode_conflict", "An artifact is unmerged or not a regular Git file")
+        indexed[relative] = mode
+    config = _git(root, "config", "--bool", "core.filemode")
+    if config.returncode not in {0, 1}:
+        raise SessionWorktreeError("artifact_mode_unavailable", "Cannot read Git executable-bit configuration")
+    trust_mode = config.stdout.strip() != "false"
+    result = {}
+    for relative in paths:
+        path = _artifact_path(root, relative)
+        if path.is_file():
+            result[relative] = (
+                ("100755" if path.stat().st_mode & stat.S_IXUSR else "100644")
+                if trust_mode
+                else indexed.get(relative, "100644")
+            )
+    return result
+
+
+def _apply_artifact_modes(root: Path, identities: dict[str, dict[str, str] | None]) -> None:
+    """Apply only named artifact modes; leave every unrelated index entry intact."""
+    import os
+    import stat
+
+    for relative, identity in identities.items():
+        if identity is None:
+            continue
+        mode = identity["mode"]
+        path = _artifact_path(root, relative)
+        if mode not in {"100644", "100755"}:
+            raise SessionWorktreeError("artifact_mode_invalid", "Invalid scoped artifact mode")
+        # An index-only executable bit is significant on hosts with core.filemode=false.
+        if _artifact_modes(root, [relative]).get(relative) == mode:
+            continue
+        entries = _git(root, "ls-files", "--stage", "-z", "--", relative)
+        if entries.returncode:
+            raise SessionWorktreeError("artifact_mode_unavailable", "Cannot read scoped index entry")
+        entry = next((value for value in entries.stdout.split("\0") if value), None)
+        blob = entry.split("\t", 1)[0].split()[1] if entry else identity["object_id"]
+        if not entry:
+            stored = _git(root, "hash-object", "-w", f"--path={relative}", "--", str(path))
+            if stored.returncode or stored.stdout.strip() != blob:
+                raise SessionWorktreeError("artifact_readback_failed", "New artifact differs before mode transfer")
+        updated = _git(root, "update-index", "--add", "--cacheinfo", mode, blob, relative)
+        if updated.returncode:
+            raise SessionWorktreeError("artifact_mode_write_failed", "Cannot preserve the scoped Git executable mode")
+        if os.name != "nt":
+            permissions = path.stat().st_mode
+            path.chmod(permissions | stat.S_IXUSR if mode == "100755" else permissions & ~0o111)
 
 
 def _replace_artifacts(root: Path, postimages: dict[str, bytes | None]) -> None:
@@ -500,9 +576,7 @@ def _replace_artifacts(root: Path, postimages: dict[str, bytes | None]) -> None:
     written = []
 
     def put(relative, content):
-        path = root / relative
-        if path.is_symlink() or not path.resolve().is_relative_to(root.resolve()):
-            raise SessionWorktreeError("artifact_outside_root", "An artifact escapes its checkout")
+        path = _artifact_path(root, relative)
         if content is None:
             path.unlink(missing_ok=True)
             return
@@ -539,13 +613,14 @@ def materialize_context_worktree(
     session_context_id: str,
     *,
     expected_head: str,
-    artifacts: dict[str, str | None],
+    artifacts: dict[str, dict[str, str] | None],
     snapshot,
     artifact_source: Path | None = None,
 ) -> dict[str, object]:
     """Derive this context's workspace from canonical work, never another worker."""
     root = project_root.resolve()
     path = worktree_path(root, session_context_id)
+    _artifact_path(path, ".")
     branch = session_branch(session_context_id)
     if not path.exists():
         branch_head = _git(root, "rev-parse", "--verify", "--quiet", "refs/heads/" + branch)
@@ -573,7 +648,8 @@ def materialize_context_worktree(
         for entry in tree.stdout.split("\0"):
             if entry:
                 metadata, relative = entry.split("\t", 1)
-                base[relative] = metadata.split(" ")[2]
+                mode, _, object_id = metadata.split(" ")
+                base[relative] = {"mode": mode, "object_id": object_id}
     changed = [
         relative
         for relative, wanted in artifacts.items()
@@ -583,11 +659,37 @@ def materialize_context_worktree(
         raise SessionWorktreeError(
             "checkout_has_local_work", "The context checkout contains edits that will not be overwritten"
         )
+    # Working bytes alone do not reveal a separately staged version. Refuse a
+    # third index value before materializing any path, including mode-only work.
+    indexed = {}
+    entries = _git(path, "ls-files", "--stage", "-z", "--", *sorted(artifacts))
+    if entries.returncode:
+        raise SessionWorktreeError("checkout_index_unavailable", "The context index cannot be read")
+    for entry in entries.stdout.split("\0"):
+        if entry:
+            metadata, relative = entry.split("\t", 1)
+            mode, object_id, stage = metadata.split(" ")
+            if stage != "0":
+                raise SessionWorktreeError("checkout_has_local_work", "The context index has unresolved work")
+            indexed[relative] = {"mode": mode, "object_id": object_id}
+    if any(
+        indexed.get(name)
+        not in (
+            base.get(name),
+            wanted,
+            {**base[name], "mode": wanted["mode"]} if base.get(name) and wanted else wanted,
+        )
+        for name, wanted in artifacts.items()
+    ):
+        raise SessionWorktreeError(
+            "checkout_has_local_work", "The context index contains staged work that will not be overwritten"
+        )
     source = (artifact_source or root).resolve()
     postimages = _artifact_bytes(source, sorted(artifacts))
     if snapshot(sorted(artifacts), root=source) != artifacts:
         raise SessionWorktreeError("artifact_preimage_changed", "Canonical work changed during context preparation")
     _replace_artifacts(path, postimages)
+    _apply_artifact_modes(path, artifacts)
     if snapshot(sorted(artifacts), root=path) != artifacts:
         raise SessionWorktreeError("checkout_readback_failed", "The materialized context differs from canonical work")
     return {
@@ -603,15 +705,15 @@ def publish_context_work(
     session_context_id: str,
     *,
     artifact_paths: list[str],
-    expected_artifacts: dict[str, str | None],
+    expected_artifacts: dict[str, dict[str, str] | None],
     snapshot,
     artifact_destination: Path | None = None,
     before_effect=None,
-) -> dict[str, str | None]:
+) -> dict[str, dict[str, str] | None]:
     """Copy the caller's scoped work to the canonical work product under a fence."""
     root = project_root.resolve()
     path = _registered_context_checkout(root, session_context_id)
-    destination = (artifact_destination or root).resolve()
+    destination = _artifact_path(artifact_destination or root, ".").resolve()
     if set(expected_artifacts) != set(artifact_paths):
         raise SessionWorktreeError("incomplete_artifact_preimage", "Supply the exact claimed artifact scope")
     result = snapshot(artifact_paths, root=path)
@@ -626,9 +728,13 @@ def publish_context_work(
     current = snapshot(artifact_paths, root=destination)
     if current == result:
         return result  # Exact retry needs no mutation or durable receipt.
-    if current != expected_artifacts:
+    if any(current[name] != expected_artifacts[name] and current[name] != result[name] for name in artifact_paths):
         raise SessionWorktreeError("artifact_preimage_changed", "Canonical work changed after this context loaded it")
-    _replace_artifacts(destination, postimages)
+    # A killed process may have completed only part of this exact effect. Check
+    # every path before writing any remainder; a third value is foreign work.
+    remaining = [name for name in artifact_paths if current[name] != result[name]]
+    _replace_artifacts(destination, {name: postimages[name] for name in remaining})
+    _apply_artifact_modes(destination, {name: result[name] for name in remaining})
     if snapshot(artifact_paths, root=destination) != result:
         raise SessionWorktreeError("artifact_readback_failed", "Published work differs from the caller's artifacts")
     return result
@@ -642,6 +748,7 @@ def project_worktree(project_root: Path, project_id: str, *, create: bool = True
     label = re.sub(r"[^A-Za-z0-9_.-]", "-", project_id)[:48]
     key = label + "-" + hashlib.sha256(project_id.encode("utf-8")).hexdigest()[:12]
     path = root / WORKTREES_DIRNAME / "projects" / key
+    _artifact_path(path, ".")
     if not path.resolve().is_relative_to(root / WORKTREES_DIRNAME / "projects"):
         raise SessionWorktreeError("project_checkout_outside_root", "The project checkout escapes its directory")
     branch = "project/" + key
@@ -670,7 +777,7 @@ def project_worktree(project_root: Path, project_id: str, *, create: bool = True
             raise SessionWorktreeError("project_base_missing", "The integration commit is unavailable")
         current = _git(path, "rev-parse", "HEAD").stdout.strip()
         if current != upstream.stdout.strip():
-            refreshed = _git(path, "merge", "--ff-only", upstream.stdout.strip())
+            refreshed = _git(path, "merge", "--ff-only", "--no-overwrite-ignore", upstream.stdout.strip())
             if refreshed.returncode:
                 raise SessionWorktreeError(
                     "project_base_reconciliation_required",

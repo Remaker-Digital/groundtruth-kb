@@ -1411,111 +1411,6 @@ SELECT
     SUM(CASE WHEN resolution_status IN ('completed', 'done', 'resolved', 'verified', 'fixed') THEN 1 ELSE 0 END) AS completed_items
 FROM current_work_items;
 
--- Platform SoT Artifact Registry (GOV-PLATFORM-SOT-REGISTRY-001 + DCL-SOT-REGISTRY-PROJECTION-PARITY-001 + DCL-SOT-REGISTRY-RECORD-SCHEMA-001) -- MemBase projection of config/registry/sot-artifacts.toml; append-only versioned per UNIQUE(id, version).
-CREATE TABLE IF NOT EXISTS sot_artifacts (
-    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
-    id TEXT NOT NULL,
-    version INTEGER NOT NULL,
-    domain TEXT NOT NULL,
-    lifecycle TEXT NOT NULL,
-    storage_path TEXT NOT NULL,
-    authority_spec_id TEXT NOT NULL,
-    mutation_api TEXT NOT NULL,
-    versioning_policy TEXT NOT NULL,
-    backup_policy TEXT NOT NULL,
-    health_check_function TEXT,
-    owner_role TEXT NOT NULL,
-    depends_on TEXT,
-    forbidden_substitutes TEXT,
-    notes TEXT,
-    changed_by TEXT NOT NULL,
-    changed_at TEXT NOT NULL,
-    change_reason TEXT NOT NULL,
-    coverage_mode TEXT,
-    UNIQUE(id, version)
-);
-
-CREATE INDEX IF NOT EXISTS idx_sot_artifacts_id ON sot_artifacts(id);
-CREATE INDEX IF NOT EXISTS idx_sot_artifacts_domain ON sot_artifacts(domain);
-CREATE INDEX IF NOT EXISTS idx_sot_artifacts_lifecycle ON sot_artifacts(lifecycle);
-
-CREATE VIEW IF NOT EXISTS current_sot_artifacts AS
-SELECT s.* FROM sot_artifacts s
-INNER JOIN (
-    SELECT id, MAX(version) AS max_version FROM sot_artifacts GROUP BY id
-) latest ON s.id = latest.id AND s.version = latest.max_version;
-
--- WI-5441 Phase 1B: artifact-registry observed-revision ledger (append-only).
--- Observed revisions record digest/state history for concrete registry members;
--- they never grant membership (DCL-SOT-REGISTRY-PROJECTION-PARITY-001 v2).
-CREATE TABLE IF NOT EXISTS sot_artifact_revisions (
-    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
-    revision_id TEXT NOT NULL,
-    entry_id TEXT NOT NULL,
-    canonical_relative_path TEXT NOT NULL,
-    object_kind TEXT NOT NULL,
-    content_digest TEXT NOT NULL,
-    size_bytes INTEGER,
-    observed_at TEXT NOT NULL,
-    actor_session TEXT NOT NULL,
-    operation TEXT NOT NULL,
-    predecessor_revision_id TEXT,
-    changed_by TEXT NOT NULL,
-    changed_at TEXT NOT NULL,
-    change_reason TEXT NOT NULL,
-    capability_hash TEXT,
-    bridge_id TEXT,
-    start_packet_hash TEXT,
-    pauth_decision TEXT,
-    journal_id TEXT,
-    UNIQUE(revision_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_sot_artifact_revisions_entry ON sot_artifact_revisions(entry_id);
-CREATE INDEX IF NOT EXISTS idx_sot_artifact_revisions_observed ON sot_artifact_revisions(observed_at);
-
--- WI-5441 Phase 1B: registry transaction journal (intent + completion) enabling
--- deterministic recovery after partial failure
--- (DCL-ARTIFACT-REGISTRY-MUTATION-AUTHORIZATION-001 v1).
-CREATE TABLE IF NOT EXISTS sot_registry_transaction_journal (
-    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
-    journal_id TEXT NOT NULL,
-    operation TEXT NOT NULL,
-    entry_id TEXT,
-    intent_recorded_at TEXT NOT NULL,
-    declaration_digest TEXT,
-    prior_revision_id TEXT,
-    current_revision_id TEXT,
-    filesystem_result TEXT,
-    projection_transaction TEXT,
-    receipt_digest TEXT,
-    journal_state TEXT NOT NULL,
-    completed_at TEXT,
-    actor_session TEXT NOT NULL,
-    changed_by TEXT NOT NULL,
-    changed_at TEXT NOT NULL,
-    change_reason TEXT NOT NULL,
-    old_canonical_digest TEXT,
-    new_canonical_digest TEXT,
-    old_packaged_digest TEXT,
-    new_packaged_digest TEXT,
-    old_projection_digest TEXT,
-    new_projection_digest TEXT,
-    request_digest TEXT,
-    payload_json TEXT,
-    expected_record_count INTEGER,
-    start_packet_hash TEXT,
-    pauth_id TEXT,
-    bridge_id TEXT,
-    receipt_seed TEXT,
-    error_message TEXT,
-    UNIQUE(journal_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_sot_registry_txn_journal_state ON sot_registry_transaction_journal(journal_state);
-
-
-
 -- WI-5441 Phase 1B: quarantine receipts. Each receipt binds identity, source stat,
 -- digests, and immutable quarantined_at/expires_at plus restore_pending
 -- (DCL-QUARANTINE-RETENTION-EXPIRY-001 v1). Retention/expiry ENFORCEMENT is not in
@@ -2185,57 +2080,6 @@ class KnowledgeDB:
         conn.commit()
         if added_work_item_cols:
             _log.debug("Applied migration: unified backlog work item columns %s", added_work_item_cols)
-
-        # Migration 6b: WI-5441 Phase 1B — additive nullable coverage_mode column on
-        # sot_artifacts (no default) per DCL-SOT-REGISTRY-RECORD-SCHEMA-001 v3, which
-        # forbids a silent default that would classify existing declarations. The new
-        # registry tables (sot_artifact_revisions, sot_registry_transaction_journal,
-        # sot_quarantine_receipts) are created via SCHEMA_SQL CREATE TABLE IF NOT EXISTS
-        # and need no migration here.
-        sot_cols = {row[1] for row in conn.execute("PRAGMA table_info(sot_artifacts)").fetchall()}
-        if "coverage_mode" not in sot_cols:
-            conn.execute("ALTER TABLE sot_artifacts ADD COLUMN coverage_mode TEXT")
-            conn.commit()
-            _log.debug("Applied migration: add coverage_mode column to sot_artifacts")
-
-        registry_journal_columns = {
-            "old_canonical_digest": "TEXT",
-            "new_canonical_digest": "TEXT",
-            "old_packaged_digest": "TEXT",
-            "new_packaged_digest": "TEXT",
-            "old_projection_digest": "TEXT",
-            "new_projection_digest": "TEXT",
-            "request_digest": "TEXT",
-            "payload_json": "TEXT",
-            "expected_record_count": "INTEGER",
-            "start_packet_hash": "TEXT",
-            "pauth_id": "TEXT",
-            "bridge_id": "TEXT",
-            "receipt_seed": "TEXT",
-            "error_message": "TEXT",
-        }
-        journal_columns = {
-            row[1] for row in conn.execute("PRAGMA table_info(sot_registry_transaction_journal)").fetchall()
-        }
-        for column_name, declaration in registry_journal_columns.items():
-            if column_name not in journal_columns:
-                conn.execute(f"ALTER TABLE sot_registry_transaction_journal ADD COLUMN {column_name} {declaration}")
-        registry_revision_columns = {
-            "capability_hash": "TEXT",
-            "bridge_id": "TEXT",
-            "start_packet_hash": "TEXT",
-            "pauth_decision": "TEXT",
-            "journal_id": "TEXT",
-        }
-        revision_columns = {row[1] for row in conn.execute("PRAGMA table_info(sot_artifact_revisions)").fetchall()}
-        for column_name, declaration in registry_revision_columns.items():
-            if column_name not in revision_columns:
-                conn.execute(f"ALTER TABLE sot_artifact_revisions ADD COLUMN {column_name} {declaration}")
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_sot_registry_txn_journal_request "
-            "ON sot_registry_transaction_journal(operation, request_digest)"
-        )
-        conn.commit()
 
         # Project membership is explicit canonical state. Opening a database
         # must never infer projects or memberships from historical text labels.
@@ -4331,60 +4175,21 @@ class KnowledgeDB:
         prose for path-looking strings.
         """
 
-        observations: list[dict[str, str]] = []
+        from groundtruth_kb.project.sot_registry import registry_path_observations
 
-        def append(source_kind: str, source_id: Any, field: str, value: Any) -> None:
-            if not isinstance(value, str):
-                return
-            path = value.strip().split("::", 1)[0]
-            if not path:
-                return
-            observations.append(
-                {
-                    "path": path,
-                    "source_kind": source_kind,
-                    "source_id": str(source_id),
-                    "field": field,
-                }
-            )
-
-        for spec in self.list_specs():
-            values = spec.get("source_paths_parsed") or spec.get("_source_paths_parsed") or ()
-            if isinstance(values, str):
-                try:
-                    values = json.loads(values)
-                except json.JSONDecodeError:
-                    values = ()
-            for value in values if isinstance(values, list | tuple) else ():
-                append("specification", spec.get("id"), "source_paths", value)
-
-        for test in self.list_tests():
-            append("test", test.get("id"), "test_file", test.get("test_file"))
-
-        for document in self.list_documents():
-            append("document", document.get("id"), "source_path", document.get("source_path"))
-
-        conn = self._get_conn()
-        link_view_exists = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type IN ('table', 'view') AND name = 'current_project_artifact_links'"
-        ).fetchone()
-        if link_view_exists:
-            rows = conn.execute(
-                "SELECT id, artifact_type, artifact_ref FROM current_project_artifact_links "
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT id, status, artifact_type, artifact_ref FROM current_project_artifact_links "
                 "WHERE status = 'active' ORDER BY id"
-            ).fetchall()
-            path_types = {"configuration", "document", "file", "path", "source_file", "test"}
-            for row in rows:
-                payload = _row_to_dict(row)
-                if str(payload.get("artifact_type") or "").casefold() in path_types:
-                    append("project_artifact_link", payload.get("id"), "artifact_ref", payload.get("artifact_ref"))
-
-        unique = {
-            (row["path"].casefold(), row["source_kind"], row["source_id"], row["field"]): row for row in observations
-        }
-        return sorted(
-            unique.values(),
-            key=lambda row: (row["path"].casefold(), row["source_kind"], row["source_id"], row["field"]),
+            )
+            .fetchall()
+        )
+        return registry_path_observations(
+            specifications=self.list_specs(),
+            tests=self.list_tests(),
+            documents=self.list_documents(),
+            project_artifact_links=(_row_to_dict(row) for row in rows),
         )
 
     # ------------------------------------------------------------------

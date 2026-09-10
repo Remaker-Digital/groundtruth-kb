@@ -57,7 +57,7 @@ def test_adopter_owned_file_preserves_customization_through_upgrade(
     # Trigger an upgrade action by deleting a managed hook so plan_upgrade
     # has substantive work to do. Without an action, execute_upgrade short-
     # circuits and the test never exercises the preserve path.
-    managed_file = adopter / ".claude" / "hooks" / "assertion-check.py"
+    managed_file = adopter / ".claude" / "hooks" / "credential-scan.py"
     managed_file.unlink()
 
     _setup_git(adopter)

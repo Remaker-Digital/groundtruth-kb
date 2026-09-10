@@ -23,8 +23,9 @@ def make_root(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
     (root / "groundtruth.toml").write_text("[project]\nname='test'\n", encoding="utf-8")
-    (root / ".api-harness").mkdir()
-    (root / ".claude" / "hooks").mkdir(parents=True)
+    (root / oh.ROUTING_CONFIG_PATH.parent).mkdir(parents=True)
+    (root / oh.ROUTING_CONFIG_PATH.parent / "settings.json").write_text('{"hooks": {}}', encoding="utf-8")
+    (root / oh.ROUTING_CONFIG_PATH.parent / "hooks").mkdir(parents=True)
     (root / "scripts").mkdir()
     for guard in {*oh.BRIDGE_WRITE_GUARDS, *oh.BRIDGE_EDIT_GUARDS, *oh.WRITE_EDIT_GUARDS, *oh.BASH_GUARDS}:
         path = root / guard
@@ -45,7 +46,80 @@ default_model = "fixture-full"
         + "\n",
         encoding="utf-8",
     )
+    for name in ("gtkb-bridge", "gtkb-proposal-review", "gtkb-verify"):
+        relative = Path(".harness-baseline-configuration") / "skills" / name / "SKILL.md"
+        target = root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((Path(__file__).resolve().parents[2] / relative).read_bytes())
     return root
+
+
+def test_missing_own_native_settings_refuses_before_any_model_request(tmp_path):
+    peer = tmp_path / ".claude/settings.json"
+    peer.parent.mkdir()
+    peer.write_text('{"hooks": {}}', encoding="utf-8")
+    route = oh.ModelRoute("fixture", FIXTURE_MODEL_ID, FIXTURE_MODEL_VERSION, True, ("Read",))
+    with pytest.raises(oh.OllamaHarnessError, match="native hook settings are missing"):
+        oh.run_tool_loop(
+            "Read the task",
+            route,
+            oh.DEFAULT_ENDPOINT,
+            1,
+            tmp_path,
+            chat_func=lambda *_: pytest.fail("The missing settings must refuse before model execution"),
+        )
+
+
+@pytest.mark.parametrize("outcome", ["stop_refusal", "provider_failure"])
+def test_ollama_native_stop_lifecycle_bounds_continuation_and_preserves_original_error(tmp_path, outcome):
+    root = make_root(tmp_path)
+    settings = root / oh.ROUTING_CONFIG_PATH.parent / "settings.json"
+    settings.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    event: [{"hooks": [{"type": "command", "command": "qualification-only probe"}]}]
+                    for event in ("SessionStart", "UserPromptSubmit", "Stop")
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    route = oh.ModelRoute("fixture", FIXTURE_MODEL_ID, FIXTURE_MODEL_VERSION, True, ("Read",))
+    observed = []
+    calls = []
+
+    def hook(_command, payload, _env, _timeout):
+        observed.append((payload["hook_event_name"], payload["session_id"]))
+        if payload["hook_event_name"] != "Stop":
+            return oh.base.GuardExecutionResult(0, "{}")
+        if outcome == "provider_failure":
+            raise OSError("Stop transport failure must not replace the provider error")
+        return oh.base.GuardExecutionResult(2, "", "Still incomplete")
+
+    def chat(_endpoint, payload, _timeout):
+        calls.append(payload)
+        if outcome == "provider_failure":
+            raise oh.OllamaHarnessError("original provider failure")
+        if len(calls) > 1:
+            assert "Still incomplete" in payload["messages"][-1]["content"]
+        return {"message": {"content": "Final prose is not delivery evidence"}}
+
+    match = "native Stop hook blocked completion" if outcome == "stop_refusal" else "original provider failure"
+    with pytest.raises(oh.OllamaHarnessError, match=match):
+        oh.run_tool_loop(
+            "Complete the assigned task",
+            route,
+            oh.DEFAULT_ENDPOINT,
+            oh.base.MAX_NATIVE_STOP_BLOCKS + 1,
+            root,
+            chat_func=chat,
+            native_hook_runner=hook,
+        )
+    stops = oh.base.MAX_NATIVE_STOP_BLOCKS if outcome == "stop_refusal" else 1
+    assert [event for event, _ in observed] == ["SessionStart", "UserPromptSubmit"] + ["Stop"] * stops
+    assert len({native for _, native in observed}) == 1
+    assert len(calls) == stops
 
 
 def set_ollama_timeout(root: Path, timeout_seconds: float | str) -> None:
@@ -419,22 +493,6 @@ def test_tool_schemas_expose_only_canonical_tools():
         oh.build_tool_schemas(["Read", "Delete"])
 
 
-def test_publish_bridge_verdict_schema_and_skill_filtering():
-    schema = oh.build_tool_schemas([oh.PUBLISH_BRIDGE_VERDICT_TOOL])[0]["function"]
-    properties = schema["parameters"]["properties"]
-    assert set(schema["parameters"]["required"]) == {"slug", "verdict", "content"}
-    assert not {"path", "file_path", "version"} & properties.keys()
-    # Every Loyal-Opposition-authored verdict is publishable: NOT-READY is the
-    # only lawful rejection of an implementation report, SUPERSEDED closes a chain.
-    assert properties["verdict"]["enum"] == ["GO", "NO-GO", "NOT-READY", "SUPERSEDED", "VERIFIED"]
-
-    allowed = ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
-    for skill in ("bridge-review", "verification"):
-        assert oh.allowed_tools_for_skill(allowed, skill)[-1] == oh.PUBLISH_BRIDGE_VERDICT_TOOL
-    for skill in ("implementation", None):
-        assert oh.PUBLISH_BRIDGE_VERDICT_TOOL not in oh.allowed_tools_for_skill(allowed, skill)
-
-
 def test_glob_skips_root_escaping_resolved_matches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     root = make_root(tmp_path)
     (root / "inside.txt").write_text("ok", encoding="utf-8")
@@ -476,9 +534,7 @@ def test_tool_loop_posts_chat_payload_and_returns_final_text(tmp_path: Path):
     assert calls[0][0] == "http://ollama.test"
     assert calls[0][1]["model"] == FIXTURE_MODEL_ID
     assert calls[0][1]["stream"] is False
-    assert {tool["function"]["name"] for tool in calls[0][1]["tools"]} == (
-        oh.CANONICAL_TOOLS - {oh.PUBLISH_BRIDGE_VERDICT_TOOL}
-    )
+    assert {tool["function"]["name"] for tool in calls[0][1]["tools"]} == (oh.CANONICAL_TOOLS)
 
 
 def test_tool_loop_keeps_read_continuation_marker_model_visible(tmp_path: Path):
@@ -533,10 +589,10 @@ def test_tool_loop_emits_allowlisted_turn_metadata_to_telemetry(tmp_path: Path):
     assert recorder.stop_reasons == ["final_response"]
 
 
-def test_bridge_review_system_prompt_uses_selected_route_metadata(tmp_path: Path):
+def test_bridge_review_system_prompt_loads_current_canonical_skills(tmp_path: Path):
     root = make_root(tmp_path)
     calls: list[dict] = []
-    prompt = oh.build_system_prompt("bridge-review", route(root))
+    prompt = oh.build_system_prompt("bridge-review", root)
 
     def chat(url: str, payload: dict, timeout: float) -> dict:
         calls.append(payload)
@@ -558,330 +614,29 @@ def test_bridge_review_system_prompt_uses_selected_route_metadata(tmp_path: Path
     assert calls[0]["messages"][1] == {"role": "user", "content": "review bridge item"}
     assert "Loyal Opposition" in system_message["content"]
     assert "bridge/INDEX.md" not in system_message["content"]
-    assert "full\nversioned bridge-file chain" in system_message["content"]
-    assert "retired bridge index" in system_message["content"]
-    assert "bridge_claim_cli.py claim <document-slug>" in system_message["content"]
-    assert f"author_model: {FIXTURE_MODEL_ID}" in system_message["content"]
-    assert f"author_model_version: {FIXTURE_MODEL_VERSION}" in system_message["content"]
+    assert "gt context work-item" in system_message["content"]
+    assert "gt bridge deliver" in system_message["content"]
+    assert "The supplied init marker" in system_message["content"]
+    assert "PublishBridgeVerdict" not in system_message["content"]
 
 
 def test_system_prompt_is_only_for_lo_bridge_skills(tmp_path: Path):
     root = make_root(tmp_path)
 
-    assert oh.build_system_prompt("bridge-review", route(root)) is not None
-    assert oh.build_system_prompt("verification", route(root)) is not None
-    assert oh.build_system_prompt("implementation", route(root)) is None
-    assert oh.build_system_prompt(None, route(root)) is None
+    assert oh.build_system_prompt("bridge-review", root) is not None
+    assert oh.build_system_prompt("verification", root) is not None
+    assert oh.build_system_prompt("implementation", root) is None
+    assert oh.build_system_prompt(None, root) is None
 
 
-def test_bridge_review_prompt_requires_atomic_verified_finalization(tmp_path: Path):
+def test_prompt_requires_native_readback_and_complete_project_finalization(tmp_path: Path):
     root = make_root(tmp_path)
-    prompt = oh.build_system_prompt("bridge-review", route(root))
-
-    assert prompt is not None
-    assert "only through\nPublishBridgeVerdict" in prompt
-    assert "Never use raw Write, Edit, or Bash for a numbered bridge verdict" in prompt
-    assert "include_paths" in prompt
-    assert "commit_message" in prompt
-    assert "performs atomic VERIFIED\nfinalization" in prompt
-    assert "fail closed" in prompt
-    assert "terminal\nVERIFIED file without its commit" in prompt
-
-
-def test_dispatch_worker_role_document_uses_canonical_keyword(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from groundtruth_kb.session import envelope
-
-    root = make_root(tmp_path)
-    captured: dict[str, object] = {}
-    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
-    for key in oh.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-envelope")
-    monkeypatch.setattr(
-        envelope,
-        "ensure_worker_session",
-        lambda project_root, **kwargs: captured.update(project_root=project_root, **kwargs),
-    )
-
-    oh.ensure_dispatch_worker_role_document(root)
-
-    assert captured == {
-        "project_root": root,
-        "harness_name": "ollama",
-        "harness_id": "D",
-        "session_id": "dispatch-D-envelope",
-        "role": "loyal-opposition",
-        "role_source": "dispatcher_composition",
-        "init_keyword": "::init gtkb lo",
-        "dispatch_run_id": "dispatch-D-envelope",
-    }
-
-
-def test_run_tool_loop_threads_lo_skill_to_tool_exposure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    root = make_root(tmp_path)
-    payloads: list[dict] = []
-
-    class Published:
-        def to_dict(self) -> dict[str, object]:
-            return {"verdict_path": "bridge/example-002.md"}
-
-    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", lambda _root: lambda *_args, **_kwargs: Published())
-    for key in oh.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-exposure")
-
-    def chat(url: str, payload: dict, timeout: float) -> dict:
-        payloads.append(payload)
-        if len(payloads) == 1:
-            return {
-                "message": {
-                    "content": "",
-                    "tool_calls": [
-                        {
-                            "function": {
-                                "name": oh.PUBLISH_BRIDGE_VERDICT_TOOL,
-                                "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
-                            }
-                        }
-                    ],
-                }
-            }
-        return {"message": {"content": "done"}}
-
-    oh.run_tool_loop(
-        "review",
-        route(root),
-        "http://ollama.test",
-        2,
-        root,
-        skill="bridge-review",
-        chat_func=chat,
-    )
-
-    names = {tool["function"]["name"] for tool in payloads[0]["tools"]}
-    assert oh.PUBLISH_BRIDGE_VERDICT_TOOL in names
-
-
-def test_bridge_review_requires_publish_bridge_verdict_before_final_text(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root = make_root(tmp_path)
-    payloads: list[dict] = []
-
-    class Published:
-        def to_dict(self) -> dict[str, object]:
-            return {"verdict_path": "bridge/example-002.md"}
-
-    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", lambda _root: lambda *_args, **_kwargs: Published())
-    for key in oh.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-completion")
-
-    def chat(_url: str, payload: dict, _timeout: float) -> dict:
-        payloads.append(json.loads(json.dumps(payload)))
-        if len(payloads) == 1:
-            return {"message": {"content": "GO body without tool publication"}}
-        if len(payloads) == 2:
-            assert [tool["function"]["name"] for tool in payload["tools"]] == [oh.PUBLISH_BRIDGE_VERDICT_TOOL]
-            return {
-                "message": {
-                    "content": "",
-                    "tool_calls": [
-                        {
-                            "id": "publish_1",
-                            "function": {
-                                "name": oh.PUBLISH_BRIDGE_VERDICT_TOOL,
-                                "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
-                            },
-                        }
-                    ],
-                }
-            }
-        return {"message": {"content": "published"}}
-
-    assert (
-        oh.run_tool_loop(
-            "review",
-            route(root),
-            "http://ollama.test",
-            3,
-            root,
-            skill="bridge-review",
-            chat_func=chat,
-        )
-        == "published"
-    )
-    assert payloads[1]["messages"][-2]["content"] == "GO body without tool publication"
-    assert "PublishBridgeVerdict" in payloads[1]["messages"][-1]["content"]
-
-
-def test_bridge_review_recovers_publisher_result_without_verdict_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root = make_root(tmp_path)
-    payloads: list[dict] = []
-    publish_calls = 0
-
-    class MissingPath:
-        def to_dict(self) -> dict[str, object]:
-            return {"status": "ok"}
-
-    class Published:
-        def to_dict(self) -> dict[str, object]:
-            return {"verdict_path": "bridge/example-002.md"}
-
-    def fake_publish(*_args, **_kwargs):
-        nonlocal publish_calls
-        publish_calls += 1
-        return MissingPath() if publish_calls == 1 else Published()
-
-    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", lambda _root: fake_publish)
-    for key in oh.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-missing-path")
-
-    def publish_tool_call(call_id: str) -> dict:
-        return {
-            "id": call_id,
-            "function": {
-                "name": oh.PUBLISH_BRIDGE_VERDICT_TOOL,
-                "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
-            },
-        }
-
-    def chat(_url: str, payload: dict, _timeout: float) -> dict:
-        payloads.append(json.loads(json.dumps(payload)))
-        if len(payloads) in (1, 2):
-            return {"message": {"content": "", "tool_calls": [publish_tool_call(f"publish_{len(payloads)}")]}}
-        return {"message": {"content": "done"}}
-
-    assert (
-        oh.run_tool_loop(
-            "review",
-            route(root),
-            "http://ollama.test",
-            3,
-            root,
-            skill="bridge-review",
-            chat_func=chat,
-        )
-        == "done"
-    )
-    assert [tool["function"]["name"] for tool in payloads[1]["tools"]] == [oh.PUBLISH_BRIDGE_VERDICT_TOOL]
-    assert "verdict_path" in payloads[1]["messages"][-1]["content"]
-    assert '"status": "ok"' in payloads[1]["messages"][-1]["content"]
-    assert publish_calls == 2
-
-
-def test_dispatch_publish_bridge_verdict_uses_ollama_runtime_metadata(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from scripts import gtkb_bridge_writer as writer
-
-    root = make_root(tmp_path)
-    captured: dict[str, object] = {}
-
-    class Published:
-        def to_dict(self) -> dict[str, object]:
-            return {"verdict_path": "bridge/example-002.md"}
-
-    def fake_publish(slug, verdict, content, project_root, **kwargs):
-        captured.update(slug=slug, verdict=verdict, content=content, project_root=project_root, **kwargs)
-        return Published()
-
-    monkeypatch.setattr(writer, "publish_lo_verdict", fake_publish)
-    for key in oh.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-parity")
-
-    result = oh.dispatch_tool_call(
-        oh.PUBLISH_BRIDGE_VERDICT_TOOL,
-        {"slug": "example", "verdict": "GO", "content": "GO\n"},
-        metadata(),
-        root,
-        skill="verification",
-    )
-
-    assert json.loads(result)["verdict_path"] == "bridge/example-002.md"
-    assert captured["session_id"] == "dispatch-D-parity"
-    assert captured["harness_name"] == "ollama"
-    author_metadata = captured["author_metadata"]
-    assert isinstance(author_metadata, dict)
-    assert author_metadata["author_harness_id"] == "D"
-    assert author_metadata["author_model"] == FIXTURE_MODEL_ID
-    assert "skill verification" in author_metadata["author_model_configuration"]
-
-
-def test_dispatch_publish_bridge_verdict_fails_closed_for_invalid_context(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root = make_root(tmp_path)
-    arguments = {"slug": "example", "verdict": "GO", "content": "GO\n"}
-    for key in oh.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-
-    with pytest.raises(oh.OllamaHarnessError, match="bridge-review/verification"):
-        oh.dispatch_tool_call(
-            oh.PUBLISH_BRIDGE_VERDICT_TOOL,
-            arguments,
-            metadata(),
-            root,
-            skill="implementation",
-        )
-    with pytest.raises(oh.OllamaHarnessError, match="concrete dispatcher session id"):
-        oh.dispatch_tool_call(
-            oh.PUBLISH_BRIDGE_VERDICT_TOOL,
-            arguments,
-            metadata(),
-            root,
-            skill="bridge-review",
-        )
-
-
-def test_dispatch_publish_bridge_verdict_rejects_malformed_lists_and_publisher_failures(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root = make_root(tmp_path)
-    for key in oh.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-parity")
-
-    with pytest.raises(oh.OllamaHarnessError, match="include_paths must be an array"):
-        oh.dispatch_tool_call(
-            oh.PUBLISH_BRIDGE_VERDICT_TOOL,
-            {"slug": "example", "verdict": "VERIFIED", "content": "VERIFIED\n", "include_paths": "bad"},
-            metadata(),
-            root,
-            skill="verification",
-        )
-
-    def fail_publisher(_root: Path):
-        def fail(*_args, **_kwargs):
-            raise ValueError("publisher rejected")
-
-        return fail
-
-    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", fail_publisher)
-    with pytest.raises(oh.OllamaHarnessError, match="governed bridge verdict publication failed"):
-        oh.dispatch_tool_call(
-            oh.PUBLISH_BRIDGE_VERDICT_TOOL,
-            {"slug": "example", "verdict": "GO", "content": "GO\n"},
-            metadata(),
-            root,
-            skill="bridge-review",
-        )
-
-
-def test_tool_loop_reconciles_success_only_after_canonical_bridge_advancement(tmp_path: Path):
-    root = make_root(tmp_path)
-    prompt = oh.build_system_prompt("bridge-review", route(root))
-
-    assert prompt is not None
-    assert "canonical exact bridge thread" in prompt
-    assert "bridge/<slug>-NNN.md" in prompt
-    assert "Draft files, prefix-sibling slugs, and noncanonical filenames do not count" in prompt
-    assert "VERIFIED completion additionally requires the atomic" in prompt
-    assert "finalization helper commit" in prompt
+    prompt = oh.build_system_prompt("bridge-review", root)
+    assert "Read back the result with `gt bridge show" in prompt
+    assert "gt projects commit" in prompt
+    assert "The CLI prepares the reviewed cohort, commits and confirms" in prompt
+    assert "Project commit establishes activation" in prompt
+    assert "finalization helper" not in prompt
 
 
 def test_default_tool_loop_calls_single_chat_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -971,191 +726,6 @@ def test_tool_loop_stops_repeated_no_progress_calls(tmp_path: Path):
     assert len(calls) == oh.MAX_REPEATED_TOOL_SIGNATURE_TURNS + 1
 
 
-def test_bridge_review_requires_publish_before_final_text(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    root = make_root(tmp_path)
-    payloads: list[dict] = []
-    published: list[dict] = []
-
-    class Published:
-        def to_dict(self) -> dict[str, object]:
-            return {"verdict_path": "bridge/example-002.md"}
-
-    def fake_publish(slug, verdict, content, project_root, **kwargs):
-        published.append(
-            {
-                "slug": slug,
-                "verdict": verdict,
-                "content": content,
-                "project_root": project_root,
-                **kwargs,
-            }
-        )
-        return Published()
-
-    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", lambda _root: fake_publish)
-    for key in oh.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-completion")
-
-    def chat(_url: str, payload: dict, _timeout: float) -> dict:
-        payloads.append(payload)
-        if len(payloads) == 1:
-            return {"message": {"content": "VERIFIED is ready"}}
-        if len(payloads) == 2:
-            assert (
-                oh.BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.split("{reason}")[0] in payload["messages"][-1]["content"]
-            )
-            return {
-                "message": {
-                    "content": "",
-                    "tool_calls": [
-                        {
-                            "id": "publish_1",
-                            "function": {
-                                "name": oh.PUBLISH_BRIDGE_VERDICT_TOOL,
-                                "arguments": {
-                                    "slug": "example",
-                                    "verdict": "VERIFIED",
-                                    "content": "VERIFIED\n\nResponds to: bridge/example-001.md\n",
-                                    "include_paths": ["scripts/example.py"],
-                                    "commit_message": "fix: example",
-                                },
-                            },
-                        }
-                    ],
-                }
-            }
-        assert "bridge/example-002.md" in payload["messages"][-1]["content"]
-        return {"message": {"content": "published"}}
-
-    assert (
-        oh.run_tool_loop(
-            "verify",
-            route(root),
-            oh.DEFAULT_ENDPOINT,
-            4,
-            root,
-            skill="verification",
-            chat_func=chat,
-        )
-        == "published"
-    )
-    assert len(published) == 1
-    assert published[0]["session_id"] == "dispatch-D-completion"
-
-
-def test_bridge_review_fails_closed_after_repeated_publisher_failures(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    root = make_root(tmp_path)
-    calls = 0
-    payloads: list[dict] = []
-
-    def fail_publish(*_args, **_kwargs):
-        raise RuntimeError("claim contention")
-
-    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", lambda _root: fail_publish)
-    for key in oh.BRIDGE_WORK_INTENT_ORDER:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-failure")
-
-    def chat(_url: str, payload: dict, _timeout: float) -> dict:
-        nonlocal calls
-        calls += 1
-        payloads.append(json.loads(json.dumps(payload)))
-        return {
-            "message": {
-                "content": "",
-                "tool_calls": [
-                    {
-                        "id": f"publish_{calls}",
-                        "function": {
-                            "name": oh.PUBLISH_BRIDGE_VERDICT_TOOL,
-                            "arguments": {
-                                "slug": "example",
-                                "verdict": "GO",
-                                "content": f"GO\n\nAttempt {calls}\n",
-                            },
-                        },
-                    }
-                ],
-            }
-        }
-
-    with pytest.raises(oh.OllamaHarnessError) as exc_info:
-        oh.run_tool_loop(
-            "review",
-            route(root),
-            oh.DEFAULT_ENDPOINT,
-            10,
-            root,
-            skill="bridge-review",
-            chat_func=chat,
-        )
-    assert calls == oh.MAX_BRIDGE_VERDICT_RECOVERY_TURNS + 1
-    assert f"exhausted after {calls} attempts" in str(exc_info.value)
-    assert "claim contention" in str(exc_info.value)
-    assert "claim contention" in payloads[1]["messages"][-1]["content"]
-    for payload in payloads[1:]:
-        assert [tool["function"]["name"] for tool in payload["tools"]] == [oh.PUBLISH_BRIDGE_VERDICT_TOOL]
-
-
-def test_bridge_review_bounds_nonpublisher_recovery_without_dispatch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    root = make_root(tmp_path)
-    payloads: list[dict] = []
-    dispatched: list[str] = []
-    original_dispatch = oh.dispatch_tool_call
-
-    def recording_dispatch(tool_name: str, *args, **kwargs) -> str:
-        dispatched.append(tool_name)
-        return original_dispatch(tool_name, *args, **kwargs)
-
-    monkeypatch.setattr(oh, "dispatch_tool_call", recording_dispatch)
-
-    def chat(_url: str, payload: dict, _timeout: float) -> dict:
-        payloads.append(json.loads(json.dumps(payload)))
-        if len(payloads) == 1:
-            return {"message": {"content": "GO is ready"}}
-        return {
-            "message": {
-                "content": "",
-                "tool_calls": [
-                    {
-                        "id": f"invalid_{len(payloads)}",
-                        "function": {"name": "Read", "arguments": {"path": "bridge/example-001.md"}},
-                    }
-                ],
-            }
-        }
-
-    with pytest.raises(oh.OllamaHarnessError) as exc_info:
-        oh.run_tool_loop(
-            "review",
-            route(root),
-            oh.DEFAULT_ENDPOINT,
-            10,
-            root,
-            skill="bridge-review",
-            chat_func=chat,
-        )
-
-    assert dispatched == []
-    assert len(payloads) == oh.MAX_BRIDGE_VERDICT_RECOVERY_TURNS + 2
-    assert "exhausted after 4 attempts" in str(exc_info.value)
-    assert "non-publisher tool call(s): Read" in str(exc_info.value)
-    for payload in payloads[1:]:
-        assert [tool["function"]["name"] for tool in payload["tools"]] == [oh.PUBLISH_BRIDGE_VERDICT_TOOL]
-
-
-def test_publisher_failure_diagnostic_is_credential_safe_and_bounded():
-    raw_secret = "secret-value-that-must-never-escape"
-    diagnostic = oh._bounded_publisher_failure_diagnostic(
-        f"ERROR: claim contention; api_key={raw_secret}; " + ("x" * 1000)
-    )
-
-    assert raw_secret not in diagnostic
-    assert "[REDACTED:api_key]" in diagnostic
-    assert len(diagnostic) <= oh.MAX_PUBLISHER_DIAGNOSTIC_CHARS
-
-
 def test_tool_loop_enforces_session_timeout_between_turns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     root = make_root(tmp_path)
     (root / "note.txt").write_text("hello", encoding="utf-8")
@@ -1196,7 +766,7 @@ def test_tool_loop_caps_bash_timeout_to_remaining_session_budget(tmp_path: Path,
         return ticks.pop(0) if ticks else 103.0
 
     def chat(url: str, payload: dict, timeout: float) -> dict:
-        if len(observed_timeouts) == 0 and len(payload["messages"]) == 1:
+        if not any(message["role"] == "assistant" for message in payload["messages"]):
             return {
                 "message": {
                     "content": "",
@@ -1521,7 +1091,7 @@ def test_guard_failure_modes_raise_before_mutation(tmp_path: Path, result: oh.Gu
 
 def test_missing_guard_raises(tmp_path: Path):
     root = make_root(tmp_path)
-    (root / ".claude" / "hooks" / "credential-scan.py").unlink()
+    (root / oh.ROUTING_CONFIG_PATH.parent / "hooks" / "credential-scan.py").unlink()
     with pytest.raises(oh.OllamaHarnessError, match="guard script is missing"):
         oh.dispatch_tool_call("Write", {"path": "out.txt", "content": "x"}, metadata(), root)
 

@@ -1,5 +1,5 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Tests for scaffold skill-template copy (``.claude/skills/gtkb-decision-capture/``)."""
+"""Tests for scaffold delivery of current managed skills."""
 
 from __future__ import annotations
 
@@ -19,51 +19,25 @@ def _make_options(profile: str, tmp_path: Path) -> ScaffoldOptions:
     )
 
 
-def test_dual_agent_project_has_decision_capture_skill(tmp_path: Path) -> None:
-    """dual-agent scaffold copies SKILL.md + helper with non-empty content."""
-    scaffold_project(_make_options("dual-agent", tmp_path))
-    target = tmp_path / "project"
-    skill_md = target / ".claude" / "skills" / "gtkb-decision-capture" / "SKILL.md"
-    helper_py = target / ".claude" / "skills" / "gtkb-decision-capture" / "helpers" / "record_decision.py"
-    assert skill_md.exists(), f"SKILL.md missing at {skill_md}"
-    assert helper_py.exists(), f"record_decision.py missing at {helper_py}"
-    assert skill_md.read_text(encoding="utf-8").strip(), "SKILL.md is empty"
-    assert helper_py.read_text(encoding="utf-8").strip(), "record_decision.py is empty"
-
-
-def test_base_profile_no_skill_tree(tmp_path: Path) -> None:
-    """local-only scaffold does not create the .claude/skills/ tree."""
+def test_base_profile_has_shared_skill_without_bridge_profile_skills(tmp_path: Path) -> None:
+    """Scaffold and upgrade deliver the same selected profile's skills."""
     scaffold_project(_make_options("local-only", tmp_path))
     target = tmp_path / "project"
     skills_root = target / ".claude" / "skills"
-    assert not skills_root.exists(), f".claude/skills/ must not be created for local-only profile; found {skills_root}"
-
-
-def test_skill_files_copied_recursively(tmp_path: Path) -> None:
-    """helpers/ subdir is present and contains record_decision.py."""
-    scaffold_project(_make_options("dual-agent", tmp_path))
-    target = tmp_path / "project"
-    helpers_dir = target / ".claude" / "skills" / "gtkb-decision-capture" / "helpers"
-    assert helpers_dir.is_dir(), f"helpers/ subdir missing at {helpers_dir}"
-    helper_py = helpers_dir / "record_decision.py"
-    assert helper_py.exists(), f"record_decision.py missing at {helper_py}"
-    content = helper_py.read_text(encoding="utf-8")
-    assert "def record_decision" in content
+    assert {p.relative_to(skills_root).as_posix() for p in skills_root.rglob("*") if p.is_file()} == {
+        "gtkb-baseline-audit/SKILL.md"
+    }
 
 
 def test_dual_agent_project_has_bridge_propose_skill(tmp_path: Path) -> None:
-    """dual-agent scaffold copies bridge-propose SKILL.md + helper with non-empty content."""
+    """Scaffold installs current native authoring instructions without a file writer."""
     scaffold_project(_make_options("dual-agent", tmp_path))
     target = tmp_path / "project"
     skill_md = target / ".claude" / "skills" / "gtkb-bridge-propose" / "SKILL.md"
     helper_py = target / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py"
     assert skill_md.exists(), f"bridge-propose SKILL.md missing at {skill_md}"
-    assert helper_py.exists(), f"write_bridge.py missing at {helper_py}"
-    assert skill_md.read_text(encoding="utf-8").strip(), "bridge-propose SKILL.md is empty"
-    helper_content = helper_py.read_text(encoding="utf-8")
-    assert helper_content.strip(), "write_bridge.py is empty"
-    # Sanity check that the shipped helper exposes the documented entry point.
-    assert "def propose_bridge" in helper_content
+    assert not helper_py.exists()
+    assert "gt bridge deliver" in skill_md.read_text(encoding="utf-8")
 
 
 def test_dual_agent_project_has_spec_intake_skill(tmp_path: Path) -> None:
@@ -94,15 +68,13 @@ def test_spec_intake_skill_recursively_copied(tmp_path: Path) -> None:
 
 
 def test_dual_agent_project_has_bridge_skill(tmp_path: Path) -> None:
-    """dual-agent scaffold copies bridge SKILL.md + all bridge helpers."""
+    """Scaffold installs native workflow instructions and the remaining read helpers."""
     scaffold_project(_make_options("dual-agent", tmp_path))
     target = tmp_path / "project"
     skill_md = target / ".claude" / "skills" / "gtkb-bridge" / "SKILL.md"
     helpers_dir = target / ".claude" / "skills" / "gtkb-bridge" / "helpers"
     helper_names = {
         "scan_bridge.py",
-        "revise_bridge.py",
-        "impl_report_bridge.py",
         "show_thread_bridge.py",
     }
 
@@ -113,3 +85,6 @@ def test_dual_agent_project_has_bridge_skill(tmp_path: Path) -> None:
         helper_path = helpers_dir / helper_name
         assert helper_path.exists(), f"{helper_name} missing at {helper_path}"
         assert helper_path.read_text(encoding="utf-8").strip(), f"{helper_name} is empty"
+    assert not (helpers_dir / "revise_bridge.py").exists()
+    assert not (helpers_dir / "impl_report_bridge.py").exists()
+    assert "gt projects commit" in skill_md.read_text(encoding="utf-8")

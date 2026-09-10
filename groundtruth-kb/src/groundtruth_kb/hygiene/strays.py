@@ -49,15 +49,19 @@ def parse_now(value: str | None = None) -> datetime:
 
 
 def _run_git(root: Path, args: list[str]) -> str:
-    result = subprocess.run(
-        ["git", *args],
-        cwd=root,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise StraysError(f"git {args[0]} unavailable or exceeded the 15-second read bound") from error
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
         raise StraysError(f"git {' '.join(args)} failed: {detail}")
@@ -312,6 +316,11 @@ def run_strays(
     root = root.resolve()
     if threshold_hours <= 0:
         raise StraysError("--threshold-hours must be greater than zero")
+    # Git otherwise discovers an ancestor repository and can make an unrelated
+    # nested directory trigger a scan of that repository and all its worktrees.
+    top_level = Path(_run_git(root, ["rev-parse", "--show-toplevel"]).strip()).resolve()
+    if top_level != root:
+        raise StraysError("The scan target must be the exact Git checkout root; ancestor discovery is refused")
     now = (now or datetime.now(UTC)).astimezone(UTC)
     registered_artifacts = _load_active_registry_records(root)
     workspace_entries = collect_workspace_entries(root, now=now, registered_artifacts=registered_artifacts)

@@ -647,7 +647,7 @@ GTKB_PATH_PREFIXES = (
     "docs/gtkb-dashboard/",
     "independent-progress-assessments/",
     "scripts/session_self_initialization.py",
-    "scripts/check_codex_hook_parity.py",
+    "scripts/check_harness_parity.py",
     "scripts/audit_standing_backlog_sources.py",
     "tests/scripts/",
     "tests/hooks/",
@@ -1629,46 +1629,35 @@ def _dev_environment_inventory_status(project_root: Path) -> dict[str, Any]:
 
 
 def _harness_parity_status(project_root: Path, *, harness_name: str | None, role_profile: str) -> dict[str, Any]:
-    harness_scope = _normalize_harness_name(harness_name) or "all"
-    try:
-        from scripts.check_harness_parity import check_harness_parity  # noqa: PLC0415
-
-        report = check_harness_parity(
-            project_root,
-            harness=harness_scope,
-            role=role_profile,
-            include_all=False,
-        )
-    except Exception as exc:  # noqa: BLE001 - startup must continue with visible diagnostic
-        return {
-            "status": "unavailable",
-            "harness_scope": harness_scope,
-            "role_scope": role_profile,
-            "scope_kind": "assigned_harness" if harness_scope != "all" else "fleet",
-            "evidence_type": "phase-1 catalog parity",
-            "operational_readiness": "not evaluated; run phase-2 readiness and hook discovery diff",
-            "counts": {},
-            "verification_command": "python scripts/check_harness_parity.py --all --markdown",
-            "phase2_command": "python scripts/harness_parity_phase2.py --project-root . --format markdown",
-            "discovery_diff_command": "python scripts/parity_discovery_diff.py --project-root . --markdown",
-            "error": str(exc),
-        }
-    return {
-        "status": report.overall_status.lower(),
-        "harness_scope": harness_scope,
-        "role_scope": role_profile,
-        "scope_kind": "assigned_harness" if harness_scope != "all" else "fleet",
-        "evidence_type": "phase-1 catalog parity",
-        "operational_readiness": "not evaluated; run phase-2 readiness and hook discovery diff",
-        "counts": report.counts,
-        "verification_command": (
-            f"python scripts/check_harness_parity.py --harness {harness_scope} --role {role_profile} --markdown"
-            if harness_scope != "all"
-            else "python scripts/check_harness_parity.py --all --markdown"
-        ),
-        "phase2_command": "python scripts/harness_parity_phase2.py --project-root . --format markdown",
-        "discovery_diff_command": "python scripts/parity_discovery_diff.py --project-root . --markdown",
+    harness = _normalize_harness_name(harness_name)
+    status = {
+        "status": "unavailable",
+        "harness_scope": harness,
+        "scope_kind": "assigned_harness",
+        "evidence_type": "installed projection conformance",
+        "operational_readiness": "not evaluated",
+        "verification_command": f"gt harness project {harness} --check"
+        if harness
+        else "Select the current harness explicitly",
     }
+    if not harness or harness == "all":
+        status["error"] = "No explicit current harness; peer configuration is not inspected"
+        return status
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "groundtruth_kb.cli", "harness", "project", harness, "--check"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        status["status"] = "pass" if result.returncode == 0 else "fail"
+        status["diagnostic"] = (result.stdout + result.stderr).strip()
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        status["error"] = str(exc)
+    return status
 
 
 def _harness_parity_compact_text(status: dict[str, Any]) -> str:
@@ -1679,7 +1668,7 @@ def _harness_parity_compact_text(status: dict[str, Any]) -> str:
         f"({status.get('evidence_type', 'phase-1 catalog parity')}; "
         f"operational_readiness={status.get('operational_readiness', 'not evaluated')}; "
         f"harness={status.get('harness_scope', 'unknown')}, "
-        f"role={status.get('role_scope', 'unknown')}, {count_text})"
+        f"{count_text})"
     )
     if status.get("error"):
         text += f"; error={status['error']}"
@@ -5043,123 +5032,6 @@ if _scripts_dir not in sys.path:
 from _wrap_io import _atomic_write_text  # noqa: E402,F401,I001
 
 
-# Pending owner-decisions surfacing
-# ---------------------------------
-# The config/hooks/gtkb-owner-decision-tracker.py hook is the canonical
-# writer of memory/pending-owner-decisions.md. This renderer reads the
-# same file and surfaces any `## Pending` entries in the startup
-# disclosure so owner decisions don't drown in inline message flow.
-# Authority: bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md Ã‚Â§2.6;
-# Codex GO at -004 with condition "keep visibility through this script,
-# do not reintroduce a separate SessionStart hook as primary surface."
-
-_PENDING_DECISIONS_REL_PATH = "memory/pending-owner-decisions.md"
-
-
-def _load_pending_owner_decisions(project_root: Path) -> list[dict[str, str]]:
-    """Read pending-owner-decisions.md `## Pending` section.
-
-    Returns a list of decision dicts (id, question, options, thread_ref,
-    asked_at, asked_in_session). Empty list when the file is missing,
-    malformed, or `## Pending` is empty. All exceptions are caught and
-    logged to stderr to preserve startup-disclosure rendering -- a
-    broken pending-decisions surfacing must never break the rest of the
-    startup report.
-    """
-    path = project_root / _PENDING_DECISIONS_REL_PATH
-    if not path.exists():
-        return []
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError as exc:  # pragma: no cover - defensive
-        sys.stderr.write(f"_load_pending_owner_decisions read failed: {exc}\n")
-        return []
-
-    try:
-        return _parse_pending_block(text)
-    except Exception as exc:  # pragma: no cover - defensive
-        sys.stderr.write(f"_load_pending_owner_decisions parse failed: {exc}\n")
-        return []
-
-
-def _parse_pending_block(text: str) -> list[dict[str, str]]:
-    """Parse the `## Pending` section into a list of decision dicts.
-
-    Format matches the YAML-frontmatter list shape that
-    config/hooks/gtkb-owner-decision-tracker.py writes:
-
-      - id: DECISION-NNNN
-        asked_at: 2026-04-25T07:30:00Z
-        question: "<text>"
-        options:
-          - "<label-1>"
-          - "<label-2>"
-        ...
-    """
-    entries: list[dict[str, str | list[str]]] = []
-    in_pending = False
-    current: dict[str, str | list[str]] | None = None
-    in_options = False
-
-    for raw_line in text.splitlines():
-        stripped = raw_line.strip()
-        if stripped.startswith("## "):
-            heading = stripped[3:].strip().lower()
-            if heading == "pending":
-                in_pending = True
-                continue
-            if in_pending:
-                # Hit the next section heading; flush and stop.
-                if current is not None:
-                    entries.append(current)
-                    current = None
-                break
-        if not in_pending:
-            continue
-        if stripped.startswith("- id: "):
-            if current is not None:
-                entries.append(current)
-            current = {"id": stripped[len("- id: ") :].strip(), "options": []}
-            in_options = False
-            continue
-        if current is None:
-            continue
-        if raw_line.startswith("  options:"):
-            in_options = True
-            continue
-        if in_options and raw_line.startswith("    - "):
-            opt = _unquote_pending_value(raw_line[len("    - ") :])
-            opts_field = current.get("options")
-            if isinstance(opts_field, list):
-                opts_field.append(opt)
-            continue
-        if raw_line.startswith("  ") and ":" in stripped:
-            in_options = False
-            key, _, val = stripped.partition(":")
-            current[key.strip()] = _unquote_pending_value(val.strip())
-
-    if current is not None:
-        entries.append(current)
-
-    # Coerce option lists to list[str] for downstream consumers.
-    out: list[dict[str, str]] = []
-    for entry in entries:
-        flat: dict[str, str] = {}
-        for k, v in entry.items():
-            if isinstance(v, list):
-                flat[k] = "; ".join(v)
-            else:
-                flat[k] = v
-        out.append(flat)
-    return out
-
-
-def _unquote_pending_value(value: str) -> str:
-    if value.startswith('"') and value.endswith('"') and len(value) >= 2:
-        return value[1:-1].replace('\\"', '"').replace("\\\\", "\\")
-    return value
-
-
 def _render_smart_poller_section(project_root: Path, role: dict[str, Any]) -> list[str]:
     """Retired stub â€” smart-poller startup-orient surface removed in Slice 4.
 
@@ -5195,51 +5067,6 @@ def _render_diagnostic_section(health: Any) -> list[str]:
         f"{icon} {health.message}",
         "",
     ]
-
-
-def _render_pending_decisions_block(decisions: list[dict[str, str]]) -> str:
-    """Format the pending-decisions list for the startup disclosure.
-
-    Matches the visual style of other startup sections (markdown bullets
-    with bold IDs). The decision id and suffix metadata render on the bullet
-    line; the question renders as a column-0 blockquote so a verbatim relay
-    of this section is classified as documentation rather than a fresh
-    owner-decision-ask by the owner-decision-tracker Stop hook (WI-3332). An
-    optional indented option list follows.
-    """
-    if not decisions:
-        return ""
-    lines: list[str] = [
-        f"{len(decisions)} owner decision(s) await a response. "
-        "Address one by quoting its DECISION-NNNN ID, type "
-        "`resolve DECISION-NNNN: <answer>` to record an answer, "
-        "`defer all` to acknowledge without resolving, or "
-        "`clear pending` to dismiss intentionally.",
-        "",
-    ]
-    for entry in decisions:
-        decision_id = entry.get("id", "")
-        question = entry.get("question", "")
-        opts = entry.get("options", "")
-        thread_ref = entry.get("thread_ref", "")
-        asked_at = entry.get("asked_at", "")
-        suffix_parts: list[str] = []
-        if asked_at:
-            suffix_parts.append(f"asked {asked_at}")
-        if thread_ref:
-            suffix_parts.append(f"thread: `{thread_ref}`")
-        suffix = f" ({'; '.join(suffix_parts)})" if suffix_parts else ""
-        # WI-3332: render the stored question as a column-0 blockquote line so
-        # a verbatim relay of this section is classified as documentation, not
-        # a fresh owner-decision-ask, by the owner-decision-tracker Stop hook's
-        # structural-context check (a line starting with "> " is treated as a
-        # relay). The decision id, question, and options stay fully visible.
-        lines.append(f"- **{decision_id}**{suffix}")
-        if question:
-            lines.append(f"> {question}")
-        if opts:
-            lines.append(f"  - Options: {opts}")
-    return "\n".join(lines)
 
 
 def _load_startup_glossary(project_root: Path) -> dict[str, Any]:
@@ -5345,17 +5172,6 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
     dashboard_open_mode = dashboard_opening.get("mode") or DASHBOARD_OPEN_MODE_HARNESS
     token_count = metrics["tokens"]["tokens_consumed_before_user_input"]
     token_count_text = "unavailable" if token_count is None else str(token_count)
-    pending_decisions = _load_pending_owner_decisions(project_root)
-    if pending_decisions:
-        pending_decisions_section = [
-            "### Pending Owner Decisions",
-            "",
-            _render_pending_decisions_block(pending_decisions),
-            "",
-        ]
-    else:
-        pending_decisions_section = []
-
     if _is_loyal_opposition_model(model):
         startup_task_section = []
         project_state_rollup_section = [
@@ -5446,7 +5262,6 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             ),
             "",
             *_render_smart_poller_section(project_root, role),
-            *pending_decisions_section,
             _render_top_priority_actions_section(model),
             "",
             *startup_task_section,

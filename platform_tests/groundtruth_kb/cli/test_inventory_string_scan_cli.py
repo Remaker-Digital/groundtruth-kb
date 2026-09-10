@@ -7,7 +7,6 @@ from pathlib import Path
 from click.testing import CliRunner
 from groundtruth_kb.cli import main
 from groundtruth_kb.db import KnowledgeDB
-from groundtruth_kb.project.sot_registry import load_toml, sync_projection
 
 
 def _git(root: Path, *args: str) -> None:
@@ -35,25 +34,9 @@ owner_role = "shared"
 '''
 
 
-def _sync_registry(root: Path) -> None:
-    registry = root / "config" / "registry" / "sot-artifacts.toml"
-    packaged = (
-        root
-        / "groundtruth-kb"
-        / "src"
-        / "groundtruth_kb"
-        / "context"
-        / "registries"
-        / "v1"
-        / "config"
-        / "registry"
-        / "sot-artifacts.toml"
-    )
-    packaged.parent.mkdir(parents=True, exist_ok=True)
-    packaged.write_bytes(registry.read_bytes())
-    db_path = root / "groundtruth.db"
-    KnowledgeDB(db_path=db_path)
-    sync_projection(load_toml(registry), db_path, changed_by="test", change_reason="fixture sync")
+def _prepare_database(root: Path) -> None:
+    db = KnowledgeDB(db_path=root / "groundtruth.db")
+    db.close()
 
 
 def _write_project(root: Path) -> Path:
@@ -64,7 +47,7 @@ def _write_project(root: Path) -> Path:
         _artifact_toml("rule", "narrative_authority", "active", "docs/rule.md"),
         encoding="utf-8",
     )
-    _sync_registry(root)
+    _prepare_database(root)
     config = root / "groundtruth.toml"
     config.write_text(
         f'[groundtruth]\ndb_path = "{(root / "groundtruth.db").as_posix()}"\nproject_root = "{root.as_posix()}"\n',
@@ -129,7 +112,7 @@ def test_inventory_refresh_counts_gitignored_registered_artifact(tmp_path: Path)
         + _artifact_toml("owner-local-env", "runtime_state", "active", ".env.local"),
         encoding="utf-8",
     )
-    _sync_registry(tmp_path)
+    _prepare_database(tmp_path)
     (tmp_path / ".gitignore").write_text(".env.local\n", encoding="utf-8")
     (tmp_path / ".env.local").write_text("REGISTERED_LOCAL_SENTINEL\n", encoding="utf-8")
     _git(tmp_path, "init")
@@ -158,7 +141,7 @@ def test_inventory_refresh_reports_compact_path_classes_and_blockers(tmp_path: P
         + _artifact_toml("missing-active", "control_surface", "active", "config/missing.toml"),
         encoding="utf-8",
     )
-    _sync_registry(tmp_path)
+    _prepare_database(tmp_path)
 
     result = CliRunner().invoke(main, ["--config", str(config), "admin", "inventory", "refresh", "--json"])
 

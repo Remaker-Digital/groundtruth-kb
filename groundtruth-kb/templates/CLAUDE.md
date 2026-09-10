@@ -1,160 +1,71 @@
-# CLAUDE.md — {{PROJECT_NAME}}
-
-This file provides active guidance for AI assistants working on {{PROJECT_NAME}}.
-It is loaded at the start of every session.
-
-> **Customize this template:** Replace `{{PROJECT_NAME}}`, `{{COPYRIGHT}}`, and
-> other placeholders with your project's values. Remove sections that don't apply.
-
-This project follows ADR-0001: Three-Tier Memory Architecture (MemBase = canonical knowledge and specifications; MEMORY.md = operational notepad; Deliberation Archive (DA) = design-reasoning record).
-
----
-
-## Canonical Terminology (ADR-0001 core vocabulary)
-
-
-| Term                          | Short definition                                                                   |
-| ----------------------------- | ---------------------------------------------------------------------------------- |
-| **MemBase**                   | Canonical, authoritative store of specs and governed knowledge (`groundtruth.db`). |
-| **Deliberation Archive (DA)** | Design-reasoning tier — decisions, reviews, rejected alternatives.                 |
-| **MEMORY.md**                 | Operational notepad at repo root. Can coordinate work; cannot make anything true.  |
-| **GroundTruth KB / GT-KB**    | The product: MemBase + CLI + templates + doctor + bridge.                          |
-| **Prime Builder**             | Implementing agent. Proposes, implements, tests.                                   |
-| **Loyal Opposition**          | Reviewing agent. Inspects, critiques, issues GO / NO-GO / VERIFIED.                |
-
-
-Full glossary: ur`.claude/rules/canonical-terminology.md` (scaffolded). Record in MemBase.
-
----
-
-
-
-## Project Identity
-
-
-| Attribute        | Value                            |
-| ---------------- | -------------------------------- |
-| **Project Name** | {{PROJECT_NAME}}                 |
-| **Type**         | {{PROJECT_TYPE}}                 |
-| **Status**       | See MEMORY.md for current status |
-| **Owner**        | {{OWNER}}                        |
-
-
-
-
-### Copyright Notice
-
-All new work in this repository must include:
-
-```
-{{COPYRIGHT}}
-```
-
----
-
-
-
-## Roles
-
-**Owner role:** Provides direction (what to build) and decisions (specifications to approve).
-
-**Builder role (AI agent):** Creates, manages, and maintains implementation artifacts. Proposes specifications, implements approved changes, runs tests, and keeps the system consistent.
-
-### GroundTruth Vision Filter
-
-The owner should primarily add or revise specifications, answer clarification
-questions, and make explicit trade-off decisions. When choosing implementation
-options, prefer approaches that reduce routine owner burden through
-specifications, automated checks, traceability, and deployment evidence.
-
-Decision filter: Does this reduce the owner's role to specifications,
-clarifications, and decisions?
-
-### Optional operational inventory
-
-If this project uses a bridge, multiple agents, scheduled pollers, or recurring automations, and keep it aligned with runtime entrypoints, schedules, directives, and role exceptions.
-
----
-
-
-
-## Workflow: Specification → Work Item → Test → Implementation
-
-1. Owner requests change → record as specification(s) in MemBase (canonical knowledge and specifications)
-2. Identify implementation gaps → create work items
-3. Work item creation triggers test creation
-4. Add work items to backlog → prioritize
-5. Implement in backlog order
-6. Execute tests → PASS or FAIL
-7. FAIL → create new work item (verify spec → verify test → fix implementation)
-
-
-
-### Spec-First Rule
-
-When the owner describes what the system **must do**, **should do**, or states numbered criteria:
-
-1. Record or verify specifications in MemBase
-2. Create work items for any gaps
-3. Present the backlog for prioritization
-4. Only proceed to implementation after approval
-
----
-
-
-
-## MemBase (Canonical Knowledge and Specifications)
-
-Access via Python API (`groundtruth_kb`) or CLI (`gt`). Web UI available via `gt serve`.
-
-**Key principle:** All canonical project knowledge lives in MemBase. MEMORY.md can coordinate work, but it cannot make anything true. Use `gt summary`
-to check current status. Use `gt assert` to verify specifications against the codebase.
-
----
-
-
-
-## Working with This Project
-
-
-
-### Starting a New Session
-
-After bridge obligations are clear, produce the mandatory **ORIENT block** once per session
-before other substantive work. Format, live-source rules, structured `UNKNOWN:<category>`
-tags, and `/baseline-audit` triggers are defined in
-.harness-baseline-configuration`/rules/session-start-orientation.md`.
-
-Send startup keywords and task content as separate messages:
-
-```text
-::init gtkb pb
-```
-
-```text
-::open project
-```
-
-
-
-
-
-### Session Wrap-Up
-
-Before ending a session:
-
-1. Produce a well-formed **ORIENT block** in the final owner-visible turn (see `.cursor/rules/session-start-orientation.md`)
-2. Update /.cursor/MEMORY.md with what was done and what's next
-3. Run `gt assert` to confirm no regressions
-4. Commit with session ID in the message
-
-
-
-### Protected Behaviors
-
-Never remove code, tests, features, or specifications without explicit owner approval.
-If something looks wrong — ask rather than act.
-
----
-
-*{{COPYRIGHT}}*
+# {{PROJECT_NAME}}
+
+Owner: {{OWNER}}
+
+# GT-KB session instructions
+
+GT-KB supplies task-scoped knowledge and a standard work process to ephemeral
+agent contexts. Read current state through the native CLI. This baseline directs
+behavior; current formal records and canonical project/work-item state supply
+intent and status.
+
+## Start from the supplied task
+
+Use the exact init marker and activity supplied by the owner or dispatched
+message. Bind the harness's actual native context identifier with
+`gt session bind --native-context-id <id> --init-keyword "<supplied-line>" --json`
+and read it back with `gt session show`. A role is immutable for that context.
+Resolve missing inputs before an action that depends on them.
+
+Load `gt context work-item <work-item> --json` and the exact dispatched bridge item
+through `gt bridge show <document> --content --json`. Inspect current membership,
+formal requirements, tests, dependencies and Git state. Read definitions through
+`gt authority resolve "<term>"` or `gt terms show <id>` when needed.
+
+Work only on the supplied target. Each context claims the next artifact it will
+deliver, with no enduring ownership of a work item or its chain. Harnesses remain
+independent and interact only through the CLI and bridge/dispatcher. Do not read
+or coordinate through another harness's configuration or runtime state.
+
+## Perform the current phase
+
+Use the role-appropriate bridge skill in the baseline's skills directory:
+`gtkb-bridge-propose`, `gtkb-proposal-review`, `gtkb-bridge`, or `gtkb-verify`.
+The owner dispatches work until Dispatcher Next is qualified and activated.
+Only agents author proposals and verdicts; the harness transports them.
+
+A program sequences projects. A project groups interdependent work that completes
+and commits together. Every work item has one parent project. Parent authorization
+is the owner's binary ordering choice; check it before NEW. Readiness also needs
+current formal intent, an executable test, independent review, a live artifact
+claim and a registered checkout. These are distinct conditions.
+
+Prime Builder proposes, implements an independently accepted proposal and reports
+READY. Loyal Opposition independently reviews and verifies work it did not author.
+Review evidence identifies Git mode and object identity. The final project commit
+contains its complete independently verified work product. Keep bridge payloads
+and generated projections out of that commit.
+
+For changed formal intent after VERIFIED before commit, use the native restart
+operation and a fresh proposal/review/implementation attempt on the same work item.
+Preserve membership and existing bytes; abandoned attempts grant no effect rights.
+Ordinary byte changes need fresh verification. Committed work remains terminal.
+
+## Preserve the work and correct drift
+
+Use only this context's registered checkout and scratch directory. Revalidate the
+claim and scope through native services before protected effects. Refuse redirected
+paths and preserve unrelated bytes. Let native publication finish or safely resume
+the intended effect; final prose is not proof of delivery.
+
+Apply owner choices to the affected canonical source or requested action. Session
+logs retain the conversation for later harvest. Ask for unresolved material intent;
+do not invent it or build a second decision/permissions archive.
+
+Correct obsolete instructions at their authoring source. The baseline and projector
+are work product; named harness configuration directories are derived output and
+are refreshed mechanically. An unavailable service, contradictory active guidance
+or failed check is reported with its practical recovery route, never treated as
+successful completion.
+
+Copyright: {{COPYRIGHT}}

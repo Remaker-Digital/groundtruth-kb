@@ -1,145 +1,56 @@
 ---
 name: gtkb-sweep-commit
-description: Clear a dirty GroundTruth-KB worktree the governed way — take an ownership inventory of the changed paths, then finalize each independently verified scope through the per-work-item Git lifecycle. Use when the owner says to "sweep commit", "commit everything", "commit all changes", consolidate verified bridge work, or perform the regular GT-KB worktree cleanup. Handles GT-KB governance hooks, inventory drift, narrative-artifact approval evidence, credential scans, and verification. Does not push unless the owner explicitly asks.
+description: Inspect pending GT-KB work and complete independently verified projects through the native CLI while preserving unrelated work. Use for commit or cleanup requests involving a dirty worktree.
 metadata:
   project: groundtruth-kb
   category: operation and hygiene
-  activity-envelope: ops
 ---
-# Activity Envelope Requirement
 
-This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
+# Complete reviewed projects
 
+Read the current project, its single-parent work items, formal intent and review
+state through the CLI. A program sequences projects; each project groups the
+work product that completes and commits together. A dirty path or bridge message
+does not establish ownership, review completion or permission to include it.
 
-# GT-KB Sweep Commit
+Preserve every unrelated staged and unstaged byte. Report unfinished projects
+and foreign changes; a cleanup request does not make them verified. Do not select
+new implementation work or change membership merely to produce a clean tree.
 
-## Overview
+Only the independent reviewing context completes an agent project commit. Use
+its actual immutable native context binding. When all project members are
+VERIFIED, the native service checks the complete current reviewed artifact set,
+including Git modes and object identities, before the normal Git hooks run.
 
-Bring a dirty GT-KB worktree back to clean by finalizing each owned, independently
-verified scope on its own. Ownership is established first; commits follow per work
-item. Unowned and unverified paths are left in place for their owners.
+1. Read current state with `gt projects show <PROJECT-ID> --json`,
+   `gt backlog show <WI-ID> --json`, and the relevant `gt bridge show <document>`.
+   Inspect `git status --short` for work that must be preserved.
+2. Confirm the proposal-derived executable tests and exact final artifact
+   identities. A failed test or changed review requires correction and fresh
+   independent verification of the affected scope.
+3. Write a UTF-8 commit message in the current context's scratch directory.
+   Cite every work item retired by this project commit as `(WI-NNNN)`.
+4. Use the current project version and actual native context:
 
-## Authority
-
-Owner decision `DELIB-202666332` ("Authorize exact VERIFIED finalization to reach a
-clean worktree") governs this procedure. It authorizes local commits for
-independently VERIFIED scopes whose exact implementation, report, verdict paths, or
-reviewed hunks are mechanically isolated, and it requires each finalization to use
-the governed path and to preserve unrelated staged and unstaged content.
-
-`python -m groundtruth_kb.git_lifecycle` is the authorized execution boundary for
-Git effects. Its operations bind to one work item and realize only that work item's
-scope, which is what keeps each commit attributable and each unrelated change
-untouched.
-
-## Operating Rules
-
-- Treat `E:\GT-KB` as the project root and do not pull live GT-KB artifacts from
-  outside that root.
-- Establish which work item owns a path before finalizing that path.
-- Finalize one work item at a time, and only when its scope is independently
-  verified.
-- Leave unowned, unverified, or concurrently held paths exactly as found.
-- Preserve unrelated staged and unstaged content across every operation.
-- Do not push unless the owner explicitly asks for a push.
-- Stop instead of finalizing if a real credential or secret finding appears in the
-  content under review.
-
-## Workflow
-
-1. Inspect live state.
-
-   ```powershell
-   git status --short
-   $paths = @(git ls-files --modified --deleted --others --exclude-standard)
-   $paths.Count
+   ```text
+   gt projects commit <PROJECT-ID> --native-context-id <native-context-id> --expected-version <version> --message-file <message-file>
    ```
 
-   If there are no paths, report the clean worktree and stop.
+5. Read back the returned Git commit and canonical project/member terminal state.
+   Report the actual result and preserved remaining work. Publish a commit only
+   when the owner has requested publication.
 
-2. Take an ownership inventory. For each cluster of changed paths, identify the
-   owning work item and whether that scope is independently verified.
+The service preserves foreign index/worktree content and refuses stale or
+overlapping inputs. Review follows current formal intent. Material formal-intent
+changes after VERIFIED and before commit require a fresh attempt on the same
+uncommitted work item; membership and work bytes remain intact, and prior GO is
+not inherited. A failed or uncertain commit is recovered from canonical state
+and the actual Git fact before any retry.
 
-   ```powershell
-   gt backlog list --contains <topic> --json
-   gt bridge show <slug>
-   ```
-
-   A scope is finalizable when a work item owns it and that work item's bridge
-   thread carries independent verification. Record clusters with no identified
-   owner and report them; they are left in place.
-
-3. For each finalizable work item, bind the scope through the governed lifecycle.
-
-   ```powershell
-   $python = "groundtruth-kb\.venv\Scripts\python.exe"
-   & $python -m groundtruth_kb.git_lifecycle create --work-item-id <WI-NNNN> --title "<title>" --project-branch <branch>
-   & $python -m groundtruth_kb.git_lifecycle attach --work-item-id <WI-NNNN>
-   & $python -m groundtruth_kb.git_lifecycle validate --work-item-id <WI-NNNN>
-   ```
-
-   `validate` confirms branch existence, ancestry, and binding hash before any
-   effect is realized.
-
-4. Run required verification for that work item's scope.
-
-   ```powershell
-   & $python -m groundtruth_kb secrets scan --staged --redacted --fail-on verified-provider
-   & $python -m py_compile @py
-   & $python -m ruff check @py
-   & $python -m ruff format --check @py
-   & $python -m pytest @tests -q --tb=short
-   & $python scripts\check_dev_environment_inventory_drift.py --staged --allow-review-evidence
-   & $python scripts\check_narrative_artifact_evidence.py --staged
-   ```
-
-   Build `$py` and `$tests` from that work item's bound scope. Broaden pytest when
-   the scope touches shared infrastructure, hooks, governance validators, or test
-   discovery logic.
-
-5. Fix expected gate failures within the bound scope.
-
-   - Ruff format drift: run `& $python -m ruff format <paths>`.
-   - Inventory drift: run `& $python scripts\collect_dev_environment_inventory.py`,
-     then rerun the inventory drift check.
-   - Narrative-artifact evidence: generate a packet, then rerun the check:
-
-     ```powershell
-     groundtruth-kb\.venv\Scripts\gt.exe generate-approval-packet `
-       --kind narrative `
-       --target <protected-narrative-path> `
-       --artifact-id <short-kebab-id> `
-       --action update `
-       --source-ref "<bridge/verdict/source evidence or owner request>" `
-       --explicit-change-request "<owner-visible request>" `
-       --change-reason "<why this narrative file changed>" `
-       --approval-mode auto `
-       --changed-by "<harness-role-id>"
-     & $python scripts\check_narrative_artifact_evidence.py --staged
-     ```
-
-   - Secret scan finding: stop. Report the finding path and wait for owner
-     direction; credential lifecycle is owner-managed.
-
-6. Realize the bound scope.
-
-   ```powershell
-   & $python -m groundtruth_kb.git_lifecycle preserve --work-item-id <WI-NNNN> --message "<type(scope): message (WI-NNNN)>"
-   ```
-
-   `preserve` realizes only the bound work-item scope, so unrelated content is
-   carried forward untouched. Cite every work item the message retires in the form
-   `(WI-NNNN)`. If a governance hook fails, read the hook output, fix the specific
-   evidence or formatting issue within the bound scope, and retry.
-
-7. Repeat steps 3 through 6 for the next finalizable work item, then report final
-   state.
-
-   ```powershell
-   git status --short
-   git log -1 --format="%H%n%s"
-   ```
-
-   Final response should include each commit hash produced, the verification
-   summary per scope, the paths deliberately left in place with the reason, the
-   remaining clean/dirty status, and whether a push was performed.
+Normal hooks check staged work product, secrets, formatting, PowerShell syntax
+and whether baseline/projector sources can produce their projections. Repair a
+failure through its current source and reverify affected work. Never bypass the
+hooks. The commit excludes bridge payloads, generated projections and runtime
+state. Current native review and project state are the evidence; no approval
+packet, staged bridge file, staged test filename or inventory snapshot substitutes
+for them. Projection and inventory refresh are operational derivations.

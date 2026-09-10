@@ -52,9 +52,7 @@ def capture_candidate(
     Delegates to :func:`groundtruth_kb.intake.capture_requirement`
     with ``changed_by=_CHANGED_BY`` and
     ``change_reason=_CAPTURE_CHANGE_REASON`` so the persisted
-    deliberation records the skill actor. Audit-trail differentiation
-    matches the ``gtkb-decision-capture`` and ``gtkb-bridge-propose``
-    precedent.
+    deliberation records the skill actor.
 
     Args:
         db: Open :class:`KnowledgeDB` instance to write against.

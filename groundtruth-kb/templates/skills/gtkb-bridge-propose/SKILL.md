@@ -1,232 +1,101 @@
 ---
 name: gtkb-bridge-propose
-description: Write a bridge proposal to ``bridge/<topic>-001.md`` through the governed no-index bridge path under governance-safe credential-scan and concurrency controls. Use when drafting a new NEW or REVISED proposal through the helper path (non-Claude-Write).
+description: Author and deliver a NEW or REVISED implementation proposal for explicitly assigned GT-KB work through the native CLI, using current task context and an exact next-artifact claim.
 ---
 
-This skill implements the helper-mediated bridge-write path. It is the
-safe alternative to persisting proposal bodies through non-Write code
-paths (``file.write_bytes``, ``shutil.copy2``, etc.) that are outside
-the ``scanner-safe-writer`` hook's Write-tool trigger scope.
+# Author an implementation proposal
 
-Authority note: after the 2026-06-15 TAFE/dispatcher cutover,
-the retired bridge-index file must not exist in current GT-KB operation. This
-skill publishes versioned bridge files and dispatcher/TAFE state; agents must
-use dispatcher/TAFE bridge state and `bridge-config` for current authority,
-topology, dispatch health, and target-selection claims.
+Use this skill as a Prime Builder context for the work selected by the owner or
+dispatcher. A proposal is the agent's own complete message. The CLI validates and
+delivers its authored bytes; it does not choose scope, compose decisions, repair
+a header or select another agent's work.
 
-# /gtkb-bridge-propose
+Use the configured native authority. Obtain current instructions with
+`gt context work-item <WI-ID> --json`. Read the work item, its one parent project,
+applicable formal sources, linked executable test and test-plan instructions,
+and prerequisites returned by that command. Resolve missing or contradictory
+scope before proposing. Owner decisions change their canonical source directly;
+prior deliberations and decision-history excerpts are not proposal authority.
 
-## What this skill does
+The receiving context's role comes from its exact supplied init marker. Use its
+native context identifier with `gt session show --native-context-id <context-id>
+--json`; if initialization is still required, bind only the exact supplied marker
+through `gt session bind`. A harness identity does not establish a role. Use only
+your own harness identity and context; no peer harness inventory is required.
 
-Takes a topic slug and a proposal body, scans the body against the canonical
-credential catalog (``CREDENTIAL_PATTERNS + BASH_EXTRAS``, PII excluded),
-writes ``bridge/<topic>-001.md``, and records the bridge thread in
-dispatcher/TAFE state without creating or requiring the retired bridge-index
-file.
+## Author the current proposal
 
-**Project-linkage metadata (per ``DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001``)**:
-the proposal body for an implementation-targeting NEW/REVISED proposal MUST
-include three machine-readable header lines near the top::
+For an existing attempt, read `gt bridge show <document> --content --json` and
+respond to its current state. NEW begins a fresh implementation attempt;
+REVISED responds to NO-GO on the existing attempt. Do not reuse a stale GO or
+infer ownership of the work item from previous participation.
 
-    Project Authorization: PAUTH-<authorization-id>
-    Project: <PROJECT-ID>
-    Work Item: <WI-NNNN | GTKB-* | WORKLIST-*>
+Before NEW, check the parent's current authorization field. If it is not
+`authorized`, an interactive context asks the owner to resolve it. A headless
+context follows the CLI's BLOCKED response; it does not change authorization.
+Authorization changes do not cancel an already initiated chain.
 
-``bridge-compliance-gate.py`` hard-blocks the Write when any line is absent.
-Non-implementation proposals self-declare exemption with a ``bridge_kind:``
-header in ``{spec_intake, governance_review, loyal_opposition_advisory}``;
-verdict files (GO/NO-GO/VERIFIED/WITHDRAWN) are exempt by status.
+Write the smallest cohesive proposal that explains the intended result, exact
+targets, relevant formal requirements, test work and acceptance criteria. Include
+necessary removal or supersession effects and interactions with current work.
+Use current source content to justify scope; a list of IDs alone is not analysis.
 
-Two options are offered on a credential hit:
-
-- **Abort** — no bridge file or dispatcher/TAFE state is written.
-- **Redact** — credential-shaped spans are replaced with
-  ``[REDACTED:<label>]`` markers. Redacted content is re-scanned. If
-  the second scan still finds hits, the skill aborts with an
-  explicit ``RedactionResidualError`` — this is a bug, not a
-  recoverable user state.
-
-**There is no Force option.** Helper writes are outside the
-``scanner-safe-writer`` hook's Write-tool trigger scope, so a bypass
-here would silently persist credential-shaped text without an
-auditable deny record. Callers who genuinely need to document
-credential-shaped values (test fixtures, rotation runbooks) should
-use prose descriptions or runtime-assembled test fixtures — not a
-helper bypass.
-
-## When to invoke
-
-Use this skill when:
-
-- Drafting a new NEW bridge proposal from session context
-- Writing a REVISED version after a NO-GO (pick a fresh file name
-  with incremented version suffix)
-- Any helper-driven code path that needs to persist a bridge
-  proposal body to disk under governance
-
-Do NOT use for:
-
-- Editing an existing bridge file (Edit tool is the correct path)
-- Writing non-bridge files (only the target versioned bridge file and
-  dispatcher/TAFE bridge state are in scope)
-- Persisting credential-shaped content (redaction is the only
-  legitimate path; force-write is not available)
-
-## How it works
-
-### Harness-explicit non-bypass model
-
-The bridge-propose helper has two governed authoring paths:
-
-- **Claude path:** helper composer functions may return proposal content for
-  the harness to persist through Claude ``Write`` / ``Edit`` tool
-  calls. Those calls flow through the live Claude PreToolUse governance hooks.
-- **Codex path:** Codex must use the helper-mediated path that runs
-  ``.claude/hooks/bridge-compliance-gate.py --audit-only`` against the composed
-  proposal content before any proposal file is written. Codex must not treat
-  ``apply_patch`` as equivalent to Claude ``Write`` / ``Edit`` for bridge
-  compliance unless a future hook-parity change explicitly adds that coverage.
-
-The pure composer functions are ``compose_proposal(...)`` and state-publication
-helpers. They perform no file I/O. The Codex writer entry
-point is ``propose_bridge_codex_non_bypass(...)``; it preserves credential
-scanning, author metadata insertion, bridge-compliance validation, file-first
-write ordering, and no-index dispatcher/TAFE publication behavior.
-
-### Optional deterministic draft scaffold
-
-For implementation-targeting proposal drafts, the author MAY start with the
-deterministic CLI scaffold:
+A dispatchable proposal has exactly these three nonblank envelope lines, in any
+order, before its typed metadata:
 
 ```text
-gt bridge propose --kind <implementation|defect-fix|scoping|advisory-disposition|retirement|umbrella> --wi <WI-ID> --slug <topic-slug> --target-path <path>
+::init gtkb lo
+::open build
+NEW
 ```
 
-The command writes a NON-DISPATCHABLE draft under
-``.gtkb-state/bridge-propose-drafts/<topic-slug>-001.md``. That draft is
-runtime state only; it is not a filed bridge proposal and does not mutate
-``bridge/`` or dispatcher/TAFE bridge state. Review and fill the AI-judgment
-placeholders, then use the helper-mediated write path below to file the final
-proposal. The helper remains the canonical bridge write path because it performs
-credential scanning, file-existence checks, and no-index dispatcher/TAFE
-publication. Here "canonical write path" means the current governed helper path
-for bridge file and state publication; it does not create or depend on
-the retired bridge-index file.
+Use REVISED for a revised proposal. The envelope names the next responder.
+Supply the complete metadata before the blank line introducing the body:
 
-Invokes ``helpers/write_bridge.py``'s ``propose_bridge()`` with the
-caller-supplied ``topic_slug``, ``body``, and optional metadata.
+- `bridge_kind: implementation_proposal`
+- `Document`, positive integer `Version`, and ISO calendar `Date`
+- `author_identity`, `author_harness_id`, `author_session_context_id`, `author_model`
+- `recipient_role: loyal-opposition`
+- `Project`, `Work Item`, and the observed integer `work_item_version`
+- `target_paths` and `test_artifact_targets`, each a JSON array of exact relative paths
+- `spec_versions`, a JSON object mapping applicable formal IDs to the versions you read
 
-### Phase 0 — Prior Deliberations pre-population
+Use the returned bound session identifier for `author_session_context_id`. Do not
+invent provenance, duplicate metadata keys or include retired permission fields.
+List the paths the proposal actually changes, including test artifacts. Changing
+a baseline does not authorize editing a generated projection.
 
-Per Phase 2 of the GTKB-DA-READ-SURFACE-CORRECTION program
-(``ADR-DA-READ-SURFACE-PLACEMENT-001`` Path D), the helper pre-populates
-the proposal's ``## Prior Deliberations`` section before the credential
-scan. Retrieval has a deterministic baseline plus an explicit semantic-search
-opt-in:
+## Claim and deliver
 
-1. **Glossary-source seeding (deterministic).** The helper reads
-   ``.claude/rules/canonical-terminology.md`` and looks for a
-   ``### <heading>`` matching the topic slug (kebab-case → space-separated,
-   case-insensitive). If matched, the heading's ``**Source:**`` block is
-   parsed and ``DELIB-*`` / MemBase spec IDs are extracted as deterministic
-   seed candidates.
-2. **Semantic search (explicit opt-in).** By default, ``db=None`` skips
-   semantic search and uses glossary-only seeding. ``db=False`` is the
-   explicit-disable form and also skips semantic search. Pass ``db=True``
-   to opt into the bounded default ``KnowledgeDB("groundtruth.db")`` search
-   path, or pass an explicit DB instance to use that connection. Results are
-   added on top of the seeds and deduplicated. If an opted-in default DB
-   cannot be opened (missing file, import error, timeout), the helper silently
-   falls back to glossary-only seeding.
+Reserve the exact next message using the observed predecessor version (zero for
+a fresh attempt) and the status you will author:
 
-When the topic is genuinely novel (no glossary entry, no DA matches), the
-helper inserts an ``_No prior deliberations: <fill in reason before
-filing>._`` placeholder so the proposal does not fail the LO review-side
-check that NO-GOs empty Prior Deliberations sections.
+```text
+gt bridge claim <document> --work-item-id <WI-ID> --native-context-id <context-id> --expected-version <head-version> --status <NEW-or-REVISED> --request-id <unique-request-id> --json
+```
 
-Combined candidates are formatted as Markdown bullets and inserted into
-the body's ``## Prior Deliberations`` section under the marker comment
-``<!-- Pre-populated by helper; review and prune. -->``. If the section
-is absent, it is appended at end of body. If the section already has
-author content, helper-suggested candidates land under a
-``### Helper-suggested candidates`` subheading instead of overwriting
-prior content.
+Retain the returned fence for this delivery. The claim covers only this next
+artifact and expires; it does not reserve the entire work item or chain. Reuse a
+request ID only when retrying the identical claim request.
 
-The author then reviews and prunes irrelevant entries before the
-proposal is filed. The Loyal Opposition review-side check (``codex-review-gate.md``
-sixth review obligation) NO-GOs proposals with empty Prior Deliberations
-sections lacking justification (a ``_No prior deliberations: <reason>._``
-line is the explicit empty-justification convention for novel topics).
+Save your complete UTF-8 message in your current session's scratch directory,
+then deliver it unchanged:
 
-**Opt out:** pass ``pre_populate_prior_deliberations=False`` to
-``propose_bridge()``. Opt-out callers must include the empty-justification
-line per the LO review check.
+```text
+gt bridge deliver <document> --native-context-id <context-id> --fence <returned-fence> --content-file <authored-message-file> --json
+```
 
-**Audit log:** every invocation writes
-``.gtkb-state/bridge-propose-helper/last-prepopulation.json`` with the
-timestamp, topic slug, derived query, glossary-seed IDs, search-result
-IDs, similarity threshold, and total candidate count. Pass
-``pre_populate_log_path=False`` to disable logging.
+Credential detection refuses delivery without exposing matched values or
+consuming the claim. Correct the authored content; the service never silently
+redacts or rewrites it. An unavailable authority is a refusal, not a reason to
+write a local bridge file or hidden state.
 
-**S331 anti-regression.** The original S331 wrong-frame failure was an
-agent producing an evaluation of "GT-KB isolation" without consulting the
-DA, which contained four lifecycle-independence anchor records. With this
-helper enabled, authoring a proposal on the topic ``"isolation"`` reads
-the Phase 1 glossary entry's ``**Source:**`` block and deterministically
-seeds those four DELIB IDs into the populated section. The mechanism is
-seed extraction, not semantic-search ranking — making the anti-regression
-mechanically grounded.
+If acknowledgement is uncertain, read the current attempt and retry the exact
+same bytes and fence when appropriate. If the claim expired or the predecessor
+changed, re-read the current task and attempt before acquiring a new claim. Do
+not increment versions automatically or overwrite another message.
 
-### Phase 1 — Pre-flight scan
-
-``scan_credential_hits(body)`` iterates ``CREDENTIAL_PATTERNS +
-BASH_EXTRAS`` (PII patterns are intentionally excluded, same policy
-as ``scanner-safe-writer``). Returns list of hits; empty list means
-the body is clean.
-
-### Phase 2 — Hit resolution
-
-If hits are non-empty, the caller must pass ``mode="abort"`` or
-``mode="redact"``:
-
-- ``abort`` raises ``CredentialHitsFoundError`` with the first hit's
-  ``pattern_name`` and description.
-- ``redact`` normalizes hit intervals (sort by ``(start, -end)``,
-  merge overlaps, outer label wins), applies replacements in
-  reverse-start order, then re-scans the redacted body. If the
-  second scan returns any hits, ``RedactionResidualError`` is
-  raised.
-
-### Phase 3 — File-first write
-
-``bridge/<topic_slug>-001.md`` is written atomically. If the file
-already exists (for example, from a prior partial attempt with the
-same slug), ``BridgeFileAlreadyExistsError`` is raised before any
-INDEX touch. The skill never silently overwrites.
-
-### Phase 4 — No-index dispatcher/TAFE publication
-
-The ``Document: <topic_slug>`` + ``NEW: bridge/<topic_slug>-001.md``
-state is published through dispatcher/TAFE bridge state without touching
-the retired bridge-index file. If another writer has already published the same
-topic or state publication fails after the bridge file write, the helper
-surfaces an actionable conflict/error so the caller can retry or repair through
-the governed bridge path.
-
-## Errors
-
-- ``CredentialHitsFoundError`` — hits found and ``mode="abort"``.
-- ``RedactionResidualError`` — second scan after redaction still
-  finds hits. Indicates a catalog/redactor bug, not a user state.
-- ``BridgeFileAlreadyExistsError`` — target file already on disk;
-  skill refuses to overwrite.
-- ``BridgeIndexConflictError`` — retained historical exception name for
-  publication conflicts. In current no-index operation, treat this as a
-  dispatcher/TAFE state-publication conflict; do not recreate
-  the retired bridge-index file.
-- The Phase 0 pre-population stage is non-fatal; failures during
-  glossary read, semantic search, or audit-log write are swallowed
-  (graceful degradation). The proposal proceeds without pre-populated
-  candidates if any stage fails.
-
-© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+Read back the delivered message through `gt bridge show <document> --content
+--json`. Delivery ends this claim. Implementation requires an independently
+authored GO and the next exact claim; proposal filing does not commit or activate
+work. Leave subsequent routing to the owner or dispatcher.

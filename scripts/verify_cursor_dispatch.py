@@ -16,7 +16,6 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts import cursor_harness  # noqa: E402
-from scripts.gtkb_bridge_writer import PROVIDER_VERDICT_STATUSES  # noqa: E402
 from scripts.harness_projection_reader import load_harness_projection  # noqa: E402
 
 HARNESS_ID = "E"
@@ -26,7 +25,6 @@ CURSOR_DISPATCH_SKILL = "bridge-review"
 CURSOR_VERIFICATION_SKILL = "verification"
 DEFAULT_LIVE_PROMPT = "Reply with READY only."
 DEFAULT_TIMEOUT_SECONDS = 60.0
-DISPATCH_ROLES = frozenset({"loyal-opposition", "prime-builder"})
 
 
 class VerificationError(RuntimeError):
@@ -65,15 +63,6 @@ def _argv_uses_cursor_shim(argv: list[str]) -> bool:
 
 def _argv_selects_skill(argv: list[str], skill: str) -> bool:
     return "--skill" in argv and skill in argv
-
-
-def _role_tokens(record: dict[str, Any]) -> set[str]:
-    raw = record.get("role")
-    if isinstance(raw, str):
-        return {raw}
-    if isinstance(raw, list):
-        return {item for item in raw if isinstance(item, str)}
-    return set()
 
 
 def _first_failed_detail(checks: list[dict[str, Any]]) -> str:
@@ -181,7 +170,10 @@ def evaluate_readiness(
     auth_runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
     live_runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
 ) -> dict[str, Any]:
-    """Return fail-closed Cursor headless dispatch readiness evidence."""
+    """Check launch prerequisites, not bridge qualification or activation.
+
+    Role comes from a receiving context's exact init marker, never this record.
+    """
 
     checks: list[dict[str, Any]] = []
 
@@ -204,19 +196,15 @@ def evaluate_readiness(
     shim_ok = shim_path.is_file()
     add_check("cursor harness shim", shim_ok, CURSOR_SHIM_RELATIVE.as_posix())
 
-    publication_contract = cursor_harness.governed_lo_publication_contract()
-    publication_ok = (
-        publication_contract.get("schema_version") == 1
-        and publication_contract.get("execution_mode") == "ask"
-        and publication_contract.get("output_format") == "text"
-        and publication_contract.get("publisher") == "publish_lo_verdict"
-        and publication_contract.get("supported_verdicts") == sorted(PROVIDER_VERDICT_STATUSES)
-    )
-    add_check(
-        "governed read-only LO publication",
-        publication_ok,
-        json.dumps(publication_contract, sort_keys=True, separators=(",", ":")),
-    )
+    try:
+        for skill in (CURSOR_DISPATCH_SKILL, CURSOR_VERIFICATION_SKILL):
+            cursor_harness._skill_system_prompt(skill, project_root=project_root)
+        instructions_ok = True
+        instructions_detail = "Current review routes load from this harness's own projection"
+    except cursor_harness.CursorHarnessError as exc:
+        instructions_ok = False
+        instructions_detail = str(exc)
+    add_check("local review instructions", instructions_ok, instructions_detail)
 
     resolver = agent_resolver or cursor_harness._resolve_agent_command
     try:
@@ -253,7 +241,7 @@ def evaluate_readiness(
 
     live_probe: dict[str, Any] | None = None
     live_ok = True
-    if require_live and record_ok and argv_ok and shim_ok and agent_ok and auth_ok:
+    if require_live and record_ok and argv_ok and shim_ok and instructions_ok and agent_ok and auth_ok:
         try:
             live_probe = _run_live_probe(
                 project_root=project_root,
@@ -270,14 +258,8 @@ def evaluate_readiness(
             detail = live_probe["error"]
         add_check("live bridge-review probe", live_ok, detail)
 
-    ready_for_activation = record_ok and argv_ok and shim_ok and publication_ok and agent_ok and auth_ok and live_ok
-    role = _role_tokens(record)
-    dispatchable_now = (
-        ready_for_activation
-        and record.get("status") == "active"
-        and bool(record.get("can_receive_dispatch"))
-        and bool(role & DISPATCH_ROLES)
-    )
+    ready = record_ok and argv_ok and shim_ok and instructions_ok and agent_ok and auth_ok and live_ok
+    dispatchable_now = ready and record.get("status") == "active" and bool(record.get("can_receive_dispatch"))
     return {
         "agent_command": agent_command,
         "auth_probe": auth_probe,
@@ -288,10 +270,8 @@ def evaluate_readiness(
         "harness_id": recipient,
         "headless_argv": argv,
         "live_probe": live_probe,
-        "publication_contract": publication_contract,
-        "ready": ready_for_activation,
+        "ready": ready,
         "recipient": recipient,
-        "role": sorted(role),
         "status": record.get("status"),
         "can_receive_dispatch": bool(record.get("can_receive_dispatch")),
     }

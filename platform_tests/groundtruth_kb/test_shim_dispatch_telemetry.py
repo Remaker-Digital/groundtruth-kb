@@ -147,11 +147,11 @@ def test_envelope_is_atomic_document_authoritative_and_privacy_bounded(tmp_path:
     assert list(path.parent.glob(f"{dispatch_id}.telemetry.json")) == [path]
 
 
-def test_governed_verdict_tool_is_counted_without_serializing_payload(tmp_path: Path) -> None:
+def test_retired_publisher_is_excluded_without_serializing_payload(tmp_path: Path) -> None:
     root = tmp_path / "project"
     root.mkdir()
     _bridge(root)
-    dispatch_id = "dispatch-governed-verdict-tool"
+    dispatch_id = "dispatch-native-tools"
     observer = _observer(root, dispatch_id)
 
     observer.record_turn(
@@ -177,7 +177,7 @@ def test_governed_verdict_tool_is_counted_without_serializing_payload(tmp_path: 
             "environment_value": "ENV_VALUE_SENTINEL",
         },
     )
-    observer.finish(stop_reason="verdict_emitted")
+    observer.finish(stop_reason="final_response")
 
     path = telemetry.telemetry_path(root, dispatch_id)
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -192,19 +192,16 @@ def test_governed_verdict_tool_is_counted_without_serializing_payload(tmp_path: 
                 "Grep",
                 "Glob",
                 "Bash",
-                "PublishBridgeVerdict",
-                "PublishBridgeVerdict",
             ],
         }
     ]
     assert payload["tool_calls"] == {
-        "total": 8,
+        "total": 6,
         "by_name": {
             "Bash": 1,
             "Edit": 1,
             "Glob": 1,
             "Grep": 1,
-            "PublishBridgeVerdict": 2,
             "Read": 1,
             "Write": 1,
         },
@@ -212,6 +209,7 @@ def test_governed_verdict_tool_is_counted_without_serializing_payload(tmp_path: 
     serialized = path.read_text(encoding="utf-8")
     for prohibited in (
         "UnknownTool",
+        "PublishBridgeVerdict",
         "/sensitive/review.md",
         "PRIVATE_VERDICT_BODY",
         "PROMPT_TEXT_SENTINEL",
@@ -578,7 +576,9 @@ def test_telemetry_write_failure_is_bounded_and_nonfatal(tmp_path: Path, monkeyp
     assert observer.diagnostic == "telemetry_write_failed"
 
 
-def test_harness_telemetry_cli_exposes_read_only_distribution(tmp_path: Path) -> None:
+def test_harness_telemetry_cli_exposes_read_only_distribution(tmp_path: Path, monkeypatch) -> None:
+    for name in ("GT_PROJECT_ROOT", "GT_DB_PATH", "GT_AUTHORITY_URL"):
+        monkeypatch.delenv(name, raising=False)
     root = tmp_path / "project"
     root.mkdir()
     _bridge(root)

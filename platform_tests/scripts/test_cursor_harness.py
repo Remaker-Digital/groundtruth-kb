@@ -11,7 +11,6 @@ fail closed.
 from __future__ import annotations
 
 import importlib.util
-import json
 import subprocess
 from pathlib import Path
 
@@ -29,39 +28,38 @@ def _load_harness():
     return module
 
 
-def _verdict_envelope(*, verdict: str = "GO", document_name: str = "gtkb-test-thread") -> str:
-    payload = {
-        "schema_version": 1,
-        "document_name": document_name,
-        "verdict": verdict,
-        "content": f"{verdict}\n\nDocument: {document_name}\nResponds to: bridge/{document_name}-001.md\n",
-        "include_paths": [],
-        "hunk_patch_paths": [],
-        "commit_message": "",
-    }
-    return f"GTKB_BRIDGE_VERDICT_ENVELOPE_BEGIN\n{json.dumps(payload)}\nGTKB_BRIDGE_VERDICT_ENVELOPE_END\n"
-
-
-def test_skill_route_alias_bridge_review_resolves() -> None:
-    """WI-4933: 'bridge-review' aliases to the bridge protocol contract."""
+@pytest.fixture
+def cursor_with_skills(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     harness = _load_harness()
+    monkeypatch.setattr(harness, "PROJECT_ROOT", tmp_path)
+    for name in ("bridge", "proposal-review", "verify"):
+        source = _REPO_ROOT / ".harness-baseline-configuration" / "skills" / f"gtkb-{name}" / "SKILL.md"
+        target = tmp_path / ".cursor" / "skills" / name / "SKILL.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
+    return harness
+
+
+def test_skill_route_alias_bridge_review_resolves(cursor_with_skills) -> None:
+    """WI-4933: 'bridge-review' aliases to the bridge protocol contract."""
+    harness = cursor_with_skills
     content = harness._skill_system_prompt("bridge-review")
     assert content is not None
     assert "name: gtkb-bridge" in content
-    assert "Operate the bridge protocol" in content
+    assert "Review an implementation proposal" in content
 
 
-def test_skill_route_alias_verification_resolves() -> None:
+def test_skill_route_alias_verification_resolves(cursor_with_skills) -> None:
     """WI-4872: 'verification' aliases to the real verify skill contract."""
-    harness = _load_harness()
+    harness = cursor_with_skills
     content = harness._skill_system_prompt("verification")
     assert content is not None
     assert "verify" in content.lower()
 
 
-def test_skill_route_non_aliased_resolves() -> None:
+def test_skill_route_non_aliased_resolves(cursor_with_skills) -> None:
     """A real skill name resolves directly (no alias needed)."""
-    harness = _load_harness()
+    harness = cursor_with_skills
     content = harness._skill_system_prompt("proposal-review")
     assert content is not None
 
@@ -69,7 +67,7 @@ def test_skill_route_non_aliased_resolves() -> None:
 def test_skill_route_unknown_still_raises() -> None:
     """Genuinely unknown routes still fail closed (CursorHarnessError preserved)."""
     harness = _load_harness()
-    with pytest.raises(harness.CursorHarnessError, match="unknown skill route"):
+    with pytest.raises(harness.CursorHarnessError, match="unknown or unreadable skill route"):
         harness._skill_system_prompt("definitely-not-a-skill")
 
 
@@ -84,10 +82,9 @@ def test_cursor_adaptation_metadata_is_compact_and_alias_aware() -> None:
     payload = harness.cursor_adaptation_metadata()
 
     assert payload["harness_id"] == "E"
-    assert payload["adaptation_label"] == "cursor-governed-lo-publication"
-    assert payload["skill_route_aliases"]["bridge-review"] == "bridge"
-    assert payload["governed_lo_publication"]["execution_mode"] == "ask"
-    assert payload["governed_lo_publication"]["publisher"] == "publish_lo_verdict"
+    assert payload["adaptation_label"] == "cursor-native-cli"
+    assert payload["skill_route_aliases"]["bridge-review"] == "proposal-review"
+    assert "governed_lo_publication" not in payload
     assert payload["raw_prompt_included"] is False
     assert all(value.startswith("sha256:") for value in payload["input_fingerprints"].values())
     assert "Follow the GT-KB skill contract" not in repr(payload)
@@ -299,191 +296,46 @@ def test_resolve_agent_command_rejects_cursor_without_agent(monkeypatch: pytest.
         harness._resolve_agent_command()
 
 
-def test_bridge_review_main_builds_prompt_mode_command(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
+@pytest.mark.parametrize("mode", [None, "plan", "ask"])
+def test_bridge_review_main_preserves_requested_mode_and_agent_output(mode, monkeypatch, capsys):
     harness = _load_harness()
     calls = []
-    publications = []
-
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-cursor-lo-1")
-    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/cursor.cmd", "agent"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: "SKILL CONTRACT" if skill else None)
-    monkeypatch.setattr(
-        harness,
-        "_publish_bridge_verdict_envelope",
-        lambda envelope, **kwargs: (
-            publications.append((envelope, kwargs))
-            or {
-                "claim_released": True,
-                "commit_sha": None,
-                "document_name": envelope["document_name"],
-                "verdict": envelope["verdict"],
-                "verdict_path": "bridge/gtkb-test-thread-002.md",
-            }
-        ),
-    )
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
+    monkeypatch.setattr(harness, "_load_project_env_local", lambda: None)
+    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: "SKILL CONTRACT")
 
     def fake_run(command, **kwargs):
         calls.append((command, kwargs))
-        return subprocess.CompletedProcess(command, 0, stdout=_verdict_envelope(), stderr="")
+        return subprocess.CompletedProcess(command, 0, stdout='{"message":"CLI delivery acknowledged"}\n', stderr="")
 
     monkeypatch.setattr(harness.subprocess, "run", fake_run)
-
-    exit_code = harness.main(
-        [
-            "--prompt",
-            "review this bridge file",
-            "--skill",
-            "bridge-review",
-            "--output-format",
-            "text",
-            "--timeout",
-            "30",
-        ]
-    )
-
-    assert exit_code == 0
+    args = [
+        "--prompt",
+        "::init gtkb lo\n::open build\nReview assigned work",
+        "--skill",
+        "bridge-review",
+        "--output-format",
+        "json",
+        "--timeout",
+        "30",
+    ]
+    if mode:
+        args += ["--mode", mode]
+    assert harness.main(args) == 0
     command, kwargs = calls[0]
-    assert command[:2] == ["C:/Tools/cursor.cmd", "agent"]
-    assert command[2:6] == ["-p", "--trust", "--workspace", str(harness.PROJECT_ROOT)]
-    assert command[6:8] == ["--output-format", "text"]
-    assert command[-3:-1] == ["--mode", "ask"]
+    assert command[:1] == ["C:/Tools/agent.exe"]
+    assert command[command.index("--output-format") + 1] == "json"
+    assert ("--mode" in command) == bool(mode)
+    if mode:
+        assert command[command.index("--mode") + 1] == mode
     assert "SKILL CONTRACT" in command[-1]
-    assert "review this bridge file" in command[-1]
-    assert "GTKB_BRIDGE_VERDICT_ENVELOPE_BEGIN" in command[-1]
-    assert "Do not create, edit, delete, stage" in command[-1]
+    assert args[1] in command[-1]
+    assert "GTKB_BRIDGE_VERDICT_ENVELOPE" not in command[-1]
     assert kwargs["cwd"] == str(harness.PROJECT_ROOT)
     assert kwargs["capture_output"] is True
-    assert kwargs["text"] is True
     assert kwargs["timeout"] == 30.0
-    assert kwargs["env"]["GTKB_HARNESS_NAME"] == "cursor"
-    assert kwargs["env"]["GTKB_HARNESS_ID"] == "E"
-    assert publications[0][0]["verdict"] == "GO"
-    assert publications[0][1]["session_id"] == "dispatch-cursor-lo-1"
-    output = json.loads(capsys.readouterr().out)
-    assert output["verdict_path"] == "bridge/gtkb-test-thread-002.md"
-
-
-def test_verdict_envelope_parser_accepts_one_strict_go_envelope() -> None:
-    harness = _load_harness()
-
-    payload = harness._parse_bridge_verdict_envelope(_verdict_envelope())
-
-    assert payload == {
-        "document_name": "gtkb-test-thread",
-        "verdict": "GO",
-        "content": "GO\n\nDocument: gtkb-test-thread\nResponds to: bridge/gtkb-test-thread-001.md\n",
-        "include_paths": [],
-        "hunk_patch_paths": [],
-        "commit_message": "",
-    }
-
-
-@pytest.mark.parametrize(
-    "invalid_output",
-    [
-        "prefix\n" + _verdict_envelope(),
-        _verdict_envelope() + "suffix\n",
-        _verdict_envelope() + _verdict_envelope(),
-        "GTKB_BRIDGE_VERDICT_ENVELOPE_BEGIN\n{}\nGTKB_BRIDGE_VERDICT_ENVELOPE_END\n",
-    ],
-)
-def test_verdict_envelope_parser_rejects_ambiguous_or_wrong_schema_output(invalid_output: str) -> None:
-    harness = _load_harness()
-
-    with pytest.raises(harness.CursorHarnessError):
-        harness._parse_bridge_verdict_envelope(invalid_output)
-
-
-def test_verdict_envelope_parser_requires_verified_finalization_fields() -> None:
-    harness = _load_harness()
-    invalid = json.loads(_verdict_envelope(verdict="VERIFIED").splitlines()[1])
-    invalid["content"] = "VERIFIED\n\nDocument: gtkb-test-thread\nResponds to: bridge/gtkb-test-thread-001.md\n"
-    text = f"GTKB_BRIDGE_VERDICT_ENVELOPE_BEGIN\n{json.dumps(invalid)}\nGTKB_BRIDGE_VERDICT_ENVELOPE_END\n"
-
-    with pytest.raises(harness.CursorHarnessError, match="requires include_paths and commit_message"):
-        harness._parse_bridge_verdict_envelope(text)
-
-
-def test_governed_publication_uses_trusted_metadata_claim_and_publisher(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    harness = _load_harness()
-    envelope = harness._parse_bridge_verdict_envelope(_verdict_envelope())
-    calls = []
-
-    monkeypatch.setattr(
-        harness,
-        "load_author_metadata",
-        lambda project_root, env: {
-            "author_identity": "loyal-opposition/cursor/E",
-            "author_harness_id": "E",
-            "author_session_context_id": "dispatch-cursor-lo-1",
-            "author_model": "fixture",
-            "author_model_version": "fixture-v1",
-            "author_model_configuration": "fixture config",
-        },
-    )
-    monkeypatch.setattr(
-        harness,
-        "acquire_work_intent",
-        lambda document_name, session_id, **kwargs: calls.append(("claim", document_name, session_id, kwargs)) or True,
-    )
-
-    class Published:
-        @staticmethod
-        def to_dict():
-            return {"verdict": "GO", "claim_released": True}
-
-    def publish(*args, **kwargs):
-        calls.append(("publish", args, kwargs))
-        return Published()
-
-    monkeypatch.setattr(harness, "publish_lo_verdict", publish)
-
-    result = harness._publish_bridge_verdict_envelope(
-        envelope,
-        project_root=harness.PROJECT_ROOT,
-        session_id="dispatch-cursor-lo-1",
-        env={"GTKB_HARNESS_NAME": "cursor"},
-    )
-
-    assert result == {"verdict": "GO", "claim_released": True}
-    assert calls[0][0:3] == ("claim", "gtkb-test-thread", "dispatch-cursor-lo-1")
-    assert calls[1][0] == "publish"
-    assert calls[1][2]["harness_name"] == "cursor"
-    assert calls[1][2]["author_metadata"]["author_harness_id"] == "E"
-
-
-def test_governed_publication_releases_claim_after_publisher_denial(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    harness = _load_harness()
-    envelope = harness._parse_bridge_verdict_envelope(_verdict_envelope())
-    released = []
-    monkeypatch.setattr(harness, "load_author_metadata", lambda *_args, **_kwargs: {"author_harness_id": "E"})
-    monkeypatch.setattr(harness, "acquire_work_intent", lambda *_args, **_kwargs: True)
-    monkeypatch.setattr(
-        harness,
-        "publish_lo_verdict",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("stale transition")),
-    )
-    monkeypatch.setattr(
-        harness,
-        "release_work_intent",
-        lambda document_name, session_id, **_kwargs: released.append((document_name, session_id)),
-    )
-
-    with pytest.raises(harness.CursorHarnessError, match="governed verdict publication failed"):
-        harness._publish_bridge_verdict_envelope(
-            envelope,
-            project_root=harness.PROJECT_ROOT,
-            session_id="dispatch-cursor-lo-1",
-            env={},
-        )
-
-    assert released == [("gtkb-test-thread", "dispatch-cursor-lo-1")]
+    assert capsys.readouterr().out == '{"message":"CLI delivery acknowledged"}\n'
 
 
 def test_main_can_force_read_only_plan_mode(
@@ -631,8 +483,8 @@ def test_timeout_returns_124_with_safe_context_and_partial_output(
     assert "exit=124" in captured.err
     assert "executable=agent.exe" in captured.err
     assert "skill=bridge-review" in captured.err
-    assert "output_format=text" in captured.err
-    assert "mode=ask" in captured.err
+    assert "output_format=json" in captured.err
+    assert "mode=plan" in captured.err
     assert prompt not in captured.out
     assert prompt not in captured.err
     assert "--workspace" not in captured.err
@@ -807,3 +659,41 @@ def test_interactive_main_does_not_record_cursor_agent_provenance(
 
     assert merged == []
     assert capsys.readouterr().out == "ok\n"
+
+
+@pytest.mark.parametrize("route", ["../.codex/skills/review", "../../peer", "/absolute", "C:/peer"])
+def test_skill_route_refuses_paths_outside_own_projection(route, cursor_with_skills):
+    with pytest.raises(cursor_with_skills.CursorHarnessError, match="invalid skill route"):
+        cursor_with_skills._skill_system_prompt(route)
+
+
+def test_missing_own_skill_never_falls_back_to_peer_projection(cursor_with_skills):
+    harness = cursor_with_skills
+    own = harness.PROJECT_ROOT / ".cursor" / "skills" / "verify" / "SKILL.md"
+    own.unlink()
+    for peer in (".codex", ".claude"):
+        target = harness.PROJECT_ROOT / peer / "skills" / "verify" / "SKILL.md"
+        target.parent.mkdir(parents=True)
+        target.write_text("Peer-only instruction", encoding="utf-8")
+    with pytest.raises(harness.CursorHarnessError, match="refresh this harness's projection"):
+        harness._skill_system_prompt("verification")
+
+
+def test_own_skill_junction_cannot_load_another_harness(tmp_path, monkeypatch):
+    harness = _load_harness()
+    monkeypatch.setattr(harness, "PROJECT_ROOT", tmp_path)
+    if harness.os.name != "nt":
+        pytest.skip("Windows NTFS junction boundary")
+    peer = tmp_path / ".codex" / "skills" / "verify"
+    peer.mkdir(parents=True)
+    (peer / "SKILL.md").write_text("Peer-only instruction", encoding="utf-8")
+    own = tmp_path / ".cursor" / "skills"
+    own.mkdir(parents=True)
+    link = own / "verify"
+    subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(peer)], check=True, capture_output=True)
+    try:
+        with pytest.raises(harness.CursorHarnessError, match="leaves this harness's skill directory"):
+            harness._skill_system_prompt("verify")
+        assert (peer / "SKILL.md").read_text(encoding="utf-8") == "Peer-only instruction"
+    finally:
+        link.rmdir()

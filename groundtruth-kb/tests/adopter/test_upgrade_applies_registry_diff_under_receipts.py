@@ -32,7 +32,7 @@ def test_upgrade_restores_missing_managed_file_and_writes_receipt(
 ) -> None:
     """Delete a managed hook → upgrade restores it + writes a v1 receipt."""
     adopter, _ = clean_adopter
-    managed_file = adopter / ".claude" / "hooks" / "assertion-check.py"
+    managed_file = adopter / ".claude" / "hooks" / "credential-scan.py"
     assert managed_file.exists(), "scaffold should have produced the managed hook"
 
     _setup_git(adopter)
@@ -40,7 +40,7 @@ def test_upgrade_restores_missing_managed_file_and_writes_receipt(
     _commit_all(adopter, "delete managed hook")
 
     actions = plan_upgrade(adopter)
-    restoring = [a for a in actions if a.file == ".claude/hooks/assertion-check.py"]
+    restoring = [a for a in actions if a.file == ".claude/hooks/credential-scan.py"]
     assert restoring, (
         f"plan_upgrade must surface a restoring action for the deleted managed "
         f"hook; got files={sorted({a.file for a in actions})}"

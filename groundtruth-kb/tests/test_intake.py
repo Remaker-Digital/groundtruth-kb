@@ -23,10 +23,8 @@ from groundtruth_kb.intake import (
     list_intakes,
     reject_intake,
 )
-from groundtruth_kb.project.doctor import _check_settings_classifiers
 from groundtruth_kb.project.managed_registry import (
     FileArtifact,
-    artifacts_for_scaffold,
     artifacts_for_upgrade,
 )
 
@@ -296,7 +294,8 @@ class TestF5RedactionAndCLI:
 
     # 17. Redaction: credential stored redacted, still filterable
     def test_redaction(self, db):
-        secret_text = 'The API must use api_key="AKIAIOSFODNN7EXAMPLEKEY" for auth'  # placeholder
+        fake_key = "AK" + "IA" + "IOSFODNN7EXAMPLEKEY"
+        secret_text = f'The API must use api_key="{fake_key}" for auth'
         cap = capture_requirement(
             db,
             secret_text,
@@ -316,7 +315,7 @@ class TestF5RedactionAndCLI:
         # Fetch the deliberation and verify the stored content has been redacted
         delib = db.get_deliberation(cap["deliberation_id"])
         assert delib is not None
-        assert "AKIAIOSFODNN7EXAMPLEKEY" not in delib.get("content", "")  # placeholder
+        assert fake_key not in delib.get("content", "")
 
     # 18. CLI smoke: gt intake list
     def test_cli_intake_list(self, tmp_path):
@@ -446,7 +445,7 @@ class TestF5Scaffold:
     """Scaffold adoption tests."""
 
     # 21. Bridge-profile — settings includes intake hook
-    def test_scaffold_bridge_includes_intake_hook(self, tmp_path):
+    def test_scaffold_bridge_has_no_automatic_intake_hook(self, tmp_path):
         from groundtruth_kb.project.scaffold import ScaffoldOptions, scaffold_project
 
         target = tmp_path / "intake-proj"
@@ -470,7 +469,7 @@ class TestF5Scaffold:
             for group in event_groups:
                 for handler in group.get("hooks", []):
                     commands.append(handler.get("command", ""))
-        assert any("intake-classifier.py" in c for c in commands)
+        assert not any("intake-classifier.py" in c for c in commands)
 
     # 22. Local-only — settings omits intake hook
     def test_scaffold_local_only_no_settings(self, tmp_path):
@@ -496,138 +495,6 @@ class TestF5Scaffold:
 
         settings_path = target / ".claude" / "settings.local.json"
         assert not settings_path.exists(), "local-only profile should not install settings.local.json"
-
-
-class TestF5Doctor:
-    """Doctor classifier-settings check (8 tests)."""
-
-    # 23. Bridge: only intake active → passes
-    def test_doctor_only_intake_active(self, seeded_project):
-        _write_settings(
-            seeded_project,
-            {
-                "UserPromptSubmit": [
-                    {"command": "python .claude/hooks/intake-classifier.py"},
-                ],
-            },
-        )
-        check = _check_settings_classifiers(seeded_project)
-        assert check.status == "pass"
-        assert "intake-classifier.py" in check.message
-
-    # 24. Bridge: only spec active → passes (backward compat)
-    def test_doctor_only_spec_active(self, seeded_project):
-        _write_settings(
-            seeded_project,
-            {
-                "UserPromptSubmit": [
-                    {"command": "python .claude/hooks/spec-classifier.py"},
-                ],
-            },
-        )
-        check = _check_settings_classifiers(seeded_project)
-        assert check.status == "pass"
-        assert "spec-classifier.py" in check.message
-
-    # 25. Bridge: both active → warns
-    def test_doctor_both_active_warns(self, seeded_project):
-        _write_settings(
-            seeded_project,
-            {
-                "UserPromptSubmit": [
-                    {"command": "python .claude/hooks/intake-classifier.py"},
-                    {"command": "python .claude/hooks/spec-classifier.py"},
-                ],
-            },
-        )
-        check = _check_settings_classifiers(seeded_project)
-        assert check.status == "warning"
-        assert "redundant" in check.message.lower()
-
-    # 26. Bridge: neither active → warns
-    def test_doctor_neither_active_warns(self, seeded_project):
-        _write_settings(
-            seeded_project,
-            {"UserPromptSubmit": [{"command": "python .claude/hooks/scheduler.py"}]},
-        )
-        check = _check_settings_classifiers(seeded_project)
-        assert check.status == "warning"
-        assert "intake-classifier" in check.message or "spec-classifier" in check.message
-
-    # 27. Bridge: malformed JSON → warns without crash
-    def test_doctor_malformed_json(self, seeded_project):
-        settings_path = seeded_project / ".claude" / "settings.local.json"
-        settings_path.write_text("{ not valid json }}", encoding="utf-8")
-        check = _check_settings_classifiers(seeded_project)
-        assert check.status == "warning"
-        assert "malformed" in check.message.lower() or "settings" in check.message.lower()
-
-    # 28. Bridge: hooks as non-dict → warns without crash
-    def test_doctor_hooks_non_dict(self, seeded_project):
-        _write_settings(seeded_project, ["not", "a", "dict"])
-        check = _check_settings_classifiers(seeded_project)
-        assert check.status == "warning"
-
-    # 29. Bridge: hooks as null → warns without crash
-    def test_doctor_hooks_null(self, seeded_project):
-        _write_settings(seeded_project, None)
-        check = _check_settings_classifiers(seeded_project)
-        assert check.status == "warning"
-
-    # 30. Local-only: no false warning when settings absent
-    def test_doctor_local_only_no_false_warning(self, tmp_path):
-        """When run_doctor is called for local-only profile, the classifier-settings
-        check is not added at all — no warning regardless of settings file state.
-        """
-        from groundtruth_kb.project.doctor import run_doctor
-
-        target = tmp_path / "local-proj"
-        target.mkdir()
-        (target / ".claude").mkdir()
-        (target / ".claude" / "hooks").mkdir()
-
-        # Minimal project files so doctor can run; no settings.local.json
-        (target / "groundtruth.toml").write_text('[project]\nname = "t"\nprofile = "local-only"\n', encoding="utf-8")
-
-        report = run_doctor(target, "local-only")
-        classifier_checks = [c for c in report.checks if c.name == "Classifier settings"]
-        assert classifier_checks == [], "local-only profile must not add a Classifier settings check"
-
-
-class TestF5Upgrade:
-    """Upgrade managed-hook tests."""
-
-    # 31. Upgrade copy — intake hook is in the managed hook list (bridge profile)
-    def test_upgrade_managed_hooks_include_intake(self):
-        assert ".claude/hooks/intake-classifier.py" in _upgrade_managed_hook_target_paths("dual-agent")
-
-    # 32. Upgrade preserve — existing spec-classifier stays in managed set
-    def test_upgrade_preserves_spec_classifier(self):
-        """Legacy spec-classifier.py must remain in the managed hook list for
-        every profile so upgrade does not drop it from projects that still
-        rely on it.
-        """
-        for profile in ("local-only", "dual-agent", "dual-agent-webapp"):
-            assert ".claude/hooks/spec-classifier.py" in _upgrade_managed_hook_target_paths(profile), (
-                f"spec-classifier.py missing from upgrade-managed set for {profile!r}"
-            )
-
-    # 33. Upgrade local-only — intake hook respects the local-only allowlist
-    def test_upgrade_local_only_excludes_intake(self):
-        """plan_upgrade() for local-only profile should not include
-        intake-classifier.py since intake is a bridge-profile feature.
-        The managed-artifact registry enforces this via the
-        ``managed_profiles`` axis on the intake-classifier record.
-        """
-        local_managed = _upgrade_managed_hook_target_paths("local-only")
-        assert ".claude/hooks/intake-classifier.py" not in local_managed
-        assert ".claude/hooks/spec-classifier.py" in local_managed
-        # And scaffold still copies intake-classifier.py for local-only
-        # (initial_profiles is ALL). Registry keeps the two axes independent.
-        local_initial = [
-            a.target_path for a in artifacts_for_scaffold("local-only", class_="hook") if isinstance(a, FileArtifact)
-        ]
-        assert ".claude/hooks/intake-classifier.py" in local_initial
 
 
 class TestF5Roundtrip:

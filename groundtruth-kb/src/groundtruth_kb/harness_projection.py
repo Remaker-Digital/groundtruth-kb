@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import os
+from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -34,25 +35,10 @@ PROJECTION_SCHEMA_VERSION = 1
 
 HARNESS_REGISTRY_RELATIVE_PATH = Path("harness-state") / "harness-registry.json"
 HARNESS_IDENTITIES_RELATIVE_PATH = Path("harness-state") / "harness-identities.json"
-HARNESS_CAPABILITIES_RELATIVE_PATH = Path("config") / "agent-control" / "harness-capability-registry.toml"
 
 
 class HarnessStateError(Exception):
-    """Raised when a harness-state SoT file is missing or malformed.
-
-    Per the WI-4327 canonical reader-entrypoint contract
-    (``DCL-HARNESS-STATE-SOT-READER-CONTRACT-001``): all reads of the 3
-    harness-state SoT surfaces (roles via ``harness-registry.json``;
-    identities via ``harness-identities.json``; capabilities via
-    ``harness-capability-registry.toml``) MUST go through the canonical
-    entrypoint functions in this module. Direct file reads in committed
-    code outside ``groundtruth_kb.harness_projection`` are doctor findings.
-
-    The exception subclasses :class:`Exception` so callers can distinguish
-    SoT contract failures from generic ``OSError`` / ``json.JSONDecodeError``
-    while still allowing a broad ``except Exception:`` to swallow them at
-    fail-soft boundaries (e.g. SessionStart).
-    """
+    """A legacy projection reader failed; it supplies no ordinary authority."""
 
 
 _PROJECTION_SOURCE_OF_TRUTH = "MemBase harnesses table (groundtruth.db)"
@@ -547,10 +533,8 @@ def _roles_from_database(root: Path) -> dict[str, Any]:
         for field in ("role", "invocation_surfaces"):
             value = record.get(field)
             if isinstance(value, str) and value.strip():
-                try:
+                with suppress(json.JSONDecodeError):
                     record[field] = json.loads(value)
-                except json.JSONDecodeError:
-                    pass
         records.append(record)
     if not records:
         raise HarnessStateError(
@@ -587,40 +571,6 @@ def _identities_from_registry(root: Path) -> dict[str, Any]:
         "generated_at": registry.get("generated_at"),
         "harnesses": harnesses,
     }
-
-
-def read_capabilities(project_root: Path | None = None) -> dict[str, Any]:
-    """Read the harness capabilities SoT (``config/agent-control/harness-capability-registry.toml``).
-
-    Canonical reader entrypoint per
-    ``DCL-HARNESS-STATE-SOT-READER-CONTRACT-001``. Direct TOML reads
-    of the capability registry in committed code outside this module
-    are doctor findings.
-
-    Raises :class:`HarnessStateError` when the SoT file is missing,
-    unreadable, malformed TOML, or non-mapping at the top level.
-    """
-    try:
-        import tomllib  # Python 3.11+ standard library
-    except ImportError as exc:  # pragma: no cover - <3.11 unsupported
-        raise HarnessStateError(f"tomllib unavailable on this Python build: {exc}") from exc
-
-    root = _resolve_project_root(project_root)
-    path = root / HARNESS_CAPABILITIES_RELATIVE_PATH
-    try:
-        with path.open("rb") as fh:
-            data = tomllib.load(fh)
-    except FileNotFoundError as exc:
-        raise HarnessStateError(f"harness-state SoT file missing: {path}") from exc
-    except OSError as exc:
-        raise HarnessStateError(f"harness-state SoT file unreadable ({path}): {exc}") from exc
-    except tomllib.TOMLDecodeError as exc:
-        raise HarnessStateError(f"harness-state SoT file malformed TOML ({path}): {exc}") from exc
-    if not isinstance(data, dict):
-        raise HarnessStateError(
-            f"harness-state SoT file expected a TOML table at top level ({path}); got {type(data).__name__}"
-        )
-    return data
 
 
 def main() -> int:

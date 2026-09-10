@@ -24,6 +24,7 @@ from groundtruth_kb.postgres_kernel import (
     validate_project_dependencies,
     validate_work_item_dependencies,
 )
+from groundtruth_kb.project.sot_registry import registry_path_observations
 
 Identifier = Annotated[str, Field(min_length=1, max_length=256, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")]
 Text = Annotated[str, Field(min_length=1)]
@@ -66,6 +67,25 @@ class SpecFields(Request):
 
 class SpecMutation(Mutation):
     fields: SpecFields
+
+
+class TermFields(Request):
+    canonical_term: Text | None = None
+    definition: Text | None = None
+    authority_level: Literal["platform_core", "adopter_extension", "project_local"] | None = None
+    scope: Text | None = None
+    accepted_synonyms: list[Text] | None = None
+    discouraged_synonyms: list[Text] | None = None
+    linked_artifacts: list[Text] | None = None
+    linked_services: list[Text] | None = None
+    usage_examples: list[Text] | None = None
+    forbidden_uses: list[Text] | None = None
+    lifecycle_status: Literal["candidate", "active", "deprecated", "retired"] | None = None
+    source_authority: Text | None = None
+
+
+class TermMutation(Mutation):
+    fields: TermFields
 
 
 class TestFields(Request):
@@ -166,6 +186,8 @@ class MembershipMove(Mutation):
 
 
 DOMAINS = {
+    "harnesses": "harnesses",
+    "terms": "canonical_terms",
     "specifications": "specifications",
     "tests": "tests",
     "projects": "projects",
@@ -175,6 +197,8 @@ DOMAINS = {
     "project-dependencies": "project_dependencies",
 }
 FILTERS = {
+    "harnesses": {"status"},
+    "terms": {"scope", "authority_level", "lifecycle_status"},
     "specifications": {"status", "type", "priority", "authority", "testability", "application_scope"},
     "tests": {"test_type", "spec_id", "application_scope"},
     "projects": {"kind", "status", "parent_project_id"},
@@ -215,6 +239,25 @@ def _current_parent(tx: PostgresTransaction, work_item_id: str) -> dict[str, Any
     return memberships[0]
 
 
+def _work_formal_roots(
+    tx: PostgresTransaction, work: dict[str, Any], project_id: str, *, lock: bool = False
+) -> dict[str, Any]:
+    """Read canonical relationship inputs independently of supplementary citations."""
+    work_sources = set(work.get("related_spec_ids_at_creation") or [])
+    if work.get("source_spec_id"):
+        work_sources.add(work["source_spec_id"])
+    test_id = work.get("source_test_id")
+    return {
+        "work": sorted(work_sources),
+        "test": {test_id: _required(tx, "tests", test_id, lock=lock)["spec_id"]} if test_id else {},
+        "project": {
+            link["id"]: link["artifact_ref"]
+            for link in _related(tx, "project_artifact_links", project_id=project_id, status="active")
+            if link["artifact_type"] == "spec"
+        },
+    }
+
+
 def _work_formal_sources(
     tx: PostgresTransaction,
     work: dict[str, Any],
@@ -229,15 +272,9 @@ def _work_formal_sources(
     applicability. Context loading and bridge effects use the same facts.
     Cyclic cross-references are visited once, without dropping their records.
     """
-    pending = set(additional_ids or []) | set(work.get("related_spec_ids_at_creation") or [])
-    if work.get("source_spec_id"):
-        pending.add(work["source_spec_id"])
-    if work.get("source_test_id"):
-        pending.add(_required(tx, "tests", work["source_test_id"], lock=lock)["spec_id"])
-    pending.update(
-        link["artifact_ref"]
-        for link in _related(tx, "project_artifact_links", project_id=project_id, status="active")
-        if link["artifact_type"] == "spec"
+    roots = _work_formal_roots(tx, work, project_id, lock=lock)
+    pending = (
+        set(additional_ids or []) | set(roots["work"]) | set(roots["test"].values()) | set(roots["project"].values())
     )
     records: dict[str, dict[str, Any]] = {}
     while pending:
@@ -441,6 +478,76 @@ class AuthorityService:
             if domain == "work-items":
                 return {"work_item": row, "membership": _current_parent(tx, record_id)}
             return row
+
+    @staticmethod
+    def _term_source_issue(tx: PostgresTransaction, record: dict[str, Any]) -> dict[str, Any] | None:
+        source = tx.get("specifications", {"id": record["source_authority"]})
+        if source is None or source["status"] != "active":
+            return {
+                "id": record["id"],
+                "source_authority": record["source_authority"],
+                "status": source["status"] if source else "missing",
+            }
+        return None
+
+    def resolve_authority(self, subject: str, *, scope: str | None = None) -> dict[str, Any]:
+        from groundtruth_kb.authority import AuthorityResolutionError, resolve_term
+
+        with self.kernel.transaction(read_only=True) as tx:
+            try:
+                result = resolve_term(subject, records=_related(tx, "canonical_terms"), scope=scope)
+            except AuthorityResolutionError as error:
+                _error("invalid_terminology", str(error))
+            if result["status"] == "resolved":
+                issue = self._term_source_issue(tx, result["record"])
+                if issue:
+                    _error("invalid_term_source", "The term's formal source requires reconciliation", **issue)
+            return result
+
+    def authority_status(self, *, scope: str | None = None) -> dict[str, Any]:
+        from groundtruth_kb.authority import compact_status
+
+        with self.kernel.transaction(read_only=True) as tx:
+            records = _related(tx, "canonical_terms", **({"scope": scope} if scope is not None else {}))
+            result = compact_status(records=records, scope=scope)
+            issues = [
+                issue
+                for row in records
+                if row["lifecycle_status"] == "active"
+                if (issue := self._term_source_issue(tx, row)) is not None
+            ]
+            result["source_issues"] = issues
+            if issues:
+                result["status"] = "fail"
+            return result
+
+    def amend_term(self, record_id: str, request: TermMutation) -> dict[str, Any]:
+        from groundtruth_kb.authority import compact_status
+
+        with self.kernel.transaction() as tx:
+            fields = request.fields.model_dump(exclude_unset=True)
+            row = _write(tx, "canonical_terms", record_id, fields, request, defaults={"lifecycle_status": "candidate"})
+            validation = compact_status(records=[{**row, "lifecycle_status": "active"}])
+            if validation["validation_issues"]:
+                _error("invalid_terminology", "Term names require correction", issues=validation["validation_issues"])
+            if row["lifecycle_status"] == "active":
+                issue = self._term_source_issue(tx, row)
+                if issue:
+                    _error("invalid_term_source", "An active term requires a current formal source", **issue)
+            return row
+
+    def registry_path_observations(self) -> list[dict[str, str]]:
+        """Read the complete typed path inventory from one current snapshot."""
+        with self.kernel.transaction(read_only=True) as tx:
+            try:
+                return registry_path_observations(
+                    specifications=_related(tx, "specifications"),
+                    tests=_related(tx, "tests"),
+                    documents=_related(tx, "documents"),
+                    project_artifact_links=_related(tx, "project_artifact_links", status="active"),
+                )
+            except ValueError as exc:
+                _error("invalid_registry_path_source", str(exc))
 
     def amend_specification(self, record_id: str, request: SpecMutation) -> dict[str, Any]:
         fields = request.fields.model_dump(exclude_unset=True)

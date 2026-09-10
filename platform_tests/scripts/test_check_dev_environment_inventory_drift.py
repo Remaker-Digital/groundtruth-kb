@@ -1,607 +1,138 @@
-"""Tests for protected dev-environment inventory drift control."""
+"""Inventory comparison is operational information, not commit permission."""
 
 from __future__ import annotations
 
 import importlib.util
 import json
-import sys
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
 
-SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "check_dev_environment_inventory_drift.py"
+ROOT = Path(__file__).resolve().parents[2]
+SPEC = importlib.util.spec_from_file_location(
+    "inventory_diagnostic", ROOT / "scripts/check_dev_environment_inventory_drift.py"
+)
+checker = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(checker)
 
 
-def _load_module():
-    spec = importlib.util.spec_from_file_location("check_dev_environment_inventory_drift", SCRIPT_PATH)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["check_dev_environment_inventory_drift"] = module
-    spec.loader.exec_module(module)
-    return module
+def setup_inventory(root, payload):
+    config = root / checker.DEFAULT_REGISTRY_RELATIVE_PATH
+    config.parent.mkdir(parents=True)
+    config.write_bytes((ROOT / checker.DEFAULT_REGISTRY_RELATIVE_PATH).read_bytes())
+    inventory = root / checker.DEFAULT_INVENTORY_RELATIVE_PATH
+    inventory.parent.mkdir(parents=True)
+    inventory.write_text(json.dumps(payload), encoding="utf-8")
+    return config, inventory
 
 
-def _write_registry(root: Path) -> Path:
-    path = root / "config" / "governance" / "protected-artifact-inventory-drift.toml"
-    path.parent.mkdir(parents=True)
-    path.write_text(
-        "\n".join(
-            [
-                "schema_version = 1",
-                'volatile_inventory_paths = ["generated_at", "redaction.sensitive_environment_entry_count"]',
-                "",
-                "[[protected_artifacts]]",
-                'id = "inventory"',
-                (
-                    'patterns = [".groundtruth/inventory/dev-environment-inventory.json", '
-                    '"scripts/check_dev_environment_inventory_drift.py"]'
-                ),
-                'severity = "accepted_baseline_update"',
-                'route = "accepted_baseline_update"',
-                "accept_with_inventory_baseline_update = true",
-                'required_evidence = ["inventory regenerated"]',
-                "",
-                "[[protected_artifacts]]",
-                'id = "hooks"',
-                'patterns = [".githooks/**"]',
-                'severity = "compatibility_tests"',
-                'route = "compatibility_tests"',
-                "accept_with_inventory_baseline_update = false",
-                'required_evidence = ["hook parity test"]',
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    return path
-
-
-def _write_inventory(root: Path, payload: dict) -> Path:
-    path = root / ".groundtruth" / "inventory" / "dev-environment-inventory.json"
-    path.parent.mkdir(parents=True)
-    path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
-    return path
-
-
-def _payload(*, generated_at: str = "2026-05-06T00:00:00Z", python_version: str = "3.14.0") -> dict:
+def payload():
     return {
         "schema_version": 1,
-        "generated_at": generated_at,
-        "toolchain": {"python": {"version": python_version}},
-        "redaction": {"status": "pass", "sensitive_environment_entry_count": 1},
+        "generated_at": "before",
+        "toolchain": {
+            "git": {"version": "1", "status": "verified", "classification": "verified", "evidence": "git --version"}
+        },
+        "installation": "current",
     }
 
 
-def test_normalize_inventory_ignores_configured_volatile_fields() -> None:
-    module = _load_module()
-    first = _payload(generated_at="2026-05-06T00:00:00Z")
-    second = _payload(generated_at="2026-05-06T01:00:00Z")
-    second["redaction"]["sensitive_environment_entry_count"] = 99
-
-    assert module.normalize_inventory(first, ["generated_at", "redaction.sensitive_environment_entry_count"]) == (
-        module.normalize_inventory(second, ["generated_at", "redaction.sensitive_environment_entry_count"])
-    )
-
-
-def test_registry_loads_and_classifies_protected_paths(tmp_path: Path) -> None:
-    module = _load_module()
-    registry = module.load_registry(_write_registry(tmp_path))
-
-    matches = module.classify_changed_paths(registry, [".githooks/pre-commit", "README.md"])
-
-    assert matches == [
-        {
-            "path": ".githooks/pre-commit",
-            "entry_id": "hooks",
-            "route": "compatibility_tests",
-            "severity": "compatibility_tests",
-            "accept_with_inventory_baseline_update": False,
-            "required_evidence": ["hook parity test"],
-        }
-    ]
-
-
-def test_clean_inventory_and_no_protected_changes_passes(tmp_path: Path) -> None:
-    module = _load_module()
-    _write_registry(tmp_path)
-    baseline = _payload()
-    _write_inventory(tmp_path, baseline)
-
-    result = module.evaluate_drift(tmp_path, changed_paths=[], current_inventory=baseline)
-
+def test_clean_inventory_requires_no_review_or_staged_test_evidence(tmp_path):
+    current = payload()
+    config, inventory = setup_inventory(tmp_path, current)
+    before = (config.read_bytes(), inventory.read_bytes(), deepcopy(current))
+    result = checker.evaluate_drift(tmp_path, current_inventory=current)
     assert result["status"] == "pass"
     assert result["outcome"] == "clean"
-    assert result["blocking"] == []
+    assert before == (config.read_bytes(), inventory.read_bytes(), current)
 
 
-def test_material_inventory_drift_fails_without_baseline_update(tmp_path: Path) -> None:
-    module = _load_module()
-    _write_registry(tmp_path)
-    _write_inventory(tmp_path, _payload(python_version="3.12.0"))
+@pytest.mark.parametrize("field", ["version", "status", "classification"])
+def test_volatile_tool_availability_does_not_change_inventory_identity(tmp_path, field):
+    current = payload()
+    setup_inventory(tmp_path, current)
+    current["toolchain"]["git"][field] = "changed"
+    current["generated_at"] = "after"
+    assert checker.evaluate_drift(tmp_path, current_inventory=current)["status"] == "pass"
 
-    result = module.evaluate_drift(tmp_path, changed_paths=[], current_inventory=_payload(python_version="3.14.0"))
 
+def test_wildcard_volatile_fields_preserve_other_data_and_inputs():
+    original = {
+        "generated_at": "now",
+        "toolchain": {"one": {"version": "1", "evidence": "one"}, "two": {"version": "2", "evidence": "two"}},
+        "other": {"version": "kept"},
+    }
+    before = deepcopy(original)
+    normalized = checker.normalize_inventory(original, ["generated_at", "toolchain.*.version"])
+    assert normalized == {
+        "toolchain": {"one": {"evidence": "one"}, "two": {"evidence": "two"}},
+        "other": {"version": "kept"},
+    }
+    assert original == before
+
+
+@pytest.mark.parametrize(
+    "evidence_name",
+    ["bridge/GO.md", "platform_tests/test_changed.py", ".groundtruth/formal-artifact-approvals/permission.md"],
+)
+def test_material_drift_cannot_be_cleared_by_permission_or_test_presence(tmp_path, evidence_name):
+    current = payload()
+    setup_inventory(tmp_path, current)
+    current["toolchain"]["git"]["evidence"] = "a different probe"
+    evidence = tmp_path / evidence_name
+    evidence.parent.mkdir(parents=True, exist_ok=True)
+    evidence.write_text("not authority", encoding="utf-8")
+    result = checker.evaluate_drift(tmp_path, current_inventory=current)
     assert result["status"] == "fail"
-    assert result["blocking"][0]["reason"] == "normalized_inventory_drift"
     assert result["diff_keys"] == ["toolchain"]
-
-
-def test_inventory_baseline_update_passes_when_current_matches_new_baseline(tmp_path: Path) -> None:
-    module = _load_module()
-    _write_registry(tmp_path)
-    current = _payload(python_version="3.14.0")
-    _write_inventory(tmp_path, current)
-
-    result = module.evaluate_drift(
-        tmp_path,
-        changed_paths=[".groundtruth/inventory/dev-environment-inventory.json"],
-        current_inventory=current,
-    )
-
-    assert result["status"] == "pass"
-    assert result["outcome"] == "accepted_baseline_update"
-
-
-def test_protected_hook_change_fails_without_review_evidence(tmp_path: Path) -> None:
-    module = _load_module()
-    _write_registry(tmp_path)
-    current = _payload()
-    _write_inventory(tmp_path, current)
-
-    result = module.evaluate_drift(tmp_path, changed_paths=[".githooks/pre-commit"], current_inventory=current)
-
-    assert result["status"] == "fail"
-    assert result["blocking"][0]["path"] == ".githooks/pre-commit"
-    assert result["blocking"][0]["route"] == "compatibility_tests"
-
-
-def test_protected_hook_change_passes_for_precommit_when_bridge_evidence_is_present(tmp_path: Path) -> None:
-    module = _load_module()
-    _write_registry(tmp_path)
-    current = _payload()
-    _write_inventory(tmp_path, current)
-
-    result = module.evaluate_drift(
-        tmp_path,
-        changed_paths=[".githooks/pre-commit", "bridge/INDEX.md", "bridge/example-003.md"],
-        current_inventory=current,
-        allow_review_evidence=True,
-    )
-
-    assert result["status"] == "pass"
-    assert result["outcome"] == "review_evidence_present"
-    assert result["review_evidence_present"] is True
-
-
-def test_changed_path_must_stay_inside_project_root(tmp_path: Path) -> None:
-    module = _load_module()
-    _write_registry(tmp_path)
-    current = _payload()
-    _write_inventory(tmp_path, current)
-
-    with pytest.raises(module.DriftCheckError, match="escapes project root"):
-        module.evaluate_drift(tmp_path, changed_paths=["../outside.txt"], current_inventory=current)
-
-
-def test_normalize_inventory_wildcard_strips_all_toolchain_versions() -> None:
-    """toolchain.*.version deletes the version key from every tool sub-dict
-    while preserving non-version fields; payloads differing only in toolchain
-    versions normalize equal (WI-3449 / DELIB-2504)."""
-    module = _load_module()
-    first = {
-        "toolchain": {
-            "python": {"version": "3.14.0", "status": "verified"},
-            "pytest": {"version": "9.0.3", "status": "verified"},
-            "ruff": {"version": "0.15.12", "status": "verified"},
-        },
-    }
-    second = {
-        "toolchain": {
-            "python": {"version": "3.14.0", "status": "verified"},
-            "pytest": {"version": "9.0.2", "status": "verified"},
-            "ruff": {"version": "0.15.5", "status": "verified"},
-        },
-    }
-    normalized_first = module.normalize_inventory(first, ["toolchain.*.version"])
-    normalized_second = module.normalize_inventory(second, ["toolchain.*.version"])
-
-    for tool in ("python", "pytest", "ruff"):
-        assert "version" not in normalized_first["toolchain"][tool]
-        assert normalized_first["toolchain"][tool]["status"] == "verified"
-    assert normalized_first == normalized_second
-
-
-def test_exact_volatile_paths_unaffected_by_wildcard_support() -> None:
-    """The wildcard extension must preserve exact-match deletion for the
-    existing non-wildcard volatile paths (generated_at, redaction.*)."""
-    module = _load_module()
-    payload = {
-        "generated_at": "2026-05-29T00:00:00Z",
-        "toolchain": {"python": {"version": "3.14.0"}},
-        "redaction": {"status": "pass", "sensitive_environment_entry_count": 7},
-    }
-    normalized = module.normalize_inventory(payload, ["generated_at", "redaction.sensitive_environment_entry_count"])
-    assert "generated_at" not in normalized
-    assert "sensitive_environment_entry_count" not in normalized["redaction"]
-    assert normalized["redaction"]["status"] == "pass"
-    # A non-volatile path is untouched.
-    assert normalized["toolchain"]["python"]["version"] == "3.14.0"
-
-
-def _write_toolchain_volatile_registry(root: Path) -> Path:
-    path = root / "config" / "governance" / "protected-artifact-inventory-drift.toml"
-    path.parent.mkdir(parents=True)
-    path.write_text(
-        "\n".join(
-            [
-                "schema_version = 1",
-                'volatile_inventory_paths = ["generated_at", "toolchain.*.version"]',
-                "",
-                "[[protected_artifacts]]",
-                'id = "inventory"',
-                'patterns = [".groundtruth/inventory/dev-environment-inventory.json"]',
-                'severity = "accepted_baseline_update"',
-                'route = "accepted_baseline_update"',
-                "accept_with_inventory_baseline_update = true",
-                'required_evidence = ["inventory regenerated"]',
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    return path
-
-
-def _write_toolchain_availability_volatile_registry(root: Path) -> Path:
-    path = root / "config" / "governance" / "protected-artifact-inventory-drift.toml"
-    path.parent.mkdir(parents=True)
-    path.write_text(
-        "\n".join(
-            [
-                "schema_version = 1",
-                (
-                    'volatile_inventory_paths = ["generated_at", "toolchain.*.version", '
-                    '"toolchain.*.status", "toolchain.*.classification"]'
-                ),
-                "",
-                "[[protected_artifacts]]",
-                'id = "inventory"',
-                'patterns = [".groundtruth/inventory/dev-environment-inventory.json"]',
-                'severity = "accepted_baseline_update"',
-                'route = "accepted_baseline_update"',
-                "accept_with_inventory_baseline_update = true",
-                'required_evidence = ["inventory regenerated"]',
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    return path
-
-
-def test_toolchain_version_difference_is_not_material_drift(tmp_path: Path) -> None:
-    """End-to-end: with toolchain.*.version volatile, a baseline and a current
-    inventory that differ ONLY in toolchain version strings produce no material
-    drift (the interpreter-split commit-freeze defect is fixed). WI-3449."""
-    module = _load_module()
-    _write_toolchain_volatile_registry(tmp_path)
-    baseline = {
-        "schema_version": 1,
-        "generated_at": "2026-05-29T00:00:00Z",
-        "toolchain": {
-            "pytest": {"version": "9.0.3", "status": "verified"},
-            "ruff": {"version": "0.15.12", "status": "verified"},
-        },
-    }
-    current = {
-        "schema_version": 1,
-        "generated_at": "2026-05-29T01:00:00Z",
-        "toolchain": {
-            "pytest": {"version": "9.0.2", "status": "verified"},
-            "ruff": {"version": "0.15.5", "status": "verified"},
-        },
-    }
-    _write_inventory(tmp_path, baseline)
-
-    result = module.evaluate_drift(tmp_path, changed_paths=[], current_inventory=current)
-
-    assert result["material_inventory_drift"] is False
-    assert result["diff_keys"] == []
-
-
-def test_non_version_toolchain_change_still_gates(tmp_path: Path) -> None:
-    """toolchain.*.version must NOT broaden to non-version fields: a status
-    change is still material drift. WI-3449."""
-    module = _load_module()
-    _write_toolchain_volatile_registry(tmp_path)
-    baseline = {
-        "schema_version": 1,
-        "generated_at": "2026-05-29T00:00:00Z",
-        "toolchain": {"pytest": {"version": "9.0.3", "status": "verified"}},
-    }
-    current = {
-        "schema_version": 1,
-        "generated_at": "2026-05-29T01:00:00Z",
-        "toolchain": {"pytest": {"version": "9.0.3", "status": "missing"}},
-    }
-    _write_inventory(tmp_path, baseline)
-
-    result = module.evaluate_drift(tmp_path, changed_paths=[], current_inventory=current)
-
-    assert result["material_inventory_drift"] is True
-    assert result["diff_keys"] == ["toolchain"]
-
-
-def test_staged_mode_material_drift_warns_when_no_staged_surface(tmp_path: Path) -> None:
-    """WI-4862: in staged (pre-commit) mode, material inventory drift whose
-    staged set touches NO inventoried surface is downgraded to a warning and the
-    commit is not blocked. A whole-tree drift from untracked/unstaged surfaces
-    must not block an unrelated commit (the headless-finalization defect)."""
-    module = _load_module()
-    _write_registry(tmp_path)
-    _write_inventory(tmp_path, _payload(python_version="3.12.0"))
-
-    result = module.evaluate_drift(
-        tmp_path,
-        changed_paths=["docs/notes.md"],
-        current_inventory=_payload(python_version="3.14.0"),
-        staged=True,
-    )
-
-    assert result["material_inventory_drift"] is True
-    assert result["status"] == "pass"
-    assert result["outcome"] == "clean"
-    assert result["blocking"] == []
-    assert any("downgraded to warning in staged mode" in warning for warning in result["warnings"])
-
-
-def test_staged_mode_material_drift_blocks_when_staged_surface(tmp_path: Path) -> None:
-    """WI-4862: in staged mode, when a staged path IS an inventoried surface
-    (e.g. .claude/rules/*.md), THIS commit changes the inventory, so the
-    material-drift block is retained."""
-    module = _load_module()
-    _write_registry(tmp_path)
-    _write_inventory(tmp_path, _payload(python_version="3.12.0"))
-
-    result = module.evaluate_drift(
-        tmp_path,
-        changed_paths=[".claude/rules/new-rule.md"],
-        current_inventory=_payload(python_version="3.14.0"),
-        staged=True,
-    )
-
-    assert result["material_inventory_drift"] is True
-    assert result["status"] == "fail"
     assert result["blocking"][0]["reason"] == "normalized_inventory_drift"
+    assert evidence.read_text() == "not authority"
 
 
-def test_unstaged_mode_material_drift_still_blocks(tmp_path: Path) -> None:
-    """WI-4862: release-gate mode (staged=False, whole-tree) is unchanged —
-    material drift always blocks regardless of changed-path surface membership."""
-    module = _load_module()
-    _write_registry(tmp_path)
-    _write_inventory(tmp_path, _payload(python_version="3.12.0"))
-
-    result = module.evaluate_drift(
-        tmp_path,
-        changed_paths=["docs/notes.md"],
-        current_inventory=_payload(python_version="3.14.0"),
-        staged=False,
-    )
-
-    assert result["material_inventory_drift"] is True
-    assert result["status"] == "fail"
-    assert result["blocking"][0]["reason"] == "normalized_inventory_drift"
+def test_recording_matching_operational_output_clears_actual_drift(tmp_path):
+    current = payload()
+    _, inventory = setup_inventory(tmp_path, current)
+    current["installation"] = "changed"
+    assert checker.evaluate_drift(tmp_path, current_inventory=current)["material_inventory_drift"]
+    inventory.write_text(json.dumps(current), encoding="utf-8")
+    assert checker.evaluate_drift(tmp_path, current_inventory=current)["status"] == "pass"
 
 
-def test_toolchain_availability_flux_with_same_public_probe_evidence_is_not_material_drift(tmp_path: Path) -> None:
-    module = _load_module()
-    _write_toolchain_availability_volatile_registry(tmp_path)
-    baseline = {
-        "schema_version": 1,
-        "generated_at": "2026-06-02T00:00:00Z",
-        "toolchain": {
-            "gh": {
-                "version": "2.83.2",
-                "status": "verified",
-                "classification": "verified",
-                "evidence": "gh --version",
-            }
-        },
-    }
-    current = {
-        "schema_version": 1,
-        "generated_at": "2026-06-02T01:00:00Z",
-        "toolchain": {
-            "gh": {
-                "version": "unknown",
-                "status": "unsupported",
-                "classification": "unsupported",
-                "evidence": "gh --version",
-            }
-        },
-    }
-    _write_inventory(tmp_path, baseline)
-
-    result = module.evaluate_drift(tmp_path, changed_paths=[], current_inventory=current)
-
-    assert result["material_inventory_drift"] is False
-    assert result["diff_keys"] == []
+@pytest.mark.parametrize(
+    "config_text",
+    [
+        "invalid =",
+        "schema_version=2",
+        'schema_version=1\nvolatile_inventory_paths="not-list"',
+        "schema_version=1\nprotected_artifacts=[]",
+    ],
+)
+def test_malformed_or_permission_routing_configuration_refuses(tmp_path, config_text):
+    config, _ = setup_inventory(tmp_path, payload())
+    config.write_text(config_text, encoding="utf-8")
+    with pytest.raises(checker.DriftCheckError):
+        checker.evaluate_drift(tmp_path, current_inventory=payload())
 
 
-def test_toolchain_public_probe_evidence_change_still_gates(tmp_path: Path) -> None:
-    module = _load_module()
-    _write_toolchain_availability_volatile_registry(tmp_path)
-    baseline = {
-        "schema_version": 1,
-        "generated_at": "2026-06-02T00:00:00Z",
-        "toolchain": {
-            "gh": {
-                "version": "2.83.2",
-                "status": "verified",
-                "classification": "verified",
-                "evidence": "gh --version",
-            }
-        },
-    }
-    current = {
-        "schema_version": 1,
-        "generated_at": "2026-06-02T01:00:00Z",
-        "toolchain": {
-            "gh": {
-                "version": "unknown",
-                "status": "unsupported",
-                "classification": "unsupported",
-                "evidence": "gh version",
-            }
-        },
-    }
-    _write_inventory(tmp_path, baseline)
-
-    result = module.evaluate_drift(tmp_path, changed_paths=[], current_inventory=current)
-
-    assert result["material_inventory_drift"] is True
-    assert result["diff_keys"] == ["toolchain"]
+@pytest.mark.parametrize("data", [b"{", b"[]", b"\xff"])
+def test_unreadable_operational_inventory_returns_typed_failure(tmp_path, capsys, data):
+    _, inventory = setup_inventory(tmp_path, payload())
+    inventory.write_bytes(data)
+    assert checker.main(["--project-root", str(tmp_path), "--json"]) == 1
+    assert json.loads(capsys.readouterr().out)["outcome"] == "checker_error"
 
 
-def _write_registry_with_review_route(root: Path) -> Path:
-    """The default registry plus a governance_review entry for baseline rules."""
-    path = _write_registry(root)
-    path.write_text(
-        path.read_text(encoding="utf-8")
-        + "\n".join(
-            [
-                "",
-                "[[protected_artifacts]]",
-                'id = "rules"',
-                'patterns = [".harness-baseline-configuration/rules/**"]',
-                'severity = "governance_review"',
-                'route = "governance_review"',
-                "accept_with_inventory_baseline_update = false",
-                'required_evidence = ["bridge report"]',
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    return path
+def test_removed_review_permission_flags_are_not_accepted():
+    with pytest.raises(SystemExit) as error:
+        checker.main(["--allow-review-evidence", "--staged"])
+    assert error.value.code == 2
 
 
-def _write_registry_with_release_blocker_route(root: Path) -> Path:
-    """The default registry plus a release_blocker entry for a release script."""
-    path = _write_registry(root)
-    path.write_text(
-        path.read_text(encoding="utf-8")
-        + "\n".join(
-            [
-                "",
-                "[[protected_artifacts]]",
-                'id = "release"',
-                'patterns = ["scripts/release_pipeline.py"]',
-                'severity = "release_blocker"',
-                'route = "release_blocker"',
-                "accept_with_inventory_baseline_update = false",
-                'required_evidence = ["release gate test"]',
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    return path
+def test_explicit_empty_volatile_set_preserves_all_fields():
+    assert checker.normalize_inventory({"generated_at": "now"}, []) == {"generated_at": "now"}
 
 
-def test_compatibility_tests_route_accepts_a_test_in_the_change_set(tmp_path: Path) -> None:
-    """A change routed to compatibility_tests is accepted by the tests that travel
-    with it. Review is recorded in the bridge, which is never committed (canon
-    section 6), so committed bridge material cannot be the only accepted route."""
-    module = _load_module()
-    _write_registry(tmp_path)
-    current = _payload()
-    _write_inventory(tmp_path, current)
-
-    result = module.evaluate_drift(
-        tmp_path,
-        changed_paths=[".githooks/pre-commit", "platform_tests/hooks/test_precommit_retired_gates.py"],
-        current_inventory=current,
-        staged=True,
-    )
-
-    assert result["status"] == "pass"
-    assert result["outcome"] == "test_evidence_present"
-    assert result["test_evidence_present"] is True
-    assert result["blocking"] == []
-    assert any("staged test evidence" in warning for warning in result["warnings"])
-
-
-def test_compatibility_tests_route_still_blocks_without_a_test_in_the_change_set(tmp_path: Path) -> None:
-    module = _load_module()
-    _write_registry(tmp_path)
-    current = _payload()
-    _write_inventory(tmp_path, current)
-
-    result = module.evaluate_drift(
-        tmp_path,
-        changed_paths=[".githooks/pre-commit", "scripts/check_ruff_format.py"],
-        current_inventory=current,
-        staged=True,
-    )
-
-    assert result["status"] == "fail"
-    assert result["test_evidence_present"] is False
-    assert result["blocking"][0]["route"] == "compatibility_tests"
-
-
-def test_release_blocker_route_accepts_a_package_test_in_the_change_set(tmp_path: Path) -> None:
-    module = _load_module()
-    _write_registry_with_release_blocker_route(tmp_path)
-    current = _payload()
-    _write_inventory(tmp_path, current)
-
-    result = module.evaluate_drift(
-        tmp_path,
-        changed_paths=["scripts/release_pipeline.py", "groundtruth-kb/tests/test_release_pipeline.py"],
-        current_inventory=current,
-        staged=True,
-    )
-
-    assert result["status"] == "pass"
-    assert result["outcome"] == "test_evidence_present"
-    assert result["blocking"] == []
-
-
-def test_governance_review_route_warns_at_commit_time(tmp_path: Path) -> None:
-    """governance_review is recorded in the bridge, not at commit time, so the
-    staged (pre-commit) gate warns instead of demanding committed bridge files."""
-    module = _load_module()
-    _write_registry_with_review_route(tmp_path)
-    current = _payload()
-    _write_inventory(tmp_path, current)
-
-    result = module.evaluate_drift(
-        tmp_path,
-        changed_paths=[".harness-baseline-configuration/rules/file-bridge-protocol.md"],
-        current_inventory=current,
-        staged=True,
-    )
-
-    assert result["status"] == "pass"
-    assert result["outcome"] == "staged_review_notice"
-    assert result["blocking"] == []
-    assert any("review is recorded in the bridge" in warning for warning in result["warnings"])
-
-
-def test_governance_review_route_still_blocks_the_whole_tree_release_gate(tmp_path: Path) -> None:
-    module = _load_module()
-    _write_registry_with_review_route(tmp_path)
-    current = _payload()
-    _write_inventory(tmp_path, current)
-
-    result = module.evaluate_drift(
-        tmp_path,
-        changed_paths=[".harness-baseline-configuration/rules/file-bridge-protocol.md"],
-        current_inventory=current,
-        staged=False,
-    )
-
-    assert result["status"] == "fail"
-    assert result["blocking"][0]["route"] == "governance_review"
+def test_missing_field_and_explicit_null_are_distinct_inventory_states():
+    assert checker.inventory_diff_summary({}, {"installation": None}) == ["installation"]
+    assert checker.inventory_diff_summary({"installation": None}, {}) == ["installation"]

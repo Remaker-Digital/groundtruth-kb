@@ -1,98 +1,29 @@
-# Governance Emergency-Bootstrap Exception Protocol
+# Bounded restoration of defective foundational controls
 
-This rule auto-loads via the `{{HARNESS_RULES_DIR}}/` convention. It defines the narrow,
-audit-disciplined exception path for repairing foundational governance
-infrastructure when the normal bridge protocol cannot run because the defect
-being repaired *is* the infrastructure the protocol depends on.
+Read current `GOV-GTKB-EMERGENCY-BOOTSTRAP-001` through the CLI. Emergency
+bootstrap addresses a demonstrated foundational defect that prevents its own
+ordinary repair; ordinary friction or unrelated work does not qualify.
 
-## Authority and Scope
+Describe the exact broken control, concrete repair targets, expected result,
+executable tests, containment and recovery. Obtain the owner's bounded repair
+direction in the interactive session and apply it directly to current formal,
+project and work-item records and to agent actions. Do not create an owner
+decision, permission, bundle or operational-event ledger. Session logs retain
+the conversation for harvest when needed.
 
-Source: WI-4458 (`PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY`); owner authorization
-`DELIB-20266267`; governed by `GOV-FILE-BRIDGE-AUTHORITY-001` (audit-trail and
-bridge discipline) and `GOV-ARTIFACT-APPROVAL-001` (retroactive owner-approval
-capture).
+Preserve credential protection, concrete path containment, foreign work,
+independent review and ordinary Git history. Live operations use the ops
+activity; a different context independently verifies their result. A defective
+gate is disclosed and corrected, not silently treated as current canon.
 
-This protocol generalizes the `bridge-essential.md` mandate — "restoring bridge
-function is always the top-priority task" — from the bridge specifically to
-other foundational governance subsystems: registered hooks, governance gates,
-and the work-intent claim system. It is an exception class, not a general
-license: every clause below narrows when a bypass is permitted and requires the
-bypass to leave a durable, owner-visible audit trail.
+When the normal writer is itself broken, restore it under the owner's explicit
+repair direction and then record current facts through the restored interface.
+Do not make restoration depend on building a second writer. After restoration,
+ordinary native CLI and Bridge services enforce current formal scope, exact
+next-artifact claims, authored messages and independent verification.
 
-## The Deadlock This Protocol Addresses
-
-The normal bridge protocol is:
-
-> Prime files NEW → Loyal Opposition GO → Prime implements and files READY →
-> Loyal Opposition commits the work product and records VERIFIED.
-
-That protocol cannot run when the defect being repaired is the very
-infrastructure the protocol depends on. The motivating incident (WI-4449, commit
-`e90b2f03`, `fix: restore registered governance hooks`): six governance hooks
-were registered in the harness hook-registration settings but their on-disk `.py` files were
-never committed. The pre-commit verify path itself invokes registered hooks
-(scan-secrets, dev-environment-inventory-drift, narrative-artifact-evidence,
-ruff-format). Restoring the hooks required a commit, but the verify path required
-the hooks to exist — a chicken-and-egg deadlock. The verify-hook bypass used to
-land that commit was the correct call, but it was an undocumented exception
-class. This protocol canonicalizes it.
-
-## (a) Sanctioned Conditions
-
-A verify-hook bypass and/or a bridge-`GO`-bypass is sanctioned ONLY when ALL of
-the following hold:
-
-1. A foundational governance subsystem is broken in a way that produces a
-   session-block or an active failure: a registered hook file is missing on
-   disk, a governance gate cannot load, or the work-intent claim system cannot
-   operate.
-2. The normal bridge protocol path is itself blocked by the very defect being
-   repaired (e.g., the verify path requires the artifact being committed, or
-   the gate that would review the change is the gate being repaired).
-3. The change is the minimal repair that restores the foundational subsystem.
-   Scope creep beyond the minimal restoration is NOT covered by this exception
-   and must follow the normal bridge protocol.
-
-If any condition is not met, the normal bridge protocol applies and the bypass
-is NOT sanctioned.
-
-## (b) After-Action Audit-Trail Entry (Required)
-
-After the emergency-bootstrap commit lands, the actor MUST file an after-action
-bridge entry with status `ADVISORY` that records:
-
-- the commit SHA of the emergency-bootstrap repair;
-- the deadlock rationale (which condition in (a) was met and why the normal path
-  was blocked);
-- the scope of the minimal repair; and
-- counterpart (Loyal Opposition) verification evidence that the repair is
-  correct.
-
-Precedent: `bridge/gtkb-commit-untracked-governance-hooks-002.md` (the WI-4449
-closure) is the canonical example of this after-action entry. The `ADVISORY`
-status marks the entry as an audit record rather than an actionable proposal in
-the queue, while preserving it permanently in the append-only bridge audit
-trail.
-
-## (c) Retroactive Owner-Approval Capture (Required)
-
-If owner approval for the emergency-bootstrap action was not already on record at
-the time of the action, the actor MUST capture it retroactively as a
-Deliberation Archive owner-decision record (`source_type=owner_conversation`,
-`outcome=owner_decision`) per `GOV-ARTIFACT-APPROVAL-001`. The deliberation cites
-the commit SHA and the after-action `ADVISORY` bridge entry, closing the
-formal-approval invariant even though the action itself preceded approval.
-
-## What This Protocol Does NOT Permit
-
-- It does not permit bypassing the bridge for ordinary feature work, defect
-  fixes, or refactors that are unrelated to restoring a broken foundational
-  subsystem.
-- It does not permit skipping the after-action `ADVISORY` entry or the
-  retroactive owner-approval capture.
-- It does not weaken the credential-scan or root-boundary invariants; those
-  remain in force during an emergency-bootstrap action.
-
-## Copyright
-
-(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+VERIFIED precedes the complete-project commit. Neither an ADVISORY nor an
+operational record is permanent authority, a permission substitute or proof of
+commitment. Keep actual results and residual work in their existing canonical
+records. A restored-route component test does not qualify an actual emergency
+operation.

@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Check protected-artifact drift against the GT-KB dev environment inventory."""
+"""Compare the public operational inventory with the current installation.
+
+Inventory is derived output. This diagnostic grants no review, authorization or
+commit permission, and never inspects bridge messages or staged test presence.
+"""
 
 from __future__ import annotations
 
 import argparse
-import fnmatch
 import json
-import subprocess
 import sys
 import tomllib
 from copy import deepcopy
@@ -17,103 +19,32 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_REGISTRY_RELATIVE_PATH = Path("config/governance/protected-artifact-inventory-drift.toml")
 DEFAULT_INVENTORY_RELATIVE_PATH = Path(".groundtruth/inventory/dev-environment-inventory.json")
 DEFAULT_VOLATILE_PATHS = ("generated_at",)
-PASSING_OUTCOMES = {
-    "clean",
-    "accepted_baseline_update",
-    "local_only_notice",
-    "review_evidence_present",
-    "test_evidence_present",
-    "staged_review_notice",
-}
-# Routes whose registry ``required_evidence`` names tests. A staged test module
-# satisfies them mechanically, which is what the registry says the evidence is.
-# fnmatch's ``*`` spans directory separators, so the patterns cover nested test
-# packages. (Owner direction, 2026-09-07, canon v8.92 sections 6 and 7.)
-TEST_EVIDENCE_ROUTES = frozenset({"compatibility_tests", "release_blocker"})
-COMPATIBILITY_TEST_PATTERNS = ("platform_tests/*test_*.py", "groundtruth-kb/tests/*test_*.py")
-# Routes whose ``required_evidence`` is a review artifact. Review is recorded in
-# the bridge, which is ephemeral and never committed (canon section 6), so at
-# pre-commit time these routes warn; the whole-tree release gate (staged=False)
-# still blocks on them.
-STAGED_REVIEW_ROUTES = frozenset({"governance_review", "docs_review"})
-BRIDGE_REVIEW_EVIDENCE_PATTERNS = ("bridge/*-[0-9][0-9][0-9].md",)
-
-# Inventoried surfaces that drive the public dev-environment inventory. This is a
-# hand-maintained mirror of the surfaces collected by
-# scripts/collect_dev_environment_inventory.py `_repo_surfaces` (.claude/rules,
-# .claude/skills SKILL.md, .claude/hooks, .claude/commands/registry.json,
-# .github/workflows) plus the .claude/settings.json settings-state surface. A
-# staged path matching any of these is "surface-affecting": it is the only case
-# in staged (pre-commit) mode where THIS commit changes the inventory, so the
-# material-drift block is retained. If the collector adds a surface and this list
-# is not updated, a staged change to the new surface would not block at
-# pre-commit time; the release-candidate gate (staged=False, whole-tree) is the
-# backstop. (WI-4862.)
-INVENTORIED_SURFACE_PATTERNS = (
-    ".claude/rules/*.md",
-    ".claude/skills/*/SKILL.md",
-    ".claude/hooks/*.py",
-    ".claude/commands/registry.json",
-    ".claude/settings.json",
-    ".github/workflows/*",
-)
 
 
 class DriftCheckError(RuntimeError):
-    """Raised for configuration or boundary errors in the drift checker."""
-
-
-def _posix_path(path: str | Path) -> str:
-    text = str(path).replace("\\", "/").strip()
-    while text.startswith("./"):
-        text = text[2:]
-    return text
-
-
-def _assert_relative_inside_project(path_text: str) -> str:
-    normalized = _posix_path(path_text)
-    path = Path(normalized)
-    if path.is_absolute() or normalized == ".." or normalized.startswith("../") or "/../" in normalized:
-        raise DriftCheckError(f"changed path escapes project root: {path_text}")
-    return normalized
+    pass
 
 
 def load_registry(path: Path) -> dict[str, Any]:
     try:
-        with path.open("rb") as handle:
-            loaded = tomllib.load(handle)
-    except OSError as exc:
-        raise DriftCheckError(f"registry unreadable: {path}") from exc
-    except tomllib.TOMLDecodeError as exc:
-        raise DriftCheckError(f"registry malformed: {path}: {exc}") from exc
-    if not isinstance(loaded, dict):
-        raise DriftCheckError("registry root must be a table")
-    if loaded.get("schema_version") != 1:
-        raise DriftCheckError("registry schema_version must be 1")
-    entries = loaded.get("protected_artifacts")
-    if not isinstance(entries, list) or not entries:
-        raise DriftCheckError("registry must define at least one protected_artifacts entry")
-    seen: set[str] = set()
-    for entry in entries:
-        if not isinstance(entry, dict):
-            raise DriftCheckError("protected_artifacts entries must be tables")
-        entry_id = str(entry.get("id") or "").strip()
-        if not entry_id:
-            raise DriftCheckError("protected artifact entry missing id")
-        if entry_id in seen:
-            raise DriftCheckError(f"duplicate protected artifact id: {entry_id}")
-        seen.add(entry_id)
-        patterns = entry.get("patterns")
-        if not isinstance(patterns, list) or not all(isinstance(item, str) and item.strip() for item in patterns):
-            raise DriftCheckError(f"{entry_id} patterns must be non-empty strings")
-        if not str(entry.get("route") or "").strip():
-            raise DriftCheckError(f"{entry_id} route is required")
-    return loaded
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+        raise DriftCheckError("Inventory comparison configuration is unavailable or malformed") from error
+    volatile = data.get("volatile_inventory_paths", list(DEFAULT_VOLATILE_PATHS))
+    if (
+        data.get("schema_version") != 1
+        or not isinstance(volatile, list)
+        or not all(isinstance(v, str) and v for v in volatile)
+    ):
+        raise DriftCheckError("Invalid inventory comparison configuration")
+    if set(data) - {"schema_version", "volatile_inventory_paths"}:
+        raise DriftCheckError("Inventory comparison must not contain review or permission routes")
+    return data
 
 
 def normalize_inventory(payload: dict[str, Any], volatile_paths: list[str] | tuple[str, ...]) -> dict[str, Any]:
     normalized = deepcopy(payload)
-    for dotted_path in volatile_paths or DEFAULT_VOLATILE_PATHS:
+    for dotted_path in volatile_paths:
         _delete_dotted_path(normalized, str(dotted_path))
     return normalized
 
@@ -149,13 +80,13 @@ def _delete_path_parts(current: Any, parts: list[str]) -> None:
 
 def inventory_diff_summary(baseline: dict[str, Any], current: dict[str, Any]) -> list[str]:
     keys = sorted(set(baseline) | set(current))
-    return [key for key in keys if baseline.get(key) != current.get(key)]
+    return [key for key in keys if key not in baseline or key not in current or baseline[key] != current[key]]
 
 
 def _read_public_inventory(path: Path) -> dict[str, Any]:
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
-    except OSError as exc:
+    except (OSError, UnicodeError) as exc:
         raise DriftCheckError(f"inventory unreadable: {path}") from exc
     except json.JSONDecodeError as exc:
         raise DriftCheckError(f"inventory malformed: {path}: {exc}") from exc
@@ -173,244 +104,52 @@ def generate_current_public_inventory(project_root: Path) -> dict[str, Any]:
     return public
 
 
-def _git_changed_paths(project_root: Path, *, staged: bool) -> list[str]:
-    commands = [["git", "diff", "--name-only"]]
-    if staged:
-        commands = [["git", "diff", "--cached", "--name-only"]]
-    else:
-        commands.append(["git", "diff", "--cached", "--name-only"])
-        commands.append(["git", "ls-files", "--others", "--exclude-standard"])
-    changed: list[str] = []
-    for command in commands:
-        result = subprocess.run(
-            command,
-            cwd=project_root,
-            text=True,
-            capture_output=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=30,
-            check=False,
-        )
-        if result.returncode != 0:
-            continue
-        for line in result.stdout.splitlines():
-            path = _assert_relative_inside_project(line)
-            if path and path not in changed:
-                changed.append(path)
-    return changed
-
-
-def classify_changed_paths(registry: dict[str, Any], changed_paths: list[str]) -> list[dict[str, Any]]:
-    entries = registry.get("protected_artifacts") or []
-    matches: list[dict[str, Any]] = []
-    for path_text in changed_paths:
-        path = _assert_relative_inside_project(path_text)
-        for entry in entries:
-            patterns = [_posix_path(pattern) for pattern in entry.get("patterns", [])]
-            if any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns):
-                matches.append(
-                    {
-                        "path": path,
-                        "entry_id": entry.get("id"),
-                        "route": entry.get("route"),
-                        "severity": entry.get("severity"),
-                        "accept_with_inventory_baseline_update": bool(
-                            entry.get("accept_with_inventory_baseline_update")
-                        ),
-                        "required_evidence": list(entry.get("required_evidence") or []),
-                    }
-                )
-                break
-    return matches
-
-
-def has_bridge_review_evidence(changed_paths: list[str]) -> bool:
-    return any(
-        any(fnmatch.fnmatchcase(path, pattern) for pattern in BRIDGE_REVIEW_EVIDENCE_PATTERNS) for path in changed_paths
-    )
-
-
-def has_test_evidence(changed_paths: list[str]) -> bool:
-    """Return True when the changed set stages at least one test module."""
-    return any(
-        any(fnmatch.fnmatchcase(path, pattern) for pattern in COMPATIBILITY_TEST_PATTERNS) for path in changed_paths
-    )
-
-
-def staged_paths_touch_inventoried_surface(changed_paths: list[str]) -> bool:
-    """Return True when any changed path is an inventoried surface (WI-4862).
-
-    Used only in staged (pre-commit) mode to decide whether material inventory
-    drift reflects THIS commit's staged set. When True, the material-drift block
-    is retained; when False, the staged-mode block is downgraded to a warning.
-    """
-    return any(
-        any(fnmatch.fnmatchcase(path, pattern) for pattern in INVENTORIED_SURFACE_PATTERNS) for path in changed_paths
-    )
-
-
 def evaluate_drift(
     project_root: Path,
     *,
     registry_path: Path | None = None,
     inventory_path: Path | None = None,
-    changed_paths: list[str] | None = None,
-    staged: bool = False,
     current_inventory: dict[str, Any] | None = None,
-    allow_review_evidence: bool = False,
 ) -> dict[str, Any]:
-    project_root = project_root.resolve()
-    registry_file = registry_path or project_root / DEFAULT_REGISTRY_RELATIVE_PATH
-    inventory_file = inventory_path or project_root / DEFAULT_INVENTORY_RELATIVE_PATH
+    root = project_root.resolve()
+    registry_file = registry_path or root / DEFAULT_REGISTRY_RELATIVE_PATH
+    inventory_file = inventory_path or root / DEFAULT_INVENTORY_RELATIVE_PATH
     registry = load_registry(registry_file)
     baseline = _read_public_inventory(inventory_file)
-    current = current_inventory if current_inventory is not None else generate_current_public_inventory(project_root)
-    volatile_paths = tuple(registry.get("volatile_inventory_paths") or DEFAULT_VOLATILE_PATHS)
-    normalized_baseline = normalize_inventory(baseline, volatile_paths)
-    normalized_current = normalize_inventory(current, volatile_paths)
-    diff_keys = inventory_diff_summary(normalized_baseline, normalized_current)
-    material_inventory_drift = bool(diff_keys)
-    paths = list(changed_paths) if changed_paths is not None else _git_changed_paths(project_root, staged=staged)
-    normalized_changed_paths = [_assert_relative_inside_project(path) for path in paths]
-    protected_changes = classify_changed_paths(registry, normalized_changed_paths)
-    review_evidence_present = has_bridge_review_evidence(normalized_changed_paths)
-    test_evidence_present = has_test_evidence(normalized_changed_paths)
-    baseline_rel = DEFAULT_INVENTORY_RELATIVE_PATH.as_posix()
-    baseline_changed = baseline_rel in set(normalized_changed_paths)
-    blocking: list[dict[str, Any]] = []
-    warnings: list[str] = []
-
-    if material_inventory_drift:
-        staged_surface_touched = staged_paths_touch_inventoried_surface(normalized_changed_paths)
-        if staged and not staged_surface_touched:
-            # Pre-commit (staged) mode: the whole-tree material drift is from
-            # untracked/unstaged inventoried surfaces unrelated to THIS commit's
-            # staged set (no staged path is an inventoried surface). Downgrade the
-            # material-drift block to a warning so the commit is not blocked. The
-            # release-candidate gate (staged=False, whole-tree) still hard-blocks.
-            # (WI-4862.)
-            warnings.append(
-                "material inventory drift present but no staged path is an inventoried surface; "
-                "downgraded to warning in staged mode (release gate still blocks)"
-            )
-        else:
-            blocking.append(
-                {
-                    "reason": "normalized_inventory_drift",
-                    "message": "current public inventory differs from committed baseline",
-                    "diff_keys": diff_keys,
-                }
-            )
-
-    accepted_baseline_update = False
-    local_only_notice = False
-    review_evidence_accepted = False
-    test_evidence_accepted = False
-    staged_review_notice = False
-    for change in protected_changes:
-        route = str(change.get("route") or "")
-        if route == "local_only_notice":
-            local_only_notice = True
-            warnings.append(f"local-only protected change: {change['path']}")
-            continue
-        if change.get("accept_with_inventory_baseline_update") and baseline_changed and not material_inventory_drift:
-            accepted_baseline_update = True
-            continue
-        if allow_review_evidence and review_evidence_present:
-            review_evidence_accepted = True
-            warnings.append(f"protected change has staged bridge review evidence: {change['path']}")
-            continue
-        if route in TEST_EVIDENCE_ROUTES and test_evidence_present:
-            test_evidence_accepted = True
-            warnings.append(f"protected change has staged test evidence: {change['path']}")
-            continue
-        if staged and route in STAGED_REVIEW_ROUTES:
-            staged_review_notice = True
-            warnings.append(
-                f"protected change routes to {route}; review is recorded in the bridge, "
-                f"not at commit time (release gate still blocks): {change['path']}"
-            )
-            continue
-        blocking.append(
-            {
-                "reason": "protected_artifact_change_requires_review",
-                "path": change["path"],
-                "entry_id": change["entry_id"],
-                "route": route,
-                "severity": change.get("severity"),
-                "required_evidence": change.get("required_evidence", []),
-            }
-        )
-
-    if blocking:
-        status = "fail"
-        outcome = "release_blocker"
-    elif accepted_baseline_update:
-        status = "pass"
-        outcome = "accepted_baseline_update"
-    elif local_only_notice:
-        status = "pass"
-        outcome = "local_only_notice"
-    elif review_evidence_accepted:
-        status = "pass"
-        outcome = "review_evidence_present"
-    elif test_evidence_accepted:
-        status = "pass"
-        outcome = "test_evidence_present"
-    elif staged_review_notice:
-        status = "pass"
-        outcome = "staged_review_notice"
-    else:
-        status = "pass"
-        outcome = "clean"
-
+    current = current_inventory if current_inventory is not None else generate_current_public_inventory(root)
+    if not isinstance(current, dict):
+        raise DriftCheckError("Current inventory must be an object")
+    volatile = registry.get("volatile_inventory_paths", list(DEFAULT_VOLATILE_PATHS))
+    differences = inventory_diff_summary(
+        normalize_inventory(baseline, volatile), normalize_inventory(current, volatile)
+    )
     return {
-        "status": status,
-        "outcome": outcome,
-        "material_inventory_drift": material_inventory_drift,
-        "diff_keys": diff_keys,
-        "changed_paths": normalized_changed_paths,
-        "protected_changes": protected_changes,
-        "baseline_changed": baseline_changed,
-        "review_evidence_present": review_evidence_present,
-        "test_evidence_present": test_evidence_present,
-        "allow_review_evidence": allow_review_evidence,
-        "blocking": blocking,
-        "warnings": warnings,
-        "registry": str(
-            registry_file.relative_to(project_root) if registry_file.is_relative_to(project_root) else registry_file
-        ),
-        "inventory": str(
-            inventory_file.relative_to(project_root) if inventory_file.is_relative_to(project_root) else inventory_file
-        ),
+        "status": "fail" if differences else "pass",
+        "outcome": "material_drift" if differences else "clean",
+        "material_inventory_drift": bool(differences),
+        "diff_keys": differences,
+        "registry": str(registry_file),
+        "inventory": str(inventory_file),
+        "blocking": [
+            {
+                "reason": "normalized_inventory_drift",
+                "message": "Current public inventory differs from recorded operational output",
+            }
+        ]
+        if differences
+        else [],
     }
 
 
 def render_summary(result: dict[str, Any]) -> str:
-    lines = [
-        f"Inventory drift check: {result['status'].upper()} ({result['outcome']})",
-        f"Registry: {result['registry']}",
-        f"Inventory: {result['inventory']}",
-        f"Changed paths: {len(result['changed_paths'])}",
-        f"Protected changes: {len(result['protected_changes'])}",
-        f"Material inventory drift: {result['material_inventory_drift']}",
-    ]
+    lines = [f"Inventory comparison: {result['status'].upper()} ({result['outcome']})"]
+    if result.get("error"):
+        lines.append(result["error"])
     if result.get("diff_keys"):
         lines.append("Diff keys: " + ", ".join(result["diff_keys"]))
-    for item in result.get("blocking", []):
-        if item.get("path"):
-            lines.append(
-                f"BLOCK {item['path']}: {item.get('entry_id')} requires {item.get('route')} ({item.get('severity')})"
-            )
-        else:
-            lines.append(f"BLOCK {item.get('reason')}: {item.get('message')}")
-    for warning in result.get("warnings", []):
-        lines.append(f"WARN {warning}")
     if result.get("material_inventory_drift"):
-        lines.append("")
         lines.append(
-            "Remediation: run 'python scripts/collect_dev_environment_inventory.py' to regenerate the baseline."
+            "Remediation: run 'python scripts/collect_dev_environment_inventory.py' to refresh the operational inventory."
         )
     return "\n".join(lines)
 
@@ -418,54 +157,21 @@ def render_summary(result: dict[str, Any]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT)
-    parser.add_argument("--registry", type=Path, default=None)
-    parser.add_argument("--inventory", type=Path, default=None)
-    parser.add_argument("--staged", action="store_true", help="Check only staged paths.")
-    parser.add_argument(
-        "--allow-review-evidence",
-        action="store_true",
-        help="Allow protected path changes when staged bridge review evidence is present.",
-    )
-    parser.add_argument("--changed-path", action="append", default=None, help="Override changed paths for tests.")
-    parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    parser.add_argument("--registry", type=Path)
+    parser.add_argument("--inventory", type=Path)
+    parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
-
-    project_root = args.project_root.resolve()
-    registry = args.registry
-    if registry is not None and not registry.is_absolute():
-        registry = project_root / registry
-    inventory = args.inventory
-    if inventory is not None and not inventory.is_absolute():
-        inventory = project_root / inventory
+    root = args.project_root.resolve()
     try:
         result = evaluate_drift(
-            project_root,
-            registry_path=registry,
-            inventory_path=inventory,
-            changed_paths=args.changed_path,
-            staged=args.staged,
-            allow_review_evidence=args.allow_review_evidence,
+            root,
+            registry_path=root / args.registry if args.registry else None,
+            inventory_path=root / args.inventory if args.inventory else None,
         )
-    except DriftCheckError as exc:
-        result = {
-            "status": "fail",
-            "outcome": "checker_error",
-            "blocking": [{"reason": "checker_error", "message": str(exc)}],
-            "changed_paths": [],
-            "protected_changes": [],
-            "material_inventory_drift": False,
-            "diff_keys": [],
-            "warnings": [],
-            "review_evidence_present": False,
-            "allow_review_evidence": args.allow_review_evidence,
-            "registry": str(registry or DEFAULT_REGISTRY_RELATIVE_PATH),
-            "inventory": str(inventory or DEFAULT_INVENTORY_RELATIVE_PATH),
-        }
-    if args.json:
-        print(json.dumps(result, indent=2, sort_keys=True))
-    else:
-        print(render_summary(result))
-    return 0 if result.get("status") == "pass" and result.get("outcome") in PASSING_OUTCOMES else 1
+    except (DriftCheckError, UnicodeError) as error:
+        result = {"status": "fail", "outcome": "checker_error", "error": str(error)}
+    print(json.dumps(result, indent=2) if args.json else render_summary(result))
+    return 0 if result["status"] == "pass" else 1
 
 
 if __name__ == "__main__":

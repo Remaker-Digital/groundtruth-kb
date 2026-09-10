@@ -15,19 +15,27 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 try:
-    from gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+    import cloud_harness_base as base
+    from sdk_bridge_bash_guard import (
+        BridgeDeliveryIncomplete,
+        bridge_bash_mutation_reason,
+        bridge_completion_target,
+        verify_bridge_completion,
+    )
 except ModuleNotFoundError:  # pragma: no cover - exercised when imported as scripts.ollama_harness.
-    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
-
-try:
-    from sdk_bridge_bash_guard import bridge_bash_mutation_reason
-except ModuleNotFoundError:  # pragma: no cover - exercised when imported as scripts.ollama_harness.
-    from scripts.sdk_bridge_bash_guard import bridge_bash_mutation_reason
+    from scripts import cloud_harness_base as base
+    from scripts.sdk_bridge_bash_guard import (
+        BridgeDeliveryIncomplete,
+        bridge_bash_mutation_reason,
+        bridge_completion_target,
+        verify_bridge_completion,
+    )
 
 try:
     import tomllib
@@ -48,73 +56,56 @@ CHAT_RETRY_BACKOFF_SECONDS = (1.0, 2.0, 4.0)
 RETRYABLE_HTTP_STATUS = frozenset({429, 500, 502, 503, 504})
 # WI-4734: full bridge verification can exceed the old 24-turn ceiling.
 DEFAULT_MAX_TURNS = 80
-ROUTING_CONFIG_PATH = Path(".api-harness") / "routing.toml"
+ROUTING_CONFIG_PATH = Path(".api-harness") / "ollama" / "routing.toml"
 MAX_TOOL_OUTPUT_CHARS = 6000
 MAX_GREP_RESULTS = 50
 MAX_GLOB_RESULTS = 100
 MAX_REPEATED_TOOL_SIGNATURE_TURNS = 4
-MAX_BRIDGE_VERDICT_RECOVERY_TURNS = 3
-MAX_PUBLISHER_DIAGNOSTIC_CHARS = 500
-PROVIDER_VERDICT_STATUS_MISMATCH_CODE = "GTKB_PROVIDER_VERDICT_STATUS_MISMATCH"
 LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
-PUBLISH_BRIDGE_VERDICT_TOOL = "PublishBridgeVerdict"
 
 
-def _provider_verdict_enum() -> list[str]:
-    """Verdicts a provider-backed Loyal Opposition may publish: the writer's contract, from the vocabulary."""
-    try:
-        from groundtruth_kb.bridge.vocabulary import LOYAL_OPPOSITION_AUTHORED_STATUSES
-
-        return sorted(LOYAL_OPPOSITION_AUTHORED_STATUSES - {"ADVISORY"})
-    except Exception:  # pragma: no cover - partial installs keep the same contract by value
-        return ["GO", "NO-GO", "NOT-READY", "SUPERSEDED", "VERIFIED"]
-
-
-BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT = (
-    "This bridge-review or verification route is not complete until PublishBridgeVerdict "
-    "successfully advances the selected numbered bridge document. Reason: {reason}. "
-    "Use only PublishBridgeVerdict next, with the complete GO, NO-GO, or VERIFIED body "
-    "and required metadata. Do not return prose as the final answer until publication succeeds."
-)
-CANONICAL_TOOLS = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash", PUBLISH_BRIDGE_VERDICT_TOOL})
+CANONICAL_TOOLS = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
 MUTATING_TOOLS = frozenset({"Write", "Edit", "Bash"})
-DISPATCH_KEYWORD_ROLES = {
-    "::init gtkb lo": "loyal-opposition",
-    "::init gtkb pb": "prime-builder",
-}
 AUTHOR_IDENTITY = "Ollama D"
 AUTHOR_HARNESS_ID = "D"
 
+_OLLAMA_HOOK_PROFILE = base.NativeHookProfile(
+    display_name="Ollama",
+    author_identity=AUTHOR_IDENTITY,
+    author_harness_id=AUTHOR_HARNESS_ID,
+    default_endpoint=DEFAULT_ENDPOINT,
+    routing_config_path=ROUTING_CONFIG_PATH,
+    dialect=base.DIALECT_OLLAMA_NATIVE,
+)
+
 
 BRIDGE_WRITE_GUARDS = (
-    Path(".claude/hooks/credential-scan.py"),
-    Path(".claude/hooks/scanner-safe-writer.py"),
-    Path(".claude/hooks/bridge-compliance-gate.py"),
-    Path(".claude/hooks/narrative-artifact-approval-gate.py"),
+    ROUTING_CONFIG_PATH.parent / Path("hooks/credential-scan.py"),
+    ROUTING_CONFIG_PATH.parent / Path("hooks/scanner-safe-writer.py"),
     Path("scripts/implementation_start_gate.py"),
 )
 BRIDGE_EDIT_GUARDS = (
-    Path(".claude/hooks/credential-scan.py"),
-    Path(".claude/hooks/scanner-safe-writer.py"),
-    Path(".claude/hooks/bridge-compliance-gate.py"),
-    Path(".claude/hooks/narrative-artifact-approval-gate.py"),
+    ROUTING_CONFIG_PATH.parent / Path("hooks/credential-scan.py"),
+    ROUTING_CONFIG_PATH.parent / Path("hooks/scanner-safe-writer.py"),
     Path("scripts/implementation_start_gate.py"),
 )
 WRITE_EDIT_GUARDS = (
-    Path(".claude/hooks/credential-scan.py"),
-    Path(".claude/hooks/scanner-safe-writer.py"),
-    Path(".claude/hooks/narrative-artifact-approval-gate.py"),
+    ROUTING_CONFIG_PATH.parent / Path("hooks/credential-scan.py"),
+    ROUTING_CONFIG_PATH.parent / Path("hooks/scanner-safe-writer.py"),
     Path("scripts/implementation_start_gate.py"),
 )
 BASH_GUARDS = (
-    Path(".claude/hooks/destructive-gate.py"),
-    Path(".claude/hooks/formal-artifact-approval-gate.py"),
+    ROUTING_CONFIG_PATH.parent / Path("hooks/destructive-gate.py"),
     Path("scripts/implementation_start_gate.py"),
 )
 
 
 class OllamaHarnessError(RuntimeError):
     """Raised for fail-closed harness errors."""
+
+
+class OllamaHarnessIncomplete(OllamaHarnessError):
+    code = "bridge_delivery_incomplete"
 
 
 @dataclass(frozen=True)
@@ -143,6 +134,7 @@ class ModelMetadata:
     model_version: str
     endpoint: str
     route_key: str
+    native_context_id: str = field(default_factory=lambda: str(uuid4()))
 
 
 @dataclass(frozen=True)
@@ -303,8 +295,17 @@ def call_ollama_tags(endpoint: str, timeout: float = DEFAULT_TIMEOUT_SECONDS) ->
     return tuple(model_ids)
 
 
+def resolve_configuration_path(project_root: Path, relative: Path) -> Path:
+    if relative.anchor or ".." in relative.parts:
+        raise OllamaHarnessError("configuration path must be relative to the selected project")
+    candidate = project_root.resolve() / relative
+    if candidate.resolve() != candidate:
+        raise OllamaHarnessError(f"configuration path is redirected: {relative.as_posix()}")
+    return candidate
+
+
 def load_routing_config(project_root: Path, advertised_model_ids: Iterable[str] | None = None) -> RoutingConfig:
-    config_path = project_root / ROUTING_CONFIG_PATH
+    config_path = resolve_configuration_path(project_root, ROUTING_CONFIG_PATH)
     try:
         raw = tomllib.loads(config_path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -322,12 +323,7 @@ def load_routing_config(project_root: Path, advertised_model_ids: Iterable[str] 
     for key, row in models_raw.items():
         if not isinstance(key, str) or not key or not isinstance(row, dict):
             raise OllamaHarnessError("model rows must be named TOML tables")
-        # WI-4473: provider-scoped loading. Only load provider=="ollama" rows so the
-        # shared .api-harness/routing.toml's openrouter rows are not validated against
-        # the local Ollama /api/tags inventory (mirrors the provider filter in
-        # scripts/openrouter_harness.py:load_routing_config). An absent provider
-        # defaults to "ollama" for backward compatibility with single-provider configs
-        # that predate the multi-provider schema.
+        # Only this provider's model rows can become selectable routes.
         provider = row.get("provider", "ollama")
         if provider != "ollama":
             continue
@@ -380,73 +376,22 @@ def resolve_model(config: RoutingConfig, requested_model: str | None, skill: str
         raise OllamaHarnessError(f"unknown model route: {route_key}") from exc
 
 
-def build_system_prompt(skill: str | None, model_route: ModelRoute) -> str | None:
-    """Return role context for Ollama skill routes that need GT-KB bridge behavior."""
+def build_system_prompt(skill: str | None, project_root: Path) -> str | None:
+    """Load current neutral bridge instructions without assigning a runtime role."""
     if skill not in LOYAL_OPPOSITION_BRIDGE_SKILLS:
         return None
-    allowed_tools = ", ".join(model_route.allowed_tools)
-    session_id = resolve_ollama_session_id(os.environ) or "<dispatch-session-id-required>"
-    return f"""You are Ollama harness D operating as Loyal Opposition for GT-KB.
-
-Before publishing any bridge verdict, you MUST acquire the work-intent claim:
-python scripts\\bridge_claim_cli.py claim <document-slug>. If the claim command
-reports an existing holder, treat that JSON output as claim evidence. Do not
-invoke PublishBridgeVerdict until the claim succeeds.
-
-Publish numbered GO, NO-GO, and VERIFIED artifacts only through
-PublishBridgeVerdict. Supply the document slug, verdict, and complete reviewed
-body; VERIFIED additionally requires include_paths and commit_message, with
-hunk_patch_paths only when reviewed hunk isolation is needed. The governed
-publisher computes the next path/version and performs atomic VERIFIED
-finalization. Never use raw Write, Edit, or Bash for a numbered bridge verdict.
-
-Use the GT-KB file bridge as the authoritative workflow surface. Read the full
-versioned bridge-file chain for the target document before acting, and use
-gt bridge dispatch config, gt bridge dispatch status, and gt bridge dispatch
-health for dispatcher topology and readiness. Respond to latest NEW, REVISED,
-or NO-ACTION bridge entries by publishing the next numbered bridge verdict file
-through PublishBridgeVerdict. A NO-ACTION entry requires a corrected,
-governance-compliant verdict through review_no_action. Do not encode an
-exclusive corrected-verdict status set. Do not stop with prose when a bridge verdict is
-required.
-Your role for this context is established by the `::init gtkb <pb|lo>` line in the header
-of the dispatchable bridge item you were dispatched to process, and it is immutable for
-this context.
-
-For proposal reviews, write GO or NO-GO. For post-implementation reports, write VERIFIED or
-NO-GO. Run preflight checks and include their raw output in the verdict as advisory context for the Prime Builder. A nonzero preflight exit is a note to attach to the verdict body, not a rejection criterion. Your verdict (GO / NO-GO / VERIFIED) evaluates the substantive quality of the proposal or implementation report being reviewed — not whether every applicable cross-cutting spec appears in the linked specs list.
-
-For a positive post-implementation VERIFIED verdict, provide the reviewed body,
-exact verified include_paths, and commit_message to PublishBridgeVerdict. If you
-cannot identify the verified path set or publication cannot commit atomically,
-fail closed and publish/report blocker evidence instead of leaving a terminal
-VERIFIED file without its commit.
-Headless dispatch success is reconciled only from canonical exact bridge thread
-advancement: write the next `bridge/<slug>-NNN.md` file for the selected slug.
-Draft files, prefix-sibling slugs, and noncanonical filenames do not count as
-completion evidence. VERIFIED completion additionally requires the atomic
-finalization helper commit.
-
-Run the preflight checks with Bash:
-python scripts\\bridge_applicability_preflight.py --bridge-id <document-slug>
-python scripts\\adr_dcl_clause_preflight.py --bridge-id <document-slug>
-
-Do not use Bash to create, edit, overwrite, remove, or index bridge/*.md files
-or the retired bridge index. The harness hard-denies shell bridge mutations;
-use guarded Write/Edit dispatch or the deterministic bridge writer/helper path
-for bridge artifacts. Treat any helper that requires the retired bridge index
-as defective and report that defect instead of following stale instructions.
-
-Bridge verdict author metadata to include:
-author_identity: Ollama Loyal Opposition
-author_harness_id: D
-author_session_context_id: {session_id}
-author_model: {model_route.model_id}
-author_model_version: {model_route.model_version}
-author_model_configuration: Ollama harness shim; route {model_route.key}; skill {skill}; guarded tools {allowed_tools}
-
-Stay within E:\\GT-KB. Preserve guard decisions exactly; if a guarded tool is denied, report the
-denial and do not invent a successful bridge action."""
+    selected = "gtkb-proposal-review" if skill == "bridge-review" else "gtkb-verify"
+    sources = [
+        project_root / ".harness-baseline-configuration" / "skills" / name / "SKILL.md"
+        for name in ("gtkb-bridge", selected)
+    ]
+    try:
+        instructions = [path.read_text(encoding="utf-8") for path in sources]
+    except (OSError, UnicodeError) as exc:
+        raise OllamaHarnessError("Current canonical bridge skill instructions are unavailable") from exc
+    if any(not text.strip() for text in instructions):
+        raise OllamaHarnessError("Current canonical bridge skill instructions are unavailable: empty source")
+    return "\n\n".join(instructions)
 
 
 def _schema(name: str, description: str, properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
@@ -507,38 +452,12 @@ def build_tool_schemas(allowed_tools: Iterable[str]) -> list[dict[str, Any]]:
             {"command": {"type": "string"}, "timeout_seconds": {"type": "number", "minimum": 1}},
             ["command"],
         ),
-        PUBLISH_BRIDGE_VERDICT_TOOL: _schema(
-            PUBLISH_BRIDGE_VERDICT_TOOL,
-            (
-                "Publish a governed Loyal Opposition verdict: GO or NO-GO on a proposal, "
-                "NOT-READY or VERIFIED on an implementation report, SUPERSEDED to close a chain. "
-                "The runtime computes the next bridge path/version. VERIFIED also requires "
-                "include_paths and commit_message; hunk_patch_paths is optional."
-            ),
-            {
-                "slug": {"type": "string"},
-                "verdict": {"type": "string", "enum": _provider_verdict_enum()},
-                "content": {"type": "string"},
-                "include_paths": {"type": "array", "items": {"type": "string"}},
-                "hunk_patch_paths": {"type": "array", "items": {"type": "string"}},
-                "commit_message": {"type": "string"},
-            },
-            ["slug", "verdict", "content"],
-        ),
     }
     allowed = tuple(allowed_tools)
     unknown = sorted(set(allowed) - CANONICAL_TOOLS)
     if unknown:
         raise OllamaHarnessError(f"unknown allowed tools: {unknown}")
     return [schemas[name] for name in allowed]
-
-
-def allowed_tools_for_skill(allowed_tools: Iterable[str], skill: str | None) -> tuple[str, ...]:
-    allowed = tuple(allowed_tools)
-    without_verdict = tuple(name for name in allowed if name != PUBLISH_BRIDGE_VERDICT_TOOL)
-    if skill in LOYAL_OPPOSITION_BRIDGE_SKILLS:
-        return (*without_verdict, PUBLISH_BRIDGE_VERDICT_TOOL)
-    return without_verdict
 
 
 def call_ollama_chat(
@@ -641,66 +560,23 @@ def set_author_metadata_env(
     model_id: str,
     model_version: str,
     endpoint: str = DEFAULT_ENDPOINT,
+    *,
+    native_context_id: str,
 ) -> dict[str, str]:
     updated = dict(env)
-    session_id = resolve_ollama_session_id(env)
+    # A native runtime identity is not the canonical binding returned by the CLI.
+    updated.pop("GTKB_AUTHOR_SESSION_CONTEXT_ID", None)
     updated.update(
         {
             "GTKB_AUTHOR_IDENTITY": AUTHOR_IDENTITY,
             "GTKB_AUTHOR_HARNESS_ID": AUTHOR_HARNESS_ID,
+            "GTKB_NATIVE_CONTEXT_ID": native_context_id,
             "GTKB_AUTHOR_MODEL": model_id,
             "GTKB_AUTHOR_MODEL_VERSION": model_version,
-            "GTKB_AUTHOR_MODEL_CONFIGURATION": f"Ollama endpoint={endpoint}; routing=static .ollama/routing.toml",
+            "GTKB_AUTHOR_MODEL_CONFIGURATION": f"Ollama endpoint={endpoint}; routing=static .api-harness/ollama/routing.toml",
         }
     )
-    if session_id:
-        updated["GTKB_AUTHOR_SESSION_CONTEXT_ID"] = session_id
     return updated
-
-
-def resolve_ollama_session_id(environ: Mapping[str, str] | None = None) -> str:
-    """Resolve the bridge work-intent session id used by guarded Ollama tools."""
-    return resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=environ)
-
-
-def _load_provider_verdict_publisher(project_root: Path) -> Callable[..., Any]:
-    root_text = str(project_root.resolve())
-    if root_text not in sys.path:
-        sys.path.insert(0, root_text)
-    try:
-        from scripts.gtkb_bridge_writer import publish_lo_verdict
-    except ModuleNotFoundError as exc:
-        raise OllamaHarnessError(
-            f"governed bridge verdict publisher is unavailable from project root {root_text}: {exc}"
-        ) from exc
-    return publish_lo_verdict
-
-
-def ensure_dispatch_worker_role_document(project_root: Path) -> None:
-    keyword = os.environ.get("GTKB_BRIDGE_DISPATCH_KEYWORD", "").strip().lower()
-    if not keyword:
-        return
-    role = DISPATCH_KEYWORD_ROLES.get(keyword)
-    if role is None:
-        raise OllamaHarnessError(f"unsupported dispatcher init keyword for worker role authority: {keyword!r}")
-    session_id = resolve_ollama_session_id(os.environ)
-    if not session_id:
-        raise OllamaHarnessError("dispatcher worker role authority requires a concrete dispatch session id")
-    try:
-        from groundtruth_kb.session.envelope import ensure_worker_session
-
-        ensure_worker_session(
-            project_root,
-            harness_name="ollama",
-            harness_id=AUTHOR_HARNESS_ID,
-            session_id=session_id,
-            role=role,
-            role_source="dispatcher_composition",
-            init_keyword=keyword,
-            dispatch_run_id=session_id,
-        )
-    except (ImportError, OSError, ValueError) as exc:
-        raise OllamaHarnessError(f"could not establish dispatcher worker role authority: {exc}") from exc
 
 
 def _default_guard_runner(
@@ -796,17 +672,26 @@ def invoke_guard_adapter(
     paths = tuple(guard_paths) if guard_paths is not None else _guard_paths_for(tool_name, tool_input, project_root)
     runner = guard_runner or _default_guard_runner
     env = set_author_metadata_env(
-        os.environ, model_metadata.model_id, model_metadata.model_version, model_metadata.endpoint
+        os.environ,
+        model_metadata.model_id,
+        model_metadata.model_version,
+        model_metadata.endpoint,
+        native_context_id=model_metadata.native_context_id,
     )
     payload = {
         "tool_name": tool_name,
         "tool_input": tool_input,
         "cwd": str(project_root),
         "project_root": str(project_root),
-        "session_id": resolve_ollama_session_id(os.environ),
+        "session_id": model_metadata.native_context_id,
     }
+    env["GTKB_PROJECT_ROOT"] = str(project_root)
     for relative_guard_path in paths:
-        guard_path = relative_guard_path if relative_guard_path.is_absolute() else project_root / relative_guard_path
+        guard_path = (
+            relative_guard_path
+            if relative_guard_path.is_absolute()
+            else resolve_configuration_path(project_root, relative_guard_path)
+        )
         if not guard_path.is_file():
             raise OllamaHarnessError(f"guard script is missing: {relative_guard_path.as_posix()}")
         result = runner(guard_path, payload, env, timeout)
@@ -921,54 +806,6 @@ def _dispatch_read(arguments: Mapping[str, Any], project_root: Path) -> str:
         return f"Read failed: {_relative_path(project_root, path)}: {exc}"
 
 
-def _dispatch_publish_bridge_verdict(
-    arguments: Mapping[str, Any],
-    model_metadata: ModelMetadata,
-    project_root: Path,
-    *,
-    skill: str | None,
-) -> str:
-    if skill not in LOYAL_OPPOSITION_BRIDGE_SKILLS:
-        raise OllamaHarnessError("PublishBridgeVerdict is available only for bridge-review/verification skills")
-    session_id = resolve_ollama_session_id(os.environ)
-    if not session_id:
-        raise OllamaHarnessError("PublishBridgeVerdict requires a concrete dispatcher session id")
-    slug = _require_string(arguments, "slug")
-    verdict = _require_string(arguments, "verdict")
-    content = _require_string(arguments, "content")
-    include_paths = _string_list_argument(arguments, "include_paths")
-    hunk_patch_paths = _string_list_argument(arguments, "hunk_patch_paths")
-    commit_message = str(arguments.get("commit_message") or "")
-
-    try:
-        publish_lo_verdict = _load_provider_verdict_publisher(project_root)
-        published = publish_lo_verdict(
-            slug,
-            verdict,
-            content,
-            project_root,
-            session_id=session_id,
-            harness_name="ollama",
-            author_metadata={
-                "author_identity": AUTHOR_IDENTITY,
-                "author_harness_id": AUTHOR_HARNESS_ID,
-                "author_session_context_id": session_id,
-                "author_model": model_metadata.model_id,
-                "author_model_version": model_metadata.model_version,
-                "author_model_configuration": (
-                    f"Ollama harness shim; route {model_metadata.route_key}; skill {skill}; "
-                    f"endpoint {model_metadata.endpoint}"
-                ),
-            },
-            include_paths=include_paths,
-            hunk_patch_paths=hunk_patch_paths,
-            commit_message=commit_message,
-        )
-    except Exception as exc:
-        raise OllamaHarnessError(f"governed bridge verdict publication failed: {exc}") from exc
-    return json.dumps(published.to_dict(), sort_keys=True)
-
-
 def _dispatch_write(
     arguments: Mapping[str, Any],
     model_metadata: ModelMetadata,
@@ -981,7 +818,7 @@ def _dispatch_write(
         "Write", {"path": str(path), "content": content}, model_metadata, project_root, guard_runner=guard_runner
     )
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    path.write_text(content, encoding="utf-8", newline="")
     return f"wrote {_relative_path(project_root, path)}"
 
 
@@ -1012,7 +849,7 @@ def _dispatch_edit(
         raise OllamaHarnessError(f"old_string not found in {_relative_path(project_root, path)}")
 
     try:
-        path.write_text(content.replace(old_string, new_string, 1), encoding="utf-8")
+        path.write_text(content.replace(old_string, new_string, 1), encoding="utf-8", newline="")
     except OSError as exc:
         raise OllamaHarnessError(f"failed to write file {_relative_path(project_root, path)}: {exc}") from exc
     return f"edited {_relative_path(project_root, path)}"
@@ -1100,7 +937,11 @@ def _dispatch_bash(
         raise OllamaHarnessError(bridge_denial)
     invoke_guard_adapter("Bash", {"command": command}, model_metadata, project_root, guard_runner=guard_runner)
     env = set_author_metadata_env(
-        os.environ, model_metadata.model_id, model_metadata.model_version, model_metadata.endpoint
+        os.environ,
+        model_metadata.model_id,
+        model_metadata.model_version,
+        model_metadata.endpoint,
+        native_context_id=model_metadata.native_context_id,
     )
     runner = command_runner or _default_command_runner
     try:
@@ -1148,8 +989,6 @@ def dispatch_tool_call(
         return _dispatch_glob(arguments, project_root)
     if tool_name == "Bash":
         return _dispatch_bash(arguments, model_metadata, project_root, guard_runner, command_runner)
-    if tool_name == PUBLISH_BRIDGE_VERDICT_TOOL:
-        return _dispatch_publish_bridge_verdict(arguments, model_metadata, project_root, skill=skill)
     raise OllamaHarnessError(f"unsupported tool: {tool_name}")
 
 
@@ -1190,48 +1029,6 @@ def _final_text_from_message(message: Mapping[str, Any]) -> str:
     return content
 
 
-def _publish_bridge_verdict_succeeded(result: str) -> bool:
-    try:
-        parsed = json.loads(result)
-    except json.JSONDecodeError:
-        return False
-    return (
-        isinstance(parsed, dict)
-        and isinstance(parsed.get("verdict_path"), str)
-        and bool(parsed["verdict_path"].strip())
-    )
-
-
-def _bounded_publisher_failure_diagnostic(result: str) -> str:
-    if result.startswith("ERROR:"):
-        diagnostic = result
-    else:
-        diagnostic = f"PublishBridgeVerdict returned no nonblank verdict_path: {result}"
-
-    try:
-        from groundtruth_kb.governance.credential_patterns import db_pattern_list
-    except (ImportError, OSError):
-        return "publisher failure details unavailable because credential redaction could not be loaded"
-
-    for label, pattern in db_pattern_list():
-        diagnostic = pattern.sub(f"[REDACTED:{label}]", diagnostic)
-    diagnostic = " ".join(diagnostic.split()) or "empty publisher failure result"
-    if len(diagnostic) > MAX_PUBLISHER_DIAGNOSTIC_CHARS:
-        diagnostic = diagnostic[: MAX_PUBLISHER_DIAGNOSTIC_CHARS - 3].rstrip() + "..."
-    return diagnostic
-
-
-def _publisher_recovery_exhausted(attempts: int, last_failure: str | None) -> OllamaHarnessError:
-    diagnostic = last_failure or "publisher failure reason unavailable"
-    return OllamaHarnessError(
-        f"bridge verdict publisher recovery exhausted after {attempts} attempts; last failure: {diagnostic}"
-    )
-
-
-def _is_provider_verdict_status_mismatch(result: str) -> bool:
-    return f"{PROVIDER_VERDICT_STATUS_MISMATCH_CODE}:" in result
-
-
 def run_tool_loop(
     prompt: str,
     model_route: ModelRoute,
@@ -1240,26 +1037,60 @@ def run_tool_loop(
     project_root: Path,
     *,
     skill: str | None = None,
+    bridge_document: str | None = None,
+    bridge_version: int | None = None,
     system_prompt: str | None = None,
     chat_func: ChatFunc | None = None,
     guard_runner: GuardRunner | None = None,
     command_runner: CommandRunner | None = None,
+    native_hook_runner: base.NativeHookRunner | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     session_timeout: float = DEFAULT_SESSION_TIMEOUT_SECONDS,
     telemetry: Any | None = None,
 ) -> str:
+    try:
+        completion_target = bridge_completion_target(prompt, skill, bridge_document, bridge_version)
+    except BridgeDeliveryIncomplete as exc:
+        raise OllamaHarnessIncomplete(str(exc)) from exc
     if max_turns < 1:
         raise OllamaHarnessError("max_turns must be at least 1")
     if session_timeout <= 0:
         raise OllamaHarnessError("session_timeout must be positive")
-    ensure_dispatch_worker_role_document(project_root)
-    messages: list[dict[str, Any]] = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-    messages.append({"role": "user", "content": prompt})
-    allowed_tools = allowed_tools_for_skill(model_route.allowed_tools, skill)
-    chat = chat_func or call_ollama_chat
     metadata = ModelMetadata(model_route.model_id, model_route.model_version, endpoint, model_route.key)
+    hook_metadata = base.ModelMetadata(
+        metadata.model_id,
+        metadata.model_version,
+        endpoint,
+        metadata.route_key,
+        native_context_id=metadata.native_context_id,
+    )
+
+    def invoke(event, **kwargs):
+        try:
+            return base.invoke_native_hooks(
+                event,
+                hook_metadata,
+                project_root,
+                _OLLAMA_HOOK_PROFILE,
+                native_hook_runner=native_hook_runner,
+                **kwargs,
+            )
+        except base.CloudHarnessError as exc:
+            raise OllamaHarnessError(str(exc)) from exc
+
+    invoke(base.NATIVE_HOOK_SESSION_START)
+    invoke(base.NATIVE_HOOK_USER_PROMPT_SUBMIT, prompt=prompt)
+    identity = (
+        f"Native context identifier: {metadata.native_context_id}. "
+        "Bind only the exact init marker supplied in the task through gt session bind. "
+        "Use its returned canonical session binding for authored provenance."
+    )
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": "\n\n".join(part for part in (identity, system_prompt) if part)}
+    ]
+    messages.append({"role": "user", "content": prompt})
+    allowed_tools = tuple(model_route.allowed_tools)
+    chat = chat_func or call_ollama_chat
     if telemetry is None:
         try:
             from groundtruth_kb.shim_dispatch_telemetry import create_dispatch_telemetry_observer
@@ -1278,22 +1109,13 @@ def run_tool_loop(
     session_deadline = time.monotonic() + session_timeout
     previous_tool_signature: str | None = None
     repeated_tool_signature_turns = 0
-    bridge_verdict_required = skill in LOYAL_OPPOSITION_BRIDGE_SKILLS
-    bridge_verdict_published = False
-    bridge_recovery_turns = 0
-    publisher_failures = 0
-    publisher_status_mismatches = 0
-    last_publisher_failure: str | None = None
+    native_stop_blocks = 0
+    native_stop_completed = False
 
     stop_reason = "process_error"
     try:
         for _turn in range(max_turns):
-            active_tools = (
-                (PUBLISH_BRIDGE_VERDICT_TOOL,)
-                if bridge_verdict_required and bridge_recovery_turns and not bridge_verdict_published
-                else allowed_tools
-            )
-            schemas = build_tool_schemas(active_tools)
+            schemas = build_tool_schemas(allowed_tools)
             payload = {"model": model_route.model_id, "messages": messages, "tools": schemas, "stream": False}
             operation_timeout = min(
                 timeout,
@@ -1317,54 +1139,40 @@ def run_tool_loop(
                 with contextlib.suppress(Exception):
                     telemetry.record_turn(_turn + 1, tool_names, provider_response=response)
             if not tool_calls:
-                content = message.get("content")
-                if bridge_verdict_required and not bridge_verdict_published:
-                    bridge_recovery_turns += 1
-                    if bridge_recovery_turns > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
-                        raise OllamaHarnessError("bridge verdict publication did not advance before final response")
-                    if isinstance(content, str) and content.strip():
-                        messages.append({"role": "assistant", "content": content})
-                        reason = "assistant returned final prose before publishing a governed verdict"
-                    else:
-                        reason = "assistant returned a blank response without a tool call"
+                block_reason = base._invoke_native_stop_hooks_nonmasking(
+                    hook_metadata,
+                    project_root,
+                    _OLLAMA_HOOK_PROFILE,
+                    native_hook_runner,
+                )
+                if block_reason:
+                    native_stop_blocks += 1
+                    if native_stop_blocks >= base.MAX_NATIVE_STOP_BLOCKS:
+                        native_stop_completed = True
+                        raise OllamaHarnessError(
+                            f"native Stop hook blocked completion {base.MAX_NATIVE_STOP_BLOCKS} consecutive times"
+                        )
+                    messages.append({"role": "assistant", "content": _final_text_from_message(message)})
                     messages.append(
-                        {
-                            "role": "user",
-                            "content": BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.format(reason=reason),
-                        }
+                        {"role": "user", "content": base.NATIVE_STOP_CONTINUATION_PROMPT.format(reason=block_reason)}
                     )
                     continue
+                native_stop_completed = True
+                try:
+                    verify_bridge_completion(
+                        completion_target,
+                        metadata.native_context_id,
+                        project_root,
+                        session_deadline - time.monotonic(),
+                        command_runner,
+                    )
+                except BridgeDeliveryIncomplete as exc:
+                    stop_reason = "bridge_delivery_incomplete"
+                    raise OllamaHarnessIncomplete(str(exc)) from exc
                 stop_reason = "final_response"
                 return _final_text_from_message(message)
             if not isinstance(tool_calls, list):
                 raise OllamaHarnessError("tool_calls must be a list")
-            if bridge_verdict_required and bridge_recovery_turns and not bridge_verdict_published:
-                recovery_tool_names = []
-                for call in tool_calls:
-                    if not isinstance(call, dict):
-                        recovery_tool_names.append(None)
-                        continue
-                    function = call.get("function")
-                    recovery_tool_names.append(function.get("name") if isinstance(function, dict) else call.get("name"))
-                rejected_names = sorted(
-                    {str(name or "<missing>") for name in recovery_tool_names if name != PUBLISH_BRIDGE_VERDICT_TOOL}
-                )
-                if rejected_names:
-                    publisher_failures += 1
-                    last_publisher_failure = _bounded_publisher_failure_diagnostic(
-                        "publisher-only recovery rejected non-publisher tool call(s): " + ", ".join(rejected_names)
-                    )
-                    if publisher_failures > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
-                        raise _publisher_recovery_exhausted(publisher_failures, last_publisher_failure)
-                    bridge_recovery_turns = max(bridge_recovery_turns, 1)
-                    messages.append({"role": "assistant", "content": message.get("content") or ""})
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.format(reason=last_publisher_failure),
-                        }
-                    )
-                    continue
 
             tool_signature = json.dumps(tool_calls, sort_keys=True, default=str)
             if tool_signature == previous_tool_signature:
@@ -1395,7 +1203,6 @@ def run_tool_loop(
                         }
                     )
                     continue
-                publisher_recovery_reason = None
                 if tool_name == "Bash":
                     arguments = dict(arguments)
                     requested_timeout = float(arguments.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
@@ -1403,43 +1210,24 @@ def run_tool_loop(
                         requested_timeout,
                         _remaining_timeout(session_deadline, "session timeout exceeded before Bash tool call"),
                     )
-                try:
-                    result = dispatch_tool_call(
-                        tool_name,
-                        arguments,
-                        metadata,
-                        project_root,
-                        guard_runner=guard_runner,
-                        command_runner=command_runner,
-                        skill=skill,
-                    )
-                except OllamaHarnessError as tool_err:
-                    # Guard denial or other tool error: return error as tool result
-                    # instead of crashing the loop. Model sees the denial and can
-                    # try a different path.
-                    result = f"ERROR: {tool_err}"
-                if bridge_verdict_required and tool_name == PUBLISH_BRIDGE_VERDICT_TOOL:
-                    if not _publish_bridge_verdict_succeeded(result):
-                        last_publisher_failure = _bounded_publisher_failure_diagnostic(result)
-                        if _is_provider_verdict_status_mismatch(result):
-                            publisher_status_mismatches += 1
-                            if publisher_status_mismatches > 1:
-                                raise OllamaHarnessError(
-                                    f"{PROVIDER_VERDICT_STATUS_MISMATCH_CODE}: publication stopped after "
-                                    f"{publisher_status_mismatches} mismatches; last failure: {last_publisher_failure}"
-                                )
-                        else:
-                            publisher_failures += 1
-                            if publisher_failures > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
-                                raise _publisher_recovery_exhausted(publisher_failures, last_publisher_failure)
-                        bridge_recovery_turns = max(bridge_recovery_turns, 1)
-                        publisher_recovery_reason = last_publisher_failure
-                    else:
-                        bridge_verdict_published = True
-                        bridge_recovery_turns = 0
-                        publisher_failures = 0
-                        publisher_status_mismatches = 0
-                        last_publisher_failure = None
+                block = invoke(base.NATIVE_HOOK_PRE_TOOL_USE, tool_name=tool_name, tool_input=arguments)
+                block_reason = base._native_hook_block_reason(block)
+                if block_reason:
+                    result = f"ERROR: native hook blocked {tool_name}: {block_reason}"
+                else:
+                    try:
+                        result = dispatch_tool_call(
+                            tool_name,
+                            arguments,
+                            metadata,
+                            project_root,
+                            guard_runner=guard_runner,
+                            command_runner=command_runner,
+                            skill=skill,
+                        )
+                    except OllamaHarnessError as tool_err:
+                        result = f"ERROR: {tool_err}"
+                invoke(base.NATIVE_HOOK_POST_TOOL_USE, tool_name=tool_name, tool_input=arguments, tool_response=result)
                 messages.append(
                     {
                         "role": "tool",
@@ -1448,31 +1236,27 @@ def run_tool_loop(
                         "content": result[:MAX_TOOL_OUTPUT_CHARS],
                     }
                 )
-                if publisher_recovery_reason is not None:
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.format(
-                                reason=publisher_recovery_reason
-                            ),
-                        }
-                    )
         stop_reason = "max_turn_exhaustion"
         raise OllamaHarnessError("max-turn exhaustion before final assistant text")
     except OllamaHarnessError as exc:
         message = str(exc).lower()
-        if "max-turn" in message:
+        if isinstance(exc, OllamaHarnessIncomplete):
+            stop_reason = exc.code
+        elif "max-turn" in message:
             stop_reason = "max_turn_exhaustion"
-        elif "repeated no-progress" in message or "bridge verdict" in message:
+        elif "repeated no-progress" in message:
             stop_reason = "no_progress_loop"
         elif "session timeout" in message:
             stop_reason = "session_timeout"
         elif any(marker in message for marker in ("provider", "request", "http", "api returned", "rate limit")):
             stop_reason = "provider_error"
-        elif "guard" in message:
+        elif "guard" in message or "native hook" in message:
             stop_reason = "guard_error"
         raise
     finally:
+        if not native_stop_completed:
+            with contextlib.suppress(Exception):
+                invoke(base.NATIVE_HOOK_STOP)
         if telemetry is not None:
             with contextlib.suppress(Exception):
                 telemetry.finish(stop_reason=stop_reason)
@@ -1481,8 +1265,10 @@ def run_tool_loop(
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the GT-KB Ollama harness shim.")
     parser.add_argument("-p", "--prompt", required=True, help="User prompt to send to Ollama.")
-    parser.add_argument("--model", help="Routing model key from .ollama/routing.toml.")
-    parser.add_argument("--skill", help="Skill or task route key from .ollama/routing.toml.")
+    parser.add_argument("--model", help="Routing model key from .api-harness/ollama/routing.toml.")
+    parser.add_argument("--skill", help="Skill or task route key from .api-harness/ollama/routing.toml.")
+    parser.add_argument("--bridge-document", help="Assigned canonical bridge document.")
+    parser.add_argument("--bridge-version", type=int, help="Exact successor version this task must deliver.")
     parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT, help="Ollama endpoint; default is localhost.")
     parser.add_argument("--max-turns", type=int, default=DEFAULT_MAX_TURNS, help="Maximum tool loop turns.")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS, help="HTTP/guard/subprocess timeout.")
@@ -1549,7 +1335,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         advertised_model_ids = call_ollama_tags(args.endpoint, operation_timeout)
         validate_advertised_models(config, advertised_model_ids)
         model_route = resolve_model(config, args.model, skill=args.skill)
-        system_prompt = build_system_prompt(args.skill, model_route)
+        system_prompt = build_system_prompt(args.skill, project_root)
         text = run_tool_loop(
             args.prompt,
             model_route,
@@ -1557,6 +1343,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             max_turns,
             project_root,
             skill=args.skill,
+            bridge_document=args.bridge_document,
+            bridge_version=args.bridge_version,
             system_prompt=system_prompt,
             timeout=operation_timeout,
             session_timeout=session_timeout,

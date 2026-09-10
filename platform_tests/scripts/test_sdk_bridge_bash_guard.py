@@ -82,13 +82,16 @@ def test_bridge_mutation_shapes_are_denied(command: str) -> None:
 
     assert reason is not None
     assert "Bash bridge artifact mutation denied" in reason
-    assert "guarded Write/Edit" in reason
+    assert "gt bridge deliver" in reason
+    assert "exact next-artifact claim" in reason
 
 
 @pytest.mark.parametrize(
     "command",
     [
         'python scripts/ollama_harness.py -p "review"',
+        'python scripts/alibaba_cloud_studio_harness.py -p "review"',
+        'python scripts/qualification_harness.py -p "review"',
         'groundtruth-kb/.venv/Scripts/python.exe scripts/openrouter_harness.py -p "review"',
         r'& "E:\GT-KB\groundtruth-kb\.venv\Scripts\pythonw.exe" scripts\ollama_harness.py -p "review"',
     ],

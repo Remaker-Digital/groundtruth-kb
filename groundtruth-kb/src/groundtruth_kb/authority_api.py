@@ -21,6 +21,7 @@ from groundtruth_kb.bridge.native import (
     BindSession,
     ClaimRequest,
     DeliverRequest,
+    EffectCheckRequest,
     FenceRequest,
     NativeBridgeService,
     PublishWorkRequest,
@@ -32,6 +33,7 @@ from groundtruth_kb.native_authority import (
     MembershipMove,
     ProjectMutation,
     SpecMutation,
+    TermMutation,
     TestMutation,
     TestPhaseMutation,
     TestPlanMutation,
@@ -39,14 +41,24 @@ from groundtruth_kb.native_authority import (
 )
 from groundtruth_kb.postgres_kernel import PostgresKernelError, canonical_json_bytes, parse_json_bytes
 from groundtruth_kb.project.native_finalization import (
+    CommitCheck,
     CommitConfirmation,
     CommitFailure,
     FinalizationRequest,
     NativeProjectFinalization,
+    ProjectCommit,
 )
 
 Domain = Literal[
-    "specifications", "tests", "projects", "work-items", "test-plans", "test-phases", "project-dependencies"
+    "specifications",
+    "tests",
+    "projects",
+    "work-items",
+    "test-plans",
+    "test-phases",
+    "project-dependencies",
+    "terms",
+    "harnesses",
 ]
 
 
@@ -75,6 +87,11 @@ class CanonicalRoute(APIRoute):
 def _result(value: object) -> Response:
     # Avoid FastAPI's float conversion of arbitrary-precision canonical JSON.
     return CanonicalJSONResponse(value)
+
+
+def _query_fields(request: Request, allowed: set[str]) -> None:
+    if set(request.query_params) - allowed or len(request.query_params.multi_items()) != len(request.query_params):
+        raise PostgresKernelError("invalid_query", "Unknown or repeated query fields are not accepted")
 
 
 def create_authority_app(service: AuthorityService, *, project_root: Path | None = None) -> FastAPI:
@@ -127,6 +144,10 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     def status() -> Response:
         return _result(service.kernel.status())
 
+    @app.get("/v1/registry/path-observations")
+    def registry_path_observations() -> Response:
+        return _result(service.registry_path_observations())
+
     @app.post("/v1/sessions/bind")
     def bind_session(request: BindSession) -> Response:
         return _result(bridge.bind(request))
@@ -135,9 +156,17 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     def session_binding(native_context_id: str) -> Response:
         return _result(bridge.session(native_context_id))
 
+    @app.post("/v1/bridge/check-effects")
+    def bridge_check_effects(request: EffectCheckRequest) -> Response:
+        return _result(bridge.check_effects(request))
+
     @app.get("/v1/bridge/queue")
     def bridge_queue(role: Literal["pb", "lo"]) -> Response:
         return _result(bridge.queue(role))
+
+    @app.get("/v1/bridge/state-report")
+    def bridge_state_report() -> Response:
+        return _result(bridge.state_report())
 
     @app.get("/v1/bridge/{document}/show")
     def bridge_show(document: Identifier, include_content: bool = False) -> Response:
@@ -146,6 +175,10 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     @app.get("/v1/bridge/{document}/artifacts")
     def bridge_artifacts(document: Identifier) -> Response:
         return _result(bridge.artifacts(document))
+
+    @app.get("/v1/bridge/{document}/delivery")
+    def bridge_delivery(document: Identifier, version: Annotated[int, Query(ge=1)], native_context_id: str) -> Response:
+        return _result(bridge.check_delivery(document, version, native_context_id))
 
     @app.post("/v1/bridge/{document}/claim")
     def bridge_claim(document: Identifier, request: ClaimRequest) -> Response:
@@ -175,6 +208,18 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     def bridge_publish_work(document: Identifier, request: PublishWorkRequest) -> Response:
         return _result(bridge.publish_work(document, request))
 
+    @app.get("/v1/authority/resolve")
+    def resolve_authority(
+        request: Request, subject: Annotated[str, Query(min_length=1)], scope: str | None = None
+    ) -> Response:
+        _query_fields(request, {"subject", "scope"})
+        return _result(service.resolve_authority(subject, scope=scope))
+
+    @app.get("/v1/authority/status")
+    def authority_status(request: Request, scope: str | None = None) -> Response:
+        _query_fields(request, {"scope"})
+        return _result(service.authority_status(scope=scope))
+
     @app.get("/v1/{domain}")
     def list_records(
         request: Request,
@@ -195,6 +240,9 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
         dependent_project_id: str | None = None,
         prerequisite_project_id: str | None = None,
         affected_gate: str | None = None,
+        lifecycle_status: str | None = None,
+        authority_level: str | None = None,
+        scope: str | None = None,
     ) -> Response:
         accepted = {
             "after",
@@ -213,9 +261,11 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
             "dependent_project_id",
             "prerequisite_project_id",
             "affected_gate",
+            "lifecycle_status",
+            "authority_level",
+            "scope",
         }
-        if set(request.query_params) - accepted or len(request.query_params.multi_items()) != len(request.query_params):
-            raise PostgresKernelError("invalid_query", "Unknown or repeated query fields are not accepted")
+        _query_fields(request, accepted)
         filters = {
             key: value
             for key, value in {
@@ -232,14 +282,30 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
                 "dependent_project_id": dependent_project_id,
                 "prerequisite_project_id": prerequisite_project_id,
                 "affected_gate": affected_gate,
+                "lifecycle_status": lifecycle_status,
+                "authority_level": authority_level,
+                "scope": scope,
             }.items()
             if value is not None
         }
         return _result(service.list_records(domain, filters=filters, after=after, limit=limit, search=search))
 
+    @app.post("/v1/projects/{project_id}/commit")
+    def commit_project(project_id: Identifier, body: ProjectCommit, request: Request) -> Response:
+        # The native server binds loopback. Use its actual listening port, not
+        # a caller's Host header or a second configured authority endpoint.
+        server = request.scope.get("server")
+        if not server or not isinstance(server[1], int):
+            raise PostgresKernelError("authority_unavailable", "The commit callback endpoint is unavailable")
+        return _result(finalization.commit(project_id, body, authority_url=f"http://127.0.0.1:{server[1]}"))
+
     @app.post("/v1/projects/{project_id}/prepare-commit")
     def prepare_commit(project_id: Identifier, request: FinalizationRequest) -> Response:
         return _result(finalization.prepare(project_id, request))
+
+    @app.post("/v1/projects/{project_id}/check-commit")
+    def check_commit(project_id: Identifier, request: CommitCheck) -> Response:
+        return _result(finalization.check_commit(project_id, request))
 
     @app.post("/v1/projects/{project_id}/confirm-commit")
     def confirm_commit(project_id: Identifier, request: CommitConfirmation) -> Response:
@@ -256,6 +322,10 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     @app.put("/v1/specifications/{record_id}")
     def amend_specification(record_id: Identifier, request: SpecMutation) -> Response:
         return _result(service.amend_specification(record_id, request))
+
+    @app.put("/v1/terms/{record_id}")
+    def amend_term(record_id: Identifier, request: TermMutation) -> Response:
+        return _result(service.amend_term(record_id, request))
 
     @app.put("/v1/tests/{record_id}")
     def amend_test(record_id: Identifier, request: TestMutation) -> Response:

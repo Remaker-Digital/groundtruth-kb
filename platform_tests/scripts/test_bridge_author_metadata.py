@@ -754,22 +754,26 @@ def test_static_headless_harness_slugs_are_synthetic_session_context_ids() -> No
     assert not is_synthetic_session_context_id("2026-06-30T22-35-51Z-prime-builder-A-e54574")
 
 
-def test_headless_harness_env_injects_resolved_session_context() -> None:
+def test_headless_harness_env_distinguishes_native_identity_from_canonical_binding() -> None:
     openrouter_env = orh.set_author_metadata_env(
-        {"GTKB_BRIDGE_POLLER_RUN_ID": "openrouter-dispatch"},
+        {"GTKB_BRIDGE_POLLER_RUN_ID": "openrouter-dispatch", "GTKB_AUTHOR_SESSION_CONTEXT_ID": "parent-binding"},
         "deepseek/fixture-model",
         "fixture-model",
         "https://openrouter.test",
+        native_context_id="openrouter-context",
     )
     ollama_env = oh.set_author_metadata_env(
         {"GTKB_INHERITED_SESSION_ID": "ollama-inherited"},
         "fixture-model:fixture-version",
         "fixture-version",
         "http://ollama.test",
+        native_context_id="ollama-context",
     )
 
-    assert openrouter_env["GTKB_AUTHOR_SESSION_CONTEXT_ID"] == "openrouter-dispatch"
-    assert ollama_env["GTKB_AUTHOR_SESSION_CONTEXT_ID"] == "ollama-inherited"
+    assert openrouter_env["GTKB_NATIVE_CONTEXT_ID"] == "openrouter-context"
+    assert ollama_env["GTKB_NATIVE_CONTEXT_ID"] == "ollama-context"
+    assert "GTKB_AUTHOR_SESSION_CONTEXT_ID" not in openrouter_env
+    assert "GTKB_AUTHOR_SESSION_CONTEXT_ID" not in ollama_env
 
 
 def test_incomplete_sources_fail_closed_not_wrong_stamp(tmp_path: Path) -> None:

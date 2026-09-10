@@ -61,31 +61,3 @@ def test_ready_is_dispatchable_and_both_statuses_resolve_to_a_role() -> None:
     assert disposition.dispatchable_for_status("READY") is True
     assert disposition._action_role_for_status("READY") == disposition.LOYAL_OPPOSITION_ROLE
     assert disposition._action_role_for_status("NOT-READY") == disposition.PRIME_BUILDER_ROLE
-
-
-def test_every_live_thread_reaches_the_queue_its_status_names() -> None:
-    """The integration guard: the owner-visible goal stated as a test.
-
-    Threads suppressed by confirmed git terminality are excluded, because that
-    suppression is a separate and legitimate mechanism. What is asserted is
-    that no thread is missing from its queue for a *vocabulary* reason, which
-    is the failure this work item removed.
-    """
-    from groundtruth_kb.bridge.state_report import build_state_report
-
-    report = build_state_report(PROJECT_ROOT)
-    bridge = report.get("bridge", report)
-    threads = bridge["threads"]
-    lo_actionable = {row["slug"] for row in bridge["lo_actionable"]}
-    prime_actionable = {row["slug"] for row in bridge["prime_actionable"]}
-
-    missing = []
-    for row in threads:
-        if row["suppressed_by_git_terminality"]:
-            continue
-        if row["latest_status"] == "READY" and row["slug"] not in lo_actionable:
-            missing.append(("READY", row["slug"], "lo_actionable"))
-        if row["latest_status"] == "NOT-READY" and row["slug"] not in prime_actionable:
-            missing.append(("NOT-READY", row["slug"], "prime_actionable"))
-
-    assert not missing, f"threads absent from the queue their status names: {missing}"

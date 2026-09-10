@@ -11,10 +11,9 @@ this wrapper. The rebind preserves the SessionStart dispatcher tests'
 shared core. Behavior is identical to the Codex wrapper except ``HARNESS_NAME``
 and ``OUT_DIR``.
 
-The drift gate for the shared primitives lives in
-``scripts/check_codex_hook_parity.py::_resolution_table_parity_errors``, which
-asserts the primitives in the shared core plus per-wrapper delegation +
-intentional-difference guards.
+Current projection conformance uses scripts/check_harness_parity.py against
+the neutral baseline and selected target. This legacy startup wrapper is not
+independent evidence of native execution or session authority.
 """
 
 from __future__ import annotations

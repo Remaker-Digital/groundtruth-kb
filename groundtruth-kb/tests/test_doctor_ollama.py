@@ -1,442 +1,209 @@
-"""Tests for the Ollama harness 4-store consistency doctor check (WI-4323).
-
-Spec-derived tests for ``_check_ollama_harness`` per the Phase-1 Child 3
-proposal (bridge/gtkb-ollama-integration-phase-1-verification-005.md) and
-the GO verdict (bridge/gtkb-ollama-integration-phase-1-verification-006.md).
-
-The check is 4-layer + cross-store consistency:
-
-- L1 — identity store: ``harness-state/harness-identities.json`` has ``ollama → D``.
-- L2 — registry store: ``harness-state/harness-registry.json`` has ``id=D`` with
-  ``harness_name=ollama``, ``harness_type=ollama``, ``status=registered``,
-  ``role=[]``.
-- L3 — capability registry: ``config/agent-control/harness-capability-registry.toml``
-  has ``[harnesses.ollama]`` with the four Phase-1 capability-floor keys.
-- L4 — routing TOML: ``.ollama/routing.toml`` parseable with at least one
-  ``tool_calling_supported=true`` model.
-- Cross-store drift: identities-vs-registry consistency.
-
-Layer 4b (advertised-model verification) is reachability-gated; tests neither
-require nor exercise a live Ollama daemon.
-
-Severity is ``warning`` per the Phase-1 rollout convention.
-
-Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
-All rights reserved.
-Licensed under AGPL-3.0-or-later.
-"""
+"""Provider-local configuration and host diagnostics preserve native authority boundaries."""
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
+import io
+import sys
+import urllib.error
 
 import pytest
 
-from groundtruth_kb.project.doctor import _check_harness_metadata_freshness, _check_ollama_harness
+from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
+from groundtruth_kb.project import doctor
 
 
 @pytest.fixture(autouse=True)
-def _skip_l4b_probe(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Auto-skip the L4b advertised-model probe in unit tests.
+def no_legacy_authority(monkeypatch):
+    def refuse(*args, **kwargs):
+        pytest.fail("Provider diagnostics must not consult SQLite or legacy harness state")
 
-    Without this fixture, the doctor check probes the local
-    ``http://localhost:11434/api/tags`` endpoint when routing models are
-    present in the fixture. If the developer's machine happens to have
-    Ollama running with a different model set, the probe surfaces a
-    spurious advertised-model finding that has nothing to do with the
-    fixture's correctness.
-    """
-    monkeypatch.setenv("GTKB_DOCTOR_OLLAMA_SKIP_PROBE", "1")
-    monkeypatch.setenv("GTKB_DOCTOR_OLLAMA_SKIP_HOST_READINESS", "1")
+    monkeypatch.setattr("sqlite3.connect", refuse)
+    monkeypatch.setattr("groundtruth_kb.harness_projection.read_roles", refuse)
+    monkeypatch.setattr("groundtruth_kb.harness_projection.read_identity", refuse)
+    monkeypatch.delenv("GT_AUTHORITY_URL", raising=False)
+    monkeypatch.delenv("GTKB_DOCTOR_OLLAMA_SKIP_PROBE", raising=False)
+    monkeypatch.delenv("GTKB_DOCTOR_OLLAMA_SKIP_HOST_READINESS", raising=False)
 
 
-def _write_clean_ollama_fixtures(root: Path) -> None:
-    """Create a 4-store fixture set with all stores consistent and clean."""
-    (root / "harness-state").mkdir(parents=True, exist_ok=True)
-    (root / "harness-state" / "harness-identities.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "harnesses": {
-                    "ollama": {
-                        "id": "D",
-                        "assigned_at": "2026-06-05T05:11:00Z",
-                        "assigned_by": "fixture",
-                    }
-                },
-            }
+def routing(root, provider="ollama", content=None):
+    path = root / ".api-harness" / provider / "routing.toml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        content
+        or (
+            'schema_version=1\n[models.fixture]\nmodel_id="model:tag"\n'
+            f'provider="{provider}"\ntool_calling_supported=true\n'
+            'allowed_tools=["Read","Write","Edit","Grep","Glob","Bash"]\n'
+            f'[routing.{provider}]\ndefault_model="fixture"\n'
         ),
         encoding="utf-8",
     )
-    (root / "harness-state" / "harness-registry.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "harnesses": [
-                    {
-                        "id": "D",
-                        "harness_name": "ollama",
-                        "harness_type": "ollama",
-                        "status": "registered",
-                        "role": [],
-                        "event_driven_hooks": False,
-                        "invocation_surfaces": {},
-                        "reviewer_precedence": None,
-                        "version": 1,
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-    (root / "config" / "agent-control").mkdir(parents=True, exist_ok=True)
-    (root / "config" / "agent-control" / "harness-capability-registry.toml").write_text(
-        "[harnesses.ollama]\n"
-        "bridge_compliance_gate_respect = true\n"
-        "root_boundary_respect = true\n"
-        "author_metadata_env_var_setting = true\n"
-        "destructive_gate_delegation = true\n",
-        encoding="utf-8",
-    )
-    (root / ".ollama").mkdir(parents=True, exist_ok=True)
-    (root / ".ollama" / "routing.toml").write_text(
-        "schema_version = 1\n"
-        "\n"
-        "[models.qwen-coder-14b]\n"
-        'model_id = "qwen2.5-coder:14b-instruct-q4_K_M"\n'
-        'model_version = "q4_K_M"\n'
-        "tool_calling_supported = true\n"
-        'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
-        "\n"
-        "[routing]\n"
-        'default_model = "qwen-coder-14b"\n',
-        encoding="utf-8",
-    )
+    return path
 
 
-def _write_cloud_routed_api_harness_fixture(root: Path) -> None:
-    """Create the WI-4700 cloud-backed Ollama API-harness freshness fixture."""
-    (root / ".api-harness").mkdir(parents=True, exist_ok=True)
-    (root / ".api-harness" / "routing.toml").write_text(
-        "schema_version = 1\n"
-        "\n"
-        "[models.kimi-k2-7-code-cloud]\n"
-        'model_id = "kimi-k2.7-code:cloud"\n'
-        'provider = "ollama"\n'
-        "tool_calling_supported = true\n"
-        'allowed_tools = ["Read", "Write"]\n'
-        "\n"
-        "[routing.ollama]\n"
-        'default_model = "kimi-k2-7-code-cloud"\n',
-        encoding="utf-8",
-    )
-    (root / "config" / "dispatcher").mkdir(parents=True, exist_ok=True)
-    (root / "config" / "dispatcher" / "rules.toml").write_text(
-        "schema_version = 1\n"
-        "\n"
-        "[harnesses.D]\n"
-        'description = "Ollama-shim: cloud-routed LO dispatch target '
-        '(current route: kimi-k2-7-code-cloud via cloud API)."\n'
-        "dispatch_cost = 20\n",
-        encoding="utf-8",
-    )
-    (root / "harness-state").mkdir(parents=True, exist_ok=True)
-    (root / "harness-state" / "harness-registry.json").write_text(
-        json.dumps({"schema_version": 1, "harnesses": [{"id": "D", "harness_name": "ollama"}]}),
-        encoding="utf-8",
-    )
-    stale = "### ollama\n\n**Definition:** Locally hosts open-weight models via http://localhost:11434.\n"
-    for rel_path in (
-        ".claude/rules/canonical-terminology.md",
-        ".claude/rules/operating-model.md",
-        "groundtruth-kb/docs/reference/canonical-terminology-detail.md",
-    ):
-        path = root / rel_path
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(stale, encoding="utf-8")
+@pytest.mark.parametrize("provider", ["ollama", "openrouter", "alibaba-cloud-studio"])
+def test_provider_routing_reads_own_projection_and_preserves_foreign_bytes(tmp_path, provider):
+    routing(tmp_path, provider)
+    poisoned = tmp_path / ".api-harness/routing.toml"
+    poisoned.write_bytes(b"unreadable old shared catalog \xff")
+    peer = tmp_path / ".claude/settings.json"
+    peer.parent.mkdir()
+    peer.write_bytes(b"unreadable peer configuration \xff")
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    timestamps = {p: p.stat().st_mtime_ns for p in before}
+    result = doctor._check_provider_routing(tmp_path, provider)
+    assert result.status == "pass", result.message
+    assert "qualification are separate" in result.message
+    assert doctor._check_provider_routing(tmp_path, provider) == result
+    assert {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
+    assert {p: p.stat().st_mtime_ns for p in before} == timestamps
+    assert not (tmp_path / "groundtruth.db").exists()
+    assert not (tmp_path / "harness-state").exists()
 
 
-def test_clean_4_store_returns_pass(tmp_path: Path) -> None:
-    """All four stores present, consistent, and well-formed → PASS."""
-    _write_clean_ollama_fixtures(tmp_path)
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "pass", f"expected pass, got {result.status}: {result.message}"
-    assert "clean" in result.message.lower()
+@pytest.mark.parametrize("provider", ["ollama", "openrouter", "alibaba-cloud-studio"])
+def test_absent_provider_is_inapplicable_but_partial_installation_is_unverified(tmp_path, provider):
+    assert doctor._check_provider_routing(tmp_path, provider).status == "info"
+    (tmp_path / ".api-harness" / provider).mkdir(parents=True)
+    result = doctor._check_provider_routing(tmp_path, provider)
+    assert result.status == "warning" and "missing" in result.message
 
 
-def test_missing_identity_returns_warning(tmp_path: Path) -> None:
-    """L1: missing identities file surfaces as warning."""
-    _write_clean_ollama_fixtures(tmp_path)
-    (tmp_path / "harness-state" / "harness-identities.json").unlink()
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "warning"
-    assert "L1" in result.message
+@pytest.mark.parametrize(
+    "change",
+    [
+        "syntax",
+        "schema",
+        "no_models",
+        "foreign_provider",
+        "missing_id",
+        "no_tools",
+        "unknown_tool",
+        "not_tool_calling",
+        "missing_default",
+        "peer_routing",
+    ],
+)
+def test_invalid_provider_routing_is_not_a_pass(tmp_path, change):
+    path = routing(tmp_path)
+    text = path.read_text()
+    replacements = {
+        "syntax": ("schema_version=1", "[unclosed"),
+        "schema": ("schema_version=1", "schema_version=2"),
+        "no_models": ("[models.fixture]", "[other.fixture]"),
+        "foreign_provider": ('provider="ollama"', 'provider="peer"'),
+        "missing_id": ('model_id="model:tag"', 'model_id=""'),
+        "no_tools": ('allowed_tools=["Read","Write","Edit","Grep","Glob","Bash"]', "allowed_tools=[]"),
+        "unknown_tool": ('"Bash"', '"UnknownTool"'),
+        "not_tool_calling": ("tool_calling_supported=true", "tool_calling_supported=false"),
+        "missing_default": ('default_model="fixture"', 'default_model="missing"'),
+        "peer_routing": ('default_model="fixture"', 'default_model="fixture"\n[routing.peer]\ndefault_model="fixture"'),
+    }
+    path.write_text(text.replace(*replacements[change]), encoding="utf-8")
+    result = doctor._check_provider_routing(tmp_path, "ollama")
+    assert result.status == "fail", result.message
 
 
-def test_identity_wrong_id_returns_warning(tmp_path: Path) -> None:
-    """L1: identities store with wrong id (E instead of D) surfaces as warning."""
-    _write_clean_ollama_fixtures(tmp_path)
-    (tmp_path / "harness-state" / "harness-identities.json").write_text(
-        json.dumps({"schema_version": 1, "harnesses": {"ollama": {"id": "E"}}}),
-        encoding="utf-8",
-    )
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "warning"
-    assert "L1" in result.message
+@pytest.fixture
+def local_host(tmp_path, monkeypatch):
+    routing(tmp_path)
+    (tmp_path / "groundtruth.toml").write_text('[groundtruth]\nauthority_url="http://127.0.0.1:12345"\n')
+    installation = {
+        "id": "ANY-ID",
+        "harness_name": "ollama",
+        "status": "active",
+        "invocation_surfaces": {"headless": {"argv": [sys.executable, "scripts/ollama_harness.py"]}},
+    }
+    calls = []
+
+    def request(self, method, path, **kwargs):
+        calls.append((method, path, kwargs))
+        return {"records": [installation], "next_after": None}
+
+    monkeypatch.setattr(AuthorityClient, "request", request)
+    monkeypatch.setattr(doctor, "_ollama_windows_autostart_finding", lambda: None)
+    monkeypatch.setattr("urllib.request.urlopen", lambda *a, **kw: io.BytesIO(b'{"models":[{"name":"model:tag"}]}'))
+    return tmp_path, installation, calls
 
 
-def test_registry_status_drift_returns_warning(tmp_path: Path) -> None:
-    """L2: registry status drift (active instead of registered) surfaces as warning."""
-    _write_clean_ollama_fixtures(tmp_path)
-    registry = json.loads((tmp_path / "harness-state" / "harness-registry.json").read_text(encoding="utf-8"))
-    registry["harnesses"][0]["status"] = "active"
-    (tmp_path / "harness-state" / "harness-registry.json").write_text(json.dumps(registry), encoding="utf-8")
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "warning"
-    assert "L2" in result.message
-    assert "status" in result.message.lower()
+def test_local_model_and_host_readiness_uses_current_installation_without_fixed_identity(local_host):
+    root, _, calls = local_host
+    result = doctor._check_ollama_harness(root)
+    assert result.status == "pass", result.message
+    assert "actual agent execution is unverified" in result.message
+    assert calls[0][:2] == ("GET", "/v1/harnesses")
+    assert not (root / "groundtruth.db").exists()
 
 
-def test_registry_role_drift_returns_warning(tmp_path: Path) -> None:
-    """L2: registry role drift (non-empty role) surfaces as warning."""
-    _write_clean_ollama_fixtures(tmp_path)
-    registry = json.loads((tmp_path / "harness-state" / "harness-registry.json").read_text(encoding="utf-8"))
-    registry["harnesses"][0]["role"] = ["prime-builder"]
-    (tmp_path / "harness-state" / "harness-registry.json").write_text(json.dumps(registry), encoding="utf-8")
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "warning"
-    assert "L2" in result.message
-    assert "role" in result.message.lower()
+@pytest.mark.parametrize("body", [b'{"models":[]}', b"[]", b'{"models":[null]}', b"not JSON", b"\xff"])
+def test_missing_or_malformed_local_model_inventory_is_unverified(local_host, monkeypatch, body):
+    root, _, _ = local_host
+    monkeypatch.setattr("urllib.request.urlopen", lambda *a, **kw: io.BytesIO(body))
+    result = doctor._check_ollama_harness(root)
+    assert result.status == "warning", result.message
 
 
-def test_capability_missing_section_returns_warning(tmp_path: Path) -> None:
-    """L3: capability registry missing [harnesses.ollama] surfaces as warning."""
-    _write_clean_ollama_fixtures(tmp_path)
-    (tmp_path / "config" / "agent-control" / "harness-capability-registry.toml").write_text(
-        "[harnesses.claude]\nplaceholder = true\n", encoding="utf-8"
-    )
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "warning"
-    assert "L3" in result.message
-
-
-def test_capability_missing_keys_returns_warning(tmp_path: Path) -> None:
-    """L3: [harnesses.ollama] missing one or more floor keys surfaces as warning."""
-    _write_clean_ollama_fixtures(tmp_path)
-    (tmp_path / "config" / "agent-control" / "harness-capability-registry.toml").write_text(
-        "[harnesses.ollama]\nbridge_compliance_gate_respect = true\n",
-        encoding="utf-8",
-    )
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "warning"
-    assert "L3" in result.message
-
-
-def test_routing_missing_returns_warning(tmp_path: Path) -> None:
-    """L4: routing TOML missing surfaces as warning."""
-    _write_clean_ollama_fixtures(tmp_path)
-    (tmp_path / ".ollama" / "routing.toml").unlink()
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "warning"
-    assert "L4" in result.message
-
-
-def test_routing_no_tool_calling_returns_warning(tmp_path: Path) -> None:
-    """L4: routing TOML with no tool_calling_supported=true models surfaces as warning."""
-    _write_clean_ollama_fixtures(tmp_path)
-    (tmp_path / ".ollama" / "routing.toml").write_text(
-        "schema_version = 1\n"
-        "\n"
-        "[models.demo]\n"
-        'model_id = "demo:latest"\n'
-        'model_version = "latest"\n'
-        "tool_calling_supported = false\n"
-        "allowed_tools = []\n"
-        "\n"
-        "[routing]\n"
-        'default_model = "demo"\n',
-        encoding="utf-8",
-    )
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "warning"
-    assert "L4" in result.message
-
-
-def test_cross_store_identity_vs_registry_drift(tmp_path: Path) -> None:
-    """Cross-store: identities has ollama→D but registry missing id=D."""
-    _write_clean_ollama_fixtures(tmp_path)
-    # Drop the registry entry for D
-    (tmp_path / "harness-state" / "harness-registry.json").write_text(
-        json.dumps({"schema_version": 1, "harnesses": []}),
-        encoding="utf-8",
-    )
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "warning"
-    # Either L2 (registry missing id=D) or Cross-store catches it.
-    assert "L2" in result.message or "Cross-store" in result.message
-
-
-def test_capability_unreadable_returns_warning(tmp_path: Path) -> None:
-    """L3: malformed TOML in capability registry surfaces as warning."""
-    _write_clean_ollama_fixtures(tmp_path)
-    (tmp_path / "config" / "agent-control" / "harness-capability-registry.toml").write_text(
-        "this is = = not = valid TOML at all", encoding="utf-8"
-    )
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "warning"
-    assert "L3" in result.message
-
-
-def test_pass_message_mentions_all_four_layers(tmp_path: Path) -> None:
-    """The clean-pass message names the layers covered for diagnostic clarity."""
-    _write_clean_ollama_fixtures(tmp_path)
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "pass"
-    assert "L1" in result.message and "L2" in result.message
-    assert "L3" in result.message and "L4" in result.message
-
-
-def test_cloud_routed_ollama_with_stale_local_narrative_fails(tmp_path: Path) -> None:
-    """WI-4700: cloud-backed Ollama route must not retain localhost/local text."""
-    _write_cloud_routed_api_harness_fixture(tmp_path)
-    result = _check_harness_metadata_freshness(tmp_path)
-    assert result.status == "fail"
-    assert "local/localhost" in result.message
-    assert "kimi-k2.7-code:cloud" in result.message
-
-
-# ── Layer 4b — advertised-model verification (hermetic, GO@-006 Constraint 4) ─
-
-
-class _FakeApiTagsResponse:
-    """Minimal context-manager response object for a mocked ``/api/tags`` GET.
-
-    Mirrors the shape ``urllib.request.urlopen`` returns: a context manager
-    whose ``read()`` returns the JSON body bytes. ``status`` is included for
-    parity with ``http.client.HTTPResponse``; the doctor check does not read
-    it but real responses carry it.
-    """
-
-    def __init__(self, body: bytes) -> None:
-        self._body = body
-        self.status = 200
-
-    def __enter__(self) -> _FakeApiTagsResponse:
-        return self
-
-    def __exit__(self, *exc_info: object) -> bool:
-        return False
-
-    def read(self) -> bytes:
-        return self._body
-
-
-def test_advertised_model_present_via_api_tags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """L4b: when the routing model appears in the mocked ``/api/tags`` response,
-    the check stays at ``pass`` (no L4b finding).
-
-    Hermetic test: monkeypatches ``urllib.request.urlopen`` so no live Ollama
-    daemon is required. The autouse ``_skip_l4b_probe`` fixture is overridden
-    via ``monkeypatch.delenv`` to re-enable the Layer 4b code path.
-    """
-    _write_clean_ollama_fixtures(tmp_path)
-    # Re-enable the L4b probe (override the autouse skip fixture).
-    monkeypatch.delenv("GTKB_DOCTOR_OLLAMA_SKIP_PROBE", raising=False)
-    body = json.dumps({"models": [{"name": "qwen2.5-coder:14b-instruct-q4_K_M"}]}).encode("utf-8")
-
-    def _fake_urlopen(_url: str, timeout: float = 2.0) -> _FakeApiTagsResponse:
-        return _FakeApiTagsResponse(body)
-
-    import urllib.request as _urlreq
-
-    monkeypatch.setattr(_urlreq, "urlopen", _fake_urlopen)
-
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "pass", (
-        f"expected pass with advertised model present; got {result.status}: {result.message}"
-    )
-    assert "L4b" not in result.message, f"unexpected L4b finding when model present: {result.message}"
-
-
-def test_advertised_model_absent_via_api_tags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """L4b: when the routing model is missing from the mocked ``/api/tags``
-    response, the check returns ``warning`` with an L4b finding.
-
-    Hermetic test: the mock advertises only an unrelated model so the routing
-    model is provably absent. The autouse ``_skip_l4b_probe`` fixture is
-    overridden via ``monkeypatch.delenv`` to re-enable the Layer 4b code path.
-    """
-    _write_clean_ollama_fixtures(tmp_path)
-    monkeypatch.delenv("GTKB_DOCTOR_OLLAMA_SKIP_PROBE", raising=False)
-    body = json.dumps({"models": [{"name": "unrelated-model:latest"}]}).encode("utf-8")
-
-    def _fake_urlopen(_url: str, timeout: float = 2.0) -> _FakeApiTagsResponse:
-        return _FakeApiTagsResponse(body)
-
-    import urllib.request as _urlreq
-
-    monkeypatch.setattr(_urlreq, "urlopen", _fake_urlopen)
-
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "warning", (
-        f"expected warning with advertised model absent; got {result.status}: {result.message}"
-    )
-    assert "L4b" in result.message, f"expected L4b finding when routing model absent; got: {result.message}"
-    assert "not advertised" in result.message.lower(), f"expected 'not advertised' diagnostic; got: {result.message}"
-
-
-def test_api_tags_unreachable_returns_warning(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """L4b: unreachable API is an explicit host-readiness warning."""
-    import urllib.error
-    import urllib.request as _urlreq
-
-    _write_clean_ollama_fixtures(tmp_path)
-    monkeypatch.delenv("GTKB_DOCTOR_OLLAMA_SKIP_PROBE", raising=False)
-
-    def _raise_url_error(_url: str, timeout: float = 2.0):  # noqa: ANN202
+def test_unreachable_model_inventory_is_not_silently_skipped(local_host, monkeypatch):
+    def unavailable(*args, **kwargs):
         raise urllib.error.URLError("connection refused")
 
-    monkeypatch.setattr(_urlreq, "urlopen", _raise_url_error)
-
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "warning"
-    assert "L4b" in result.message
-    assert "/api/tags unreachable" in result.message
+    monkeypatch.setattr("urllib.request.urlopen", unavailable)
+    result = doctor._check_ollama_harness(local_host[0])
+    assert result.status == "warning" and "unavailable" in result.message
 
 
-def test_windows_autostart_missing_returns_warning(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """L5: missing Windows task/service is a diagnostic warning."""
-    from groundtruth_kb.project import doctor as doctor_mod
+@pytest.mark.parametrize(
+    "endpoint", ["https://remote.invalid", "http://owner:secret@localhost:11434", "http://localhost:invalid", ""]
+)
+def test_nonlocal_or_invalid_endpoint_never_substitutes_local_host(local_host, monkeypatch, endpoint):
+    root, installation, _ = local_host
+    installation["invocation_surfaces"]["headless"]["argv"] += ["--endpoint", endpoint]
 
-    _write_clean_ollama_fixtures(tmp_path)
-    monkeypatch.delenv("GTKB_DOCTOR_OLLAMA_SKIP_HOST_READINESS", raising=False)
-    monkeypatch.setattr(doctor_mod.sys, "platform", "win32")
-    monkeypatch.setattr(doctor_mod.shutil, "which", lambda _name: "powershell.exe")
+    def refuse(*args, **kwargs):
+        pytest.fail("No request or local autostart probe is allowed for this endpoint")
 
-    captured: dict[str, object] = {}
+    monkeypatch.setattr("urllib.request.urlopen", refuse)
+    monkeypatch.setattr(doctor, "_ollama_windows_autostart_finding", refuse)
+    result = doctor._check_ollama_harness(root)
+    assert result.status in {"fail", "warning"} and "secret" not in result.message
 
-    def _fake_run(args, **kwargs):  # noqa: ANN001, ANN202
-        captured["args"] = args
-        captured["kwargs"] = kwargs
-        return doctor_mod.subprocess.CompletedProcess(
-            args=args,
-            returncode=0,
-            stdout='{"scheduled_tasks":[],"services":[]}',
-            stderr="",
-        )
 
-    monkeypatch.setattr(doctor_mod.subprocess, "run", _fake_run)
+@pytest.mark.parametrize("setting", ["GTKB_DOCTOR_OLLAMA_SKIP_PROBE", "GTKB_DOCTOR_OLLAMA_SKIP_HOST_READINESS"])
+def test_skipped_readiness_probe_cannot_report_pass(local_host, monkeypatch, setting):
+    monkeypatch.setenv(setting, "1")
+    result = doctor._check_ollama_harness(local_host[0])
+    assert result.status == "warning" and "skipped" in result.message.lower()
 
-    result = _check_ollama_harness(tmp_path)
-    assert result.status == "warning"
-    assert "L5" in result.message
-    assert "autostart not detected" in result.message
-    args = captured["args"]
-    kwargs = captured["kwargs"]
-    assert "-NonInteractive" in args
-    assert kwargs["stdin"] == doctor_mod.subprocess.DEVNULL
-    if doctor_mod.os.name == "nt":
-        assert kwargs["creationflags"] == getattr(doctor_mod.subprocess, "CREATE_NO_WINDOW", 0)
-    else:
-        assert "creationflags" not in kwargs
+
+def test_unavailable_canonical_metadata_does_not_use_files_or_open_sqlite(local_host, monkeypatch):
+    def unavailable(*args, **kwargs):
+        raise AuthorityClientError("authority_unavailable", "Service unavailable")
+
+    monkeypatch.setattr(AuthorityClient, "request", unavailable)
+    result = doctor._check_ollama_harness(local_host[0])
+    assert result.status == "warning" and "metadata unavailable" in result.message
+
+
+def test_missing_autostart_is_a_diagnostic_without_starting_services(local_host, monkeypatch):
+    monkeypatch.setattr(doctor, "_ollama_windows_autostart_finding", lambda: "Ollama autostart not detected")
+    result = doctor._check_ollama_harness(local_host[0])
+    assert result.status == "warning" and "autostart not detected" in result.message
+
+
+def test_windows_autostart_probe_is_hidden_read_only_and_noninteractive(monkeypatch):
+    monkeypatch.setattr(doctor.sys, "platform", "win32")
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: "powershell.exe")
+    calls = []
+
+    def run(args, **kwargs):
+        calls.append((args, kwargs))
+        return doctor.subprocess.CompletedProcess(args, 0, '{"scheduled_tasks":[],"services":[]}', "")
+
+    monkeypatch.setattr(doctor.subprocess, "run", run)
+    assert "autostart not detected" in doctor._ollama_windows_autostart_finding()
+    args, kwargs = calls[0]
+    assert "-NonInteractive" in args and kwargs["stdin"] == doctor.subprocess.DEVNULL
+    assert "Get-ScheduledTask" in args[-1] and "Get-Service" in args[-1]
+    assert "Start-" not in args[-1] and "Register-" not in args[-1]
+    if doctor.os.name == "nt":
+        assert kwargs["creationflags"] == doctor.subprocess.CREATE_NO_WINDOW

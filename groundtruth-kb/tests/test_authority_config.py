@@ -1,10 +1,13 @@
 """The native client selects one explicit local service without credential URLs."""
 
+import json
+
 import pytest
 from click.testing import CliRunner
 
 from groundtruth_kb.cli import main
 from groundtruth_kb.config import GTConfig, GTConfigError, validate_authority_url
+from groundtruth_kb.postgres_kernel import PostgresKernel, PostgresKernelError
 
 
 @pytest.mark.parametrize(
@@ -51,7 +54,16 @@ def test_native_help_and_unavailable_commands_do_not_open_sqlite(tmp_path, monke
     assert help_result.exit_code == 0, help_result.output
     assert "service" in help_result.output
     assert "generate-approval-packet" not in help_result.output
+
+    def unavailable(*args, **kwargs):
+        raise PostgresKernelError("postgres_unavailable", "PostgreSQL unavailable for this test")
+
+    def reject_sqlite(*args, **kwargs):
+        pytest.fail("Unavailable PostgreSQL must not open SQLite")
+
+    monkeypatch.setattr(PostgresKernel, "_connect", unavailable)
+    monkeypatch.setattr("sqlite3.connect", reject_sqlite)
     rejected = CliRunner().invoke(main, ["--config", str(config_path), "db", "postgres", "status"])
     assert rejected.exit_code == 1
-    assert "fallback is disabled" in rejected.output
+    assert json.loads(rejected.output)["error"]["code"] == "postgres_unavailable"
     assert not (tmp_path / "absent.db").exists()

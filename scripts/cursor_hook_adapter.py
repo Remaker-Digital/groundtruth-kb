@@ -160,6 +160,10 @@ def _to_claude_pretooluse_inner(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _from_claude_response(payload: dict[str, Any]) -> dict[str, Any]:
+    native = payload.get("hookSpecificOutput")
+    if isinstance(native, dict) and native.get("permissionDecision") in {"deny", "ask"}:
+        reason = native.get("permissionDecisionReason") or "native hook did not allow the effect"
+        return {"permission": "deny", "user_message": reason, "agent_message": reason}
     if payload.get("decision") == "block":
         reason = payload.get("reason") or payload.get("systemMessage") or "blocked by GT-KB hook"
         return {"permission": "deny", "user_message": reason, "agent_message": reason}
@@ -218,6 +222,8 @@ def main() -> int:
             reason = stdout.splitlines()[-1] if stdout.splitlines() else "blocked by GT-KB hook"
             return _deny(reason)
         adapted_out = _from_claude_response(hook_payload if isinstance(hook_payload, dict) else {})
+        if completed.returncode and adapted_out.get("permission") != "deny":
+            return _deny(f"Target hook failed with exit status {completed.returncode}")
         return _emit_cursor(adapted_out)
 
     if completed.returncode == 0:

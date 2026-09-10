@@ -282,7 +282,7 @@ CURRENT_REPO_BRIDGE_OR_GOVERNANCE_FILES = {
     "CLAUDE.md",
     "groundtruth.db",
     "groundtruth.toml",
-    "scripts/check_codex_hook_parity.py",
+    "scripts/check_harness_parity.py",
     "scripts/session_self_initialization.py",
     "scripts/workstream_focus.py",
 }
@@ -676,22 +676,6 @@ def _next_toggled_role(current_role: str) -> str:
     return ROLE_PRIME_BUILDER if current_role == ROLE_LOYAL_OPPOSITION else ROLE_LOYAL_OPPOSITION
 
 
-def _role_change_parity_message(role: str, project_root: Path | None = None) -> str:
-    root = (project_root or _project_root_from_env()).resolve()
-    harness_name = _resolved_harness_name()
-    harness_scope = _normalize_harness_name_from_roles(harness_name) or "all"
-    if harness_scope not in {"claude", "codex"}:
-        harness_scope = "all"
-    try:
-        from scripts.check_harness_parity import check_harness_parity  # noqa: PLC0415
-
-        report = check_harness_parity(root, harness=harness_scope, role=role)
-    except Exception as exc:  # noqa: BLE001 - role command must still complete with visible diagnostic
-        return f" Harness parity check unavailable: {exc}."
-    counts = ", ".join(f"{key}={value}" for key, value in sorted(report.counts.items())) or "no counts"
-    return f" Harness parity after role change: {report.overall_status} ({counts})."
-
-
 def set_next_session_role(role: str, project_root: Path | None = None) -> str:
     if role not in {ROLE_PRIME_BUILDER, ROLE_LOYAL_OPPOSITION}:
         raise ValueError(f"Unsupported next-session role: {role}")
@@ -721,7 +705,6 @@ def handle_role_command(prompt: str, project_root: Path | None = None) -> dict[s
             f"Next fresh-session operating mode set to {_role_label(next_role)}. "
             f"This updates `{role_path_display}` for harness `{_resolved_harness_id(project_root) or 'unidentified'}`; "
             "the current session role is unchanged."
-            f"{_role_change_parity_message(next_role, project_root)}"
         )
     }
 

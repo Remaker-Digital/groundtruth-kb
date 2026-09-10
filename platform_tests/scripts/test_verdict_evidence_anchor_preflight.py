@@ -1,29 +1,8 @@
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Tests for the WI-4520 verdict-evidence-anchor preflight.
+"""Read-only citation diagnostics and their baseline hook adapter.
 
-Covers the spec-derived verification plan of
-bridge/gtkb-antigravity-lo-hallucination-prevention-005.md, as implemented under
-the operative-file-scoped, false-positive-hardened design documented in the
-post-implementation report (0 false positives across the real verdict corpus):
-
-Unit (reusable module):
-  1. Valid NO-GO citing a real operative line + real quoted string passes.
-  2. Missing operative file fails.
-  3. Cited operative line out of range fails.
-  4. Hallucinated quoted string (WI-4520 shape: in-range line, absent quote) fails.
-  5. Operative path-form normalization (Windows/Unix) resolves to the same file.
-  6. [inference] / [no exact anchor] / absence-keyword / [absent] lines skip.
-  7. Multi-line explicit range within bounds passes; out of bounds fails.
-  Plus operative-scoping invariants: non-operative citations are not checked, a
-  bare "line N" without a quote never drives a range check, no operative header
-  means no check, and quotes attributed to a named source (not adjacent to a
-  bare operative line) are not flagged.
-
-Integration -- governed verdict-writing paths:
-  8. scripts.gtkb_bridge_writer.write_bridge_file raises a BridgeError subclass
-     on a fabricated anchor and writes on a valid one (helper-routed chokepoint).
-  9. The bridge-compliance-gate hook emits a deny reason on a fabricated anchor
-     and passes a valid one (proposal-review Write-tool chokepoint).
+Raw file publication and header-repair assertions are retired. Native delivery
+validates current claim, scope and author provenance independently.
 """
 
 from __future__ import annotations
@@ -31,9 +10,6 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-import pytest
-
-from scripts.gtkb_bridge_writer import BridgeError, BridgeEvidenceAnchorError, write_bridge_file
 from scripts.verdict_evidence_anchor_preflight import (
     build_packet,
     validate_verdict_evidence_anchors,
@@ -41,7 +17,7 @@ from scripts.verdict_evidence_anchor_preflight import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-HOOK_PATH = PROJECT_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
+HOOK_PATH = PROJECT_ROOT / ".harness-baseline-configuration" / "hooks" / "bridge-compliance-gate.py"
 
 
 def _write_op(tmp_path: Path, rel: str, lines: list[str]) -> None:
@@ -215,84 +191,6 @@ def test_build_packet_reports_violations(tmp_path: Path) -> None:
 # --- Item 8: write_bridge_file integration (helper-routed chokepoint) --------
 
 
-def test_write_bridge_file_blocks_fabricated_nogo(tmp_path: Path) -> None:
-    _write_op(tmp_path, "bridge/foo-001.md", ["NEW", "", "## Implementation Plan", "tail"])
-    bad = _verdict("F1: bad citation at `bridge/foo-001.md:99`.")
-    with pytest.raises(BridgeEvidenceAnchorError):
-        write_bridge_file("nogo-thread", 2, bad, tmp_path, require_author_metadata=False)
-    assert not (tmp_path / "bridge" / "nogo-thread-002.md").exists()
-
-
-def test_write_bridge_file_error_is_bridge_error_subclass() -> None:
-    assert issubclass(BridgeEvidenceAnchorError, BridgeError)
-
-
-def test_write_bridge_file_allows_valid_nogo(tmp_path: Path) -> None:
-    _mark_project_root(tmp_path)
-    _write_op(
-        tmp_path,
-        "bridge/nogo-thread-001.md",
-        [
-            "NEW",
-            "author_identity: prime-builder/test",
-            "author_harness_id: T",
-            "author_session_context_id: fixture-prime-session",
-            "author_model: fixture-model",
-            "author_model_version: fixture-model-version",
-            "author_model_configuration: fixture-prime-configuration",
-            "",
-            "## Implementation Plan",
-            "real anchored text",
-        ],
-    )
-    good = _verdict(
-        "author_identity: loyal-opposition/test\n"
-        "author_harness_id: T\n"
-        "author_session_context_id: fixture-lo-session\n"
-        "author_model: fixture-model\n"
-        "author_model_version: fixture-model-version\n"
-        "author_model_configuration: fixture-lo-configuration\n"
-        "bridge_kind: lo_verdict\n"
-        "\n"
-        'F1: line 10 reads "real anchored text"; `bridge/nogo-thread-001.md:10` is in range.',
-        reviewed="bridge/nogo-thread-001.md",
-    )
-    path = write_bridge_file("nogo-thread", 2, good, tmp_path, require_author_metadata=False)
-    assert path.exists()
-
-
-def test_write_bridge_file_allows_non_verdict(tmp_path: Path) -> None:
-    # A NEW proposal is not a gated verdict; a forward citation to a proposed
-    # (not-yet-created) file:line must not be blocked.
-    _mark_project_root(tmp_path)
-    proposal = (
-        "NEW\n"
-        "author_identity: prime-builder/test\n"
-        "author_harness_id: T\n"
-        "author_session_context_id: fixture-prime-session\n"
-        "author_model: fixture-model\n"
-        "author_model_version: fixture-model-version\n"
-        "author_model_configuration: fixture-prime-configuration\n"
-        "bridge_kind: prime_proposal\n"
-        "Project Authorization: PAUTH-PROJECT-TEST-FIXTURE\n"
-        "Project: PROJECT-TEST-FIXTURE\n"
-        "Work Item: WI-0001\n"
-        'target_paths: ["scripts/new_module.py"]\n'
-        "\n"
-        "## Requirement Sufficiency\n"
-        "\n"
-        "Existing requirements are sufficient.\n"
-        "\n"
-        "## Specification Links\n"
-        "\n"
-        "- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`\n"
-        "\n"
-        "Will create `scripts/new_module.py:10`.\n"
-    )
-    path = write_bridge_file("propthing", 1, proposal, tmp_path, require_author_metadata=False)
-    assert path.exists()
-
-
 # --- Item 9: bridge-compliance-gate hook integration (Write-tool chokepoint) -
 
 
@@ -318,44 +216,6 @@ def test_hook_allows_valid_nogo(tmp_path: Path) -> None:
     hook = _load_hook()
     good = _verdict("F1: `bridge/foo-001.md:4` is in range.")
     assert hook._verdict_evidence_anchor_deny_reason(good, tmp_path) is None
-
-
-def test_hook_deny_reason_for_content_blocks_fabricated_nogo(tmp_path: Path) -> None:
-    _mark_project_root(tmp_path)
-    _write_op(
-        tmp_path,
-        "bridge/foo-001.md",
-        [
-            "NEW",
-            "author_identity: prime-builder/test",
-            "author_harness_id: T",
-            "author_session_context_id: test-prime-session",
-            "",
-            "## Implementation Plan",
-            "tail",
-        ],
-    )
-    hook = _load_hook()
-    bad = (
-        "NO-GO\n"
-        "::init gtkb pb\n"
-        "::open test\n"
-        "author_identity: loyal-opposition/test\n"
-        "author_harness_id: T\n"
-        "author_session_context_id: test-lo-session\n"
-        "bridge_kind: lo_verdict\n"
-        "Responds to: bridge/foo-001.md\n"
-        "\n"
-        "F1: fabricated citation at `bridge/foo-001.md:99`.\n"
-    )
-    reason = hook._deny_reason_for_content(
-        cwd_path=tmp_path,
-        file_path="bridge/foo-002.md",
-        content=bad,
-        run_pending_preflight=False,
-    )
-    assert reason is not None
-    assert "evidence anchors" in reason
 
 
 # --- WI-5437: unsupported exact-path removal claims ------------------------

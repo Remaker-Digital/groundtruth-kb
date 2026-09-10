@@ -45,7 +45,7 @@ LOYAL_OPPOSITION_BRIDGE_SKILLS = base.LOYAL_OPPOSITION_BRIDGE_SKILLS
 CANONICAL_TOOLS = base.CANONICAL_TOOLS
 
 DEFAULT_ENDPOINT = "https://dashscope.aliyuncs.com/apps/anthropic"
-ROUTING_CONFIG_PATH = Path(".api-harness") / "routing.toml"
+ROUTING_CONFIG_PATH = Path(".api-harness") / "alibaba-cloud-studio" / "routing.toml"
 AUTHOR_IDENTITY = "Alibaba Cloud Studio H"
 AUTHOR_HARNESS_ID = "H"
 API_KEY_ENV = "ALIBABA_API_KEY"
@@ -63,15 +63,7 @@ _ALIBABA_PROFILE = base.AdopterProfile(
     dialect=base.DIALECT_ANTHROPIC_MESSAGES,
     hook_tier=base.HOOK_TIER_NATIVE_FULL,
     auth_style=base.AUTH_STYLE_AUTHORIZATION_BEARER,
-    publish_bridge_verdict_tool=True,
-    force_anthropic_publisher_tool_choice=True,
-    disable_anthropic_publisher_recovery_thinking=True,
 )
-
-
-def resolve_alibaba_cloud_studio_session_id(environ: Mapping[str, str] | None = None) -> str:
-    """Resolve the bridge work-intent session id used by guarded tools."""
-    return base.resolve_harness_session_id(environ)
 
 
 def load_routing_config(project_root: Path) -> RoutingConfig:
@@ -109,8 +101,18 @@ def set_author_metadata_env(
     model_version: str,
     endpoint: str = DEFAULT_ENDPOINT,
     model_configuration: str | None = None,
+    *,
+    native_context_id: str,
 ) -> dict[str, str]:
-    return base.set_author_metadata_env(env, model_id, model_version, _ALIBABA_PROFILE, endpoint, model_configuration)
+    return base.set_author_metadata_env(
+        env,
+        model_id,
+        model_version,
+        _ALIBABA_PROFILE,
+        endpoint,
+        model_configuration,
+        native_context_id=native_context_id,
+    )
 
 
 def run_alibaba_native_hook(
@@ -167,6 +169,8 @@ def run_tool_loop(
     project_root: Path,
     *,
     skill: str | None = None,
+    bridge_document: str | None = None,
+    bridge_version: int | None = None,
     system_prompt: str | None = None,
     chat_func: ChatFunc | None = None,
     guard_runner: GuardRunner | None = None,
@@ -184,6 +188,8 @@ def run_tool_loop(
         project_root,
         _ALIBABA_PROFILE,
         skill=skill,
+        bridge_document=bridge_document,
+        bridge_version=bridge_version,
         system_prompt=system_prompt,
         chat_func=chat_func or call_alibaba_cloud_studio_chat,
         guard_runner=guard_runner,
@@ -194,40 +200,35 @@ def run_tool_loop(
     )
 
 
-def build_system_prompt(skill: str | None, model_route: ModelRoute) -> str | None:
-    """Supply the bridge guardrails needed for dispatched Loyal Opposition work."""
+def build_system_prompt(skill: str | None, project_root: Path) -> str | None:
+    """Load current neutral bridge instructions without assigning a runtime role."""
     if skill not in LOYAL_OPPOSITION_BRIDGE_SKILLS:
         return None
-    session_id = resolve_alibaba_cloud_studio_session_id(os.environ) or "<dispatch-session-id-required>"
-    tools = ", ".join(model_route.allowed_tools)
-    return (
-        "You are Alibaba Cloud Studio harness H operating as Loyal Opposition for GT-KB. "
-        "Use the versioned bridge-file chain as authoritative and acquire the required "
-        "bridge work-intent claim before any bridge verdict write. "
-        "Publish every GO, NO-GO, or VERIFIED only with PublishBridgeVerdict; never use Write, Edit, "
-        "or Bash for a numbered bridge artifact. The verdict tool computes path/version and VERIFIED "
-        "requires include_paths plus commit_message (and hunk_patch_paths when reviewed shared-file "
-        "hunks must be isolated). Preserve every guard decision exactly. "
-        f"Bridge author metadata: identity={AUTHOR_IDENTITY}; harness_id={AUTHOR_HARNESS_ID}; "
-        f"session_id={session_id}; model={model_route.model_id}; allowed_tools={tools}."
-    )
-
-
-def configure_lo_readonly_environment(skill: str | None) -> None:
-    """Configure full hooks for H's non-interactive bridge-review worker."""
-    if skill in LOYAL_OPPOSITION_BRIDGE_SKILLS:
-        os.environ["LOYAL_OPPOSITION_READONLY"] = "1"
-        os.environ["GTKB_NO_AXIS_2_SURFACE"] = "1"
-        os.environ["GTKB_NO_PROJECT_COMPLETION_SURFACE"] = "1"
+    selected = "gtkb-proposal-review" if skill == "bridge-review" else "gtkb-verify"
+    sources = [
+        project_root / ".harness-baseline-configuration" / "skills" / name / "SKILL.md"
+        for name in ("gtkb-bridge", selected)
+    ]
+    try:
+        instructions = [path.read_text(encoding="utf-8") for path in sources]
+    except (OSError, UnicodeError) as exc:
+        raise AlibabaCloudStudioHarnessError("Current canonical bridge skill instructions are unavailable") from exc
+    if any(not text.strip() for text in instructions):
+        raise AlibabaCloudStudioHarnessError(
+            "Current canonical bridge skill instructions are unavailable: empty source"
+        )
+    return "\n\n".join(instructions)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the GT-KB Alibaba Cloud Studio H harness.")
     parser.add_argument("-p", "--prompt", required=True, help="User prompt to send to Alibaba Cloud Studio.")
     parser.add_argument(
-        "--model", default=DEFAULT_MODEL_ROUTE, help="Routing model key from .api-harness/routing.toml."
+        "--model",
+        default=DEFAULT_MODEL_ROUTE,
+        help="Routing model key from .api-harness/alibaba-cloud-studio/routing.toml.",
     )
-    parser.add_argument("--skill", help="Skill or task route key from .api-harness/routing.toml.")
+    parser.add_argument("--skill", help="Skill or task route key from .api-harness/alibaba-cloud-studio/routing.toml.")
     parser.add_argument("--max-turns", type=int, default=DEFAULT_MAX_TURNS, help="Maximum tool loop turns.")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS, help="HTTP/guard/subprocess timeout.")
     parser.add_argument(
@@ -236,6 +237,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=DEFAULT_SESSION_TIMEOUT_SECONDS,
         help="Maximum wall-clock seconds for the whole harness tool loop.",
     )
+    parser.add_argument("--bridge-document", help="Assigned canonical bridge document.")
+    parser.add_argument("--bridge-version", type=int, help="Exact successor version this task must deliver.")
     return parser
 
 
@@ -257,7 +260,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         _load_env_local()
     except ImportError:
         pass
-    configure_lo_readonly_environment(args.skill)
 
     api_key = os.environ.get(API_KEY_ENV)
     if not api_key:
@@ -286,7 +288,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             max_turns,
             project_root,
             skill=args.skill,
-            system_prompt=build_system_prompt(args.skill, model_route),
+            bridge_document=args.bridge_document,
+            bridge_version=args.bridge_version,
+            system_prompt=build_system_prompt(args.skill, project_root),
             timeout=operation_timeout,
             session_timeout=session_timeout,
         )

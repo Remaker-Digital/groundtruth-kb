@@ -1,33 +1,15 @@
-"""Bridge status resolution is independent of artifact-head line order (WI-7672).
-
-``file-bridge-protocol.md`` section "Complete authored heads are order-independent
-at the writer" (WI-6538) states that a head carrying a canonical status token, one
-``::init gtkb`` line and one ``::open`` line within the first three non-blank lines
-is COMPLETE and correct in **any** order.
-
-``proposal_filing`` previously resolved status by taking the first non-blank line,
-so a head in the order-independent form reported ``'::init gtkb pb'`` as its status
-and a live ``GO`` was invisible. WI-6541 had already repaired this exact defect in
-``bridge/read_commands.py`` and did not reach this reader.
-
-The repair reuses ``bridge.versioned_files.status_from_bridge_file``, the canonical
-reader already used by ``read_commands``, ``versioned_files`` and
-``git_lifecycle.service``.
-
-Authority: ``GOV-FILE-BRIDGE-AUTHORITY-001``;
-``DCL-BRIDGE-ENVELOPE-LINE-AUTHORING-PLACEMENT-001``;
-``ADR-BRIDGE-ARTIFACT-HEAD-ENVELOPE-001``; ``GOV-SOT-SINGLETON-001``.
-Bridge thread ``gtkb-wi7672-bridge-status-reader-head-order``.
-"""
+"""Current authored heads and grandfathered file reads preserve status order independence."""
 
 from __future__ import annotations
 
-import inspect
+from itertools import permutations
 from pathlib import Path
 
 import pytest
-from groundtruth_kb.bridge import proposal_filing
+from groundtruth_kb.bridge.native import parse_authored_message
 from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
+
+from platform_tests.groundtruth_kb.test_native_bridge import authored
 
 MARKER_INIT = "::init gtkb lo"
 MARKER_OPEN = "::open build"
@@ -76,31 +58,12 @@ def test_line_one_heads_are_unaffected(tmp_path: Path) -> None:
         assert status_from_bridge_file(path) == token
 
 
-def test_proposal_filing_holds_no_independent_status_read() -> None:
-    """GOV-SOT-SINGLETON-001: one canonical implementation, not two.
-
-    The defect was a private first-non-blank-line expression. Assert the module
-    delegates to the canonical reader instead of re-deriving status itself.
-    """
-    source = inspect.getsource(proposal_filing)
-    assert "status_from_bridge_file" in source, "module no longer delegates to the canonical reader"
-    assert 'if line.strip()), ""' not in source, (
-        "a first-non-blank-line status expression is present again; bridge status must be "
-        "read via status_from_bridge_file so head order does not change the answer"
-    )
-
-
-def test_canonical_reader_agrees_with_proposal_filing_on_a_real_thread() -> None:
-    """End-to-end: the reader and the consumer report the same status.
-
-    Uses the live repository rather than a fixture so the assertion covers the
-    actual call path that refused a GO'd PostgreSQL thread.
-    """
-    repo_root = Path(__file__).resolve().parents[2]
-    slug = "gtkb-wi7672-bridge-status-reader-head-order"
-    latest = sorted((repo_root / "bridge").glob(f"{slug}-[0-9]*.md"))
-    if not latest:
-        pytest.skip(f"no numbered files for {slug} in this checkout")
-    direct = status_from_bridge_file(latest[-1])
-    via_consumer = proposal_filing._bridge_invalidation_inputs(repo_root, slug)["latest_bridge_status"]
-    assert via_consumer == direct, f"consumer {via_consumer!r} disagrees with canonical reader {direct!r}"
+@pytest.mark.parametrize("status", ["NEW", "REVISED", "GO", "NO-GO", "READY", "NOT-READY", "VERDICT-REJECTED"])
+def test_native_complete_heads_are_order_independent(status):
+    content = authored({"session_context_id": "context-for-header-validation"}, "order-independent", 1, status)
+    lines = content.splitlines()
+    for head in permutations(lines[:3]):
+        reordered = "\r\n".join([*head, *lines[3:]])
+        result = parse_authored_message(reordered)
+        assert result["status"] == status
+        assert result["metadata"]["document"] == "order-independent"

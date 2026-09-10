@@ -47,7 +47,6 @@ resolve_runtime_limits = base.resolve_runtime_limits
 resolve_project_root = base.resolve_project_root
 ensure_utf8_output_streams = base.ensure_utf8_output_streams
 build_tool_schemas = base.build_tool_schemas
-_content_status_token = base._content_status_token
 _relative_path = base._relative_path
 _relative_path_or_none = base._relative_path_or_none
 _iter_text_files = base._iter_text_files
@@ -71,14 +70,15 @@ SKIPPED_SCAN_DIR_NAMES = base.SKIPPED_SCAN_DIR_NAMES
 LOYAL_OPPOSITION_BRIDGE_SKILLS = base.LOYAL_OPPOSITION_BRIDGE_SKILLS
 CANONICAL_TOOLS = base.CANONICAL_TOOLS
 MUTATING_TOOLS = base.MUTATING_TOOLS
-BRIDGE_WRITE_GUARDS = base.BRIDGE_WRITE_GUARDS
-BRIDGE_EDIT_GUARDS = base.BRIDGE_EDIT_GUARDS
-WRITE_EDIT_GUARDS = base.WRITE_EDIT_GUARDS
-BASH_GUARDS = base.BASH_GUARDS
+ROUTING_CONFIG_PATH = Path(".api-harness") / "openrouter" / "routing.toml"
+
+BRIDGE_WRITE_GUARDS = base.projected_guard_paths(base.BRIDGE_WRITE_GUARDS, ROUTING_CONFIG_PATH)
+BRIDGE_EDIT_GUARDS = base.projected_guard_paths(base.BRIDGE_EDIT_GUARDS, ROUTING_CONFIG_PATH)
+WRITE_EDIT_GUARDS = base.projected_guard_paths(base.WRITE_EDIT_GUARDS, ROUTING_CONFIG_PATH)
+BASH_GUARDS = base.projected_guard_paths(base.BASH_GUARDS, ROUTING_CONFIG_PATH)
 
 # --- OpenRouter adopter specifics (the varying axes) ---
 DEFAULT_ENDPOINT = "https://openrouter.ai/api/v1"
-ROUTING_CONFIG_PATH = Path(".api-harness") / "routing.toml"
 AUTHOR_IDENTITY = "OpenRouter F"
 AUTHOR_HARNESS_ID = "F"
 _OPENROUTER_HEADERS = {
@@ -95,15 +95,9 @@ _OPENROUTER_PROFILE = base.AdopterProfile(
     provider_routing_key="openrouter",
     routing_config_path=ROUTING_CONFIG_PATH,
     dialect=base.DIALECT_OPENAI_CHAT,
-    hook_tier=base.HOOK_TIER_GUARD_ADAPTER_FLOOR,
-    publish_bridge_verdict_tool=True,
+    hook_tier=base.HOOK_TIER_NATIVE_FULL,
     extra_headers=_OPENROUTER_HEADERS,
 )
-
-
-def resolve_openrouter_session_id(environ: Mapping[str, str] | None = None) -> str:
-    """Resolve the bridge work-intent session id used by guarded OpenRouter tools."""
-    return base.resolve_harness_session_id(environ)
 
 
 def load_routing_config(project_root: Path) -> RoutingConfig:
@@ -125,23 +119,22 @@ def set_author_metadata_env(
     model_version: str,
     endpoint: str = DEFAULT_ENDPOINT,
     model_configuration: str | None = None,
+    *,
+    native_context_id: str,
 ) -> dict[str, str]:
     return base.set_author_metadata_env(
-        env, model_id, model_version, _OPENROUTER_PROFILE, endpoint, model_configuration
+        env,
+        model_id,
+        model_version,
+        _OPENROUTER_PROFILE,
+        endpoint,
+        model_configuration,
+        native_context_id=native_context_id,
     )
 
 
 def _metadata_from_response(metadata: ModelMetadata, response: Mapping[str, Any]) -> ModelMetadata:  # noqa: F811
     return base.metadata_from_response(metadata, response, _OPENROUTER_PROFILE)
-
-
-def _normalize_bridge_author_model_metadata(
-    content: str,
-    model_metadata: ModelMetadata,
-    project_root: Path,
-    path: Path,
-) -> str:
-    return base.normalize_bridge_author_model_metadata(content, model_metadata, project_root, path, _OPENROUTER_PROFILE)
 
 
 def invoke_guard_adapter(
@@ -202,9 +195,12 @@ def run_tool_loop(
     project_root: Path,
     *,
     skill: str | None = None,
+    bridge_document: str | None = None,
+    bridge_version: int | None = None,
     system_prompt: str | None = None,
     chat_func: ChatFunc | None = None,
     guard_runner: GuardRunner | None = None,
+    native_hook_runner: base.NativeHookRunner | None = None,
     command_runner: CommandRunner | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     session_timeout: float = DEFAULT_SESSION_TIMEOUT_SECONDS,
@@ -219,9 +215,12 @@ def run_tool_loop(
         project_root,
         _OPENROUTER_PROFILE,
         skill=skill,
+        bridge_document=bridge_document,
+        bridge_version=bridge_version,
         system_prompt=system_prompt,
         chat_func=chat_func or call_openrouter_chat,
         guard_runner=guard_runner,
+        native_hook_runner=native_hook_runner,
         command_runner=command_runner,
         timeout=timeout,
         session_timeout=session_timeout,
@@ -229,75 +228,29 @@ def run_tool_loop(
     )
 
 
-def build_system_prompt(skill: str | None, model_route: ModelRoute) -> str | None:
-    """Return role context for OpenRouter skill routes that need GT-KB bridge behavior."""
+def build_system_prompt(skill: str | None, project_root: Path) -> str | None:
+    """Load current neutral bridge instructions without assigning a runtime role."""
     if skill not in LOYAL_OPPOSITION_BRIDGE_SKILLS:
         return None
-    allowed_tools = ", ".join(model_route.allowed_tools)
-    session_id = resolve_openrouter_session_id(os.environ) or "<dispatch-session-id-required>"
-    return f"""You are OpenRouter harness F operating as Loyal Opposition for GT-KB.
-
-Before publishing any bridge verdict, you MUST acquire the work-intent claim:
-python scripts\\bridge_claim_cli.py claim <document-slug>. If the claim command
-reports an existing holder, treat that JSON output as claim evidence. Do not
-invoke PublishBridgeVerdict until the claim succeeds.
-
-Publish numbered GO, NO-GO, and VERIFIED artifacts only through
-PublishBridgeVerdict. Supply the document slug, verdict, and complete reviewed
-body; VERIFIED additionally requires include_paths and commit_message, with
-hunk_patch_paths only when reviewed hunk isolation is needed. The governed
-publisher computes the next path/version and performs atomic VERIFIED
-finalization. Never use raw Write, Edit, or Bash for a numbered bridge verdict.
-
-Use the GT-KB file bridge as the authoritative workflow surface. Read the full
-versioned bridge-file chain for the target document before acting, and use
-gt bridge dispatch config, gt bridge dispatch status, and gt bridge dispatch
-health for dispatcher topology and readiness. Respond to latest NEW, REVISED,
-or NO-ACTION bridge entries by publishing the next numbered bridge verdict file
-through PublishBridgeVerdict. A NO-ACTION entry requires a corrected,
-governance-compliant verdict through review_no_action. Do not encode an
-exclusive corrected-verdict status set. Do not stop with prose when a bridge verdict is
-required.
-Your role for this context is established by the `::init gtkb <pb|lo>` line in the header
-of the dispatchable bridge item you were dispatched to process, and it is immutable for
-this context.
-
-For proposal reviews, write GO or NO-GO. For post-implementation reports, write VERIFIED or
-NO-GO. Run preflight checks and include their raw output in the verdict as advisory context for the Prime Builder. A nonzero preflight exit is a note to attach to the verdict body, not a rejection criterion. Your verdict (GO / NO-GO / VERIFIED) evaluates the substantive quality of the proposal or implementation report being reviewed — not whether every applicable cross-cutting spec appears in the linked specs list.
-
-For a positive post-implementation VERIFIED verdict, provide the reviewed body,
-exact verified include_paths, and commit_message to PublishBridgeVerdict. If you
-cannot identify the verified path set or publication cannot commit atomically,
-fail closed and publish/report blocker evidence instead of leaving a terminal
-VERIFIED file without its commit.
-
-Run the preflight checks with Bash:
-python scripts\\bridge_applicability_preflight.py --bridge-id <document-slug>
-python scripts\\adr_dcl_clause_preflight.py --bridge-id <document-slug>
-
-Do not use Bash to create, edit, overwrite, remove, or index bridge/*.md files
-or the retired bridge index. The harness hard-denies shell bridge mutations;
-use guarded Write/Edit dispatch or the deterministic bridge writer/helper path
-for bridge artifacts. Treat any helper that requires the retired bridge index
-as defective and report that defect instead of following stale instructions.
-
-Bridge verdict author metadata to include:
-author_identity: OpenRouter Loyal Opposition
-author_harness_id: F
-author_session_context_id: {session_id}
-author_model: {model_route.model_id}
-author_model_version: {model_route.model_version}
-author_model_configuration: OpenRouter harness shim; route {model_route.key}; skill {skill}; guarded tools {allowed_tools}
-
-Stay within E:\\GT-KB. Preserve guard decisions exactly; if a guarded tool is denied, report the
-denial and do not invent a successful bridge action."""
+    selected = "gtkb-proposal-review" if skill == "bridge-review" else "gtkb-verify"
+    sources = [
+        project_root / ".harness-baseline-configuration" / "skills" / name / "SKILL.md"
+        for name in ("gtkb-bridge", selected)
+    ]
+    try:
+        instructions = [path.read_text(encoding="utf-8") for path in sources]
+    except (OSError, UnicodeError) as exc:
+        raise OpenRouterHarnessError("Current canonical bridge skill instructions are unavailable") from exc
+    if any(not text.strip() for text in instructions):
+        raise OpenRouterHarnessError("Current canonical bridge skill instructions are unavailable: empty source")
+    return "\n\n".join(instructions)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the GT-KB OpenRouter harness shim.")
     parser.add_argument("-p", "--prompt", required=True, help="User prompt to send to OpenRouter.")
-    parser.add_argument("--model", help="Routing model key from .api-harness/routing.toml.")
-    parser.add_argument("--skill", help="Skill or task route key from .api-harness/routing.toml.")
+    parser.add_argument("--model", help="Routing model key from .api-harness/openrouter/routing.toml.")
+    parser.add_argument("--skill", help="Skill or task route key from .api-harness/openrouter/routing.toml.")
     parser.add_argument(
         "--endpoint", default=DEFAULT_ENDPOINT, help="OpenRouter endpoint; default is https://openrouter.ai/api/v1."
     )
@@ -309,6 +262,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=DEFAULT_SESSION_TIMEOUT_SECONDS,
         help="Maximum wall-clock seconds for the whole harness tool loop.",
     )
+    parser.add_argument("--bridge-document", help="Assigned canonical bridge document.")
+    parser.add_argument("--bridge-version", type=int, help="Exact successor version this task must deliver.")
     return parser
 
 
@@ -346,7 +301,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             cli_session_timeout=args.session_timeout,
             cli_max_turns=args.max_turns,
         )
-        system_prompt = build_system_prompt(args.skill, model_route)
+        system_prompt = build_system_prompt(args.skill, project_root)
         text = run_tool_loop(
             args.prompt,
             model_route,
@@ -355,6 +310,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             max_turns,
             project_root,
             skill=args.skill,
+            bridge_document=args.bridge_document,
+            bridge_version=args.bridge_version,
             system_prompt=system_prompt,
             timeout=operation_timeout,
             session_timeout=session_timeout,

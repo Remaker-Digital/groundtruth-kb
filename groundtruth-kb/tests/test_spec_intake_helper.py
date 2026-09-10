@@ -21,7 +21,7 @@ from groundtruth_kb import get_templates_dir, intake
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.gates import GateRegistry
 
-_HELPER_PATH = Path(get_templates_dir()) / "skills" / "spec-intake" / "helpers" / "spec_intake.py"
+_HELPER_PATH = Path(get_templates_dir()) / "skills" / "gtkb-spec-intake" / "helpers" / "spec_intake.py"
 
 
 def _load_helper() -> ModuleType:
@@ -44,11 +44,15 @@ def _load_helper() -> ModuleType:
 
 
 @pytest.fixture()
-def helper_db(tmp_path: Path) -> KnowledgeDB:
+def helper_db(tmp_path: Path):
     """Fresh KnowledgeDB with builtin gates for helper tests."""
     db_path = tmp_path / "helper.db"
     registry = GateRegistry.from_config([], include_builtins=True)
-    return KnowledgeDB(db_path=db_path, gate_registry=registry)
+    db = KnowledgeDB(db_path=db_path, gate_registry=registry)
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 # ── Capture tests ─────────────────────────────────────────────────────
@@ -141,7 +145,7 @@ def test_capture_candidate_raises_on_malformed_result(
 
 
 def test_confirm_candidate_creates_spec(helper_db: KnowledgeDB) -> None:
-    """Happy path: confirm creates a KB spec at ``status='specified'``."""
+    """Confirmation creates an active specification with exact readback."""
     helper = _load_helper()
     cap = helper.capture_candidate(
         helper_db,
@@ -151,7 +155,8 @@ def test_confirm_candidate_creates_spec(helper_db: KnowledgeDB) -> None:
     )
     result = helper.confirm_candidate(helper_db, cap["deliberation_id"])
     assert "spec" in result
-    assert result["spec"]["status"] == "specified"
+    assert result["spec"]["status"] == "active"
+    assert helper_db.get_spec(result["confirmed_spec_id"])["status"] == "active"
 
 
 def test_confirm_candidate_writes_skill_changed_by_on_spec(

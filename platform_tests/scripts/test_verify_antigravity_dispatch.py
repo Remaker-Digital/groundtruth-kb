@@ -17,8 +17,7 @@ from scripts.verify_antigravity_dispatch import (
     _resolve_executable_for_host,
     build_dispatch_command,
     evaluate_readiness,
-    inspect_verdict_anchor_guard,
-    resolve_loaded_project_module,
+    import_project_module,
     run_verification,
     sanitize_capture,
 )
@@ -106,36 +105,13 @@ def _fake_module(name: str, source_path: Path, **attributes: object) -> ModuleTy
     return module
 
 
-def test_project_module_resolver_reuses_exact_loaded_object(tmp_path, monkeypatch):
-    source_path = tmp_path / "runtime.py"
-    source_path.write_text("# fixture\n", encoding="utf-8")
-    sentinel = object()
-    module = _fake_module("_private_runtime", source_path, sentinel=sentinel)
-    monkeypatch.setitem(sys.modules, "_private_runtime", module)
-    monkeypatch.setattr(
-        importlib,
-        "import_module",
-        lambda _name: pytest.fail("package import must not run for an exact loaded module"),
-    )
-
-    resolved = resolve_loaded_project_module(
-        project_root=tmp_path,
-        expected_source_path=source_path,
-        import_name="scripts.runtime",
-        required_attributes=("sentinel",),
-    )
-
-    assert resolved is module
-    assert resolved.sentinel is sentinel
-
-
 def test_project_module_resolver_validates_package_fallback_source(tmp_path, monkeypatch):
     source_path = tmp_path / "runtime.py"
     source_path.write_text("# fixture\n", encoding="utf-8")
     module = _fake_module("scripts.runtime", source_path, sentinel=object())
     monkeypatch.setattr(importlib, "import_module", lambda name: module if name == "scripts.runtime" else None)
 
-    resolved = resolve_loaded_project_module(
+    resolved = import_project_module(
         project_root=tmp_path,
         expected_source_path=source_path,
         import_name="scripts.runtime",
@@ -145,19 +121,22 @@ def test_project_module_resolver_validates_package_fallback_source(tmp_path, mon
     assert resolved is module
 
 
-def test_project_module_resolver_rejects_duplicate_exact_source_objects(tmp_path, monkeypatch):
+def test_project_module_import_ignores_duplicate_alias_objects(tmp_path, monkeypatch):
     source_path = tmp_path / "runtime.py"
     source_path.write_text("# fixture\n", encoding="utf-8")
-    monkeypatch.setitem(sys.modules, "_runtime_one", _fake_module("_runtime_one", source_path, sentinel=1))
-    monkeypatch.setitem(sys.modules, "_runtime_two", _fake_module("_runtime_two", source_path, sentinel=2))
-
-    with pytest.raises(VerificationError, match="multiple loaded module objects"):
-        resolve_loaded_project_module(
+    for name in ("_runtime_one", "_runtime_two"):
+        monkeypatch.setitem(sys.modules, name, _fake_module(name, source_path, sentinel="foreign"))
+    canonical = _fake_module("scripts.runtime", source_path, sentinel="canonical")
+    monkeypatch.setattr(importlib, "import_module", lambda name: canonical if name == "scripts.runtime" else None)
+    assert (
+        import_project_module(
             project_root=tmp_path,
             expected_source_path=source_path,
             import_name="scripts.runtime",
             required_attributes=("sentinel",),
         )
+        is canonical
+    )
 
 
 def test_project_module_resolver_rejects_wrong_source_fallback(tmp_path, monkeypatch):
@@ -173,7 +152,7 @@ def test_project_module_resolver_rejects_wrong_source_fallback(tmp_path, monkeyp
     )
 
     with pytest.raises(VerificationError, match="resolved to .* expected"):
-        resolve_loaded_project_module(
+        import_project_module(
             project_root=tmp_path,
             expected_source_path=source_path,
             import_name="scripts.runtime",
@@ -184,12 +163,10 @@ def test_project_module_resolver_rejects_wrong_source_fallback(tmp_path, monkeyp
 def test_project_module_resolver_rejects_missing_required_attributes(tmp_path, monkeypatch):
     source_path = tmp_path / "runtime.py"
     source_path.write_text("# fixture\n", encoding="utf-8")
-    monkeypatch.setitem(
-        sys.modules, "_runtime_without_contract", _fake_module("_runtime_without_contract", source_path)
-    )
+    monkeypatch.setattr(importlib, "import_module", lambda name: _fake_module(name, source_path))
 
     with pytest.raises(VerificationError, match="missing required attributes: sentinel"):
-        resolve_loaded_project_module(
+        import_project_module(
             project_root=tmp_path,
             expected_source_path=source_path,
             import_name="scripts.runtime",
@@ -204,7 +181,7 @@ def test_project_module_resolver_rejects_source_outside_project_root(tmp_path):
     source_path.write_text("# outside\n", encoding="utf-8")
 
     with pytest.raises(VerificationError, match="outside the project root"):
-        resolve_loaded_project_module(
+        import_project_module(
             project_root=project_root,
             expected_source_path=source_path,
             import_name="scripts.runtime",
@@ -212,7 +189,7 @@ def test_project_module_resolver_rejects_source_outside_project_root(tmp_path):
         )
 
 
-def test_daemon_style_top_level_import_reuses_private_runtime_with_foreign_namespace(tmp_path):
+def test_foreign_package_namespace_cannot_borrow_private_runtime_aliases(tmp_path):
     project_root = Path(__file__).resolve().parents[2]
     script = textwrap.dedent(
         """
@@ -224,18 +201,17 @@ def test_daemon_style_top_level_import_reuses_private_runtime_with_foreign_names
 
         project_root = Path(sys.argv[1]).resolve()
         scripts_dir = project_root / "scripts"
-        source_dir = project_root / "groundtruth-kb" / "src"
-        sys.path[:0] = [str(scripts_dir), str(source_dir)]
-
-        runtime_spec = importlib.util.spec_from_file_location(
-            "_dispatcher_runtime_for_daemon",
-            scripts_dir / "dispatcher_runtime.py",
-        )
-        runtime = importlib.util.module_from_spec(runtime_spec)
-        sys.modules[runtime_spec.name] = runtime
-        runtime_spec.loader.exec_module(runtime)
-
-        projection = sys.modules["harness_projection_reader"]
+        # Present convincing private aliases without loading their unrelated
+        # dependencies. The real verifier must still import its canonical names.
+        runtime = types.ModuleType("_dispatcher_runtime_for_daemon")
+        runtime.__file__ = str(scripts_dir / "dispatcher_runtime.py")
+        runtime.DispatchTarget = object()
+        runtime._harness_command = object()
+        sys.modules[runtime.__name__] = runtime
+        projection = types.ModuleType("harness_projection_reader")
+        projection.__file__ = str(scripts_dir / "harness_projection_reader.py")
+        projection.load_harness_projection = object()
+        sys.modules[projection.__name__] = projection
 
         foreign_scripts = types.ModuleType("scripts")
         foreign_scripts.__path__ = [str(project_root / "foreign-scripts")]
@@ -270,13 +246,8 @@ def test_daemon_style_top_level_import_reuses_private_runtime_with_foreign_names
         check=False,
     )
 
-    assert completed.returncode == 0, completed.stderr
-    assert json.loads(completed.stdout) == {
-        "dispatch_target_reused": True,
-        "harness_command_reused": True,
-        "package_runtime_loaded": False,
-        "projection_reader_reused": True,
-    }
+    assert completed.returncode != 0
+    assert "Cannot import canonical project module" in completed.stderr
 
 
 def test_build_dispatch_command_uses_registry_template(tmp_path, monkeypatch):
@@ -491,49 +462,6 @@ def test_sanitize_capture_redacts_credential_shapes():
     assert "abc123456789xyz" not in sanitized
     assert "AIza123456789012345678901234567890" not in sanitized
     assert "[REDACTED]" in sanitized
-
-
-def _write_guarded_verdict_helper(root: Path, rel_path: str) -> None:
-    helper = root / rel_path
-    helper.parent.mkdir(parents=True, exist_ok=True)
-    helper.write_text(
-        "from scripts.verdict_evidence_anchor_preflight import validate_verdict_evidence_anchors\n"
-        "\n"
-        "def _assert_verdict_evidence_anchors():\n"
-        "    return validate_verdict_evidence_anchors\n",
-        encoding="utf-8",
-    )
-
-
-def test_inspect_verdict_anchor_guard_detects_helper_coverage(tmp_path):
-    validator = tmp_path / "scripts" / "verdict_evidence_anchor_preflight.py"
-    validator.parent.mkdir(parents=True, exist_ok=True)
-    validator.write_text("# fixture\n", encoding="utf-8")
-    _write_guarded_verdict_helper(tmp_path, ".codex/skills/gtkb-verify/helpers/write_verdict.py")
-
-    result = inspect_verdict_anchor_guard(tmp_path)
-
-    assert result["ok"] is True
-    assert result["validator"]["exists"] is True
-    assert ".codex/skills/gtkb-verify/helpers/write_verdict.py" in result["guarded_helpers"]
-
-
-def test_evaluate_readiness_reports_verdict_anchor_guard(tmp_path, monkeypatch):
-    _write_registry(tmp_path, _antigravity_record(can_receive_dispatch=True))
-    monkeypatch.setattr(
-        "scripts.verify_antigravity_dispatch.shutil.which",
-        lambda exe: "/fake/path/agy.cmd" if exe == "agy" else None,
-    )
-    validator = tmp_path / "scripts" / "verdict_evidence_anchor_preflight.py"
-    validator.parent.mkdir(parents=True, exist_ok=True)
-    validator.write_text("# fixture\n", encoding="utf-8")
-    _write_guarded_verdict_helper(tmp_path, ".claude/skills/gtkb-verify/helpers/write_verdict.py")
-
-    result = evaluate_readiness(project_root=tmp_path, recipient="C")
-
-    assert result["ready"] is True
-    assert result["verdict_anchor_guard"]["ok"] is True
-    assert ".claude/skills/gtkb-verify/helpers/write_verdict.py" in result["verdict_anchor_guard"]["guarded_helpers"]
 
 
 def test_readiness_fails_closed_for_legacy_gemini_registry(tmp_path):

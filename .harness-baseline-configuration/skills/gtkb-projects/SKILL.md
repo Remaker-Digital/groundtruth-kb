@@ -184,7 +184,7 @@ python -m pytest platform_tests/scripts/test_project_authorization.py -q
 python -m pytest platform_tests/scripts/test_cli_backlog_list.py -q
 python -m pytest groundtruth-kb/tests/test_project_dependency_ordering.py platform_tests/scripts/test_projects_cli.py -q
 python scripts/check_project_dependency_ordering.py --json
-python scripts/generate_codex_skill_adapters.py --check --update-registry
+python scripts/check_harness_parity.py --all --validate
 python -m pytest platform_tests/scripts/test_projects_skill_adapter.py -q
 python -m pytest platform_tests/scripts/test_check_harness_parity.py -q
 ```

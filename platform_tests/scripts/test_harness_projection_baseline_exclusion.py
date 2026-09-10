@@ -120,20 +120,21 @@ def test_unrecognized_artifact_class_is_named_in_a_gap(engine):
     )
 
 
-def test_engine_still_renders_every_implemented_profile(engine):
+@pytest.mark.parametrize(
+    "name",
+    [
+        name
+        for name, profile in _load_engine().load_profiles()["harnesses"].items()
+        if profile.get("status") != "profile_pending"
+    ],
+)
+def test_engine_still_renders_every_implemented_profile(engine, name):
     """Over-exclusion guard against the live baseline, not a fixture.
 
     Every profile with an implemented slice must still produce a non-empty plan.
     A plan that collapsed would mean the new exclusion classes started matching
     real configuration.
     """
-    profiles = engine.load_profiles()
-    checked = 0
-    for name, profile in (profiles.get("harnesses") or {}).items():
-        if (profile or {}).get("status") == "profile_pending":
-            continue
-        plan = engine.build_plan(name)
-        assert plan.writes, f"profile {name} produced an empty plan after exclusion changes"
-        assert not plan.gaps, f"profile {name} reported gaps: {plan.gaps[:3]}"
-        checked += 1
-    assert checked >= 1, "no implemented profile was exercised"
+    plan = engine.build_plan(name)
+    assert plan.writes, f"profile {name} produced an empty plan after exclusion changes"
+    assert not plan.gaps, f"profile {name} reported gaps: {plan.gaps[:3]}"

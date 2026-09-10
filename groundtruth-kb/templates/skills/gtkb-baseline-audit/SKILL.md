@@ -65,7 +65,7 @@ Outputs missing a valid tag or using fewer/more than 29 rows are **invalid** and
 | 18 | Managed-artifact drift | doctor managed-artifact check | command_output |
 | 19 | MemBase open work items (subject) | `gt` / dashboard | command_output |
 | 20 | Standing backlog top priorities | backlog CLI / dashboard | doc_inference |
-| 21 | Pending owner decisions | pending-owner-decisions surface | doc_inference |
+| 21 | Current project authorization and membership | canonical project CLI | command_output |
 | 22 | CI required checks status | `gh run list` or dashboard | CI_result |
 | 23 | Latest failing workflow | `gh run list` | CI_result |
 | 24 | Package / rc version | `pyproject.toml` / release notes | release_tag |

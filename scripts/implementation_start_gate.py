@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Hard gate protected implementation mutations unless a bridge GO packet exists."""
+"""Check tool effects through the native CLI and current artifact claims."""
 
 from __future__ import annotations
 
@@ -13,93 +13,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-try:
-    from scripts.implementation_authorization import (
-        BOOTSTRAP_BRIDGE_IDS,
-        AuthorizationError,
-        assess_packet_terminal_evidence,
-        bridge_entry,
-        canonical_project_root,
-        cross_claim_path_collision_reason,
-        extract_target_paths,
-        finalization_target_paths_for_verified,
-        normalize_relative_path,
-        packet_path_for_bridge,
-        path_authorized_by_target_paths,
-        peer_report_dirty_path_collision_reason,
-        resolve_work_intent_session_id,
-        work_intent_claim_block_reason,
-    )
-except ImportError:  # pragma: no cover - direct script execution path
-    from implementation_authorization import (
-        BOOTSTRAP_BRIDGE_IDS,
-        AuthorizationError,
-        assess_packet_terminal_evidence,
-        bridge_entry,
-        canonical_project_root,
-        cross_claim_path_collision_reason,
-        extract_target_paths,
-        finalization_target_paths_for_verified,
-        normalize_relative_path,
-        packet_path_for_bridge,
-        path_authorized_by_target_paths,
-        peer_report_dirty_path_collision_reason,
-        resolve_work_intent_session_id,
-        work_intent_claim_block_reason,
-    )
-
-try:
-    from scripts import bridge_work_intent_registry
-except ImportError:  # pragma: no cover - direct script execution path
-    import bridge_work_intent_registry  # type: ignore[no-redef]
-
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-
-try:
-    from scripts.controlled_artifact_paths import (
-        DISPATCHER_CONFIG_PATH,
-        direct_write_block_reason_code,
-        normalize_relative_path_text,
-    )
-    from scripts.controlled_artifact_paths import (
-        is_protected_path as _controlled_is_protected_path,
-    )
-    from scripts.controlled_artifact_paths import (
-        protected_path_classification as _controlled_path_classification,
-    )
-except ImportError:  # pragma: no cover - direct script execution path
-    from controlled_artifact_paths import (
-        DISPATCHER_CONFIG_PATH,
-        direct_write_block_reason_code,
-        normalize_relative_path_text,
-    )
-    from controlled_artifact_paths import (
-        is_protected_path as _controlled_is_protected_path,
-    )
-    from controlled_artifact_paths import (
-        protected_path_classification as _controlled_path_classification,
-    )
-
-DISPATCHER_CONFIG_CLI_ONLY_BLOCK_ID = "GTKB-DISPATCHER-CONFIG-CLI-ONLY"  # config/dispatcher/rules.toml CLI-only guard
-EMERGENCY_BRIDGE_REPAIR_ENV_VAR = "GTKB_EMERGENCY_BRIDGE_REPAIR"
-BRIDGE_FUNCTION_EXACT = {
-    ".claude/settings.json",
-    ".codex/hooks.json",
-    "scripts/bridge_claim_cli.py",
-    "scripts/bridge_lifecycle_resolver.py",
-    "scripts/check_protected_commit_authorization.py",
-    "scripts/dispatcher_runtime.py",
-    "scripts/gtkb_bridge_writer.py",
-    "scripts/implementation_authorization.py",
-    "scripts/implementation_start_gate.py",
-}
-BRIDGE_FUNCTION_PREFIXES = (
-    ".claude/hooks/",
-    ".codex/gtkb-hooks/",
-    "groundtruth-kb/src/groundtruth_kb/bridge/",
-)
 SAFE_COMMAND_PREFIXES = (
     "rg ",
     "git status",
@@ -111,18 +26,16 @@ SAFE_COMMAND_PREFIXES = (
     "get-childitem",
     "python -m pytest",
     "python -m groundtruth_kb deliberations search",
-    "python -m ruff check",
-    "python -m ruff format --check",
     "python scripts/bridge_applicability_preflight.py",
     "python scripts/adr_dcl_clause_preflight.py",
 )
+
 GIT_LIFECYCLE_MUTATING_SUBCOMMANDS = frozenset(
     {"create", "attach", "preserve", "promote", "close", "resume", "recover", "drain"}
 )
+
 INVALID_HOOK_PAYLOAD_KEY = "__gtkb_invalid_hook_payload__"
-# Direct Git is an inspection surface only. Every subcommand outside this
-# deliberately small allowlist must enter through ``groundtruth_kb.git_lifecycle``
-# so effect-time authority, quiescence, recovery, and evidence are enforced.
+
 DIRECT_GIT_READ_ONLY_SUBCOMMANDS = frozenset(
     {
         "blame",
@@ -155,16 +68,15 @@ DIRECT_GIT_READ_ONLY_SUBCOMMANDS = frozenset(
         "version",
     }
 )
+
 GIT_GLOBAL_OPTIONS_WITH_VALUES = frozenset(
     {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix", "--config-env"}
 )
-# Markers that disqualify a safe-command prefix, split by shell quoting
-# semantics so the scan can be quote-aware (WI-3357):
-#   - chaining markers are literal inside EITHER quote type;
-#   - execution markers still run inside double quotes (literal only inside
-#     single quotes).
+
 GIT_FINALIZATION_CHAINING_MARKERS = (";", "&&", "||", "|")
+
 GIT_FINALIZATION_EXECUTION_MARKERS = ("$(", "`")
+
 MUTATING_COMMAND_RE = re.compile(
     r"\b("
     r"set-content|out-file|new-item|remove-item|move-item|copy-item|"
@@ -202,56 +114,67 @@ MUTATING_COMMAND_RE = re.compile(
     r"|(?:^|[|;&\n]|\()\s*(?:tee|touch|truncate|shred|install|patch|dd|cp|mv|rm|ln)\b",
     re.IGNORECASE,
 )
-# A shell redirection operator token: `>` / `>>`, or the combined-stream
-# `&>` / `&>>` form. Matched against standalone tokens produced by a
-# punctuation-aware shlex scan (see _shell_redirect_present), never against
-# raw command text -- so a `>` inside a quoted argument or an embedded Python
-# expression is not misread as a redirect. A leading file-descriptor digit
-# (`2>`) tokenizes separately and is not part of the operator token.
+
 REDIRECT_OPERATOR_TOKEN_RE = re.compile(r"&?>{1,2}")
+
 NULL_SINK_REDIRECT_STRIP_RE = re.compile(
     r"\s*(?:\d+|&)?>{1,2}(?!&)\s*(?:/dev/null|\$null|NUL)\b",
     re.IGNORECASE,
 )
+
 SAFE_SQLITE_READ_RE = re.compile(
     r"sqlite3\b.*?\.execute\(\s*['\"](?:SELECT|WITH|EXPLAIN)\b",
     re.IGNORECASE | re.DOTALL,
 )
+
 SQLITE_WRITE_DISQUALIFIERS_RE = re.compile(
     r"\.executescript\(|\.executemany\(|\.commit\(|"
     r"\b(?:INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER|TRUNCATE|PRAGMA)\b",
     re.IGNORECASE,
 )
-BLOCKING_CLAUSE_ID = "PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001"
-# PATH_TOKEN_RE removed here (HYG-046): it was an unused dead copy. The canonical
-# constant lives in implementation_authorization; bridge_applicability_preflight
-# (its sole live user) imports it from there — eliminating the prior drift.
+
 PATCH_PATH_RE = re.compile(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", re.MULTILINE)
+
 PATCH_MOVE_RE = re.compile(r"^\*\*\* Move to: (.+)$", re.MULTILINE)
-# WI-3357: opener of the documented HEREDOC commit-message pattern
-#   git commit -m "$(cat <<'EOF' ... EOF)"
-# This regex matches ONLY the fixed opener `$(cat <<['"]DELIM['"]` on a single
-# physical line (internal whitespace is [ \t], never a newline). The opener-line
-# tail, the heredoc-terminating delimiter line, and the substitution's closing
-# `)` are validated by an explicit forward scan in
-# _find_heredoc_message_substitution_spans().
+
 _HEREDOC_OPENER_RE = re.compile(
     r"\$\([ \t]*cat[ \t]+<<(?P<dash>-?)[ \t]*"
     r"(?P<q>['\"])(?P<delim>[A-Za-z_][A-Za-z0-9_]*)(?P=q)"
 )
+
 _PYTHON_EXECUTABLE_NAMES = {"py", "python", "python.exe"}
-# Placeholder recorded when a command carries a mutating signal but the gate
-# cannot enumerate its concrete targets. It is a sentinel, never a real path.
-UNKNOWN_MUTATING_TARGET = "<unknown-mutating-target>"
-# WI-5694 cycle 2: the canonical Loyal Opposition verdict-finalization helper.
-# Compared against a lowercased, forward-slash-normalized script token suffix so
-# both repo-relative and absolute invocations resolve.
-VERIFICATION_FINALIZATION_HELPER_PATH = ".claude/skills/gtkb-verify/helpers/write_verdict.py"
+
 _WRAP_DIAGNOSTIC_SCRIPT_NAMES = {
     "wrap_capture_transcript.py",
     "wrap_scan_hygiene.py",
     "wrap_scan_consistency.py",
 }
+
+
+try:
+    from scripts.controlled_artifact_paths import (
+        DISPATCHER_CONFIG_PATH,
+        normalize_relative_path_text,
+    )
+    from scripts.controlled_artifact_paths import (
+        is_protected_path as _controlled_is_protected_path,
+    )
+    from scripts.controlled_artifact_paths import (
+        protected_path_classification as _controlled_path_classification,
+    )
+except ImportError:  # pragma: no cover - direct script execution path
+    from controlled_artifact_paths import (
+        DISPATCHER_CONFIG_PATH,
+        normalize_relative_path_text,
+    )
+    from controlled_artifact_paths import (
+        is_protected_path as _controlled_is_protected_path,
+    )
+    from controlled_artifact_paths import (
+        protected_path_classification as _controlled_path_classification,
+    )
+
+DISPATCHER_CONFIG_CLI_ONLY_BLOCK_ID = "GTKB-DISPATCHER-CONFIG-CLI-ONLY"  # config/dispatcher/rules.toml CLI-only guard
 
 
 def _project_root(payload: dict[str, Any]) -> Path:
@@ -260,7 +183,7 @@ def _project_root(payload: dict[str, Any]) -> Path:
         return Path(explicit).resolve()
     cwd = payload.get("cwd")
     cwd_path = Path(cwd).resolve() if isinstance(cwd, str) and cwd.strip() else PROJECT_ROOT
-    return canonical_project_root(cwd_path)
+    return Path(os.environ.get("GTKB_PROJECT_ROOT") or cwd_path).resolve()
 
 
 def _tool_name(payload: dict[str, Any]) -> str:
@@ -281,13 +204,18 @@ def _tool_input(payload: dict[str, Any]) -> Any:
     return payload
 
 
-def _normalize(root: Path, path_text: str) -> str | None:
-    cleaned = path_text.strip().strip("'\"`").replace("\\", "/")
+def _normalize(root: Path, path_text: str, *, shell_quoted: bool = False) -> str | None:
+    cleaned = path_text
+    if shell_quoted and len(cleaned) >= 2 and cleaned[0] == cleaned[-1] and cleaned[0] in "'\"":
+        cleaned = cleaned[1:-1]
+    cleaned = cleaned.replace("\\", "/")
     if not cleaned:
         return None
     try:
-        return normalize_relative_path(root, cleaned)
-    except AuthorizationError:
+        target = Path(cleaned)
+        target = target if target.is_absolute() else root / target
+        return target.relative_to(root).as_posix()
+    except ValueError:
         return cleaned
 
 
@@ -303,26 +231,7 @@ def _protected_path_classification(relative_path: str, *, project_root: Path | N
     return _controlled_path_classification(relative_path, project_root=project_root)
 
 
-def _is_bridge_function_path(relative_path: str) -> bool:
-    rel = _preserve_dot_prefixed_relative_path(relative_path)
-    return rel in BRIDGE_FUNCTION_EXACT or any(rel.startswith(prefix) for prefix in BRIDGE_FUNCTION_PREFIXES)
-
-
 _BRIDGE_ARTIFACT_DEPOSIT_RE = re.compile(r"^bridge/[A-Za-z0-9][A-Za-z0-9._-]*-\d{3}\.md$")
-
-
-def _is_bridge_artifact_deposit_path(relative_path: str) -> bool:
-    """Bridge-artifact deposit under the canon transition provision (WI-7030)."""
-    rel = _preserve_dot_prefixed_relative_path(relative_path).replace("\\", "/")
-    return bool(_BRIDGE_ARTIFACT_DEPOSIT_RE.match(rel))
-
-
-def _emergency_bridge_repair_applies(protected_paths: list[str]) -> bool:
-    if os.environ.get(EMERGENCY_BRIDGE_REPAIR_ENV_VAR) != "1":
-        return False
-    if not protected_paths or "<unknown-mutating-target>" in protected_paths:
-        return False
-    return all(_is_bridge_function_path(path) or _is_bridge_artifact_deposit_path(path) for path in protected_paths)
 
 
 def _dispatcher_config_direct_edit_targets(paths: list[str]) -> list[str]:
@@ -864,7 +773,7 @@ def _diagnostic_output_paths_for_stage(root: Path, stage: str) -> list[str] | No
             return None
     normalized: list[str] = []
     for output in outputs:
-        rel = _normalize(root, output)
+        rel = _normalize(root, output, shell_quoted=True)
         if not rel:
             return None
         normalized.append(rel)
@@ -908,7 +817,7 @@ def _paths_from_shell(root: Path, command: str) -> list[str]:
             continue
         extractor, relevant = classification
         for raw in extractor(relevant):
-            rel = _normalize(root, raw)
+            rel = _normalize(root, raw, shell_quoted=True)
             if rel:
                 paths.append(rel)
     return sorted(set(paths))
@@ -940,6 +849,162 @@ def _is_safe_command(command: str) -> bool:
     return any(
         normalized == prefix.strip() or normalized.startswith(prefix.strip() + " ") for prefix in SAFE_COMMAND_PREFIXES
     )
+
+
+_RUFF_VALUE_OPTIONS = frozenset(
+    {
+        "--config",
+        "--color",
+        "--output-format",
+        "--target-version",
+        "--extension",
+        "--select",
+        "--ignore",
+        "--extend-select",
+        "--per-file-ignores",
+        "--extend-per-file-ignores",
+        "--fixable",
+        "--unfixable",
+        "--extend-fixable",
+        "--exclude",
+        "--extend-exclude",
+        "--cache-dir",
+        "--stdin-filename",
+        "--line-length",
+        "--range",
+        "--output-file",
+        "-o",
+    }
+)
+_RUFF_FLAG_OPTIONS = frozenset(
+    {
+        "--fix",
+        "--no-fix",
+        "--fix-only",
+        "--no-fix-only",
+        "--unsafe-fixes",
+        "--no-unsafe-fixes",
+        "--show-fixes",
+        "--no-show-fixes",
+        "--diff",
+        "--check",
+        "--watch",
+        "-w",
+        "--ignore-noqa",
+        "--preview",
+        "--no-preview",
+        "--statistics",
+        "--show-files",
+        "--show-settings",
+        "--respect-gitignore",
+        "--no-respect-gitignore",
+        "--force-exclude",
+        "--no-force-exclude",
+        "--no-cache",
+        "-n",
+        "--exit-zero",
+        "-e",
+        "--exit-non-zero-on-fix",
+        "--verbose",
+        "-v",
+        "--quiet",
+        "-q",
+        "--silent",
+        "-s",
+        "--isolated",
+        "--help",
+        "-h",
+        "--add-noqa",
+    }
+)
+
+
+def _ruff_effects(root: Path, command: str) -> tuple[list[str], bool] | None:
+    """Identify Ruff's possible source and report writes without executing it.
+
+    Configuration can enable fixes, so a plain check is not proof of read-only
+    behavior. Unknown options or compound commands lack a complete target set.
+    Ruff's disposable cache is not reviewed work product.
+    """
+    stages = _split_pipeline_stages(command)
+    for stage in stages:
+        nested, wrapper = _nested_shell_command(stage)
+        if wrapper:
+            if nested and nested != command and _ruff_effects(root, nested) is not None:
+                return [], True  # Wrapper environment/cwd is not the supplied tool cwd.
+            continue
+        tokens = _shell_split(stage)
+        if not tokens:
+            continue
+        verb_index = _shell_verb_index(tokens)
+        if verb_index is None:
+            continue
+        relevant = tokens[verb_index:]
+        executable = _executable_name(relevant[0])
+        if executable in {"ruff", "ruff.exe"}:
+            args = relevant[1:]
+        elif (executable in _PYTHON_EXECUTABLE_NAMES or executable.startswith("python")) and relevant[1:3] == [
+            "-m",
+            "ruff",
+        ]:
+            args = relevant[3:]
+        else:
+            continue
+        if (
+            len(stages) != 1
+            or verb_index
+            or _has_disqualifying_control_marker(command)
+            or _shell_redirect_present(command)
+        ):
+            return [], True
+        if not args or args[0] not in {"check", "format"}:
+            return [], True
+        subcommand, *args = args
+        flags: set[str] = set()
+        sources: list[str] = []
+        output = os.environ.get("RUFF_OUTPUT_FILE") if subcommand == "check" else None
+        output_shell_quoted = False
+        index = 0
+        while index < len(args):
+            token = args[index]
+            if token == "--":
+                sources.extend(args[index + 1 :])
+                break
+            option, separator, value = token.partition("=")
+            if option in _RUFF_VALUE_OPTIONS:
+                if not separator:
+                    index += 1
+                    if index >= len(args):
+                        return [], True
+                    value = args[index]
+                if option in {"--output-file", "-o"}:
+                    output = value
+                    output_shell_quoted = True
+            elif option in _RUFF_FLAG_OPTIONS and (not separator or option == "--add-noqa"):
+                flags.add(option)
+            elif token.startswith("-"):
+                return [], True
+            else:
+                sources.append(token)
+            index += 1
+        if flags & {"--help", "-h"}:
+            return [], False
+        read_only = "--diff" in flags or (
+            "--check" in flags if subcommand == "format" else {"--no-fix", "--no-fix-only"} <= flags
+        )
+        # Do not infer precedence among conflicting write/read modifiers.
+        if "--add-noqa" in flags or ("--diff" not in flags and flags & {"--fix", "--fix-only"}):
+            read_only = False
+        if not read_only and not sources:
+            return [], True  # An implicit recursive '.' is not a concrete artifact.
+        targets = [] if read_only else sources
+        paths = [_normalize(root, target, shell_quoted=True) for target in targets]
+        if output:
+            paths.append(_normalize(root, output, shell_quoted=output_shell_quoted))
+        if any(not path for path in paths):
+            return [], True
+        return sorted(set(paths)), bool(paths)
+    return None
 
 
 # WI-6674: help output is read-only, but the WI-3291 prefix allowlist cannot
@@ -1422,10 +1487,17 @@ def changed_paths(payload: dict[str, Any]) -> tuple[list[str], bool]:
     tool = _tool_name(payload).lower()
     data = _tool_input(payload)
 
-    if tool in {"write", "edit", "multiedit"}:
-        path = data.get("file_path") or data.get("path")
+    if tool in {"write", "edit", "strreplace", "multiedit", "notebookedit", "delete"}:
+        if not isinstance(data, dict):
+            return [], True
+        path = data.get("file_path") or data.get("notebook_path") or data.get("path")
         rel = _normalize(root, str(path)) if path else None
         return ([rel] if rel else []), True
+
+    if tool in {"move", "copy"}:
+        # No supported native payload identifies both paths for these tools.
+        # Use an explicit shell/CLI operation instead of checking only one side.
+        return [], True
 
     if _is_apply_patch_tool(tool) or any("*** Begin Patch" in value for value in _string_values(payload)):
         text = _apply_patch_text(payload, data)
@@ -1433,6 +1505,9 @@ def changed_paths(payload: dict[str, Any]) -> tuple[list[str], bool]:
 
     command = _command_from_payload(payload, data, tool)
     if command is not None:
+        ruff_effects = _ruff_effects(root, command)
+        if ruff_effects is not None:
+            return ruff_effects
         if _is_safe_command(command):
             return [], False
         diagnostic_outputs = _diagnostic_output_paths_from_shell(root, command)
@@ -1444,586 +1519,75 @@ def changed_paths(payload: dict[str, Any]) -> tuple[list[str], bool]:
     return [], False
 
 
-def _finalization_git_add_targets(command: str) -> list[str] | None:
-    """Return the explicit path args of a pure ``git add`` staging command.
-
-    Returns ``None`` (disqualified) unless the command is a single-stage
-    ``git add`` of explicit file paths. Any of the following disqualifies the
-    fast finalization clearance so the command falls through to the normal
-    authorization gate: multiple pipeline stages / chaining, control or
-    command-substitution markers, a non-``git add`` verb, a broad or whole-tree
-    stage (``-A`` / ``--all`` / ``-u`` / ``.`` / any flag), pathspec magic
-    (``:/``, ``:(exclude)``), glob metacharacters, unparseable tokens, or no
-    explicit path argument. This mirrors the disqualifiers named in the WI-4837
-    proposal (chained protected writes, broad reset/checkout/rm, deletion,
-    cleanup, denied git flags, unparseable targets).
-    """
-    scan_command = command or ""
-    if _has_disqualifying_control_marker(scan_command):
-        return None
-    stages = _split_pipeline_stages(scan_command)
-    if len(stages) != 1:
-        return None
-    try:
-        raw_tokens = shlex.split(stages[0], posix=False)
-    except ValueError:
-        return None
-    tokens = [token for token in (_clean_shell_token(raw) for raw in raw_tokens) if token]
-    # Skip leading VAR=value env prefixes (mirror _classify_command_verb).
-    index = 0
-    while index < len(tokens):
-        tok = tokens[index]
-        if "=" in tok and not tok.startswith("-") and "/" not in tok and "\\" not in tok:
-            index += 1
-            continue
-        break
-    relevant = tokens[index:]
-    if len(relevant) < 3 or relevant[0].lower() != "git" or relevant[1].lower() != "add":
-        return None
-    paths: list[str] = []
-    for arg in relevant[2:]:
-        if arg == "--":
-            continue
-        if arg.startswith("-"):
-            return None  # any flag (incl. -A/--all/-u/-p/--patch) disqualifies
-        if arg.startswith(":"):
-            return None  # pathspec magic (:/, :(exclude)) disqualifies
-        if arg == ".":
-            return None  # whole-tree add disqualifies
-        if any(meta in arg for meta in ("*", "?", "[", "]")):
-            return None  # glob disqualifies (targets not concretely enumerable)
-        paths.append(arg)
-    if not paths:
-        return None
-    return paths
-
-
-def _post_verified_finalization_clearance(root: Path, payload: dict[str, Any]) -> str | None:
-    """Clear a narrow post-``VERIFIED`` finalization ``git add`` staging command.
-
-    WI-4837 automatic parity (owner decision
-    ``DELIB-WI4837-AUTOMATIC-PARITY-20260707``). After a bridge thread reaches
-    terminal ``VERIFIED`` the implementation phase is closed, so ordinary
-    implementation-start packets fail closed and a Prime-side ``git add`` that
-    stages the thread's own approved paths for a recovery finalization commit is
-    blocked. This mirrors the pre-commit gate, which already clears
-    terminal-``VERIFIED`` approved paths. The clearance is granted only when ALL
-    of the following hold:
-
-    - the command is a single-stage ``git add`` of explicit file paths (no
-      chaining, substitution, flags, pathspec magic, globs, or whole-tree add);
-    - the current work-intent/session context identifies one bridge thread;
-    - that thread's latest post-GO chain state is terminal ``VERIFIED``;
-    - every staged target is inside the thread's approved proposal
-      ``target_paths``.
-
-    Returns a human-readable reason string when the clearance is granted, or
-    ``None`` to fall through to the normal authorization gate (which fails
-    closed). Never raises: any lookup failure returns ``None``.
-    """
-    data = _tool_input(payload)
-    is_shell = _tool_name(payload).lower() in {"bash", "shell_command", "shell"} or (
-        isinstance(data, dict) and "command" in data
-    )
-    if not is_shell:
-        return None
-    command = str((data.get("command") if isinstance(data, dict) else None) or payload.get("command") or "")
-    targets = _finalization_git_add_targets(command)
-    if not targets:
-        return None
-    normalized_targets: list[str] = []
-    for target in targets:
-        cleaned = target.strip().strip("'\"`").replace("\\", "/")
-        if not cleaned or cleaned == ".":
-            return None
-        try:
-            rel = normalize_relative_path(root, cleaned)
-        except AuthorizationError:
-            return None  # target escapes project root -> fail closed
-        normalized_targets.append(rel)
-    session_id = resolve_work_intent_session_id(payload)
-    if not session_id:
-        return None
-    try:
-        bridge_id = bridge_work_intent_registry.current_claimed_bridge_id(session_id, project_root=root)
-    except Exception:  # noqa: BLE001 - registry failure must not clear the gate
-        return None
-    if not bridge_id:
-        return None
-    try:
-        approved_target_paths = finalization_target_paths_for_verified(root, bridge_id)
-    except AuthorizationError:
-        return None  # not terminal VERIFIED, or approved paths unparseable -> fall through
-    for rel in normalized_targets:
-        if not path_authorized_by_target_paths(approved_target_paths, rel):
-            return None  # a staged target is outside approved target_paths -> fall through
-    return (
-        f"post-VERIFIED finalization staging cleared for bridge {bridge_id!r}: "
-        f"staged targets {sorted(normalized_targets)} are all inside the approved "
-        "terminal-VERIFIED proposal target_paths "
-        "(automatic parity per DELIB-WI4837-AUTOMATIC-PARITY-20260707)."
-    )
-
-
-def _arg_values(args: list[str], flag: str) -> list[str]:
-    """Return every value supplied for a repeatable ``--flag value`` / ``--flag=value``."""
-    values: list[str] = []
-    for index, token in enumerate(args):
-        if token == flag and index + 1 < len(args):
-            values.append(args[index + 1])
-        elif token.startswith(flag + "="):
-            values.append(token.split("=", 1)[1])
-    return values
-
-
-def _verification_finalization_corridor(command: str) -> tuple[str, list[str]] | None:
-    """Return ``(slug, include_values)`` for the canonical finalization invocation.
-
-    The corridor key for the WI-5694 cycle-2 terminal-evidence clearance. Returns
-    ``None`` (disqualified) unless ``command`` is a single-stage shell invocation
-    of the canonical Loyal Opposition verdict helper
-    ``.claude/skills/gtkb-verify/helpers/write_verdict.py`` carrying BOTH
-    ``--finalize-verified`` and an explicit ``--slug <bridge-id>``.
-
-    Disqualifiers mirror :func:`_finalization_git_add_targets`: chaining,
-    pipelines, control or command-substitution markers, unparseable tokens, a
-    non-python executable, a different script, a missing ``--finalize-verified``,
-    or a missing/empty ``--slug``. A leading PowerShell call operator (``&``) is
-    accepted because it is the project's documented invocation form; an ``&``
-    token anywhere else disqualifies.
-    """
-    scan_command = command or ""
-    if _has_disqualifying_control_marker(scan_command):
-        return None
-    stages = _split_pipeline_stages(scan_command)
-    if len(stages) != 1:
-        return None
-    raw_tokens = _shell_split(stages[0])
-    if raw_tokens is None:
-        return None
-    tokens = [token for token in (_clean_shell_token(raw) for raw in raw_tokens) if token]
-    if not tokens:
-        return None
-    # A leading PowerShell call operator is the documented invocation form; any
-    # other bare `&` token is a control marker and disqualifies.
-    if tokens[0] == "&":
-        tokens = tokens[1:]
-    if any(token == "&" for token in tokens):
-        return None
-    verb_index = _shell_verb_index(tokens)
-    if verb_index is None:
-        return None
-    relevant = tokens[verb_index:]
-    if len(relevant) < 3:
-        return None
-    executable = _executable_name(relevant[0])
-    if executable not in _PYTHON_EXECUTABLE_NAMES and not executable.startswith("python"):
-        return None
-    script = relevant[1].replace("\\", "/").lower()
-    if script.startswith("./"):
-        script = script[2:]
-    # Suffix match at a path boundary so a sibling such as
-    # `evil.claude/skills/.../write_verdict.py` cannot impersonate the helper.
-    if script != VERIFICATION_FINALIZATION_HELPER_PATH and not script.endswith(
-        "/" + VERIFICATION_FINALIZATION_HELPER_PATH
-    ):
-        return None
-    args = relevant[2:]
-    if "--finalize-verified" not in args:
-        return None
-    slug = (_arg_value(args, "--slug") or "").strip()
-    if not slug:
-        return None
-    return slug, _arg_values(args, "--include")
-
-
-def _verification_finalization_packet_facts(root: Path, bridge_id: str) -> tuple[list[str], str] | None:
-    """Return ``(approved_target_paths, packet_hash)`` from the named packet.
-
-    Read-only. The packet's ``target_path_globs`` are the GO'd proposal's
-    approved ``target_paths`` recorded at packet-creation time; the packet's hash
-    and pinned-GO chain integrity are verified by
-    :func:`assess_packet_terminal_evidence` on the same file before this helper's
-    result is used. Returns ``None`` on any lookup or parse failure (fail closed).
-    """
-    try:
-        path = packet_path_for_bridge(root, bridge_id)
-    except AuthorizationError:
-        return None
-    if not path.is_file():
-        return None
-    try:
-        packet = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    if not isinstance(packet, dict):
-        return None
-    globs = packet.get("target_path_globs")
-    if not isinstance(globs, list) or not globs:
-        return None
-    approved = [str(glob) for glob in globs if str(glob).strip()]
-    if not approved:
-        return None
-    return approved, str(packet.get("packet_hash") or "")
-
-
-def _is_bridge_chain_file(slug: str, relative_path: str) -> bool:
-    """True when ``relative_path`` is a numbered bridge file of ``slug``'s own chain."""
-    return re.fullmatch(rf"bridge/{re.escape(slug)}-\d{{3,}}\.md", relative_path) is not None
-
-
-def _verification_finalization_evidence_clearance(
-    root: Path, payload: dict[str, Any], protected: list[str]
-) -> str | None:
-    """Clear the canonical finalization command under terminal-evidence semantics.
-
-    WI-5694 cycle 2 (owner decision ``DELIB-202667723``, AUQ evidence
-    ``AUQ-20260730-PACKET-EXPIRY-AUTHORITY-MODEL``). The Loyal Opposition
-    verification workflow's only live implementation-start packet consultation is
-    this PreToolUse gate. Per the owner's terminal-evidence-sufficient model an
-    expired packet remains valid EVIDENCE when it was live at implementation and
-    is uncontested, so a clean independent verification is no longer blocked from
-    recording ``VERIFIED`` merely because the Prime Builder packet window closed
-    during review (root incident:
-    ``bridge/gtkb-wi5640-verified-finalization-packet-expiry-advisory-001.md``).
-
-    The clearance is granted only when ALL of the following hold:
-
-    - the command matches the canonical finalization corridor
-      (:func:`_verification_finalization_corridor`);
-    - the session's own work-intent claim identifies exactly the ``--slug``
-      thread, and this session is the claim holder;
-    - the thread's post-GO chain state is ``awaiting_review`` (a post-implementation
-      report awaiting the terminal verdict). The post-terminal re-staging corridor
-      remains exclusively :func:`_post_verified_finalization_clearance`'s;
-    - :func:`assess_packet_terminal_evidence` reports ``evidence_valid``. This
-      imports the four owner-mandated cases wholesale: expired-but-live-at-
-      implementation and uncontested clears; expired-before-implementation,
-      contested, and any registry read error fail closed;
-    - every bound-checked mutation target lies inside the union of the GO'd
-      proposal's approved ``target_paths`` and the thread's own numbered
-      ``bridge/<slug>-NNN.md`` chain files.
-
-    When the gate could not enumerate concrete targets (the
-    ``<unknown-mutating-target>`` sentinel, produced for example by an output
-    redirect), the clearance re-derives the command's declared targets from its
-    own ``--include`` arguments. A redirect into any protected path disqualifies
-    outright: a finalization helper never legitimately redirects into a
-    controlled artifact.
-
-    Returns a human-readable reason string carrying the assessment evidence when
-    the clearance is granted, or ``None`` to fall through to the normal
-    authorization gate (which fails closed). Never raises: any lookup failure
-    returns ``None``.
-    """
-    data = _tool_input(payload)
-    is_shell = _tool_name(payload).lower() in {"bash", "shell_command", "shell"} or (
-        isinstance(data, dict) and "command" in data
-    )
-    if not is_shell:
-        return None
-    command = str((data.get("command") if isinstance(data, dict) else None) or payload.get("command") or "")
-    corridor = _verification_finalization_corridor(command)
-    if corridor is None:
-        return None
-    slug, include_values = corridor
-
-    session_id = resolve_work_intent_session_id(payload)
-    if not session_id:
-        return None
-    try:
-        claimed_bridge_id = bridge_work_intent_registry.current_claimed_bridge_id(session_id, project_root=root)
-    except Exception:  # noqa: BLE001 - registry failure must not clear the gate
-        return None
-    if not claimed_bridge_id or claimed_bridge_id != slug:
-        return None
-    try:
-        holder = bridge_work_intent_registry.current_holder(slug, project_root=root)
-    except Exception:  # noqa: BLE001 - registry failure must not clear the gate
-        return None
-    if not isinstance(holder, dict) or holder.get("session_id") != session_id:
-        return None
-
-    # Fresh assessment at decision time - never cached.
-    try:
-        assessment = assess_packet_terminal_evidence(root, slug)
-    except Exception:  # noqa: BLE001 - assessment failure must not clear the gate
-        return None
-    if not isinstance(assessment, dict) or not assessment.get("evidence_valid"):
-        return None
-    if assessment.get("chain_state") != "awaiting_review":
-        return None
-
-    facts = _verification_finalization_packet_facts(root, slug)
-    if facts is None:
-        return None
-    approved_target_paths, packet_hash_value = facts
-
-    stages = _split_pipeline_stages(command)
-    redirects: list[str] = []
-    for raw_redirect in _redirect_targets(stages[0]) if stages else []:
-        rel = _normalize(root, _clean_shell_token(raw_redirect))
-        if rel is None:
-            return None  # an unresolvable redirect target cannot be bounded
-        redirects.append(rel)
-    if any(is_protected_path(rel, project_root=root) for rel in redirects):
-        return None
-
-    normalized_includes: list[str] = []
-    for raw_include in include_values:
-        cleaned = _clean_shell_token(raw_include).replace("\\", "/")
-        if not cleaned or cleaned == ".":
-            return None
-        try:
-            normalized_includes.append(normalize_relative_path(root, cleaned))
-        except AuthorizationError:
-            return None  # declared target escapes project root -> fail closed
-
-    if UNKNOWN_MUTATING_TARGET in protected:
-        bounded = sorted(set(normalized_includes))
-    else:
-        bounded = sorted(set(protected) | set(normalized_includes))
-    if not bounded:
-        return None
-    for rel in bounded:
-        if path_authorized_by_target_paths(approved_target_paths, rel):
-            continue
-        if _is_bridge_chain_file(slug, rel):
-            continue
-        return None
-
-    return (
-        f"verification-finalization terminal-evidence clearance for bridge {slug!r}: "
-        f"packet_hash={packet_hash_value or '<absent>'} "
-        f"expired={bool(assessment.get('expired'))} "
-        f"live_at_implementation={bool(assessment.get('live_at_implementation'))} "
-        f"contested={bool(assessment.get('contested'))} "
-        f"chain_state={assessment.get('chain_state')!r} "
-        f"cleared_targets={bounded} "
-        "(terminal-evidence-sufficient packet semantics per DELIB-202667723; "
-        "historical evidence only - no active mutation authority conferred)."
-    )
-
-
-def _claimed_bridge_id(root: Path, session_id: str | None) -> str:
-    """Return the bridge id this session holds a work-intent claim for.
-
-    WI-7751: the gate previously read ``bridge_id`` out of an implementation-start
-    packet. ``GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`` v5 retires that
-    instrument, so the id is read from the work-intent registry instead — which is
-    already authoritative for it, as ``validate_targets`` demonstrates under WI-4443
-    by consulting the registry before any packet.
-
-    Fails closed. An absent session id, an absent claim, or a registry read error all
-    yield ``""``, which is not a bootstrap id, so ``work_intent_claim_block_reason``
-    then produces the denial. This function never authorizes on its own.
-    """
-    if not session_id or not session_id.strip():
-        return ""
-    try:
-        claimed = bridge_work_intent_registry.current_claimed_bridge_id(session_id, project_root=root)
-    except Exception:  # noqa: BLE001 - a registry read failure must deny, never authorize
-        return ""
-    return str(claimed or "")
-
-
-def _authorized_target_paths(root: Path, bridge_id: str) -> list[str]:
-    """Return the GO-approved proposal's ``target_paths`` for a live bridge thread.
-
-    WI-7751: ``GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`` v5 retires the
-    implementation-start packet but explicitly RETAINS change scope — "change scope
-    is the implementation proposal's declared ``target_paths`` together with the
-    applicable active formal authority". This derives that scope directly from the
-    proposal the latest GO authorized, in the chain the session is currently
-    implementing, and mints nothing.
-
-    Mirrors ``finalization_target_paths_for_verified``, which already derives the
-    same set for the post-``VERIFIED`` staging corridor without minting a packet;
-    this is the live-GO counterpart of that read.
-
-    Fails closed. Absence of a GO, of an approved proposal file, of a readable
-    proposal, or of declared ``target_paths`` all raise
-    :class:`AuthorizationError`, so scope can never widen by omission.
-    """
-    entry = bridge_entry(root, bridge_id)
-    go_index = next(
-        (index for index, (status, _) in enumerate(entry.versions) if status == "GO"),
-        None,
-    )
-    if go_index is None:
-        raise AuthorizationError(
-            f"No GO is present in the bridge chain for {entry.bridge_id}; found latest status {entry.latest_status}."
-        )
-    approved_proposal_file = next(
-        (path for status, path in entry.versions[go_index + 1 :] if status in {"NEW", "REVISED"}),
-        None,
-    )
-    if approved_proposal_file is None:
-        raise AuthorizationError(f"No approved proposal file found under GO for {entry.bridge_id}.")
-    try:
-        markdown = (root / approved_proposal_file).read_text(encoding="utf-8-sig")
-    except (OSError, UnicodeError) as exc:
-        raise AuthorizationError(
-            f"Approved proposal file is unreadable for scope derivation: {approved_proposal_file}"
-        ) from exc
-    target_paths = extract_target_paths(markdown)
-    if not target_paths:
-        raise AuthorizationError(f"Approved proposal for {entry.bridge_id} declares no target_paths.")
-    return target_paths
-
-
 def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
-    invalid_payload_reason = payload.get(INVALID_HOOK_PAYLOAD_KEY)
-    if isinstance(invalid_payload_reason, str) and invalid_payload_reason:
-        return {
-            "decision": "block",
-            "reason_code": "invalid_hook_payload",
-            "reason": (
-                "BLOCKED (GTKB-IMPLEMENTATION-START-GATE): invalid PreToolUse payload. "
-                f"{invalid_payload_reason} The gate fails closed because tool intent cannot be verified."
-            ),
-        }
-    direct_git_effect = _direct_git_effect_from_payload(payload)
-    if direct_git_effect is not None:
-        return {
-            "decision": "block",
-            "reason_code": "direct_git_effect_requires_lifecycle",
-            "reason": (
-                "BLOCKED (GTKB-GIT-LIFECYCLE): direct "
-                f"`git {direct_git_effect}` is not an authorized execution boundary. "
-                "Use the canonical `python -m groundtruth_kb.git_lifecycle` operation so current authority, "
-                "scope binding, quiescence, recovery, and evidence are enforced at effect time."
-            ),
-        }
+    """Route actual mutating targets through the CLI; never consult legacy packets."""
+
+    def blocked(code: str, reason: str) -> dict[str, Any]:
+        return {"decision": "block", "reason_code": code, "reason": reason}
+
+    invalid = payload.get(INVALID_HOOK_PAYLOAD_KEY)
+    if invalid:
+        return blocked("invalid_hook_payload", "Cannot identify the tool effect from the supplied payload.")
+    direct_git = _direct_git_effect_from_payload(payload)
+    if direct_git is not None:
+        return blocked(
+            "direct_git_effect_requires_lifecycle",
+            "Use the ordinary gt project commit or gt bridge worktree/publish-work operation for Git effects.",
+        )
     root = _project_root(payload)
-    paths, mutating = changed_paths(payload)
+    cwd = Path(str(payload.get("cwd") or root)).absolute()
+    paths, mutating = changed_paths({**payload, "project_root": str(cwd)})
     if not mutating:
         return {}
     if not paths:
-        protected = [UNKNOWN_MUTATING_TARGET]  # mutating, but no target extractable → fabricate sentinel → deny
-    else:
-        protected = [path for path in paths if is_protected_path(path, project_root=root)]
-    if not protected:
-        return {}
-    direct_reason_code = direct_write_block_reason_code(protected, project_root=root)
-    if direct_reason_code is not None:
-        classifications = ", ".join(
-            sorted({_protected_path_classification(path, project_root=root) for path in protected})
-        )
-        return {
-            "decision": "block",
-            "reason_code": direct_reason_code,
-            "reason": (
-                f"BLOCKED (GTKB-CONTROLLED-ARTIFACT-DIRECT-MUTATION): {BLOCKING_CLAUSE_ID}\n"
-                f"Reason: direct mutation matched controlled artifact surface(s): {classifications}. "
-                "Use the governed bridge, MemBase, dispatcher, or implementation-authorization helper path "
-                "for this artifact class; a raw tool or shell write is not valid authority evidence."
-            ),
-        }
-    dispatcher_config_targets = _dispatcher_config_direct_edit_targets(protected)
-    if dispatcher_config_targets:
-        return _dispatcher_config_cli_only_block(dispatcher_config_targets)
-    if _emergency_bridge_repair_applies(protected):
-        return {}
-    # WI-4837: post-VERIFIED finalization staging clearance (automatic parity per
-    # DELIB-WI4837-AUTOMATIC-PARITY-20260707). A narrow `git add` of the thread's
-    # own approved target_paths, on a terminal-VERIFIED chain identified by the
-    # session's work-intent claim, is cleared here so the finalization commit can
-    # stage its verified paths. This runs BEFORE validate_targets (which fails
-    # closed for terminal VERIFIED) and leaves _validate_packet unchanged:
-    # ordinary post-VERIFIED mutation still falls through and is blocked below.
-    finalization_reason = _post_verified_finalization_clearance(root, payload)
-    if finalization_reason is not None:
-        return {}
-    # WI-5694 cycle 2: verification-finalization terminal-evidence clearance
-    # (owner decision DELIB-202667723). The canonical `write_verdict.py
-    # --finalize-verified` command for a thread whose post-GO chain awaits its
-    # terminal verdict is cleared when the implementation-start packet is valid
-    # historical EVIDENCE -- live at implementation and uncontested -- even after
-    # it has expired. This runs BEFORE validate_targets (whose hard expiry
-    # rejection is the active-authority WI-4532 invariant DELIB-202667723
-    # retains) and leaves _validate_packet untouched: every non-corridor command
-    # falls through to the unchanged path below.
-    evidence_reason = _verification_finalization_evidence_clearance(root, payload, protected)
-    if evidence_reason is not None:
-        return {}
+        return blocked("unknown_effect_targets", "Use an explicit tool target or the ordinary CLI for this effect.")
+    native = str(os.environ.get("GTKB_NATIVE_CONTEXT_ID") or payload.get("session_id") or "").strip()
+    supplied = str(payload.get("session_id") or "").strip()
+    if not native or (supplied and supplied != native):
+        return blocked("invalid_native_context", "The tool must carry the current harness-native context identifier.")
+    argv = [
+        sys.executable,
+        "-m",
+        "groundtruth_kb",
+        "bridge",
+        "check-effects",
+        "--native-context-id",
+        native,
+        "--cwd",
+        str(cwd),
+        "--json",
+    ]
+    for path in paths:
+        argv.extend(["--path", path])
+    env = dict(os.environ)
+    env["GT_PROJECT_ROOT"] = str(root)
+    env["PYTHONIOENCODING"] = "utf-8"
     try:
-        # WI-7751: the gate no longer resolves an implementation-start packet and no
-        # longer re-evaluates a packet-bound project authorization.
-        # GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001 v5 states that no authorization
-        # instrument exists and that a surface requiring one is defective and must be
-        # repaired rather than satisfied. The readiness controls v5 RETAINS — a matching
-        # live work-intent claim, and the WI-4471/peer-report concurrency checks — stay
-        # exactly as they were. They only ever needed the session's claimed bridge id,
-        # which the work-intent registry is already authoritative for; validate_targets
-        # itself consults the registry first under WI-4443, before any packet.
-        session_id = resolve_work_intent_session_id(payload)
-        bridge_id = _claimed_bridge_id(root, session_id)
-        # WI-7751: the retired packet path ran first and its broad handler absorbed
-        # registry faults before the claim check ever ran. With that path gone, an
-        # unexpected registry error would escape gate_decision and be reported as a
-        # crash rather than a denial, which is fail-open at the hook boundary. Convert
-        # it to a denial here so a registry fault still refuses the mutation.
-        try:
-            block_reason = work_intent_claim_block_reason(root, bridge_id, session_id)
-        except AuthorizationError:
-            raise
-        except Exception as exc:  # noqa: BLE001 - a registry fault must deny, never authorize
-            raise AuthorizationError(f"Could not verify the bridge work-intent claim for {bridge_id!r}: {exc}") from exc
-        if block_reason:
-            raise AuthorizationError(block_reason)
-        # WI-7751: change scope is RETAINED by v5 — "change scope is the
-        # implementation proposal's declared target_paths". The packet used to carry
-        # that set; with the packet retired, the set is derived from the GO-approved
-        # proposal of the thread this session is implementing. WI-7761 records the
-        # correction this stands in for: the work-intent claim should carry the
-        # authorized paths, captured when the claim is taken against the GO, so the
-        # gate needs no bridge read at mutation time.
-        # Bootstrap threads are exempt for the same reason work_intent_claim_block_reason
-        # exempts them: they exist to bring the gate's own authority surface into being
-        # and therefore cannot have a GO'd proposal to derive scope from.
-        if bridge_id not in BOOTSTRAP_BRIDGE_IDS:
-            authorized_paths = _authorized_target_paths(root, bridge_id)
-            unauthorized = [
-                path
-                for path in protected
-                if not path_authorized_by_target_paths(authorized_paths, normalize_relative_path(root, path))
-            ]
-            if unauthorized:
-                raise AuthorizationError(
-                    "Protected target(s) outside the approved proposal's target_paths for "
-                    f"{bridge_id!r}: {', '.join(sorted(unauthorized))}. Authorized paths: "
-                    f"{', '.join(sorted(authorized_paths))}."
-                )
-        # WI-4471: cross-claim path-collision check — block if a different session's
-        # active claim already reserves any of the same target paths.
-        collision_reason = cross_claim_path_collision_reason(
-            root, targets=protected, bridge_id=bridge_id, session_id=session_id
+        result = subprocess.run(
+            argv,
+            cwd=root,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=10,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
-        if collision_reason:
-            raise AuthorizationError(collision_reason)
-        peer_report_reason = peer_report_dirty_path_collision_reason(
-            root,
-            targets=protected,
-            bridge_id=bridge_id,
+        if result.returncode:
+            return blocked(
+                "native_effect_refused", result.stderr.strip()[:2000] or "The native CLI refused the effect check."
+            )
+        current = json.loads(result.stdout)
+        if (
+            not isinstance(current, dict)
+            or current.get("status") != "current"
+            or current.get("scope") not in {"scratch", "implementation"}
+        ):
+            return blocked("invalid_effect_response", "The native CLI did not return a current effect check.")
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return blocked(
+            "effect_check_unavailable", "Restore the native CLI/authority connection before retrying this effect."
         )
-        if peer_report_reason:
-            raise AuthorizationError(peer_report_reason)
-    except AuthorizationError as exc:
-        classifications = ", ".join(
-            sorted({_protected_path_classification(path, project_root=root) for path in protected})
-        )
-        return {
-            "decision": "block",
-            "reason": (
-                f"BLOCKED (GTKB-IMPLEMENTATION-START-GATE): {BLOCKING_CLAUSE_ID}\n"
-                f"Reason: protected implementation mutation matched {classifications} and requires "
-                f"a live bridge GO authorization packet plus matching bridge work-intent claim. {exc}\n"
-                "Suggested fix: acquire or activate an authorization packet with "
-                "`python scripts/bridge_claim_cli.py claim <id>` and "
-                "`python scripts/implementation_authorization.py begin --bridge-id <id>` before mutating protected targets."
-            ),
-        }
     return {}
 
 

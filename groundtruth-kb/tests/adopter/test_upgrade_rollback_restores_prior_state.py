@@ -33,7 +33,7 @@ def _commit_all(adopter: Path, message: str) -> None:
 def test_rollback_restores_pre_upgrade_state(clean_adopter: tuple[Path, Path], tmp_path: Path) -> None:
     """Delete a managed file → upgrade restores it → rollback removes it again."""
     adopter, _ = clean_adopter
-    managed_file = adopter / ".claude" / "hooks" / "assertion-check.py"
+    managed_file = adopter / ".claude" / "hooks" / "credential-scan.py"
     assert managed_file.exists()
 
     _setup_git(adopter)

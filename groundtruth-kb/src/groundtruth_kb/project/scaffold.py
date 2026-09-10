@@ -294,8 +294,6 @@ def enumerate_scaffold_outputs(profile_name: str, *, cloud_provider: str = "none
             # GTKB-ISOLATION-017 Slice 3: Phase 9 §1 scaffold artifacts
             "README.md",
             "memory/release-readiness.md",
-            ".codex/hooks.json",
-            ".groundtruth/formal-artifact-approvals/.gitkeep",
         }
     )
 
@@ -323,18 +321,6 @@ def enumerate_scaffold_outputs(profile_name: str, *, cloud_provider: str = "none
                 "bridge/.gitkeep",
             }
         )
-        # Codex bootstrap files copied from the GT-KB templates dir. These
-        # live under templates/project/codex-bootstrap/*.md and are
-        # version-deterministic but enumerated from the templates tree so
-        # adding a new bootstrap doc does not silently drift the check.
-        templates_dir = get_templates_dir()
-        codex_src = templates_dir / "project" / "codex-bootstrap"
-        if codex_src.exists():
-            for src in codex_src.glob("*.md"):
-                if src.name == "loyal-opposition-log.md":
-                    paths.add(f"independent-progress-assessments/{src.name}")
-                else:
-                    paths.add(f".claude/rules/{src.name}")
 
     # Webapp-profile outputs (all profiles with ``includes_docker``)
     if profile.includes_docker:
@@ -381,6 +367,7 @@ def scaffold_project(options: ScaffoldOptions) -> Path:
 
     # ── Base templates (all profiles) ─────────────────────────────────
     _copy_base_templates(target)
+    _copy_skill_templates(target, profile.name)
 
     # ── Dual-agent templates ──────────────────────────────────────────
     if profile.includes_bridge:
@@ -547,11 +534,6 @@ def _emit_slice3_artifacts(target: Path, project_name: str, copyright_notice: st
     - ``README.md`` — adopter-facing quickstart block (Phase 9 §1 line 105).
     - ``memory/release-readiness.md`` — application-subject banner
       (Phase 9 §1 lines 123–125).
-    - ``.codex/hooks.json`` — forward-compat intent (Phase 9 §1 lines 129–130;
-      consistent with ADR-CODEX-HOOK-PARITY-FALLBACK-001).
-    - ``.groundtruth/formal-artifact-approvals/.gitkeep``
-      (Phase 9 §1 lines 131–132).
-
     Standing-backlog seeding was retired at Slice 7-prime per DELIB-S337;
     new adopters use MemBase-only backlog (no markdown standing-backlog file).
     """
@@ -576,29 +558,9 @@ def _emit_slice3_artifacts(target: Path, project_name: str, copyright_notice: st
             encoding="utf-8",
         )
 
-    codex_dir = target / ".codex"
-    codex_dir.mkdir(parents=True, exist_ok=True)
-    (codex_dir / "hooks.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "intent": "forward-compatible Codex hook registration",
-                "see": "ADR-CODEX-HOOK-PARITY-FALLBACK-001",
-                "hooks": [],
-            },
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    approvals_dir = target / ".groundtruth" / "formal-artifact-approvals"
-    approvals_dir.mkdir(parents=True, exist_ok=True)
-    (approvals_dir / ".gitkeep").write_text("", encoding="utf-8")
-
 
 def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
-    """Copy dual-agent templates: AGENTS.md, bridge rules, Codex bootstrap."""
+    """Copy the profile instructions and registered managed artifacts."""
     templates = get_templates_dir()
 
     # BRIDGE-INVENTORY.md
@@ -616,7 +578,7 @@ def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
     if agents_template.exists():
         shutil.copy2(agents_template, target / "AGENTS.md")
     else:
-        _write_default_agents_md(target)
+        raise FileNotFoundError(f"Required session instructions missing: {agents_template}")
 
     # All rules (bridge-specific) — registry-driven.
     rules_target = target / ".claude" / "rules"
@@ -644,22 +606,6 @@ def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
             continue
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
-
-    # Codex bootstrap documents
-    ipa_dir = target / "independent-progress-assessments"
-    ipa_dir.mkdir(parents=True, exist_ok=True)
-    (ipa_dir / "CODEX-INSIGHT-DROPBOX").mkdir(exist_ok=True)
-
-    rules_dir = target / ".claude" / "rules"
-    rules_dir.mkdir(parents=True, exist_ok=True)
-
-    codex_src = templates / "project" / "codex-bootstrap"
-    if codex_src.exists():
-        for src in codex_src.glob("*.md"):
-            if src.name == "loyal-opposition-log.md":
-                shutil.copy2(src, ipa_dir / src.name)
-            else:
-                shutil.copy2(src, rules_dir / src.name)
 
     # settings.local.json with bridge hooks
     settings_template = templates / "project" / "settings.local.json"
@@ -697,22 +643,19 @@ def _copy_dual_agent_templates(target: Path, *, project_name: str = "") -> None:
     bridge_dir.mkdir(parents=True, exist_ok=True)
     (bridge_dir / ".gitkeep").write_text("", encoding="utf-8")
 
-    # .claude/skills/ — dual-agent-only Phase A skills (decision-capture).
-    _copy_skill_templates(target)
 
-
-def _copy_skill_templates(target: Path) -> None:
-    """Copy dual-agent skill templates into ``.claude/skills/``.
+def _copy_skill_templates(target: Path, profile_name: str) -> None:
+    """Copy the selected profile's registered skill templates.
 
     Driven by the managed-artifact registry: every ``skill``-class record whose
-    ``initial_profiles`` contains ``dual-agent`` is copied, preserving subdirectory
-    structure (e.g., ``decision-capture/helpers/record_decision.py``). Missing
+    ``initial_profiles`` contains the selected profile is copied, preserving subdirectory
+    structure. Missing
     template files are silently skipped so a partially-populated template tree
     does not break scaffold.
     """
     templates = get_templates_dir()
 
-    for artifact in artifacts_for_scaffold("dual-agent", class_="skill"):
+    for artifact in artifacts_for_scaffold(profile_name, class_="skill"):
         assert isinstance(artifact, FileArtifact)
         src = templates / artifact.template_path
         if not src.exists():
@@ -979,34 +922,6 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["E501", "B008", "SIM108", "UP007"]
 """
     (target / "pyproject-sections.toml").write_text(content, encoding="utf-8")
-
-
-def _write_default_agents_md(target: Path) -> None:
-    content = """\
-# {{PROJECT_NAME}} — Loyal Opposition Operating Contract
-
-## Non-negotiable Rule
-YOU MUST NOT delete or modify files which you have not created without explicit
-approval from the owner.
-
-## Role
-- **Loyal Opposition mission:** inspect, critique, and analyze implementation.
-- **Output:** evidence-based reports in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`
-
-## Startup Checklist
-1. Run file bridge sweep: scan versioned bridge files for latest NEW, REVISED, or NO-ACTION entries
-2. Read project CLAUDE.md and MEMORY.md
-3. Report operating state to Prime Builder
-
-## Report Standard
-Each finding must include:
-1. Concrete claim
-2. Evidence source
-3. Severity (P0-P3)
-4. Impact
-5. Recommended action
-"""
-    (target / "AGENTS.md").write_text(content, encoding="utf-8")
 
 
 def _write_default_dockerfile(target: Path) -> None:

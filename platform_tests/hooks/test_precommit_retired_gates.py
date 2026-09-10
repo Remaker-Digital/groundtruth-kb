@@ -21,8 +21,6 @@ PRE_COMMIT_HOOK = PROJECT_ROOT / ".githooks" / "pre-commit"
 RETIRED_GATE = "check_protected_commit_authorization.py"
 LIVE_GATES = (
     "scan_secrets.py",
-    "check_dev_environment_inventory_drift.py",
-    "check_narrative_artifact_evidence.py",
     "check_ruff_format.py",
     "check_commit_pathspec_safety.py",
     "check_projection_drift.py",
@@ -36,6 +34,8 @@ def _invocations(text: str, script: str) -> list[str]:
 
 def test_pre_commit_does_not_invoke_the_retired_protected_commit_gate() -> None:
     text = PRE_COMMIT_HOOK.read_text(encoding="utf-8")
+    for retired in ("check_narrative_artifact_evidence.py", "check_dev_environment_inventory_drift.py"):
+        assert not _invocations(text, retired)
     assert _invocations(text, RETIRED_GATE) == [], (
         f"{RETIRED_GATE} is retired: project authorization is a field on the project row "
         "and gates dispatch, not commits (canon section 3)."

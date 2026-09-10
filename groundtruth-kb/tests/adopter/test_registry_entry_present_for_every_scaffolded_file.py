@@ -29,7 +29,6 @@ _REGISTRY_EXEMPT_FILES: frozenset[str] = frozenset(
     {
         # Bootstrap-only outputs (not registry-managed)
         ".gitignore",  # written by bootstrap._write_project_gitignore
-        ".groundtruth/formal-artifact-approvals/.gitkeep",  # Slice 3 emit
         # Base templates copied by `_copy_base_templates`
         ".editorconfig",
         ".pre-commit-config.yaml",
@@ -42,17 +41,11 @@ _REGISTRY_EXEMPT_FILES: frozenset[str] = frozenset(
         # Dual-agent template-copies
         "BRIDGE-INVENTORY.md",
         "bridge-os-poller-setup-prompt.md",
-        # Codex bootstrap docs (per `_copy_dual_agent_templates` codex_src loop)
-        ".claude/rules/codex-review-operating-contract.md",
-        ".claude/rules/codex-session-bootstrap.md",
-        ".claude/rules/codex-way-of-working.md",
-        "independent-progress-assessments/loyal-opposition-log.md",
+        "bridge/.gitkeep",  # empty directory marker, never a bridge payload
         # Settings synthesized from settings-hook-registration rows (the rows are
         # in the registry but the file itself is the implicit aggregation target)
         ".claude/settings.json",
         ".claude/settings.local.json",
-        # Codex forward-compat config emitted by Slice 3
-        ".codex/hooks.json",
     }
 )
 

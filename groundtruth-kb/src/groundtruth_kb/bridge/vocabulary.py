@@ -118,7 +118,7 @@ HISTORICAL_TRANSITIONS: dict[str, frozenset[str]] = {
 # lets a reader describe an old chain. Accepting `NEW -> VERIFIED` lets it
 # conclude that work was verified which never received a GO or an
 # implementation report -- and this resolver is consumed by
-# `implementation_start_gate` and `check_protected_commit_authorization`, so a
+# `implementation_start_gate`, so a
 # resolution is not merely a description there.
 #
 # VERIFIED is the authority-bearing terminal status. No superseded pair may

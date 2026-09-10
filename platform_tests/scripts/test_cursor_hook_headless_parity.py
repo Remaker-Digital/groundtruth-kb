@@ -10,15 +10,22 @@ import subprocess
 import sys
 from pathlib import Path
 
+from scripts.check_harness_parity import _load_projector
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CURSOR_HOOKS_PATH = PROJECT_ROOT / ".cursor" / "hooks.json"
 CURSOR_ADAPTER_PATH = PROJECT_ROOT / "scripts" / "cursor_hook_adapter.py"
 SESSION_START_CORE = PROJECT_ROOT / "scripts" / "session_start_dispatch_core.py"
 SESSION_SELF_INIT = PROJECT_ROOT / "scripts" / "session_self_initialization.py"
 
 
+def _cursor_registration() -> str:
+    plan = _load_projector(PROJECT_ROOT).build_plan("cursor")
+    assert not plan.gaps, plan.gaps
+    return plan.writes[".cursor/hooks.json"]
+
+
 def _cursor_hook_commands() -> list[str]:
-    hooks = json.loads(CURSOR_HOOKS_PATH.read_text(encoding="utf-8"))["hooks"]
+    hooks = json.loads(_cursor_registration())["hooks"]
     commands: list[str] = []
     for entries in hooks.values():
         for entry in entries:
@@ -41,7 +48,7 @@ def test_cursor_interactive_hooks_use_venv_python_exe() -> None:
 
 
 def test_cursor_fail_closed_hooks_use_timeout_floor_and_write_matchers() -> None:
-    raw = CURSOR_HOOKS_PATH.read_text(encoding="utf-8")
+    raw = _cursor_registration()
     hooks = json.loads(raw)["hooks"]
     assert '"timeout": 5' not in raw
 
@@ -61,7 +68,7 @@ def test_cursor_fail_closed_hooks_use_timeout_floor_and_write_matchers() -> None
         "destructive-gate.py",
         "credential-scan.py",
         "scanner-safe-writer.py",
-        "formal-artifact-approval-gate.py",
+        "implementation_start_gate.py",
     )
     for script in write_only:
         matching = [
@@ -159,6 +166,40 @@ def test_adapter_maps_empty_failure_to_cursor_deny_exit_2(tmp_path: Path) -> Non
 
     assert completed.returncode == 2
     assert payload["permission"] == "deny"
+
+
+def test_adapter_preserves_native_permission_deny_from_successful_process(tmp_path: Path) -> None:
+    target = tmp_path / "native_deny.py"
+    target.write_text(
+        'import json\nprint(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", '
+        '"permissionDecision": "deny", "permissionDecisionReason": "native effect refused"}}))\n',
+        encoding="utf-8",
+    )
+    completed = _run_adapter(target, {"tool_name": "Write", "tool_input": {"path": "x"}})
+    assert completed.returncode == 2
+    assert json.loads(completed.stdout)["user_message"] == "native effect refused"
+
+
+def test_adapter_does_not_accept_json_from_failed_hook_process(tmp_path: Path) -> None:
+    target = tmp_path / "failed_allow.py"
+    target.write_text('print("{}")\nraise SystemExit(1)\n', encoding="utf-8")
+    completed = _run_adapter(target, {"tool_name": "Write", "tool_input": {"path": "x"}})
+    assert completed.returncode == 2
+    assert json.loads(completed.stdout)["permission"] == "deny"
+
+
+def test_adapter_preserves_real_native_gate_refusal(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("GTKB_NATIVE_CONTEXT_ID", raising=False)
+    destination = tmp_path / "must-not-be-written.txt"
+    completed = _run_adapter(
+        PROJECT_ROOT / "scripts/implementation_start_gate.py",
+        {"tool_name": "Write", "tool_input": {"file_path": str(destination), "content": "blocked"}},
+    )
+    result = json.loads(completed.stdout)
+    assert completed.returncode == 2
+    assert result["permission"] == "deny"
+    assert "current harness-native context identifier" in result["user_message"]
+    assert not destination.exists()
 
 
 def test_adapter_resolves_relative_target_from_non_repo_cwd(tmp_path: Path) -> None:

@@ -4,12 +4,11 @@ Registry declarations remain the only membership authority.  The observers in
 this module establish that a present path is load-bearing; they never grant
 membership themselves.  Reconciliation therefore reports candidate additions
 separately from current membership and leaves registry mutation to the
-journalled control plane.
+canonical declaration writer.
 """
 
 from __future__ import annotations
 
-import fnmatch
 import hashlib
 import heapq
 import json
@@ -24,13 +23,17 @@ from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
+from groundtruth_kb.authority_client import AuthorityClient
+from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.inventory.string_scan import registered_artifact_inventory
 from groundtruth_kb.project.registry_control_plane import (
     RegistryCoverageError,
     RegistrySnapshot,
+    _glob_path_matches,
+    _path_object_kind,
     load_registry_snapshot,
-    registry_currentness,
+    registry_identity_state,
 )
 from groundtruth_kb.project.sot_registry import SoTArtifact
 
@@ -120,20 +123,9 @@ _NON_AUTHORITATIVE_RUNTIME_PREFIXES = (
     "test-auth-root/",
 )
 _CANONICAL_UNTRACKED_REFERENCE_PREFIXES = (
-    ".agent/skills/",
-    ".api-harness/skills/",
-    ".claude/commands/",
-    ".claude/hooks/",
-    ".claude/rules/",
-    ".claude/skills/",
-    ".codex/gtkb-hooks/",
-    ".codex/skills/",
-    ".cursor/gtkb-hooks/",
-    ".cursor/rules/",
-    ".cursor/skills/",
+    ".harness-baseline-configuration/",
     ".githooks/",
     ".github/workflows/",
-    ".goose/skills/",
     "config/",
     "docs/",
     "groundtruth-kb/",
@@ -143,11 +135,9 @@ _CANONICAL_UNTRACKED_REFERENCE_PREFIXES = (
     "scripts/",
     "tools/",
 )
-_RECURSIVE_SERVICE_CONTAINER_ROOTS = frozenset({".groundtruth/formal-artifact-approvals"})
 _SKIP_SOURCE_PREFIXES = (
     "bridge/",
     ".gtkb-state/",
-    ".claude/session/",
     "memory/",
 )
 _PATH_TOKEN_RE = re.compile(
@@ -247,13 +237,12 @@ def _is_non_authoritative_reference(relative: str) -> bool:
         folded = folded[2:]
     parts = PurePosixPath(folded.rstrip("/")).parts
     basename = parts[-1] if parts else ""
-    formal_approval = folded.startswith(".groundtruth/formal-artifact-approvals/")
     return (
         folded == "memory.md"
         or folded in {"groundtruth.db-shm", "groundtruth.db-wal", "groundtruth.db-journal"}
         or any(part in _NON_AUTHORITATIVE_SEGMENTS for part in parts)
         or any(folded.startswith(prefix.casefold()) for prefix in _NON_AUTHORITATIVE_RUNTIME_PREFIXES)
-        or (folded.startswith(".groundtruth/") and not formal_approval)
+        or folded.startswith(".groundtruth/")
         or basename.startswith(("last-session-", "last-user-visible-startup", "last-wrapup-"))
         or basename in {".session-lifecycle-guard.json", "scheduled_tasks.lock"}
         or any(folded.startswith(prefix.casefold()) for prefix in _NON_AUTHORITATIVE_PREFIXES)
@@ -270,15 +259,13 @@ def _is_authoritative_dependency_target(
 
     Git membership is corroborating evidence only.  A target still needs the
     registered-reference observation that called this helper.  Present
-    untracked projections are accepted only inside known canonical surfaces or
+    untracked source files are considered only inside current source surfaces or
     when another typed observer independently selected them.
     """
 
     folded = relative.casefold()
     if _is_non_authoritative_reference(relative):
         return False
-    if folded == "groundtruth.db" or folded.startswith(".groundtruth/formal-artifact-approvals/"):
-        return True
     tracked = folded in _tracked_canonical_paths(project_root)
     if folded in typed_seed_paths or tracked:
         return True
@@ -293,19 +280,6 @@ def _is_opaque_payload(snapshot: RegistrySnapshot, relative: str) -> bool:
         return False
     operation_record = snapshot.resolver.resolve_operation_path(relative)
     return operation_record is not None and operation_record.coverage_mode == "opaque_container"
-
-
-def _is_prospective_service_payload(relative: str) -> bool:
-    folded = relative.casefold()
-    return any(folded.startswith(root.casefold().rstrip("/") + "/") for root in _RECURSIVE_SERVICE_CONTAINER_ROOTS)
-
-
-def _is_prospective_service_boundary_or_payload(relative: str) -> bool:
-    folded = relative.casefold().rstrip("/")
-    return any(
-        folded == root.casefold().rstrip("/") or folded.startswith(root.casefold().rstrip("/") + "/")
-        for root in _RECURSIVE_SERVICE_CONTAINER_ROOTS
-    )
 
 
 def _is_skipped_dependency_source(relative: str) -> bool:
@@ -419,18 +393,14 @@ def _without_opaque_payload_observations(
 ) -> ObserverResult:
     """Keep opaque payloads owned by their registered service boundary."""
 
-    kept = tuple(
-        item
-        for item in result.observations
-        if not _is_opaque_payload(snapshot, item.relative_path)
-        and not _is_prospective_service_payload(item.relative_path)
-    )
+    kept = tuple(item for item in result.observations if not _is_opaque_payload(snapshot, item.relative_path))
     ancestor_paths = {ancestor for item in kept for ancestor in _ancestors(item.relative_path)}
     if not result.observations:
         ancestor_paths = {
             ancestor
             for ancestor in result.ancestor_paths
-            if not _is_opaque_payload(snapshot, ancestor) and not _is_prospective_service_boundary_or_payload(ancestor)
+            if (record := snapshot.resolver.resolve_operation_path(ancestor)) is None
+            or record.coverage_mode != "opaque_container"
         }
     if kept == result.observations and ancestor_paths == set(result.ancestor_paths):
         return result
@@ -478,7 +448,7 @@ def _normalize_present_paths_uncached(root: Path, raw: str) -> tuple[tuple[str, 
     candidate = Path(value)
     if candidate.is_absolute():
         try:
-            relative = candidate.resolve(strict=False).relative_to(root).as_posix()
+            relative = candidate.relative_to(root).as_posix()
         except (OSError, ValueError):
             return (), "outside_project_root"
         value = relative
@@ -498,7 +468,7 @@ def _normalize_present_paths_uncached(root: Path, raw: str) -> tuple[tuple[str, 
         matches = [
             relative
             for relative in _tracked_inventory(root)
-            if fnmatch.fnmatchcase(relative.casefold(), pattern)
+            if _glob_path_matches(relative, pattern)
             and not _is_hosted_application_path(relative)
             and not _is_non_authoritative_reference(relative)
         ]
@@ -512,6 +482,11 @@ def _normalize_present_paths_uncached(root: Path, raw: str) -> tuple[tuple[str, 
     if not exists:
         return (), "missing"
     try:
+        ancestor = root
+        for part in PurePosixPath(value.rstrip("/")).parts:
+            ancestor /= part
+            if _path_object_kind(ancestor) not in {"file", "directory"}:
+                return (), "linked_or_special_path"
         resolved = target.resolve(strict=False)
         resolved.relative_to(root)
     except (OSError, ValueError):
@@ -520,28 +495,39 @@ def _normalize_present_paths_uncached(root: Path, raw: str) -> tuple[tuple[str, 
 
 
 def observe_capability_inventory(project_root: Path, _snapshot: RegistrySnapshot, _db_path: Path) -> ObserverResult:
+    """Observe current neutral baseline files without consulting harness outputs."""
     observer: ObserverClass = "capability_inventory"
-    try:
-        from scripts.check_harness_parity import capability_artifact_observations
+    baseline = project_root / ".harness-baseline-configuration"
+    observations: list[ArtifactObservation] = []
 
-        rows = capability_artifact_observations(project_root)
-        observations: list[ArtifactObservation] = []
-        diagnostics: list[str] = []
-        for row in rows:
-            paths, status = _normalize_present_paths(project_root, str(row["path"]))
-            if status not in {None, "missing"}:
-                diagnostics.append(f"{row['path']}: {status}")
-            for relative in paths:
+    def walk(directory: Path) -> None:
+        for path in sorted(directory.iterdir(), key=lambda item: item.name.casefold()):
+            if path.name in _NON_AUTHORITATIVE_SEGMENTS or path.suffix.lower() in {".pyc", ".pyo"}:
+                continue
+            if path.name == ".projection-manifest.json":
+                continue  # Projector output is not an authored baseline source.
+            kind = _path_object_kind(path)
+            relative = _relative(project_root, path)
+            if kind == "directory":
+                if path.name.startswith("."):
+                    raise RegistryCoverageError(f"Unexpected hidden subtree in canonical baseline: {relative}")
+                walk(path)
+            elif kind == "file":
                 observations.append(
                     ArtifactObservation(
-                        relative_path=relative,
-                        observer_class=observer,
-                        evidence_source=str(row["source"]),
-                        reason=str(row["reason"]),
+                        relative, observer, "canonical_harness_baseline", "current baseline source file"
                     )
                 )
-        return _result(observer, input_rows=rows, observations=observations, diagnostics=diagnostics)
-    except Exception as exc:  # noqa: BLE001 - a failed required observer is explicit evidence.
+            else:
+                raise RegistryCoverageError(f"Cannot follow {kind} in canonical baseline: {relative}")
+
+    try:
+        if not baseline.exists() or _path_object_kind(baseline) != "directory":
+            raise RegistryCoverageError(f"Canonical baseline root is missing or not an ordinary directory: {baseline}")
+        walk(baseline)
+        rows = [{"path": item.relative_path, "source": item.evidence_source} for item in observations]
+        return _result(observer, input_rows=rows, observations=observations)
+    except (OSError, ValueError, RegistryCoverageError) as exc:
         return _result(
             observer,
             input_rows={"error": type(exc).__name__, "detail": str(exc)},
@@ -550,11 +536,33 @@ def observe_capability_inventory(project_root: Path, _snapshot: RegistrySnapshot
         )
 
 
-def observe_governed_knowledge(project_root: Path, _snapshot: RegistrySnapshot, db_path: Path) -> ObserverResult:
+def observe_governed_knowledge(
+    project_root: Path,
+    _snapshot: RegistrySnapshot,
+    db_path: Path,
+    *,
+    config: GTConfig | None = None,
+) -> ObserverResult:
     observer: ObserverClass = "governed_knowledge"
     try:
-        db = KnowledgeDB(db_path=db_path)
-        rows = db.list_registry_path_observations()
+        selected = config
+        if selected is None:
+            config_path = project_root / "groundtruth.toml"
+            selected = (
+                GTConfig.load(config_path, project_root=project_root)
+                if config_path.is_file()
+                else GTConfig.load(discover=False, project_root=project_root, db_path=db_path)
+            )
+        if selected.authority_url:
+            rows = AuthorityClient(selected.authority_url).request("GET", "/v1/registry/path-observations")
+            if not isinstance(rows, list):
+                raise ValueError("Authority path inventory must be a list")
+        else:
+            db = KnowledgeDB(db_path=selected.db_path, read_only=True)
+            try:
+                rows = db.list_registry_path_observations()
+            finally:
+                db.close()
         observations: list[ArtifactObservation] = []
         diagnostics: list[str] = []
         for row in rows:
@@ -712,33 +720,9 @@ def observe_registered_dependency_closure(
         records_by_id = {record.id: record for record in snapshot.records}
         observations: list[ArtifactObservation] = []
         input_files: list[dict[str, str]] = []
-        proposed_container_sources: dict[str, Path] = {}
-
-        approval_root = project_root / ".groundtruth" / "formal-artifact-approvals"
-        if approval_root.is_dir():
-            observations.append(
-                ArtifactObservation(
-                    ".groundtruth/formal-artifact-approvals",
-                    observer,
-                    "managed_service_container:formal-artifact-approvals",
-                    "immutable formal-approval audit service container",
-                )
-            )
-            for path in sorted(approval_root.rglob("*"), key=lambda item: item.as_posix().casefold()):
-                if path.is_file() and path.suffix.casefold() in _TEXT_SUFFIXES:
-                    proposed_container_sources[_relative(project_root, path)] = path
-        database = project_root / "groundtruth.db"
-        if database.is_file():
-            observations.append(
-                ArtifactObservation(
-                    "groundtruth.db",
-                    observer,
-                    "service_identity:groundtruth-kb-membase",
-                    "load-bearing opaque MemBase service identity",
-                )
-            )
-
         for record in snapshot.records:
+            if record.lifecycle == "archive":
+                continue
             for dependency in record.depends_on:
                 target = records_by_id.get(dependency)
                 raw = target.storage_path if target is not None else dependency
@@ -753,7 +737,7 @@ def observe_registered_dependency_closure(
                         )
                     )
 
-        source_files: dict[str, Path] = dict(proposed_container_sources)
+        source_files: dict[str, Path] = {}
         for expansion in expansions:
             record = records_by_id.get(expansion.artifact.id)
             if (
@@ -791,16 +775,8 @@ def observe_registered_dependency_closure(
                 continue
             processed.add(relative.casefold())
             path = source_files[relative]
-            try:
-                payload = path.read_bytes()
-            except OSError:
-                continue
-            if len(payload) > 2_000_000:
-                continue
-            try:
-                text = payload.decode("utf-8")
-            except UnicodeDecodeError:
-                continue
+            payload = path.read_bytes()
+            text = payload.decode("utf-8")
             input_files.append({"path": relative, "sha256": _sha256_bytes(payload)})
             raw_references = set(_text_path_references(text))
             if path.suffix.casefold() in {".json", ".toml"}:
@@ -845,13 +821,13 @@ def observe_registered_dependency_closure(
                         heapq.heappush(pending, (target.casefold(), target))
 
         input_rows = {
-            "registry_generation": snapshot.generation_digest,
+            "registry_generation": snapshot.declaration_digest,
             "seed_paths": normalized_seeds,
             "source_files": input_files,
             "dependency_rows": [
                 {"id": record.id, "depends_on": list(record.depends_on)}
                 for record in sorted(snapshot.records, key=lambda item: item.id)
-                if record.depends_on
+                if record.depends_on and record.lifecycle != "archive"
             ],
         }
         return _result(observer, input_rows=input_rows, observations=observations)
@@ -963,7 +939,7 @@ def _membership_census(
                 tuple(sorted({item.observer_class for item in observations})),
                 tuple(sorted({item.evidence_source for item in observations})),
             )
-        if observations and (kind != "directory" or relative in _RECURSIVE_SERVICE_CONTAINER_ROOTS):
+        if observations and kind != "directory":
             return (
                 "unregistered_load_bearing",
                 None,
@@ -1187,77 +1163,32 @@ def _candidate_id(relative: str) -> str:
 
 def _candidate_domain(relative: str) -> str:
     folded = relative.casefold()
-    if folded == "groundtruth.db":
-        return "specifications"
     if folded.startswith("bridge/"):
         return "bridge_protocol"
-    if folded.endswith(".md") and folded.startswith((".claude/rules/", "docs/")):
+    if folded.endswith(".md") and folded.startswith((".harness-baseline-configuration/rules/", "docs/")):
         return "narrative_authority"
     if "/test" in folded or folded.startswith("platform_tests/") or folded.startswith("tests/"):
         return "governance_policy"
-    if folded.startswith(("harness-state/", ".claude/session/")):
-        return "harness_state"
     return "control_surface"
 
 
 def _candidate_record(relative: str, *, object_kind: str, git_managed: bool, observers: Sequence[str]) -> SoTArtifact:
-    if relative == "groundtruth.db":
-        return SoTArtifact(
-            id=_candidate_id(relative),
-            domain="specifications",
-            lifecycle="active",
-            storage_path=relative,
-            authority_spec_id="GOV-PLATFORM-SOT-REGISTRY-001",
-            mutation_api="groundtruth_kb.db.KnowledgeDB service ledger",
-            versioning_policy="append_only_versioned",
-            backup_policy="membase_export",
-            health_check_function="_check_db_schema",
-            owner_role="automated_only",
-            restore_action="membase_export_restore",
-            notes="WI-5441 service-owned opaque database identity; internal payload lifecycle remains in MemBase.",
-            coverage_mode="opaque_container",
-        )
-    if relative in _RECURSIVE_SERVICE_CONTAINER_ROOTS:
-        return SoTArtifact(
-            id=_candidate_id(relative),
-            domain="governance_policy",
-            lifecycle="active",
-            storage_path=relative + "/",
-            authority_spec_id="GOV-ARTIFACT-APPROVAL-001",
-            mutation_api="formal artifact approval packet writer",
-            versioning_policy="immutable_archive",
-            backup_policy="external_backup",
-            health_check_function="",
-            owner_role="automated_only",
-            restore_action="manual",
-            notes="WI-5441 narrow recursive service container for immutable formal-approval audit packets.",
-            coverage_mode="recursive",
-        )
-    immutable_approval = relative.casefold().startswith(".groundtruth/formal-artifact-approvals/")
-    versioning = (
-        "git_tracked" if git_managed else "immutable_archive" if immutable_approval else "overwrite_single_writer"
-    )
-    backup = "git_tracked" if git_managed else "external_backup" if immutable_approval else "gitignored_runtime"
-    restore = "git_restore" if git_managed else "manual" if immutable_approval else "regenerate_from_source"
-    owner = "automated_only" if immutable_approval else "shared"
-    mutation_api = (
-        "formal artifact approval packet writer"
-        if immutable_approval
-        else "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
-    )
+    versioning = "git_tracked" if git_managed else "overwrite_single_writer"
+    backup = "git_tracked" if git_managed else "gitignored_runtime"
+    restore = "git_restore" if git_managed else "regenerate_from_source"
     return SoTArtifact(
         id=_candidate_id(relative),
         domain=_candidate_domain(relative),
         lifecycle="active",
         storage_path=relative,
         authority_spec_id="GOV-PLATFORM-SOT-REGISTRY-001",
-        mutation_api=mutation_api,
+        mutation_api="Source edit within the current implementation scope, or direct owner edit",
         versioning_policy=versioning,
         backup_policy=backup,
         health_check_function="",
-        owner_role=owner,
+        owner_role="shared",
         restore_action=restore,
-        notes=f"Deterministically admitted by WI-5441 observers: {', '.join(sorted(observers))}.",
+        notes=f"Admission candidate from current observers: {', '.join(sorted(observers))}.",
         coverage_mode="exact",
     )
 
@@ -1309,10 +1240,10 @@ def reconcile_artifact_membership(
     *,
     snapshot: RegistrySnapshot | None = None,
     db_path: Path | None = None,
+    config: GTConfig | None = None,
     observers: Sequence[Callable[[Path, RegistrySnapshot, Path], ObserverResult]] | None = None,
     observer_results: Sequence[ObserverResult] | None = None,
     deep: bool = False,
-    audit: bool = False,
 ) -> dict[str, Any]:
     """Return one shared membership report without mutating registry state."""
 
@@ -1321,12 +1252,12 @@ def reconcile_artifact_membership(
     _TRACKED_CANONICAL_CACHE.pop(root, None)
     _GIT_MANAGED_INVENTORY_CACHE.pop(root, None)
     _REFERENCE_RESOLUTION_CACHE.clear()
-    database = (db_path or root / "groundtruth.db").resolve()
-    coherent = snapshot or load_registry_snapshot(project_root=root, db_path=database)
+    database = Path(db_path or (config.db_path if config else root / "groundtruth.db")).resolve()
+    coherent = snapshot or load_registry_snapshot(project_root=root)
     if observer_results is None:
         if observers is None:
             capability = observe_capability_inventory(root, coherent, database)
-            governed = observe_governed_knowledge(root, coherent, database)
+            governed = observe_governed_knowledge(root, coherent, database, config=config)
             package = observe_package_and_entrypoint(root, coherent, database)
             seeds = {item.relative_path for result in (capability, governed, package) for item in result.observations}
             dependency = observe_registered_dependency_closure(
@@ -1385,15 +1316,7 @@ def reconcile_artifact_membership(
         counts[entry.membership_class] += 1
         traversal_counts[entry.traversal_state] += 1
 
-    if audit:
-        currentness = registry_currentness(coherent, project_root=root, db_path=database)
-        audit_gaps = [
-            *({"kind": "missing_revision", "registry_id": item} for item in currentness["missing_revisions"]),
-            *({"kind": "stale_content_observation", **item} for item in currentness["stale"]),
-        ]
-    else:
-        currentness = {"current": None, "missing_revisions": [], "stale": []}
-        audit_gaps = [{"kind": "audit_not_performed"}]
+    identity_state = registry_identity_state(coherent, project_root=root)
     membership_complete = bool(
         all_succeeded and not candidates and counts["unregistered_load_bearing"] == 0 and counts["invalid_unknown"] == 0
     )
@@ -1412,9 +1335,14 @@ def reconcile_artifact_membership(
         "schema_version": 1,
         "project_root": str(root),
         "deep_census": deep,
-        "registry_generation_digest": coherent.generation_digest,
+        "registry_generation_digest": coherent.declaration_digest,
         "registry_record_count": len(coherent.records),
         "observers": [result.as_dict() for result in collected],
+        "observer_failures": [
+            {"observer_class": result.observer_class, "diagnostics": list(result.diagnostics)}
+            for result in collected
+            if not result.succeeded
+        ],
         "observer_input_digests": {result.observer_class: result.input_digest for result in collected},
         "counts": counts,
         "traversal_counts": dict(sorted(traversal_counts.items())),
@@ -1425,13 +1353,11 @@ def reconcile_artifact_membership(
         "candidate_manifest_sha256": _digest(manifest_rows),
         "reconciliation_evidence_digest": _digest(evidence_rows),
         "membership_complete": membership_complete,
-        "audit_complete": not audit_gaps,
-        "audit_performed": audit,
-        "audit_gaps": audit_gaps,
+        "identity_state": identity_state,
         "operational_liveness": True,
         "pruned_envelope_count": pruned,
-        "sweep_eligible": bool(membership_complete and currentness["current"] and pruned == 0),
-        "release_eligible": bool(membership_complete and pruned == 0),
+        "sweep_eligible": bool(membership_complete and identity_state["current"] and pruned == 0),
+        "release_eligible": bool(membership_complete and identity_state["current"] and pruned == 0),
     }
 
 
@@ -1445,15 +1371,14 @@ def reconciliation_summary(report: Mapping[str, Any]) -> dict[str, Any]:
             "registry_generation_digest",
             "registry_record_count",
             "observer_input_digests",
+            "observer_failures",
             "counts",
             "traversal_counts",
             "unknown_root_attribution",
             "candidate_manifest_sha256",
             "reconciliation_evidence_digest",
             "membership_complete",
-            "audit_complete",
-            "audit_performed",
-            "audit_gaps",
+            "identity_state",
             "operational_liveness",
             "pruned_envelope_count",
             "sweep_eligible",

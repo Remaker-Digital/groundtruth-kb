@@ -29,6 +29,19 @@ from groundtruth_kb.project.sot_registry import (
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize("source_paths", ["not JSON", '"scalar"', {"path": "src/a.py"}, [None], [123]])
+def test_typed_path_inventory_refuses_malformed_sources(source_paths) -> None:
+    from groundtruth_kb.project.sot_registry import registry_path_observations
+
+    with pytest.raises(ValueError, match="specification:SPEC-1:source_paths"):
+        registry_path_observations(
+            specifications=[{"id": "SPEC-1", "source_paths": source_paths}],
+            tests=[],
+            documents=[],
+            project_artifact_links=[],
+        )
+
+
 def test_bootstrap_inventory_loads() -> None:
     """The shipped TOML loads without errors and contains >= 22 records."""
     records = load_toml(default_registry_path())

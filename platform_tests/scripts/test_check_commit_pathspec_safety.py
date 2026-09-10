@@ -1,191 +1,158 @@
-"""Tests for scripts/check_commit_pathspec_safety.py (WI-4464 Slice A).
-
-Each test maps to an acceptance criterion in the implementation proposal
-``bridge/gtkb-wi4464-commit-pathspec-safety-detector-001.md`` (Verification
-Plan). The detector is split into a pure ``classify_staged`` function and a
-thin ``_staged_names`` git shim so these tests bypass git entirely via
-monkeypatch.
-"""
+"""Real-index work-product boundaries; reads preserve index and foreign bytes."""
 
 from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = PROJECT_ROOT / "scripts" / "check_commit_pathspec_safety.py"
+import pytest
+
+ROOT = Path(__file__).resolve().parents[2]
+SPEC = importlib.util.spec_from_file_location("normal_commit_paths", ROOT / "scripts/check_commit_pathspec_safety.py")
+checker = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(checker)
 
 
-def _load_checker():
-    spec = importlib.util.spec_from_file_location("check_commit_pathspec_safety", SCRIPT_PATH)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    try:
-        spec.loader.exec_module(module)
-        return module
-    finally:
-        sys.modules.pop(spec.name, None)
+def git(root, *args, input=None, check=True):
+    return subprocess.run(["git", "-C", str(root), *args], input=input, capture_output=True, check=check)
 
 
-checker = _load_checker()
+@pytest.fixture
+def repo(tmp_path):
+    git(tmp_path, "init", "-q")
+    git(tmp_path, "config", "core.autocrlf", "false")
+    git(tmp_path, "config", "user.email", "test@invalid.example")
+    git(tmp_path, "config", "user.name", "Test")
+    return tmp_path
 
 
-# --- classify_staged: contamination signature detection ---------------------
+def stage(repo, name, content="product\n"):
+    path = repo / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    git(repo, "add", "--", name)
 
 
-def test_mixed_bridge_and_source_is_flagged() -> None:
-    """Contamination signature (WI-4464; bridge-essential "Scoped commits only")."""
-    result = checker.classify_staged(["bridge/foo-001.md", "scripts/x.py"])
-    assert result["mixed"] is True
-    assert result["bridge_queue"] == ["bridge/foo-001.md"]
-    assert result["other"] == ["scripts/x.py"]
+def inspect_unchanged(repo):
+    index = (repo / ".git/index").read_bytes()
+    foreign = repo / "unrelated.tmp"
+    foreign.write_bytes(b"foreign\x00work")
+    result = checker.inspect_staged(repo)
+    assert (repo / ".git/index").read_bytes() == index
+    assert foreign.read_bytes() == b"foreign\x00work"
+    return result
 
 
-def test_bridge_only_not_mixed() -> None:
-    """No false positive on a legit bridge-only commit (GOV-FILE-BRIDGE-AUTHORITY-001)."""
-    result = checker.classify_staged(["bridge/foo-001.md", "bridge/bar-002.md"])
-    assert result["mixed"] is False
-    assert result["bridge_queue"] == ["bridge/bar-002.md", "bridge/foo-001.md"]
-    assert result["other"] == []
+@pytest.mark.parametrize(
+    "name",
+    ["src/module.py", ".harness-baseline-configuration/rules/topic.md", "docs/bracket[1].md", "docs/café note.md"],
+)
+def test_real_product_index_passes_without_permission_evidence(repo, name):
+    stage(repo, name)
+    result = inspect_unchanged(repo)
+    assert result["status"] == "pass"
+    assert result["product"] == [name]
 
 
-def test_source_only_not_mixed() -> None:
-    """No false positive on a source-only commit."""
-    result = checker.classify_staged(["scripts/x.py", "a/b.py"])
-    assert result["mixed"] is False
-    assert result["bridge_queue"] == []
-    assert result["other"] == ["a/b.py", "scripts/x.py"]
+@pytest.mark.parametrize(
+    "name",
+    [
+        "bridge/item.md",
+        "bridge/item.json",
+        ".codex/hooks.json",
+        "sub/.claude/settings.json",
+        "AGENTS.md",
+        ".groundtruth/inventory/public.json",
+        ".groundtruth/formal-artifact-approvals/packet.md",
+        "config/agent-control/registry.json",
+        "scratchpad/context/note.md",
+        ".gtkb-state/permission.json",
+        "harness-state/registry.json",
+        "groundtruth.db",
+    ],
+)
+@pytest.mark.parametrize("with_source", [False, True])
+def test_nonproduct_postimages_refuse_even_without_mixed_source(repo, name, with_source):
+    stage(repo, name)
+    if with_source:
+        stage(repo, "src/product.txt")
+    result = inspect_unchanged(repo)
+    assert result["status"] == "fail"
+    assert result["refused"] == [{"path": name, "reason": "not_work_product"}]
 
 
-def test_empty_not_mixed() -> None:
-    """Empty staged set is not flagged."""
-    result = checker.classify_staged([])
-    assert result["mixed"] is False
-    assert result["bridge_queue"] == []
-    assert result["other"] == []
+def test_forward_deletion_and_product_rename_remain_possible(repo):
+    for name in ["bridge/old.md", ".codex/old.json", "src/old.txt"]:
+        stage(repo, name)
+    git(repo, "commit", "-qm", "preimage")
+    git(repo, "rm", "--", "bridge/old.md", ".codex/old.json")
+    git(repo, "mv", "src/old.txt", "src/new.txt")
+    result = inspect_unchanged(repo)
+    assert result["status"] == "pass"
+    assert set(result["removals"]) == {"bridge/old.md", ".codex/old.json", "src/old.txt"}
+    assert result["product"] == ["src/new.txt"]
 
 
-def test_nested_bridge_path_is_other() -> None:
-    """Conservative matcher: nested bridge/ paths are NOT queue surface."""
-    result = checker.classify_staged(["bridge/sub/foo.md", "bridge/bar-001.md"])
-    assert result["mixed"] is True
-    assert result["bridge_queue"] == ["bridge/bar-001.md"]
-    assert result["other"] == ["bridge/sub/foo.md"]
+def test_mode_only_product_change_is_inspected(repo):
+    stage(repo, "run.sh", "exit 0\n")
+    git(repo, "commit", "-qm", "preimage")
+    git(repo, "update-index", "--chmod=+x", "run.sh")
+    assert inspect_unchanged(repo)["product"] == ["run.sh"]
 
 
-def test_non_md_bridge_path_is_other() -> None:
-    """Conservative matcher: non-.md bridge/ paths are NOT queue surface."""
-    result = checker.classify_staged(["bridge/notes.txt", "bridge/foo-001.md"])
-    assert result["mixed"] is True
-    assert result["bridge_queue"] == ["bridge/foo-001.md"]
-    assert result["other"] == ["bridge/notes.txt"]
+def test_case_only_rename_has_one_surviving_identity(repo):
+    stage(repo, "old.txt")
+    git(repo, "commit", "-qm", "preimage")
+    git(repo, "mv", "old.txt", "temporary.txt")
+    git(repo, "mv", "temporary.txt", "OLD.txt")
+    assert inspect_unchanged(repo)["status"] == "pass"
 
 
-def test_backslash_paths_normalized() -> None:
-    """Windows-style backslash paths normalize to forward slashes."""
-    result = checker.classify_staged(["bridge\\bar-001.md", "scripts\\x.py"])
-    assert result["mixed"] is True
-    assert result["bridge_queue"] == ["bridge/bar-001.md"]
-    assert result["other"] == ["scripts/x.py"]
+@pytest.mark.parametrize("mode", ["120000", "160000"])
+def test_nonregular_index_modes_refuse(repo, mode):
+    oid = git(repo, "hash-object", "-w", "--stdin", input=b"target").stdout.decode().strip()
+    git(repo, "update-index", "--add", "--cacheinfo", f"{mode},{oid},link")
+    result = inspect_unchanged(repo)
+    assert result["refused"] == [{"path": "link", "reason": "unsupported_file_mode"}]
 
 
-# --- main(): CLI advisory / strict / json behavior --------------------------
+def test_colliding_postimage_identities_refuse(repo):
+    oid = git(repo, "hash-object", "-w", "--stdin", input=b"product").stdout.decode().strip()
+    git(repo, "-c", "core.ignorecase=false", "update-index", "--add", "--cacheinfo", f"100644,{oid},File.txt")
+    git(repo, "-c", "core.ignorecase=false", "update-index", "--add", "--cacheinfo", f"100644,{oid},file.txt")
+    with pytest.raises(checker.IndexCheckError, match="colliding"):
+        checker.inspect_staged(repo)
 
 
-def test_advisory_exit_zero_on_mixed(monkeypatch, capsys) -> None:
-    """Advisory mode never blocks a commit (fail-open; protects swarm + sweep-commit)."""
-    monkeypatch.setattr(checker, "_staged_names", lambda: ["bridge/foo-001.md", "scripts/x.py"])
-    rc = checker.main(["--staged"])
-    captured = capsys.readouterr()
-    assert rc == 0
-    assert "WARNING" in captured.err
-    assert "bridge/foo-001.md" in captured.err
-    assert "scripts/x.py" in captured.err
-    assert captured.out == ""
+def test_unmerged_index_refuses(repo):
+    oid = git(repo, "hash-object", "-w", "--stdin", input=b"product").stdout.decode().strip()
+    git(
+        repo,
+        "update-index",
+        "--index-info",
+        input=f"100644 {oid} 1\tconflict.txt\n100644 {oid} 2\tconflict.txt\n".encode(),
+    )
+    with pytest.raises(checker.IndexCheckError, match="unmerged"):
+        checker.inspect_staged(repo)
 
 
-def test_strict_exit_nonzero_on_mixed(monkeypatch, capsys) -> None:
-    """Strict mode blocks on contamination with a distinct exit code."""
-    monkeypatch.setattr(checker, "_staged_names", lambda: ["bridge/foo-001.md", "scripts/x.py"])
-    rc = checker.main(["--staged", "--strict"])
-    captured = capsys.readouterr()
-    assert rc == checker.STRICT_CONTAMINATION_EXIT
-    assert rc == 3
-    assert "WARNING" in captured.err
+def test_unavailable_index_is_nonzero_and_never_fail_open(repo, monkeypatch):
+    tmp_path = repo
+    invalid = repo / "bad-index"
+    invalid.write_bytes(b"invalid index")
+    monkeypatch.setenv("GIT_INDEX_FILE", str(invalid))
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/check_commit_pathspec_safety.py"), "--staged", "--json"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert json.loads(result.stdout)["error"].startswith("staged_index_unavailable")
 
 
-def test_strict_exit_zero_on_clean(monkeypatch, capsys) -> None:
-    """Strict mode passes a clean (bridge-only) staged set."""
-    monkeypatch.setattr(checker, "_staged_names", lambda: ["bridge/foo-001.md", "bridge/bar-002.md"])
-    rc = checker.main(["--staged", "--strict"])
-    captured = capsys.readouterr()
-    assert rc == 0
-    assert captured.err == ""
-
-
-def test_json_output(monkeypatch, capsys) -> None:
-    """JSON output shape: parseable with mixed/bridge_queue/other keys."""
-    monkeypatch.setattr(checker, "_staged_names", lambda: ["bridge/foo-001.md", "scripts/x.py"])
-    rc = checker.main(["--staged", "--json"])
-    captured = capsys.readouterr()
-    assert rc == 0
-    payload = json.loads(captured.out)
-    assert payload == {
-        "mixed": True,
-        "bridge_queue": ["bridge/foo-001.md"],
-        "other": ["scripts/x.py"],
-        "foreign_verdicts": [],
-        "foreign_blocked": False,
-    }
-
-
-def test_json_exit_zero_even_when_mixed(monkeypatch, capsys) -> None:
-    """--json always exits 0 regardless of contamination (machine-read mode)."""
-    monkeypatch.setattr(checker, "_staged_names", lambda: ["bridge/INDEX.md", "scripts/x.py"])
-    rc = checker.main(["--staged", "--json", "--strict"])
-    capsys.readouterr()
-    assert rc == 0
-
-
-def test_no_staged_fail_open(monkeypatch, capsys) -> None:
-    """No-git / no-staged fail-open: exit 0, no warning."""
-    monkeypatch.setattr(checker, "_staged_names", lambda: [])
-    rc = checker.main(["--staged", "--strict"])
-    captured = capsys.readouterr()
-    assert rc == 0
-    assert captured.err == ""
-    assert captured.out == ""
-
-
-def test_default_no_staged_flag_is_clean(capsys) -> None:
-    """Without --staged, no git read occurs; clean exit 0."""
-    rc = checker.main([])
-    captured = capsys.readouterr()
-    assert rc == 0
-    assert captured.err == ""
-
-
-# --- _staged_names(): git shim fail-open ------------------------------------
-
-
-def test_staged_names_fail_open_on_oserror(monkeypatch) -> None:
-    """_staged_names returns [] when git is unavailable (OSError)."""
-
-    def _raise(*_args, **_kwargs):
-        raise OSError("git not found")
-
-    monkeypatch.setattr(checker.subprocess, "run", _raise)
-    assert checker._staged_names() == []
-
-
-def test_staged_names_fail_open_on_called_process_error(monkeypatch) -> None:
-    """_staged_names returns [] when git exits non-zero (not a repo)."""
-
-    def _raise(*_args, **_kwargs):
-        raise checker.subprocess.CalledProcessError(128, ["git"])
-
-    monkeypatch.setattr(checker.subprocess, "run", _raise)
-    assert checker._staged_names() == []
+def test_empty_index_passes(repo):
+    assert checker.inspect_staged(repo) == {"status": "pass", "product": [], "removals": [], "refused": []}

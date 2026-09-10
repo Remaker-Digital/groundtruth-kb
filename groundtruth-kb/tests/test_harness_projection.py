@@ -19,14 +19,12 @@ from typing import Any
 import pytest  # noqa: E402
 
 from groundtruth_kb.harness_projection import (
-    HARNESS_CAPABILITIES_RELATIVE_PATH,
     HARNESS_IDENTITIES_RELATIVE_PATH,
     HARNESS_REGISTRY_RELATIVE_PATH,
     PROJECTION_SCHEMA_VERSION,
     HarnessStateError,
     build_projection,
     generate_harness_projection,
-    read_capabilities,
     read_identity,
     read_roles,
 )
@@ -296,11 +294,6 @@ def _write_harness_state_fixtures(root: Path) -> None:
         json.dumps({"schema_version": 1, "harnesses": {"claude": {"id": "B"}}}),
         encoding="utf-8",
     )
-    (root / HARNESS_CAPABILITIES_RELATIVE_PATH).parent.mkdir(parents=True, exist_ok=True)
-    (root / HARNESS_CAPABILITIES_RELATIVE_PATH).write_text(
-        '[[harness]]\nname = "claude"\ntype = "claude"\n',
-        encoding="utf-8",
-    )
 
 
 def test_read_roles_returns_parsed_registry(tmp_path: Path) -> None:
@@ -320,14 +313,6 @@ def test_read_identity_returns_parsed_identities(tmp_path: Path) -> None:
     assert data["harnesses"]["claude"]["id"] == "B"
 
 
-def test_read_capabilities_returns_parsed_toml(tmp_path: Path) -> None:
-    """read_capabilities() reads the canonical harness-capability-registry.toml SoT."""
-    _write_harness_state_fixtures(tmp_path)
-    data = read_capabilities(project_root=tmp_path)
-    assert isinstance(data, dict)
-    assert data["harness"][0]["name"] == "claude"
-
-
 def test_read_roles_missing_file_raises_harness_state_error(tmp_path: Path) -> None:
     """Missing harness-registry.json raises HarnessStateError, not FileNotFoundError."""
     # No fixtures written; SoT file absent.
@@ -341,15 +326,6 @@ def test_read_identity_malformed_json_raises_harness_state_error(tmp_path: Path)
     (tmp_path / HARNESS_IDENTITIES_RELATIVE_PATH).write_text("{not valid json", encoding="utf-8")
     with pytest.raises(HarnessStateError, match="malformed JSON"):
         read_identity(project_root=tmp_path)
-
-
-def test_read_capabilities_malformed_toml_raises_harness_state_error(tmp_path: Path) -> None:
-    """Malformed TOML in capabilities file raises HarnessStateError."""
-    cap_path = tmp_path / HARNESS_CAPABILITIES_RELATIVE_PATH
-    cap_path.parent.mkdir(parents=True, exist_ok=True)
-    cap_path.write_text("[[harness\nname = oops missing-bracket", encoding="utf-8")
-    with pytest.raises(HarnessStateError, match="malformed TOML"):
-        read_capabilities(project_root=tmp_path)
 
 
 def test_read_roles_non_object_top_level_raises_harness_state_error(tmp_path: Path) -> None:
@@ -400,38 +376,3 @@ def test_gt_harness_identity_is_reachable_and_emits_json() -> None:
     assert result.exit_code == 0, f"stderr: {result.output}"
     data = json.loads(result.output)
     assert isinstance(data, dict)
-
-
-def test_gt_harness_capabilities_is_reachable_and_emits_json() -> None:
-    """``gt harness capabilities`` exits 0 and emits JSON parseable as a mapping."""
-    from click.testing import CliRunner  # noqa: PLC0415
-
-    from groundtruth_kb.cli import main as gt_main  # noqa: PLC0415
-
-    result = CliRunner().invoke(gt_main, ["harness", "capabilities"])
-    assert result.exit_code == 0, f"stderr: {result.output}"
-    data = json.loads(result.output)
-    assert isinstance(data, dict)
-
-
-def test_gt_harness_help_lists_reader_and_registry_commands() -> None:
-    """``gt harness --help`` lists BOTH reader and registry commands.
-
-    Anti-regression assertion against Codex NO-GO -008 F1: the Phase-4 reader
-    surface MUST coexist with the pre-existing registry surface on a single
-    ``harness`` click group rather than being shadowed by a duplicate group
-    registration.
-    """
-    from click.testing import CliRunner  # noqa: PLC0415
-
-    from groundtruth_kb.cli import main as gt_main  # noqa: PLC0415
-
-    result = CliRunner().invoke(gt_main, ["harness", "--help"])
-    assert result.exit_code == 0
-    # Phase-4 canonical reader commands MUST be listed:
-    assert "roles" in result.output
-    assert "identity" in result.output
-    assert "capabilities" in result.output
-    # Pre-existing registry commands MUST still be listed (not shadowed):
-    assert "list" in result.output
-    assert "register" in result.output

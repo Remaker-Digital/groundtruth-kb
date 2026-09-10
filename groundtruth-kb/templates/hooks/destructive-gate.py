@@ -10,7 +10,7 @@ Also detects potential secret exfiltration patterns (credentials in URLs,
 piping secrets to network commands).
 
 Stdin:  JSON {"tool_name": "Bash", "tool_input": {"command": "..."}, ...}
-Stdout: JSON {"decision": "block", "reason": "..."} or {}
+Stdout: native PreToolUse hookSpecificOutput deny object, or {}
 Exit:   Always 0
 
 This hook is FAIL-CLOSED for recognized destructive patterns — if pattern
@@ -280,45 +280,35 @@ def _check_destructive(command: str) -> str | None:
     return None
 
 
+def _deny(reason):
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }
+
+
 def main():
     try:
-        raw = sys.stdin.read()
-        data = json.loads(raw)
-    except (json.JSONDecodeError, Exception):
-        # Can't parse input — fail closed (block)
-        print(
-            json.dumps(
-                {"decision": "block", "reason": "PreToolUse gate: failed to parse hook input. Blocking as precaution."}
-            )
-        )
-        sys.exit(0)
-
-    tool_name = data.get("tool_name", "")
-
-    # Only gate Bash commands
-    if tool_name != "Bash":
-        print(json.dumps({}))
-        sys.exit(0)
-
-    tool_input = data.get("tool_input", {})
-    command = tool_input.get("command", "")
-
-    if not command:
-        print(json.dumps({}))
-        sys.exit(0)
-
-    try:
+        if "--self-test" in sys.argv[1:]:
+            data = {"tool_name": "Bash", "tool_input": {"command": "git reset --hard"}}
+        else:
+            data = json.loads(sys.stdin.read())
+        if not isinstance(data, dict) or not isinstance(data.get("tool_input"), dict):
+            raise ValueError("invalid hook input")
+        if data.get("tool_name") not in {"Bash", "PowerShell"}:
+            print("{}")
+            return
+        command = data["tool_input"].get("command", "")
+        if not isinstance(command, str):
+            raise ValueError("invalid shell command")
         reason = _check_destructive(command)
-    except Exception as exc:
-        # Pattern matching failed — fail CLOSED
-        reason = f"PreToolUse gate: pattern check error ({exc}). Blocking as precaution."
-
-    if reason:
-        print(json.dumps({"decision": "block", "reason": reason}))
-    else:
-        print(json.dumps({}))
-
-    sys.exit(0)
+        result = _deny(reason) if reason else {}
+    except (ValueError, TypeError, AttributeError, re.error):
+        result = _deny("destructive_input_invalid: Cannot validate the requested command")
+    print(json.dumps(result))
 
 
 if __name__ == "__main__":

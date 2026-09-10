@@ -1,436 +1,112 @@
-"""Tests for the deterministic ``gt bridge propose`` draft CLI."""
+"""Authored bridge delivery replaces generated proposals and hidden drafts."""
 
 from __future__ import annotations
 
 import json
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
-from scripts.bridge_author_metadata import FIELD_ENV_NAMES, REQUIRED_AUTHOR_METADATA_FIELDS
 
-from groundtruth_kb.bridge.proposal_autoload import (
-    auto_prior_delibs,
-    auto_project_metadata,
-    auto_spec_links,
-)
-from groundtruth_kb.bridge.proposal_filing import NONIMPAIRMENT_REQUIRED_FIELDS
-from groundtruth_kb.bridge.taxonomy import BridgeKind
+from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 from groundtruth_kb.cli import main
-from groundtruth_kb.cli_bridge_propose import build_propose_context, render_proposal_draft
-from groundtruth_kb.db import KnowledgeDB
-
-WI_ID = "WI-3318"
-PROJECT_ID = "PROJECT-GTKB-DETERMINISTIC-SERVICES-TEST"
-DELIB_ID = "DELIB-GT-BRIDGE-PROPOSE-CLI"
 
 
-def _config_path(project_dir: Path) -> Path:
-    return project_dir / "groundtruth.toml"
-
-
-def _seed_project(project_dir: Path) -> None:
-    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
-    try:
-        db.insert_spec(
-            id="SPEC-CLI-001",
-            title="CLI source spec",
-            status="specified",
-            changed_by="test",
-            change_reason="seed spec",
-        )
-        db.insert_deliberation(
-            id=DELIB_ID,
-            source_type="owner_conversation",
-            title="Owner approved gt bridge propose CLI",
-            summary=f"Owner approved deterministic bridge proposal scaffolding for {WI_ID}.",
-            content=f"{WI_ID} approved for deterministic bridge proposal scaffolding.",
-            changed_by="test",
-            change_reason="seed owner decision",
-        )
-        db.insert_project("Deterministic Services", "test", "seed project", id=PROJECT_ID)
-        db.insert_work_item(
-            id=WI_ID,
-            title="gt bridge propose CLI",
-            description="Build deterministic bridge proposal scaffolding.",
-            origin="new",
-            component="developer_tooling",
-            source_spec_id="SPEC-CLI-001",
-            resolution_status="open",
-            priority="P1",
-            changed_by="test",
-            change_reason="seed work item",
-            related_spec_ids_at_creation='["SPEC-RELATED-001"]',
-        )
-        db.link_project_work_item(PROJECT_ID, WI_ID, "test", "link work item")
-    finally:
-        db.close()
-
-
-def _runner_result(project_dir: Path, *args: str):
-    return CliRunner().invoke(main, ["--config", str(_config_path(project_dir)), *args])
-
-
-def _context(project_dir: Path, kind: str = "implementation") -> dict:
-    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
-    try:
-        return build_propose_context(
-            db,
-            project_dir,
-            kind=kind,
-            wi_id=WI_ID,
-            slug="gtkb-test-bridge-propose",
-            target_paths=("groundtruth-kb/src/groundtruth_kb/cli.py",),
-            add_specs=("SPEC-EXTRA-001",),
-        )
-    finally:
-        db.close()
-
-
-def _clear_author_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    for names in FIELD_ENV_NAMES.values():
-        for name in names:
-            monkeypatch.delenv(name, raising=False)
-
-
-def test_scaffold_emits_six_author_metadata_field_labels(project_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _clear_author_env(monkeypatch)
-    _seed_project(project_dir)
-    rendered = render_proposal_draft("implementation", _context(project_dir))
-
-    for field in REQUIRED_AUTHOR_METADATA_FIELDS:
-        assert f"{field}:" in rendered
-
-
-def test_scaffold_author_block_after_date_before_project_line(
-    project_dir: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _clear_author_env(monkeypatch)
-    _seed_project(project_dir)
-    rendered = render_proposal_draft("implementation", _context(project_dir))
-
-    assert rendered.index("Date: ") < rendered.index("author_identity:")
-    assert rendered.index("author_model_configuration:") < rendered.index("Project: ")
-
-
-def test_scaffold_environment_cannot_establish_unbound_authorship(
-    project_dir: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _clear_author_env(monkeypatch)
-    values = {
-        "GTKB_AUTHOR_IDENTITY": "prime-builder/test-harness",
-        "GTKB_AUTHOR_HARNESS_ID": "T",
-        "GTKB_AUTHOR_SESSION_CONTEXT_ID": "test-session-123",
-        "GTKB_AUTHOR_MODEL": "test-model",
-        "GTKB_AUTHOR_MODEL_VERSION": "test-model-version",
-        "GTKB_AUTHOR_MODEL_CONFIGURATION": "test-config",
-    }
-    for name, value in values.items():
-        monkeypatch.setenv(name, value)
-
-    _seed_project(project_dir)
-    rendered = render_proposal_draft("implementation", _context(project_dir))
-
-    # Caller-controlled environment values do not create the immutable
-    # exact-init context binding. A draft must expose missing provenance.
-    for field in REQUIRED_AUTHOR_METADATA_FIELDS:
-        assert f"{field}: TODO: <fill {field}>" in rendered
-
-
-def test_scaffold_author_block_degrades_to_placeholder_when_unresolvable(
-    project_dir: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _clear_author_env(monkeypatch)
-    _seed_project(project_dir)
-    rendered = render_proposal_draft("implementation", _context(project_dir))
-
-    for field in REQUIRED_AUTHOR_METADATA_FIELDS:
-        assert f"{field}: TODO: <fill {field}>" in rendered
-
-
-def test_auto_project_metadata_names_no_authorization_record(project_dir: Path) -> None:
-    # Authorization is a field on the project row and gates dispatch, not
-    # filing (canon v8.92 section 3), so the scaffold metadata carries the
-    # project and work item only.
-    _seed_project(project_dir)
-    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
-    try:
-        metadata = auto_project_metadata(db, WI_ID)
-    finally:
-        db.close()
-
-    assert "project_authorization_id" not in metadata
-    assert metadata["project_id"] == PROJECT_ID
-    assert metadata["work_item_title"] == "gt bridge propose CLI"
-
-
-def test_auto_spec_links_cross_cutting(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
-    try:
-        specs = auto_spec_links(
-            db,
-            project_dir,
-            WI_ID,
-            "implementation",
-            ("groundtruth-kb/src/groundtruth_kb/cli.py",),
-            ("SPEC-EXTRA-001",),
-        )
-    finally:
-        db.close()
-
-    assert "SPEC-CLI-001" in specs
-    assert "SPEC-RELATED-001" in specs
-    assert "GOV-FILE-BRIDGE-AUTHORITY-001" in specs
-    assert "DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001" in specs
-    assert "SPEC-EXTRA-001" in specs
-
-
-def test_implementation_template_renders(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    rendered = render_proposal_draft("implementation", _context(project_dir))
-    assert "# Implementation Proposal - gt bridge propose CLI" in rendered
-    assert f"Project: {PROJECT_ID}" in rendered
-    assert f"Work Item: {WI_ID}" in rendered
-    assert "Project Authorization:" not in rendered
-    assert "## Specification Links" in rendered
-    assert "## Intuitiveness / Non-Impairment Disposition" in rendered
-    section = rendered.split("## Intuitiveness / Non-Impairment Disposition", 1)[1]
-    disposition = json.loads(section.split("```json", 1)[1].split("```", 1)[0])
-    assert set(disposition) == {"schema_version", *NONIMPAIRMENT_REQUIRED_FIELDS}
-    assert disposition["schema_version"] == 1
-    assert all(disposition[field] == "TODO" for field in NONIMPAIRMENT_REQUIRED_FIELDS)
-    assert "${claim}" in rendered
-
-
-def test_template_bridge_kind_default_matches_taxonomy(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    rendered = render_proposal_draft("implementation", _context(project_dir))
-    allowed_kinds = {kind.value for kind in BridgeKind}
-    assert f"bridge_kind: {BridgeKind.IMPLEMENTATION_PROPOSAL.value}" in rendered
-    assert BridgeKind.IMPLEMENTATION_PROPOSAL.value in allowed_kinds
-    assert "bridge_kind: implementation_proposal_draft" not in rendered
-
-
-def test_defect_fix_template_renders(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    rendered = render_proposal_draft("defect-fix", _context(project_dir, "defect-fix"))
-    assert "# Defect-Fix Proposal - gt bridge propose CLI" in rendered
-    assert "## Defect / Reproduction" in rendered
-
-
-def test_scoping_template_renders(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    rendered = render_proposal_draft("scoping", _context(project_dir, "scoping"))
-    assert "# Scoping Proposal - gt bridge propose CLI" in rendered
-    assert "## Scope Boundary" in rendered
-
-
-def test_advisory_disposition_template_renders(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    rendered = render_proposal_draft("advisory-disposition", _context(project_dir, "advisory-disposition"))
-    assert "# Advisory-Disposition Proposal - gt bridge propose CLI" in rendered
-    assert "## Advisory Disposition" in rendered
-
-
-def test_retirement_template_renders(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    rendered = render_proposal_draft("retirement", _context(project_dir, "retirement"))
-    assert "# Retirement Proposal - gt bridge propose CLI" in rendered
-    assert "## Retirement Rationale" in rendered
-
-
-def test_umbrella_template_renders(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    rendered = render_proposal_draft("umbrella", _context(project_dir, "umbrella"))
-    assert "# Umbrella Proposal - gt bridge propose CLI" in rendered
-    assert "## Umbrella Inventory" in rendered
-
-
-def test_template_emits_spec_to_test_skeleton(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    rendered = render_proposal_draft("implementation", _context(project_dir))
-    assert "## Specification-Derived Verification Plan" in rendered
-    assert rendered.index("## Intuitiveness / Non-Impairment Disposition") < rendered.index(
-        "## Specification-Derived Verification Plan"
+def config_at(root: Path, native: bool) -> Path:
+    config = root / "groundtruth.toml"
+    config.write_text(
+        '[groundtruth]\nproject_root = "."\ndb_path = "absent.db"\n'
+        + ('authority_url = "http://127.0.0.1:32189"\n' if native else ""),
+        encoding="utf-8",
     )
-    assert "${verification_plan_table}" in rendered
+    return config
 
 
-def test_cli_arg_validation(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    result = _runner_result(
-        project_dir,
-        "bridge",
-        "propose",
-        "--kind",
-        "unknown",
-        "--wi",
-        WI_ID,
-        "--slug",
-        "gtkb-test",
-    )
-    assert result.exit_code == 2
-    assert "Invalid value for '--kind'" in result.output
+@pytest.mark.parametrize("native", [False, True])
+@pytest.mark.parametrize("command", ["propose", "file-implementation-proposal"])
+def test_removed_proposal_generators_are_not_available(tmp_path, native, command):
+    config = config_at(tmp_path, native)
+    result = CliRunner().invoke(main, ["--config", str(config), "bridge", command, "--help"])
+    assert result.exit_code != 0
+    assert "No such command" in result.output
+    assert list(tmp_path.iterdir()) == [config]
 
 
-def test_missing_wi_clear_error(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    result = _runner_result(
-        project_dir,
-        "bridge",
-        "propose",
-        "--kind",
-        "implementation",
-        "--wi",
-        "WI-MISSING",
-        "--slug",
-        "gtkb-test",
-        "--dry-run",
-    )
-    assert result.exit_code == 1
-    assert "Work item not found: WI-MISSING" in result.output
+def test_deliver_preserves_authored_bytes_and_explicit_identity(tmp_path, monkeypatch):
+    config = config_at(tmp_path, True)
+    candidate = tmp_path / "authored.md"
+    content = "::init gtkb lo\r\n::open build\r\nNEW\r\n\r\nAuthored: café 漢字\r\n"
+    candidate.write_bytes(content.encode("utf-8"))
+    calls = []
 
+    def request(self, method, path, **kwargs):
+        calls.append((method, path, kwargs))
+        return {"status": "delivered", "document": "proposal", "version": 1}
 
-def test_cli_dry_run_no_write(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    result = _runner_result(
-        project_dir,
-        "bridge",
-        "propose",
-        "--kind",
-        "implementation",
-        "--wi",
-        WI_ID,
-        "--slug",
-        "gtkb-test-bridge-propose",
-        "--target-path",
-        "groundtruth-kb/src/groundtruth_kb/cli.py",
-        "--dry-run",
+    monkeypatch.setattr(AuthorityClient, "request", request)
+    monkeypatch.setenv("GTKB_SESSION_ID", "another-context")
+    result = CliRunner().invoke(
+        main,
+        [
+            "--config",
+            str(config),
+            "bridge",
+            "deliver",
+            "proposal",
+            "--native-context-id",
+            "actual-context",
+            "--fence",
+            "7",
+            "--content-file",
+            str(candidate),
+            "--json",
+        ],
     )
     assert result.exit_code == 0, result.output
-    assert "# Implementation Proposal - gt bridge propose CLI" in result.output
-    assert not (project_dir / ".gtkb-state" / "bridge-propose-drafts").exists()
+    assert json.loads(result.output)["status"] == "delivered"
+    assert calls == [
+        (
+            "POST",
+            "/v1/bridge/proposal/deliver",
+            {
+                "body": {
+                    "native_context_id": "actual-context",
+                    "fence": 7,
+                    "content": content,
+                    "mode": "interactive",
+                }
+            },
+        )
+    ]
+    assert candidate.read_bytes() == content.encode("utf-8")
+    assert set(tmp_path.iterdir()) == {config, candidate}
 
 
-def test_cli_draft_path_in_root(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    result = _runner_result(
-        project_dir,
-        "bridge",
-        "propose",
-        "--kind",
-        "implementation",
-        "--wi",
-        WI_ID,
-        "--slug",
-        "gtkb-test-bridge-propose",
-        "--target-path",
-        "groundtruth-kb/src/groundtruth_kb/cli.py",
+def test_delivery_outage_does_not_fall_back_to_a_local_bridge(tmp_path, monkeypatch):
+    config = config_at(tmp_path, True)
+    candidate = tmp_path / "authored.md"
+    candidate.write_text("Authored content\n", encoding="utf-8")
+
+    def unavailable(*args, **kwargs):
+        raise AuthorityClientError("authority_unavailable", "The selected authority is unavailable")
+
+    monkeypatch.setattr(AuthorityClient, "request", unavailable)
+    result = CliRunner().invoke(
+        main,
+        [
+            "--config",
+            str(config),
+            "bridge",
+            "deliver",
+            "proposal",
+            "--native-context-id",
+            "actual-context",
+            "--fence",
+            "7",
+            "--content-file",
+            str(candidate),
+            "--json",
+        ],
     )
-    assert result.exit_code == 0, result.output
-    draft = project_dir / ".gtkb-state" / "bridge-propose-drafts" / "gtkb-test-bridge-propose-001.md"
-    assert draft.is_file()
-    assert draft.resolve().is_relative_to(project_dir.resolve())
-    assert "NON-DISPATCHABLE" in result.output
-
-
-def test_cli_refuses_overwrite(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    draft = project_dir / ".gtkb-state" / "bridge-propose-drafts" / "gtkb-test-bridge-propose-001.md"
-    draft.parent.mkdir(parents=True)
-    draft.write_text("existing", encoding="utf-8")
-    result = _runner_result(
-        project_dir,
-        "bridge",
-        "propose",
-        "--kind",
-        "implementation",
-        "--wi",
-        WI_ID,
-        "--slug",
-        "gtkb-test-bridge-propose",
-    )
-    assert result.exit_code == 1
-    assert "Refusing to overwrite" in result.output
-    assert draft.read_text(encoding="utf-8") == "existing"
-
-
-def test_cli_does_not_touch_bridge_dir(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    bridge_dir = project_dir / "bridge"
-    bridge_dir.mkdir()
-    index = bridge_dir / "INDEX.md"
-    index.write_text("# Bridge Index\n", encoding="utf-8")
-    result = _runner_result(
-        project_dir,
-        "bridge",
-        "propose",
-        "--kind",
-        "implementation",
-        "--wi",
-        WI_ID,
-        "--slug",
-        "gtkb-test-bridge-propose",
-        "--target-path",
-        "groundtruth-kb/src/groundtruth_kb/cli.py",
-    )
-    assert result.exit_code == 0, result.output
-    assert index.read_text(encoding="utf-8") == "# Bridge Index\n"
-    assert not (bridge_dir / "gtkb-test-bridge-propose-001.md").exists()
-
-
-def test_cli_bridge_propose_no_optional_deps(project_dir: Path) -> None:
-    _seed_project(project_dir)
-    for source in (
-        Path("src/groundtruth_kb/cli_bridge_propose.py"),
-        Path("src/groundtruth_kb/bridge/proposal_autoload.py"),
-    ):
-        text = (Path(__file__).parents[1] / source).read_text(encoding="utf-8")
-        assert "import jinja2" not in text
-        assert "import chromadb" not in text
-
-    help_result = _runner_result(project_dir, "bridge", "propose", "--help")
-    assert help_result.exit_code == 0, help_result.output
-    dry_run_result = _runner_result(
-        project_dir,
-        "bridge",
-        "propose",
-        "--kind",
-        "implementation",
-        "--wi",
-        WI_ID,
-        "--slug",
-        "gtkb-test-bridge-propose",
-        "--dry-run",
-    )
-    assert dry_run_result.exit_code == 0, dry_run_result.output
-    assert "author_identity:" in dry_run_result.output
-
-
-def test_cli_bridge_propose_help_resolves() -> None:
-    result = subprocess.run(
-        [sys.executable, "-m", "groundtruth_kb", "bridge", "propose", "--help"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
-    assert result.returncode == 0, result.stderr
-    assert "Emit a deterministic, non-dispatchable bridge proposal draft." in result.stdout
-
-
-def test_auto_prior_delibs_fallback_safe(project_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _seed_project(project_dir)
-    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
-
-    def fail_search(*_args, **_kwargs):
-        raise RuntimeError("optional search unavailable")
-
-    monkeypatch.setattr(db, "search_deliberations", fail_search)
-    try:
-        assert auto_prior_delibs(db, WI_ID, "gtkb-test-bridge-propose") == []
-    finally:
-        db.close()
+    assert result.exit_code != 0 and "authority_unavailable" in result.output
+    assert set(tmp_path.iterdir()) == {config, candidate}

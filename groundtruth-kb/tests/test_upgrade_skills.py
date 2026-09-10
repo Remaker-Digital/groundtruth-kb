@@ -14,8 +14,8 @@ from pathlib import Path
 from groundtruth_kb import __version__
 from groundtruth_kb.project.upgrade import execute_upgrade, plan_upgrade
 
-_SKILL_MD = ".claude/skills/gtkb-decision-capture/SKILL.md"
-_SKILL_HELPER = ".claude/skills/gtkb-decision-capture/helpers/record_decision.py"
+_SKILL_MD = ".claude/skills/gtkb-spec-intake/SKILL.md"
+_SKILL_HELPER = ".claude/skills/gtkb-spec-intake/helpers/spec_intake.py"
 
 
 def _write_minimal_toml(target: Path, profile: str, version: str) -> None:
@@ -94,10 +94,10 @@ def test_execute_creates_missing_skill_files_at_same_version(tmp_path: Path) -> 
     skill_md = tmp_path / _SKILL_MD
     helper_py = tmp_path / _SKILL_HELPER
     assert skill_md.exists(), "SKILL.md should be copied by execute_upgrade"
-    assert helper_py.exists(), "record_decision.py should be copied by execute_upgrade"
+    assert helper_py.exists(), "spec_intake.py should be copied by execute_upgrade"
     assert skill_md.read_text(encoding="utf-8").strip(), "SKILL.md is empty"
     helper_content = helper_py.read_text(encoding="utf-8")
-    assert "def record_decision" in helper_content
+    assert "def capture_candidate" in helper_content
 
 
 # ---------------------------------------------------------------------------
@@ -116,8 +116,8 @@ def _write_skill_files(target: Path, *, customized: bool) -> None:
     from groundtruth_kb import get_templates_dir
 
     templates = get_templates_dir()
-    skill_src = templates / "skills" / "gtkb-decision-capture" / "SKILL.md"
-    helper_src = templates / "skills" / "gtkb-decision-capture" / "helpers" / "record_decision.py"
+    skill_src = templates / "skills" / "gtkb-spec-intake" / "SKILL.md"
+    helper_src = templates / "skills" / "gtkb-spec-intake" / "helpers" / "spec_intake.py"
 
     skill_dst = target / _SKILL_MD
     helper_dst = target / _SKILL_HELPER
@@ -165,7 +165,7 @@ def test_execute_upgrade_applies_customized_skill_with_force(tmp_path: Path) -> 
     # Hash comparison avoids newline-translation false negatives on
     # Windows. execute_upgrade uses shutil.copy2 which preserves bytes.
     templates = get_templates_dir()
-    template_bytes = (templates / "skills" / "gtkb-decision-capture" / "SKILL.md").read_bytes()
+    template_bytes = (templates / "skills" / "gtkb-spec-intake" / "SKILL.md").read_bytes()
     assert hashlib.sha256(skill_path.read_bytes()).hexdigest() == hashlib.sha256(template_bytes).hexdigest()
 
 
@@ -185,12 +185,12 @@ def test_plan_upgrade_silent_on_at_template_skill_at_version_mismatch(tmp_path: 
 # ---------------------------------------------------------------------------
 
 
-def test_base_profile_no_skill_actions(tmp_path: Path) -> None:
-    """local-only profile: no skill-related actions (neither add nor skip)."""
+def test_base_profile_does_not_install_bridge_profile_skills(tmp_path: Path) -> None:
+    """A local profile restores its shared skill without adding bridge skills."""
     _write_minimal_toml(tmp_path, profile="local-only", version=__version__)
     actions = plan_upgrade(tmp_path)
     skill_actions = [a for a in actions if a.file.startswith(".claude/skills/")]
-    assert not skill_actions, f"local-only profile should emit no skill actions; got {skill_actions}"
+    assert {a.file for a in skill_actions} == {".claude/skills/gtkb-baseline-audit/SKILL.md"}
 
 
 # ---------------------------------------------------------------------------
@@ -210,9 +210,7 @@ def test_plan_upgrade_adds_missing_bridge_propose_skill_at_same_version(tmp_path
     assert _BRIDGE_PROPOSE_SKILL_MD in action_files, (
         f"expected add action for missing {_BRIDGE_PROPOSE_SKILL_MD}; got: {[(a.action, a.file) for a in actions]}"
     )
-    assert _BRIDGE_PROPOSE_HELPER in action_files, (
-        f"expected add action for missing {_BRIDGE_PROPOSE_HELPER}; got: {[(a.action, a.file) for a in actions]}"
-    )
+    assert _BRIDGE_PROPOSE_HELPER not in {a.file for a in actions}
 
 
 # ---------------------------------------------------------------------------
@@ -269,8 +267,6 @@ def test_execute_creates_missing_spec_intake_files_at_same_version(tmp_path: Pat
 _BRIDGE_SKILL_FILES = {
     ".claude/skills/gtkb-bridge/SKILL.md",
     ".claude/skills/gtkb-bridge/helpers/scan_bridge.py",
-    ".claude/skills/gtkb-bridge/helpers/revise_bridge.py",
-    ".claude/skills/gtkb-bridge/helpers/impl_report_bridge.py",
     ".claude/skills/gtkb-bridge/helpers/show_thread_bridge.py",
 }
 
@@ -296,12 +292,9 @@ def test_execute_creates_missing_bridge_skill_files_at_same_version(tmp_path: Pa
         assert path.exists(), f"{rel_path} should be copied by execute_upgrade"
         assert path.read_text(encoding="utf-8").strip(), f"{rel_path} is empty"
     assert "def scan" in (tmp_path / ".claude/skills/gtkb-bridge/helpers/scan_bridge.py").read_text(encoding="utf-8")
-    assert "def file_revision" in (tmp_path / ".claude/skills/gtkb-bridge/helpers/revise_bridge.py").read_text(
-        encoding="utf-8"
-    )
-    assert "def file_report" in (tmp_path / ".claude/skills/gtkb-bridge/helpers/impl_report_bridge.py").read_text(
-        encoding="utf-8"
-    )
+    assert not (tmp_path / ".claude/skills/gtkb-bridge/helpers/revise_bridge.py").exists()
+    assert not (tmp_path / ".claude/skills/gtkb-bridge/helpers/impl_report_bridge.py").exists()
+    assert "gt bridge deliver" in (tmp_path / _BRIDGE_PROPOSE_SKILL_MD).read_text(encoding="utf-8")
     assert "def show" in (tmp_path / ".claude/skills/gtkb-bridge/helpers/show_thread_bridge.py").read_text(
         encoding="utf-8"
     )
