@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import subprocess
@@ -244,6 +245,12 @@ def main(argv: list[str] | None = None) -> int:
     environment = dict(os.environ)
     code = EXIT_STARTUP_FAILED
     try:
+        if importlib.util.find_spec("deepseek_harness") is None:
+            raise LauncherError(
+                EXIT_STARTUP_FAILED,
+                "The DeepSeek SDK is not importable by this interpreter; run harness.py with "
+                "infrastructure/deepseek-sdk/runtime-env/Scripts/python.exe",
+            )
         installation = verify_installation()
         cli = cli_runner(root, args.config, environment)
         binding = bind_context(cli, native_context_id, args.init)

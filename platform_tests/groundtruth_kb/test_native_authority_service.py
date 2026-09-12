@@ -207,7 +207,14 @@ def test_harness_installation_reads_current_metadata_without_role_or_history_wri
     assert not {"role", "reviewer_precedence", "can_receive_dispatch", "event_driven_hooks"} & current.json().keys()
     assert client.get("/v1/harnesses", params={"role": "lo"}).status_code == 422
     assert client.get("/v1/harnesses/missing").status_code == 404
-    assert client.put("/v1/harnesses/A", json={"role": "lo"}).status_code == 405
+    # The native harness record path exists (phase M) but a role is never a harness field: the boundary refuses it
+    # and neither the row nor its history changes.
+    refused = client.put(
+        "/v1/harnesses/A",
+        json={"expected_version": 1, "actor": "qualification", "reason": "role write", "fields": {"role": "lo"}},
+    )
+    assert refused.status_code == 422, refused.text
+    assert client.get("/v1/harnesses/A").json()["version"] == 1
     assert history_count(service) == before
 
 

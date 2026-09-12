@@ -29,6 +29,7 @@ from groundtruth_kb.bridge.native import (
 from groundtruth_kb.native_authority import (
     AuthorityService,
     DependencyMutation,
+    HarnessMutation,
     Identifier,
     MembershipMove,
     ProjectAuthorizationChange,
@@ -324,6 +325,10 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     @app.get("/v1/{domain}/{record_id}")
     def show(domain: Domain, record_id: Identifier) -> Response:
         return _result(service.show(domain, record_id))
+
+    @app.put("/v1/harnesses/{record_id}")
+    def amend_harness(record_id: Identifier, request: HarnessMutation) -> Response:
+        return _result(service.amend_harness(record_id, request))
 
     @app.put("/v1/specifications/{record_id}")
     def amend_specification(record_id: Identifier, request: SpecMutation) -> Response:

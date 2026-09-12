@@ -28,6 +28,7 @@ effect gate grants to that context and the commit gates never stage; `--home`
 overrides it.
 
 ```powershell
+# The private runtime-env interpreter alone carries the SDK; any other interpreter exits 2 with a report.
 infrastructure\deepseek-sdk\runtime-env\Scripts\python.exe infrastructure\deepseek-sdk\harness.py `
   --init "::init gtkb lo" --document <attempt> --version <n> --task-file <task.md> --report <report.json>
 ```
@@ -37,4 +38,4 @@ exercises the installed runtime's actual editor and PowerShell tools against the
 native CLI, incomplete delivery, interruption and a fresh successor context; the
 model-driven positive case runs only when a credential is present and is reported
 as not executed otherwise. The harness registry row is recorded with
-`gt harnesses record` after the PostgreSQL cutover.
+`gt harness record` through the native authority (no role field: roles bind to contexts).

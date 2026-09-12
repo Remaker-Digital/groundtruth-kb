@@ -346,6 +346,34 @@ def test_installed_runtime_tools_follow_the_live_cli_claim_and_refuse_foreign_ef
     assert client.get(f"/v1/bridge/{document}/show?include_content=true").json() == before
 
 
+def test_a_missing_sdk_module_is_a_typed_startup_failure_with_a_report(tmp_path, monkeypatch):
+    """Under an interpreter without the SDK the launcher exits 2 with a content-free report instead of a traceback."""
+    launcher = _launcher()
+    monkeypatch.setattr(launcher.importlib.util, "find_spec", lambda name: None)
+    task = tmp_path / "task.md"
+    task.write_text("task", encoding="utf-8")
+    report = tmp_path / "report.json"
+    code = launcher.main(
+        [
+            "--root",
+            str(tmp_path),
+            "--init",
+            "::init gtkb lo",
+            "--document",
+            "doc-1",
+            "--version",
+            "1",
+            "--task-file",
+            str(task),
+            "--report",
+            str(report),
+        ]
+    )
+    assert code == launcher.EXIT_STARTUP_FAILED
+    written = json.loads(report.read_text(encoding="utf-8"))
+    assert written["exit_code"] == 2 and "runtime-env" in written["error"]
+
+
 def test_default_invocation_places_the_runtime_home_in_the_bound_contexts_scratch_directory(tmp_path, monkeypatch):
     """Without --home the runtime home is this context's own scratch directory under the root, never `.gtkb-state`
     (a runtime-residue location the native effect gate does not grant and the commit gates never stage)."""
@@ -362,6 +390,7 @@ def test_default_invocation_places_the_runtime_home_in_the_bound_contexts_scratc
         captured.update(kwargs)
         return {"finish_reason": None, "events": 0, "turn": "none"}
 
+    monkeypatch.setattr(launcher.importlib.util, "find_spec", lambda name: object())  # the SDK is importable here
     monkeypatch.setattr(launcher, "verify_installation", lambda source=None: {"executable": tmp_path / "dsh.exe"})
     monkeypatch.setattr(launcher, "cli_runner", lambda root, config, environment: fake_cli)
     monkeypatch.setattr(launcher, "run_session", fake_run_session)

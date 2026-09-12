@@ -127,6 +127,18 @@ class TestPhaseMutation(Mutation):
     fields: TestPhaseFields
 
 
+class HarnessFields(Request):
+    harness_name: Text | None = None
+    harness_type: Text | None = None
+    status: Literal["registered", "active", "suspended", "retired"] | None = None
+    invocation_surfaces: dict[str, Any] | None = None
+    capabilities_ref: str | None = None
+
+
+class HarnessMutation(Mutation):
+    fields: HarnessFields
+
+
 class ProjectFields(Request):
     name: Text | None = None
     parent_project_id: Identifier | None = None
@@ -587,6 +599,41 @@ class AuthorityService:
                 )
             except ValueError as exc:
                 _error("invalid_registry_path_source", str(exc))
+
+    def amend_harness(self, record_id: str, request: HarnessMutation) -> dict[str, Any]:
+        """Create or amend one harness installation record; roles never live here (they bind to contexts)."""
+        from groundtruth_kb.harness_lifecycle import STATUS_ACTIVE, STATUS_REGISTERED, validate_transition
+
+        fields = request.fields.model_dump(exclude_unset=True)
+        with self.kernel.transaction() as tx:
+            current = tx.get("harnesses", {"id": record_id}, lock=True)
+            if current is None:
+                for required in ("harness_name", "harness_type"):
+                    if not fields.get(required):
+                        _error(
+                            "harness_fields_required", "A new harness needs harness_name and harness_type", id=record_id
+                        )
+                if fields.get("status") not in (None, STATUS_REGISTERED):
+                    _error(
+                        "invalid_harness_transition",
+                        "A new harness starts as registered",
+                        id=record_id,
+                        status=fields["status"],
+                    )
+            elif "status" in fields and fields["status"] != current["status"]:
+                try:
+                    validate_transition(current["status"], fields["status"])
+                except ValueError as exc:
+                    _error("invalid_harness_transition", str(exc), id=record_id)
+                if current["status"] == STATUS_ACTIVE:
+                    others = [row for row in _related(tx, "harnesses", status=STATUS_ACTIVE) if row["id"] != record_id]
+                    if not others:
+                        _error(
+                            "last_active_harness",
+                            "The last active harness cannot be suspended or retired",
+                            id=record_id,
+                        )
+            return _write(tx, "harnesses", record_id, fields, request, defaults={"status": STATUS_REGISTERED})
 
     def amend_specification(self, record_id: str, request: SpecMutation) -> dict[str, Any]:
         fields = request.fields.model_dump(exclude_unset=True)

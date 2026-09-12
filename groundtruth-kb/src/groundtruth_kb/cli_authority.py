@@ -175,7 +175,7 @@ def _domain_group(name: str, domain: str, *, read_only: bool = False) -> click.G
 
 
 NATIVE_COMMANDS = {
-    "harness": _domain_group("harness", "harnesses", read_only=True),
+    "harness": _domain_group("harness", "harnesses"),
     "terms": _domain_group("terms", "terms"),
     "spec": _domain_group("spec", "specifications"),
     "tests": _domain_group("tests", "tests"),
