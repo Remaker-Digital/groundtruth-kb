@@ -8,9 +8,9 @@ param(
 
 # Registers the scheduled task GTKB-DomainService under the current (owner) account: it runs
 # infrastructure/postgresql/domain_service_launcher.py at every logon of this account and on demand,
-# restarts it up to three times a minute apart if a trigger-started instance exits, relaunches it by a repetition
-# trigger every five minutes when no instance is running, never stops it on a time limit, and ignores battery state. The
-# launcher alone carries PGSERVICEFILE; no credential value is stored in the task definition.
+# configures a repetition trigger every five minutes and retains the restart-on-failure settings, with no
+# execution time limit and battery limits disabled. IgnoreNew leaves a running instance alone.
+# The launcher alone carries PGSERVICEFILE; no credential value is stored in the task definition.
 # Re-running the script with the same root updates the task in place; a task that points at another
 # installation is refused. After starting the task the script probes the service on 127.0.0.1:$Port
 # with bounded retries (Wait-GtkbDomainServiceReady in domain-service-readiness.ps1) and fails when the
@@ -41,8 +41,11 @@ if ($existing) {
 
 $action = New-ScheduledTaskAction -Execute $interpreter -Argument $arguments -WorkingDirectory $resolvedRoot
 $logon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
-# A repetition trigger relaunches a dead service within five minutes regardless of how the previous instance ended
-# (the restart-on-failure policy below applies only to trigger-started instances); IgnoreNew leaves a running instance alone.
+# The repetition trigger attempts a start every five minutes; IgnoreNew leaves a running instance alone.
+# On this workstation (2026-09-12), each exit-1 probe logged one launch and no relaunch during its observation window:
+# on demand, 230 s after start; one-time trigger, 310 s from registration (about 240 s after launch).
+# Repetition recovery was demonstrated separately: kill test 2 restored the listener after 37 s.
+# These observations do not establish Task Scheduler's general restart-on-failure semantics.
 $repeat = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 3650)
 $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited

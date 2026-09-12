@@ -548,9 +548,13 @@ service alone leaves the CLI refusing. Three files start the service unattended:
   the last output.
 - `register-domain-service.ps1 -Root E:\GT-KB [-Port 8765] [-ReadinessSeconds 60]` registers the scheduled task
   `GTKB-DomainService` under the current account: at every logon of that account, on demand, and by a repetition
-  trigger every five minutes (an instance is ignored while one runs, so a dead service is relaunched within five
-  minutes regardless of how the previous instance ended); three restarts a minute apart for a trigger-started
-  instance; no execution time limit; battery state neither prevents a start nor stops the service. It refuses to change a task that points at another installation, starts the
+  trigger configured to attempt a start every five minutes (`IgnoreNew` leaves a running instance alone). The
+  restart-on-failure settings remain configured. On this workstation on 2026-09-12, each exit-1 probe logged one launch
+  and no relaunch during its observation window: 230 seconds after the on-demand start; 310 seconds from registration
+  for the one-time-trigger case (about 240 seconds after launch). Repetition recovery was demonstrated separately:
+  kill test 2 restored the listener after 37 seconds. These observations do not establish Task Scheduler's general
+  restart-on-failure semantics. There is no execution time limit; battery state neither prevents a start nor stops the
+  service. It refuses to change a task that points at another installation, starts the
   task, then waits for readiness with the probe above and fails, naming the number of probes and the task state, when
   the service does not answer within the window. Registration is an owner action of the same kind as
   `register-service.ps1` for PostgreSQL.
