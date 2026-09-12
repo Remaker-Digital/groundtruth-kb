@@ -14,8 +14,6 @@ from __future__ import annotations
 
 import ast
 import pathlib
-import sys
-from unittest import mock
 
 import pytest
 
@@ -100,45 +98,3 @@ def test_narrowed_db_persist_quality_scores() -> None:
             break
     else:
         pytest.fail("persist_quality_scores function not found in db.py")
-
-
-def test_pid_is_running_narrowed_windows() -> None:
-    """Windows _pid_is_running catches (OSError, AttributeError, ImportError), not Exception."""
-    from groundtruth_kb.bridge.launcher import _pid_is_running
-
-    with (
-        mock.patch.object(sys, "platform", "win32"),
-        mock.patch.dict("sys.modules", {"ctypes": mock.MagicMock(side_effect=AttributeError)}),
-    ):
-        # Force reimport scenario — the function uses inline import
-        result = _pid_is_running(99999)
-        assert result is False
-
-
-def test_pid_is_running_unix_no_broad_catch() -> None:
-    """Unix _pid_is_running only catches OSError, not Exception."""
-    from groundtruth_kb.bridge.launcher import _pid_is_running
-
-    if sys.platform == "win32":
-        # On Windows, we test the Unix path by mocking platform
-        with mock.patch.object(sys, "platform", "linux"):
-            # OSError should be caught
-            with mock.patch("os.kill", side_effect=OSError("No such process")):
-                assert _pid_is_running(99999) is False
-
-            # Non-OSError exceptions should propagate (no broad catch)
-            with (
-                mock.patch("os.kill", side_effect=RuntimeError("unexpected")),
-                pytest.raises(RuntimeError, match="unexpected"),
-            ):
-                _pid_is_running(99999)
-    else:
-        # On Unix, test directly
-        with mock.patch("os.kill", side_effect=OSError("No such process")):
-            assert _pid_is_running(99999) is False
-
-        with (
-            mock.patch("os.kill", side_effect=RuntimeError("unexpected")),
-            pytest.raises(RuntimeError, match="unexpected"),
-        ):
-            _pid_is_running(99999)

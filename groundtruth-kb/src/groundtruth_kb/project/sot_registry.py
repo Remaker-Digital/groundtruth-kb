@@ -408,18 +408,10 @@ def load_toml(path: Path) -> list[SoTArtifact]:
 
 
 def default_registry_path(project_root: Path | None = None) -> Path:
-    """Return the canonical path to ``config/registry/sot-artifacts.toml``.
-
-    If ``project_root`` is None, derives from the location of this module
-    (assumes installed-package layout).
-    """
-
+    """Return the selected project's declaration, independent of package location."""
     if project_root is None:
-        # This module lives at:
-        # <project_root>/groundtruth-kb/src/groundtruth_kb/project/sot_registry.py
-        # so project_root is 4 parents up.
-        project_root = Path(__file__).resolve().parents[4]
-    return project_root / "config" / "registry" / "sot-artifacts.toml"
+        raise ValueError("project_root is required; the installed package location is not project authority")
+    return Path(project_root).resolve() / "config" / "registry" / "sot-artifacts.toml"
 
 
 # ---------------------------------------------------------------------------

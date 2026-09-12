@@ -1,0 +1,9 @@
+# Operator configuration for the GT-KB native domain service (copy to operator-config.toml next to this file).
+# The service process alone reads the PostgreSQL credential file; the launcher sets PGSERVICEFILE for that
+# process only. Clients select the service through authority_url in their own groundtruth.toml.
+
+[groundtruth]
+project_root = "E:/GT-KB"
+
+[postgresql]
+service = "gtkb_authority"

@@ -2094,21 +2094,6 @@ def run_tool_loop(
         model_route.key,
         requested_model_id=model_route.model_id,
     )
-    if telemetry is None:
-        try:
-            from groundtruth_kb.shim_dispatch_telemetry import create_dispatch_telemetry_observer
-
-            telemetry = create_dispatch_telemetry_observer(
-                project_root,
-                harness_id=profile.author_harness_id,
-                harness_name=profile.display_name.lower().replace(" ", "-"),
-                provider=profile.provider_routing_key,
-                model_id=model_route.model_id,
-                model_version=model_route.model_version,
-                turn_budget=max_turns,
-            )
-        except (ImportError, OSError, ValueError):
-            telemetry = None
     session_deadline = time.monotonic() + session_timeout
     native_hooks_started = False
     if profile.hook_tier == HOOK_TIER_NATIVE_FULL:

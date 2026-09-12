@@ -10,7 +10,6 @@ import shutil
 import sqlite3
 import subprocess
 import sys
-from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -18,9 +17,6 @@ from pathlib import Path
 from typing import Any, Literal
 
 from groundtruth_kb import get_templates_dir
-from groundtruth_kb.bridge.role_state import (
-    BRIDGE_AGENT_TO_RECIPIENT as _BRIDGE_AGENT_TO_RECIPIENT,
-)
 from groundtruth_kb.project.managed_registry import (
     FileArtifact,
     GitignorePattern,
@@ -125,11 +121,6 @@ _TAFE_SCHEMA_REQUIRED_COLUMNS: dict[str, set[str]] = {
         "changed_at",
         "change_reason",
     },
-}
-_TAFE_SCHEMA_REQUIRED_VIEWS = {
-    "current_flow_definitions",
-    "current_flow_instances",
-    "current_stage_instances",
 }
 
 
@@ -730,169 +721,12 @@ def _connect_readonly_sqlite(db_path: Path) -> sqlite3.Connection:
     return sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True)
 
 
-def _check_tafe_schema(target: Path) -> ToolCheck:
-    db_path = target / "groundtruth.db"
-    if not db_path.exists():
-        return ToolCheck(
-            name="TAFE schema health",
-            required=False,
-            found=False,
-            status="warning",
-            message="TAFE schema health: groundtruth.db not found",
-        )
-    try:
-        conn = _connect_readonly_sqlite(db_path)
-        try:
-            table_rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
-            view_rows = conn.execute("SELECT name FROM sqlite_master WHERE type='view'").fetchall()
-            tables = {row[0] for row in table_rows}
-            views = {row[0] for row in view_rows}
-            findings: list[str] = []
-            missing_tables = sorted(set(_TAFE_SCHEMA_REQUIRED_COLUMNS) - tables)
-            if missing_tables:
-                findings.append(f"missing tables: {', '.join(missing_tables)}")
-            for table_name, required_columns in _TAFE_SCHEMA_REQUIRED_COLUMNS.items():
-                if table_name not in tables:
-                    continue
-                columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
-                missing_columns = sorted(required_columns - columns)
-                if missing_columns:
-                    findings.append(f"{table_name} missing columns: {', '.join(missing_columns)}")
-            missing_views = sorted(_TAFE_SCHEMA_REQUIRED_VIEWS - views)
-            if missing_views:
-                findings.append(f"missing views: {', '.join(missing_views)}")
-        finally:
-            conn.close()
-    except Exception as exc:  # intentional-catch: diagnostic doctor check, error -> warning
-        return ToolCheck(
-            name="TAFE schema health",
-            required=False,
-            found=True,
-            status="warning",
-            message=f"TAFE schema health: DB inspection failed: {exc}",
-        )
-
-    if findings:
-        return ToolCheck(
-            name="TAFE schema health",
-            required=False,
-            found=True,
-            status="warning",
-            message="TAFE schema health: " + "; ".join(findings),
-        )
-    return ToolCheck(
-        name="TAFE schema health",
-        required=False,
-        found=True,
-        status="pass",
-        message=(
-            "TAFE schema health: tables/views present "
-            f"({len(_TAFE_SCHEMA_REQUIRED_COLUMNS)} tables, {len(_TAFE_SCHEMA_REQUIRED_VIEWS)} views)"
-        ),
-    )
-
-
 def _decode_tafe_json(value: Any, *, field: str, flow_id: str, findings: list[str]) -> Any:
     try:
         return json.loads(value or "null")
     except (TypeError, json.JSONDecodeError) as exc:
         findings.append(f"{flow_id} {field} invalid JSON: {exc}")
         return None
-
-
-def _check_tafe_flow_definitions(target: Path) -> ToolCheck:
-    db_path = target / "groundtruth.db"
-    if not db_path.exists():
-        return ToolCheck(
-            name="TAFE flow definitions health",
-            required=False,
-            found=False,
-            status="warning",
-            message="TAFE flow definitions health: groundtruth.db not found",
-        )
-    try:
-        from groundtruth_kb.typed_artifact_flow import canonical_reviewed_task_flow_definitions  # noqa: PLC0415
-
-        canonical = {seed["id"]: seed for seed in canonical_reviewed_task_flow_definitions()}
-        conn = _connect_readonly_sqlite(db_path)
-        conn.row_factory = sqlite3.Row
-        try:
-            row_count = conn.execute(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type='view' AND name='current_flow_definitions'"
-            ).fetchone()[0]
-            if not row_count:
-                return ToolCheck(
-                    name="TAFE flow definitions health",
-                    required=False,
-                    found=True,
-                    status="warning",
-                    message="TAFE flow definitions health: current_flow_definitions view missing",
-                )
-            rows = {
-                row["id"]: row
-                for row in conn.execute(
-                    "SELECT * FROM current_flow_definitions WHERE COALESCE(lifecycle_status, status) = 'active'"
-                ).fetchall()
-            }
-        finally:
-            conn.close()
-    except Exception as exc:  # intentional-catch: diagnostic doctor check, error -> warning
-        return ToolCheck(
-            name="TAFE flow definitions health",
-            required=False,
-            found=True,
-            status="warning",
-            message=f"TAFE flow definitions health: DB inspection failed: {exc}",
-        )
-
-    findings: list[str] = []
-    missing = sorted(set(canonical) - set(rows))
-    if missing:
-        findings.append(f"missing active canonical definitions: {', '.join(missing)}")
-    for flow_id, seed in canonical.items():
-        row = rows.get(flow_id)
-        if row is None:
-            continue
-        stage_sequence = _decode_tafe_json(
-            row["stage_sequence"], field="stage_sequence", flow_id=flow_id, findings=findings
-        )
-        required_roles = _decode_tafe_json(
-            row["required_roles_by_stage"],
-            field="required_roles_by_stage",
-            flow_id=flow_id,
-            findings=findings,
-        )
-        if row["flow_type"] != seed["flow_type"]:
-            findings.append(f"{flow_id} flow_type drift: {row['flow_type']} != {seed['flow_type']}")
-        if stage_sequence != seed["stage_sequence"]:
-            findings.append(f"{flow_id} stage_sequence drift")
-        if isinstance(stage_sequence, list) and len(stage_sequence) != len(set(stage_sequence)):
-            findings.append(f"{flow_id} stage_sequence contains duplicate stages")
-        if isinstance(required_roles, dict) and isinstance(stage_sequence, list):
-            missing_roles = [stage for stage in stage_sequence if stage not in required_roles]
-            extra_roles = sorted(set(required_roles) - set(stage_sequence))
-            if missing_roles:
-                findings.append(f"{flow_id} missing required roles: {', '.join(missing_roles)}")
-            if extra_roles:
-                findings.append(f"{flow_id} has roles for unknown stages: {', '.join(extra_roles)}")
-        if required_roles != seed["required_roles_by_stage"]:
-            findings.append(f"{flow_id} required_roles_by_stage drift")
-
-    if findings:
-        return ToolCheck(
-            name="TAFE flow definitions health",
-            required=False,
-            found=True,
-            status="warning",
-            message="TAFE flow definitions health: " + "; ".join(findings),
-        )
-    return ToolCheck(
-        name="TAFE flow definitions health",
-        required=False,
-        found=True,
-        status="pass",
-        message=f"TAFE flow definitions health: {len(canonical)} canonical definitions active and well-formed",
-    )
 
 
 def _orphan_citation_audit_script(target: Path) -> Path:
@@ -1130,7 +964,7 @@ def _check_cursor_dispatch_readiness(target: Path) -> ToolCheck:
     check_name = "Cursor dispatch readiness"
     try:
         from scripts.verify_cursor_dispatch import evaluate_readiness  # noqa: PLC0415
-    except Exception as exc:  # noqa: BLE001 - doctor must surface import drift
+    except Exception as exc:  # noqa: BLE001  # intentional-catch: doctor must surface import drift
         return ToolCheck(
             name=check_name,
             required=False,
@@ -1141,7 +975,7 @@ def _check_cursor_dispatch_readiness(target: Path) -> ToolCheck:
 
     try:
         result = evaluate_readiness(project_root=target)
-    except Exception as exc:  # noqa: BLE001 - readiness probe is diagnostic
+    except Exception as exc:  # noqa: BLE001  # intentional-catch: readiness probe is diagnostic
         return ToolCheck(
             name=check_name,
             required=False,
@@ -1582,7 +1416,7 @@ def _check_raw_written_close_intent_no_action(target: Path) -> ToolCheck:
         gate = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(gate)
         detect = gate._no_action_close_intent_deny
-    except Exception:  # noqa: BLE001 - detector unavailable must not crash doctor
+    except Exception:  # noqa: BLE001  # intentional-catch: detector unavailable must not crash doctor
         return ToolCheck(
             name=name,
             required=False,
@@ -1620,7 +1454,7 @@ def _check_raw_written_close_intent_no_action(target: Path) -> ToolCheck:
         try:
             if detect(str(target / rel), content) is not None:
                 hits.append(rel)
-        except Exception:  # noqa: BLE001 - one bad file must not abort the scan
+        except Exception:  # noqa: BLE001  # intentional-catch: one bad file must not abort the scan
             continue
 
     if hits:
@@ -2217,9 +2051,21 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
     else:
         identity = authority_report["identity_state"]
         if not identity["current"]:
+            defects = {
+                "missing locators": identity.get("missing", []),
+                "object-kind mismatches": identity.get("object_kind_mismatches", []),
+                "archived objects still present": identity.get("archived_present", []),
+                "invalid paths": identity.get("invalid_paths", []),
+            }
             failures.append(
-                f"registry identity failed: {len(identity['missing'])} missing locators, "
-                f"{len(identity['object_kind_mismatches'])} object-kind mismatches"
+                "registry identity failed: "
+                + ", ".join(f"{len(rows)} {kind}" for kind, rows in defects.items())
+                + "; "
+                + "; ".join(
+                    f"{kind}: {row.get('id', '?')} ({row.get('path', '?')})"
+                    for kind, rows in defects.items()
+                    for row in rows
+                )
             )
         membership = authority_report["membership_reconciliation"]
         for failure in membership.get("observer_failures", []):
@@ -2397,7 +2243,7 @@ def _check_sot_duplicate_guard(target: Path) -> ToolCheck:
 
     try:
         from groundtruth_kb.project.sot_audit import run_duplicate_sot_audit
-    except Exception as exc:  # pragma: no cover - defensive import boundary
+    except Exception as exc:  # pragma: no cover  # intentional-catch: defensive import boundary
         return ToolCheck(
             name=check_name,
             required=True,
@@ -3065,273 +2911,9 @@ def _check_canonical_terms_registry(target: Path) -> ToolCheck:
         conn.close()
 
 
-def _check_file_bridge_setup(target: Path) -> ToolCheck:
-    """Check file bridge configuration for dual-agent projects."""
-    bridge_dir = target / "bridge"
-    if not bridge_dir.is_dir():
-        return ToolCheck(
-            name="File Bridge Config",
-            required=True,
-            found=False,
-            status="warning",
-            message=(
-                "Bridge directory not found; create bridge/ and file numbered "
-                "bridge documents through dispatcher-backed flows."
-            ),
-        )
-
-    rules_dir = target / ".claude" / "rules"
-    # ``_check_file_bridge_setup`` is gated on ``p.includes_bridge`` at its
-    # sole call site in :func:`run_doctor`, so sourcing the required-rule
-    # set from the bridge-profile registry entries preserves prior behavior.
-    required_rules = _required_bridge_rule_filenames("dual-agent")
-    missing_rules = [r for r in required_rules if not (rules_dir / r).exists()]
-    if missing_rules:
-        return ToolCheck(
-            name="File Bridge Config",
-            required=True,
-            found=True,
-            status="warning",
-            message=f"Missing bridge rule file(s) in .claude/rules/: {', '.join(missing_rules)}",
-        )
-
-    return ToolCheck(
-        name="File Bridge Config",
-        required=True,
-        found=True,
-        status="pass",
-        message="File bridge directory and bridge rules present",
-    )
-
-
-def _check_file_bridge_state_parse(target: Path) -> ToolCheck:
-    bridge_dir = target / "bridge"
-    if not bridge_dir.exists():
-        return ToolCheck(
-            name="File Bridge State",
-            required=True,
-            found=False,
-            status="fail",
-            message="bridge directory not found; cannot parse bridge workflow state",
-        )
-
-    try:
-        from groundtruth_kb.bridge.status_driver import collect_bridge_status
-
-        snapshot = collect_bridge_status(target)
-    except Exception as exc:  # intentional-catch: doctor health check
-        return ToolCheck(
-            name="File Bridge State",
-            required=True,
-            found=True,
-            status="fail",
-            message=f"Versioned bridge state unreadable: {exc}",
-        )
-
-    if snapshot.queue.parse_error_count:
-        first_error = snapshot.queue.parse_errors[0] if snapshot.queue.parse_errors else {}
-        return ToolCheck(
-            name="File Bridge State",
-            required=True,
-            found=True,
-            status="fail",
-            message=f"Versioned bridge state malformed: {first_error}",
-        )
-
-    return ToolCheck(
-        name="File Bridge State",
-        required=True,
-        found=True,
-        status="pass",
-        message=(
-            f"Versioned bridge state parseable ({snapshot.queue.threads} "
-            f"thread{'s' if snapshot.queue.threads != 1 else ''})"
-        ),
-    )
-
-
 # -- Bridge dispatch liveness ------------------------------------------
 # Bridge dispatch liveness reads recipients[role].updated_at from the shared
 # dispatch-state.json written by the dispatcher daemon.
-
-_BRIDGE_DISPATCH_STATE_PATH = Path(".gtkb-state/bridge-poller/dispatch-state.json")
-
-_BRIDGE_FRESH_SECS = 4 * 60  # < 4 min → OK
-_BRIDGE_WARN_SECS = 10 * 60  # 4–10 min → WARN; > 10 min → ALARM
-_BRIDGE_DISPATCH_DOC = "docs/tutorials/dual-agent-setup.md"
-_BRIDGE_AUTH_DOC = "docs/troubleshooting/auth.md"
-
-
-def _check_bridge_dispatch_liveness(target: Path, agent: str) -> ToolCheck:
-    """Check file bridge dispatch liveness for *agent* (``'claude'`` or ``'codex'``).
-
-    Reads ``recipients[role].updated_at`` from ``dispatch-state.json`` and
-    computes staleness against the freshness thresholds.
-
-    - ``< 4 min`` or empty queue with fresh state heartbeat → OK
-    - ``4–10 min`` → WARN
-    - ``> 10 min`` → ALARM
-    - File absent  → not started (WARN)
-    - Missing / unparseable ``recipients[role].updated_at`` → ALARM
-    """
-    state_path = target / _BRIDGE_DISPATCH_STATE_PATH
-    role = _BRIDGE_AGENT_TO_RECIPIENT.get(agent, agent)
-    check_name = f"{agent.title()} bridge dispatch"
-
-    if not state_path.exists():
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=False,
-            status="warning",
-            message=(f"{agent} bridge dispatch not started; see {_BRIDGE_DISPATCH_DOC} for dispatcher daemon setup"),
-        )
-
-    try:
-        raw = state_path.read_bytes().decode("utf-8-sig")
-        data: object = json.loads(raw)
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=f"{agent} bridge dispatch-state file unreadable: {exc}",
-        )
-
-    if not isinstance(data, dict):
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=f"{agent} bridge dispatch-state file is not a JSON object",
-        )
-
-    recipients = data.get("recipients")
-    if not isinstance(recipients, dict):
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=(f"{agent} bridge dispatch-state missing 'recipients' map — ALARM. See {_BRIDGE_AUTH_DOC}"),
-        )
-
-    recipient_state = recipients.get(role)
-    if recipient_state is None:
-        matching = [k for k in recipients if k.startswith(f"{role}:") and isinstance(recipients[k], dict)]
-        if matching:
-            matching.sort(key=lambda k: str(recipients[k].get("updated_at") or ""), reverse=True)
-            recipient_state = recipients[matching[0]]
-
-    if not isinstance(recipient_state, dict):
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=(
-                f"{agent} bridge dispatch-state missing 'recipients.{role}' entry — ALARM. See {_BRIDGE_AUTH_DOC}"
-            ),
-        )
-
-    updated_at_raw = recipient_state.get("updated_at")
-    last_result = recipient_state.get("last_result", "unknown")
-    pending_count = recipient_state.get("pending_count", 0)
-    state_display = f"{last_result}, pending: {pending_count}"
-
-    if not isinstance(updated_at_raw, str) or not updated_at_raw.strip():
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=(
-                f"{agent} bridge dispatch-state missing recipients.{role}.updated_at — ALARM. See {_BRIDGE_AUTH_DOC}"
-            ),
-        )
-
-    try:
-        updated_at = datetime.fromisoformat(updated_at_raw.replace("Z", "+00:00"))
-    except ValueError:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=(
-                f"{agent} bridge dispatch-state has unparseable updated_at "
-                f"{updated_at_raw!r} — ALARM. See {_BRIDGE_AUTH_DOC}"
-            ),
-        )
-
-    now = datetime.now(tz=UTC)
-    age_secs = (now - updated_at).total_seconds()
-    age_min = int(age_secs // 60)
-    age_sec_part = int(age_secs % 60)
-    age_display = f"{age_min}m {age_sec_part}s ago"
-
-    # Compute top-level staleness (DCL-DISPATCH-STATE-STALENESS-THRESHOLD-001)
-    top_updated_at_raw = data.get("updated_at")
-    top_updated_at = None
-    if isinstance(top_updated_at_raw, str) and top_updated_at_raw.strip():
-        with suppress(ValueError):
-            top_updated_at = datetime.fromisoformat(top_updated_at_raw.replace("Z", "+00:00"))
-    if top_updated_at is None:
-        try:
-            mtime = state_path.stat().st_mtime
-            top_updated_at = datetime.fromtimestamp(mtime, tz=UTC)
-        except OSError:
-            pass
-
-    is_top_stale = False
-    top_age_display = ""
-    if top_updated_at is not None:
-        top_age_secs = (now - top_updated_at).total_seconds()
-        if top_age_secs > 3600:
-            is_top_stale = True
-            top_age_min = int(top_age_secs // 60)
-            top_age_sec_part = int(top_age_secs % 60)
-            top_age_display = f"{top_age_min}m {top_age_sec_part}s ago"
-
-    top_state_is_fresh = top_updated_at is not None and not is_top_stale
-    is_empty_queue = pending_count == 0
-
-    if age_secs < _BRIDGE_FRESH_SECS:
-        status: Literal["pass", "fail", "warning", "info"] = "pass"
-        message = f"{agent} bridge dispatch: OK (last update {age_display}, state: {state_display})"
-    elif is_empty_queue and top_state_is_fresh:
-        status = "pass"
-        message = (
-            f"{agent} bridge dispatch: OK (empty queue idle; recipient last update {age_display}, "
-            f"state: {state_display})"
-        )
-    elif age_secs < _BRIDGE_WARN_SECS:
-        status = "warning"
-        message = (
-            f"{agent} bridge dispatch: WARN (last update {age_display}, state: {state_display}) "
-            f"— investigate dispatcher daemon liveness or see {_BRIDGE_DISPATCH_DOC}"
-        )
-    else:
-        status = "fail"
-        message = (
-            f"{agent} bridge dispatch: ALARM (last update {age_display}, state: {state_display}) "
-            f"— check {_BRIDGE_AUTH_DOC} and {_BRIDGE_DISPATCH_DOC}"
-        )
-
-    if is_top_stale:
-        if status == "pass":
-            status = "warning"
-        message += f" (stale dispatch-state.json: last updated {top_age_display} ago)"
-
-    return ToolCheck(
-        name=check_name,
-        required=False,
-        found=True,
-        status=status,
-        message=message,
-    )
 
 
 # ── Auto-install ──────────────────────────────────────────────────────
@@ -3412,230 +2994,6 @@ DA_HARVEST_COVERAGE_WARN_THRESHOLD = 95.0
 DA_HARVEST_COVERAGE_ERROR_THRESHOLD = 80.0
 
 
-def _check_dispatcher_daemon_substrate_readiness(target: Path) -> ToolCheck:
-    """Correlate bridge substrate with dispatcher-daemon liveness (WI-4848 slice 3c)."""
-    check_name = "Dispatcher daemon substrate readiness"
-    from groundtruth_kb.mode_switch.validation import (
-        DISPATCHER_DAEMON_HEARTBEAT_MAX_AGE_SECONDS,
-        DISPATCHER_DAEMON_SUBSTRATE,
-    )
-
-    sub_path = target / "harness-state" / "bridge-substrate.json"
-    substrate = DISPATCHER_DAEMON_SUBSTRATE
-    if sub_path.is_file():
-        try:
-            sub_doc = json.loads(_require_utf8_text(sub_path))
-            if isinstance(sub_doc, dict):
-                raw = sub_doc.get("substrate")
-                if isinstance(raw, str) and raw.strip():
-                    substrate = raw.strip()
-        except (OSError, json.JSONDecodeError):
-            return ToolCheck(
-                name=check_name,
-                required=False,
-                found=True,
-                status="warning",
-                message="harness-state/bridge-substrate.json is unreadable; substrate correlation skipped",
-            )
-
-    daemon_script = target / "scripts" / "gtkb_dispatcher_daemon.py"
-    if not daemon_script.is_file():
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=False,
-            status="warning",
-            message="scripts/gtkb_dispatcher_daemon.py missing; daemon substrate check skipped",
-        )
-
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location(
-        "gtkb_dispatcher_daemon_doctor",
-        daemon_script,
-    )
-    if spec is None or spec.loader is None:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message="could not load gtkb_dispatcher_daemon.py for substrate correlation",
-        )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    daemon_status = module.collect_daemon_status(target)
-    running = bool(daemon_status.get("running"))
-    heartbeat_age = daemon_status.get("heartbeat_age_seconds")
-    stale = not running or heartbeat_age is None or float(heartbeat_age) > DISPATCHER_DAEMON_HEARTBEAT_MAX_AGE_SECONDS
-
-    if substrate == DISPATCHER_DAEMON_SUBSTRATE:
-        if stale:
-            detail = (
-                f"active substrate is {DISPATCHER_DAEMON_SUBSTRATE!r} but daemon is not healthy "
-                f"(running={running}, heartbeat_age_seconds={heartbeat_age})"
-            )
-            return ToolCheck(
-                name=check_name,
-                required=False,
-                found=True,
-                status="warning",
-                message=(
-                    detail + f"; threshold={DISPATCHER_DAEMON_HEARTBEAT_MAX_AGE_SECONDS}s. "
-                    "See .claude/rules/dispatcher-daemon-substrate-rollback-runbook.md"
-                ),
-            )
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message=(f"active substrate is {DISPATCHER_DAEMON_SUBSTRATE!r} and daemon heartbeat is fresh"),
-        )
-
-    if running and heartbeat_age is not None and float(heartbeat_age) <= DISPATCHER_DAEMON_HEARTBEAT_MAX_AGE_SECONDS:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message=(
-                f"substrate is {substrate!r} (daemon running with fresh heartbeat; advisory-only — go-live not active)"
-            ),
-        )
-
-    return ToolCheck(
-        name=check_name,
-        required=False,
-        found=True,
-        status="pass",
-        message=f"substrate is {substrate!r}; daemon substrate go-live path is not selected",
-    )
-
-
-def _check_dispatcher_daemon_supervisor_task(
-    target: Path,
-    load_complex_health: Callable[[], dict[str, Any]] | None = None,
-) -> ToolCheck:
-    """Warn when dispatcher_daemon substrate lacks a healthy Windows supervisor (WI-4937)."""
-    check_name = "Dispatcher daemon supervisor task"
-    skip = _dispatcher_daemon_task_skip_check(target, check_name=check_name, component_label="supervisor")
-    if skip is not None:
-        return skip
-
-    status = _dispatcher_complex_component_status(
-        load_complex_health or _dispatcher_complex_health_reader(target), "supervisor"
-    )
-    if status.get("healthy"):
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message="GTKB-DispatcherDaemon supervisor is registered, enabled, and headless",
-        )
-    findings = status.get("findings") or []
-    detail = "; ".join(str(item) for item in findings) or "supervisor unhealthy"
-    return ToolCheck(
-        name=check_name,
-        required=False,
-        found=bool(status.get("registered")),
-        status="warning",
-        message=(f"{detail}. Install/enable with: gt bridge dispatch daemon supervisor install"),
-    )
-
-
-def _check_dispatcher_daemon_watchdog_task(
-    target: Path,
-    load_complex_health: Callable[[], dict[str, Any]] | None = None,
-) -> ToolCheck:
-    """Warn when dispatcher_daemon substrate lacks a healthy Windows storm watchdog (WI-5023)."""
-    check_name = "Dispatcher daemon watchdog task"
-    skip = _dispatcher_daemon_task_skip_check(target, check_name=check_name, component_label="watchdog")
-    if skip is not None:
-        return skip
-
-    status = _dispatcher_complex_component_status(
-        load_complex_health or _dispatcher_complex_health_reader(target), "watchdog"
-    )
-    if status.get("healthy"):
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message="GTKB-HarnessStormWatchdog is registered, enabled, hidden, and uses pythonw.exe",
-        )
-    findings = status.get("findings") or []
-    detail = "; ".join(str(item) for item in findings) or "watchdog unhealthy"
-    return ToolCheck(
-        name=check_name,
-        required=False,
-        found=bool(status.get("registered")),
-        status="warning",
-        message=(f"{detail}. Install/enable with: gt bridge dispatch daemon watchdog install"),
-    )
-
-
-def _check_service_sot_watchdog(
-    target: Path,
-    load_task_status: Callable[[Path], dict[str, Any]] | None = None,
-) -> ToolCheck:
-    """Warn when the platform service/SoT watchdog task is absent or stale."""
-    check_name = "Service/SoT watchdog task"
-    registry_path = target / "config" / "registry" / "sot-artifacts.toml"
-    if not registry_path.is_file():
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message="Service/SoT watchdog skipped outside a platform SoT-registry workspace",
-        )
-    if os.name != "nt":
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message="Service/SoT watchdog task check is Windows-only; skipped on this host",
-        )
-
-    try:
-        if load_task_status is None:
-            from groundtruth_kb.watchdog.service_sot import collect_task_status
-
-            status = collect_task_status(target)
-        else:
-            status = load_task_status(target)
-    except Exception as exc:  # noqa: BLE001 - doctor checks fail soft
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=False,
-            status="warning",
-            message=f"Service/SoT watchdog status unavailable: {exc}",
-        )
-
-    if status.get("healthy"):
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message="GTKB-ServiceSoTWatchdog is registered, enabled, hidden, fresh, and detection-only",
-        )
-    findings = status.get("findings") or []
-    detail = "; ".join(str(item) for item in findings) or "service/SoT watchdog unhealthy"
-    return ToolCheck(
-        name=check_name,
-        required=False,
-        found=bool(status.get("registered")),
-        status="warning",
-        message=(f"{detail}. Install/enable with: gt watchdog service-sot install"),
-    )
-
-
 def _check_deliberation_search_backend(target: Path) -> ToolCheck:
     """Fail loudly when mandatory deliberation semantic search is degraded."""
     check_name = "Deliberation search backend"
@@ -3657,7 +3015,7 @@ def _check_deliberation_search_backend(target: Path) -> ToolCheck:
             status = db.deliberation_search_backend_status()
         finally:
             db.close()
-    except Exception as exc:  # noqa: BLE001 - doctor checks must report, not crash
+    except Exception as exc:  # noqa: BLE001  # intentional-catch: doctor checks must report, not crash
         return ToolCheck(
             name=check_name,
             required=True,
@@ -3695,216 +3053,6 @@ def _check_deliberation_search_backend(target: Path) -> ToolCheck:
             f"indexed {indexed_count}/{current_count} current deliberations "
             f"({chunk_count} chunks) at {chroma_path}; run `gt deliberations rebuild-index`"
         ),
-    )
-
-
-def _dispatcher_daemon_task_skip_check(target: Path, *, check_name: str, component_label: str) -> ToolCheck | None:
-    """Return a completed skip/warning check when the component probe is not applicable."""
-    from groundtruth_kb.mode_switch.validation import DISPATCHER_DAEMON_SUBSTRATE
-
-    if os.name != "nt":
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message=f"{component_label} task check is Windows-only; skipped on this host",
-        )
-
-    sub_path = target / "harness-state" / "bridge-substrate.json"
-    substrate = DISPATCHER_DAEMON_SUBSTRATE
-    if sub_path.is_file():
-        try:
-            sub_doc = json.loads(_require_utf8_text(sub_path))
-            if isinstance(sub_doc, dict):
-                raw = sub_doc.get("substrate")
-                if isinstance(raw, str) and raw.strip():
-                    substrate = raw.strip()
-        except (OSError, json.JSONDecodeError):
-            return ToolCheck(
-                name=check_name,
-                required=False,
-                found=True,
-                status="warning",
-                message=f"harness-state/bridge-substrate.json is unreadable; {component_label} check skipped",
-            )
-
-    if substrate != DISPATCHER_DAEMON_SUBSTRATE:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message=f"substrate is {substrate!r}; {component_label} task not required",
-        )
-
-    return None
-
-
-def _collect_dispatcher_complex_health(target: Path) -> dict[str, Any]:
-    from groundtruth_kb.dispatcher_complex import collect_complex_health
-
-    try:
-        return collect_complex_health(target)
-    except Exception as exc:  # intentional-catch: doctor probes fail soft
-        return {
-            "components": {
-                "daemon": {
-                    "status": {
-                        "healthy": False,
-                        "registered": False,
-                        "findings": [f"dispatcher complex health unavailable: {exc}"],
-                    }
-                },
-                "supervisor": {
-                    "status": {
-                        "healthy": False,
-                        "registered": False,
-                        "findings": [f"dispatcher complex health unavailable: {exc}"],
-                    }
-                },
-                "watchdog": {
-                    "status": {
-                        "healthy": False,
-                        "registered": False,
-                        "findings": [f"dispatcher complex health unavailable: {exc}"],
-                    }
-                },
-            }
-        }
-
-
-def _dispatcher_complex_health_reader(target: Path) -> Callable[[], dict[str, Any]]:
-    health: dict[str, Any] | None = None
-
-    def read() -> dict[str, Any]:
-        nonlocal health
-        if health is None:
-            health = _collect_dispatcher_complex_health(target)
-        return health
-
-    return read
-
-
-def _dispatcher_complex_component_status(
-    load_complex_health: Callable[[], dict[str, Any]],
-    component_name: str,
-) -> dict[str, Any]:
-    health = load_complex_health()
-    components = health.get("components")
-    if not isinstance(components, dict):
-        return {
-            "healthy": False,
-            "registered": False,
-            "findings": ["dispatcher complex health payload has no components"],
-        }
-    component = components.get(component_name)
-    if not isinstance(component, dict):
-        return {
-            "healthy": False,
-            "registered": False,
-            "findings": [f"dispatcher complex health payload has no {component_name} component"],
-        }
-    status = component.get("status")
-    if isinstance(status, dict):
-        return status
-    finding = component.get("finding") or component.get("error") or f"{component_name} status unavailable"
-    return {
-        "healthy": False,
-        "registered": False,
-        "findings": [str(finding)],
-    }
-
-
-def _retired_bridge_worker_markers() -> tuple[str, ...]:
-    return (
-        "cross_" + "harness_" + "bridge_" + "trigger.py",
-        "bridge-" + "dispatch-" + "trigger.cmd",
-        "single_" + "harness_" + "bridge_" + "automation.py",
-        "single_" + "harness_" + "bridge_" + "dispatcher.py",
-    )
-
-
-def _collect_hook_commands(value: object) -> list[str]:
-    commands: list[str] = []
-    if isinstance(value, dict):
-        for key, child in value.items():
-            if key == "command" and isinstance(child, str):
-                commands.append(child)
-            else:
-                commands.extend(_collect_hook_commands(child))
-    elif isinstance(value, list):
-        for child in value:
-            commands.extend(_collect_hook_commands(child))
-    return commands
-
-
-def _check_dispatcher_only_bridge_automation(target: Path) -> ToolCheck:
-    """Check that automated bridge dispatch is daemon-only."""
-    check_name = "Dispatcher-only bridge automation"
-
-    daemon_script = target / "scripts" / "gtkb_dispatcher_daemon.py"
-    if not daemon_script.is_file():
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=False,
-            status="fail",
-            message=f"scripts/gtkb_dispatcher_daemon.py missing; see {_BRIDGE_DISPATCH_DOC} for daemon setup",
-        )
-
-    markers = _retired_bridge_worker_markers()
-    script_findings = [
-        marker for marker in markers if marker.endswith(".py") and (target / "scripts" / marker).exists()
-    ]
-    hook_findings: list[str] = []
-    for hook_path in (target / ".claude" / "settings.json", target / ".codex" / "hooks.json"):
-        if not hook_path.exists():
-            continue
-        try:
-            payload = json.loads(_require_utf8_text(hook_path))
-        except (OSError, json.JSONDecodeError) as exc:
-            return ToolCheck(
-                name=check_name,
-                required=False,
-                found=True,
-                status="fail",
-                message=f"{hook_path.relative_to(target).as_posix()} unreadable: {exc}",
-            )
-        for command in _collect_hook_commands(payload):
-            if any(marker in command for marker in markers):
-                hook_findings.append(f"{hook_path.relative_to(target).as_posix()}: {command[:160]}")
-
-    if script_findings or hook_findings:
-        head = (script_findings + hook_findings)[0]
-        finding_count = len(script_findings) + len(hook_findings)
-        extra = "" if finding_count == 1 else f" (+{finding_count - 1} more)"
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=f"retired bridge worker surface present: {head}{extra}",
-        )
-
-    state_path = target / _BRIDGE_DISPATCH_STATE_PATH
-    if not state_path.exists():
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                "dispatcher daemon script present and retired hook workers absent; dispatch-state.json not written yet"
-            ),
-        )
-
-    return ToolCheck(
-        name=check_name,
-        required=False,
-        found=True,
-        status="pass",
-        message="dispatcher daemon is the only automated bridge substrate and dispatch-state.json is present",
     )
 
 
@@ -4794,61 +3942,6 @@ def _check_standing_backlog_health(target: Path) -> ToolCheck:
     )
 
 
-def _check_lapsed_go_implementation_claims(target: Path) -> ToolCheck:
-    """Warn when GO-latest implementation claims are lapsed past grace."""
-    check_name = "Lapsed GO implementation claims"
-    scripts_dir = target / "scripts"
-    inserted = False
-    if scripts_dir.is_dir() and str(scripts_dir) not in sys.path:
-        sys.path.insert(0, str(scripts_dir))
-        inserted = True
-    try:
-        try:
-            from bridge_work_intent_registry import lapsed_go_implementation_claims  # type: ignore
-        except (
-            Exception
-        ) as exc:  # pragma: no cover - defensive doctor surface  # intentional-catch: autogenerated check fix
-            return ToolCheck(
-                name=check_name,
-                required=False,
-                found=False,
-                status="warning",
-                message=f"Lapsed GO implementation claims: registry unavailable: {exc}",
-            )
-        try:
-            claims = lapsed_go_implementation_claims(project_root=target)
-        except Exception as exc:  # noqa: BLE001 - diagnostic doctor check  # intentional-catch: autogenerated check fix
-            return ToolCheck(
-                name=check_name,
-                required=False,
-                found=False,
-                status="warning",
-                message=f"Lapsed GO implementation claims: inspection failed: {exc}",
-            )
-    finally:
-        if inserted:
-            with suppress(ValueError):
-                sys.path.remove(str(scripts_dir))
-
-    if not claims:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message="Lapsed GO implementation claims: none",
-        )
-    examples = ", ".join(str(claim.get("thread_slug")) for claim in claims[:5])
-    suffix = "" if len(claims) <= 5 else f", +{len(claims) - 5} more"
-    return ToolCheck(
-        name=check_name,
-        required=False,
-        found=True,
-        status="warning",
-        message=f"Lapsed GO implementation claims: {len(claims)} lapsed ({examples}{suffix})",
-    )
-
-
 def _work_tree_stray_age_hours(report: dict[str, Any]) -> list[float]:
     ages: list[float] = []
     for key in ("workspace_findings", "stash_findings", "worktree_findings"):
@@ -4962,9 +4055,7 @@ def _check_obsolete_reference_purge(target: Path) -> ToolCheck:
             from check_obsolete_reference_purge import (  # type: ignore
                 unpaired_retirement_class_artifacts,
             )
-        except (
-            Exception
-        ) as exc:  # pragma: no cover - defensive doctor surface  # intentional-catch: autogenerated check fix
+        except Exception as exc:  # pragma: no cover  # intentional-catch: defensive doctor surface
             return ToolCheck(
                 name=check_name,
                 required=False,
@@ -5206,8 +4297,6 @@ def run_doctor(
         checks.append(check_func(target))
 
     if p.includes_bridge:
-        checks.append(_check_file_bridge_setup(target))
-        checks.append(_check_file_bridge_state_parse(target))
         checks.append(_check_active_legacy_root_references(target))
         checks.append(_check_registered_hooks_tracked(target))
         checks.append(_check_raw_written_close_intent_no_action(target))
@@ -5224,21 +4313,12 @@ def run_doctor(
         for registration in artifacts_for_doctor(profile, class_="settings-hook-registration"):
             if isinstance(registration, SettingsHookRegistration):
                 checks.append(_check_settings_hook_registration_drift(target, profile, registration))
-        checks.append(_check_bridge_dispatch_liveness(target, "claude"))
-        checks.append(_check_bridge_dispatch_liveness(target, "codex"))
-        checks.append(_check_dispatcher_only_bridge_automation(target))
         # Slice 3 of PROJECT-GTKB-CROSS-HARNESS-PARITY: discovery-diff over actual
         # harness hook surfaces (DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001 assertion
         # PARITY-DIFF-WIRED). WARN-only at Slice 3 per Q6; FAIL ramp + CI gate land
         # in Slice 6 after a coverage audit.
         checks.append(_check_harness_projection_conformance(target))
-        checks.append(_check_dispatcher_daemon_substrate_readiness(target))
-        dispatcher_complex_health = _dispatcher_complex_health_reader(target)
-        checks.append(_check_dispatcher_daemon_supervisor_task(target, dispatcher_complex_health))
-        checks.append(_check_dispatcher_daemon_watchdog_task(target, dispatcher_complex_health))
-        checks.append(_check_service_sot_watchdog(target))
         checks.append(_check_deliberation_search_backend(target))
-        checks.append(_check_lapsed_go_implementation_claims(target))
         checks.append(_check_work_tree_strays(target))
         # WI-4795: Phase-1 WARN surface for DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001
         # (deterministic obsolete-reference-purge pairing check).
@@ -5253,8 +4333,6 @@ def run_doctor(
         checks.append(_check_da_harvest_coverage(target))
         checks.append(_check_standing_backlog_health(target))
         checks.append(_check_orphan_citations(target))
-        checks.append(_check_tafe_schema(target))
-        checks.append(_check_tafe_flow_definitions(target))
         checks.append(_check_ollama_harness(target))
         checks.append(_check_provider_routing(target, "alibaba-cloud-studio"))
         checks.append(_check_provider_routing(target, "openrouter"))

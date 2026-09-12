@@ -29,7 +29,6 @@ Read the smallest relevant set:
 
 - `.harness-baseline-configuration/rules/canonical-terminology.md`
 - `.harness-baseline-configuration/rules/operating-model.md`
-- `config/agent-control/system-interface-map.toml`
 - current MemBase source-of-truth tables/views for the concept under review
 - relevant docs, tests, scripts, generated artifacts, and archive paths
 

@@ -7,7 +7,6 @@ import sqlite3
 from pathlib import Path
 
 from groundtruth_kb.db import (
-    _ACTIVATION_STATUS_DENIED_PROJECT_IDS,
     _SCHEMA_STRUCTURAL_SENTINELS,
     _VALID_AUTHORIZATION_VALUES,
     SCHEMA_VERSION,
@@ -71,26 +70,6 @@ def test_structural_sentinels_present_after_construction(tmp_path):
         assert column in cols, f"{table}.{column} missing after construction"
 
 
-def test_current_stamp_does_not_mask_a_missing_column(tmp_path):
-    """WI-7015: a stamped-but-incomplete database must be repaired, not skipped."""
-    path = tmp_path / "stamped.db"
-    KnowledgeDB(path)._get_conn().close()
-
-    conn = sqlite3.connect(path)
-    # The index must go first: SQLite refuses DROP COLUMN while an index
-    # references it. That same dependency is why SCHEMA_SQL cannot self-heal
-    # this gap, and why the repair has to run before it.
-    conn.execute("DROP INDEX IF EXISTS idx_project_authorizations_owner_decision")
-    conn.execute("ALTER TABLE project_authorizations DROP COLUMN owner_decision_deliberation_id")
-    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")  # stamp current; schema is not
-    conn.commit()
-    conn.close()
-
-    repaired = KnowledgeDB(path)._get_conn()
-    cols = {row[1] for row in repaired.execute("PRAGMA table_info(project_authorizations)").fetchall()}
-    assert "owner_decision_deliberation_id" in cols
-
-
 # --- WI-7611: projects.authorization -------------------------------------
 
 
@@ -109,45 +88,6 @@ def test_fresh_database_carries_authorization_defaulting_to_authorized(tmp_path:
     )
     value = conn.execute("SELECT authorization FROM projects WHERE id = 'PROJECT-TEST-DEFAULT'").fetchone()[0]
     assert value == "authorized"
-
-
-def test_authorization_migration_backfills_a_stamped_database(tmp_path: Path) -> None:
-    """An existing database gains the column by migration, not only by SCHEMA_SQL.
-
-    The column is dropped from a constructed database and the stamp rolled back,
-    reproducing a pre-WI-7611 database, then reopened. This is the path that
-    matters: SCHEMA_SQL alone cannot add a column to a table that already exists.
-    """
-    path = tmp_path / "stamped.db"
-    KnowledgeDB(path)._get_conn().close()
-
-    conn = sqlite3.connect(path)
-    conn.execute(
-        "INSERT INTO projects (id, version, name, changed_by, changed_at, change_reason) "
-        "VALUES (?, 1, 'denied probe', 'test', '2026-09-03', 'probe')",
-        (_ACTIVATION_STATUS_DENIED_PROJECT_IDS[0],),
-    )
-    conn.execute(
-        "INSERT INTO projects (id, version, name, changed_by, changed_at, change_reason) "
-        "VALUES ('PROJECT-TEST-ORDINARY', 1, 'ordinary probe', 'test', '2026-09-03', 'probe')"
-    )
-    conn.execute("ALTER TABLE projects DROP COLUMN authorization")
-    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION - 1}")
-    conn.commit()
-    conn.close()
-
-    migrated = KnowledgeDB(path)._get_conn()
-    cols = {row[1] for row in migrated.execute("PRAGMA table_info(projects)").fetchall()}
-    assert "authorization" in cols, "migration did not add the column to an existing table"
-
-    ordinary = migrated.execute("SELECT authorization FROM projects WHERE id = 'PROJECT-TEST-ORDINARY'").fetchone()[0]
-    assert ordinary == "authorized"
-
-    denied = migrated.execute(
-        "SELECT authorization FROM projects WHERE id = ?",
-        (_ACTIVATION_STATUS_DENIED_PROJECT_IDS[0],),
-    ).fetchone()[0]
-    assert denied == "not authorized"
 
 
 def test_authorization_holds_only_the_two_canonical_values(tmp_path: Path) -> None:

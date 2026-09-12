@@ -214,29 +214,6 @@ def test_primary_role_prime_first() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_set_harness_role_writes_list_form(tmp_path: Path) -> None:
-    # WI-3342 IP-6: the write path persists to the DB ``harnesses`` table and
-    # regenerates the registry projection; the harness must exist in the DB.
-    # Seed active B and D to satisfy active partition, A is suspended
-    _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", [ROLE_LOYAL_OPPOSITION], "suspended"),
-            "B": ("claude", [ROLE_PRIME_BUILDER], "active"),
-            "D": ("ollama", [ROLE_LOYAL_OPPOSITION], "active"),
-        },
-    )
-    set_harness_role(
-        tmp_path,
-        ROLE_PRIME_BUILDER,
-        harness_id="A",
-        harness_name="codex",
-    )
-    role = _projection_role(tmp_path, "A")
-    assert isinstance(role, list)
-    assert role == [ROLE_PRIME_BUILDER]
-
-
 def test_role_for_harness_writes_list_form_on_self_correction(tmp_path: Path) -> None:
     # WI-3342 IP-6: self-correction writes to the DB + projection; seed harness
     # B so the corrective role write lands (the mirror skips DB-less harnesses).
@@ -281,39 +258,6 @@ def test_legacy_scalar_role_reads_as_singleton_set(tmp_path: Path) -> None:
     # Loader normalizes legacy scalar values into list form.
     assert document["harnesses"]["A"]["role"] == ["loyal-opposition"]
     assert document["harnesses"]["B"]["role"] == ["prime-builder"]
-
-
-def test_legacy_scalar_upgrades_to_list_on_first_write(tmp_path: Path) -> None:
-    """IP-10 backward-compat: every WRITE path emits list form, never scalar.
-
-    WI-3342 IP-5/IP-6: the role-map write surface is the DB ``harnesses`` table
-    (which is list-native) + the regenerated registry projection; the retired
-    role-assignments.json file-writer is gone. This test pins the write-path
-    list-emission contract: after a ``set_harness_role`` write, every role
-    record in the regenerated projection is list form (no scalar leaks).
-    """
-    # Seed active A and D to satisfy active partition, B is suspended
-    _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", [ROLE_LOYAL_OPPOSITION], "active"),
-            "B": ("claude", [ROLE_PRIME_BUILDER], "suspended"),
-            "D": ("ollama", [ROLE_PRIME_BUILDER], "active"),
-        },
-    )
-
-    # Trigger a write via set_harness_role on B (suspended)
-    set_harness_role(
-        tmp_path,
-        ROLE_LOYAL_OPPOSITION,
-        harness_id="B",
-        harness_name="claude",
-    )
-
-    # B's role set is list form; A is demoted-or-carried as list form too —
-    # the write path normalizes every role record to the list wire form.
-    assert _projection_role(tmp_path, "B") == [ROLE_LOYAL_OPPOSITION]
-    assert isinstance(_projection_role(tmp_path, "A"), list)
 
 
 def test_load_role_assignments_normalizes_legacy_scalar_projection_record(

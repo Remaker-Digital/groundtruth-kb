@@ -1289,7 +1289,7 @@ def _validate_manifest_relationships(tables: Mapping[str, list[dict[str, Any]]])
             raise PostgresKernelError("invalid_manifest", "Only a program can contain execution projects")
 
     membership_pairs: set[tuple[str, str]] = set()
-    active_parents: set[str] = set()
+    active_parent_counts: dict[str, int] = {}
     for row in tables["project_work_item_memberships"]:
         _require_reference(row["project_id"], ids["projects"], label="membership.project_id")
         _require_reference(row["work_item_id"], ids["work_items"], label="membership.work_item_id")
@@ -1300,16 +1300,26 @@ def _validate_manifest_relationships(tables: Mapping[str, list[dict[str, Any]]])
         if row["status"] == "active":
             if projects[row["project_id"]]["kind"] != "project":
                 raise PostgresKernelError("invalid_manifest", "A program cannot contain work items")
-            if row["work_item_id"] in active_parents:
-                raise PostgresKernelError("invalid_manifest", "A work item cannot have multiple active parent projects")
-            active_parents.add(row["work_item_id"])
+            active_parent_counts[row["work_item_id"]] = active_parent_counts.get(row["work_item_id"], 0) + 1
 
-    missing_parents = ids["work_items"] - active_parents
+    # Open work is constituted under exactly one execution project; intake and
+    # every native membership write keep that rule. Closed work migrates with
+    # its recorded membership history exactly: zero or several active rows are
+    # historical facts that are neither repaired nor fabricated here.
+    open_items = {str(row["id"]) for row in tables["work_items"] if row.get("resolution_status") == "open"}
+    multiple_parents = sorted(item for item in open_items if active_parent_counts.get(item, 0) > 1)
+    if multiple_parents:
+        raise PostgresKernelError(
+            "invalid_manifest",
+            "An open work item cannot have multiple active parent projects",
+            details={"work_item_ids": multiple_parents[:20]},
+        )
+    missing_parents = sorted(item for item in open_items if active_parent_counts.get(item, 0) == 0)
     if missing_parents:
         raise PostgresKernelError(
             "invalid_manifest",
-            "Every work item requires one active parent project",
-            details={"missing_parent_count": len(missing_parents), "work_item_ids": sorted(missing_parents)[:20]},
+            "Every open work item requires one active parent project",
+            details={"missing_parent_count": len(missing_parents), "work_item_ids": missing_parents[:20]},
         )
 
     for row in tables["project_dependencies"]:
@@ -1828,7 +1838,7 @@ class PostgresKernel:
             )
         except PostgresKernelError:
             raise
-        except Exception as exc:
+        except Exception as exc:  # intentional-catch: driver failures surface as PostgresKernelError
             raise PostgresKernelError("postgres_unavailable", "PostgreSQL service is unavailable") from exc
 
     def _configure_transaction(self, cursor: Any) -> None:
@@ -2111,7 +2121,7 @@ class PostgresKernel:
                 }
         except PostgresKernelError:
             raise
-        except Exception as exc:
+        except Exception as exc:  # intentional-catch: driver failures surface as PostgresKernelError
             raise PostgresKernelError("postgres_operation_failed", "PostgreSQL initialization failed") from exc
 
     def status(self) -> dict[str, Any]:
@@ -2129,7 +2139,14 @@ class PostgresKernel:
                 )
                 server_major = int(str(version_text)) // 10000
                 tables = self._table_names(cursor, schema_name)
-                metadata = self._decode_schema_comment(self._schema_comment(cursor, schema_name))
+                schema_comment = self._schema_comment(cursor, schema_name)
+                # A table-free public schema carrying only PostgreSQL's stock comment is an
+                # uninitialized target, exactly as initialize() classifies it. Report it as
+                # not ready with every table missing instead of raising metadata drift.
+                stock_public_default = (
+                    schema_name == "public" and not tables and schema_comment == STOCK_PUBLIC_SCHEMA_COMMENT
+                )
+                metadata = None if stock_public_default else self._decode_schema_comment(schema_comment)
                 actual_catalog_sha256 = self._catalog_sha256(cursor, schema_name)
                 cursor.execute(
                     "SELECT table_name,column_name FROM information_schema.columns WHERE table_schema=%s",
@@ -2176,7 +2193,7 @@ class PostgresKernel:
                 }
         except PostgresKernelError:
             raise
-        except Exception as exc:
+        except Exception as exc:  # intentional-catch: driver failures surface as PostgresKernelError
             raise PostgresKernelError("postgres_operation_failed", "PostgreSQL status failed") from exc
 
     @contextmanager
@@ -2568,7 +2585,7 @@ class PostgresKernel:
             raise PostgresKernelError(
                 "retryable_conflict", "PostgreSQL import encountered a retryable conflict"
             ) from exc
-        except Exception as exc:
+        except Exception as exc:  # intentional-catch: driver failures surface as PostgresKernelError
             raise PostgresKernelError("postgres_operation_failed", "PostgreSQL import failed") from exc
 
     def readback_current(self, *, output: Path) -> dict[str, Any]:
@@ -2584,7 +2601,7 @@ class PostgresKernel:
                 payload = canonical_json_bytes(manifest)
         except PostgresKernelError:
             raise
-        except Exception as exc:
+        except Exception as exc:  # intentional-catch: driver failures surface as PostgresKernelError
             raise PostgresKernelError("postgres_operation_failed", "PostgreSQL readback failed") from exc
         publication = _publish_bytes(output, payload)
         return {
@@ -2647,7 +2664,7 @@ class PostgresKernel:
             ) from exc
         except (CheckViolation, ForeignKeyViolation, NotNullViolation, DataError) as exc:
             raise PostgresKernelError("invalid_state", "PostgreSQL rejected the domain state") from exc
-        except Exception as exc:
+        except Exception as exc:  # intentional-catch: driver failures surface as PostgresKernelError
             raise PostgresKernelError("postgres_operation_failed", "PostgreSQL domain operation failed") from exc
 
     @staticmethod

@@ -464,7 +464,30 @@ class NativeBridgeService:
         results = []
         for predecessor_id in work.get("depends_on_work_items") or []:
             predecessor = _required(tx, "work_items", predecessor_id, lock=lock)
-            parent = _current_parent(tx, predecessor_id)["project_id"]
+            memberships = _related(tx, "project_work_item_memberships", work_item_id=predecessor_id, status="active")
+            if len(memberships) != 1:
+                if predecessor["resolution_status"] == "open":
+                    _error(
+                        "invalid_membership",
+                        "A work item requires exactly one current project",
+                        work_item_id=predecessor_id,
+                    )
+                # Closed history may carry zero or several active memberships
+                # (owner decision 2026-09-10). Its result cannot be located in one
+                # project, so the dependent reports the reason instead of refusing.
+                results.append(
+                    {
+                        "work_item_id": predecessor_id,
+                        "project_id": None,
+                        "required_result": "project_commit",
+                        "current_status": predecessor["resolution_status"],
+                        "satisfied": False,
+                        "reason": "predecessor_membership_irregular",
+                        "changed_paths": [],
+                    }
+                )
+                continue
+            parent = memberships[0]["project_id"]
             if cross_project_only and parent == project_id:
                 continue
             project = _required(tx, "projects", parent, lock=lock)

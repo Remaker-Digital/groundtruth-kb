@@ -507,7 +507,11 @@ def _artifact_modes(root: Path, paths: list[str]) -> dict[str, str]:
         return {}
     for relative in paths:
         _artifact_path(root, relative)
-    entries = _git(root, "ls-files", "--stage", "-z", "--", *paths)
+    # Large cohesive projects can exceed Windows' process command-line limit.
+    # Read the index once, then select exact paths before validating entries;
+    # unrelated conflicts or non-file entries must not deny this scope.
+    requested = set(paths)
+    entries = _git(root, "ls-files", "--stage", "-z")
     if entries.returncode:
         raise SessionWorktreeError("artifact_mode_unavailable", "Cannot read scoped Git modes")
     indexed = {}
@@ -515,6 +519,8 @@ def _artifact_modes(root: Path, paths: list[str]) -> dict[str, str]:
         if not entry:
             continue
         metadata, relative = entry.split("\t", 1)
+        if relative not in requested:
+            continue
         mode, _object_id, stage = metadata.split()
         if stage != "0" or relative in indexed or mode not in {"100644", "100755"}:
             raise SessionWorktreeError("artifact_mode_conflict", "An artifact is unmerged or not a regular Git file")

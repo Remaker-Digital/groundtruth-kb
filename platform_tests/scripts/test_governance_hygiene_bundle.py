@@ -27,42 +27,6 @@ def test_change_a_stale_duplicates_removed() -> None:
         assert not path.exists(), f"stale duplicate still present: {path}"
 
 
-def test_change_b_conventional_commits_discipline_rule_present() -> None:
-    """Change B — Conventional Commits type discipline rule added to file-bridge-protocol.md."""
-    rule = (PROJECT_ROOT / ".claude" / "rules" / "file-bridge-protocol.md").read_text(encoding="utf-8")
-    assert "## Conventional Commits Type Discipline" in rule
-    assert "Recommended commit type" in rule or "Recommended Commit Type" in rule
-    assert "feat:" in rule
-    assert "chore:" in rule
-    assert "FINDING-P0-001" in rule
-
-
-def test_change_c_lo_kb_write_approval_packet_pathway_present() -> None:
-    """Change C — Loyal Opposition KB-write approval-packet pathway clause present."""
-    rule = (PROJECT_ROOT / ".claude" / "rules" / "loyal-opposition.md").read_text(encoding="utf-8")
-    assert "Loyal Opposition KB-Write Approval-Packet Pathway" in rule
-    assert "FINDING-P1-007" in rule
-    assert "formal-artifact-approvals" in rule
-
-
-def test_change_d_parked_draft_pattern_documented() -> None:
-    """Change D — parked-draft semantics documented in file-bridge-protocol.md."""
-    rule = (PROJECT_ROOT / ".claude" / "rules" / "file-bridge-protocol.md").read_text(encoding="utf-8")
-    assert "## Parked-Draft Pattern" in rule
-    assert "ERR_NO_INDEX_ENTRY" in rule
-    assert "FINDING-P4-001" in rule
-
-
-def test_change_e_canonical_terminology_dual_repo_listing() -> None:
-    """Change E — Agent Red entry now lists both canonical and migration-target repos."""
-    rule = (PROJECT_ROOT / ".claude" / "rules" / "canonical-terminology.md").read_text(encoding="utf-8")
-    # Both repo URLs must be present
-    assert "https://github.com/mike-remakerdigital/agent-red" in rule
-    assert "https://github.com/Remaker-Digital/agent-red-customer-engagement" in rule
-    assert "Migration target" in rule or "migration-target" in rule.lower()
-    assert "DELIB-S330-SLICE-8-6-PHASE-4-CANONICAL-AGENT-RED-REPO-MIGRATION-PREREQUISITE" in rule
-
-
 def test_change_f_release_readiness_header_refreshed() -> None:
     """Change F — release-readiness.md header timestamp updated to S333 or newer."""
     text = (PROJECT_ROOT / "memory" / "release-readiness.md").read_text(encoding="utf-8")
@@ -74,16 +38,6 @@ def test_change_f_release_readiness_header_refreshed() -> None:
     assert match is not None, f"header timestamp not found in:\n{head}"
     date_str = match.group(1)
     assert date_str >= "2026-05-06", f"header timestamp {date_str} is older than S333 (2026-05-06)"
-
-
-def test_change_g_index_carries_auq_umbrella_naming_note() -> None:
-    """Change G — bridge/INDEX.md carries the AUQ-stack umbrella-naming HTML comment."""
-    text = (PROJECT_ROOT / "bridge" / "INDEX.md").read_text(encoding="utf-8")
-    if "STARTUP-PRUNED HISTORICAL PREAMBLE" in text:
-        return
-    assert "Umbrella naming note" in text
-    assert "gtkb-gov-askuserquestion-enforcement-stack-slice" in text
-    assert "gtkb-gov-auq-enforcement-stack-slice" in text
 
 
 def test_no_destructive_operations_in_bundle() -> None:

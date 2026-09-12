@@ -272,7 +272,7 @@ if __name__ == "__main__":
         KeyError,
         ValueError,
     ) as error:
-        print(str(error), file=sys.stderr)
+        sys.stderr.write(f"{error}\n")
         raise SystemExit(1) from error
 
 

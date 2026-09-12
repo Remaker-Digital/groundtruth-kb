@@ -159,66 +159,6 @@ def test_resolved_harness_id_resolves_from_projection(tmp_path: Path) -> None:
     assert resolved_harness_id(tmp_path, harness_name="claude") == "B"
 
 
-def test_kb_attribution_raw_reader_resolves_from_projection(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Migrated raw-reader site ``scripts/_kb_attribution.py``: ``_load_role_assignments``
-    and ``_load_harness_identities`` resolve from the registry projection via
-    the IP-3 foundational loaders (WI-3342 IP-4).
-    """
-    import scripts._kb_attribution as kb_attr
-
-    _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", [ROLE_LOYAL_OPPOSITION]),
-            "B": ("claude", [ROLE_PRIME_BUILDER]),
-        },
-    )
-    # _kb_attribution resolves against its module-level PROJECT_ROOT; point it
-    # at the isolated fixture root for this test.
-    monkeypatch.setattr(kb_attr, "PROJECT_ROOT", tmp_path)
-
-    role_map = kb_attr._load_role_assignments()
-    identities = kb_attr._load_harness_identities()
-    assert role_map["A"]["role"] == [ROLE_LOYAL_OPPOSITION]
-    assert role_map["B"]["role"] == [ROLE_PRIME_BUILDER]
-    assert identities["codex"]["id"] == "A"
-    assert identities["claude"]["id"] == "B"
-
-
-def test_dispatcher_runtime_raw_readers_resolve_from_projection(
-    tmp_path: Path,
-) -> None:
-    """Migrated raw-reader site ``scripts/dispatcher_runtime.py``:
-    ``_read_role_assignments`` / ``_read_harness_identities`` resolve the legacy
-    document shape from the registry projection (WI-3342 IP-4).
-    """
-    import importlib.util
-
-    trigger_path = _REPO_ROOT / "scripts" / "dispatcher_runtime.py"
-    spec = importlib.util.spec_from_file_location("dispatcher_runtime_readermig", trigger_path)
-    assert spec is not None and spec.loader is not None
-    trigger = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = trigger
-    spec.loader.exec_module(trigger)
-
-    _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", [ROLE_LOYAL_OPPOSITION]),
-            "B": ("claude", [ROLE_PRIME_BUILDER]),
-        },
-    )
-
-    role_map = trigger._read_role_assignments(tmp_path)
-    identities = trigger._read_harness_identities(tmp_path)
-    # Legacy document shape: {"harnesses": {harness_id: record}}.
-    assert role_map["harnesses"]["A"]["role"] == [ROLE_LOYAL_OPPOSITION]
-    assert role_map["harnesses"]["B"]["role"] == [ROLE_PRIME_BUILDER]
-    # Identity legacy shape: {"harnesses": {harness_name: {"id": harness_id}}}.
-    assert identities["harnesses"]["codex"]["id"] == "A"
-    assert identities["harnesses"]["claude"]["id"] == "B"
-
-
 def test_projection_reader_accessors_resolve_from_projection(tmp_path: Path) -> None:
     """The DB-independent projection reader accessors (the IP-1 keyed accessors
     every migrated dict-shaped reader funnels through) resolve role/identity

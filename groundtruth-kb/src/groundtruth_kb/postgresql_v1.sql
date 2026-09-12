@@ -452,8 +452,16 @@ CREATE INDEX specifications_status_idx ON {schema}.specifications(status);
 CREATE INDEX tests_spec_id_idx ON {schema}.tests(spec_id);
 CREATE INDEX work_items_resolution_idx ON {schema}.work_items(resolution_status);
 CREATE INDEX projects_status_idx ON {schema}.projects(status, "authorization");
-CREATE UNIQUE INDEX membership_single_active_parent_idx ON {schema}.project_work_item_memberships(work_item_id)
-    WHERE status = 'active';
 CREATE INDEX project_memberships_work_item_idx ON {schema}.project_work_item_memberships(work_item_id);
+-- Closed work keeps its recorded membership history exactly (owner decision
+-- 2026-09-10), including zero or several active rows, so no storage-level
+-- uniqueness over every work item's active membership exists. Exactly one
+-- current execution project per OPEN work item is enforced by the migration
+-- validator on import and readback and by the native service's membership
+-- writes (intake creates one membership; a move retires the current row and
+-- activates the destination inside one serializable transaction). The schema
+-- stays declarative: no functions, triggers or views.
+CREATE INDEX project_memberships_active_idx ON {schema}.project_work_item_memberships(work_item_id)
+    WHERE status = 'active';
 CREATE INDEX project_dependencies_prerequisite_idx ON {schema}.project_dependencies(prerequisite_project_id, status);
 CREATE INDEX record_history_record_idx ON {schema}.record_history(record_type, new_version);

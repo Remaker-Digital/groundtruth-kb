@@ -145,21 +145,6 @@ def test_canonical_skill_declares_disposition_contract() -> None:
         assert phrase in body, f"skill body is missing required phrase {phrase!r}"
 
 
-def test_registry_entry_present_and_scoped() -> None:
-    capability = _registry_capability()
-    assert capability["kind"] == "skill"
-    assert capability["canonical_name"] == "advisory-disposition"
-    assert capability["canonical_source"] == ".claude/skills/advisory-disposition/SKILL.md"
-    assert capability["required_for_roles"] == ["prime-builder"]
-    assert capability["claude"]["surface"] == ".claude/skills/advisory-disposition/SKILL.md"
-    assert capability["claude"]["status"] == "native"
-    assert capability["codex"]["surface"] == ".codex/skills/advisory-disposition/SKILL.md"
-    assert capability["codex"]["status"] == "adapter"
-    assert capability["codex"]["adapter_source"] == ".claude/skills/advisory-disposition/SKILL.md"
-    assert capability["antigravity"]["status"] == "unsupported"
-    assert capability["cursor"]["status"] == "unsupported"
-
-
 def test_codex_adapter_and_manifest_match_canonical_sha() -> None:
     assert _CODEX_ADAPTER.is_file(), f"missing Codex adapter: {_CODEX_ADAPTER}"
     canonical = _CLAUDE_SKILL.read_text(encoding="utf-8")

@@ -6,8 +6,6 @@ import importlib.util
 import sys
 from pathlib import Path
 
-from groundtruth_kb.db import KnowledgeDB
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "audit_standing_backlog_sources.py"
 
@@ -88,39 +86,6 @@ def test_standing_backlog_audit_summarizes_membase_work_items_and_release_blocke
     assert audit["release_blockers"] == []
 
 
-def test_standing_backlog_contains_harvested_source_items() -> None:
-    """Verify current structured backlog ownership and live audit evidence."""
-    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
-    try:
-        items = {item_id: db.get_work_item(item_id) for item_id in ("GTKB-GOV-004", "GTKB-GOV-009", "GTKB-GOV-010")}
-    finally:
-        db.close()
-
-    assert all(items.values()), f"expected canonical backlog records; got {items}"
-
-    harvest_parent = items["GTKB-GOV-004"]
-    assert harvest_parent["project_name"] == "GTKB-GOV-004"
-    assert harvest_parent["resolution_status"] == "retired"
-    assert "unified backlog" in harvest_parent["title"].lower()
-
-    azure_gate = items["GTKB-GOV-009"]
-    assert azure_gate["resolution_status"] == "verified"
-    assert "bridge/gtkb-azure-cicd-gates-010.md" in azure_gate["status_detail"]
-
-    audit_owner = items["GTKB-GOV-010"]
-    assert audit_owner["resolution_status"] == "retired"
-    assert "audit as release-gate input" in audit_owner["title"].lower()
-    assert "gtkb-standing-backlog-harvest-audit-maintenance VERIFIED@-006" in audit_owner["status_detail"]
-
-    module = _load_module()
-    audit = module.build_audit(REPO_ROOT)
-
-    assert set(audit) == {"bridge", "work_items", "release_blockers"}
-    assert isinstance(audit["bridge"]["status_counts"], dict)
-    assert isinstance(audit["work_items"]["status_counts"], dict)
-    assert isinstance(audit["release_blockers"], list)
-
-
 def test_standing_backlog_audit_treats_withdrawn_as_terminal_not_actionable(tmp_path: Path) -> None:
     """WITHDRAWN at top of a document's version chain must be parsed as the
     latest status, and must NOT appear in actionable (parallel to VERIFIED's
@@ -145,16 +110,3 @@ def test_standing_backlog_audit_treats_withdrawn_as_terminal_not_actionable(tmp_
     assert fixture_entry["status"] not in module.ACTIONABLE_BRIDGE_STATUSES, (
         "WITHDRAWN must be terminal (not in ACTIONABLE_BRIDGE_STATUSES) like VERIFIED"
     )
-
-
-def test_standing_backlog_harvest_decision_is_archived() -> None:
-    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
-    try:
-        decision = db.get_deliberation("DELIB-0839")
-        assert decision is not None
-        assert decision["outcome"] == "informational"
-        assert "GTKB-GOV-004 through GTKB-GOV-010" in decision["content"]
-        assert "MemBase work_items require structured grouping" in decision["content"]
-        assert "STANDING-BACKLOG-HARVEST-2026-04-20.md" in decision["content"]
-    finally:
-        db.close()

@@ -37,7 +37,6 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 DISPATCH_PROMPT_SOURCES = (
-    REPO_ROOT / "scripts" / "dispatcher_runtime.py",
     REPO_ROOT / "scripts" / "openrouter_harness.py",
     REPO_ROOT / "scripts" / "ollama_harness.py",
 )

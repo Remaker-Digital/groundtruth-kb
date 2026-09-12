@@ -49,6 +49,8 @@ def _emit(value: Any, json_output: bool, *, complete: bool = False) -> None:
                     f"{record['dependent_project_id']} requires {record['prerequisite_project_id']} "
                     f"= {record['required_prerequisite_state']} at {record['affected_gate']} [{record['status']}]"
                 )
+            elif record.get("artifact_type") == "spec":
+                label = f"{record['project_id']} -> {record['artifact_ref']} [{record['status']}]"
             if "id" in record:
                 click.echo(f"{record['id']} v{record.get('version', '?')}: {label}")
                 description = record.get("description", record.get("definition"))
@@ -71,7 +73,7 @@ def _emit(value: Any, json_output: bool, *, complete: bool = False) -> None:
 def _fields(path: Path) -> dict[str, Any]:
     try:
         value = parse_json_bytes(path.read_bytes())
-    except Exception as error:
+    except Exception as error:  # intentional-catch: an unreadable fields file becomes a ClickException
         raise click.ClickException("The fields file must contain a UTF-8 JSON object") from error
     if not isinstance(value, dict):
         raise click.ClickException("The fields file must contain a JSON object")
@@ -100,6 +102,7 @@ def _domain_group(name: str, domain: str, *, read_only: bool = False) -> click.G
     @click.option("--priority", default=None)
     @click.option("--spec-id", default=None)
     @click.option("--plan-id", default=None)
+    @click.option("--project-id", default=None, hidden=domain != "project-formal-links")
     @click.option("--scope", default=None, hidden=domain != "terms")
     @click.option("--authority-level", default=None, hidden=domain != "terms")
     @click.option("--dependent-project", "dependent_project_id", default=None, hidden=domain != "project-dependencies")
@@ -184,6 +187,7 @@ NATIVE_COMMANDS = {
 
 
 NATIVE_COMMANDS["projects"].add_command(_domain_group("dependencies", "project-dependencies"))
+NATIVE_COMMANDS["projects"].add_command(_domain_group("formal-links", "project-formal-links"))
 
 
 @click.command("assert")
@@ -220,6 +224,23 @@ def native_assert(ctx: click.Context, spec_id: str | None, triggered_by: str, js
 
 
 NATIVE_COMMANDS["assert"] = native_assert
+
+
+@NATIVE_COMMANDS["projects"].command("set-authorization")
+@click.argument("project_id")
+@click.option("--authorization", type=click.Choice(["authorized", "not authorized"]), required=True)
+@click.option("--expected-version", type=click.IntRange(1), required=True, help="Current project version.")
+@click.option("--actor", required=True)
+@click.option("--change-reason", "reason", required=True)
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def set_project_authorization(ctx: click.Context, project_id: str, json_output: bool, **body: Any) -> None:
+    """Apply the owner's explicit ordering choice; existing bridge chains continue."""
+    _emit(
+        _call(ctx, "PUT", f"/v1/projects/{quote(project_id, safe='')}/authorization", body=body),
+        json_output,
+        complete=True,
+    )
 
 
 @NATIVE_COMMANDS["projects"].command("readiness")

@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import json
 import re
-import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -59,48 +57,6 @@ def _gt_command() -> str:
     return "gt"
 
 
-def test_rule_files_have_no_live_role_assignments_mirror_authority() -> None:
-    """The retired mirror must not be cited in rule files."""
-    for relpath in PROTECTED_TARGETS:
-        text = _read(relpath)
-        for snippet in OPERATING_ROLE_ALLOWED_MIRROR_SNIPPETS:
-            text = text.replace(snippet, "")
-        assert MIRROR not in text, f"{relpath} still cites retired {MIRROR}"
-
-
-def test_rule_files_cite_canonical_role_reader_entrypoint() -> None:
-    """Each protected role surface points live role reads at the canonical reader."""
-    for relpath in PROTECTED_TARGETS:
-        if relpath == ".claude/rules/canonical-terminology.md":
-            text = _read("groundtruth-kb/docs/reference/canonical-terminology-detail.md")
-        else:
-            text = _read(relpath)
-        assert CANONICAL_READER in text, f"{relpath} does not cite {CANONICAL_READER}"
-        assert CANONICAL_READER_CLI_GROUP in text, f"{relpath} does not cite {CANONICAL_READER_CLI_GROUP}"
-        assert CANONICAL_READER_CLI_SUBCOMMAND in text, f"{relpath} does not cite {CANONICAL_READER_CLI_SUBCOMMAND}"
-
-
-def test_rule_files_do_not_cite_singular_harness_role_command() -> None:
-    """The deprecated singular CLI spelling must not remain in live guidance."""
-    for relpath in PROTECTED_TARGETS:
-        assert SINGULAR_READER_COMMAND.search(_read(relpath)) is None, (
-            f"{relpath} still cites singular harness-role reader command"
-        )
-
-
-def test_canonical_reader_cli_subcommand_is_live() -> None:
-    """The documented CLI reader subcommand should execute and emit the projection."""
-    result = subprocess.run(
-        [_gt_command(), "harness", CANONICAL_READER_CLI_SUBCOMMAND],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    payload = json.loads(result.stdout)
-    assert "harnesses" in payload
-
-
 def test_legacy_overlay_pointer_files_are_deleted() -> None:
     """The per-harness operating-role pointer files are retired from live state."""
     for relpath in OVERLAY_POINTERS:
@@ -113,12 +69,3 @@ def test_live_guidance_has_no_overlay_pointer_references() -> None:
         text = _read(relpath)
         for pointer in OVERLAY_POINTERS:
             assert pointer not in text, f"{relpath} still references deleted overlay {pointer}"
-
-
-def test_canonical_reader_entrypoint_glossary_entry_present() -> None:
-    """The new first-contact concept is present in canonical terminology."""
-    term_text = _read(".claude/rules/canonical-terminology.md")
-    assert "### canonical reader entrypoint" in term_text
-    detail_text = _read("groundtruth-kb/docs/reference/canonical-terminology-detail.md")
-    assert "DCL-HARNESS-STATE-SOT-READER-CONTRACT-001" in detail_text
-    assert "groundtruth_kb.harness_projection.{read_roles, read_identity, read_capabilities}" in detail_text

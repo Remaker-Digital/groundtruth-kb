@@ -33,7 +33,6 @@ _CACHE_STEM = "last-user-visible" + "-startup"
 # are needed to reclaim the stale artifacts, so they are correct as they stand.
 _PRODUCER_PATHS = (
     "scripts/workstream_focus.py",
-    "scripts/session_start_dispatch_core.py",
     "scripts/session_self_initialization.py",
 )
 

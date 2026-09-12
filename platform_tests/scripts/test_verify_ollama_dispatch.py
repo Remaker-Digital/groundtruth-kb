@@ -273,7 +273,7 @@ def test_dispatch_bash_nonzero_returns_model_visible_evidence(ollama_harness_mod
 
     result = ollama_harness_module.dispatch_tool_call(
         "Bash",
-        {"command": "python scripts/adr_dcl_clause_preflight.py --bridge-id fixture"},
+        {"command": "python -m groundtruth_kb --help"},
         metadata,
         tmp_path,
         guard_runner=guard_runner,
@@ -281,7 +281,7 @@ def test_dispatch_bash_nonzero_returns_model_visible_evidence(ollama_harness_mod
     )
 
     assert "Bash command exited with return code 5." in result
-    assert "Command: python scripts/adr_dcl_clause_preflight.py --bridge-id fixture" in result
+    assert "Command: python -m groundtruth_kb --help" in result
     assert "STDOUT:\nout" in result
     assert "STDERR:\nerr" in result
 

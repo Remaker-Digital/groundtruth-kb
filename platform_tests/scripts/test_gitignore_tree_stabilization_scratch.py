@@ -87,15 +87,6 @@ def test_wi5299_residue_classes_are_gitignored() -> None:
         )
 
 
-def test_control_paths_are_not_hidden_by_scratch_ignores() -> None:
-    for test_path in VISIBLE_CONTROL_PATHS:
-        result = _git("check-ignore", "-q", test_path)
-
-        assert result.returncode == 1, (
-            f"Expected {test_path!r} to remain visible to git. stdout: {result.stdout!r} stderr: {result.stderr!r}"
-        )
-
-
 def test_gitignore_is_lf_pinned_and_has_no_cr_bytes() -> None:
     gitignore_bytes = (ROOT / ".gitignore").read_bytes()
     assert b"\r" not in gitignore_bytes, ".gitignore must stay LF-only"

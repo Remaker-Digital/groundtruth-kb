@@ -20,10 +20,7 @@ rg scan that targets this file itself as one of the eight approved paths.
 
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
-
-import pytest
 
 _ROOT = Path(__file__).resolve().parents[2]
 
@@ -47,7 +44,8 @@ _SOURCE_FILES = (
     _ROOT / "scripts" / "_session_init_keyword.py",
 )
 
-# All eight approved target paths from the GO'd bridge proposal.
+# The approved target paths from the GO'd bridge proposal that still exist
+# (test_workstream_focus_hook_parity.py was retired with the hook copies).
 _ALL_TARGET_FILES = (
     _ROOT / "scripts" / "session_self_initialization.py",
     _ROOT / "scripts" / "workstream_focus.py",
@@ -55,7 +53,6 @@ _ALL_TARGET_FILES = (
     _ROOT / "platform_tests" / "scripts" / "test_session_self_initialization_spec_citation_existence.py",
     _ROOT / "platform_tests" / "hooks" / "test_workstream_focus.py",
     _ROOT / "platform_tests" / "scripts" / "test_session_self_initialization.py",
-    _ROOT / "platform_tests" / "scripts" / "test_workstream_focus_hook_parity.py",
     _ROOT / "platform_tests" / "scripts" / "test_session_init_keyword_matching.py",
 )
 
@@ -68,7 +65,7 @@ def _read(path: Path) -> str:
 
 
 def test_phantoms_absent_from_all_target_files() -> None:
-    """None of the three phantom IDs appear in any of the eight approved target paths."""
+    """None of the three phantom IDs appear in any of the surviving approved target paths."""
     offenders: list[str] = []
     for path in _ALL_TARGET_FILES:
         text = _read(path)
@@ -83,20 +80,3 @@ def test_real_ids_present_in_source_files() -> None:
     source_text = "\n".join(_read(p) for p in _SOURCE_FILES)
     missing = [rid for rid in _REAL_IDS if rid not in source_text]
     assert not missing, f"replacement IDs missing from SessionStart source files: {missing}"
-
-
-def test_replacement_ids_exist_in_membase() -> None:
-    """The three real replacement IDs governing init-keyword behavior exist in MemBase."""
-    if not _DB_PATH.is_file():
-        pytest.skip(f"groundtruth.db not found at {_DB_PATH}")
-    conn = sqlite3.connect(_DB_PATH)
-    try:
-        rows = conn.execute(
-            "SELECT id FROM current_specifications WHERE id IN (?, ?, ?)",
-            list(_REAL_IDS),
-        ).fetchall()
-    finally:
-        conn.close()
-    found = {row[0] for row in rows}
-    missing = [rid for rid in _REAL_IDS if rid not in found]
-    assert not missing, f"replacement IDs absent from MemBase current_specifications: {missing}"

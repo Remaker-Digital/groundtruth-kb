@@ -18,11 +18,8 @@ Bridge authority: ``bridge/gtkb-isolation-017-slice2-5-rationale-schema-extensio
 
 from __future__ import annotations
 
-import sqlite3
 from dataclasses import fields
 from pathlib import Path
-
-import pytest
 
 
 def _fixtures_dir() -> Path:
@@ -130,27 +127,3 @@ def test_ownership_meta_has_notes_field_with_round_trip() -> None:
 def _kb_path() -> Path:
     here = Path(__file__).resolve()
     return here.parents[2] / "groundtruth.db"
-
-
-def test_ipr_and_cvr_slice2_5_documents_exist_with_adr_tag() -> None:
-    """T-IPR-CVR: GOV-20 Phase 1 advisory pilot - IPR + CVR docs in KB."""
-    db_path = _kb_path()
-    if not db_path.exists():
-        pytest.skip(f"groundtruth.db not available at {db_path}")
-    conn = sqlite3.connect(str(db_path))
-    try:
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT id, category, tags FROM documents WHERE id IN (?, ?)",
-            ("IPR-SLICE2-5-RATIONALE-SCHEMA-001", "CVR-SLICE2-5-RATIONALE-SCHEMA-001"),
-        ).fetchall()
-    finally:
-        conn.close()
-
-    found_ids = {r["id"] for r in rows}
-    assert "IPR-SLICE2-5-RATIONALE-SCHEMA-001" in found_ids, "IPR-SLICE2-5 missing from KB"
-    assert "CVR-SLICE2-5-RATIONALE-SCHEMA-001" in found_ids, "CVR-SLICE2-5 missing from KB"
-
-    for r in rows:
-        tags = (r["tags"] or "").lower()
-        assert "adr-isolation-application-placement-001" in tags, f"{r['id']} missing ADR tag; got tags={r['tags']!r}"

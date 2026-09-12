@@ -9,7 +9,6 @@ for the spec-to-test mapping.
 from __future__ import annotations
 
 import json
-import sqlite3
 from pathlib import Path
 
 import pytest
@@ -395,30 +394,3 @@ def _kb_path() -> Path:
     here = Path(__file__).resolve()
     # tests/test_doctor_isolation.py → groundtruth-kb/ → E:/GT-KB
     return here.parents[2] / "groundtruth.db"
-
-
-def test_ipr_and_cvr_slice1_documents_exist_with_adr_tag() -> None:
-    """T-IPR-CVR: GOV-20 Phase 1 advisory pilot - IPR + CVR docs in KB.
-
-    Skips when ``groundtruth.db`` is unavailable (CI / out-of-tree builds).
-    """
-    db_path = _kb_path()
-    if not db_path.exists():
-        pytest.skip(f"groundtruth.db not available at {db_path}")
-    conn = sqlite3.connect(str(db_path))
-    try:
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT id, category, tags FROM documents WHERE id IN (?, ?)",
-            ("IPR-SLICE1-DOCTOR-CHECKS-001", "CVR-SLICE1-DOCTOR-CHECKS-001"),
-        ).fetchall()
-    finally:
-        conn.close()
-
-    found_ids = {r["id"] for r in rows}
-    assert "IPR-SLICE1-DOCTOR-CHECKS-001" in found_ids, "IPR-SLICE1 missing from KB"
-    assert "CVR-SLICE1-DOCTOR-CHECKS-001" in found_ids, "CVR-SLICE1 missing from KB"
-
-    for r in rows:
-        tags = (r["tags"] or "").lower()
-        assert "adr-isolation-application-placement-001" in tags, f"{r['id']} missing ADR tag; got tags={r['tags']!r}"

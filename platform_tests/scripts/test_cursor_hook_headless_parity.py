@@ -14,7 +14,6 @@ from scripts.check_harness_parity import _load_projector
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CURSOR_ADAPTER_PATH = PROJECT_ROOT / "scripts" / "cursor_hook_adapter.py"
-SESSION_START_CORE = PROJECT_ROOT / "scripts" / "session_start_dispatch_core.py"
 SESSION_SELF_INIT = PROJECT_ROOT / "scripts" / "session_self_initialization.py"
 
 
@@ -87,14 +86,6 @@ def test_cursor_hook_adapter_uses_create_no_window_for_inner_hooks() -> None:
     assert "creationflags" in source
     assert "_windows_no_window_creationflags" in source
     assert "subprocess.run([sys.executable, str(target), *sys.argv[2:]], **run_kwargs)" in source
-
-
-def test_session_start_dispatch_core_spawns_startup_service_headless() -> None:
-    source = SESSION_START_CORE.read_text(encoding="utf-8")
-
-    assert "no_window_subprocess_kwargs" in source
-    assert "prefer_pythonw_executable" in source
-    assert "**no_window_subprocess_kwargs()" in source
 
 
 def test_session_self_initialization_command_output_is_headless() -> None:

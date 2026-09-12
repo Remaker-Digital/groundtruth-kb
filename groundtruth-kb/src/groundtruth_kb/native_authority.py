@@ -144,6 +144,21 @@ class ProjectMutation(Mutation):
     fields: ProjectFields
 
 
+class ProjectAuthorizationChange(Mutation):
+    authorization: Literal["authorized", "not authorized"]
+
+
+class ProjectFormalLinkFields(Request):
+    project_id: Identifier | None = None
+    artifact_ref: Identifier | None = None
+    status: Literal["active", "retired"] | None = None
+    notes: str | None = None
+
+
+class ProjectFormalLinkMutation(Mutation):
+    fields: ProjectFormalLinkFields
+
+
 class DependencyFields(Request):
     dependent_project_id: Identifier | None = None
     prerequisite_project_id: Identifier | None = None
@@ -195,6 +210,7 @@ DOMAINS = {
     "test-plans": "test_plans",
     "test-phases": "test_plan_phases",
     "project-dependencies": "project_dependencies",
+    "project-formal-links": "project_artifact_links",
 }
 FILTERS = {
     "harnesses": {"status"},
@@ -206,6 +222,7 @@ FILTERS = {
     "test-plans": {"status"},
     "test-phases": {"plan_id"},
     "project-dependencies": {"status", "dependent_project_id", "prerequisite_project_id", "affected_gate"},
+    "project-formal-links": {"status", "project_id"},
 }
 
 
@@ -237,6 +254,24 @@ def _current_parent(tx: PostgresTransaction, work_item_id: str) -> dict[str, Any
     if len(memberships) != 1:
         _error("invalid_membership", "A work item requires exactly one current project", work_item_id=work_item_id)
     return memberships[0]
+
+
+def _membership_facts(tx: PostgresTransaction, work: dict[str, Any]) -> dict[str, Any]:
+    """Recorded membership facts for a read.
+
+    An open work item has exactly one active parent project; reading an open item with any other
+    history is refused like every mutation, move and readiness check. Closed work keeps its recorded
+    membership rows exactly as history (the migration preserves zero or several active memberships
+    on the owner's decision), so a read returns those rows and ``membership`` only when exactly one is
+    active. Nothing is repaired or invented on the read path.
+    """
+    memberships = _related(tx, "project_work_item_memberships", work_item_id=work["id"])
+    active = [row for row in memberships if row["status"] == "active"]
+    if work["resolution_status"] == "open":
+        if len(active) != 1:
+            _error("invalid_membership", "A work item requires exactly one current project", work_item_id=work["id"])
+        return {"membership": active[0], "memberships": memberships}
+    return {"membership": active[0] if len(active) == 1 else None, "memberships": memberships}
 
 
 def _work_formal_roots(
@@ -456,6 +491,8 @@ class AuthorityService:
     ) -> dict[str, Any]:
         if domain not in DOMAINS or set(filters or {}) - FILTERS[domain]:
             _error("invalid_query", "Unknown domain or unsupported filter")
+        if domain == "project-formal-links":
+            filters = {**(filters or {}), "artifact_type": "spec"}
         with self.kernel.transaction(read_only=True) as tx:
             records = tx.list(DOMAINS[domain], filters=filters, after=after, limit=limit, search=search)
         return {"records": records, "next_after": records[-1]["id"] if len(records) == limit else None}
@@ -465,6 +502,8 @@ class AuthorityService:
             _error("invalid_query", "Unknown knowledge domain")
         with self.kernel.transaction(read_only=True) as tx:
             row = _required(tx, DOMAINS[domain], record_id)
+            if domain == "project-formal-links" and row["artifact_type"] != "spec":
+                _error("not_found", "The record is not a project formal-source relationship", id=record_id)
             if domain == "projects":
                 return {
                     "project": row,
@@ -476,7 +515,7 @@ class AuthorityService:
                     "artifact_links": _related(tx, "project_artifact_links", project_id=record_id, status="active"),
                 }
             if domain == "work-items":
-                return {"work_item": row, "membership": _current_parent(tx, record_id)}
+                return {"work_item": row, **_membership_facts(tx, row)}
             return row
 
     @staticmethod
@@ -604,6 +643,77 @@ class AuthorityService:
                 defaults["authorization"] = "not authorized"
             return _write(tx, "projects", record_id, fields, request, defaults=defaults)
 
+    def set_project_authorization(self, record_id: str, request: ProjectAuthorizationChange) -> dict[str, Any]:
+        """Apply owner-directed ordering to the existing project row.
+
+        Attribution describes the mutation, not proof of permission. This
+        operation neither changes membership nor revokes initiated attempts.
+        """
+        with self.kernel.transaction() as tx:
+            current = _required(tx, "projects", record_id, lock=True)
+            if current["version"] != request.expected_version:
+                _error(
+                    "cas_conflict",
+                    "Read the current project before changing authorization",
+                    id=record_id,
+                    expected=request.expected_version,
+                    actual=current["version"],
+                )
+            if current["kind"] != "project":
+                _error("program_not_authorizable", "Programs have no execution authorization")
+            if current["status"] != "active":
+                _error("project_closed", "A closed project cannot change execution ordering")
+            if record_id == "PROJECT-GTKB-NEW-WORK-INTAKE" and request.authorization != "not authorized":
+                _error("intake_not_authorizable", "Move intake work to its execution project before dispatch")
+            if current["authorization"] == request.authorization:
+                return current
+            return _write(tx, "projects", record_id, {"authorization": request.authorization}, request)
+
+    def amend_project_formal_link(self, record_id: str, request: ProjectFormalLinkMutation) -> dict[str, Any]:
+        """Amend a formal root without publishing evidence or changing authorization."""
+        with self.kernel.transaction() as tx:
+            current = tx.get("project_artifact_links", {"id": record_id}, lock=True)
+            actual = current["version"] if current else 0
+            if actual != request.expected_version:
+                _error("cas_conflict", "Read the current formal link before changing it", actual=actual, id=record_id)
+            if current and current["artifact_type"] != "spec":
+                _error("invalid_formal_link", "This operation cannot amend other project artifact types")
+            fields = request.fields.model_dump(exclude_unset=True)
+            candidate = {**(current or {"status": "active"}), **fields}
+            if not candidate.get("project_id") or not candidate.get("artifact_ref"):
+                _error("formal_link_endpoint_required", "A formal link names an execution project and formal record")
+            if current and any(candidate[key] != current[key] for key in ("project_id", "artifact_ref")):
+                _error("formal_link_identity_frozen", "Retire the old relationship and create the intended new one")
+            if candidate["status"] not in {"active", "retired"}:
+                _error("invalid_formal_link_transition", "A formal relationship is active or retired")
+            if not current and candidate["status"] != "active":
+                _error("invalid_formal_link_transition", "A new formal relationship starts active")
+            # Bridge effects and finalization hold the same project row. A root
+            # change cannot cross an effect, and later operations re-read roots.
+            _execution_project(tx, candidate["project_id"])
+            if candidate["status"] == "active":
+                source = _required(tx, "specifications", candidate["artifact_ref"], lock=True)
+                if source["status"] != "active":
+                    _error("inactive_formal_source", "An active formal link requires a current active formal record")
+                duplicates = _related(
+                    tx,
+                    "project_artifact_links",
+                    project_id=candidate["project_id"],
+                    artifact_type="spec",
+                    artifact_ref=candidate["artifact_ref"],
+                    status="active",
+                )
+                if any(row["id"] != record_id for row in duplicates):
+                    _error("duplicate_formal_link", "This project already has an active relationship to the source")
+            return _write(
+                tx,
+                "project_artifact_links",
+                record_id,
+                fields,
+                request,
+                defaults={"artifact_type": "spec", "relationship": "governed_by", "status": "active"},
+            )
+
     def amend_dependency(self, record_id: str, request: DependencyMutation) -> dict[str, Any]:
         with self.kernel.transaction() as tx:
             current = tx.get("project_dependencies", {"id": record_id}, lock=True)
@@ -709,7 +819,7 @@ class AuthorityService:
                     },
                     Mutation(expected_version=0, actor=request.actor, reason=request.reason),
                 )
-            return {"work_item": row, "membership": _current_parent(tx, record_id)}
+            return {"work_item": row, **_membership_facts(tx, row)}
 
     @staticmethod
     def _check_dependencies(tx: PostgresTransaction, record_id: str, dependencies: list[str]) -> None:

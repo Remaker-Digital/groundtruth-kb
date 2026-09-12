@@ -20,10 +20,9 @@ aggregate queue artifacts.
 
 Operationalizes `PROJECT-GTKB-GOV-PROPOSAL-STANDARDS` (Slices 1-3 enforce
 proposal structure mechanically; this Slice 4 surface helps authors *produce*
-that structure). It invokes `scripts/gtkb_propose_scaffold.py` to emit a draft
-proposal body under `.gtkb-state/propose-drafts/<slug>-001.md` with every
-gate-satisfying element pre-populated, plus a self-review checklist of the
-mandatory preflights.
+that structure). The agent authors the complete proposal itself in its own
+scratch directory and delivers it with `gt bridge deliver`; no scaffold helper
+or preflight script exists.
 
 ## When to invoke
 
@@ -42,12 +41,11 @@ versions of an existing thread, verdict files, or advisory entries.
 
 1. **Emit the scaffold draft:**
 
-   ```text
-   python scripts/gtkb_propose_scaffold.py scaffold \
-       --slug <slug> --work-item <WI> --project <PROJECT-ID> \
-       [--slice <N>] [--bridge-kind <kind>] \
-       [--target-path <glob> --target-path <glob> ...]
-   ```
+   Author the proposal body by hand from the current `gt context work-item <WI> --json`
+   output: exact `target_paths`, `test_artifact_targets`, observed `work_item_version`
+   and `spec_versions`, the intended result, governing requirements, affected
+   artifacts, implementation approach, complete verification plan and justified
+   exclusions (see the `file-bridge-protocol` rule).
 
    The helper validates the slug (kebab-case and safe bridge-file name),
    validates the work-item/project relationship and the project's current
@@ -87,7 +85,7 @@ versions of an existing thread, verdict files, or advisory entries.
 `PROJECT-GTKB-GOV-PROPOSAL-STANDARDS` Slice 4;
 owner decision `DELIB-S382-PROPOSAL-STANDARDS-COMPLETION-SCOPE`;
 GO at `bridge/gtkb-proposal-standards-propose-scaffold-skill-002.md`.
-Helper: `scripts/gtkb_propose_scaffold.py`. Tests:
-`platform_tests/scripts/test_gtkb_propose_scaffold.py`.
+The former scaffold helper and its tests are retired; delivery validation lives in
+the native bridge service (`gt bridge deliver`).
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

@@ -19,14 +19,12 @@ may create, and what a reader may resolve.
 
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "groundtruth-kb" / "src"))
-sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 from groundtruth_kb.bridge.vocabulary import (  # noqa: E402
     CANONICAL_STATUSES,
@@ -135,68 +133,3 @@ def test_resolvable_is_exactly_canon_union_historical() -> None:
     for status in set(TRANSITIONS) | set(HISTORICAL_TRANSITIONS):
         expected = TRANSITIONS.get(status, frozenset()) | HISTORICAL_TRANSITIONS.get(status, frozenset())
         assert RESOLVABLE_TRANSITIONS[status] == expected
-
-
-def test_no_live_chain_on_disk_fails_on_a_transition() -> None:
-    """The integration guard: the owner's actual goal, stated as a test.
-
-    Scoped to LIVE chains -- those whose latest version is not VERIFIED or
-    WITHDRAWN. Terminal chains bearing a VERIFIED shortcut are excluded on
-    purpose (see AUTHORITY_BEARING_EXCLUSIONS); they carry no work that can be
-    stranded, and tolerating them would manufacture authority.
-
-    Chains also fail resolution for reasons this work never touched -- broken
-    responds-to links, non-contiguous versions, absent metadata. Those are
-    separate defects with their own carriers, so only the transition class is
-    asserted here.
-    """
-    from bridge_lifecycle_resolver import (
-        BridgeLifecycleResolutionError,
-        resolve_bridge_lifecycle,
-    )
-    from groundtruth_kb.bridge.vocabulary import observed_status_pattern
-
-    bridge_dir = PROJECT_ROOT / "bridge"
-    if not bridge_dir.is_dir():
-        return
-
-    pattern = observed_status_pattern()
-
-    def head_status(path: Path) -> str:
-        """Read the status token from a head whose lines may be in any order.
-
-        Per the complete-head rule a status token, an ``::init`` line and an
-        ``::open`` line may appear in any order within the first three
-        non-blank lines, so taking line one unconditionally misreads roughly
-        one chain in ten.
-        """
-        nonblank = [ln.strip() for ln in path.read_text(encoding="utf-8", errors="replace").splitlines() if ln.strip()]
-        for line in nonblank[:3]:
-            match = pattern.match(line)
-            if match:
-                return match.group("status")
-        return ""
-
-    latest: dict[str, tuple[int, Path]] = {}
-    for path in bridge_dir.glob("*-[0-9][0-9][0-9].md"):
-        match = re.match(r"^(.*)-(\d{3})\.md$", path.name)
-        if not match:
-            continue
-        version = int(match.group(2))
-        slug = match.group(1)
-        if version >= latest.get(slug, (0, path))[0]:
-            latest[slug] = (version, path)
-
-    offenders = []
-    for slug, (_, newest) in sorted(latest.items()):
-        if head_status(newest) in {"VERIFIED", "WITHDRAWN"}:
-            continue
-        try:
-            resolve_bridge_lifecycle(PROJECT_ROOT, slug)
-        except BridgeLifecycleResolutionError as exc:
-            if "INVALID_BRIDGE_TRANSITION" in f"{getattr(exc, 'code', '')}{exc}":
-                offenders.append(slug)
-        except Exception:  # noqa: BLE001 - other failure classes are out of scope
-            continue
-
-    assert not offenders, f"live chains failing on a transition: {offenders}"

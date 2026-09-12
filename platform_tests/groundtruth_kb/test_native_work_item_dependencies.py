@@ -8,7 +8,7 @@ from threading import Event
 import pytest
 from groundtruth_kb.bridge import native as native_bridge
 from groundtruth_kb.bridge.native import NativeBridgeService
-from groundtruth_kb.native_authority import Mutation, SpecMutation, _write
+from groundtruth_kb.native_authority import Mutation, SpecMutation, _related, _write
 
 from platform_tests.groundtruth_kb.test_native_authority_service import history_count, put, work_fields
 from platform_tests.groundtruth_kb.test_native_authority_service import native as native
@@ -86,6 +86,51 @@ def test_labels_without_review_do_not_satisfy_predecessors_or_block_unrelated_wo
     assert not report["ready"]
     expected = "predecessor_review_missing" if status == "verified" else "predecessor_not_verified"
     assert report["predecessors"][0]["reason"] == expected
+    assert put(client, "work-items", "WI-3", work_fields(), project_id="PROJECT-1").status_code == 200
+    assert client.get("/v1/work-items/WI-3/readiness").json()["ready"]
+    assert claim(client, "unrelated", "pb1", 0, "NEW", work_item_id="WI-3").status_code == 200
+
+
+@pytest.mark.parametrize("status", ["resolved", "verified"])
+def test_closed_predecessor_with_irregular_membership_reports_a_reason_without_refusing(bridge, status):
+    # Owner decision 2026-09-10: closed work migrates with its recorded membership
+    # history exactly, so a closed predecessor may carry no current project. The
+    # dependent's readiness names that reason; open work keeps the strict rule.
+    service, client, _, _ = bridge
+    dependent(client)
+    with service.kernel.transaction() as tx:
+        _write(
+            tx,
+            "work_items",
+            "WI-1",
+            {"resolution_status": status},
+            Mutation(expected_version=1, actor="qualification", reason="Closed historical source fixture"),
+        )
+        membership = _related(tx, "project_work_item_memberships", work_item_id="WI-1", status="active")[0]
+        _write(
+            tx,
+            "project_work_item_memberships",
+            membership["id"],
+            {"status": "removed"},
+            Mutation(expected_version=membership["version"], actor="qualification", reason="Irregular closed history"),
+        )
+    report = readiness(client)
+    assert not report["ready"]
+    assert report["predecessors"] == [
+        {
+            "work_item_id": "WI-1",
+            "project_id": None,
+            "required_result": "project_commit",
+            "current_status": status,
+            "satisfied": False,
+            "reason": "predecessor_membership_irregular",
+            "changed_paths": [],
+        }
+    ]
+    assert client.get("/v1/work-items/WI-2/context").json()["work_item_readiness"] == report
+    refused = claim(client, "chain-2", "pb1", 0, "NEW", work_item_id="WI-2")
+    assert refused.json()["error"]["code"] == "work_item_dependencies_unsatisfied"
+    assert client.get("/v1/work-items/WI-1/context").json()["error"]["code"] == "invalid_membership"
     assert put(client, "work-items", "WI-3", work_fields(), project_id="PROJECT-1").status_code == 200
     assert client.get("/v1/work-items/WI-3/readiness").json()["ready"]
     assert claim(client, "unrelated", "pb1", 0, "NEW", work_item_id="WI-3").status_code == 200

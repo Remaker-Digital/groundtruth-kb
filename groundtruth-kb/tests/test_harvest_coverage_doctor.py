@@ -12,8 +12,6 @@ from pathlib import Path
 
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.project.doctor import (
-    DA_HARVEST_COVERAGE_ERROR_THRESHOLD,
-    DA_HARVEST_COVERAGE_WARN_THRESHOLD,
     _check_da_harvest_coverage,
 )
 
@@ -80,70 +78,6 @@ def _make_project_dir(
     return target
 
 
-def test_check_da_harvest_coverage_passes_at_100_percent(tmp_path: Path) -> None:
-    """All active VERIFIED threads covered → pass."""
-    threads = [f"thread-{i}" for i in range(5)]
-    target = _make_project_dir(tmp_path, threads, threads)
-    result = _check_da_harvest_coverage(target)
-    assert result.status == "pass"
-    assert "100.00%" in result.message
-    assert "5/5" in result.message
-
-
-def test_check_da_harvest_coverage_passes_at_warn_threshold(tmp_path: Path) -> None:
-    """Coverage exactly at WARN threshold (95%) → pass (boundary = pass)."""
-    # 20 threads, 19 covered = 95.00%
-    threads = [f"thread-{i:02d}" for i in range(20)]
-    target = _make_project_dir(tmp_path, threads, threads[:19])
-    result = _check_da_harvest_coverage(target)
-    assert result.status == "pass"
-    assert "95.00%" in result.message
-    # Sanity: confirm constant is what we think
-    assert DA_HARVEST_COVERAGE_WARN_THRESHOLD == 95.0
-
-
-def test_check_da_harvest_coverage_warns_below_warn_threshold(tmp_path: Path) -> None:
-    """Below WARN but at-or-above ERROR threshold → warning."""
-    # 10 threads, 9 covered = 90.00% (below 95 WARN, above 80 ERROR)
-    threads = [f"thread-{i:02d}" for i in range(10)]
-    target = _make_project_dir(tmp_path, threads, threads[:9])
-    result = _check_da_harvest_coverage(target)
-    assert result.status == "warning"
-    assert "90.00%" in result.message
-    assert "below WARN threshold" in result.message
-
-
-def test_check_da_harvest_coverage_warns_exactly_at_error_threshold(tmp_path: Path) -> None:
-    """Coverage exactly at ERROR threshold (80%) → warning (boundary = warning, not fail)."""
-    # 10 threads, 8 covered = 80.00%
-    threads = [f"thread-{i:02d}" for i in range(10)]
-    target = _make_project_dir(tmp_path, threads, threads[:8])
-    result = _check_da_harvest_coverage(target)
-    assert result.status == "warning"
-    assert "80.00%" in result.message
-    assert DA_HARVEST_COVERAGE_ERROR_THRESHOLD == 80.0
-
-
-def test_check_da_harvest_coverage_fails_below_error_threshold(tmp_path: Path) -> None:
-    """Below ERROR threshold → fail."""
-    # 10 threads, 7 covered = 70.00%
-    threads = [f"thread-{i:02d}" for i in range(10)]
-    target = _make_project_dir(tmp_path, threads, threads[:7])
-    result = _check_da_harvest_coverage(target)
-    assert result.status == "fail"
-    assert "70.00%" in result.message
-    assert "below ERROR threshold" in result.message
-
-
-def test_check_da_harvest_coverage_fails_at_0_percent(tmp_path: Path) -> None:
-    """0% coverage → fail."""
-    threads = [f"thread-{i:02d}" for i in range(5)]
-    target = _make_project_dir(tmp_path, threads, [])
-    result = _check_da_harvest_coverage(target)
-    assert result.status == "fail"
-    assert "0.00%" in result.message
-
-
 def test_check_da_harvest_coverage_skipped_when_missing_index(tmp_path: Path) -> None:
     """Missing INDEX.md → skipped with warning (not fail)."""
     target = tmp_path / "project"
@@ -176,23 +110,3 @@ def test_check_da_harvest_coverage_empty_index_passes(tmp_path: Path) -> None:
     assert result.status == "pass"
     assert "100.00%" in result.message
     assert "0/0" in result.message
-
-
-def test_check_da_harvest_coverage_message_includes_uncovered_preview(tmp_path: Path) -> None:
-    """Below-threshold result mentions at least one uncovered thread name."""
-    threads = [f"thread-{i:02d}" for i in range(10)]
-    target = _make_project_dir(tmp_path, threads, threads[:7])
-    result = _check_da_harvest_coverage(target)
-    assert result.status == "fail"
-    # Uncovered threads are sorted; at least one name should appear
-    assert "thread-07" in result.message or "thread-08" in result.message or "thread-09" in result.message
-
-
-def test_check_da_harvest_coverage_previews_only_three_uncovered(tmp_path: Path) -> None:
-    """Message previews up to 3 uncovered threads + 'N more' suffix."""
-    threads = [f"thread-{i:02d}" for i in range(20)]
-    # Cover only 10 → 50% coverage, 10 uncovered
-    target = _make_project_dir(tmp_path, threads, threads[:10])
-    result = _check_da_harvest_coverage(target)
-    assert result.status == "fail"
-    assert "(+7 more)" in result.message

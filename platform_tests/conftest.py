@@ -163,19 +163,16 @@ def pytest_sessionfinish(session, exitstatus) -> None:
 def _harness_marker_env_vars() -> tuple[str, ...]:
     """Every environment variable that can select an acting harness.
 
-    Sourced from ``RUNTIME_HARNESS_MARKERS`` rather than copied, so this cannot
-    drift from the resolver it exists to neutralize. Falls back to a literal set
-    if the package is not importable during collection.
+    The retired session-envelope resolver used to supply this list; the literal
+    set below is now the single source and must be extended with any new
+    harness-native session variable.
     """
-    names = {"GTKB_HARNESS_NAME", "GTKB_HARNESS_ID", "GTKB_SESSION_ID"}
-    try:
-        from groundtruth_kb.session.envelope import RUNTIME_HARNESS_MARKERS
-
-        for markers in RUNTIME_HARNESS_MARKERS.values():
-            names.update(markers)
-    except Exception:  # pragma: no cover - defensive during collection
-        names.update(
+    return tuple(
+        sorted(
             {
+                "GTKB_HARNESS_NAME",
+                "GTKB_HARNESS_ID",
+                "GTKB_SESSION_ID",
                 "ANTIGRAVITY_SESSION_ID",
                 "CLAUDE_CODE_SESSION_ID",
                 "CLAUDECODE",
@@ -184,7 +181,7 @@ def _harness_marker_env_vars() -> tuple[str, ...]:
                 "GOOSE_SESSION_ID",
             }
         )
-    return tuple(sorted(names))
+    )
 
 
 _HARNESS_SESSION_ENV_VARS = _harness_marker_env_vars()

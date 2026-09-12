@@ -233,19 +233,6 @@ class TestSpec0851WizardAutoPresent:
 # ═══════════════════════════════════════════════════════════════════════
 
 
-class TestSpec0471ProtectedBehaviors:
-    """SPEC-0471: Protected behaviors prevent uncontrolled regressions."""
-
-    def test_protected_behaviors_exist(self):
-        hook = CLAUDE_DIR / "hooks" / "assertion-check.py"
-        src = hook.read_text(encoding="utf-8")
-        # The hook runs ALL assertions which includes PB-* protected behavior specs
-        assert "run_all_assertions" in src, (
-            "Assertion hook must run all assertions (including PB-* protected behaviors)"
-        )
-        assert "regression" in src.lower() or "FAIL" in src, "Hook must report regressions"
-
-
 class TestSpec0472NeverRemoveWithoutApproval:
     """SPEC-0472: Code, tests, features MUST NEVER be removed without approval."""
 

@@ -49,13 +49,6 @@ script = "document_author_provenance_gate.py"
 blocking = true
 timeout_seconds = 5
 
-[[hook]]
-event = "pre_tool_use"
-intents = ["file_write", "shell_exec"]
-script = "lo-file-safety-gate.py"
-blocking = true
-timeout_seconds = 5
-
 # Session write isolation uses the shared native effect gate. The CLI resolves
 # the current binding, registered checkout, exact artifact claim and scratch
 # scope; missing identity or unavailable authority cannot imply permission.
@@ -71,13 +64,6 @@ timeout_seconds = 15
 event = "pre_tool_use"
 intents = ["file_write", "shell_exec"]
 script = "directive-enforcement-adapter.py"
-blocking = true
-timeout_seconds = 5
-
-[[hook]]
-event = "pre_tool_use"
-intents = ["file_write", "shell_exec"]
-script = "bridge-proposal-wi-id-collision-gate.py"
 blocking = true
 timeout_seconds = 5
 
@@ -108,14 +94,6 @@ intents = ["all"]
 script = "advisory-router-scan.py"
 blocking = true
 timeout_seconds = 10
-
-[[hook]]
-event = "pre_tool_use"
-intents = ["file_write", "shell_exec"]
-script = "dispatch_blackbox_gate.py"
-script_root = "project_scripts"
-blocking = true
-timeout_seconds = 5
 
 [[hook]]
 event = "turn_end"

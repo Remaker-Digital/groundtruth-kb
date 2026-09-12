@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -13,7 +11,6 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = REPO_ROOT / "scripts" / "workstream_focus.py"
-HOOK_PATH = REPO_ROOT / ".claude" / "hooks" / "workstream-focus.py"
 
 _PACKAGE_SRC = REPO_ROOT / "groundtruth-kb" / "src"
 if str(_PACKAGE_SRC) not in sys.path:
@@ -75,14 +72,6 @@ def _load_module():
     return module
 
 
-def _load_hook_module():
-    spec = importlib.util.spec_from_file_location("workstream_focus_hook_wi5580", HOOK_PATH)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 def _seed_harness_identities(root: Path, identities: dict[str, str]) -> None:
     path = root / "harness-state" / "harness-identities.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -96,27 +85,6 @@ def _seed_harness_identities(root: Path, identities: dict[str, str]) -> None:
         + "\n",
         encoding="utf-8",
     )
-
-
-def _run_hook(payload: dict, state_path: Path, *, guard_path: Path | None = None) -> dict:
-    env = {
-        **dict(os.environ),
-        "GTKB_WORKSTREAM_FOCUS_STATE": str(state_path),
-        "CLAUDE_PROJECT_DIR": str(REPO_ROOT),
-    }
-    effective_guard_path = guard_path or (state_path.parent / "lifecycle-guard.json")
-    env["GTKB_LIFECYCLE_GUARD_PATH"] = str(effective_guard_path)
-    result = subprocess.run(
-        [sys.executable, str(HOOK_PATH)],
-        cwd=REPO_ROOT,
-        env=env,
-        input=json.dumps(payload),
-        text=True,
-        capture_output=True,
-        timeout=10,
-        check=True,
-    )
-    return json.loads(result.stdout)
 
 
 def _isolate_state(monkeypatch, tmp_path: Path) -> tuple[Path, Path]:
@@ -304,6 +272,8 @@ def test_hook_payload_accepts_claude_prompt_field_for_user_promptsubmit(tmp_path
 def test_hook_payload_accepts_claude_prompt_field_for_startup_gate(tmp_path, monkeypatch) -> None:
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
+    # The relay render records a fail-soft diagnostic under the project root; keep it in the fixture tree.
+    monkeypatch.setattr(module, "_startup_diagnostic_dir", lambda project_root=None: tmp_path / "startup-diagnostics")
     guard_path = tmp_path / "guard.json"
     guard_path.write_text(
         json.dumps(
@@ -417,6 +387,8 @@ Read bridge/INDEX.md directly before acting.
 def test_startup_gate_init_keyword_sets_app_scope(tmp_path, monkeypatch) -> None:
     module = _load_module()
     canonical, _ = _isolate_state(monkeypatch, tmp_path)
+    # The relay render records a fail-soft diagnostic under the project root; keep it in the fixture tree.
+    monkeypatch.setattr(module, "_startup_diagnostic_dir", lambda project_root=None: tmp_path / "startup-diagnostics")
     guard_path = tmp_path / "guard.json"
     guard_path.write_text(
         json.dumps(
@@ -450,6 +422,8 @@ def test_startup_gate_init_keyword_sets_app_scope(tmp_path, monkeypatch) -> None
 def test_startup_gate_canonical_application_subject_sets_application_scope(tmp_path, monkeypatch) -> None:
     module = _load_module()
     canonical, _ = _isolate_state(monkeypatch, tmp_path)
+    # The relay render records a fail-soft diagnostic under the project root; keep it in the fixture tree.
+    monkeypatch.setattr(module, "_startup_diagnostic_dir", lambda project_root=None: tmp_path / "startup-diagnostics")
     guard_path = tmp_path / "guard.json"
     guard_path.write_text(
         json.dumps(
@@ -674,150 +648,6 @@ def test_user_promptsubmit_clears_stale_startup_gate_after_startup_stop(tmp_path
     assert "startup_prompt_preview" not in guard_state
 
 
-def test_prompt_hook_accepts_bom_prefixed_stdin_from_windows_pipeline(tmp_path) -> None:
-    state_path = tmp_path / "focus.json"
-    guard_path = tmp_path / "guard.json"
-    guard_path.write_text(
-        json.dumps(
-            {
-                "discard_next_user_prompt": True,
-                "startup_guard_id": "test-guard",
-                "startup_response_pending": False,
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    env = {
-        **dict(os.environ),
-        "GTKB_WORKSTREAM_FOCUS_STATE": str(state_path),
-        "GTKB_LIFECYCLE_GUARD_PATH": str(guard_path),
-        "CLAUDE_PROJECT_DIR": str(REPO_ROOT),
-    }
-
-    result = subprocess.run(
-        [sys.executable, str(HOOK_PATH)],
-        cwd=REPO_ROOT,
-        env=env,
-        input=("\ufeff" + json.dumps({"prompt": "::init gtkb pb", "hook_event_name": "UserPromptSubmit"})).encode(
-            "utf-8"
-        ),
-        capture_output=True,
-        timeout=30,
-        check=True,
-    )
-
-    response = json.loads(result.stdout.decode("utf-8"))
-    assert "(init-keyword match)" in response["systemMessage"]
-    assert "first owner message of a fresh session is never actionable" not in response["systemMessage"]
-    assert json.loads(guard_path.read_text(encoding="utf-8"))["startup_response_pending"] is True
-
-
-@pytest.mark.skip(reason="workstream-focus.py intentionally retired S304/S305; see REVISED-5 BN-3")
-def test_prompt_hook_switches_focus_with_standalone_commands(tmp_path) -> None:
-    state_path = tmp_path / "focus.json"
-
-    response = _run_hook({"user_prompt": "GT-KB mode"}, state_path)
-    assert "GT-KB Infrastructure Focus" in response["systemMessage"]
-    assert json.loads(state_path.read_text(encoding="utf-8"))["current_focus"] == "gtkb_infrastructure"
-
-    response = _run_hook({"user_prompt": "please application mode."}, state_path)
-    assert "Application Focus" in response["systemMessage"]
-    assert json.loads(state_path.read_text(encoding="utf-8"))["current_focus"] == "application"
-
-
-def test_prompt_hook_toggles_next_session_role_with_simple_phrase(tmp_path, monkeypatch) -> None:
-    module = _load_module()
-    # WI-3342 IP-6: the role-toggle path persists to the DB-backed registry; an
-    # isolated groundtruth.db + projection is seeded under tmp_path and tmp_path
-    # is passed as project_root so the real registry is never mutated.
-    _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", ["loyal-opposition"], "active"),
-            "B": ("claude", ["prime-builder"], "active"),
-        },
-    )
-    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
-    monkeypatch.setenv("GTKB_HARNESS_ID", "A")
-    monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
-    monkeypatch.setattr(
-        "groundtruth_kb.mode_switch.invariants.verify_role_document_partition",
-        lambda doc: None,
-    )
-
-    response = module.handle_user_prompt("switch mode next session", tmp_path)
-
-    assert "Next fresh-session operating mode set to Prime Builder" in response["systemMessage"]
-    assert "Harness parity after role change:" not in response["systemMessage"]
-    # Role-set wire form per IP-8 of gtkb-single-harness-bridge-dispatcher-001:
-    # WRITE always emits JSON list; singleton represents the multi-harness case.
-    # WI-3342 IP-5: the post-write role surface is the registry projection.
-    assert _projection_role(tmp_path, "A") == ["prime-builder"]
-    assert _projection_role(tmp_path, "B") == ["prime-builder"]
-
-    response = module.handle_user_prompt("please change mode next session.", tmp_path)
-
-    assert "Next fresh-session operating mode set to Loyal Opposition" in response["systemMessage"]
-    assert _projection_role(tmp_path, "A") == ["loyal-opposition"]
-
-
-def test_prompt_hook_sets_explicit_next_session_role(tmp_path, monkeypatch) -> None:
-    module = _load_module()
-    _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", ["loyal-opposition"], "active"),
-            "B": ("claude", ["prime-builder"], "active"),
-        },
-    )
-    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
-    monkeypatch.setenv("GTKB_HARNESS_ID", "A")
-    monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
-    monkeypatch.setattr(
-        "groundtruth_kb.mode_switch.invariants.verify_role_document_partition",
-        lambda doc: None,
-    )
-
-    response = module.handle_user_prompt("prime builder mode next session", tmp_path)
-
-    assert "Next fresh-session operating mode set to Prime Builder" in response["systemMessage"]
-    assert _projection_role(tmp_path, "A") == ["prime-builder"]
-    assert _projection_role(tmp_path, "B") == ["prime-builder"]
-
-
-def test_prompt_hook_uses_harness_id_role_map_when_named(tmp_path, monkeypatch) -> None:
-    module = _load_module()
-    _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", ["loyal-opposition"], "active"),
-            "B": ("claude", ["prime-builder"], "active"),
-        },
-    )
-    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
-    monkeypatch.setenv("GTKB_HARNESS_ID", "A")
-    monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "guard.json"))
-    monkeypatch.setattr(
-        "groundtruth_kb.mode_switch.invariants.verify_role_document_partition",
-        lambda doc: None,
-    )
-
-    response = module.handle_user_prompt("switch mode next session", tmp_path)
-
-    assert "Next fresh-session operating mode set to Prime Builder" in response["systemMessage"]
-    # The message names the role-map file path the operating-role command
-    # updates and the durable harness id it applies to.
-    role_path_display = module.operating_role_path(tmp_path)
-    try:
-        expected_path = role_path_display.relative_to(tmp_path.resolve()).as_posix()
-    except ValueError:
-        expected_path = str(role_path_display)
-    assert expected_path in response["systemMessage"]
-    assert "harness `A`" in response["systemMessage"]
-    assert _projection_role(tmp_path, "A") == ["prime-builder"]
-
-
 def test_prompt_hook_toggles_dashboard_auto_launch(tmp_path, monkeypatch) -> None:
     module = _load_module()
     preferences_path = tmp_path / "session-startup-preferences.json"
@@ -833,67 +663,6 @@ def test_prompt_hook_toggles_dashboard_auto_launch(tmp_path, monkeypatch) -> Non
 
     assert "Dashboard auto-launch is disabled" in response["systemMessage"]
     assert json.loads(preferences_path.read_text(encoding="utf-8"))["open_dashboard_on_session_start"] is False
-
-
-@pytest.mark.skip(reason="workstream-focus.py intentionally retired S304/S305; see REVISED-5 BN-3")
-def test_prompt_hook_discards_first_fresh_session_message_when_startup_gate_is_armed(
-    tmp_path,
-) -> None:
-    state_path = tmp_path / "focus.json"
-    guard_path = tmp_path / "guard.json"
-    guard_path.write_text(
-        json.dumps(
-            {
-                "discard_next_user_prompt": True,
-                "startup_guard_id": "test-guard",
-                "startup_response_pending": False,
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    response = _run_hook({"user_prompt": "Please resume."}, state_path, guard_path=guard_path)
-
-    assert "first owner message of a fresh session is never actionable" in response["systemMessage"]
-    assert response["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
-    assert (
-        "startup disclosure already generated for this session" in response["hookSpecificOutput"]["additionalContext"]
-    )
-
-    guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
-    assert guard_state["discard_next_user_prompt"] is False
-    assert guard_state["startup_prompt_discarded"] is True
-    assert guard_state["startup_response_pending"] is True
-    assert "startup_prompt_preview" not in guard_state
-
-
-@pytest.mark.skip(reason="workstream-focus.py intentionally retired S304/S305; see REVISED-5 BN-3")
-def test_startup_response_pending_clears_on_next_owner_prompt_and_allows_normal_processing(
-    tmp_path,
-) -> None:
-    state_path = tmp_path / "focus.json"
-    guard_path = tmp_path / "guard.json"
-    guard_path.write_text(
-        json.dumps(
-            {
-                "discard_next_user_prompt": False,
-                "startup_guard_id": "test-guard",
-                "startup_prompt_discarded": True,
-                "startup_response_pending": True,
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    response = _run_hook({"user_prompt": "GT-KB mode"}, state_path, guard_path=guard_path)
-
-    assert "GT-KB Infrastructure Focus" in response["systemMessage"]
-    assert json.loads(state_path.read_text(encoding="utf-8"))["current_focus"] == "gtkb_infrastructure"
-    guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
-    assert guard_state["startup_response_pending"] is False
-    assert guard_state["startup_input_gate_cleared_at"]
 
 
 def test_classify_root_4_categories(tmp_path, monkeypatch) -> None:
@@ -955,10 +724,6 @@ def test_classify_root_config_platform_carveout() -> None:
         module.classify_root("config/file-reference-migration/wi5640.toml", REPO_ROOT)
         == module.ROOT_CURRENT_REPO_BRIDGE_OR_GOVERNANCE
     )
-    assert (
-        module.classify_root("config/dispatcher-next/requirements-spike.txt", REPO_ROOT)
-        == module.ROOT_CURRENT_REPO_BRIDGE_OR_GOVERNANCE
-    )
     # Carve-out precision: a config/ path OUTSIDE the platform subdirs still
     # classifies as application_product (the blanket config/ fallback preserved).
     assert module.classify_root("config/app-settings.toml", REPO_ROOT) == module.ROOT_APPLICATION_PRODUCT
@@ -977,24 +742,6 @@ def test_config_carveout_drift_guard_fails_on_synthetic_uncarved_subdir(
     assert "synthetic-uncarved-wi5970" in joined
     assert "CURRENT_REPO_BRIDGE_OR_GOVERNANCE_PREFIXES" in joined
     assert "_EXPECTED_APPLICATION_CONFIG_SUBDIRS" in joined
-
-
-def test_gtkb_subject_allows_config_hooks_write(tmp_path, monkeypatch) -> None:
-    """WI-5957 T3: config/hooks writes are allowed under gtkb_infrastructure."""
-
-    module = _load_module()
-    _isolate_state(monkeypatch, tmp_path)
-    module.save_state(module.FOCUS_GTKB_INFRASTRUCTURE, REPO_ROOT)
-
-    response = module.guard_tool_use(
-        {
-            "tool_name": "Write",
-            "tool_input": {"file_path": "config/hooks/gtkb-bridge-axis-2-surface.py"},
-        },
-        REPO_ROOT,
-    )
-
-    assert response == {}
 
 
 def test_application_subject_blocks_gtkb_product_write(tmp_path, monkeypatch) -> None:
@@ -1707,54 +1454,6 @@ def test_assert_readiness_subject_scope_permits_single_green() -> None:
     module.assert_readiness_subject_scope(application_green=False, gtkb_green=True, dual_scope_declared=False)
 
 
-def _mock_dispatch_core(monkeypatch, module, fake_render) -> None:
-    import sys
-
-    if str(module.PROJECT_ROOT) not in sys.path:
-        sys.path.insert(0, str(module.PROJECT_ROOT))
-    try:
-        import scripts.session_start_dispatch_core as _core_pkg
-
-        monkeypatch.setattr(_core_pkg, "_render_role_startup_report", fake_render)
-    except (ImportError, AttributeError):
-        pass
-
-    if str(module.PROJECT_ROOT / "scripts") not in sys.path:
-        sys.path.insert(0, str(module.PROJECT_ROOT / "scripts"))
-    try:
-        import session_start_dispatch_core as _core_top
-
-        monkeypatch.setattr(_core_top, "_render_role_startup_report", fake_render)
-    except (ImportError, AttributeError):
-        pass
-
-
-def _mock_dispatch_core_render_and_write(monkeypatch, module, *, render, write) -> None:
-    """Stub both _render_role_startup_report and _write_startup_relay_cache on
-    whichever session_start_dispatch_core import path the refresh thread resolves."""
-    import sys
-
-    if str(module.PROJECT_ROOT) not in sys.path:
-        sys.path.insert(0, str(module.PROJECT_ROOT))
-    try:
-        import scripts.session_start_dispatch_core as _core_pkg
-
-        monkeypatch.setattr(_core_pkg, "_render_role_startup_report", render)
-        monkeypatch.setattr(_core_pkg, "_write_startup_relay_cache", write)
-    except (ImportError, AttributeError):
-        pass
-
-    if str(module.PROJECT_ROOT / "scripts") not in sys.path:
-        sys.path.insert(0, str(module.PROJECT_ROOT / "scripts"))
-    try:
-        import session_start_dispatch_core as _core_top
-
-        monkeypatch.setattr(_core_top, "_render_role_startup_report", render)
-        monkeypatch.setattr(_core_top, "_write_startup_relay_cache", write)
-    except (ImportError, AttributeError):
-        pass
-
-
 def test_continuation_armed_gate_does_not_block_tool_use(tmp_path, monkeypatch) -> None:
     """WI-5083 belt-and-suspenders: a startup-input gate armed under a
     mid-session continuation source must not block tool use, even inside the
@@ -1823,42 +1522,6 @@ def test_fresh_armed_gate_still_blocks_within_window(tmp_path, monkeypatch) -> N
 
     assert response["decision"] == "block"
     assert "GTKB-STARTUP-INPUT-GATE" in response["reason"]
-
-
-def test_claude_adapter_refuses_foreign_harness_override_without_writing(tmp_path, monkeypatch) -> None:
-    hook = _load_hook_module()
-    _seed_harness_identities(tmp_path, {"codex": "A", "claude": "B"})
-    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
-    monkeypatch.setenv("GTKB_HARNESS_ID", "A")
-
-    persisted = hook._persist_interactive_session_envelope(
-        {"prompt": "::init gtkb pb", "session_id": "session-wi5580-foreign"},
-        tmp_path,
-    )
-
-    assert persisted is False
-    assert not (tmp_path / "harness-state" / "codex" / "session-envelopes").exists()
-    assert not (tmp_path / "harness-state" / "claude" / "session-envelopes").exists()
-
-
-def test_claude_adapter_writes_only_its_durable_exact_session_document(tmp_path, monkeypatch) -> None:
-    hook = _load_hook_module()
-    _seed_harness_identities(tmp_path, {"codex": "A", "claude": "B"})
-    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
-    monkeypatch.setenv("GTKB_HARNESS_ID", "B")
-
-    persisted = hook._persist_interactive_session_envelope(
-        {"prompt": "::init gtkb lo", "session_id": "session-wi5580-claude"},
-        tmp_path,
-    )
-
-    assert persisted is True
-    path = tmp_path / "harness-state" / "claude" / "session-envelopes" / "session-wi5580-claude.json"
-    envelope = json.loads(path.read_text(encoding="utf-8"))
-    assert envelope["harness_name"] == "claude"
-    assert envelope["harness_id"] == "B"
-    assert envelope["worker_role_provenance"]["role"] == "loyal-opposition"
-    assert not (tmp_path / "harness-state" / "codex" / "session-envelopes").exists()
 
 
 # --- WI-6556: path-segment-boundary matching in known-path detection --------

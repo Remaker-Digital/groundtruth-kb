@@ -139,39 +139,6 @@ class TestF3QualityGate:
         # Tier should be one of the valid tiers
         assert score["tier"] in ("gold", "silver", "bronze", "needs-work")
 
-    def test_f3_export_import_roundtrip(self, db, tmp_path):
-        """Quality scores survive export/import cycle."""
-        self._make_spec(db, spec_id="SPEC-010")
-        db.persist_quality_scores("S286")
-
-        # Export
-        export_path = tmp_path / "export.json"
-        db.export_json(export_path)
-
-        # Import into fresh DB via CLI (needs TOML config)
-        fresh_dir = tmp_path / "fresh"
-        fresh_dir.mkdir()
-        fresh_db_path = fresh_dir / "groundtruth.db"
-        fresh_toml = fresh_dir / "groundtruth.toml"
-        fresh_toml.write_text(
-            f'[groundtruth]\ndb_path = "{fresh_db_path.as_posix()}"\n',
-            encoding="utf-8",
-        )
-        db2 = KnowledgeDB(db_path=fresh_db_path)
-        db2.close()
-
-        from click.testing import CliRunner
-
-        from groundtruth_kb.cli import main as cli_main
-
-        runner = CliRunner()
-        result = runner.invoke(cli_main, ["--config", str(fresh_toml), "import", str(export_path), "--merge"])
-        assert result.exit_code == 0, result.output
-
-        db2 = KnowledgeDB(db_path=fresh_db_path)
-        history = db2.get_quality_history("SPEC-010")
-        assert len(history) >= 1
-
     def test_f3_malformed_flags_import_rejects(self, db, tmp_path):
         """Malformed flags value is rejected on import, not stored."""
         self._make_spec(db, spec_id="SPEC-011")

@@ -31,6 +31,8 @@ from groundtruth_kb.native_authority import (
     DependencyMutation,
     Identifier,
     MembershipMove,
+    ProjectAuthorizationChange,
+    ProjectFormalLinkMutation,
     ProjectMutation,
     SpecMutation,
     TermMutation,
@@ -57,6 +59,7 @@ Domain = Literal[
     "test-plans",
     "test-phases",
     "project-dependencies",
+    "project-formal-links",
     "terms",
     "harnesses",
 ]
@@ -236,6 +239,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
         component: str | None = None,
         test_type: str | None = None,
         parent_project_id: str | None = None,
+        project_id: str | None = None,
         application_scope: str | None = None,
         dependent_project_id: str | None = None,
         prerequisite_project_id: str | None = None,
@@ -257,6 +261,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
             "component",
             "test_type",
             "parent_project_id",
+            "project_id",
             "application_scope",
             "dependent_project_id",
             "prerequisite_project_id",
@@ -278,6 +283,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
                 "component": component,
                 "test_type": test_type,
                 "parent_project_id": parent_project_id,
+                "project_id": project_id,
                 "application_scope": application_scope,
                 "dependent_project_id": dependent_project_id,
                 "prerequisite_project_id": prerequisite_project_id,
@@ -343,9 +349,17 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     def amend_project(record_id: Identifier, request: ProjectMutation) -> Response:
         return _result(service.amend_project(record_id, request))
 
+    @app.put("/v1/projects/{record_id}/authorization")
+    def set_project_authorization(record_id: Identifier, request: ProjectAuthorizationChange) -> Response:
+        return _result(service.set_project_authorization(record_id, request))
+
     @app.put("/v1/project-dependencies/{record_id}")
     def amend_dependency(record_id: Identifier, request: DependencyMutation) -> Response:
         return _result(service.amend_dependency(record_id, request))
+
+    @app.put("/v1/project-formal-links/{record_id}")
+    def amend_project_formal_link(record_id: Identifier, request: ProjectFormalLinkMutation) -> Response:
+        return _result(service.amend_project_formal_link(record_id, request))
 
     @app.get("/v1/projects/{record_id}/readiness")
     def project_readiness(record_id: Identifier, gate: Literal["readiness", "closure"] = "readiness") -> Response:

@@ -5,14 +5,12 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
-import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from groundtruth_kb import __version__
 from groundtruth_kb import db as _db_module
-from groundtruth_kb.bridge.status_driver import collect_bridge_status
 from groundtruth_kb.config import GTConfig
 
 STATUS_ORDER = {"PASS": 0, "UNKNOWN": 1, "WARN": 2, "FAIL": 3}
@@ -20,12 +18,8 @@ COMPONENTS = (
     "project",
     "db",
     "chroma",
-    "bridge",
-    "bridge-dispatch",
     "dashboard",
     "hooks",
-    "resource-registry",
-    "system-interface-map",
 )
 
 
@@ -98,12 +92,8 @@ def collect_operating_state(
         "project": lambda: _probe_project(root, config),
         "db": lambda: _probe_db(root, config, quick=startup),
         "chroma": lambda: _probe_chroma(root, config),
-        "bridge": lambda: _probe_bridge(root),
-        "bridge-dispatch": lambda: _probe_bridge_dispatch(root),
         "dashboard": lambda: _probe_dashboard(root),
         "hooks": lambda: _probe_hooks(root),
-        "resource-registry": lambda: _probe_resource_registry(root),
-        "system-interface-map": lambda: _probe_system_interface_map(root),
     }
     collected = tuple(_timed_probe(name, probe_map[name]) for name in selected)
     overall = _overall_status(collected)
@@ -225,59 +215,6 @@ def _probe_chroma(root: Path, config: GTConfig) -> tuple[str, str, str, dict[str
     return "WARN", "ChromaDB cache directory exists without chroma.sqlite3", str(chroma_path), {}
 
 
-def _probe_bridge(root: Path) -> tuple[str, str, str, dict[str, Any]]:
-    bridge_dir = root / "bridge"
-    if not bridge_dir.exists():
-        return "UNKNOWN", "bridge directory not found", str(bridge_dir), {}
-    snapshot = collect_bridge_status(root)
-    queue = snapshot.queue
-    status = "WARN" if queue.parse_error_count else "PASS"
-    return (
-        status,
-        (
-            f"{queue.threads} bridge thread(s); Prime actionable={len(queue.prime_actionable)}; "
-            f"Loyal Opposition actionable={len(queue.loyal_opposition_actionable)}"
-        ),
-        str(bridge_dir),
-        queue.to_json_dict(top_n=10),
-    )
-
-
-def _probe_bridge_dispatch(root: Path) -> tuple[str, str, str, dict[str, Any]]:
-    """Dispatcher-daemon dispatch-state probe."""
-    daemon_script = root / "scripts" / "gtkb_dispatcher_daemon.py"
-
-    if not daemon_script.exists():
-        return "UNKNOWN", "dispatcher daemon script not found", str(daemon_script), {}
-    snapshot = collect_bridge_status(root).automation
-    dispatch_state = snapshot.dispatch_state
-    default_dispatch_state_path = str(root / ".gtkb-state" / "bridge-poller" / "dispatch-state.json")
-    dispatch_state_path = dispatch_state.get("path", default_dispatch_state_path)
-    if not dispatch_state.get("exists"):
-        return (
-            "UNKNOWN",
-            "dispatch-state.json not yet written by the dispatcher daemon",
-            dispatch_state_path,
-            snapshot.to_json_dict(),
-        )
-    if not dispatch_state.get("parseable"):
-        return "FAIL", "dispatch-state.json unreadable", dispatch_state_path, snapshot.to_json_dict()
-
-    hook_values = snapshot.hook_registrations.values()
-    retired_workers_registered = any(hook.get("retired_bridge_worker_registered") for hook in hook_values)
-    status = "FAIL" if retired_workers_registered else "PASS"
-    retired_count = len(snapshot.system_inventory.get("retired_systems", []))
-    external_count = len(snapshot.system_inventory.get("external_thread_automations", []))
-    detail = (
-        f"{dispatch_state.get('recipient_count', 0)} dispatch recipient(s) tracked; "
-        f"dispatcher daemon is the only automated bridge substrate; retired systems={retired_count}; "
-        f"external thread automations={external_count}"
-    )
-    if retired_workers_registered:
-        detail += "; retired bridge worker hook registration present"
-    return status, detail, dispatch_state_path, snapshot.to_json_dict()
-
-
 def _probe_dashboard(root: Path) -> tuple[str, str, str, dict[str, Any]]:
     dashboard_db = root / ".groundtruth" / "dashboard" / "gtkb-dashboard.sqlite"
     if not dashboard_db.exists():
@@ -306,119 +243,6 @@ def _probe_hooks(root: Path) -> tuple[str, str, str, dict[str, Any]]:
         except json.JSONDecodeError as exc:
             return "FAIL", f".claude/settings.json is invalid JSON: {exc}", str(settings), {}
     return "PASS", "hook/rule surface is readable", str(root / ".claude"), {"settings_exists": settings.exists()}
-
-
-def _probe_resource_registry(root: Path) -> tuple[str, str, str, dict[str, Any]]:
-    registry_path = root / "config" / "agent-control" / "project-resource-aliases.toml"
-    pointer_path = root / ".claude" / "rules" / "project-resource-aliases.toml"
-    if not registry_path.exists():
-        return "UNKNOWN", "project resource alias registry not found", str(registry_path), {}
-    try:
-        with registry_path.open("rb") as handle:
-            registry = tomllib.load(handle)
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        return "FAIL", f"resource registry is unreadable: {exc}", str(registry_path), {}
-
-    resources = registry.get("resources", [])
-    if not isinstance(resources, list) or not resources:
-        return "FAIL", "resource registry has no resources", str(registry_path), {}
-    unverified = [
-        str(row.get("id"))
-        for row in resources
-        if isinstance(row, dict) and str(row.get("status") or "") == "canonical_unverified_url"
-    ]
-    separate = [
-        str(row.get("id"))
-        for row in resources
-        if isinstance(row, dict) and str(row.get("status") or "").startswith("separate_project")
-    ]
-    pointer_status = "missing"
-    if pointer_path.exists():
-        try:
-            with pointer_path.open("rb") as handle:
-                pointer = tomllib.load(handle)
-            pointer_status = (
-                "delegated"
-                if pointer.get("registry_path") == "config/agent-control/project-resource-aliases.toml"
-                and "resources" not in pointer
-                else "invalid"
-            )
-        except (OSError, tomllib.TOMLDecodeError):
-            pointer_status = "invalid"
-
-    status = "FAIL" if pointer_status == "invalid" else "WARN" if unverified else "PASS"
-    detail = (
-        f"{len(resources)} resource(s); unverified canonical={len(unverified)}; "
-        f"separate-project={len(separate)}; pointer={pointer_status}"
-    )
-    return (
-        status,
-        detail,
-        str(registry_path),
-        {
-            "resources": len(resources),
-            "unverified_canonical": unverified,
-            "separate_project": len(separate),
-            "pointer_status": pointer_status,
-        },
-    )
-
-
-def _probe_system_interface_map(root: Path) -> tuple[str, str, str, dict[str, Any]]:
-    map_path = root / "config" / "agent-control" / "system-interface-map.toml"
-    if not map_path.exists():
-        return "UNKNOWN", "system interface map not found", str(map_path), {}
-    try:
-        with map_path.open("rb") as handle:
-            system_map = tomllib.load(handle)
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        return "FAIL", f"system interface map is unreadable: {exc}", str(map_path), {}
-    systems = system_map.get("systems", [])
-    if not isinstance(systems, list) or not systems:
-        return "FAIL", "system interface map has no systems", str(map_path), {}
-    companion = root / str(system_map.get("human_companion") or "")
-    backlog = next((row for row in systems if isinstance(row, dict) and row.get("id") == "backlog"), None)
-    backlog_text = (
-        " ".join(str(backlog.get(field) or "") for field in ("authoritative_source", "read_method", "harness_caveats"))
-        if backlog
-        else ""
-    )
-    backlog_ok = backlog is not None and all(
-        token in backlog_text for token in ("current_work_items", "work_items", "versioned bridge")
-    )
-    status = "PASS" if companion.exists() and backlog_ok else "WARN"
-    companion_state = "present" if companion.exists() else "missing"
-    backlog_state = "ok" if backlog_ok else "incomplete"
-    detail = f"{len(systems)} system(s); companion={companion_state}; backlog_case={backlog_state}"
-    return (
-        status,
-        detail,
-        str(map_path),
-        {
-            "systems": len(systems),
-            "human_companion": str(companion),
-            "human_companion_exists": companion.exists(),
-            "first_reconciliation_case": "backlog",
-            "backlog_case": "ok" if backlog_ok else "incomplete",
-        },
-    )
-
-
-def _latest_bridge_statuses(index: Path) -> dict[str, str]:
-    statuses: dict[str, str] = {}
-    current: str | None = None
-    for raw_line in index.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if line.startswith("Document: "):
-            current = line.removeprefix("Document: ").strip()
-            continue
-        if current is None or current in statuses:
-            continue
-        for status in ("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY"):
-            if line.startswith(f"{status}:"):
-                statuses[current] = status
-                break
-    return statuses
 
 
 def _is_relative_to(path: Path, parent: Path) -> bool:

@@ -12,8 +12,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPTS = _PROJECT_ROOT / "scripts"
 _SRC = _PROJECT_ROOT / "groundtruth-kb" / "src"
@@ -185,13 +183,3 @@ def test_doctor_surface_warn_pass_failsoft(tmp_path):
 def test_check_script_exists_at_declared_path():
     # DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001 assertion 3.
     assert (_PROJECT_ROOT / "scripts" / "check_obsolete_reference_purge.py").is_file()
-
-
-def test_adr_obligation_exists_with_type():
-    # DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001 assertion 2 (live read-only).
-    root_db = _PROJECT_ROOT / "groundtruth.db"
-    if not root_db.is_file():
-        pytest.skip("live MemBase not present")
-    db = KnowledgeDB(root_db)
-    adrs = db.list_specs(type="architecture_decision")
-    assert any(s.get("id") == "ADR-OBSOLETE-REFERENCE-PURGE-OBLIGATION-001" for s in adrs)

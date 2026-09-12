@@ -12,7 +12,8 @@ fails, the absence claims are not trusted.
 
 from __future__ import annotations
 
-from groundtruth_kb.cli import projects_cmd
+import click
+from groundtruth_kb.cli import main
 
 REMOVED_SUBCOMMANDS = (
     "authorize",
@@ -25,11 +26,13 @@ REMOVED_SUBCOMMANDS = (
 
 def test_control_subcommand_is_registered() -> None:
     """Non-vacuity guard: the group imported and still registers real commands."""
-    assert "show" in projects_cmd.commands
-    assert "update" in projects_cmd.commands
+    assert "show" in main.get_command(click.Context(main), "projects").commands
+    assert "record" in main.get_command(click.Context(main), "projects").commands
 
 
 def test_authorization_subcommands_are_absent() -> None:
-    assert "show" in projects_cmd.commands, "control subcommand missing"
+    assert "show" in main.get_command(click.Context(main), "projects").commands, "control subcommand missing"
     for name in REMOVED_SUBCOMMANDS:
-        assert name not in projects_cmd.commands, f"gt projects {name} should have been removed"
+        assert name not in main.get_command(click.Context(main), "projects").commands, (
+            f"gt projects {name} should have been removed"
+        )

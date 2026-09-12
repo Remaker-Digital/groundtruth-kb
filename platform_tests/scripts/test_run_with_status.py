@@ -303,15 +303,3 @@ def test_lifetime_rejects_nonpositive(tmp_path: Path) -> None:
         with pytest.raises(SystemExit) as exc_info:
             run_with_status.main(["--lifetime", bad, str(status_file), sys.executable, "--version"])
         assert exc_info.value.code == 2, bad
-
-
-def test_dispatch_lo_gets_review_lifetime() -> None:
-    """SPEC-CENTRALIZED-DISPATCH-SERVICE-001 (LO budget routing): the dispatcher routes the
-    longer review lifetime to Loyal Opposition / verification dispatches and the bounded
-    implementation lifetime to Prime Builder dispatches."""
-    from scripts import dispatcher_runtime as trigger
-
-    assert trigger.worker_lifetime_seconds("loyal-opposition") == trigger.OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS
-    assert trigger.worker_lifetime_seconds("loyal-opposition") == trigger.LO_REVIEW_WORKER_LIFETIME_SECONDS
-    assert trigger.worker_lifetime_seconds("prime-builder") == trigger.PB_IMPL_WORKER_LIFETIME_SECONDS
-    assert trigger.worker_lifetime_seconds(None) is None

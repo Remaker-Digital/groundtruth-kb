@@ -12,9 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from click.testing import CliRunner
-from groundtruth_kb.cli import main
-from groundtruth_kb.hygiene import (
+from groundtruth_kb.hygiene.supersession import (
     SupersessionFinding,
     SupersessionScanResult,
     emit_supersession_json,
@@ -133,41 +131,3 @@ def test_supersession_scan_is_read_only_against_sources(tmp_path: Path) -> None:
     assert result.finding_count == 1
     assert after_paths == before_paths
     assert live.read_text(encoding="utf-8") == before_text
-
-
-def test_cli_help_lists_supersession_scan() -> None:
-    result = CliRunner().invoke(main, ["hygiene", "--help"])
-
-    assert result.exit_code == 0
-    assert "supersession-scan" in result.output
-
-
-def test_cli_supersession_scan_writes_json_only(tmp_path: Path) -> None:
-    root = tmp_path / "repo"
-    root.mkdir()
-    (root / "live.md").write_text("This file is no longer authoritative.\n", encoding="utf-8")
-    out = tmp_path / "out"
-
-    result = CliRunner().invoke(
-        main,
-        ["hygiene", "supersession-scan", "--root", str(root), "--output", str(out), "--format", "json"],
-    )
-
-    assert result.exit_code == 0, result.output
-    assert (out / "findings.json").exists()
-    assert not (out / "summary.md").exists()
-    payload = json.loads((out / "findings.json").read_text(encoding="utf-8"))
-    assert payload["finding_count"] == 1
-
-
-def test_cli_supersession_scan_fail_on_findings_exits_two(tmp_path: Path) -> None:
-    root = tmp_path / "repo"
-    root.mkdir()
-    (root / "live.md").write_text("This file is deprecated.\n", encoding="utf-8")
-
-    result = CliRunner().invoke(
-        main,
-        ["hygiene", "supersession-scan", "--root", str(root), "--fail-on-findings", "--format", "json"],
-    )
-
-    assert result.exit_code == 2

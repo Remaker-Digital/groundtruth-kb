@@ -26,12 +26,6 @@ SAFE_COMMAND_PREFIXES = (
     "get-childitem",
     "python -m pytest",
     "python -m groundtruth_kb deliberations search",
-    "python scripts/bridge_applicability_preflight.py",
-    "python scripts/adr_dcl_clause_preflight.py",
-)
-
-GIT_LIFECYCLE_MUTATING_SUBCOMMANDS = frozenset(
-    {"create", "attach", "preserve", "promote", "close", "resume", "recover", "drain"}
 )
 
 INVALID_HOOK_PAYLOAD_KEY = "__gtkb_invalid_hook_payload__"
@@ -602,42 +596,6 @@ def _python_script_invocation(tokens: list[str]) -> tuple[str, list[str]] | None
     return script_name, relevant[2:]
 
 
-def _git_lifecycle_subcommand(stage: str) -> str | None:
-    """Return the production Git-lifecycle CLI subcommand for one shell stage."""
-    tokens = _shell_split(stage)
-    if not tokens:
-        return None
-    verb_index = _shell_verb_index(tokens)
-    if verb_index is None:
-        return None
-    relevant = [_clean_shell_token(token) for token in tokens[verb_index:]]
-    executable = Path(relevant[0]).name.lower()
-    if executable not in _PYTHON_EXECUTABLE_NAMES and not executable.startswith("python"):
-        return None
-    if len(relevant) < 4 or relevant[1:3] != ["-m", "groundtruth_kb.git_lifecycle"]:
-        return None
-
-    # argparse accepts these global options before the required subcommand.
-    index = 3
-    options_with_values = {"--repo", "--state-dir", "--dispatcher-state-dir"}
-    flag_options = {"--json", "--dry-run"}
-    while index < len(relevant):
-        token = relevant[index]
-        if token in options_with_values:
-            if index + 1 >= len(relevant):
-                return None
-            index += 2
-            continue
-        if any(token.startswith(option + "=") for option in options_with_values):
-            index += 1
-            continue
-        if token in flag_options:
-            index += 1
-            continue
-        return token.lower()
-    return None
-
-
 def _direct_git_subcommand(stage: str) -> str | None:
     """Return a direct Git subcommand, accounting for executable/global options."""
     tokens = _shell_split(stage)
@@ -710,13 +668,6 @@ def _has_direct_git_effect_signal(command: str) -> bool:
     if _direct_git_effect(command) is not None:
         return True
     return any(_direct_git_effect(stage) is not None for stage in _split_pipeline_stages(command))
-
-
-def _has_mutating_git_lifecycle_signal(command: str) -> bool:
-    return any(
-        _git_lifecycle_subcommand(stage) in GIT_LIFECYCLE_MUTATING_SUBCOMMANDS
-        for stage in _split_pipeline_stages(command)
-    )
 
 
 def _arg_value(args: list[str], flag: str) -> str | None:
@@ -1242,7 +1193,6 @@ def _has_mutating_signal(command: str) -> bool:
     return (
         MUTATING_COMMAND_RE.search(shell_view) is not None
         or _has_direct_git_effect_signal(command)
-        or _has_mutating_git_lifecycle_signal(command)
         or _has_python_mutating_signal(command)
         or _shell_redirect_present(command)
     )

@@ -66,11 +66,9 @@ made deterministic.
 If a finding is material, record it as a Loyal Opposition advisory via an
 **Advisory Proposal** bridge entry (ADVISORY status; see
 `gtkb-bridge-advisory-status-001`, VERIFIED). `independent-progress-assessments/`
-is retired; do not write there. The existing advisory-router
-(`scripts/advisory_backlog_router.py`, registered as a Stop hook) converts
-bridge ADVISORY entries into staged backlog candidates idempotently. Do not
-mutate the backlog directly from this skill — detection is read-only; backlog
-promotion happens downstream through the advisory and the router.
+is retired; do not write there. Do not mutate the backlog directly from this
+skill: detection is read-only, and backlog promotion happens downstream through
+the advisory and the owner-directed intake.
 
 Classify each routed advisory as `adopt`, `adapt`, `reject`, `defer`, or
 `monitor`. For `adopt` or `adapt`, the advisory MUST include a `Required Prime

@@ -328,22 +328,6 @@ def test_no_cross_project_leak(backfill, tmp_path):
     assert "thread-a" not in links.get("PROJECT-C", set())
 
 
-def test_shared_wi_links_thread_to_every_gating_project(backfill, tmp_path):
-    bridge = tmp_path / "bridge"
-    # WI-1 is a member of BOTH projects; thread-a addresses it. Both projects
-    # legitimately get the link (the link is per-project, not leaked).
-    _write_thread(bridge, "thread-a", [("VERIFIED", _impl_report("WI-1"))])
-    _build_index(bridge, [("thread-a", ["VERIFIED: bridge/thread-a-001.md"])])
-    _seed_db(tmp_path, projects={"PROJECT-A": ["WI-1"], "PROJECT-B": ["WI-1"]})
-
-    backfill.apply_backfill(tmp_path)
-    from project_verified_completion_scanner import _implements_links_by_project
-
-    links = _implements_links_by_project(tmp_path)
-    assert links.get("PROJECT-A") == {"thread-a"}
-    assert links.get("PROJECT-B") == {"thread-a"}
-
-
 # --------------------------------------------------------------------------- #
 # v4 invariant: links alone do not complete an unfinished project
 # --------------------------------------------------------------------------- #

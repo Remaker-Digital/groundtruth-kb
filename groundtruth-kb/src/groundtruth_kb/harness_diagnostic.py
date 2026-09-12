@@ -98,28 +98,14 @@ def _document_role(project_root: Path, harness_name: str) -> dict[str, Any]:
             "status": "unavailable",
             "reason": "worker_session_document_missing_session_id",
         }
-    try:
-        from groundtruth_kb.session.envelope import EnvelopeError, resolve_worker_role_provenance
-
-        provenance = resolve_worker_role_provenance(
-            project_root,
-            current_session_id=session_id,
-            harness_name=harness_name,
-        )
-    except (EnvelopeError, OSError, ValueError) as exc:
-        return {
-            "role": None,
-            "source": path.as_posix(),
-            "document": path.as_posix(),
-            "status": "unavailable",
-            "reason": type(exc).__name__,
-        }
+    # The session-envelope role provenance substrate is retired; a worker document
+    # cannot establish a role. Roles belong to the native session binding.
     return {
-        "role": _text(provenance.get("role")),
-        "source": "worker_session_document",
+        "role": None,
+        "source": path.as_posix(),
         "document": path.as_posix(),
-        "status": "observed",
-        "reason": None,
+        "status": "unavailable",
+        "reason": "worker_role_provenance_retired",
     }
 
 
@@ -163,79 +149,9 @@ def _model_identity(record: dict[str, Any]) -> str | None:
     return None
 
 
-def _telemetry_projection(record: dict[str, Any]) -> dict[str, Any]:
-    correlation = _mapping(record.get("correlation"))
-    worker = _mapping(record.get("worker"))
-    timing = _mapping(record.get("timing"))
-    budget = _mapping(record.get("budget"))
-    tool_calls = _mapping(record.get("tool_calls"))
-    outcome = _mapping(record.get("outcome"))
-    usage = _mapping(record.get("usage"))
-    cost = _mapping(record.get("cost"))
-    tools = _mapping(tool_calls.get("by_name"))
-    safe_tools = {
-        name: value
-        for name, value in sorted(tools.items())
-        if name in _SAFE_TOOL_NAMES and isinstance(value, int) and not isinstance(value, bool) and value >= 0
-    }
-    return {
-        "correlation": {
-            key: correlation.get(key)
-            for key in (
-                "dispatch_id",
-                "run_id",
-                "bridge_document_id",
-                "bridge_thread_id",
-                "session_context_id",
-                "claim_id",
-            )
-        }
-        | {
-            "related_work_item_ids": [
-                value for value in correlation.get("related_work_item_ids", []) if isinstance(value, str)
-            ]
-        },
-        "worker": {
-            "harness_id": _safe_id(worker.get("harness_id")),
-            "harness_name": _safe_id(worker.get("harness_name")),
-            "provider": _safe_id(worker.get("provider")),
-            "model_id": _safe_id(worker.get("model_id")),
-            "model_version": _safe_id(worker.get("model_version")),
-        },
-        "timing": {key: timing.get(key) for key in ("started_at", "completed_at", "elapsed_ms")},
-        "budget": {key: budget.get(key) for key in ("turn_budget", "turns_used")},
-        "turns": [
-            {
-                "index": turn.get("index"),
-                "tool_names": [name for name in turn.get("tool_names", []) if name in _SAFE_TOOL_NAMES],
-            }
-            for turn in record.get("turns", [])
-            if isinstance(turn, dict)
-        ][:MAX_RECENT_RECORDS],
-        "tool_calls": {"total": tool_calls.get("total"), "by_name": safe_tools},
-        "outcome": {
-            key: outcome.get(key)
-            for key in ("stop_reason", "exit_status", "exit_code", "bridge_status", "failure_class")
-        },
-        "usage": {"coverage": usage.get("coverage"), **{field: usage.get(field) for field in _NUMERIC_USAGE_FIELDS}},
-        "cost": {
-            "amount": cost.get("amount"),
-            "currency": _text(cost.get("currency")),
-            "source": _text(cost.get("source")),
-        },
-    }
-
-
 def _recent_telemetry(project_root: Path, harness_id: str, harness_name: str) -> list[dict[str, Any]]:
-    from groundtruth_kb.shim_dispatch_telemetry import read_dispatch_telemetry_records
-
-    records = read_dispatch_telemetry_records(
-        project_root,
-        harness_id=harness_id,
-        harness_name=harness_name,
-        limit=MAX_RECENT_RECORDS,
-    )
-    return [_telemetry_projection(record) for record in records]
+    """The dispatcher-launched shim telemetry substrate is retired; no records exist."""
+    return []
 
 
 def _field(status: str, *, reason: str | None = None, record_count: int = 0) -> dict[str, Any]:

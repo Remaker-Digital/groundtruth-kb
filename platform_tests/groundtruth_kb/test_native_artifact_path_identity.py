@@ -160,3 +160,48 @@ def test_literal_bracket_filename_mode_transfer_preserves_both_blob_identities(t
     assert (tmp_path / target).read_text() == "reviewed_literal = 1\n"
     assert (tmp_path / foreign).read_text() == "unrelated = 2\n"
     assert git("rev-parse", "HEAD") == head
+
+
+def test_large_mode_scope_ignores_foreign_conflict_and_preserves_the_index(tmp_path):
+    import subprocess
+
+    from groundtruth_kb.session.worktree import SessionWorktreeError, _artifact_modes
+
+    def git(*args, input=None):
+        return (
+            subprocess.run(
+                ["git", "--literal-pathspecs", "-C", str(tmp_path), *args],
+                input=input.encode("utf-8") if input is not None else None,
+                capture_output=True,
+                check=True,
+            )
+            .stdout.decode("utf-8")
+            .strip()
+        )
+
+    git("init")
+    git("config", "core.filemode", "false")
+    paths = [f"artifact scope/{i:04d}-{'reviewed' * 8}.py" for i in range(600)]
+    assert len(subprocess.list2cmdline(["git", "ls-files", "--stage", "-z", "--", *paths])) > 32767
+    (tmp_path / "artifact scope").mkdir()
+    for path in paths:
+        (tmp_path / path).write_bytes(b"reviewed = True\n")
+    foreign = "foreign.py"
+    (tmp_path / foreign).write_bytes(b"foreign bytes\n")
+    git("add", "--all")
+    git("update-index", "--chmod=+x", "--", paths[0])
+    blob = git("hash-object", "--", foreign)
+    git("update-index", "--force-remove", "--", foreign)
+    git("update-index", "--index-info", input=f"100644 {blob} 2\t{foreign}\n100755 {blob} 3\t{foreign}\n")
+    assert git("ls-files", "--stage", "--", foreign).splitlines() == [
+        f"100644 {blob} 2\t{foreign}",
+        f"100755 {blob} 3\t{foreign}",
+    ]
+    before = (tmp_path / ".git/index").read_bytes()
+
+    modes = _artifact_modes(tmp_path, paths)
+    assert modes == {path: "100755" if path == paths[0] else "100644" for path in paths}
+    with pytest.raises(SessionWorktreeError, match="unmerged"):
+        _artifact_modes(tmp_path, [foreign])
+    assert (tmp_path / ".git/index").read_bytes() == before
+    assert (tmp_path / foreign).read_bytes() == b"foreign bytes\n"

@@ -397,19 +397,6 @@ def test_safe_prefix_does_not_exempt_appended_mutating_stage(command: str, reaso
     assert result["reason_code"] == reason_code
 
 
-@pytest.mark.parametrize(
-    "subcommand",
-    ["create", "attach", "preserve", "promote", "close", "resume", "recover", "drain"],
-)
-def test_git_lifecycle_mutating_subcommands_are_mutation_signals(
-    subcommand: str,
-) -> None:
-    command = f"python -m groundtruth_kb.git_lifecycle --repo . {subcommand} --fixture-argument x"
-
-    assert gate._has_mutating_git_lifecycle_signal(command) is True
-    assert gate._is_mutating_command(command) is True
-
-
 @pytest.mark.parametrize("hook_input", ["", "{}", "[]", "{malformed-json"])
 def test_hook_denies_empty_or_malformed_json_payload(
     hook_input: str,
@@ -761,7 +748,7 @@ def test_impl_start_gate_genuine_redirect_still_mutating() -> None:
 @pytest.mark.parametrize(
     ("command", "expected", "rationale"),
     [
-        ("python -m groundtruth_kb.git_lifecycle create --help", True, "help on a governed CLI"),
+        ("python -m groundtruth_kb projects commit --help", True, "help on a governed CLI"),
         ("gt bridge dispatch report --help", True, "help on the gt CLI"),
         ("sometool --usage", True, "usage flag"),
         ("sometool --help > out.txt", False, "redirection writes a file"),

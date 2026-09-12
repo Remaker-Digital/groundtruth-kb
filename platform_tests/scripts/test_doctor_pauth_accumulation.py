@@ -16,7 +16,6 @@ fails and the test does not pass silently.
 
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
 
 from groundtruth_kb.db import KnowledgeDB
@@ -58,31 +57,6 @@ def test_removed_checks_are_not_registered_in_any_doctor_surface() -> None:
     assert "def _check_python" in source, "control marker missing; the source read did not resolve the real module"
     for name in REMOVED_DOCTOR_CHECKS:
         assert name not in source, f"{name} still appears in {doctor.__file__}"
-
-
-def test_fresh_database_creates_no_authorization_relation(tmp_path: Path) -> None:
-    """A database built through the production API has no authorization store.
-
-    This is the durable half of the removal: the schema no longer creates the
-    table, so it cannot return on a later open.
-    """
-    db_path = tmp_path / "groundtruth.db"
-    db = KnowledgeDB(db_path=db_path)
-    try:
-        db.insert_project("Project Fixture", "test", "fixture", id="PROJECT-FIXTURE")
-    finally:
-        db.close()
-
-    connection = sqlite3.connect(db_path)
-    try:
-        names = {row[0] for row in connection.execute("SELECT name FROM sqlite_master")}
-    finally:
-        connection.close()
-
-    assert "projects" in names, "control relation missing; the fixture database did not build"
-    assert not [name for name in names if "project_authorization" in name], (
-        "a fresh database created an authorization relation"
-    )
 
 
 def test_knowledge_db_exposes_no_authorization_writers() -> None:

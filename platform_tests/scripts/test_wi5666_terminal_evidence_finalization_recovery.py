@@ -77,63 +77,6 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
 
-def test_fresh_recovery_bridge_chain_is_append_only_role_separated_and_exactly_linked() -> None:
-    """GOV-FILE-BRIDGE-AUTHORITY-001 / PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001."""
-    assert BRIDGE_PROPOSAL.exists(), "fresh recovery v001 proposal must exist"
-    proposal = _read(BRIDGE_PROPOSAL)
-    assert "Version: 001" in proposal or "Version: 001" in proposal
-    assert "bridge_kind: prime_proposal" in proposal
-    assert "Work Item: WI-5666" in proposal
-    assert PROJECT_ID in proposal
-    assert PARENT_PAUTH_ID in proposal
-    # Independent v002 GO must exist and be role-separated (LO verdict).
-    assert BRIDGE_GO.exists(), "independent v002 GO must exist"
-    go = _read(BRIDGE_GO)
-    assert "GO" in go.splitlines()[0]
-    assert "loyal-opposition" in go.lower() or "lo_verdict" in go
-    # The report under review is part of the durable chain.  Validate the
-    # existing append-only sequence instead of requiring that report to be
-    # absent, so this assertion is reproducible both before and after filing.
-    prefix = "gtkb-wi5666-skill-rename-parent-terminal-evidence-recovery-"
-    versions = sorted((REPO_ROOT / "bridge").glob(f"{prefix}[0-9][0-9][0-9].md"))
-    numbers = [int(path.stem.rsplit("-", 1)[1]) for path in versions]
-    assert numbers == list(range(1, numbers[-1] + 1)), "numbered chain must have no gaps"
-
-    expected_prefix = {1: "NEW", 2: "GO", 3: "NEW", 4: "NO-GO"}
-    for version, expected_status in expected_prefix.items():
-        path = REPO_ROOT / "bridge" / f"{prefix}{version:03d}.md"
-        assert path.exists(), f"required recovery-chain version {version:03d} must exist"
-        assert _read(path).splitlines()[0].strip() == expected_status
-
-    # Any correction cycles after the first NO-GO alternate PB REVISED reports
-    # and independent LO verdicts.  This remains valid after the report and
-    # terminal verdict are filed.
-    for path in versions[4:]:
-        version = int(path.stem.rsplit("-", 1)[1])
-        text = _read(path)
-        status = text.splitlines()[0].strip()
-        if version % 2:
-            assert status == "REVISED"
-            assert "bridge_kind: implementation_report" in text
-            assert "prime-builder" in text.lower()
-        else:
-            assert status in {"NO-GO", "VERIFIED"}
-            assert "loyal-opposition" in text.lower() or "bridge_kind: lo_verdict" in text
-
-
-def test_owner_decisions_unique_membership_and_parent_pauth_cover_wi5666_recovery() -> None:
-    """SPEC-AUQ-POLICY-ENGINE-001 / GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001."""
-    proposal = _read(BRIDGE_PROPOSAL)
-    assert "DELIB-20260801-WI5666-CANONICAL-PARENT-SELECTION" in proposal
-    assert "DELIB-20260730-WI5666-SPEC-DERIVED-TEST-EXPANSION" in proposal
-    assert MEMBERSHIP_ID in proposal
-    assert PARENT_PAUTH_ID in proposal
-    # Parent PAUTH declares bounded classes and retained bans (no mutation of
-    # dispatcher/credential/release/history).
-    for ban in ("dispatcher", "credential", "push", "history-rewrite", "deployment", "release", "destructive-cleanup"):
-        assert ban in proposal.lower()
-
-
 def test_historical_commit_has_exact_four_path_boundary_and_current_paths_are_clean() -> None:
     """ADR-ISOLATION-APPLICATION-PLACEMENT-001 / GOV-WORK-TREE-HYGIENE-001."""
     show = subprocess.run(

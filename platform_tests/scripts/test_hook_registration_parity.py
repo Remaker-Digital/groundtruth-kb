@@ -54,14 +54,3 @@ def test_no_registration_surface_names_implementation_start_gate() -> None:
         assert commands, relative
         offenders = [command for command in commands if RETIRED_GATE_TOKEN in command]
         assert not offenders, f"{relative} still registers the retired gate: {offenders}"
-
-
-def test_codex_batch_catalog_does_not_run_implementation_start_gate() -> None:
-    hooks = json.loads((REPO_ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8"))
-    assert RETIRED_GATE_TOKEN not in json.dumps(hooks, sort_keys=True)
-
-    wrapper = _load_codex_hook_wrapper()
-    for batch_name, entries in wrapper.BATCHES.items():
-        assert not any(RETIRED_GATE_TOKEN in " ".join(entry) for entry in entries), batch_name
-
-    assert not (REPO_ROOT / ".codex" / "gtkb-hooks" / "implementation-start-gate.cmd").exists()

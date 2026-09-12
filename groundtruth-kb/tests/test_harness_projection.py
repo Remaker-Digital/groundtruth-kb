@@ -169,24 +169,6 @@ class TestBuildProjection:
         assert dispatch_surface["event_driven_hooks"] is False
         assert dispatch_surface["dispatch_tags"] == ["prime-builder"]
 
-    def test_headless_receive_declaration_overrides_retired_dispatch_false(self, db: Any) -> None:
-        _insert_harness(
-            db,
-            id="A",
-            harness_name="codex",
-            harness_type="codex",
-            role=["prime-builder"],
-            invocation_surfaces={
-                "headless": {"argv": ["codex", "exec"], "can_receive_dispatch": True},
-                "dispatch": {"can_receive_dispatch": False, "can_fire_events": True},
-            },
-        )
-
-        record = build_projection(db.list_harnesses())["harnesses"][0]
-
-        assert record["can_receive_dispatch"] is True
-        assert record["can_fire_events"] is False
-
     def test_build_projection_ignores_dispatch_config_overlay_argument(self, db: Any) -> None:
         _insert_harness(
             db,
@@ -351,28 +333,3 @@ def test_read_roles_non_object_top_level_raises_harness_state_error(tmp_path: Pa
 #
 # These CliRunner-based tests assert the live command table directly.
 # ──────────────────────────────────────────────────────────────────────────
-
-
-def test_gt_harness_roles_is_reachable_and_emits_json() -> None:
-    """``gt harness roles`` exits 0 and emits JSON parseable as a mapping."""
-    from click.testing import CliRunner  # noqa: PLC0415
-
-    from groundtruth_kb.cli import main as gt_main  # noqa: PLC0415
-
-    result = CliRunner().invoke(gt_main, ["harness", "roles"])
-    assert result.exit_code == 0, f"stderr: {result.output}"
-    data = json.loads(result.output)
-    assert isinstance(data, dict)
-    assert "harnesses" in data
-
-
-def test_gt_harness_identity_is_reachable_and_emits_json() -> None:
-    """``gt harness identity`` exits 0 and emits JSON parseable as a mapping."""
-    from click.testing import CliRunner  # noqa: PLC0415
-
-    from groundtruth_kb.cli import main as gt_main  # noqa: PLC0415
-
-    result = CliRunner().invoke(gt_main, ["harness", "identity"])
-    assert result.exit_code == 0, f"stderr: {result.output}"
-    data = json.loads(result.output)
-    assert isinstance(data, dict)

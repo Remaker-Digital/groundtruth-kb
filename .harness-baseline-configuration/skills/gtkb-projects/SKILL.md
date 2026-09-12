@@ -1,194 +1,147 @@
 ---
 name: gtkb-projects
-description: Use GT-KB MemBase-backed project lifecycle commands to create, inspect, order, dependency-link, authorize, and retire first-class project records without creating a second backlog authority.
+description: Inspect and reconcile GT-KB programs, execution projects, single-parent work membership, formal links and dependencies through the native CLI; apply explicit owner-directed project authorization.
 license: "Proprietary - (c) 2026 Remaker Digital"
 metadata:
   project: groundtruth-kb
   category: implementation and planning
 ---
-# gtkb-Projects
+# Project and work constitution
 
-Use this skill when work needs deterministic project lifecycle operations through
-the `gt projects` CLI surface.
+Use this skill for the assigned project's outcome, membership and ordering.
+A program sequences projects. An execution project groups the interdependent
+changes that finish and commit together. Every work item has exactly one
+execution-project parent. A label or related Bridge citation is not membership.
+Size the result before making records; unrelated unfinished work must not prevent
+a cohesive project from finishing. Reconcile existing work before adding it.
 
-## Authority
+Read the current `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`,
+`GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001` and
+`GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001` through `gt spec show` when
+they apply. The operating-model rule explains their wider context.
 
-Project, sub-project, work item, backlog, MemBase, implementation proposal,
-implementation report, and verification meanings come from:
+## Read current state
 
-- `.harness-baseline-configuration/rules/operating-model.md`
-- `.harness-baseline-configuration/rules/canonical-terminology.md`
-
-This skill does not redefine those terms. Projects organize known work in the
-MemBase backlog; they do not replace `current_work_items` or create a separate
-backlog source of truth.
-
-**CLI-only backlog/project access:** agents MUST read and mutate backlog and
-project state through the governed `gt backlog` and `gt projects` CLI surfaces
-(or skills that invoke those commands). Do not open `groundtruth.db` with
-SQLite, import `KnowledgeDB` for routine backlog browsing, or fetch the full
-backlog and post-filter locally. Use CLI filters instead.
-
-## Backlog Query Surface
-
-Use `gt backlog list` for governed backlog reads. Prefer `--json` when another
-tool needs structured output.
-
-Exact-value filters (repeatable where noted):
+Use the configured native authority through the CLI. Supply `--config <file>`
+before the command when selecting another installation. An unavailable service
+is a refusal, not permission to read a local SQLite copy or cached projection.
 
 ```powershell
-gt backlog list --json
-gt backlog list --id WI-1234 --json
-gt backlog list --project GTKB-X --priority P1 --stage open --json
-gt backlog list --approval-state bridge_authorized --approval-state implementation_authorized --json
-gt backlog list --origin defect --component backlog --resolution-status open --json
-```
-
-Field-specific pattern and range filters:
-
-```powershell
-gt backlog list --field source_owner_directive:DELIB-123 --json
-gt backlog list --field related_bridge_threads:gtkb-thread-slug --json
-gt backlog list --match title:*scanner* --json
-gt backlog list --match id:WI-48* --json
-gt backlog list --range priority:P1..P2 --json
-gt backlog list --range implementation_order:1..10 --json
-```
-
-Project-membership and sort controls:
-
-```powershell
-gt backlog list --member-of PROJECT-GTKB-DISPATCHER-RELIABILITY --json
-gt backlog list --sort priority --sort id --json
-gt backlog list --sort implementation_order --sort-desc --json
-gt backlog list --contains dispatcher --limit 20 --json
-```
-
-Use `gt backlog show <WI-ID> --json` for one item. Use `gt backlog status`
-for project-level backlog summaries.
-
-## Commands
-
-Use plural `gt projects` for MemBase project lifecycle work. Keep singular
-`gt project` for scaffold, doctor, upgrade, and rollback surfaces.
-
-Read operations:
-
-```powershell
-gt projects list
-gt projects list --json
-gt projects list --field source_project_name:"Backlog Triage and Hygiene" --json
-gt projects list --match name:*DISPATCHER* --sort rank --json
-gt projects show <PROJECT-ID>
+gt projects list --kind program --json
+gt projects list --kind project --status active --json
 gt projects show <PROJECT-ID> --json
+gt backlog list --status open --priority P1 --search "<search text>" --limit 20 --json
+gt backlog show <WI-ID> --json
+gt context work-item <WI-ID> --json
+gt projects readiness <PROJECT-ID> --gate readiness --json
+gt projects readiness <PROJECT-ID> --gate closure --json
+gt backlog readiness <WI-ID> --json
 ```
 
-Mutating operations require `--change-reason` and append a new MemBase version:
+Project readback includes current members, dependencies and formal links.
+Work-item readback includes the exact current parent. List results are bounded
+and ordered by ID; use `--after <last-ID>` to continue. Readiness explains the
+current prerequisite outcome; it is not GO, verification or authorization.
+Task context provides the explicit formal-relationship floor. Investigate the
+complete applicable formal closure rather than assuming stored links are exhaustive.
+
+## Create or amend current records
+
+Use a UTF-8 JSON fields file containing only the fields to change. Every write
+requires `--actor`, `--change-reason` and `--expected-version`. Version 0 asserts
+a new record; an amendment names the exact version just read. On a conflict,
+read the current state and reconsider the requested change before retrying.
+Read back the returned canonical result. Attribution is not a permission carrier.
 
 ```powershell
-gt projects create "<name>" --change-reason "<reason>"
-gt projects update <PROJECT-ID> --status active --change-reason "<reason>"
-gt projects add-item <PROJECT-ID> <WI-ID> --order 1 --change-reason "<reason>"
-gt projects reorder <PROJECT-ID> <WI-ID> <WI-ID> --change-reason "<reason>"
-gt projects retire <PROJECT-ID> --change-reason "<reason>"
-gt projects link-bridge <PROJECT-ID> <bridge-thread-slug> --change-reason "<reason>"
-gt projects update <PROJECT-ID> --activation-status authorized --change-reason "<owner-directed reason>"
-gt projects update <PROJECT-ID> --activation-status "not authorized" --change-reason "<owner-directed reason>"
+gt projects record --id <PROGRAM-ID> --kind program --fields-file <fields.json> --expected-version 0 --actor <actor> --change-reason "<reason>" --json
+gt projects record --id <PROJECT-ID> --kind project --fields-file <fields.json> --expected-version 0 --actor <actor> --change-reason "<reason>" --json
+gt projects record --id <PROJECT-ID> --fields-file <fields.json> --expected-version <version> --actor <actor> --change-reason "<reason>" --json
+gt backlog record --id <WI-ID> --project-id <PROJECT-ID> --fields-file <fields.json> --expected-version 0 --actor <actor> --change-reason "<reason>" --json
 ```
 
-Use `--json` when another tool or agent needs machine-readable output.
+Project fields include `name`, `purpose`, `target_outcome`, `scope_note`, `rank`
+and optional `parent_project_id` naming an active program. Kind is immutable.
+Project authorization and terminal status are not generic fields to amend here.
+New execution projects start authorized except the standing intake project.
+Programs have no authorization value and cannot contain work items.
 
-## Project Dependencies
+A new implementation item's fields include `title`, `description`,
+`source_spec_id`, `source_test_id` and `priority`. Its test must be executable
+and belong to an active test-plan phase. Amend current work through the same
+`backlog record` operation with its current version. Use `implementation_order`
+and `depends_on_work_items` for current work ordering. Keep lifecycle status
+with the Bridge and project-finalization services.
 
-Versioned MemBase dependency records are the sole dependency authority.
-`dependent_project_id` depends on `prerequisite_project_id`; do not infer edge
-direction from physical compatibility fields or use `from` / `to` terminology.
-Workers must use the nested CLI and must not call
-`KnowledgeDB.add_project_dependency()` or write dependency rows directly.
+## Reconcile membership
 
-Create one dependency:
+Moving an open item is one atomic replacement of its current parent:
 
 ```powershell
-gt projects dependencies add `
-  --dependent-project <PROJECT-ID> `
-  --prerequisite-project <PROJECT-ID> `
-  --kind requires_project_state `
-  --required-state retired `
-  --affected-gate authorization `
-  --rationale "<why this dependency is required>" `
-  --provenance "<decision, proposal, or work-item evidence>" `
-  --change-reason "<reason for this version>" `
-  --json
+gt projects move-item --work-item-id <WI-ID> --from-project <CURRENT-PROJECT-ID> --to-project <DESTINATION-PROJECT-ID> --expected-version <membership-version> --membership-order 1 --actor <actor> --change-reason "<reason>" --json
 ```
 
-Read and validate dependency state:
+Use the membership version from work-item readback, not its work-item or project
+version. Both projects retain their authorization. A commit-terminal member is
+immutable. The move must preserve foreign work and satisfy current work
+dependencies; inspect any refusal before changing the proposed topology.
+There is no routine detach-to-unparented operation. Unmatched defects enter
+`PROJECT-GTKB-NEW-WORK-INTAKE` and are reconciled to an execution project.
+
+## Apply the owner's authorization choice
+
+Only explicit owner direction sets this field. Membership changes, a GO, an
+agent recommendation or a prior decision narrative do not set it implicitly.
 
 ```powershell
-gt projects dependencies show <DEPENDENCY-ID> --json
-gt projects dependencies list --project <PROJECT-ID> --json
+gt projects set-authorization <PROJECT-ID> --authorization "not authorized" --expected-version <project-version> --actor <actor> --change-reason "<owner-directed change>" --json
+gt projects set-authorization <PROJECT-ID> --authorization authorized --expected-version <project-version> --actor <actor> --change-reason "<owner-directed change>" --json
+```
+
+This changes the existing project row and returns it. It grants no path scope,
+expiry or per-action permissions, and creates no authorization artifact.
+The intake project remains not authorized. A NEW proposal rechecks its current
+parent; an already initiated chain continues after an authorization change.
+
+## Reconcile formal sources and prerequisites
+
+```powershell
+gt projects formal-links list --project-id <PROJECT-ID> --status active --json
+gt projects formal-links show <LINK-ID> --json
+gt projects formal-links record --id <LINK-ID> --fields-file <fields.json> --expected-version <version> --actor <actor> --change-reason "<reason>" --json
 gt projects dependencies list --dependent-project <PROJECT-ID> --json
 gt projects dependencies list --prerequisite-project <PROJECT-ID> --json
-gt projects dependencies validate --json
+gt projects dependencies show <DEPENDENCY-ID> --json
+gt projects dependencies record --id <DEPENDENCY-ID> --fields-file <fields.json> --expected-version <version> --actor <actor> --change-reason "<reason>" --json
 ```
 
-Retire and recover an edge:
+A new formal-link fields file names `project_id` and `artifact_ref` (the current
+active formal-record ID), with optional `notes`. Use version 0 to create it.
+Retire or reactivate it with `{"status":"retired"}` or `{"status":"active"}`.
+Endpoints are immutable: retire the old link and create the intended new link.
+This operation cannot write Bridge links or Git commit evidence.
 
-```powershell
-gt projects dependencies retire <DEPENDENCY-ID> --change-reason "<reason>" --json
-gt projects dependencies recover <DEPENDENCY-ID> --change-reason "<reason>" --json
-```
+A prerequisite fields file names `dependent_project_id`,
+`prerequisite_project_id`, `dependency_kind: "requires_project_state"`,
+`required_prerequisite_state`, `affected_gate` and `rationale`.
+The required state is `active`, `verified`, `retired` or `cancelled`; the gate
+is `readiness` or `closure`. A project depends on the named prerequisite outcome.
+The service validates the whole active graph and refuses cycles, invalid
+endpoints, duplicate edges and unreachable closed states. Read back the affected
+project's readiness after a change. Dependencies never set authorization.
 
-The initial kind, `requires_project_state`, supports required prerequisite
-states `active`, `completed`, `retired`, and `cancelled`, and affected gates
-`readiness`, `authorization`, `promotion`, and `closure`. Mutations append
-versions and validate the complete active graph. Self-edges, cycles, unknown or
-invalid endpoints, duplicate semantic edges, unsupported kind/state/gate
-values, and contradictory lifecycle transitions fail without mutation.
+## Review and completion
 
-Readiness output names the dependency, both endpoints, current and required
-states, satisfaction, the affected or blocked gate, provenance, and a recovery
-route. An unsatisfied edge blocks only its declared gate. Dependency
-satisfaction and ordering never change project `activation-status`, grant bridge `GO`, work
-intent, implementation-start authority, or protected-file mutation authority.
-Rendered DAGs and cached projections are views only; use
-`gt projects dependencies validate --json` when current authority is required.
+Current roots are rechecked at Bridge effects and precommit. Removing a formal
+relationship cannot be hidden by an old proposal citation. After a material
+formal-intent change, reconcile the affected attempt. For VERIFIED but
+uncommitted work, start a fresh proposal/review/implementation attempt on the
+same work item, preserving membership and bytes and inheriting no GO.
 
-## Safety Rules
-
-- Do not write directly to `groundtruth.db` for routine project lifecycle work.
-- Do not open `groundtruth.db` with SQLite or read the backlog through
-  `KnowledgeDB` for routine agent workflows; use `gt backlog list` /
-  `gt backlog show` with CLI filters.
-- Do not create new project or backlog authority tables.
-- Do not use `gt projects link-bridge` to edit or recreate the retired
-  aggregate queue artifact. This command records a project artifact link with
-  `artifact_type="bridge_thread"` only.
-- Keep `add-item` to one explicit work item at a time.
-- Keep `reorder` scoped to one selected project. It must name the active
-  membership set exactly, so omitted or extra work items fail closed.
-- If a requested operation would update multiple projects or bulk-update work
-  items, stop and file a follow-on bridge proposal or dry-run inventory packet.
-- Only an owner-directed update may change the project's `activation-status`.
-  The field does not bypass bridge proposal review, `GO`, `target_paths`,
-  implementation reports, or Loyal Opposition verification.
-
-## Verification
-
-For implementation work that changes this skill or the project lifecycle
-surface, run the focused CLI and parity checks named by the governing bridge
-proposal, normally:
-
-```powershell
-python -m pytest platform_tests/scripts/test_projects_cli.py -q
-python -m pytest platform_tests/scripts/test_project_authorization.py -q
-python -m pytest platform_tests/scripts/test_cli_backlog_list.py -q
-python -m pytest groundtruth-kb/tests/test_project_dependency_ordering.py platform_tests/scripts/test_projects_cli.py -q
-python scripts/check_project_dependency_ordering.py --json
-python scripts/check_harness_parity.py --all --validate
-python -m pytest platform_tests/scripts/test_projects_skill_adapter.py -q
-python -m pytest platform_tests/scripts/test_check_harness_parity.py -q
-```
-
-## Copyright
+Each member is independently verified for its exact path, Git mode and object
+identity. When all members are VERIFIED, use the native project commit workflow
+and normal hooks to commit the complete result once. Exclude Bridge payloads
+and generated projections. Related messages, a passing selected test or an
+edited status label cannot establish project completion.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

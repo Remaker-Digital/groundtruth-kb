@@ -31,7 +31,6 @@ from groundtruth_kb.project.doctor import (
     DoctorReport,
     ToolCheck,
     _check_bridge_propose_skill_present,
-    _check_file_bridge_setup,
     _check_hooks,
     _check_scanner_safe_writer_drift,
     _check_spec_intake_skill_present,
@@ -75,7 +74,6 @@ def _project_checks(target: Path, profile: str) -> list[ToolCheck]:
     """
     checks: list[ToolCheck] = [_check_hooks(target, profile)]
     if profile in ("dual-agent", "dual-agent-webapp"):
-        checks.append(_check_file_bridge_setup(target))
         checks.append(_check_scanner_safe_writer_drift(target, profile))
         checks.append(_check_bridge_propose_skill_present(target, profile))
         checks.append(_check_spec_intake_skill_present(target, profile))
@@ -129,11 +127,11 @@ def test_registry_affected_normalized_projection_roundtrips(tmp_path: Path) -> N
     assert all(t[1] in {"pass", "fail", "warning"} for t in projection)
 
 
-def test_dual_agent_registry_affected_count_is_five(tmp_path: Path) -> None:
-    """dual-agent scaffold exercises exactly 5 registry-affected project checks."""
+def test_dual_agent_registry_affected_count_is_four(tmp_path: Path) -> None:
+    """dual-agent scaffold exercises exactly 4 registry-affected project checks."""
     target = _scaffold(tmp_path, "dual-agent")
     checks = _project_checks(target, "dual-agent")
-    assert len(checks) == 5
+    assert len(checks) == 4
 
 
 def test_local_only_registry_affected_count_is_one(tmp_path: Path) -> None:

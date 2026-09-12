@@ -144,16 +144,6 @@ def test_init_disclosure_is_minimized_for_routing_only() -> None:
 # ---- Backlog projection / pipeline tests -----------------------------------
 
 
-def test_backlog_items_preserve_status_priority_shape() -> None:
-    module = _load_module()
-    items = module._backlog_items_from_membase(REPO_ROOT)
-    assert items, "expected a non-empty backlog projection from MemBase"
-    sample = items[0]
-    assert "resolution_status" in sample
-    assert "stage" in sample
-    assert "priority" in sample
-
-
 def test_top_3_does_not_filter_by_legacy_approval_metadata(monkeypatch) -> None:
     """Top-3 must not derive priority eligibility from legacy approval metadata."""
     module = _load_module()
@@ -342,29 +332,6 @@ def test_wrap_trigger_helper_preserved_for_capstone_reuse() -> None:
 
 
 # ---- TEST-11254: initial skill/knowledge shard migration (WI-4949) ---------
-
-
-def test_test11254_startup_glossary_loads_core_subset_not_full_corpus() -> None:
-    """SPEC-INTAKE-46594e: base startup uses bounded core primer, not full glossary."""
-    from scripts.startup_glossary_load import load_glossary_for_startup
-
-    result = load_glossary_for_startup(REPO_ROOT)
-    assert result["status"] == "loaded"
-    assert result["scope"] == "core_startup"
-    assert int(result["term_count"]) <= int(result["full_term_count"])
-    assert int(result["full_term_count"]) > int(result["term_count"])
-
-
-def test_test11254_global_baseline_excludes_activity_only_codex_surfaces() -> None:
-    """Deferred Codex LO surfaces must not appear in global_baseline allowed_surfaces."""
-    import tomllib
-
-    sharding_path = REPO_ROOT / "config" / "agent-control" / "activity-envelope-sharding.toml"
-    sharding = tomllib.loads(sharding_path.read_text(encoding="utf-8"))
-    global_surfaces = set(sharding["classes"]["global_baseline"]["allowed_surfaces"])
-    deferred = set(sharding["classes"]["activity_only"]["deferred_surfaces"])
-    assert deferred, "activity_only deferred_surfaces must be declared"
-    assert not global_surfaces.intersection(deferred)
 
 
 def test_test11254_readiness_both_roles_build_startup_model() -> None:

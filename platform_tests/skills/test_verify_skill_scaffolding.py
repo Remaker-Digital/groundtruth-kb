@@ -184,13 +184,6 @@ def test_skill_documents_no_index_mutation() -> None:
     assert "dispatcher/TAFE bridge state" in body, "skill must point at current bridge-state authority"
 
 
-def test_skill_documents_preflight_invocations() -> None:
-    """Test #8 — body cites the exact preflight script invocations."""
-    body = _CLAUDE_SKILL.read_text(encoding="utf-8")
-    assert "scripts/bridge_applicability_preflight.py" in body, "missing applicability preflight invocation"
-    assert "scripts/adr_dcl_clause_preflight.py" in body, "missing clause preflight invocation"
-
-
 def test_codex_adapter_file_exists() -> None:
     """Test #9 — Codex adapter file exists."""
     assert _CODEX_ADAPTER.is_file(), f"missing Codex adapter: {_CODEX_ADAPTER}"

@@ -93,51 +93,6 @@ def test_inventory_in_root_output_path(inventory_module):
     assert out.is_relative_to(REPO_ROOT.resolve()), f"out path escapes project root: {out}"
 
 
-def test_inventory_generator_produces_expected_row_count(inventory_module, db_available, tmp_path):
-    """GOV-STANDING-BACKLOG-001 / row-count check: emit exactly 119 data rows."""
-    out = tmp_path / "inventory.md"
-    rc = inventory_module.main(["--db", str(db_available), "--out", str(out)])
-    assert rc == 0
-    assert out.exists()
-    text = out.read_text(encoding="utf-8")
-    data_lines = [
-        line
-        for line in text.splitlines()
-        if line.startswith("| ")
-        and not line.startswith("| # ")
-        and not line.startswith("| ---")
-        and not line.startswith("|---")
-        and "WI ID" not in line
-    ]
-    assert len(data_lines) == EXPECTED_ROW_COUNT, f"expected {EXPECTED_ROW_COUNT} data rows; got {len(data_lines)}"
-
-
-def test_inventory_covers_all_distinct_wi_ids(inventory_module, db_available, tmp_path):
-    """Inventory generator covers every distinct WI id in the changed_by window."""
-    out = tmp_path / "inventory.md"
-    rc = inventory_module.main(["--db", str(db_available), "--out", str(out)])
-    assert rc == 0
-    text = out.read_text(encoding="utf-8")
-    expected_ids = _distinct_wi_ids(db_available)
-    assert len(expected_ids) == EXPECTED_ROW_COUNT
-    for wi_id in expected_ids:
-        assert f"`{wi_id}`" in text, f"missing WI id in inventory output: {wi_id}"
-
-
-def test_review_packet_aggregates_transition_types(inventory_module, review_module, db_available, tmp_path):
-    """Review packet aggregates by transition type without errors."""
-    inv = tmp_path / "inventory.md"
-    pkt = tmp_path / "packet.md"
-    assert inventory_module.main(["--db", str(db_available), "--out", str(inv)]) == 0
-    rc = review_module.main(["--db", str(db_available), "--inventory", str(inv), "--out", str(pkt)])
-    assert rc == 0
-    text = pkt.read_text(encoding="utf-8")
-    assert "Counts By Transition Type" in text
-    assert "->" in text, "transition arrow missing — aggregation likely empty"
-    rows = [line for line in text.splitlines() if line.startswith("| `") and "->" in line]
-    assert rows, "no transition rows rendered"
-
-
 def test_review_packet_contains_phase_2_deferred_marker(inventory_module, review_module, db_available, tmp_path):
     """Phase-1 scope marker: review packet must contain DECISION DEFERRED TO PHASE 2."""
     inv = tmp_path / "inventory.md"

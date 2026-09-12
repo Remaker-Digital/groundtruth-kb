@@ -4,9 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-from click.testing import CliRunner
 
-from groundtruth_kb.cli import main
 from groundtruth_kb.project import sot_audit
 from groundtruth_kb.project.sot_audit import run_duplicate_sot_audit
 
@@ -182,23 +180,3 @@ def test_audit_rejects_incomplete_derived_cache_contract(tmp_path: Path) -> None
     assert cache.classification == "duplicate_sot_violation"
     assert "read_only" in cache.duplicated_fields
     assert cache.remediation_work_item_id is None
-
-
-def test_registry_audit_duplicates_cli_emits_json(tmp_path: Path) -> None:
-    _write_groundtruth_toml(tmp_path)
-    _write_registry(
-        tmp_path,
-        _registry_record("harness-registry", "harness-state/harness-registry.json", domain="harness_state"),
-    )
-    _write_dispatch_duplicate(tmp_path)
-
-    result = CliRunner().invoke(
-        main,
-        ["--config", str(tmp_path / "groundtruth.toml"), "registry", "audit-duplicates", "--json", "--no-write"],
-    )
-
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["coverage_complete"] is True
-    assert payload["violation_count"] == 1
-    assert payload["uncovered_violation_count"] == 0

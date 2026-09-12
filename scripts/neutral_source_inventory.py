@@ -12,7 +12,7 @@ family (GOV-HARNESS-NEUTRAL-BASELINE-001).
 Output is diagnostic evidence only and carries no authority. The service
 mutates no source, projection, specification, project authorization, or
 alternate state; it writes only a machine-readable plan/check result (stdout
-JSON and an optional `.gtkb-state/` report).
+JSON and an optional caller-selected diagnostic report).
 
 Exit codes:
   0  inventory/check clean (every artifact classified, no contamination)
@@ -437,7 +437,7 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
-    parser.add_argument("--report-dir", type=Path, default=None, help="Optional .gtkb-state report dir")
+    parser.add_argument("--report-dir", type=Path, default=None, help="Optional diagnostic report directory")
     parser.add_argument("--project-root", type=Path, default=None, help="Host root override")
     args = parser.parse_args(argv)
 

@@ -103,15 +103,6 @@ def test_t5_resolve_safe_path_resolves_relative_to_root() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_t8_gt_status_summary_returns_generated_summary_envelope() -> None:
-    from groundtruth_kb.mcp_surface.server import build_status_summary_envelope
-
-    envelope = build_status_summary_envelope(PROJECT_ROOT)
-    assert envelope["authority"] == "generated-summary"
-    assert envelope["source_ref"] == "bridge/INDEX.md+groundtruth.db"
-    assert envelope["generated_at"].endswith("Z")
-
-
 # ---------------------------------------------------------------------------
 # T9 - payload includes expected shape
 # ---------------------------------------------------------------------------
@@ -122,14 +113,10 @@ def test_t9_gt_status_summary_payload_includes_expected_fields() -> None:
 
     payload = gt_status_summary_payload(PROJECT_ROOT)
     assert set(payload.keys()) == {
-        "bridge_status_counts",
         "membase_row_counts",
         "project_root",
         "working_tree_clean",
     }
-    assert isinstance(payload["bridge_status_counts"], dict)
-    # Live INDEX.md guarantees at least one status is present.
-    assert sum(payload["bridge_status_counts"].values()) > 0
     assert isinstance(payload["membase_row_counts"], dict)
     # MemBase row counts MUST come from the current_* views, not the
     # append-only base tables, per bridge gtkb-mcp-stable-harness-surface-

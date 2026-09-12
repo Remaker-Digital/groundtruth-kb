@@ -170,16 +170,6 @@ def test_goose_session_id_resolves_when_sole() -> None:
     assert resolve_session_id(None, order=MARKER_CONTINUITY_ORDER, environ=env) == "goose-session-123"
 
 
-def test_runtime_harness_markers_cover_goose_and_cursor() -> None:
-    """WI-5935 Slice C: active identity-file harnesses goose and cursor carry marker entries."""
-    from groundtruth_kb.session.envelope import RUNTIME_HARNESS_MARKERS  # noqa: PLC0415
-
-    assert "goose" in RUNTIME_HARNESS_MARKERS
-    assert "GOOSE_SESSION_ID" in RUNTIME_HARNESS_MARKERS["goose"]
-    assert "cursor" in RUNTIME_HARNESS_MARKERS
-    assert "CURSOR_CONVERSATION_ID" in RUNTIME_HARNESS_MARKERS["cursor"]
-
-
 def test_default_harness_ids_include_goose_g() -> None:
     """W0.1 (WI-5839): goose is registered in DEFAULT_HARNESS_IDS as identity G."""
     from scripts.harness_identity import DEFAULT_HARNESS_IDS

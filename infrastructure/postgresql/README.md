@@ -70,6 +70,49 @@ alone. Copy recovery material to an out-of-band location appropriate to the
 failure scenario before claiming protection against primary-storage loss.
 See the [PostgreSQL recovery contract](https://www.postgresql.org/docs/18/continuous-archiving.html).
 
+Unattended base backups and retention use the operator tool in this directory:
+
+    & E:\GT-KB\groundtruth-kb\.venv\Scripts\python.exe infrastructure/postgresql/base_backup.py --root E:\GT-KB --keep 7
+
+It takes one plain-format base backup with streamed WAL and a SHA-256 manifest
+into backups/base-<UTC stamp>/, verifies it with pg_verifybackup, writes a JSON
+record beside it, keeps the newest seven verified base backups, and prunes only
+those archived WAL segments and backup-history files older than the oldest
+retained backup's start segment. `--dry-run` prints the plan and changes nothing.
+The tool reads the server through the protected admin service file and never
+handles a password. Run it unattended from a scheduled task under the owner's
+account before the nightly off-volume copy, so that the copy always carries a
+verified base backup and the WAL needed after it. Every schema object travels
+with the backup; the restore drill of the installed server on another volume is
+recorded in the realignment evidence.
+
+Recovery after loss of this volume uses only the off-volume copy written by the
+nightly SyncBackSE job (`D:\GT-KB-LocalBackup`), through the operator tool in
+this directory as it exists inside that copy:
+
+    & D:\GT-KB-LocalBackup\groundtruth-kb\.venv\Scripts\python.exe D:\GT-KB-LocalBackup\infrastructure\postgresql\restore_from_copy.py --copy D:\GT-KB-LocalBackup --data E:\GT-KB\infrastructure\postgresql\data --port 5432
+
+Any Python 3.11+ interpreter runs it; it needs nothing from the lost volume.
+It verifies the newest base backup with the copy's own pg_verifybackup, restores
+it into the empty target data directory, replays every complete archived WAL
+segment that follows it from the copy's archive, promotes the server and writes
+restore-report.json beside the data directory. Recovery runs through the entire
+complete archived WAL: no recovery target is set (a target at the first record
+of the last segment would discard later committed records in that segment);
+PostgreSQL replays every archived segment until the archive ends and promotes,
+and the tool then proves that every complete archived segment after the base
+was restored from the archive and that replay reached the last archived
+segment, so a restore that only replayed the base backup cannot pass as a full
+recovery. The report lists the segments restored from the archive, the final
+redo and replay positions, the effective restore_command, the schema-comment
+digests and every table's row count. For every port, the original one
+included, the tool derives the libpq service file and password file inside the
+report directory from the copy's own admin credential file (the copied
+pg_service.conf names the original volume and is never used); `--stop` removes
+them after a rehearsal beside a running installation on another port.
+After a real recovery, register the service and re-create the daily base-backup
+task as described above, then take a fresh base backup before the next copy.
+
 The opt-in recovery test creates a physical backup, verifies its manifest,
 commits another row, archives WAL, restores to a separate directory and port,
 and replays to a named restore point. It verifies both rows and stops the
@@ -165,9 +208,17 @@ new state cannot be silently dropped. The snapshot's actual schema inventory
 and contents are still checked against the specific transform input. Accounting
 for the table set does not prove every field, citation or work relationship is
 valid; those reconciliations and the permanent cutover remain required.
-Every imported work item, including a previously verified item, must resolve
-to exactly one active parent-project relationship. Missing or multiple parents
-refuse the manifest; historical status is not an exception to the work model.
+Every open work item must resolve to exactly one active parent-project
+relationship; a missing or competing parent refuses the manifest. Closed work
+(any resolution status other than open) migrates with its recorded membership
+rows exactly as history: zero or several active memberships are accepted for a
+closed item and are neither repaired nor fabricated by the migration (owner
+decision, 2026-09-10). Intake and every native membership write keep the
+exactly-one-parent rule. A read of a closed item (`gt ... show`, `GET
+/v1/work-items/<id>`) returns its recorded membership rows and `membership:
+null` when no single active parent exists, inventing nothing; task context,
+mutations, the membership move and execution readiness still report
+`invalid_membership` for an irregular history.
 
 The supported client commands include:
 
@@ -422,7 +473,11 @@ manifest/freshness machinery, all startup consumers or installed projections.
 
 The work-item readiness report identifies the required result, current status and
 specific reason for each unavailable predecessor. Task context reads the same
-report together with project readiness. These prerequisite checks do not replace
+report together with project readiness. A closed predecessor whose recorded
+membership history is irregular (no single current project) is reported as
+`predecessor_membership_irregular`; it never satisfies a dependency until its
+history is reconciled or the dependency is re-authored, and the dependent's
+read is not refused. These prerequisite checks do not replace
 the separate role, proposal, claim, review or NEW-authorization checks.
 
 Within one project, an independently VERIFIED predecessor can support dependent
@@ -470,3 +525,49 @@ those bytes stays verified. Differing snapshots are neither silently collapsed
 nor a permanent refusal with no recovery. Both commit preparation and
 confirmation enforce this comparison, and the project still commits once after
 all members have verified their committed form.
+
+## Unattended domain-service startup
+
+Ordinary knowledge and bridge commands route through the native domain service on `authority_url`; a PostgreSQL
+service alone leaves the CLI refusing. Three files start the service unattended:
+
+- `domain_service_launcher.py` runs the installed package's `service serve` on `127.0.0.1` with the credential
+  environment confined to that process: `PGSERVICEFILE` = `credentials/pg_service.conf`, after every inherited `PG*`
+  value, every inherited `GT_POSTGRES_*` override (the configuration loader maps those onto the `[postgresql]` section
+  and would redirect the service selection) and any inherited `GT_AUTHORITY_URL` are dropped. On Windows the service
+  runs inside a job object that ends every process in it when the launcher ends, so stopping the launcher never
+  leaves a listener behind. Containment precedes execution: without a job nothing is started; the service is created
+  suspended, placed in the job and only then resumed, so no descendant can exist outside the job; a service that
+  cannot be placed in the job or resumed is ended while still suspended and the launcher exits 3. Output is appended to `logs/domain-service.log`. It refuses to start when
+  the credential file or the operator config is missing. `--print-command` shows the command and the names of the
+  environment keys it sets, never their values.
+- `domain-service-readiness.ps1` defines `Wait-GtkbDomainServiceReady`, the bounded readiness probe: it runs the
+  ordinary `service status --json` bound to `127.0.0.1:<port>` through `GT_AUTHORITY_URL`, treats a failed probe as
+  an expected condition while the service starts (native stderr and non-zero exit codes are captured and never
+  terminate the loop, in Windows PowerShell 5.1 as in PowerShell 7), and reports readiness, the number of probes and
+  the last output.
+- `register-domain-service.ps1 -Root E:\GT-KB [-Port 8765] [-ReadinessSeconds 60]` registers the scheduled task
+  `GTKB-DomainService` under the current account: at every logon of that account and on demand, three restarts a
+  minute apart, no execution time limit. It refuses to change a task that points at another installation, starts the
+  task, then waits for readiness with the probe above and fails, naming the number of probes and the task state, when
+  the service does not answer within the window. Registration is an owner action of the same kind as
+  `register-service.ps1` for PostgreSQL.
+
+Copy `operator-config.example.toml` to `operator-config.toml` and set `[postgresql] service` to the credential entry the
+service process uses (`gtkb_authority`). Verify after registration (PowerShell):
+
+    $env:GT_AUTHORITY_URL = 'http://127.0.0.1:8765'
+    gt --config E:\GT-KB\infrastructure\postgresql\operator-config.toml service status --json
+    schtasks /Query /TN GTKB-DomainService /V /FO LIST
+
+The tests cover the launcher's composition and refusal paths, the regression that inherited `GT_POSTGRES_*` overrides
+cannot redirect the operator config's service, the readiness probe's timeout without aborting under Windows PowerShell
+5.1 and PowerShell 7, and (opt-in, `GTKB_RUN_POSTGRES_INTEGRATION=1`) a launch to readiness against the disposable
+installation with a deliberately polluted parent environment, the probe waiting through the service's delayed
+readiness, the complete process tree ending with the launcher so that the listener disappears, refusal before anything
+is started when no job exists, an uncontainable service ended before it runs (no child, no descendant), a real
+descendant born inside the job and ended when the job closes, and the cleanup safety net leaving a foreign
+listener alone. Scheduled startup
+itself is established at registration on the owner's workstation: task state Running after a logon, the status
+readback above, and the current state read back through the ordinary CLI. Resumption of ordinary sessions waits for
+that evidence, and the client `authority_url` is set only after it.

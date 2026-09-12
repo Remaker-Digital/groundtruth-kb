@@ -17,6 +17,23 @@ from groundtruth_kb.project.registry_control_plane import load_registry_snapshot
 from groundtruth_kb.project.sot_registry import load_toml
 
 
+def test_registry_read_requires_an_explicit_project_or_declaration(tmp_path, monkeypatch):
+    from groundtruth_kb.project.registry_control_plane import RegistryControlPlaneError, inspect_registry
+    from groundtruth_kb.project.sot_registry import default_registry_path
+
+    _config, declaration = _seed(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    before = _files(tmp_path)
+    with pytest.raises(ValueError, match="project_root is required"):
+        default_registry_path()
+    for reader in (load_registry_snapshot, inspect_registry):
+        with pytest.raises(RegistryControlPlaneError, match="project_root or registry_path is required"):
+            reader()
+    assert default_registry_path(tmp_path) == declaration
+    assert load_registry_snapshot(registry_path=declaration).records[0].id == "sample"
+    assert _files(tmp_path) == before
+
+
 def _declaration(notes: str) -> str:
     return f'''[[artifacts]]
 id = "sample"

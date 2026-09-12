@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -180,7 +181,10 @@ def test_native_registration_covers_bash_and_patch_once():
     plan = engine.build_plan("codex")
     assert not plan.gaps
     document = json.loads(plan.writes[profile["hooks_json_path"]])
-    assert set(document["hooks"]) == {"PreToolUse", "PostToolUse", "SessionStart", "UserPromptSubmit", "Stop"}
+    manifest = tomllib.loads((ROOT / ".harness-baseline-configuration/hooks/manifest.toml").read_text(encoding="utf-8"))
+    expected_events = {profile["hook_events"][hook["event"]] for hook in manifest["hook"]}
+    assert set(document["hooks"]) == expected_events
+    assert "PreToolUse" in expected_events
     gates = [
         g
         for g in document["hooks"]["PreToolUse"]
@@ -191,3 +195,45 @@ def test_native_registration_covers_bash_and_patch_once():
     ]
     assert len(gates) == 1
     assert set(gates[0]["matcher"].split("|")) == {"apply_patch", "Bash"}
+
+
+def test_each_registered_hook_uses_the_native_adapter_without_batch_or_finalizer():
+    engine = _load_projector(ROOT)
+    profile = engine.load_profiles()["harnesses"]["codex"]
+    plan = engine.build_plan("codex")
+    assert not plan.gaps
+    document = json.loads(plan.writes[profile["hooks_json_path"]])
+    commands = list(_commands(document))
+    assert commands
+    for command in commands:
+        assert _references_script(command, "scripts/codex_hook_adapter.py", profile["project_dir_var"])
+        assert "--batch" not in command
+        for retired in ("run_py_no_window", "auto_finalize_sweep", "bridge_verified_backlog_reconciler", ".claude/"):
+            assert retired not in command
+
+
+@pytest.mark.parametrize("event", ["PreToolUse", "PostToolUse", "SessionStart", "UserPromptSubmit", "Stop"])
+def test_one_selected_child_produces_one_native_response(runtime, event):
+    root, target = runtime
+    target.write_text(
+        "from pathlib import Path\n"
+        "p=Path('invocations.txt')\n"
+        "p.write_text(p.read_text()+'child\\n' if p.exists() else 'child\\n')\n"
+        "print('{}')\n",
+        encoding="utf-8",
+    )
+    assert run(runtime, payload(root, event), event=event) == {}
+    assert (root / "invocations.txt").read_text() == "child\n"
+
+
+@pytest.mark.parametrize(
+    "response",
+    [{"systemMessage": "current hook context"}, {"hookSpecificOutput": {"additionalContext": "current hook context"}}],
+)
+def test_selected_hook_context_is_preserved_without_aggregation(runtime, response):
+    root, target = runtime
+    target.write_text(f"print({json.dumps(json.dumps(response))})", encoding="utf-8")
+    result = run(runtime, payload(root))
+    assert result == {
+        "hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": "current hook context"}
+    }

@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from groundtruth_kb import get_templates_dir
 from groundtruth_kb.project import baseline_audit
 

@@ -104,17 +104,6 @@ def test_the_dcl_asserts_no_bridge_path() -> None:
     )
 
 
-def test_foundation_and_downstream_work_items_are_declared() -> None:
-    """The work items the constraint names must exist in MemBase.
-
-    A gate naming work items that do not exist enforces nothing, and the failure would be invisible
-    while the constraint still read as active.
-    """
-    conn = _connect()
-    missing = [wid for wid in (FOUNDATION, *DOWNSTREAM) if _latest_status(conn, wid) is None]
-    assert missing == [], f"{DCL_ID} names work items absent from MemBase: {missing}"
-
-
 def test_downstream_items_are_gated_on_the_foundation() -> None:
     """The fail-closed direction: no downstream item completes ahead of the foundation.
 

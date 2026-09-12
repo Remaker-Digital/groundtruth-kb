@@ -213,7 +213,15 @@ except ImportError:
             "Password passed as command argument",
         ),
         (
-            re.compile(r"-p\s+['\"]?[^\s]+['\"]?\s"),
+            # Mirrors the canonical catalog: password-bearing command syntax (a
+            # command whose -p takes the password, then -p and a value of any shape)
+            # or a quoted -p value; unquoted option prose such as `-p port` and
+            # other commands' -p are not credentials.
+            re.compile(
+                r"(?:\b(?:sshpass|mysql|mysqladmin|mysqldump|mysqlimport|mysqlcheck|mariadb|ma"
+                r"riadb-dump|mongo|mongosh|mongodump|mongorestore|mongoexport|mongoimport|rd"
+                r"esktop)\b[^\n]*?[ \t]-p[ \t]*['\"]?[^\s'\"<>|;&]+|-p[ \t]*['\"][^'\"\n]+['\"])"
+            ),
             "bash_password_flag_p",
             "Possible password flag (-p)",
         ),

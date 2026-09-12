@@ -104,17 +104,6 @@ def test_procedure_cites_parent_thread() -> None:
     )
 
 
-def test_procedure_cites_approval_packet_requirement() -> None:
-    """Approval-Gate section cites GOV-ARTIFACT-APPROVAL-001 + DCL-ARTIFACT-APPROVAL-HOOK-001."""
-    text = _read_procedure()
-    assert "GOV-ARTIFACT-APPROVAL-001" in text, (
-        "Procedure file must cite GOV-ARTIFACT-APPROVAL-001 in Approval-Gate section."
-    )
-    assert "DCL-ARTIFACT-APPROVAL-HOOK-001" in text, (
-        "Procedure file must cite DCL-ARTIFACT-APPROVAL-HOOK-001 in Approval-Gate section."
-    )
-
-
 def test_procedure_distinguishes_da_from_bridge_followons() -> None:
     """Owner-dialogue workflow distinguishes DA-recorded vs bridge-tracked Prime responses."""
     text = _read_procedure()

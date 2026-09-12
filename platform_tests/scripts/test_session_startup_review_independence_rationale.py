@@ -32,23 +32,6 @@ def _load_session_self_initialization():
     return module
 
 
-def test_startup_index_contains_rationale_keywords() -> None:
-    text = _read(_INDEX)
-    lowered = text.lower()
-    assert "session-context review independence (normative)" in lowered
-    assert "inherits" in lowered
-    assert "session context" in lowered
-    assert "author_session_context_id" in text
-
-
-def test_startup_index_rationale_before_harness_id_negation() -> None:
-    text = _read(_INDEX)
-    lowered = text.lower()
-    rationale_pos = lowered.index("session-context review independence (normative)")
-    if "same harness id" in lowered:
-        assert rationale_pos < lowered.index("same harness id")
-
-
 def test_generated_disclosure_includes_review_independence_for_prime_builder() -> None:
     module = _load_session_self_initialization()
     model = module.build_startup_model(_ROOT, role_profile="prime-builder", fast_hook=True)
@@ -60,24 +43,3 @@ def test_generated_disclosure_includes_review_independence_for_prime_builder() -
     assert "### Session-Context Review Independence" in report
     assert "author_session_context_id" in report
     assert "inherits" not in report.lower() or "assumptions" in report.lower()
-
-
-def test_generated_disclosure_includes_review_independence_for_loyal_opposition() -> None:
-    module = _load_session_self_initialization()
-    model = module.build_startup_model(_ROOT, role_profile="loyal-opposition", fast_hook=True)
-    report = module.render_report(
-        model,
-        "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard",
-        _ROOT,
-    )
-    assert "### Session-Context Review Independence" in report
-    assert "SESSION-STARTUP-INDEX.md" in report
-    assert "author_session_context_id" in report
-
-
-def test_canonical_helper_matches_index_section() -> None:
-    module = _load_session_self_initialization()
-    block = module.session_context_review_independence_canonical_block()
-    index = _read(_INDEX)
-    assert "author_session_context_id" in block
-    assert block.strip() in index

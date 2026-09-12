@@ -19,7 +19,6 @@ Covers the Child 4 Specification-Derived Verification Plan:
 
 from __future__ import annotations
 
-import json
 import sqlite3
 import sys
 from pathlib import Path
@@ -109,14 +108,6 @@ def test_onboarding_gov_declares_capability_floor_with_guard_field() -> None:
     assert "advertised_tool_subset" in desc
 
 
-def test_each_spec_is_packet_gated_via_change_reason() -> None:
-    """Packet-gated evidence: each spec's change_reason cites its approval packet."""
-    for spec_id in OLLAMA_SPECS:
-        change_reason = _row(spec_id)["change_reason"]
-        expected_packet = f".groundtruth/formal-artifact-approvals/2026-06-05-{spec_id}.json"
-        assert expected_packet in change_reason, f"{spec_id}: change_reason does not cite {expected_packet}"
-
-
 # ──────────────────────────────────────────────────────────────────────────
 # WI-4325: protected narrative edits present and correct
 # ──────────────────────────────────────────────────────────────────────────
@@ -152,30 +143,3 @@ def test_operating_model_section_3_records_registered_no_active_role() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 # Approval-packet evidence: formal + narrative packets exist and validate
 # ──────────────────────────────────────────────────────────────────────────
-
-
-def test_five_formal_approval_packets_exist_and_validate() -> None:
-    from groundtruth_kb.governance.approval_packet import validate_packet
-
-    for spec_id, packet_path in FORMAL_PACKETS.items():
-        assert packet_path.is_file(), f"formal packet missing for {spec_id}: {packet_path}"
-        packet = json.loads(packet_path.read_text(encoding="utf-8"))
-        result = validate_packet(packet)
-        assert result.is_valid, f"{spec_id} packet invalid: {result.errors}"
-        assert packet["artifact_id"] == spec_id
-        assert packet.get("approved_by") == "owner" or packet.get("acknowledged_by") == "owner"
-
-
-def test_two_narrative_packets_exist_and_match_current_file_content() -> None:
-    from groundtruth_kb.governance.narrative_artifact_packet import (
-        read_lf_normalized,
-        validate_narrative_packet,
-    )
-
-    for rel_path, packet_path in NARRATIVE_PACKETS.items():
-        assert packet_path.is_file(), f"narrative packet missing: {packet_path}"
-        packet = json.loads(packet_path.read_text(encoding="utf-8"))
-        proposed = read_lf_normalized(PROJECT_ROOT / rel_path)
-        result = validate_narrative_packet(packet, rel_path=rel_path, proposed_content=proposed)
-        assert result.is_valid, f"narrative packet for {rel_path} invalid or content mismatch: {result.errors}"
-        assert packet["target_path"] == rel_path

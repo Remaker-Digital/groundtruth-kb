@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from groundtruth_kb.project import doctor, session_start_orientation as orient
-
+from groundtruth_kb.project import doctor
+from groundtruth_kb.project import session_start_orientation as orient
 
 WELL_FORMED_ORIENT = """\
 ORIENT S301 @ 16:41Z

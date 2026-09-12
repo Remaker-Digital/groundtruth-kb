@@ -139,13 +139,6 @@ def test_bridge_import_expression_is_flagged() -> None:
     assert any("importlib" in v for v in violations)
 
 
-def test_bridge_import_assignment_is_flagged() -> None:
-    """x = importlib.import_module('groundtruth_kb.bridge.context') as assignment is flagged."""
-    source = "import importlib\nx = importlib.import_module('groundtruth_kb.bridge.context')\n"
-    violations = _find_top_level_violations(source)
-    assert any("importlib" in v for v in violations)
-
-
 def test_bridge_annotated_assignment_is_flagged() -> None:
     """x: T = importlib.import_module('groundtruth_kb.bridge') as annotated-assign is flagged."""
     source = "import importlib\nfrom typing import Any\nx: Any = importlib.import_module('groundtruth_kb.bridge')\n"
@@ -160,26 +153,8 @@ def test_from_groundtruth_kb_import_bridge_flagged() -> None:
     assert violations  # should produce at least one violation
 
 
-def test_from_groundtruth_kb_bridge_context_flagged() -> None:
-    """from groundtruth_kb.bridge.context import agent_peer should be flagged."""
-    source = "from groundtruth_kb.bridge.context import agent_peer\n"
-    violations = _find_top_level_violations(source)
-    assert violations
-
-
 def test_from_groundtruth_kb_bridge_flagged() -> None:
     """from groundtruth_kb.bridge import runtime should be flagged."""
     source = "from groundtruth_kb.bridge import runtime\n"
     violations = _find_top_level_violations(source)
     assert violations
-
-
-def test_inner_bridge_import_not_flagged() -> None:
-    """Bridge import inside a function is NOT a top-level import — should not be flagged."""
-    source = (
-        "def test_something():\n"
-        "    from groundtruth_kb.bridge.context import agent_peer\n"
-        "    assert agent_peer('codex') == 'prime'\n"
-    )
-    violations = _find_top_level_violations(source)
-    assert not violations

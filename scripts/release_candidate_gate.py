@@ -278,39 +278,6 @@ def _check_dev_environment_inventory_drift() -> None:
     print(f"PASS development environment inventory drift ({result.get('outcome')})")
 
 
-def _project_resource_helpers():
-    if str(PROJECT_ROOT) not in sys.path:
-        sys.path.insert(0, str(PROJECT_ROOT))
-    from scripts.resolve_project_resource import (  # noqa: PLC0415
-        check_git_remote_drift,
-        load_registry,
-        validate_registry,
-    )
-
-    return load_registry, validate_registry, check_git_remote_drift
-
-
-def _check_project_resource_registry() -> None:
-    load_registry, validate_registry, check_git_remote_drift = _project_resource_helpers()
-    registry_path = PROJECT_ROOT / "config" / "agent-control" / "project-resource-aliases.toml"
-    if not registry_path.is_file():
-        raise GateFailure(f"Project resource registry is missing: {registry_path.relative_to(PROJECT_ROOT)}")
-    try:
-        registry = load_registry(registry_path)
-    except (OSError, ValueError) as exc:
-        raise GateFailure(f"Project resource registry is unreadable: {exc}") from exc
-    errors = validate_registry(registry)
-    if errors:
-        raise GateFailure("Project resource registry is invalid: " + "; ".join(errors))
-    drift = check_git_remote_drift(registry, repo_root=PROJECT_ROOT)
-    if drift.get("status") != "pass":
-        raise GateFailure(f"Project GitHub remote identity drift: {drift.get('message')}")
-    print(
-        "PASS project resource registry "
-        f"({registry_path.relative_to(PROJECT_ROOT).as_posix()}, origin={drift.get('origin')})"
-    )
-
-
 def _check_sot_registry_authority() -> None:
     """Fail release on incoherent identity, incomplete membership, or pruned census."""
     package_src = PROJECT_ROOT / "groundtruth-kb" / "src"
@@ -559,7 +526,6 @@ def main() -> int:
         _check_secret_gate_present()
         _check_secret_ci_workflow_present()
         _check_tracked_secret_scan()
-        _check_project_resource_registry()
         _check_standing_backlog_health()
         _check_agent_red_app_root_minimization()
         _check_no_window_spawn_audit()

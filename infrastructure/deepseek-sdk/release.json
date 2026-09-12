@@ -1,0 +1,29 @@
+{
+  "platform": "windows-x64",
+  "profile": "sdk-minimal",
+  "python": {
+    "minimum": "3.10",
+    "qualified": "3.14.0"
+  },
+  "sdk": {
+    "name": "deepseek-harness-sdk",
+    "version": "0.1.2rc1",
+    "url": "https://files.pythonhosted.org/packages/d7/38/0220769bc89ca29318a8f09c30390095aaa071ae2116f677e8398763390e/deepseek_harness_sdk-0.1.2rc1-py3-none-any.whl",
+    "sha256": "24689eec01e95233feb75ca08a0fe748b491e71682f80d2c04e6f9485f20488a"
+  },
+  "runtime": {
+    "name": "deepseek-harness-runtime-bin",
+    "version": "0.1.2rc1",
+    "url": "https://files.pythonhosted.org/packages/e7/63/16b5733796e85f5df2d5985f0c78fdf582cd002f687d7e985f16d19d9cb3/deepseek_harness_runtime_bin-0.1.2rc1-py3-none-win_amd64.whl",
+    "sha256": "390bd8cd5f8700fc609c58e1ccb78091d5c8c6e11c21656e284e0f68da0e148f",
+    "executable": "Lib/site-packages/deepseek_harness_runtime/runtime/deepseek-harness-sdk-runtime-win-x64.exe",
+    "executable_sha256": "63066db12457ddf898afb44db6314713e18130f7fdb36030a9d98c23bc0b3162"
+  },
+  "dependencies": [
+    "pydantic==2.13.5",
+    "pydantic-core==2.46.5",
+    "annotated-types==0.8.0",
+    "typing-extensions==4.16.0",
+    "typing-inspection==0.4.4"
+  ]
+}

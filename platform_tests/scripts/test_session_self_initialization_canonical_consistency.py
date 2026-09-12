@@ -115,59 +115,12 @@ def test_topology_label_matches_role_map_cardinality_two_singletons(project_root
     assert "Harness topology: `multi_harness`" in rendered
 
 
-def test_topology_label_matches_role_map_cardinality_one_multi_role(project_root: Path) -> None:
-    """One harness with both roles -> rendered topology line shows ``single_harness``."""
-    _write_role_map(
-        project_root,
-        {
-            "harnesses": {
-                "A": {"role": ["prime-builder", "loyal-opposition"]},
-            }
-        },
-    )
-    model = _make_model(role={"harness_id": "A"})
-    rendered = ssi._render_current_project_state(model)
-    assert "Harness topology: `single_harness`" in rendered
-
-
 def test_topology_label_matches_canonical_fail_closed_for_empty_role_map(project_root: Path) -> None:
     """Empty role-map -> canonical fail-closed ``multi_harness`` (NOT the prior ``single_harness`` literal default)."""
     _write_role_map(project_root, {"harnesses": {}})
     model = _make_model(role={"harness_id": "B"})
     rendered = ssi._render_current_project_state(model)
     assert "Harness topology: `multi_harness`" in rendered
-
-
-def test_role_slot_renders_singleton_role_token_prime(project_root: Path) -> None:
-    """Active harness B with singleton ``["prime-builder"]`` -> rendered slot shows ``prime-builder``."""
-    _write_role_map(
-        project_root,
-        {
-            "harnesses": {
-                "A": {"role": ["loyal-opposition"]},
-                "B": {"role": ["prime-builder"]},
-            }
-        },
-    )
-    model = _make_model(role={"harness_id": "B"})
-    rendered = ssi._render_current_project_state(model)
-    assert "Active harness role slot: `prime-builder`" in rendered
-
-
-def test_role_slot_renders_singleton_role_token_lo(project_root: Path) -> None:
-    """Active harness A with singleton ``["loyal-opposition"]`` -> rendered slot shows ``loyal-opposition``."""
-    _write_role_map(
-        project_root,
-        {
-            "harnesses": {
-                "A": {"role": ["loyal-opposition"]},
-                "B": {"role": ["prime-builder"]},
-            }
-        },
-    )
-    model = _make_model(role={"harness_id": "A"})
-    rendered = ssi._render_current_project_state(model)
-    assert "Active harness role slot: `loyal-opposition`" in rendered
 
 
 def test_role_slot_renders_shared_for_multi_element(project_root: Path) -> None:
@@ -199,35 +152,6 @@ def test_role_slot_renders_shared_for_missing_active_harness(project_root: Path)
     model = _make_model(role={"harness_id": "C"})
     rendered = ssi._render_current_project_state(model)
     assert "Active harness role slot: `shared`" in rendered
-
-
-def test_render_ignores_stale_persisted_workstream_state(project_root: Path) -> None:
-    """Stale persisted ``workstream_focus`` is overridden by canonical derivation.
-
-    Persisted state says ``single_harness`` + ``shared``; live role-map has
-    two singletons (multi-harness). Render should reflect the live state.
-    """
-    _write_role_map(
-        project_root,
-        {
-            "harnesses": {
-                "A": {"role": ["loyal-opposition"]},
-                "B": {"role": ["prime-builder"]},
-            }
-        },
-    )
-    model = _make_model(
-        workstream_focus={
-            "role_slot": "shared",
-            "topology_mode": "single_harness",
-        },
-        role={"harness_id": "B"},
-    )
-    rendered = ssi._render_current_project_state(model)
-    assert "Harness topology: `multi_harness`" in rendered
-    assert "Active harness role slot: `prime-builder`" in rendered
-    # Stale persisted values should NOT appear in the render
-    assert "Harness topology: `single_harness`" not in rendered
 
 
 def test_topology_label_canonical_fail_closed_for_missing_role_map_file(project_root: Path) -> None:

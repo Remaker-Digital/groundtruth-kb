@@ -59,7 +59,7 @@ class AuthorityClient:
                 if not isinstance(result, dict):
                     raise ValueError("not an error object")
                 result = result.get("error", result)
-            except Exception:
+            except Exception:  # intentional-catch: an unreadable error body collapses to the HTTP status
                 raise AuthorityClientError("authority_error", f"Authority returned HTTP {error.code}") from error
             raise AuthorityClientError(
                 result.get("code", "authority_error"),
@@ -73,5 +73,5 @@ class AuthorityClient:
             ) from error
         try:
             return parse_json_bytes(payload)
-        except Exception as error:
+        except Exception as error:  # intentional-catch: malformed canonical JSON is reported as invalid_response
             raise AuthorityClientError("invalid_response", "Authority returned invalid canonical JSON") from error

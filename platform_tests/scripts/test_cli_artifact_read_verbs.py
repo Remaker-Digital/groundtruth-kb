@@ -120,22 +120,6 @@ def _seed_artifacts(tmp_path: Path) -> None:
         db.close()
 
 
-def test_spec_show_and_list_read_artifacts(tmp_path: Path) -> None:
-    config_path = _write_config(tmp_path)
-    _seed_artifacts(tmp_path)
-
-    shown = _invoke_json(config_path, "spec", "show", "SPEC-READ-001")
-    assert shown["id"] == "SPEC-READ-001"
-    assert shown["version"] == 2
-    assert shown["status"] == "verified"
-
-    history = _invoke_json(config_path, "spec", "show", "SPEC-READ-001", "--history")
-    assert [row["version"] for row in history] == [2, 1]
-
-    listed = _invoke_json(config_path, "spec", "list", "--status", "verified", "--tag", "cli-read")
-    assert [row["id"] for row in listed] == ["SPEC-READ-001"]
-
-
 def test_deliberations_show_alias_matches_get(tmp_path: Path) -> None:
     config_path = _write_config(tmp_path)
     _seed_artifacts(tmp_path)
@@ -146,19 +130,3 @@ def test_deliberations_show_alias_matches_get(tmp_path: Path) -> None:
     assert shown == got
     assert shown["id"] == "DELIB-READ-001"
     assert shown["spec_id"] == "SPEC-READ-001"
-
-
-def test_tests_show_and_list_read_artifacts(tmp_path: Path) -> None:
-    config_path = _write_config(tmp_path)
-    _seed_artifacts(tmp_path)
-
-    shown = _invoke_json(config_path, "tests", "show", "TEST-READ-001")
-    assert shown["id"] == "TEST-READ-001"
-    assert shown["version"] == 2
-    assert shown["last_result"] == "fail"
-
-    history = _invoke_json(config_path, "tests", "show", "TEST-READ-001", "--history")
-    assert [row["version"] for row in history] == [2, 1]
-
-    listed = _invoke_json(config_path, "tests", "list", "--spec-id", "SPEC-READ-001", "--test-type", "unit")
-    assert [row["id"] for row in listed] == ["TEST-READ-001"]

@@ -47,8 +47,6 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RESOLVER_PATH = PROJECT_ROOT / "scripts" / "session_role_resolution.py"
-TRIGGER_PATH = PROJECT_ROOT / "scripts" / "dispatcher_runtime.py"
-CORE_PATH = PROJECT_ROOT / "scripts" / "session_start_dispatch_core.py"
 DOCTOR_PATH = PROJECT_ROOT / "groundtruth-kb" / "src" / "groundtruth_kb" / "project" / "doctor.py"
 DB_PATH = PROJECT_ROOT / "groundtruth.db"
 
@@ -56,13 +54,7 @@ DCL_ID = "DCL-ROLE-RESOLUTION-DECLARED-AUTHORITY-001"
 
 # R5 gate set per proposal -003 § Implementation Design. These are the surfaces
 # that could plausibly invalidate work on a registry status/role mismatch.
-GATE_SET = (
-    PROJECT_ROOT / ".claude" / "hooks" / "lo-file-safety-gate.py",
-    PROJECT_ROOT / "scripts" / "implementation_authorization.py",
-    PROJECT_ROOT / "scripts" / "implementation_start_gate.py",
-    PROJECT_ROOT / "scripts" / "session_start_dispatch_core.py",
-    PROJECT_ROOT / "scripts" / "dispatcher_runtime.py",
-)
+GATE_SET = (PROJECT_ROOT / "scripts" / "implementation_start_gate.py",)
 _REGISTRY_STATUS_PATTERNS = (
     re.compile(r"\bsuspended\b", re.IGNORECASE),
     re.compile(r"\bnon[-_]functional\b", re.IGNORECASE),
@@ -232,19 +224,6 @@ def test_r2_marker_absent_invalid_or_stale_fails_closed(tmp_path: Path) -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_r3_dispatcher_routes_via_registry_projection() -> None:
-    """R3 (structural): the dispatcher daemon routes via the registry
-    projection and never consults the interactive session-role marker.
-    """
-    src = _read(TRIGGER_PATH)
-    assert "load_harness_projection(" in src, "trigger must route via the registry projection (R3)."
-    assert "def _resolve_dispatch_target(" in src, "trigger missing the registry-keyed dispatch resolver."
-    assert "active-session-role.json" not in src, (
-        "dispatch routing must not read the interactive session marker; R3 requires "
-        "registry-authoritative routing (declared-not-detected)."
-    )
-
-
 # ──────────────────────────────────────────────────────────────────────────
 # R4 — a mismatch is a warn/audit surface, not an override (assertion 4, code)
 # ──────────────────────────────────────────────────────────────────────────
@@ -294,82 +273,15 @@ def test_r5_no_gate_invalidates_on_registry_mismatch_alone() -> None:
             f"{path.name} appears to invalidate work on a registry status/role mismatch (DCL assertion 1): {hits!r}."
         )
 
-    # Anchor the revised behavior: the dispatch keyword checker may resolve and
-    # audit the dispatcher role set, but it must not use STRICT_DROP for mismatch.
-    core = _read(CORE_PATH)
-    core_body = _extract_function(core, "_bridge_dispatch_keyword_check")
-    assert "StartupDecision.STRICT_DROP" not in core_body, (
-        "_bridge_dispatch_keyword_check must not invalidate work via STRICT_DROP "
-        "on a registry-vs-declared role mismatch."
-    )
-    assert "own_role_set" in core_body and "_audit_log_misdirected_dispatch" in core_body, (
-        "expected dispatcher-role mismatch to remain auditable while prompt keyword authorization proceeds."
-    )
-
 
 # ──────────────────────────────────────────────────────────────────────────
 # Meta — the DCL is present in MemBase with R1-R5 in its body
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_dcl_role_resolution_authority_001_spec_present() -> None:
-    """Meta/sanity: the DCL row exists in MemBase with R1-R5 in its description,
-    anchoring this regression guard to the live spec."""
-    if not DB_PATH.is_file():
-        pytest.skip(f"MemBase not present at {DB_PATH}; spec-presence anchor not checkable in this environment.")
-    from groundtruth_kb.db import KnowledgeDB
-
-    db = KnowledgeDB(str(DB_PATH))
-    try:
-        spec = db.get_spec(DCL_ID)
-    finally:
-        db.close()
-
-    assert spec is not None, f"{DCL_ID} missing from MemBase."
-    description = str(spec.get("description") or "")
-    for rule in ("R1", "R2", "R3", "R4", "R5"):
-        assert rule in description, f"{DCL_ID} description missing rule marker {rule!r}."
-
-
 # ──────────────────────────────────────────────────────────────────────────
 # WI-4781 — GOV-SESSION-ROLE-AUTHORITY-001 dispatcher-only section present
 # ──────────────────────────────────────────────────────────────────────────
-
-
-def test_gov_session_role_authority_001_dispatcher_only() -> None:
-    """GOV-SESSION-ROLE-AUTHORITY-001 v3+ must contain the Dispatcher-Only
-    Registry Authority section per DELIB-20265878.
-
-    Regression guard: if a future spec update removes or renames this section,
-    this test will catch the regression before it propagates to enforcement gates
-    that rely on the dispatcher-only principle.
-    """
-    if not DB_PATH.is_file():
-        pytest.skip(f"MemBase not present at {DB_PATH}; spec-presence anchor not checkable in this environment.")
-    from groundtruth_kb.db import KnowledgeDB
-
-    db = KnowledgeDB(str(DB_PATH))
-    try:
-        spec = db.get_spec("GOV-SESSION-ROLE-AUTHORITY-001")
-    finally:
-        db.close()
-
-    assert spec is not None, "GOV-SESSION-ROLE-AUTHORITY-001 missing from MemBase."
-    assert int(spec.get("version", 0)) >= 3, (
-        f"GOV-SESSION-ROLE-AUTHORITY-001 must be at least v3 (WI-4781); found v{spec.get('version')}."
-    )
-    description = str(spec.get("description") or "")
-    assert "Dispatcher-Only Registry Authority" in description, (
-        "GOV-SESSION-ROLE-AUTHORITY-001 description missing '## Dispatcher-Only Registry Authority' "
-        "section (DELIB-20265878). Non-dispatcher enforcement gates must not use the registry role "
-        "as authority; this section is the canonical statement of that constraint."
-    )
-    assert "dispatcher-authoritative only" in description, (
-        "GOV-SESSION-ROLE-AUTHORITY-001 description missing 'dispatcher-authoritative only' language (DELIB-20265878)."
-    )
-    assert "MUST NOT fresh-read the registry role to decide" in description, (
-        "GOV-SESSION-ROLE-AUTHORITY-001 description missing MUST NOT enforcement gate language."
-    )
 
 
 # ──────────────────────────────────────────────────────────────────────────

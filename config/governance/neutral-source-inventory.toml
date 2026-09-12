@@ -115,7 +115,6 @@ check_literal_machine_paths = true
 generated_output_names = [
   ".projection-manifest.json",
   "hooks.json",
-  "routing.toml",
 ]
 tokens = [
   ".claude",
@@ -131,16 +130,8 @@ tokens = [
 # omitted, both classes are declared for that path.
 
 [[declared_references.declarations]]
-path = ".harness-baseline-configuration/.projection-manifest.json"
-reason = "The projection manifest enumerates the generated targets it produces; naming every target is the manifest's function, not contamination."
-
-[[declared_references.declarations]]
 path = "config/registry/sot-artifacts.toml"
 reason = "The source-of-truth registry records forbidden-substitute paths, which are by construction paths inside generated trees; the registry cannot forbid a path without naming it."
-
-[[declared_references.declarations]]
-path = "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/registry/sot-artifacts.toml"
-reason = "Packaged copy of the source-of-truth registry above; identical function and identical justification."
 
 [[declared_references.declarations]]
 path = "scripts/harness_projection/profiles.toml"

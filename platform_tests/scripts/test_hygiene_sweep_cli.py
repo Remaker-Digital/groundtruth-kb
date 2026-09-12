@@ -5,13 +5,13 @@ and was subsequently destroyed (uncommitted) by a parallel session's working-tre
 cleanup. Restored under WI-3435 / PROJECT-GTKB-RELIABILITY-FIXES per bridge thread
 ``gtkb-hygiene-sweep-cli-test-rebuild`` (Codex GO at ``-002``).
 
-Tests exercise the live interfaces only (GOV-10, GOV-19):
-- the ``groundtruth_kb.hygiene`` package functions/dataclasses, and
-- the click ``main -> hygiene -> sweep`` command in ``groundtruth_kb.cli``.
+Tests exercise the live interface only (GOV-10, GOV-19): the
+``groundtruth_kb.hygiene.sweep`` module functions/dataclasses. The former
+``gt hygiene sweep`` command route no longer exists, so its CLI cases are gone.
 
-Seven categories, 23 tests:
+Six categories:
 load_pattern_set (6) | walk_repo (3) | scan_file (3) | run_sweep (2)
-| emit_json/emit_markdown (3) | CLI surface (5) | MemBase non-participation (1).
+| emit_json/emit_markdown (3) | MemBase non-participation (1).
 
 Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -23,9 +23,7 @@ import re
 from pathlib import Path
 
 import pytest
-from click.testing import CliRunner
-from groundtruth_kb.cli import main
-from groundtruth_kb.hygiene import (
+from groundtruth_kb.hygiene.sweep import (
     Finding,
     PatternSetError,
     SweepResult,
@@ -312,102 +310,6 @@ def test_emit_markdown_no_findings_renders_zero_section(tmp_path: Path) -> None:
     text = out.read_text(encoding="utf-8")
     assert "No findings." in text
     assert "## " not in text  # no per-class section headings
-
-
-# ===========================================================================
-# Category 6 — CLI surface (5): click `main -> hygiene -> sweep`
-# ===========================================================================
-
-
-def _cli_repo(tmp_path: Path, *, with_findings: bool) -> tuple[Path, Path, Path]:
-    """Build a synthetic repo + pattern set; return (root, patterns_toml, out_dir)."""
-    root = tmp_path / "repo"
-    root.mkdir()
-    body = "see agent-red here\n" if with_findings else "all clean here\n"
-    (root / "doc.md").write_text(body, encoding="utf-8")
-    toml = _write_patterns(
-        tmp_path / "patterns.toml",
-        [{"id": "p1", "file_globs": ["*.md"], "content_patterns": ["agent-red"]}],
-    )
-    return root, toml, tmp_path / "out"
-
-
-def test_cli_help_lists_subcommand() -> None:
-    result = CliRunner().invoke(main, ["hygiene", "--help"])
-    assert result.exit_code == 0
-    assert "sweep" in result.output
-
-
-def test_cli_runs_against_synthetic_repo(tmp_path: Path) -> None:
-    root, toml, out = _cli_repo(tmp_path, with_findings=True)
-    result = CliRunner().invoke(
-        main,
-        ["hygiene", "sweep", "--root", str(root), "--patterns-path", str(toml), "--output", str(out)],
-    )
-    assert result.exit_code == 0, result.output
-    assert (out / "findings.json").exists()
-    assert (out / "summary.md").exists()
-    assert "hygiene sweep:" in result.output
-
-
-def test_cli_fail_on_findings_exits_two(tmp_path: Path) -> None:
-    root, toml, out = _cli_repo(tmp_path, with_findings=True)
-    result = CliRunner().invoke(
-        main,
-        [
-            "hygiene",
-            "sweep",
-            "--root",
-            str(root),
-            "--patterns-path",
-            str(toml),
-            "--output",
-            str(out),
-            "--fail-on-findings",
-        ],
-    )
-    assert result.exit_code == 2
-
-
-def test_cli_no_findings_fail_on_findings_exits_zero(tmp_path: Path) -> None:
-    root, toml, out = _cli_repo(tmp_path, with_findings=False)
-    result = CliRunner().invoke(
-        main,
-        [
-            "hygiene",
-            "sweep",
-            "--root",
-            str(root),
-            "--patterns-path",
-            str(toml),
-            "--output",
-            str(out),
-            "--fail-on-findings",
-        ],
-    )
-    assert result.exit_code == 0, result.output
-
-
-def test_cli_format_json_only(tmp_path: Path) -> None:
-    root, toml, out = _cli_repo(tmp_path, with_findings=True)
-    result = CliRunner().invoke(
-        main,
-        [
-            "hygiene",
-            "sweep",
-            "--root",
-            str(root),
-            "--patterns-path",
-            str(toml),
-            "--output",
-            str(out),
-            "--format",
-            "json",
-        ],
-    )
-    assert result.exit_code == 0, result.output
-    assert (out / "findings.json").exists()
-    assert not (out / "summary.md").exists()
 
 
 # ===========================================================================

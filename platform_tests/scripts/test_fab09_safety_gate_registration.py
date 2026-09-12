@@ -115,22 +115,6 @@ def test_credential_scan_codex_parity():
 # --- SPEC-AUQ-POLICY-ENGINE-001: capture hooks are real implementations ---
 
 
-def test_gov09_capture_is_not_stub():
-    path = _HOOKS_DIR / "gov09-capture.py"
-    assert path.exists(), "gov09-capture.py must exist"
-    content = path.read_text(encoding="utf-8")
-    lines = [line for line in content.strip().splitlines() if line.strip()]
-    assert len(lines) > 35, (
-        f"gov09-capture.py has {len(lines)} non-blank lines; stubs have <35 â€” this should be a real implementation"
-    )
-
-
-def test_gov09_capture_registered_user_prompt_submit():
-    settings = _load_settings()
-    cmds = _settings_hook_commands(settings, "UserPromptSubmit")
-    assert any("gov09-capture.py" in c for c in cmds), "gov09-capture.py must be registered in UserPromptSubmit"
-
-
 # --- S292: dead mechanisms removed ---
 
 
@@ -182,22 +166,7 @@ def test_delib_common_template_parity():
     _template_parity("_delib_common.py")
 
 
-def test_gov09_capture_template_parity():
-    _template_parity("gov09-capture.py")
-
-
 # --- Structural: capture hooks import _delib_common ---
-
-
-def test_gov09_capture_imports_delib_common():
-    content = (_HOOKS_DIR / "gov09-capture.py").read_text(encoding="utf-8")
-    tree = ast.parse(content)
-    imports = [
-        node.names[0].name
-        for node in ast.walk(tree)
-        if isinstance(node, ast.ImportFrom) and node.module == "_delib_common"
-    ]
-    assert "insert_deliberation" in imports, "gov09-capture.py must import insert_deliberation from _delib_common"
 
 
 # --- Doctor checks: safety-gate registration + stub reporting (HYG-050/S294 deferred items) ---
@@ -209,14 +178,6 @@ def test_doctor_safety_gate_registration_pass():
 
     result = _check_safety_gate_registration(_ROOT)
     assert result.status == "pass", f"safety-gate-registration check should pass on live repo: {result.message}"
-
-
-def test_doctor_capture_hook_stub_status_pass():
-    """_check_capture_hook_stub_status returns pass (not stubbed) for live hooks."""
-    from groundtruth_kb.project.doctor import _check_capture_hook_stub_status
-
-    result = _check_capture_hook_stub_status(_ROOT)
-    assert result.status == "pass", f"capture-hook-stub-status should pass on live repo: {result.message}"
 
 
 def test_doctor_safety_gate_registration_detects_missing(tmp_path):
@@ -231,20 +192,6 @@ def test_doctor_safety_gate_registration_detects_missing(tmp_path):
     assert result.status == "warning"
     assert "destructive-gate.py" in result.message
     assert "credential-scan.py" in result.message
-
-
-def test_doctor_capture_hook_stub_detection(tmp_path):
-    """_check_capture_hook_stub_status reports stubs with <35 non-blank lines."""
-    hooks_dir = tmp_path / ".claude" / "hooks"
-    hooks_dir.mkdir(parents=True)
-    (hooks_dir / "gov09-capture.py").write_text("# scaffold stub\npass\n", encoding="utf-8")
-
-    from groundtruth_kb.project.doctor import _check_capture_hook_stub_status
-
-    result = _check_capture_hook_stub_status(tmp_path)
-    assert result.status == "warning"
-    assert "gov09-capture.py" in result.message
-    assert "stubbed" in result.message
 
 
 def test_projected_terminology_directs_canonical_cli_retrieval():

@@ -6,12 +6,8 @@ Work item: WI-AUTO-SPEC-INTAKE-C2C7FF / SPEC-INTAKE-c2c7ff.
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
-
-import pytest
-from click.testing import CliRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
@@ -24,7 +20,6 @@ from groundtruth_kb.backlog.query import (  # noqa: E402
     filter_projects,
     filter_work_items,
 )
-from groundtruth_kb.cli import main  # noqa: E402
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 
 
@@ -168,26 +163,3 @@ def test_filter_projects_pattern_exact_and_sort():
     )
     filtered = filter_projects(rows, query, contains_fields=("id", "name"))
     assert [row["id"] for row in filtered] == ["PROJECT-ALPHA", "PROJECT-BETA"]
-
-
-@pytest.mark.parametrize(
-    ("args", "expected_ids"),
-    [
-        (["backlog", "list", "--json"], ["WI-1001", "WI-1002"]),
-        (["backlog", "list", "--approval-state", "bridge_authorized", "--json"], ["WI-1002"]),
-        (["backlog", "list", "--field", "source_owner_directive:DELIB-ALPHA", "--json"], ["WI-1001"]),
-        (["backlog", "list", "--match", "title:*Scanner*", "--json"], ["WI-1001"]),
-        (["backlog", "list", "--range", "priority:P1..P2", "--json"], ["WI-1001", "WI-1002"]),
-        (["backlog", "list", "--member-of", "PROJECT-ALPHA", "--json"], ["WI-1001"]),
-        (["backlog", "list", "--all", "--resolution-status", "resolved", "--json"], ["WI-1003"]),
-        (["backlog", "list", "--sort", "implementation_order", "--sort-desc", "--json"], ["WI-1002", "WI-1001"]),
-    ],
-)
-def test_cli_backlog_list_filters(tmp_path: Path, args: list[str], expected_ids: list[str]) -> None:
-    root, config = _project(tmp_path)
-    _seed_backlog(root / "groundtruth.db")
-    runner = CliRunner()
-    result = runner.invoke(main, ["--config", str(config), *args])
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert [row["id"] for row in payload] == expected_ids

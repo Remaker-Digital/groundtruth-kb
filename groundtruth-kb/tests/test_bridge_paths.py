@@ -190,7 +190,12 @@ def test_get_state_dir_env_override_at_home_dir_raises(
 def test_resolve_project_root_from_inside_groundtruth_kb_returns_parent_root(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Resolution from inside groundtruth-kb/ must return the GT-KB host root."""
+    """Resolution from inside groundtruth-kb/ must return the GT-KB host root.
+
+    A linked worktree checkout (``.git`` is a gitfile) resolves to the canonical
+    main-worktree root by the resolver's contract, so the expected root is read
+    from the gitfile rather than assumed to be this checkout.
+    """
     p = _paths()
     host_root = Path(__file__).resolve().parents[2]
     package_dir = host_root / "groundtruth-kb"
@@ -198,11 +203,17 @@ def test_resolve_project_root_from_inside_groundtruth_kb_returns_parent_root(
         pytest.skip(f"Test precondition: {p.GROUNDTRUTH_MARKER} must exist at {host_root}")
     if not (package_dir.exists() and package_dir.is_dir()):
         pytest.skip(f"Test precondition: package dir must exist at {package_dir}")
+    expected_root = host_root
+    gitfile = host_root / ".git"
+    if gitfile.is_file():
+        gitdir = gitfile.read_text(encoding="utf-8").strip().removeprefix("gitdir:").strip()
+        # <main>/.git/worktrees/<name> -> <main>
+        expected_root = Path(gitdir).resolve().parents[2]
 
     monkeypatch.delenv(p.PROJECT_ROOT_ENV_VAR, raising=False)
     monkeypatch.chdir(package_dir)
     resolved = p.resolve_project_root()
-    assert resolved.resolve() == host_root.resolve()
+    assert resolved.resolve() == expected_root.resolve()
 
 
 def test_resolve_project_root_rejects_git_repo_without_groundtruth_toml(

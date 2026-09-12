@@ -49,21 +49,15 @@ MANIFEST = BASELINE_HOOKS / "hooks.manifest.toml"
 if not MANIFEST.exists():
     MANIFEST = BASELINE_HOOKS / "manifest.toml"
 
-BRIDGE_GATE = BASELINE_HOOKS / "bridge-compliance-gate.py"
 SOT_GATE = BASELINE_HOOKS / "sot-read-discipline.py"
-NARRATIVE_GATE = BASELINE_HOOKS / "narrative-artifact-approval-gate.py"
 
 SOT_REGISTRY = PROJECT_ROOT / "config" / "registry" / "sot-artifacts.toml"
 
-# The seven gates this work item restored. Six write gates plus the read gate.
+# The shell-covered gates that remain after the module-removal batch: two write gates plus the read gate.
 SHELL_COVERED_SCRIPTS = {
     "document_author_provenance_gate.py",
-    "bridge-compliance-gate.py",
-    "bridge-proposal-wi-id-collision-gate.py",
-    "narrative-artifact-approval-gate.py",
     "code-quality-baseline-proposal-check.py",
     "sot-read-discipline.py",
-    "dispatch_blackbox_gate.py",
 }
 
 
@@ -150,43 +144,6 @@ def test_sot_gate_declares_shell_exec() -> None:
 # --------------------------------------------------------------------------
 
 
-def test_shell_heredoc_write_to_bridge_file_is_denied() -> None:
-    command = "cat > bridge/gtkb-wi7289-regression-probe-001.md <<'EOF'\nthis is not a canonical status token\nEOF"
-    decision, reason = _decision(
-        _run_hook(BRIDGE_GATE, {"tool_name": "Bash", "cwd": ".", "tool_input": {"command": command}})
-    )
-    assert decision == "deny", f"shell heredoc bridge write was not denied (reason={reason!r})"
-
-
-def test_shell_and_native_bridge_denial_reasons_are_byte_identical() -> None:
-    """GO binding condition 3: widening invocation must not alter enforcement.
-
-    The shell branch re-runs the native decision function on a synthesized
-    payload rather than re-implementing the checks, so identical reasons are a
-    structural property. This test is what detects a future divergence.
-    """
-    body = "this is not a canonical status token"
-    target = "bridge/gtkb-wi7289-regression-probe-001.md"
-    native_decision, native_reason = _decision(
-        _run_hook(
-            BRIDGE_GATE,
-            {"tool_name": "Write", "cwd": ".", "tool_input": {"file_path": target, "content": body}},
-        )
-    )
-    shell_decision, shell_reason = _decision(
-        _run_hook(
-            BRIDGE_GATE,
-            {
-                "tool_name": "Bash",
-                "cwd": ".",
-                "tool_input": {"command": f"cat > {target} <<'EOF'\n{body}\nEOF"},
-            },
-        )
-    )
-    assert native_decision == shell_decision == "deny"
-    assert shell_reason == native_reason
-
-
 def test_shell_read_of_forbidden_substitute_is_denied() -> None:
     substitutes = _forbidden_substitutes()
     if not substitutes:
@@ -240,14 +197,6 @@ def test_owner_bypass_still_permits_forbidden_substitute_read() -> None:
     assert decision != "block"
 
 
-def test_shell_write_to_narrative_artifact_is_denied_without_packet() -> None:
-    command = "cat > CLAUDE.md <<'EOF'\n# unapproved rewrite\nEOF"
-    decision, reason = _decision(
-        _run_hook(NARRATIVE_GATE, {"tool_name": "Bash", "cwd": ".", "tool_input": {"command": command}})
-    )
-    assert decision == "block", f"shell write to a narrative artifact was not blocked (reason={reason!r})"
-
-
 # --------------------------------------------------------------------------
 # Over-blocking guards (GO binding condition 2)
 # --------------------------------------------------------------------------
@@ -264,27 +213,12 @@ def test_shell_write_to_narrative_artifact_is_denied_without_packet() -> None:
         "cat README.md",
     ],
 )
-@pytest.mark.parametrize("gate", [BRIDGE_GATE, SOT_GATE, NARRATIVE_GATE])
+@pytest.mark.parametrize("gate", [SOT_GATE])
 def test_unrecognized_or_read_only_commands_stay_allowed(gate: Path, command: str) -> None:
     decision, reason = _decision(_run_hook(gate, {"tool_name": "Bash", "cwd": ".", "tool_input": {"command": command}}))
     assert decision not in {"deny", "block"}, (
         f"{gate.name} over-blocked a benign command {command!r} (reason={reason!r})"
     )
-
-
-def test_native_write_to_ungoverned_path_still_allowed() -> None:
-    """Native behavior must be untouched by the shell expansion."""
-    decision, _ = _decision(
-        _run_hook(
-            BRIDGE_GATE,
-            {
-                "tool_name": "Write",
-                "cwd": ".",
-                "tool_input": {"file_path": "scratchpad/harmless.txt", "content": "hello"},
-            },
-        )
-    )
-    assert decision not in {"deny", "block"}
 
 
 # --------------------------------------------------------------------------

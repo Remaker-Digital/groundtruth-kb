@@ -17,8 +17,6 @@ import json
 from collections import Counter
 from pathlib import Path
 
-import pytest
-
 _ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -46,16 +44,6 @@ def _commands_for_event(event: str) -> list[str]:
 def test_claude_settings_is_valid_json() -> None:
     document = _settings_document()
     assert isinstance(document.get("hooks"), dict), ".claude/settings.json must carry a `hooks` object"
-
-
-@pytest.mark.parametrize(("event", "script"), _DEDUPED_REGISTRATIONS)
-def test_deduped_hook_registered_exactly_once(event: str, script: str) -> None:
-    matching = [command for command in _commands_for_event(event) if script in command]
-    assert len(matching) == 1, (
-        f"WI-5480 regression: {script} must be registered exactly once under {event} "
-        f"(found {len(matching)}). A duplicate registration spawns the hook twice per "
-        f"event with no added enforcement; zero means the dedupe dropped the gate."
-    )
 
 
 def test_no_hook_command_is_duplicated_within_an_event() -> None:

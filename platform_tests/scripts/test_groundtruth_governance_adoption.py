@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import subprocess
 import tomllib
 from pathlib import Path
@@ -63,171 +62,6 @@ def test_transport_evidence_gate_plugin_is_configured() -> None:
         "SPEC-1537",
         "SPEC-1802",
     }
-
-
-def test_groundtruth_governance_artifacts_are_present_and_not_ignored() -> None:
-    required_paths = [
-        ".groundtruth/formal-artifact-approvals/2026-04-20-codex-hook-parity-decision.json",
-        ".groundtruth/formal-artifact-approvals/2026-04-20-session-formalization-audit-batch.json",
-        ".groundtruth/formal-artifact-approvals/2026-04-20-standing-backlog-harvest.json",
-        ".groundtruth/formal-artifact-approvals/2026-04-20-standing-backlog-formalization.json",
-        ".groundtruth/formal-artifact-approvals/2026-04-20-session-self-initialization-directive.json",
-        ".groundtruth/formal-artifact-approvals/2026-04-20-session-lifecycle-engagement-principle.json",
-        ".groundtruth/formal-artifact-approvals/2026-04-20-gtkb-gov-011-implementation-verification.json",
-        ".groundtruth/formal-artifact-approvals/2026-04-22-artifact-oriented-governance.json",
-        ".groundtruth/formal-artifact-approvals/2026-04-22-core-spec-intake-phase0.json",
-        ".groundtruth/formal-artifact-approvals/2026-04-23-bridge-authority.json",
-        ".codex/config.toml",
-        ".codex/hooks.json",
-        ".claude/settings.json",
-        ".claude/hooks/assertion-check.py",
-        ".claude/hooks/credential-scan.py",
-        ".claude/hooks/destructive-gate.py",
-        ".claude/hooks/formal-artifact-approval-gate.py",
-        ".claude/hooks/spec-classifier.py",
-        ".claude/rules/bridge-essential.md",
-        ".claude/rules/acting-prime-builder.md",
-        ".claude/rules/codex-review-gate.md",
-        ".claude/rules/deliberation-protocol.md",
-        ".claude/rules/file-bridge-protocol.md",
-        ".claude/rules/loyal-opposition.md",
-        ".claude/rules/report-depth-prime-builder-context.md",
-        ".claude/skills/alternatives-investigation/SKILL.md",
-        ".claude/skills/arch-audit/SKILL.md",
-        ".claude/skills/check-deliberations/SKILL.md",
-        ".claude/skills/code-review-audit/SKILL.md",
-        ".claude/skills/codex-report/SKILL.md",
-        ".claude/skills/bridge-propose/SKILL.md",
-        ".claude/skills/bridge-propose/helpers/write_bridge.py",
-        ".claude/skills/decision-capture/SKILL.md",
-        ".claude/skills/decision-capture/helpers/record_decision.py",
-        ".claude/skills/kb-adr/SKILL.md",
-        ".claude/skills/kb-assert/SKILL.md",
-        ".claude/skills/kb-batch/SKILL.md",
-        ".claude/skills/kb-promote/SKILL.md",
-        ".claude/skills/kb-query/SKILL.md",
-        ".claude/skills/kb-session-wrap/SKILL.md",
-        ".claude/skills/kb-spec/SKILL.md",
-        ".claude/skills/kb-work-item/SKILL.md",
-        ".claude/skills/proposal-review/SKILL.md",
-        ".claude/skills/release-candidate-gate/SKILL.md",
-        ".claude/skills/send-review/SKILL.md",
-        ".claude/skills/spec-intake/SKILL.md",
-        ".claude/skills/spec-intake/helpers/spec_intake.py",
-        "applications/Agent_Red/.claude/skills/deploy/SKILL.md",
-        "applications/Agent_Red/.claude/skills/run-tests/SKILL.md",
-        "applications/Agent_Red/.claude/skills/seed-tenant/SKILL.md",
-        "scripts/check_harness_parity.py",
-        "scripts/session_self_initialization.py",
-        "scripts/workstream_focus.py",
-        "docs/gtkb-dashboard/index.html",
-        "scripts/audit_standing_backlog_sources.py",
-        "platform_tests/scripts/test_codex_hook_parity.py",
-        "platform_tests/scripts/test_session_self_initialization.py",
-        "platform_tests/scripts/test_standing_backlog_harvest.py",
-        "platform_tests/hooks/test_workstream_focus.py",
-    ]
-
-    # Per S330 Slice 8.6 row-9 waiver
-    # (DELIB-S330-SLICE-8-6-ROW-9-DASHBOARD-FILES-WAIVER, scope = these 2
-    # files only; expiry = v0.7.0 GA / GTKB-DASHBOARD-002 work_list row 30
-    # completion; residual risk = adopters can't see the dashboard until
-    # then): the 2 auto-regen telemetry files are produced by the
-    # SessionStart hook, which does not run in CI's clean-checkout
-    # environment. They are gitignored per bridge/gtkb-telemetry-churn-
-    # policy-2026-04-28-002.md (GO). The test no longer fails on their
-    # absence; presence is verified by the runtime hook itself when it
-    # executes (a different test surface). Other required_paths still
-    # fail-closed.
-    missing = [path for path in required_paths if not (REPO_ROOT / path).is_file()]
-    assert not missing, f"Missing GroundTruth governance artifacts: {missing}"
-    _assert_not_git_ignored(required_paths)
-
-
-def test_project_settings_registers_bridge_visibility_hook() -> None:
-    settings = json.loads(_read(".claude/settings.json"))
-
-    pre_tool_commands = [hook["command"] for group in settings["hooks"]["PreToolUse"] for hook in group["hooks"]]
-
-    assert any("formal-artifact-approval-gate.py" in command for command in pre_tool_commands)
-
-    # Per gtkb-claude-session-start-parity GO at -002, the Claude SessionStart
-    # hook may register the canonical script directly (legacy --emit-report path)
-    # OR a dispatcher under .claude/hooks/ that delegates to the canonical
-    # service via the --emit-startup-service-payload contract. Both shapes
-    # preserve governance: the SessionStart hook surface is canonical-service-backed.
-    session_start_hooks = [hook["command"] for group in settings["hooks"]["SessionStart"] for hook in group["hooks"]]
-    direct_match = any(
-        "session_self_initialization.py" in command and "--emit-report" in command and "--fast-hook" in command
-        for command in session_start_hooks
-    )
-    dispatcher_match = any("session_start_dispatch.py" in command for command in session_start_hooks)
-    assert direct_match or dispatcher_match, (
-        "SessionStart must register either the canonical service directly "
-        "(--emit-report --fast-hook) or a dispatcher under .claude/hooks/ "
-        "that delegates to it"
-    )
-    if dispatcher_match:
-        # Verify the dispatcher source delegates to the canonical service
-        # using the SessionStart-correct startup-service payload contract.
-        dispatcher_path = Path(".claude/hooks/session_start_dispatch.py")
-        assert dispatcher_path.is_file(), f"SessionStart dispatcher path missing: {dispatcher_path}"
-        dispatcher_source = dispatcher_path.read_text(encoding="utf-8")
-        core_path = Path("scripts/session_start_dispatch_core.py")
-        core_source = core_path.read_text(encoding="utf-8")
-        combined_source = dispatcher_source + "\n" + core_source
-        assert "session_self_initialization.py" in combined_source
-        assert "--emit-startup-service-payload" in combined_source
-        assert "--fast-hook" in combined_source
-        assert "--harness-name" in combined_source
-        assert "claude" in combined_source
-    assert any(
-        "session_self_initialization.py" in hook["command"]
-        and "--emit-wrapup" in hook["command"]
-        and "--fast-hook" in hook["command"]
-        for group in settings["hooks"]["Stop"]
-        for hook in group["hooks"]
-    )
-
-
-def test_codex_config_registers_formal_artifact_approval_hook_intent() -> None:
-    config = _load_toml(".codex/config.toml")
-    hooks = json.loads(_read(".codex/hooks.json"))
-
-    assert config["features"]["hooks"] is True
-    assert "codex_hooks" not in config["features"]
-    pre_tool_groups = hooks["hooks"]["PreToolUse"]
-    formal_groups = [
-        group
-        for group in pre_tool_groups
-        if any("formal-artifact-approval.cmd" in hook["command"] for hook in group["hooks"])
-    ]
-    assert formal_groups
-    assert all(group["matcher"] == "Bash" for group in formal_groups)
-    assert any(
-        "gtkb-hooks" in hook["command"] and "formal-artifact-approval.cmd" in hook["command"]
-        for group in formal_groups
-        for hook in group["hooks"]
-    )
-    assert any(
-        "gtkb-hooks" in hook["command"] and "session_start_dispatch.py" in hook["command"]
-        for group in hooks["hooks"]["SessionStart"]
-        for hook in group["hooks"]
-    )
-    assert any(
-        "gtkb-hooks" in hook["command"] and "session_wrapup_trigger_dispatch.py" in hook["command"]
-        for group in hooks["hooks"]["UserPromptSubmit"]
-        for hook in group["hooks"]
-    )
-    assert any(
-        "gtkb-hooks" in hook["command"] and "workstream-focus.cmd" in hook["command"]
-        for group in hooks["hooks"]["UserPromptSubmit"]
-        for hook in group["hooks"]
-    )
-    assert any(
-        group.get("matcher") == "Bash" and any("workstream-focus.cmd" in hook["command"] for hook in group["hooks"])
-        for group in pre_tool_groups
-    )
 
 
 def test_release_candidate_gate_runs_governance_adoption_tests() -> None:
@@ -410,20 +244,6 @@ def test_formal_artifact_approval_records_are_in_membase() -> None:
         db.close()
 
 
-def test_codex_hook_limitation_decision_is_archived() -> None:
-    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
-    try:
-        decision = db.get_deliberation("DELIB-0836")
-        assert decision is not None
-        assert decision["outcome"] == "owner_decision"
-        assert decision["source_type"] == "owner_conversation"
-        assert "Codex hooks are currently disabled on Windows" in decision["content"]
-        assert "scripts/check_codex_hook_parity.py" in decision["content"]
-        assert "live Windows interception boundary" in decision["content"]
-    finally:
-        db.close()
-
-
 def test_session_governance_principles_have_membase_records() -> None:
     expected = {
         "GOV-RELEASE-READINESS-GOVERNED-TESTING-001": ("governance", ["DELIB-0828", "DELIB-0829"]),
@@ -458,20 +278,6 @@ def test_session_governance_principles_have_membase_records() -> None:
 
         audit = db.get_spec("GOV-SESSION-FORMALIZATION-AUDIT-001")
         assert "audit the session against Deliberation Archive entries" in audit["description"]
-    finally:
-        db.close()
-
-
-def test_session_formalization_audit_is_archived() -> None:
-    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
-    try:
-        audit = db.get_deliberation("DELIB-0837")
-        assert audit is not None
-        assert audit["outcome"] == "informational"
-        assert "DELIB-0828" in audit["content"]
-        assert "DELIB-0836" in audit["content"]
-        assert "GOV-SESSION-FORMALIZATION-AUDIT-001" in audit["content"]
-        assert "Residual scope notes" in audit["content"]
     finally:
         db.close()
 
@@ -530,19 +336,6 @@ def test_standing_backlog_is_formalized_as_governed_artifact() -> None:
         db.close()
 
 
-def test_standing_backlog_decision_is_archived() -> None:
-    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
-    try:
-        decision = db.get_deliberation("DELIB-0838")
-        assert decision is not None
-        assert decision["outcome"] == "owner_decision"
-        assert "treated like other GroundTruth-KB specifications" in decision["content"]
-        assert "Individual backlog entries remain queue/work items" in decision["content"]
-        assert "Future sessions must inspect the standing backlog" in decision["content"]
-    finally:
-        db.close()
-
-
 def test_session_self_initialization_records_are_in_membase() -> None:
     expected = {
         "GOV-SESSION-SELF-INITIALIZATION-001": ("governance", "verified"),
@@ -582,21 +375,6 @@ def test_session_self_initialization_records_are_in_membase() -> None:
         db.close()
 
 
-def test_session_self_initialization_decision_is_archived() -> None:
-    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
-    try:
-        decision = db.get_deliberation("DELIB-0840")
-        assert decision is not None
-        assert decision["outcome"] == "owner_decision"
-        assert decision["source_type"] == "owner_conversation"
-        assert "role being assumed" in decision["content"]
-        assert "live link to the project dashboard" in decision["content"]
-        assert "three top priority actions" in decision["content"]
-        assert "reducing token consumption" in decision["content"]
-    finally:
-        db.close()
-
-
 def test_session_lifecycle_engagement_records_are_in_membase() -> None:
     expected = {
         "GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001": "governance",
@@ -624,25 +402,6 @@ def test_session_lifecycle_engagement_records_are_in_membase() -> None:
         dcl = db.get_spec("DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001")
         assert "Safe automatic lifecycle hooks" in dcl["description"]
         assert "Mutating wrap-up operations" in dcl["description"]
-    finally:
-        db.close()
-
-
-def test_session_lifecycle_engagement_decisions_are_archived() -> None:
-    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
-    try:
-        decision = db.get_deliberation("DELIB-0841")
-        assert decision is not None
-        assert decision["outcome"] == "owner_decision"
-        assert "should not have to explicitly instruct GT-KB" in decision["content"]
-        assert "priorities across all dimensions" in decision["content"]
-        assert "simplify user input" in decision["content"]
-
-        implementation = db.get_deliberation("DELIB-0842")
-        assert implementation is not None
-        assert implementation["outcome"] == "informational"
-        assert "GTKB-GOV-011" in implementation["content"]
-        assert "session_self_initialization.py" in implementation["content"]
     finally:
         db.close()
 
@@ -677,19 +436,6 @@ def test_artifact_oriented_governance_records_are_in_membase() -> None:
         dcl = db.get_spec("DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001")
         assert "candidate" in dcl["description"]
         assert "non-intrusive confirmation" in dcl["description"]
-    finally:
-        db.close()
-
-
-def test_artifact_oriented_governance_decision_is_archived() -> None:
-    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
-    try:
-        decision = db.get_deliberation("DELIB-0874")
-        assert decision is not None
-        assert decision["outcome"] == "owner_decision"
-        assert "default behavior of the system should be oriented toward artifacts and plans" in decision["content"]
-        assert "clear decision triggers for CRUD operations" in decision["content"]
-        assert "reduces knowledge and memory loss" in decision["content"]
     finally:
         db.close()
 
@@ -737,20 +483,6 @@ def test_core_spec_intake_phase0_records_are_in_membase() -> None:
         db.close()
 
 
-def test_core_spec_intake_phase0_decision_is_archived() -> None:
-    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
-    try:
-        decision = db.get_deliberation("DELIB-0875")
-        assert decision is not None
-        assert decision["outcome"] == "owner_decision"
-        decision_content = _one_line(decision["content"])
-        assert "enrolled by default" in decision_content
-        assert "explicit opt-out" in decision_content
-        assert "persisted MemBase evidence" in decision_content
-    finally:
-        db.close()
-
-
 def test_bridge_authority_governance_records_are_in_membase() -> None:
     db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
     try:
@@ -778,33 +510,6 @@ def test_bridge_authority_governance_records_are_in_membase() -> None:
         assert "DELIB-0880" in (startup["affected_by"] or "")
     finally:
         db.close()
-
-
-def test_bridge_authority_decision_is_archived() -> None:
-    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
-    try:
-        decision = db.get_deliberation("DELIB-0880")
-        assert decision is not None
-        assert decision["outcome"] == "owner_decision"
-        decision_content = _one_line(decision["content"])
-        assert "content of bridge/INDEX.md is authoritative" in decision_content
-        assert "Copies, cached versions, summaries" in decision_content
-        assert "All project-level restrictions are lifted" in decision_content
-        assert "permanent permission to diagnose and repair the bridge" in decision_content
-    finally:
-        db.close()
-
-
-def test_bridge_authority_is_loaded_by_startup_rules() -> None:
-    agents = _read("AGENTS.md")
-    protocol = _read(".claude/rules/file-bridge-protocol.md")
-    loyal = _read(".claude/rules/loyal-opposition.md")
-    bootstrap = _read(".claude/rules/codex-session-bootstrap.md")
-    way = _read(".claude/rules/codex-way-of-working.md")
-
-    for text in [agents, protocol, loyal, bootstrap, way]:
-        normalized = _one_line(text)
-        assert "bridge" in normalized
 
 
 def test_standing_priorities_load_artifact_oriented_governance_directive() -> None:

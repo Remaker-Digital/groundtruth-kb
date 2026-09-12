@@ -75,10 +75,9 @@ SUPERSEDED_STATUSES = frozenset({"retired", "superseded"})
 
 ACTIVE_SURFACE_CLASSES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("generated", (".codex/skills/**/*.md", ".cursor/skills/**/*.md", ".agent/skills/**/*.md")),
-    ("hook", (".claude/hooks/*.py", "config/hooks/*.py")),
+    ("hook", (".claude/hooks/*.py",)),
     ("skill", (".claude/skills/**/SKILL.md",)),
     ("rule", (".claude/rules/*.md",)),
-    ("startup", ("config/agent-control/*.md",)),
     ("manifest", ("config/registry/*.toml", "groundtruth-kb/templates/managed-artifacts.toml")),
     ("scaffold", ("groundtruth-kb/templates/rules/*.md", "groundtruth-kb/templates/project/*.md")),
     ("cli-help", ("groundtruth-kb/src/groundtruth_kb/cli.py",)),

@@ -8,6 +8,10 @@ metadata:
   category: operations and hygiene
   activity-envelope: ops
 ---
+
+> **Status:** the `gt hygiene reclaim` command family described below is not installed in
+> the current CLI (`gt hygiene` exposes only `worktrees`). The owner decides whether the
+> hygiene services are restored or retired; until then this skill is reference text only.
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope (e.g., 'ops', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity>`,do not act on this skill request and informt eh user that this skill is only availablewithin the specified activity envelope.

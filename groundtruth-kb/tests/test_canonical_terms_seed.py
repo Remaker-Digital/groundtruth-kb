@@ -204,17 +204,3 @@ def test_seed_revival_after_retire(db: KnowledgeDB, tmp_path: Path) -> None:
     versions = canonical_terms.list_versions(db, "PLATFORM")
     assert len(versions) == 3
     assert versions[-1]["lifecycle_status"] == "active"
-
-
-def test_seed_against_live_glossary(db: KnowledgeDB) -> None:
-    """T-population-1 (integration): seed against the live
-    .claude/rules/canonical-terminology.md and verify ≥ 26 platform_core terms.
-    """
-    repo_root = Path(__file__).resolve().parents[2]
-    live_glossary = repo_root / ".claude" / "rules" / "canonical-terminology.md"
-    if not live_glossary.exists():
-        pytest.skip("live canonical-terminology.md not present at repo root")
-    plan = canonical_terms.seed_from_markdown(db, live_glossary, dry_run=False, changed_by="test-live-seed")
-    assert plan.summary().get("insert", 0) >= 26, plan.summary()
-    rows = canonical_terms.list_terms(db, authority_level="platform_core")
-    assert len(rows) >= 26

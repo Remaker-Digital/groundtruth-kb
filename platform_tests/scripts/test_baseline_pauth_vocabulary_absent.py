@@ -20,8 +20,6 @@ SCANNED_TARGETS = (
     "config/governance/protected-artifact-inventory-drift.toml",
     "config/membase-dump/dump-policy.toml",
     "config/registry/sot-artifacts.toml",
-    "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/registry/sot-artifacts.toml",
-    "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/activity-disposition-profiles.toml",
 )
 
 GENERATED_OUTPUT = "config/agent-control/gtkb-backlog-approval-state.md"
@@ -29,7 +27,6 @@ BASELINE_INPUT = ".harness-baseline-configuration/rules/backlog-approval-state.m
 COMMAND_SURFACE_EXCLUSIONS = (
     "config/agent-control/command-surface.toml",
     "config/agent-control/gtkb-command-surface.toml",
-    "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/command-surface.toml",
 )
 
 RETIRED_PATTERNS = {
@@ -73,7 +70,7 @@ def test_retired_authorization_carriers_are_absent() -> None:
 
 def test_scan_visits_every_declared_surviving_target() -> None:
     scanned = _scan_declared_targets()
-    assert len(SCANNED_TARGETS) == 14
+    assert len(SCANNED_TARGETS) == 12
     assert set(scanned) == set(SCANNED_TARGETS)
 
 

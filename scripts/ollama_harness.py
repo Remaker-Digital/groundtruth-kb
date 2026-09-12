@@ -1091,21 +1091,6 @@ def run_tool_loop(
     messages.append({"role": "user", "content": prompt})
     allowed_tools = tuple(model_route.allowed_tools)
     chat = chat_func or call_ollama_chat
-    if telemetry is None:
-        try:
-            from groundtruth_kb.shim_dispatch_telemetry import create_dispatch_telemetry_observer
-
-            telemetry = create_dispatch_telemetry_observer(
-                project_root,
-                harness_id=AUTHOR_HARNESS_ID,
-                harness_name="ollama",
-                provider="ollama",
-                model_id=model_route.model_id,
-                model_version=model_route.model_version,
-                turn_budget=max_turns,
-            )
-        except (ImportError, OSError, ValueError):
-            telemetry = None
     session_deadline = time.monotonic() + session_timeout
     previous_tool_signature: str | None = None
     repeated_tool_signature_turns = 0

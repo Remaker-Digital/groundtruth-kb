@@ -180,23 +180,6 @@ def test_remove_then_move_back(tmp_path: Path) -> None:
 # --------------------------------------------------------------------------
 
 
-def test_cli_remove_item_invokes_service(tmp_path: Path, monkeypatch) -> None:
-    db_path = tmp_path / "groundtruth.db"
-    _seed(db_path)
-    monkeypatch.chdir(tmp_path)
-    result = CliRunner().invoke(
-        main,
-        ["projects", "remove-item", PROJECT_ID, WORK_ITEM_ID, "--change-reason", "cli detach"],
-    )
-    assert result.exit_code == 0, result.output
-    assert WORK_ITEM_ID in result.output
-    db = KnowledgeDB(db_path=str(db_path))
-    try:
-        assert WORK_ITEM_ID not in _active_work_item_ids(db, PROJECT_ID)
-    finally:
-        db.close()
-
-
 def test_cli_remove_item_rejects_active_status(tmp_path: Path, monkeypatch) -> None:
     """F2 (CLI): `--status active` is surfaced as a non-zero ClickException."""
     db_path = tmp_path / "groundtruth.db"

@@ -75,35 +75,3 @@ def test_doctor_cli_emits_no_current_use_smart_poller_guidance(tmp_path: Path) -
         assert pattern not in output, (
             f"forbidden current-use smart-poller wording found: {pattern!r}\nfull doctor output:\n{output}"
         )
-
-
-def test_doctor_cli_emits_cross_harness_or_dispatch_wording(tmp_path: Path) -> None:
-    """Dispatch-related check messages must reference the new mechanism."""
-    _scaffold_minimal_dual_agent(tmp_path)
-    runner = CliRunner()
-    result = runner.invoke(
-        main,
-        ["project", "doctor", "--dir", str(tmp_path)],
-    )
-    assert result.exit_code in (0, 1), f"unexpected exit code {result.exit_code}; output:\n{result.output}"
-
-    output = result.output.lower()
-    assert any(needle in output for needle in _REQUIRED_DISPATCH_WORDING), (
-        f"doctor output must contain at least one dispatcher-daemon or bridge-dispatch reference; got:\n{result.output}"
-    )
-
-
-def test_doctor_cli_runs_dispatcher_daemon_check(tmp_path: Path) -> None:
-    """The dispatcher-daemon check must run and emit a status line."""
-    _scaffold_minimal_dual_agent(tmp_path)
-    runner = CliRunner()
-    result = runner.invoke(
-        main,
-        ["project", "doctor", "--dir", str(tmp_path)],
-    )
-    assert result.exit_code in (0, 1), f"unexpected exit code {result.exit_code}; output:\n{result.output}"
-
-    output_lower = result.output.lower()
-    assert "dispatcher daemon" in output_lower or "dispatcher-daemon" in output_lower, (
-        f"dispatcher-daemon check did not run; output:\n{result.output}"
-    )

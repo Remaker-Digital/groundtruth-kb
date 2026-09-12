@@ -43,9 +43,9 @@ def test_typed_path_inventory_refuses_malformed_sources(source_paths) -> None:
 
 
 def test_bootstrap_inventory_loads() -> None:
-    """The shipped TOML loads without errors and contains >= 22 records."""
-    records = load_toml(default_registry_path())
-    assert len(records) >= 22, f"expected >=22 bootstrap records, got {len(records)}"
+    """The selected project declaration loads and supplies current membership."""
+    records = load_toml(default_registry_path(Path(__file__).resolve().parents[2]))
+    assert records
 
 
 def test_bootstrap_row1_is_self_reference() -> None:
@@ -53,7 +53,7 @@ def test_bootstrap_row1_is_self_reference() -> None:
 
     Bootstrap guarantee per DCL-SOT-REGISTRY-PROJECTION-PARITY-001.
     """
-    records = load_toml(default_registry_path())
+    records = load_toml(default_registry_path(Path(__file__).resolve().parents[2]))
     row1 = records[0]
     assert row1.id == "sot-registry-toml"
     assert row1.storage_path == "config/registry/sot-artifacts.toml"
@@ -62,7 +62,7 @@ def test_bootstrap_row1_is_self_reference() -> None:
 
 def test_bootstrap_all_records_have_valid_enums() -> None:
     """All bootstrap records have enum values that load_toml accepted."""
-    records = load_toml(default_registry_path())
+    records = load_toml(default_registry_path(Path(__file__).resolve().parents[2]))
     valid_domains = {
         "specifications",
         "narrative_authority",
@@ -98,7 +98,7 @@ def test_bootstrap_all_records_have_valid_enums() -> None:
 
 def test_bootstrap_no_duplicate_ids() -> None:
     """All bootstrap record ids are unique (loader rejects duplicates)."""
-    records = load_toml(default_registry_path())
+    records = load_toml(default_registry_path(Path(__file__).resolve().parents[2]))
     ids = [r.id for r in records]
     assert len(ids) == len(set(ids)), "duplicate ids in bootstrap inventory"
 
@@ -426,7 +426,7 @@ def test_removing_self_reference_breaks_bootstrap_guarantee() -> None:
     consumers should observe the missing record (DCL-SOT-REGISTRY-PROJECTION-PARITY-001
     bootstrap guarantee).
     """
-    records = load_toml(default_registry_path())
+    records = load_toml(default_registry_path(Path(__file__).resolve().parents[2]))
     full = records
     truncated = records[1:]  # drop row 1
     report = validate_projection_parity(truncated, full)

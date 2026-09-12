@@ -28,6 +28,20 @@ from scripts.check_harness_parity import _commands, _load_projector, _references
 
 ROOT = Path(__file__).resolve().parents[2]
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
+RETIRED_LO_GATE_PATHS = (
+    ".harness-baseline-configuration/hooks/lo-file-safety-gate.py",
+    "config/governance/lo-file-safety.toml",
+    ".claude/hooks/lo-file-safety-gate.py",
+    ".codex/hooks/lo-file-safety-gate.py",
+    ".cursor/hooks/lo-file-safety-gate.py",
+    ".goose/hooks/lo-file-safety-gate.py",
+    ".agent/hooks/lo-file-safety-gate.py",
+    ".api-harness/ollama/hooks/lo-file-safety-gate.py",
+    ".api-harness/openrouter/hooks/lo-file-safety-gate.py",
+    ".api-harness/alibaba-cloud-studio/hooks/lo-file-safety-gate.py",
+    ".codex/gtkb-hooks/lo-file-safety-gate-bash-adapter.py",
+    ".codex/gtkb-hooks/lo-file-safety-gate.cmd",
+)
 
 
 @pytest.mark.parametrize(
@@ -49,6 +63,14 @@ def test_declared_gate_checks_live_checkout_scope_and_preserves_foreign_work(har
     assert len(commands) == 1
     assert "worktree-scope-gate.py" not in plan.writes[profile["hooks_json_path"]]
     assert "bridge-compliance-gate.py" not in plan.writes[profile["hooks_json_path"]]
+    # The Loyal-Opposition file-safety gate and its adapters are retired: the kernel enforces the obligation.
+    assert "lo-file-safety-gate" not in plan.writes[profile["hooks_json_path"]]
+    assert not [path for path in plan.writes if "lo-file-safety-gate" in path]
+    for retired in RETIRED_LO_GATE_PATHS:
+        assert not (ROOT / retired).exists(), retired
+    assert "lo-file-safety-gate" not in (ROOT / ".codex" / "plugins" / "gtkb" / "hooks" / "hooks.json").read_text(
+        encoding="utf-8"
+    )
     if harness == "claude":
         for tool in ("Write", "Edit"):
             selected = [

@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from scripts import dispatcher_runtime as trigger
 from scripts import verify_ollama_dispatch as verify
 
 OLLAMA_MODEL_ID = "fixture-review:current"
@@ -81,19 +80,6 @@ def _write_project(root: Path, *, allowed_tools: list[str] | None = None) -> Pat
     return root
 
 
-def test_build_dispatch_command_uses_registry_template(tmp_path: Path) -> None:
-    root = _write_project(tmp_path)
-    command = verify.build_dispatch_command(root, "hello")
-    assert command == [
-        "groundtruth-kb/.venv/Scripts/python.exe",
-        "scripts/ollama_harness.py",
-        "-p",
-        "hello",
-        "--skill",
-        "bridge-review",
-    ]
-
-
 def test_readiness_passes_with_mocked_tags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = _write_project(tmp_path)
     monkeypatch.setattr(verify, "call_ollama_tags", lambda endpoint, timeout: {OLLAMA_MODEL_ID})
@@ -155,70 +141,3 @@ def test_readiness_fails_when_required_review_tool_missing(tmp_path: Path) -> No
     detail = result["checks"][-1]["detail"]
     for tool in ("Bash", "Edit", "Grep", "Write"):
         assert tool in detail
-
-
-def test_trigger_resolves_active_ollama_only_when_readiness_passes(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _write_project(tmp_path)
-    _write_registry(tmp_path, [_ollama_record(role=["loyal-opposition"], status="active")])
-    monkeypatch.setattr(trigger, "_evaluate_ollama_dispatch_readiness", lambda root: {"ready": True})
-
-    target = trigger._resolve_dispatch_target("loyal-opposition", tmp_path, tmp_path / "state")
-
-    assert target is not None
-    assert target.harness_id == "D"
-    assert target.command_handle == "ollama"
-    assert target.canonical_mode == "lo"
-
-
-@pytest.mark.parametrize(("role", "mode"), [("loyal-opposition", "lo"), ("prime-builder", "pb")])
-def test_trigger_resolution_is_portable_across_roles(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, role: str, mode: str
-) -> None:
-    _write_project(tmp_path)
-    _write_registry(tmp_path, [_ollama_record(role=[role], status="active")])
-    monkeypatch.setattr(trigger, "_evaluate_ollama_dispatch_readiness", lambda root: {"ready": True})
-
-    target = trigger._resolve_dispatch_target(role, tmp_path, tmp_path / "state")
-
-    assert target is not None
-    assert target.harness_id == "D"
-    assert target.canonical_mode == mode
-
-
-def test_trigger_fails_closed_when_ollama_readiness_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _write_project(tmp_path)
-    _write_registry(tmp_path, [_ollama_record(role=["loyal-opposition"], status="active")])
-    monkeypatch.setattr(
-        trigger,
-        "_evaluate_ollama_dispatch_readiness",
-        lambda root: {"ready": False, "checks": [{"name": "ollama /api/tags", "passed": False}]},
-    )
-    state_dir = tmp_path / "state"
-
-    with pytest.raises(trigger.DispatchTargetNotReady) as excinfo:
-        trigger._resolve_dispatch_target("loyal-opposition", tmp_path, state_dir)
-
-    assert excinfo.value.reason == "ollama_dispatch_not_ready"
-    assert excinfo.value.harness_id == "D"
-    failures = [
-        json.loads(line) for line in (state_dir / "dispatch-failures.jsonl").read_text(encoding="utf-8").splitlines()
-    ]
-    assert any(record["reason"] == "ollama_dispatch_not_ready" for record in failures)
-    assert not any(record["reason"] == "no_active_target_for_role" for record in failures)
-
-
-def test_registered_ollama_without_role_is_not_selected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _write_project(tmp_path)
-    calls = 0
-
-    def _readiness(root: Path) -> dict:
-        nonlocal calls
-        calls += 1
-        return {"ready": True}
-
-    monkeypatch.setattr(trigger, "_evaluate_ollama_dispatch_readiness", _readiness)
-
-    assert trigger._resolve_dispatch_target("loyal-opposition", tmp_path, tmp_path / "state") is None
-    assert calls == 0

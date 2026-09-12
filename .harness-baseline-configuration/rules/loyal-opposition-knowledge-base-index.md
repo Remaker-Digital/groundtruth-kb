@@ -33,13 +33,12 @@ Purpose: index of Loyal Opposition rules maintained for the reviewing harness an
 - `{{HARNESS_RULES_DIR}}/canonical-terminology.md` — core primer subset only at startup;
   full corpus and activity-specific terms load on `::open <activity>`.
 - `{{HARNESS_RULES_DIR}}/file-bridge-protocol.md` — bridge statuses, gates, claim/preflight.
-- `config/agent-control/SESSION-STARTUP-INDEX.md` + role overlay — canonical load order.
 - `session-bootstrap.md` — deterministic restart guide (Phase A global; Phase B
   defers activity-only surfaces).
 
 ## Activity-Envelope Loads (deferred until `::open <activity>`)
 
-Per `config/agent-control/activity-envelope-sharding.toml` § `migration.wi4949`:
+Activity-specific surfaces load on demand from the baseline rules directory:
 
 | Surface | Open with |
 |---|---|

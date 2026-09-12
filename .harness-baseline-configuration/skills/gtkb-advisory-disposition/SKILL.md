@@ -65,11 +65,10 @@ clarify follow-on dependencies.
    the thread into a Prime-authored, Loyal-Opposition-actionable status: keep
    the thread `ADVISORY` with a recorded Prime disposition note (e.g., a
    Deliberation Archive entry), or move it to a terminal `WITHDRAWN` status
-   with cited rationale and owner-decision evidence. Do NOT write a `NO-ACTION`
-   bridge entry to close an advisory: `NO-ACTION` is a Prime Builder rejection
-   of a prior Loyal Opposition `GO`/`NO-GO` verdict (per
-   `DCL-NO-ACTION-STATUS-SEMANTICS-001`) and is invalid on an advisory thread
-   with no prior verdict; the bridge-compliance-gate blocks it.
+   with cited rationale. Do NOT write a `NO-ACTION` bridge entry to close an
+   advisory: `NO-ACTION` is an obsolete status that the native bridge writer
+   rejects; an advisory thread stays `ADVISORY` and derived work begins a fresh
+   `NEW` chain that cites it.
 2. **Work item**: choose this when the advisory describes actionable future work
    that is not already tracked, does not itself create or revise a governing
    specification, and is not yet implementation-approved. Create or update a

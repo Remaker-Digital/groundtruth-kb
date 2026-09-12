@@ -42,6 +42,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -395,6 +396,7 @@ def ruff_format(text: str, rel: str, gaps: list[str]) -> str:
             input=text.encode("utf-8"),
             capture_output=True,
             timeout=10,
+            cwd=PROJECT_ROOT,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         gaps.append(f"{rel}: ruff format unavailable ({exc})")
@@ -673,6 +675,21 @@ def render_provider_routing(profile: dict, baseline: Path) -> str:
     )
 
 
+def _contains_baseline_payload(path: Path) -> bool:
+    """Empty directory remnants carry no configuration; never follow redirects."""
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return False
+    if stat.S_ISLNK(metadata.st_mode) or getattr(metadata, "st_file_attributes", 0) & getattr(
+        stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400
+    ):
+        return True
+    if stat.S_ISDIR(metadata.st_mode):
+        return any(_contains_baseline_payload(child) for child in path.iterdir())
+    return True
+
+
 def build_plan(harness: str) -> Plan:
     profiles = load_profiles()
     baseline_cfg = profiles["baseline"]
@@ -692,6 +709,18 @@ def build_plan(harness: str) -> Plan:
     stamp_text = profiles["stamp"]["text"].format(baseline_root=baseline_cfg["root"], harness=harness)
     deferred_rules = set(baseline_cfg.get("deferred_rules") or [])
     plan = Plan()
+
+    # Native registrations and old runtime output are not neutral inputs.
+    # Report contamination before any output or leftover removal is attempted.
+    for name in (".projection-manifest.json", "commands", "config.toml", "gtkb-hooks", "hooks.json", "plugins"):
+        misplaced = base / name
+        if _contains_baseline_payload(misplaced):
+            plan.gaps.append(
+                f"misplaced_native_output: {baseline_cfg['root']}/{name}; "
+                "native configuration belongs to the harness profile and renderer, runtime output is not baseline source"
+            )
+    if plan.gaps:
+        return plan
 
     surfaces = {}
     if profile.get("skills_dir"):

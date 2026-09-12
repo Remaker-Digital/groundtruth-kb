@@ -78,6 +78,6 @@ When completing this report, append a machine-parseable self-disclosure line lis
 
 - Call `format_skills_applied([...])` or author the equivalent line using the same canonical format.
 - Canonical format: `Skills applied: <comma-separated skill names>`; use `Skills applied: (none)` when none apply.
-- Report-only: this line is advisory input for future `gt skills check` (WI-4810); it does not gate publishing.
+- Report-only: the line does not gate publishing.
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

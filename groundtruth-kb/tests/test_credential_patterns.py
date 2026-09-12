@@ -302,6 +302,17 @@ def test_public_match_has_no_matched_text_attribute() -> None:
 # ---------------------------------------------------------------------------
 
 
+# Pre-migration regexes that were deliberately refined after the catalog migration.
+# The fixture stays immutable; the refined spec is resolved by name, and its
+# behaviour is proven by the positive/negative samples above and by
+# platform_tests/hooks/test_scanner_safe_writer_md_prose.py.
+REFINED_AFTER_MIGRATION: dict[tuple[str, str], str] = {
+    # `-p` now fires on password-bearing command syntax or a quoted value, never on the
+    # value's shape (unquoted prose such as `-p port` is allowed; `sshpass -p abc` blocks).
+    (r"-p\s+['\"]?[^\s]+['\"]?\s", ""): "bash_password_flag_p",
+}
+
+
 def test_mapping_all_source_entries_have_canonical_target() -> None:
     """Every pre-migration source entry must have a canonical target.
 
@@ -342,6 +353,9 @@ def test_mapping_all_source_entries_have_canonical_target() -> None:
         key = (entry["pattern"], entry["flags"])
         hits = canonical_by_pattern_flags.get(key, [])
         bash_cred_hits = [s for s in hits if s.scope is Scope.BASH_CREDENTIAL]
+        refined_name = REFINED_AFTER_MIGRATION.get(key)
+        if not bash_cred_hits and refined_name is not None:
+            bash_cred_hits = [s for s in specs if s.name == refined_name and s.scope is Scope.BASH_CREDENTIAL]
         if not bash_cred_hits:
             unresolved.append(
                 f"bash_credential:{entry['description']!r} (pattern={entry['pattern']!r}, flags={entry['flags']!r})"

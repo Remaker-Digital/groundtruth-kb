@@ -708,6 +708,141 @@ def test_import_rolls_back_an_injected_mid_transaction_failure(
         )
 
 
+def _work_model_rows(open_parents: int) -> dict[str, list[dict[str, object]]]:
+    """Two execution projects, one closed work item with two active parents (recorded history), and one
+    open work item with ``open_parents`` active parents; every column of each table spec is present."""
+    from groundtruth_kb.postgres_kernel import TABLE_SPECS
+
+    metadata = {
+        "version": 1,
+        "changed_by": "test",
+        "changed_at": "2026-09-01T00:00:00+00:00",
+        "change_reason": "fixture",
+    }
+
+    def row(table: str, **values: object) -> dict[str, object]:
+        return {column: {**metadata, **values}.get(column) for column in TABLE_SPECS[table].columns}
+
+    projects = [
+        row("projects", id=pid, name=pid, kind="project", status="active", authorization="authorized")
+        for pid in ("PROJECT-ONE", "PROJECT-TWO")
+    ]
+    work_items = [
+        row(
+            "work_items",
+            id="WI-CLOSED",
+            title="Closed history",
+            origin="owner",
+            component="kernel",
+            resolution_status="resolved",
+            stage="created",
+        ),
+        row(
+            "work_items",
+            id="WI-OPEN",
+            title="Open work",
+            origin="owner",
+            component="kernel",
+            resolution_status="open",
+            stage="created",
+        ),
+    ]
+    memberships = [
+        row(
+            "project_work_item_memberships",
+            id="M-CLOSED-ONE",
+            project_id="PROJECT-ONE",
+            work_item_id="WI-CLOSED",
+            status="active",
+        ),
+        row(
+            "project_work_item_memberships",
+            id="M-CLOSED-TWO",
+            project_id="PROJECT-TWO",
+            work_item_id="WI-CLOSED",
+            status="active",
+        ),
+        row(
+            "project_work_item_memberships",
+            id="M-OPEN-ONE",
+            project_id="PROJECT-ONE",
+            work_item_id="WI-OPEN",
+            status="active",
+        ),
+    ]
+    if open_parents == 2:
+        memberships.append(
+            row(
+                "project_work_item_memberships",
+                id="M-OPEN-TWO",
+                project_id="PROJECT-TWO",
+                work_item_id="WI-OPEN",
+                status="active",
+            )
+        )
+    return {"projects": projects, "work_items": work_items, "project_work_item_memberships": memberships}
+
+
+def test_closed_history_with_several_active_parents_imports_and_open_work_keeps_one(
+    isolated_postgres: tuple[str, str], tmp_path: Path
+) -> None:
+    """Owner decision 2026-09-10: closed work migrates with its recorded membership history exactly, so the
+    schema carries no uniqueness over every work item's active membership; exactly one active parent per
+    OPEN work item is enforced by the validator on import and readback (and by the native service's
+    membership writes), and the packaged schema stays declarative."""
+    service, schema_name = isolated_postgres
+    code, payload, _ = _invoke("db", "postgres", "init")
+    assert code == 0 and payload["status"] == "initialized", payload
+
+    refused_manifest = _empty_manifest()
+    refused_manifest["tables"].update(_work_model_rows(open_parents=2))
+    refused_path = tmp_path / "refused.json"
+    refused_path.write_bytes(canonical_json_bytes(refused_manifest))
+    refused_code, refused, _ = _invoke(
+        "db", "postgres", "import-current", "--input", str(refused_path), "--actor", "test", "--reason", "must refuse"
+    )
+    assert refused_code == 1 and refused["error"]["code"] == "invalid_manifest", refused
+    assert "open work item" in refused["error"]["message"]
+
+    manifest = _empty_manifest()
+    manifest["tables"].update(_work_model_rows(open_parents=1))
+    manifest_bytes = canonical_json_bytes(manifest)
+    manifest_path = tmp_path / "current.json"
+    manifest_path.write_bytes(manifest_bytes)
+    imported_code, imported, _ = _invoke(
+        "db",
+        "postgres",
+        "import-current",
+        "--input",
+        str(manifest_path),
+        "--actor",
+        "test",
+        "--reason",
+        "closed history",
+    )
+    assert imported_code == 0 and imported["status"] == "imported" and imported["row_count"] == 7, imported
+    readback_path = tmp_path / "readback.json"
+    readback_code, readback, _ = _invoke("db", "postgres", "readback-current", "--output", str(readback_path))
+    assert readback_code == 0 and readback["status"] == "ok"
+    assert readback_path.read_bytes() == manifest_bytes
+    with psycopg.connect(service=service, autocommit=True) as connection:
+        counts = connection.execute(
+            sql.SQL(
+                "SELECT work_item_id, count(*)::int FROM {}.project_work_item_memberships"
+                " WHERE status = 'active' GROUP BY 1 ORDER BY 1"
+            ).format(sql.Identifier(schema_name))
+        ).fetchall()
+        assert counts == [("WI-CLOSED", 2), ("WI-OPEN", 1)]
+        procedural = connection.execute(
+            "SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid"
+            " JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = %s AND NOT t.tgisinternal",
+            (schema_name,),
+        ).fetchone()[0]
+        assert procedural == 0
+    status_code, status, _ = _invoke("db", "postgres", "status")
+    assert status_code == 0 and status["ready"] is True and status["schema_catalog_matches"] is True, status
+
+
 def _create_sqlite_fixture(path: Path) -> sqlite3.Connection:
     connection = sqlite3.connect(path)
     connection.execute("PRAGMA journal_mode=WAL")

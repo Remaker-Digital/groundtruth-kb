@@ -100,6 +100,14 @@ def _run_hook(tool_name: str, file_path: str, content: str) -> dict:
     return json.loads(result.stdout)
 
 
+def _assert_denied(result: dict) -> None:
+    """The hook blocks through the harness-native PreToolUse contract."""
+    output = result.get("hookSpecificOutput") or {}
+    assert output.get("hookEventName") == "PreToolUse", result
+    assert output.get("permissionDecision") == "deny", result
+    assert str(output.get("permissionDecisionReason", "")).startswith("credential_detected"), result
+
+
 # ===================================================================
 # HELPER-LEVEL TESTS (direct function calls)
 # ===================================================================
@@ -317,7 +325,7 @@ class TestEntrypointWrite:
 
     def test_write_non_fixture_in_test_path_blocked(self):
         result = _run_hook("Write", "tests/conftest.py", f'"{_SAMPLE_NEW_CONFTEST}"')
-        assert result.get("decision") == "block"
+        _assert_denied(result)
 
     def test_write_excluded_path_allowed(self):
         result = _run_hook("Write", "memory/notes.md", f'"{_SAMPLE_REAL}"')
@@ -325,7 +333,7 @@ class TestEntrypointWrite:
 
     def test_write_fqdn_blocked(self):
         result = _run_hook("Write", "src/config.py", _FQDN)
-        assert result.get("decision") == "block"
+        _assert_denied(result)
 
 
 class TestEntrypointEdit:
@@ -333,7 +341,7 @@ class TestEntrypointEdit:
 
     def test_edit_bare_key_blocked(self):
         result = _run_hook("Edit", "src/config.py", _SAMPLE_DEMO)
-        assert result.get("decision") == "block"
+        _assert_denied(result)
 
     def test_edit_fixture_in_test_allowed(self):
         result = _run_hook("Edit", "tests/some_test.py", f'"{_FIX_LIVE}"')

@@ -31,7 +31,7 @@ not create or restore aggregate queue artifacts.
    a kebab-case `topic_slug` from the current work context.
 
 2. **Draft the proposal content** with the required bridge sections from
-   `config/agent-control/gtkb-file-bridge-protocol.md`, including specification links,
+   `.harness-baseline-configuration/rules/file-bridge-protocol.md`, including specification links,
    project/work-item metadata when implementation-targeting, prior
    deliberations, owner input when applicable, and a spec-derived verification
    plan.

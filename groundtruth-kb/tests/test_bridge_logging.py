@@ -29,23 +29,6 @@ def _clean_loggers() -> None:  # type: ignore[misc]
         h.close()
 
 
-def test_poller_emits_info_on_scan(caplog: pytest.LogCaptureFixture) -> None:
-    """Poller scan emits INFO-level log record."""
-    poller_logger = logging.getLogger("groundtruth_kb.bridge.poller")
-    with caplog.at_level(logging.INFO, logger=_PACKAGE_LOGGER):
-        poller_logger.info("Scan found %d items", 5)
-    assert any("Scan found 5 items" in r.message for r in caplog.records)
-    assert any(r.levelno == logging.INFO for r in caplog.records if "Scan found" in r.message)
-
-
-def test_worker_emits_info_on_dispatch(caplog: pytest.LogCaptureFixture) -> None:
-    """Worker dispatch emits INFO record."""
-    worker_logger = logging.getLogger("groundtruth_kb.bridge.worker")
-    with caplog.at_level(logging.INFO, logger=_PACKAGE_LOGGER):
-        worker_logger.info("dispatching resident worker run: targets=%s new=%d contexts=%d", "msg-1", 1, 1)
-    assert any("dispatching resident worker run" in r.message for r in caplog.records)
-
-
 def test_db_emits_warning_on_chromadb_fallback(caplog: pytest.LogCaptureFixture) -> None:
     """ChromaDB fallback logs WARNING."""
     db_logger = logging.getLogger("groundtruth_kb.db")

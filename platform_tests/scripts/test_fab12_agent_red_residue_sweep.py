@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
 import importlib
-import json
 import re
 import tomllib
 from pathlib import Path
@@ -18,39 +16,6 @@ def _read_text(relative_path: str) -> str:
 
 def _read_toml(relative_path: str) -> dict:
     return tomllib.loads(_read_text(relative_path))
-
-
-def test_platform_identity_and_memory_authority_are_explicit() -> None:
-    config = _read_toml("groundtruth.toml")
-
-    assert config["project"]["project_name"] == "GroundTruth-KB Platform"
-    assert config["project"]["profile"] == "dual-agent"
-    assert config["scoped_service"]["application_id"] == "agent-red"
-
-    assert _read_text("memory/MEMORY.md").splitlines()[0] == "# GroundTruth-KB Platform Memory"
-
-    claude_text = _read_text("CLAUDE.md")
-    memory_line = next(line for line in claude_text.splitlines() if "Platform session memory" in line)
-    assert "memory/MEMORY.md" in memory_line
-    assert "in-repo GT-KB notepad is authoritative" in memory_line
-    assert "home-directory auto-memory is a non-authoritative harness cache" in memory_line
-    assert len(claude_text.splitlines()) <= 300
-
-
-def test_claude_md_narrative_approval_packet_matches_current_file() -> None:
-    packet_path = (
-        ROOT / ".groundtruth" / "formal-artifact-approvals" / "2026-06-13-claude-md-antigravity-startup-opt-s438.json"
-    )
-    packet = json.loads(packet_path.read_text(encoding="utf-8"))
-    claude_text = _read_text("CLAUDE.md")
-
-    assert packet["artifact_type"] == "narrative_artifact"
-    assert packet["target_path"] == "CLAUDE.md"
-    assert packet["source_ref"] == "owner-AUQ-2026-06-13-S438-antigravity-startup-optimization"
-    assert packet["presented_to_user"] is True
-    assert packet["transcript_captured"] is True
-    assert packet["full_content"] == claude_text
-    assert packet["full_content_sha256"] == hashlib.sha256(claude_text.encode("utf-8")).hexdigest()
 
 
 def test_root_pyproject_and_ci_paths_are_platform_scoped_and_extant() -> None:

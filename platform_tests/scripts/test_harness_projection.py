@@ -59,6 +59,31 @@ def test_projection_idempotent():
     assert not plan_a.gaps, f"projector gaps present: {plan_a.gaps}"
 
 
+def test_projection_format_uses_selected_project_config_from_foreign_cwd(tmp_path, monkeypatch):
+    selected = tmp_path / "selected"
+    foreign = tmp_path / "foreign"
+    selected.mkdir()
+    foreign.mkdir()
+    selected_config = selected / "ruff.toml"
+    foreign_config = foreign / "ruff.toml"
+    selected_config.write_text("line-length = 120\n", encoding="utf-8")
+    foreign_config.write_text("line-length = 40\n", encoding="utf-8")
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", selected)
+    text = 'result = function("first_argument", "second_argument", "third_argument", "fourth_argument")\n'
+    before = {path: path.read_bytes() for path in (selected_config, foreign_config)}
+    gaps = []
+    monkeypatch.chdir(selected)
+    local = project_harness.ruff_format(text, ".goose/hooks/example.py", gaps)
+    monkeypatch.chdir(foreign)
+    external = project_harness.ruff_format(text, ".goose/hooks/example.py", gaps)
+
+    assert not gaps, gaps
+    assert external == local == text
+    assert {path: path.read_bytes() for path in before} == before
+    assert not (selected / ".goose").exists()
+    assert not (foreign / ".goose").exists()
+
+
 @pytest.mark.parametrize("harness", ["antigravity", "claude", "codex", "cursor", "goose", "openrouter"])
 def test_fresh_projection_does_not_launch_automatic_assertion_or_handoff_consumer(harness):
     plan = project_harness.build_plan(harness)
@@ -67,8 +92,47 @@ def test_fresh_projection_does_not_launch_automatic_assertion_or_handoff_consume
     registrations = {path: text for path, text in plan.writes.items() if path.endswith(".json")}
     assert registrations
     assert not any("assertion-check.py" in text for text in registrations.values())
-    plugin = json.loads((BASELINE / "plugins/gtkb/hooks/hooks.json").read_text(encoding="utf-8"))
-    assert not any("assertion-check.py" in hook["command"] for hook in plugin["hooks"].get("SessionStart", []))
+    assert not (BASELINE / "plugins/gtkb/hooks/hooks.json").exists()
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        ".projection-manifest.json",
+        "commands/registry.json",
+        "config.toml",
+        "gtkb-hooks/runtime.jsonl",
+        "hooks.json",
+        "plugins/gtkb/hooks/hooks.json",
+    ],
+)
+def test_misplaced_native_output_refuses_before_changing_a_projection(tmp_path, monkeypatch, relative):
+    baseline = tmp_path / ".harness-baseline-configuration"
+    contaminant = baseline / relative
+    contaminant.parent.mkdir(parents=True)
+    contaminant.write_text("not neutral source", encoding="utf-8")
+    target = tmp_path / ".goose/rules/foreign.md"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"preserve unrelated output")
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+
+    plan = project_harness.build_plan("goose")
+    assert not plan.writes and not plan.removes
+    assert any("misplaced_native_output" in gap and relative.split("/")[0] in gap for gap in plan.gaps)
+    assert project_harness.run("goose", "write") == 2
+    assert target.read_bytes() == b"preserve unrelated output"
+    assert contaminant.read_text(encoding="utf-8") == "not neutral source"
+
+
+def test_empty_removed_output_directories_do_not_block_projection(tmp_path, monkeypatch):
+    baseline = tmp_path / ".harness-baseline-configuration"
+    remnants = baseline / "plugins/gtkb/hooks"
+    remnants.mkdir(parents=True)
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+
+    plan = project_harness.build_plan("goose")
+    assert not plan.gaps and plan.writes
+    assert remnants.is_dir()
 
 
 def test_api_harness_projection_idempotent_and_clean() -> None:

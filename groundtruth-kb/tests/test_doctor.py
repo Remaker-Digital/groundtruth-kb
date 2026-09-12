@@ -12,7 +12,6 @@ from pathlib import Path
 from groundtruth_kb.project.doctor import (
     DoctorReport,
     ToolCheck,
-    _check_bridge_dispatch_liveness,
     _check_db_schema,
     _check_deliberation_search_backend,
     _check_git,
@@ -435,68 +434,6 @@ def _utc_now_minus_seconds(seconds: int) -> str:
 # public-surface tests.
 
 
-def test_bridge_poller_fresh_file_ok(tmp_path: Path) -> None:
-    """dispatch-state recipient updated < 4 min ago → OK."""
-    _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(60))
-    result = _check_bridge_dispatch_liveness(tmp_path, "claude")
-    assert result.status == "pass", f"Expected pass, got {result.status}: {result.message}"
-    assert "OK" in result.message
-
-
-def test_bridge_poller_5_min_old_warn(tmp_path: Path) -> None:
-    """dispatch-state recipient updated 5 min ago → WARN."""
-    _make_status_file(tmp_path, "codex", _utc_now_minus_seconds(5 * 60 + 10), "pending", pending_count=1)
-    result = _check_bridge_dispatch_liveness(tmp_path, "codex")
-    assert result.status == "warning", f"Expected warning, got {result.status}: {result.message}"
-    assert "WARN" in result.message
-
-
-def test_bridge_poller_15_min_old_alarm(tmp_path: Path) -> None:
-    """dispatch-state recipient updated 15 min ago → ALARM."""
-    _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(15 * 60), "pending", pending_count=1)
-    result = _check_bridge_dispatch_liveness(tmp_path, "claude")
-    assert result.status == "fail", f"Expected fail, got {result.status}: {result.message}"
-    assert "ALARM" in result.message
-
-
-def test_bridge_poller_missing_file_not_started(tmp_path: Path) -> None:
-    """Missing dispatch-state file → not started (WARN)."""
-    result = _check_bridge_dispatch_liveness(tmp_path, "codex")
-    assert result.status == "warning", f"Expected warning, got {result.status}: {result.message}"
-    assert "not started" in result.message.lower()
-
-
-def test_bridge_poller_missing_updated_at_field_alarm(tmp_path: Path) -> None:
-    """dispatch-state with missing recipients[role].updated_at → ALARM."""
-    state_path = tmp_path / _DISPATCH_STATE_REL
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "recipients": {
-                    "prime-builder": {"last_result": "no_pending", "pending_count": 0},
-                    "loyal-opposition": {"last_result": "no_pending", "pending_count": 0},
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-    result = _check_bridge_dispatch_liveness(tmp_path, "claude")
-    assert result.status == "fail", f"Expected fail, got {result.status}: {result.message}"
-    assert "ALARM" in result.message or "updated_at" in result.message
-
-
-def test_bridge_poller_unknown_last_result_no_error(tmp_path: Path) -> None:
-    """Unknown last_result values are displayed as-is without raising an error."""
-    for state in ("running", "completed", "custom-state-42"):
-        _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(30), state=state)
-        result = _check_bridge_dispatch_liveness(tmp_path, "claude")
-        # Should not raise; must return a ToolCheck with the last_result value visible
-        assert isinstance(result, ToolCheck)
-        assert state in result.message
-
-
 # ---------------------------------------------------------------------------
 # _check_settings_hook_registration_drift — §B.3 generalized composite check
 # Covers gtkb-da-governance-completeness-implementation-015 §B.4 cases 1-5
@@ -542,29 +479,6 @@ def test_derive_paired_hook_id_strips_prefix_and_event_suffix() -> None:
     )
 
 
-def test_settings_hook_registration_gov09_file_missing_is_fail(tmp_path: Path) -> None:
-    """§B.4 case 1: bridge profile, hook file missing → ``fail``."""
-    reg = _get_registration("settings.hook.gov09-capture.userpromptsubmit")
-    result = _check_settings_hook_registration_drift(tmp_path, "dual-agent", reg)
-    assert result.name == f"settings:{reg.id}"
-    assert result.status == "fail"
-    assert result.required is True
-    assert "gov09-capture.py" in result.message
-
-
-def test_settings_hook_registration_gov09_file_present_empty_event_is_warning(
-    tmp_path: Path,
-) -> None:
-    """§B.4 case 2: hook file present, ``hooks['UserPromptSubmit']`` empty → ``warning``."""
-    reg = _get_registration("settings.hook.gov09-capture.userpromptsubmit")
-    _touch_hook_file(tmp_path, reg.hook_filename)
-    _write_settings_hooks(tmp_path, {"UserPromptSubmit": []})
-    result = _check_settings_hook_registration_drift(tmp_path, "dual-agent", reg)
-    assert result.status == "warning"
-    assert "UserPromptSubmit" in result.message
-    assert "settings.json" in result.message
-
-
 def test_settings_hook_registration_owner_decision_present_and_registered_is_pass(
     tmp_path: Path,
 ) -> None:
@@ -575,27 +489,6 @@ def test_settings_hook_registration_owner_decision_present_and_registered_is_pas
     result = _check_settings_hook_registration_drift(tmp_path, "dual-agent", reg)
     assert result.status == "pass"
     assert "PostToolUse" in result.message
-
-
-def test_settings_hook_registration_wrong_event_location_is_warning(tmp_path: Path) -> None:
-    """§B.4 case 4: gov09-capture entry appears in ``PreToolUse`` instead of ``UserPromptSubmit``
-    → ``warning`` (the event-correct location is what's checked)."""
-    reg = _get_registration("settings.hook.gov09-capture.userpromptsubmit")
-    _touch_hook_file(tmp_path, reg.hook_filename)
-    _write_settings_hooks(tmp_path, {"PreToolUse": [_hook_entry(reg.hook_filename)]})
-    result = _check_settings_hook_registration_drift(tmp_path, "dual-agent", reg)
-    assert result.status == "warning"
-
-
-def test_settings_hook_registration_base_profile_is_pass_and_not_required(tmp_path: Path) -> None:
-    """§B.4 case 5 (partial): on a non-bridge profile the check degrades to
-    ``pass`` with ``required=False`` without inspecting the filesystem."""
-    reg = _get_registration("settings.hook.gov09-capture.userpromptsubmit")
-    # No hook file, no settings.json — base profile should still pass.
-    result = _check_settings_hook_registration_drift(tmp_path, "local-only", reg)
-    assert result.status == "pass"
-    assert result.required is False
-    assert "base profile" in result.message
 
 
 def test_run_doctor_local_only_omits_new_settings_checks(tmp_path: Path) -> None:

@@ -261,13 +261,9 @@ CURRENT_REPO_BRIDGE_OR_GOVERNANCE_PREFIXES = (
     # governance preflight configs, SoT registry, agent-control config, hook
     # implementations, etc.).
     # Any ``config/<other>`` path still falls through to application_product.
-    "config/agent-control/",
-    "config/dispatcher/",
-    "config/dispatcher-next/",
     "config/file-reference-migration/",
     "config/governance/",
     "config/harness-parity/",
-    "config/hooks/",
     "config/membase-dump/",
     "config/project-templates/",
     "config/registry/",

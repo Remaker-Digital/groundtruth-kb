@@ -9,14 +9,41 @@ MemBase, writes bridge state, or changes harness eligibility.
 from __future__ import annotations
 
 import json
+import re
 import statistics
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from groundtruth_kb.bridge.versioned_files import status_from_bridge_text
+
 from scripts.benchmarks.common import BenchmarkResult, current_source_commit, new_run_id
-from scripts.bridge_thread_files import parse_versioned_bridge_filename, status_from_bridge_file
+
+_VERSIONED_BRIDGE_FILE_RE = re.compile(r"^(?P<slug>[A-Za-z0-9_.-]+)-(?P<version>\d{3})\.md$")
+
+
+def _parse_versioned_bridge_filename(name: str) -> tuple[str, int] | None:
+    """Return ``(slug, version)`` for exact ``<slug>-NNN.md`` names only (retired thread-file helper, inlined)."""
+
+    match = _VERSIONED_BRIDGE_FILE_RE.match(name)
+    if match is None:
+        return None
+    return match.group("slug"), int(match.group("version"))
+
+
+def _status_from_bridge_file(path: Path) -> str | None:
+    """Return the canonical status token of a bridge file, retrying a case-normalized copy for historical tokens."""
+
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    token = status_from_bridge_text(text)
+    if token is not None:
+        return token
+    return status_from_bridge_text(text.upper())
+
 
 BENCHMARK_ID = "harness_observed_scorecard"
 ADVISORY_ONLY = True
@@ -245,7 +272,7 @@ def _apply_bridge_statuses(
     thread_latest: dict[str, tuple[int, str, str]] = {}
     bridge_file_count = 0
     for path in sorted(bridge_dir.glob("*.md")):
-        parsed = parse_versioned_bridge_filename(path.name)
+        parsed = _parse_versioned_bridge_filename(path.name)
         if parsed is None:
             continue
         try:
@@ -258,7 +285,7 @@ def _apply_bridge_statuses(
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        status = status_from_bridge_file(path)
+        status = _status_from_bridge_file(path)
         if status is None:
             continue
         slug, version = parsed

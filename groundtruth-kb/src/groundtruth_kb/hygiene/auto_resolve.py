@@ -663,7 +663,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         plan = build_plan(args.root)
     except AutoResolveError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        sys.stderr.write(f"error: {exc}\n")
         return 2
 
     if args.apply:

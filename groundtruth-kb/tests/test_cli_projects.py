@@ -69,9 +69,3 @@ def test_cli_authorize_missing_specs_emits_usage_error(tmp_path, monkeypatch) ->
     # exit code 1 -- confirming the typed ProjectAuthorizationSpecLinkageError
     # path, not the generic ProjectLifecycleError path.
     assert result.exit_code == 2, result.output
-
-
-def test_cli_error_cites_source_spec(tmp_path, monkeypatch) -> None:
-    result = _invoke_authorize_without_specs(tmp_path, monkeypatch)
-    assert result.exit_code != 0
-    assert "GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001" in result.output

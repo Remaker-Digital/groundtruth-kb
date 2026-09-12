@@ -36,40 +36,6 @@ def test_bridge_directory_marker_created_for_dual_agent_webapp(tmp_path: Path) -
     assert not (tmp_path / "project" / "bridge" / "INDEX.md").exists()
 
 
-def test_file_bridge_protocol_contains_statuses_table(tmp_path: Path) -> None:
-    """The scaffolded bridge rule contains the Statuses table."""
-    options = _make_options("dual-agent", tmp_path)
-    scaffold_project(options)
-    content = (tmp_path / "project" / ".claude" / "rules" / "file-bridge-protocol.md").read_text(
-        encoding="utf-8",
-    )
-    assert "Statuses" in content
-    assert "| NEW |" in content
-    assert "| GO |" in content
-    assert "| VERIFIED |" in content
-
-
-def test_file_bridge_protocol_contains_prime_workflow(tmp_path: Path) -> None:
-    """The scaffolded bridge rule contains the Prime Workflow section."""
-    options = _make_options("dual-agent", tmp_path)
-    scaffold_project(options)
-    content = (tmp_path / "project" / ".claude" / "rules" / "file-bridge-protocol.md").read_text(
-        encoding="utf-8",
-    )
-    assert "Prime Workflow" in content
-
-
-def test_bridge_rules_describe_loyal_opposition_workflow(tmp_path: Path) -> None:
-    """The scaffolded bridge rule describes Loyal Opposition review routing."""
-    options = _make_options("dual-agent", tmp_path)
-    scaffold_project(options)
-    content = (tmp_path / "project" / ".claude" / "rules" / "file-bridge-protocol.md").read_text(
-        encoding="utf-8",
-    )
-    assert "NEW, REVISED, or NO-ACTION" in content
-    assert "dispatcher/TAFE" in content
-
-
 def test_bridge_index_absent_for_local_only(tmp_path: Path) -> None:
     """scaffold_project() with local-only profile does NOT create bridge/INDEX.md."""
     options = _make_options("local-only", tmp_path)

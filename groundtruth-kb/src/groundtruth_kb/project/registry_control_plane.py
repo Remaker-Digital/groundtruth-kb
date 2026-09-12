@@ -81,11 +81,13 @@ class RegistryPaths:
         registry_path: Path | None = None,
     ) -> RegistryPaths:
         if project_root is None:
-            if registry_path is not None and registry_path.name == "sot-artifacts.toml":
+            if registry_path is not None:
                 candidate = registry_path.resolve()
                 project_root = candidate.parents[2] if candidate.parent.name == "registry" else candidate.parent
             else:
-                project_root = Path(__file__).resolve().parents[4]
+                raise RegistryControlPlaneError(
+                    "project_root or registry_path is required; the installed package location is not project authority"
+                )
         root = Path(project_root).resolve()
         canonical = Path(registry_path or root / "config" / "registry" / "sot-artifacts.toml").resolve()
         return cls(root, canonical)
@@ -432,8 +434,7 @@ def _open_registry_read_only_connection(db_path: Path) -> Iterator[sqlite3.Conne
 
 def load_registry_snapshot(*, project_root: Path | None = None, registry_path: Path | None = None) -> RegistrySnapshot:
     """Read and validate one current canonical declaration, without side effects."""
-    root = Path(project_root) if project_root is not None else Path(__file__).resolve().parents[4]
-    path = Path(registry_path) if registry_path is not None else root / "config/registry/sot-artifacts.toml"
+    path = RegistryPaths.resolve(project_root=project_root, registry_path=registry_path).registry_path
     try:
         payload = path.read_bytes()
     except OSError as exc:

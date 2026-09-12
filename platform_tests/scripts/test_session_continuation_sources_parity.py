@@ -1,7 +1,7 @@
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """WI-5083: _SESSION_CONTINUATION_SOURCES is intentionally duplicated (not
-imported) across the SessionStart hot-path modules. This parity test asserts
-the copies stay equal (mirrors the _SESSION_ROLE_MARKER_NAME parity contract)."""
+imported) across the two kept SessionStart scripts. This parity test asserts
+the copies stay equal (the retired Codex hook copy is no longer compared)."""
 
 from __future__ import annotations
 
@@ -29,6 +29,3 @@ def test_session_continuation_sources_parity():
     ssi = _load("session_self_initialization", "scripts/session_self_initialization.py")
     assert wf._SESSION_CONTINUATION_SOURCES == EXPECTED
     assert ssi._SESSION_CONTINUATION_SOURCES == EXPECTED
-    # Codex hook read textually to avoid its module-load side effects.
-    codex_src = (REPO_ROOT / ".codex/gtkb-hooks/session_wrapup_trigger_dispatch.py").read_text(encoding="utf-8")
-    assert '_SESSION_CONTINUATION_SOURCES = frozenset({"resume", "compact"})' in codex_src

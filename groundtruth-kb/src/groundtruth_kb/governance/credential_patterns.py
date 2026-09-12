@@ -326,7 +326,18 @@ CREDENTIAL_PATTERNS: list[PatternSpec] = [
     ),
     PatternSpec(
         name="bash_password_flag_p",
-        pattern=re.compile(r"-p\s+['\"]?[^\s]+['\"]?\s"),
+        # Password-bearing command syntax, whatever the value looks like: a command
+        # whose -p takes the password (sshpass, the MySQL/MariaDB and MongoDB
+        # families, rdesktop) followed on the same line by -p and a value, attached
+        # or separated, quoted or not; or a quoted -p value in any context. The
+        # value's length or composition never decides. Unquoted option prose
+        # (`-p port`) and other commands' -p (`mkdir -p`, `docker run -p 8080:80`,
+        # `psql -p 5432`) are not credentials.
+        pattern=re.compile(
+            r"(?:\b(?:sshpass|mysql|mysqladmin|mysqldump|mysqlimport|mysqlcheck|mariadb|ma"
+            r"riadb-dump|mongo|mongosh|mongodump|mongorestore|mongoexport|mongoimport|rd"
+            r"esktop)\b[^\n]*?[ \t]-p[ \t]*['\"]?[^\s'\"<>|;&]+|-p[ \t]*['\"][^'\"\n]+['\"])"
+        ),
         description="Possible password flag (-p)",
         scope=Scope.BASH_CREDENTIAL,
         flags_literal="",

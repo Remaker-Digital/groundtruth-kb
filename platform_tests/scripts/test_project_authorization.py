@@ -17,7 +17,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from groundtruth_kb.cli import projects_cmd
+import click
+from groundtruth_kb.cli import main
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.project.lifecycle import ProjectLifecycleError, ProjectLifecycleService
 
@@ -55,7 +56,7 @@ def test_control_surfaces_are_present() -> None:
     """Non-vacuity guard for every absence assertion in this module."""
     assert hasattr(KnowledgeDB, "insert_project")
     assert hasattr(ProjectLifecycleService, "update_project")
-    assert "show" in projects_cmd.commands
+    assert "show" in main.get_command(click.Context(main), "projects").commands
     assert issubclass(ProjectLifecycleError, Exception)
 
 
@@ -75,9 +76,11 @@ def test_lifecycle_service_methods_are_absent() -> None:
 
 def test_cli_subcommands_are_absent() -> None:
     """The five owner-facing authorization subcommands are unregistered."""
-    assert "show" in projects_cmd.commands, "control subcommand missing"
+    assert "show" in main.get_command(click.Context(main), "projects").commands, "control subcommand missing"
     for name in REMOVED_SUBCOMMANDS:
-        assert name not in projects_cmd.commands, f"gt projects {name} should have been removed"
+        assert name not in main.get_command(click.Context(main), "projects").commands, (
+            f"gt projects {name} should have been removed"
+        )
 
 
 def test_authorization_is_a_project_row_field(tmp_path: Path) -> None:

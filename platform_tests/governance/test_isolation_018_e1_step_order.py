@@ -47,20 +47,6 @@ def test_step05_produces_write_set_before_step1_reads_it(tmp_path: Path) -> None
         json.loads(write_set_path.read_text(encoding="utf-8"))
 
 
-def test_canonical_artifacts_exist_in_repo() -> None:
-    """Post-Step 0 + Step 0.5 in the GT-KB repo, both canonical artifacts
-    must exist at their documented paths."""
-    repo_root = Path(__file__).resolve().parents[2]
-    manifest_path = repo_root / ".tmp" / "e3-disposition" / "manifest-v3.json"
-    write_set_path = repo_root / ".tmp" / "e1-drift" / "write-set.json"
-
-    # These files are gitignored (under .tmp/) but are produced by E.1
-    # implementation's Step 0 and Step 0.5. After implementation has run,
-    # both should exist.
-    assert manifest_path.exists(), f"manifest-v3.json missing at {manifest_path} — Step 0 was not run"
-    assert write_set_path.exists(), f"write-set.json missing at {write_set_path} — Step 0.5 was not run"
-
-
 def test_manifest_v3_schema_is_complete() -> None:
     """manifest-v3.json must contain the required disposition buckets and
     the totals field for downstream consumers (write-set generator)."""

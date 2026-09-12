@@ -761,23 +761,22 @@ def _work_model_manifest():
     return manifest
 
 
-def test_manifest_rejects_two_active_parents_even_with_distinct_pairs():
+def test_manifest_rejects_two_active_parents_for_open_work_even_with_distinct_pairs():
     manifest = _work_model_manifest()
     first = manifest["tables"]["project_work_item_memberships"][0]
     manifest["tables"]["project_work_item_memberships"].append(
         {**first, "id": "MEMBER-TWO", "project_id": "PROJECT-TWO"}
     )
-    with pytest.raises(PostgresKernelError, match="multiple active parent"):
+    with pytest.raises(PostgresKernelError, match="multiple active parent") as refused:
         normalize_manifest(manifest)
+    assert refused.value.details == {"work_item_ids": ["WI-ONE"]}
     first["status"] = "removed"
     assert normalize_manifest(manifest)["tables"]["project_work_item_memberships"]
 
 
 @pytest.mark.parametrize("membership_status", [None, "removed"])
-@pytest.mark.parametrize("work_status", ["open", "verified"])
-def test_manifest_requires_one_active_parent_for_every_work_item(membership_status, work_status):
+def test_manifest_requires_one_active_parent_for_every_open_work_item(membership_status):
     manifest = _work_model_manifest()
-    manifest["tables"]["work_items"][0]["resolution_status"] = work_status
     if membership_status is None:
         manifest["tables"]["project_work_item_memberships"] = []
     else:
@@ -785,6 +784,42 @@ def test_manifest_requires_one_active_parent_for_every_work_item(membership_stat
     with pytest.raises(PostgresKernelError, match="requires one active parent") as refused:
         normalize_manifest(manifest)
     assert refused.value.details == {"missing_parent_count": 1, "work_item_ids": ["WI-ONE"]}
+
+
+@pytest.mark.parametrize("membership_status", [None, "removed"])
+@pytest.mark.parametrize("work_status", ["verified", "resolved", "retired", "wont_fix", "not_a_defect"])
+def test_manifest_accepts_closed_work_without_an_active_parent_as_history(membership_status, work_status):
+    # Owner decision 2026-09-10: closed work migrates with its recorded membership
+    # history exactly; no parent is fabricated and no historical row is repaired.
+    manifest = _work_model_manifest()
+    manifest["tables"]["work_items"][0]["resolution_status"] = work_status
+    if membership_status is None:
+        manifest["tables"]["project_work_item_memberships"] = []
+    else:
+        manifest["tables"]["project_work_item_memberships"][0]["status"] = membership_status
+    normalized = normalize_manifest(manifest)
+    assert normalized["tables"]["work_items"][0]["resolution_status"] == work_status
+    assert [row["status"] for row in normalized["tables"]["project_work_item_memberships"]] == (
+        [] if membership_status is None else [membership_status]
+    )
+
+
+@pytest.mark.parametrize("work_status", ["verified", "resolved", "retired"])
+def test_manifest_accepts_closed_work_with_several_active_parents_as_history(work_status):
+    manifest = _work_model_manifest()
+    manifest["tables"]["work_items"][0]["resolution_status"] = work_status
+    first = manifest["tables"]["project_work_item_memberships"][0]
+    manifest["tables"]["project_work_item_memberships"].append(
+        {**first, "id": "MEMBER-TWO", "project_id": "PROJECT-TWO"}
+    )
+    normalized = normalize_manifest(manifest)
+    assert sorted(row["project_id"] for row in normalized["tables"]["project_work_item_memberships"]) == [
+        "PROJECT-ONE",
+        "PROJECT-TWO",
+    ]
+    manifest["tables"]["projects"][1].update(kind="program", authorization=None)
+    with pytest.raises(PostgresKernelError, match="program cannot contain work items"):
+        normalize_manifest(manifest)
 
 
 def test_manifest_rejects_program_work_item_membership():
@@ -1651,6 +1686,44 @@ class _RecordingConnection:
 
     def cursor(self) -> _RecordingCursor:
         return self._cursor
+
+
+class _StatusCursor(_RecordingCursor):
+    """Answers the one SHOW that status() reads; every other read returns nothing."""
+
+    def fetchone(self) -> dict[str, Any]:
+        return {"server_version_num": "180006"}
+
+
+def _status_with(monkeypatch, *, schema_name: str, tables: set[str], comment: object) -> dict[str, Any]:
+    cursor = _StatusCursor()
+    monkeypatch.setattr(PostgresKernel, "_current_schema", staticmethod(lambda _c: schema_name))
+    monkeypatch.setattr(PostgresKernel, "_table_names", staticmethod(lambda _c, _s: set(tables)))
+    monkeypatch.setattr(PostgresKernel, "_schema_comment", staticmethod(lambda _c, _s: comment))
+    monkeypatch.setattr(PostgresKernel, "_catalog_sha256", classmethod(lambda _cls, _c, _s: "0" * 64))
+    kernel = PostgresKernel(PostgreSQLConfig(), connector=lambda **_kwargs: _RecordingConnection(cursor))
+    return kernel.status()
+
+
+def test_status_reports_a_stock_public_schema_as_uninitialized_not_drift(monkeypatch):
+    """Found on the permanent installation 2026-09-10: a pristine database must read as not ready,
+    with every kernel table missing, not as metadata drift."""
+    report = _status_with(monkeypatch, schema_name="public", tables=set(), comment=_STOCK_PUBLIC_COMMENT)
+    assert report["reachable"] is True and report["ready"] is False
+    assert report["schema_version"] is None and report["schema_sha256"] is None
+    assert report["schema_catalog_matches"] is False
+    assert report["missing_tables"] == sorted(ALL_TABLES) and report["unexpected_tables"] == []
+    assert report["postgresql_major_version"] == 18
+
+
+@pytest.mark.parametrize(
+    ("schema_name", "tables"),
+    [("public", {"unrelated"}), ("gtkb", set())],
+)
+def test_status_still_reports_drift_when_the_stock_comment_is_not_the_exception(monkeypatch, schema_name, tables):
+    with pytest.raises(PostgresKernelError, match="metadata is invalid") as refused:
+        _status_with(monkeypatch, schema_name=schema_name, tables=tables, comment=_STOCK_PUBLIC_COMMENT)
+    assert refused.value.code == "schema_metadata_drift"
 
 
 def _classify_initialize(monkeypatch, *, schema_name: str, tables: set[str], comment: object):

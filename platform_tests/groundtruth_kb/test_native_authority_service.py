@@ -887,6 +887,59 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
                     if process.poll() is not None or time.monotonic() >= deadline:
                         pytest.fail("Native authority did not start; inspect disposable service.log")
                     time.sleep(0.1)
+            # Test-phase listing is a current native domain read, not a legacy
+            # SQLite history query under the backlog command. Exercise several
+            # real revisions and both ordinary CLI output modes.
+            phase_two = put(
+                client,
+                "test-phases",
+                "PHASE-2",
+                {
+                    "title": "Earlier phase two",
+                    "plan_id": "PLAN-1",
+                    "phase_order": 20,
+                    "test_ids": [],
+                    "gate_criteria": "Second observable result",
+                },
+            )
+            assert phase_two.status_code == 200, phase_two.text
+            for phase_id, last_version in (("PHASE-1", 4), ("PHASE-2", 3)):
+                phase = client.get(f"/v1/test-phases/{phase_id}").json()
+                for version in range(2, last_version + 1):
+                    final = version == last_version
+                    phase = {
+                        **phase,
+                        **{
+                            "version": version,
+                            "title": f"Current {phase_id}" if final else f"Earlier {phase_id}",
+                            "last_result": "pass" if final else "obsolete-result",
+                            "changed_at": datetime.now(UTC).isoformat(),
+                            "changed_by": "qualification",
+                            "change_reason": "Phase-listing fixture",
+                        },
+                    }
+                    # Seed result history through the native kernel fixture;
+                    # phase-definition authors cannot set execution results.
+                    service.kernel.mutate_current(
+                        table="test_plan_phases",
+                        identity={"id": phase_id},
+                        expected_version=version - 1,
+                        new_state=phase,
+                        actor="qualification",
+                        reason="Phase-listing fixture",
+                    )
+            phase_history_before = history_count(service)
+            phase_json = cli("test-phases", "list", "--json")
+            assert phase_json.returncode == 0, phase_json.stderr
+            phases = json.loads(phase_json.stdout)
+            assert [p["id"] for p in phases] == ["PHASE-1", "PHASE-2"]
+            assert [p["version"] for p in phases] == [4, 3]
+            assert {p["last_result"] for p in phases} == {"pass"}
+            phase_text = cli("test-phases", "list")
+            assert phase_text.returncode == 0, phase_text.stderr
+            phase_lines = [line for line in phase_text.stdout.splitlines() if line.strip()]
+            assert phase_lines == ["PHASE-1 v4: Current PHASE-1", "PHASE-2 v3: Current PHASE-2"]
+            assert history_count(service) == phase_history_before
             observation_fields = {
                 "title": "Read-only CLI observation",
                 "status": "active",

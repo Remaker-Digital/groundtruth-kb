@@ -140,5 +140,6 @@ def test_codex_stop_and_startup_are_explicit_native_events():
     assert set(value["hooks"]) == {"PreToolUse", "PostToolUse", "Stop"}
     assert all(not g.get("matcher") for g in value["hooks"]["Stop"])
     commands = [h["command"] for groups in value["hooks"].values() for g in groups for h in g["hooks"]]
-    assert not any("auto_finalize_sweep.py" in c or "cross_harness_bridge_trigger.py" in c for c in commands)
+    hook_paths = {match for command in commands for match in re.findall(r"'([^']+\.py)'", command)}
+    assert hook_paths and all(path in plan.writes or (ROOT / path).is_file() for path in hook_paths)
     assert not any(name in c for c in commands for name in ("owner-decision-tracker", "owner-decision-capture"))

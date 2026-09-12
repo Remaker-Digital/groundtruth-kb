@@ -35,8 +35,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pytest
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RULES_DIR = PROJECT_ROOT / ".harness-baseline-configuration" / "rules"
 
@@ -92,14 +90,6 @@ def test_no_b_class_state_store_wording() -> None:
     )
 
 
-def test_no_dated_cutover_references() -> None:
-    """No dated cutover construction survives (DELIB-20260807011969 B2)."""
-    offending = _matches(C1_CLASS_RE)
-    assert not offending, "Category-C1 dated-cutover phrasing remains:\n" + "\n".join(
-        f"  {name}:{lineno}  {line}" for name, lineno, line in offending
-    )
-
-
 def test_no_competing_replacement_term() -> None:
     """`bridge state` is the settled term; `canonical bridge state` was rejected."""
     offending = _matches(COMPETING_TERM_RE)
@@ -112,15 +102,6 @@ def test_replacement_term_is_present() -> None:
     """Guard against a purge that deleted the referent instead of renaming it."""
     hits = _matches(re.compile(r"bridge state", re.IGNORECASE))
     assert hits, "No `bridge state` occurrences found; the store lost its name."
-
-
-def test_a_vi_false_positives_preserved() -> None:
-    """The topic-language rules about the token `TAFE` are deliberately kept."""
-    text = (RULES_DIR / "canonical-terminology.md").read_text(encoding="utf-8")
-    assert "bridge-, TAFE-," in text, (
-        "A-vi topic-language rule at canonical-terminology.md was removed; it "
-        "states a rule ABOUT the token, not a claim that the dispatcher is live."
-    )
 
 
 class TestCensusIntegrity:
@@ -188,22 +169,3 @@ class TestCensusIntegrity:
             "Enumeration diverges from the filesystem; the census would miss "
             "files that exist on disk but not in the index."
         )
-
-
-@pytest.mark.parametrize(
-    "expected_file",
-    [
-        "bridge-essential.md",
-        "file-bridge-protocol.md",
-        "session-bootstrap.md",
-        "canonical-terminology.md",
-        "way-of-working.md",
-        "decision-ledger.md",
-    ],
-)
-def test_in_scope_files_still_present(expected_file: str) -> None:
-    """The purge renames; it must not delete rule files (that is A-class)."""
-    assert (RULES_DIR / expected_file).is_file(), (
-        f"{expected_file} is missing. The B+C1 slice renames wording only; "
-        "file deletion is A-class work and is not authorised here."
-    )

@@ -20,17 +20,10 @@ from typing import Any
 from mcp import types
 from mcp.server.lowlevel import Server
 
-from groundtruth_kb.bridge.status_driver import collect_bridge_status
 from groundtruth_kb.mcp_surface.authority import AuthorityLabel, build_envelope
 from groundtruth_kb.mcp_surface.boundary import resolve_safe_path
 
 SERVER_NAME = "gt-kb-mcp"
-
-
-def _bridge_status_counts(project_root: Path) -> dict[str, int]:
-    """Return latest-status-per-thread counts from versioned bridge files."""
-
-    return collect_bridge_status(project_root).queue.status_counts
 
 
 def _membase_row_counts(project_root: Path) -> dict[str, int | None]:
@@ -84,7 +77,6 @@ def gt_status_summary_payload(project_root: Path) -> dict[str, Any]:
     """Build the ``gt_status_summary`` payload (without the envelope wrap)."""
 
     return {
-        "bridge_status_counts": _bridge_status_counts(project_root),
         "membase_row_counts": _membase_row_counts(project_root),
         "project_root": str(project_root),
         "working_tree_clean": _working_tree_clean(project_root),

@@ -488,57 +488,6 @@ def test_dev_environment_inventory_drift_gate_passes_clean_result(monkeypatch):
     gate._check_dev_environment_inventory_drift()
 
 
-def test_project_resource_registry_gate_passes_valid_registry(tmp_path, monkeypatch):
-    gate = _load_gate_module()
-    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
-    registry = tmp_path / "config" / "agent-control" / "project-resource-aliases.toml"
-    registry.parent.mkdir(parents=True)
-    registry.write_text("schema_version = 1\n", encoding="utf-8")
-
-    def fake_helpers():
-        return (
-            lambda _path: {"schema_version": 1},
-            lambda _registry: [],
-            lambda _registry, *, repo_root: {
-                "status": "pass",
-                "message": "origin remote matches governed GT-KB repo",
-                "origin": "https://github.com/Remaker-Digital/groundtruth-kb.git",
-            },
-        )
-
-    monkeypatch.setattr(gate, "_project_resource_helpers", fake_helpers)
-
-    gate._check_project_resource_registry()
-
-
-def test_project_resource_registry_gate_fails_when_missing(tmp_path, monkeypatch):
-    gate = _load_gate_module()
-    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
-
-    with pytest.raises(gate.GateFailure, match="resource registry is missing"):
-        gate._check_project_resource_registry()
-
-
-def test_project_resource_registry_gate_fails_on_remote_drift(tmp_path, monkeypatch):
-    gate = _load_gate_module()
-    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
-    registry = tmp_path / "config" / "agent-control" / "project-resource-aliases.toml"
-    registry.parent.mkdir(parents=True)
-    registry.write_text("schema_version = 1\n", encoding="utf-8")
-
-    def fake_helpers():
-        return (
-            lambda _path: {"schema_version": 1},
-            lambda _registry: [],
-            lambda _registry, *, repo_root: {"status": "fail", "message": "origin remote drift detected"},
-        )
-
-    monkeypatch.setattr(gate, "_project_resource_helpers", fake_helpers)
-
-    with pytest.raises(gate.GateFailure, match="remote identity drift"):
-        gate._check_project_resource_registry()
-
-
 def test_agent_red_app_root_minimization_gate_passes(tmp_path, monkeypatch, capsys):
     gate = _load_gate_module()
     monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)

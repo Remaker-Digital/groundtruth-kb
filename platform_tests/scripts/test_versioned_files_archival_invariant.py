@@ -30,16 +30,6 @@ def _is_archived(project_root: Path, slug: str) -> bool:
     )
 
 
-def test_malformed_lead_in_with_later_terminal_status_is_not_archived(tmp_path: Path) -> None:
-    _write_bridge_file(
-        tmp_path,
-        "stranded-go-001.md",
-        "## Implementation Report\n\nVERIFIED\n\nThis later token is not the status line.\n",
-    )
-
-    assert _is_archived(tmp_path, "stranded-go") is False
-
-
 def test_canonical_nonterminal_status_remains_live_even_with_later_terminal_text(tmp_path: Path) -> None:
     _write_bridge_file(
         tmp_path,

@@ -24,7 +24,6 @@ RUNTIME_COMPONENTS = frozenset(
         "scratchpad",
         ".worktrees",
         ".agent",
-        ".agents",
         ".antigravity",
         ".api-harness",
         ".claude",

@@ -7,7 +7,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 
-from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 
 APP_REGISTRY = REPO_ROOT / "applications" / "Agent_Red" / ".gtkb-app-isolation.json"
 CLOSEOUT_PROJECT_ID = "PROJECT-GTKB-ISOLATION-PROGRAM-CLOSEOUT"
@@ -76,28 +75,3 @@ def test_codex_registry_entry_remains_minimal_and_unchanged() -> None:
             "(no GT-KB platform content imported)"
         ),
     }
-
-
-def test_closeout_project_records_unbuilt_slices_and_readiness_handoff() -> None:
-    db = KnowledgeDB(REPO_ROOT / "groundtruth.db")
-    try:
-        project = db.get_project(CLOSEOUT_PROJECT_ID)
-        links = db.list_project_artifact_links(CLOSEOUT_PROJECT_ID)
-    finally:
-        db.close()
-
-    assert project is not None
-    notes = project["notes"] or ""
-    assert "GTKB-ISOLATION-019 closeout overclaimed completion" in notes
-    assert "sub-slice 5 (app-root minimization validator) remains unbuilt" in notes
-    assert "sub-slice 6 (ADR/DCL into MemBase) remains unbuilt" in notes
-    assert READINESS_PROJECT_ID in notes
-    for work_item_id in ("WI-4654", "WI-4655", "WI-4656", "WI-4657"):
-        assert work_item_id in notes
-
-    assert any(
-        link["artifact_type"] == "bridge_thread"
-        and link["artifact_ref"] == BRIDGE_THREAD
-        and link["relationship"] == "reconciles"
-        for link in links
-    )

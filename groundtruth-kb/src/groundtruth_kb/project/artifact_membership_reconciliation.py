@@ -579,7 +579,7 @@ def observe_governed_knowledge(
                     )
                 )
         return _result(observer, input_rows=rows, observations=observations, diagnostics=diagnostics)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001  # intentional-catch: the observer reports its own failure
         return _result(
             observer,
             input_rows={"error": type(exc).__name__, "detail": str(exc)},
@@ -678,7 +678,7 @@ def observe_package_and_entrypoint(project_root: Path, _snapshot: RegistrySnapsh
             "source": source,
         }
         return _result(observer, input_rows=input_rows, observations=observations)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001  # intentional-catch: the observer reports its own failure
         return _result(
             observer,
             input_rows={"error": type(exc).__name__, "detail": str(exc)},
@@ -831,7 +831,7 @@ def observe_registered_dependency_closure(
             ],
         }
         return _result(observer, input_rows=input_rows, observations=observations)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001  # intentional-catch: the observer reports its own failure
         return _result(
             observer,
             input_rows={"error": type(exc).__name__, "detail": str(exc)},

@@ -54,22 +54,6 @@ def test_no_agent_red_in_generated_rule_files(tmp_path: Path) -> None:
         assert "Agent Red" not in content, f"'Agent Red' found in {rule_file}"
 
 
-def test_bridge_essential_contains_gt_project_doctor(tmp_path: Path) -> None:
-    """Generated bridge-essential.md contains the 'gt project doctor' command string."""
-    options = _make_options("dual-agent", tmp_path)
-    scaffold_project(options)
-    content = (tmp_path / "project" / ".claude" / "rules" / "bridge-essential.md").read_text(encoding="utf-8")
-    assert "gt project doctor" in content
-
-
-def test_bridge_essential_contains_scheduler_not_implemented_message(tmp_path: Path) -> None:
-    """Generated bridge-essential.md contains the scheduler-not-implemented notice."""
-    options = _make_options("dual-agent", tmp_path)
-    scaffold_project(options)
-    content = (tmp_path / "project" / ".claude" / "rules" / "bridge-essential.md").read_text(encoding="utf-8")
-    assert "Bridge scheduler commands are not implemented in this release." in content
-
-
 def test_local_only_does_not_include_bridge_rule_files(tmp_path: Path) -> None:
     """local-only profile should only have prime-builder.md, not the bridge-specific rules."""
     options = _make_options("local-only", tmp_path)

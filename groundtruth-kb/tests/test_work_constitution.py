@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Barrier
 
 import pytest
-from click.testing import CliRunner
 
-from groundtruth_kb.cli import main
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.project.lifecycle import ProjectLifecycleError, ProjectLifecycleService
 from groundtruth_kb.project.membership_resolver import MembershipResolutionError, resolve_execution_membership
@@ -229,22 +226,6 @@ def test_concurrent_links_cannot_create_two_parents(work_db, tmp_path):
     assert history_size(work_db) == 1
 
 
-def test_cli_program_and_authorization_paths(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    runner = CliRunner()
-
-    def invoke(*args):
-        result = runner.invoke(main, ["projects", *args, "--json"])
-        assert result.exit_code == 0, (result.output, result.exception)
-        return json.loads(result.output)
-
-    program = invoke("create", "Repair", "--kind", "program", "--change-reason", "test")
-    execution = invoke("create", "Execution", "--parent-project-id", program["id"], "--change-reason", "test")
-    updated = invoke("update", execution["id"], "--authorization", "not authorized", "--change-reason", "test")
-    assert updated["authorization"] == "not authorized"
-    assert invoke("show", program["id"])["projects"][0]["id"] == execution["id"]
-
-
 def test_old_project_schema_migrates_without_rewriting_history(tmp_path):
     path = tmp_path / "groundtruth.db"
     with sqlite3.connect(path) as conn:
@@ -335,33 +316,3 @@ def test_concurrent_legacy_removals_retain_one_parent(work_db, tmp_path):
         results = list(pool.map(remove, [first["id"], second["id"]]))
     assert sorted(results) == ["rejected", "removed"]
     assert resolve_execution_membership(work_db, wi).project_id in {first["id"], second["id"]}
-
-
-def test_cli_move_and_kind_filter(work_db, tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    program = project(work_db, "Repair", kind="program")
-    first, second = project(work_db), project(work_db, "Beta", authorization="not authorized")
-    wi = item(work_db)
-    work_db.link_project_work_item(first["id"], wi, "test", "fixture")
-    runner = CliRunner()
-    result = runner.invoke(
-        main,
-        [
-            "projects",
-            "move-item",
-            wi,
-            "--from-project",
-            first["id"],
-            "--to-project",
-            second["id"],
-            "--change-reason",
-            "move",
-            "--json",
-        ],
-    )
-    assert result.exit_code == 0, result.output
-    assert json.loads(result.output)["project_id"] == second["id"]
-    result = runner.invoke(main, ["projects", "list", "--kind", "program", "--json"])
-    assert result.exit_code == 0, result.output
-    assert [row["id"] for row in json.loads(result.output)] == [program["id"]]
-    assert work_db.get_project(second["id"])["authorization"] == "not authorized"

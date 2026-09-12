@@ -29,6 +29,21 @@ def config():
     return nsi._load_config(REPO_ROOT)
 
 
+def test_current_provider_routing_is_input_while_a_projection_manifest_is_output(tmp_path, config):
+    baseline = tmp_path / ".harness-baseline-configuration"
+    baseline.mkdir()
+    routing = baseline / "routing.toml"
+    routing.write_bytes((REPO_ROOT / ".harness-baseline-configuration/routing.toml").read_bytes())
+    selected = {**config, "roots": {"harness_baseline": ".harness-baseline-configuration"}}
+
+    assert nsi._generated_output_in_source(tmp_path, selected) == []
+    misplaced = baseline / ".projection-manifest.json"
+    misplaced.write_text('{"harness":"fixture","paths":[]}', encoding="utf-8")
+    findings = nsi._generated_output_in_source(tmp_path, selected)
+    assert len(findings) == 1 and ".projection-manifest.json" in findings[0]
+    assert routing.read_bytes() == (REPO_ROOT / ".harness-baseline-configuration/routing.toml").read_bytes()
+
+
 def _build_fixture(tmp_path):
     """Build a minimal fixture checkout with groundtruth.toml and inventory config."""
     (tmp_path / "groundtruth.toml").write_text("# fixture\n", encoding="utf-8")
