@@ -8,7 +8,8 @@ param(
 
 # Registers the scheduled task GTKB-DomainService under the current (owner) account: it runs
 # infrastructure/postgresql/domain_service_launcher.py at every logon of this account and on demand,
-# restarts it up to three times a minute apart if it exits, and never stops it on a time limit. The
+# restarts it up to three times a minute apart if a trigger-started instance exits, relaunches it by a repetition
+# trigger every five minutes when no instance is running, never stops it on a time limit, and ignores battery state. The
 # launcher alone carries PGSERVICEFILE; no credential value is stored in the task definition.
 # Re-running the script with the same root updates the task in place; a task that points at another
 # installation is refused. After starting the task the script probes the service on 127.0.0.1:$Port
@@ -39,10 +40,13 @@ if ($existing) {
 }
 
 $action = New-ScheduledTaskAction -Execute $interpreter -Argument $arguments -WorkingDirectory $resolvedRoot
-$trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
-$settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew -StartWhenAvailable
+$logon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+# A repetition trigger relaunches a dead service within five minutes regardless of how the previous instance ended
+# (the restart-on-failure policy below applies only to trigger-started instances); IgnoreNew leaves a running instance alone.
+$repeat = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 3650)
+$settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
-Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
+Register-ScheduledTask -TaskName $taskName -Action $action -Trigger @($logon, $repeat) -Settings $settings -Principal $principal -Force | Out-Null
 Start-ScheduledTask -TaskName $taskName
 
 $probe = Wait-GtkbDomainServiceReady -ProbeInterpreter $probeInterpreter -OperatorConfig $operatorConfig -Port $Port -Seconds $ReadinessSeconds

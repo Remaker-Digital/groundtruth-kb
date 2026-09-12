@@ -547,8 +547,10 @@ service alone leaves the CLI refusing. Three files start the service unattended:
   terminate the loop, in Windows PowerShell 5.1 as in PowerShell 7), and reports readiness, the number of probes and
   the last output.
 - `register-domain-service.ps1 -Root E:\GT-KB [-Port 8765] [-ReadinessSeconds 60]` registers the scheduled task
-  `GTKB-DomainService` under the current account: at every logon of that account and on demand, three restarts a
-  minute apart, no execution time limit. It refuses to change a task that points at another installation, starts the
+  `GTKB-DomainService` under the current account: at every logon of that account, on demand, and by a repetition
+  trigger every five minutes (an instance is ignored while one runs, so a dead service is relaunched within five
+  minutes regardless of how the previous instance ended); three restarts a minute apart for a trigger-started
+  instance; no execution time limit; battery state neither prevents a start nor stops the service. It refuses to change a task that points at another installation, starts the
   task, then waits for readiness with the probe above and fails, naming the number of probes and the task state, when
   the service does not answer within the window. Registration is an owner action of the same kind as
   `register-service.ps1` for PostgreSQL.
